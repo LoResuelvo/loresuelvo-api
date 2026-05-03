@@ -1,0 +1,17 @@
+FROM golang:1.22-alpine
+
+# Instalar dependencias del sistema requeridas para tests (como CGO) y descargas
+RUN apk add --no-cache git build-base curl
+
+WORKDIR /app
+
+# Linter y Herramientas de gherkin
+RUN curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.56.2
+RUN go install github.com/cucumber/godog/cmd/godog@latest
+
+COPY go.mod go.sum ./
+RUN go mod download
+
+COPY . .
+EXPOSE 8080
+CMD ["go", "run", "main.go"]
