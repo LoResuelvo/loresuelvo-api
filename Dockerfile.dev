@@ -1,4 +1,4 @@
-FROM golang:1.22-alpine
+FROM golang:1.26-alpine
 
 # Instalar dependencias del sistema requeridas para tests (como CGO) y descargas
 RUN apk add --no-cache git build-base curl
