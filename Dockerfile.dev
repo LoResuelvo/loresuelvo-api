@@ -6,7 +6,7 @@ RUN apk add --no-cache git build-base curl
 WORKDIR /app
 
 # Linter y Herramientas de gherkin
-RUN curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $(go env GOPATH)/bin v1.56.2
+RUN go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
 RUN go install github.com/cucumber/godog/cmd/godog@latest
 
 COPY go.mod go.sum ./

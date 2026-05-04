@@ -23,15 +23,15 @@ bash:
 
 # Ejecuta linter
 lint:
-	docker compose exec $(SERVICE) golangci-lint run
+	docker compose exec -e GOFLAGS="-buildvcs=false" $(SERVICE) golangci-lint run
 
 test:
-	docker compose exec $(SERVICE) go test -v ./...
+	docker compose exec -e GOFLAGS="-buildvcs=false" $(SERVICE) go test -v ./...
 
 aceptance:
-	docker compose exec $(SERVICE) godog
+	docker compose exec -e GOFLAGS="-buildvcs=false" $(SERVICE) godog
 
 # Levanta un contenedor temporal, corre linter, pruebas unitarias y gherkin.
 # Al finalizar, el contenedor se elimina automáticamente (--rm).
 test-all-once:
-	docker compose run --rm $(SERVICE) sh -c "golangci-lint run && go test -v ./... && godog"
+	docker compose run --rm -e GOFLAGS="-buildvcs=false" $(SERVICE) sh -c "golangci-lint run && go test -v ./... && godog"
