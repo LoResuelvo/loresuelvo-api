@@ -1,0 +1,22 @@
+name: CI Build & Test
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build:
+    name: Build y Verificar
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Descargar el código
+        uses: actions/checkout@v4
+
+      - name: Construir la imagen de desarrollo
+        run: docker compose build api-dev
+
+      - name: Ejecutar Linter y Pruebas (Todo en uno)
+        run: make test-all-once
