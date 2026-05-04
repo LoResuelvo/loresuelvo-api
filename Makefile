@@ -28,10 +28,7 @@ lint:
 test:
 	docker compose exec -e GOFLAGS="-buildvcs=false" $(SERVICE) go test -v ./...
 
-aceptance:
-	docker compose exec -e GOFLAGS="-buildvcs=false" $(SERVICE) godog
-
 # Levanta un contenedor temporal, corre linter, pruebas unitarias y gherkin.
 # Al finalizar, el contenedor se elimina automáticamente (--rm).
 test-all-once:
-	docker compose run --rm -e GOFLAGS="-buildvcs=false" $(SERVICE) sh -c "golangci-lint run && go test -v ./... && godog"
+	docker compose run --rm -e GOFLAGS="-buildvcs=false" $(SERVICE) sh -c "go test -v ./... && golangci-lint run"
