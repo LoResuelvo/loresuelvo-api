@@ -60,7 +60,7 @@ jobs:
             set -e
             cd ~/loresuelvo-api
             git fetch --tags --force
-            git checkout ${{ github.ref_name }
+            git checkout ${{ github.ref_name }}
             echo "DATABASE_URL=${{ secrets.DATABASE_URL_PROD }}" > .env
             export IMAGE_TAG=${{ github.ref_name }}
             export GITHUB_REPOSITORY_OWNER=${{ github.repository_owner }}
