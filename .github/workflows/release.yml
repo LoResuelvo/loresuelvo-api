@@ -19,9 +19,11 @@ jobs:
 
       - name: Build y Push de la imagen
         run: |
-          docker build \
-            -t ghcr.io/${{ github.repository_owner }}/api:${{ github.ref_name }} .
-          docker push --all-tags ghcr.io/${{ github.repository_owner }}/api
+          OWNER_LC=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+          IMAGE_NAME="ghcr.io/${OWNER_LC}/api:${{ github.ref_name }}"
+          
+          docker build -t $IMAGE_NAME .
+          docker push $IMAGE_NAME
 
   deploy-staging:
     needs: build-and-push
@@ -38,9 +40,12 @@ jobs:
             cd /app/api
             git fetch --tags --force
             git checkout ${{ github.ref_name }}
+            
             echo "DATABASE_URL=${{ secrets.DATABASE_URL_TEST }}" > .env
+            
             export IMAGE_TAG=${{ github.ref_name }}
-            export GITHUB_REPOSITORY_OWNER=${{ github.repository_owner }}
+            export GITHUB_REPOSITORY_OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+            
             docker compose -f docker-compose.prod.yml pull
             docker compose -f docker-compose.prod.yml up -d
             docker image prune -f
@@ -58,12 +63,15 @@ jobs:
           key: ${{ secrets.DROPLET_PROD_SSH_KEY }}
           script: |
             set -e
-            cd ~/loresuelvo-api
+            cd /app/api
             git fetch --tags --force
             git checkout ${{ github.ref_name }}
+            
             echo "DATABASE_URL=${{ secrets.DATABASE_URL_PROD }}" > .env
+            
             export IMAGE_TAG=${{ github.ref_name }}
-            export GITHUB_REPOSITORY_OWNER=${{ github.repository_owner }}
+            export GITHUB_REPOSITORY_OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+            
             docker compose -f docker-compose.prod.yml pull
             docker compose -f docker-compose.prod.yml up -d
             docker image prune -f
