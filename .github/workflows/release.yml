@@ -19,8 +19,9 @@ jobs:
 
       - name: Build y Push de la imagen
         run: |
-          docker build -t ghcr.io/${{ github.repository_owner }}/api:latest .
-          docker push ghcr.io/${{ github.repository_owner }}/api:latest
+          docker build \
+            -t ghcr.io/${{ github.repository_owner }}/api:${{ github.ref_name }} .
+          docker push --all-tags ghcr.io/${{ github.repository_owner }}/api
 
   deploy-staging:
     needs: build-and-push
@@ -30,27 +31,39 @@ jobs:
         uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.DROPLET_STAGING_IP }}
-          username: root
-          key: ${{ secrets.SSH_KEY }}
+          username: ${{ secrets.DROPLET_USER }}
+          key: ${{ secrets.DROPLET_STAGING_SSH_KEY }}
           script: |
+            set -e
             cd /app/api
-            git pull origin main
+            git fetch --tags --force
+            git checkout ${{ github.ref_name }}
+            echo "DATABASE_URL=${{ secrets.DATABASE_URL_TEST }}" > .env
+            export IMAGE_TAG=${{ github.ref_name }}
+            export GITHUB_REPOSITORY_OWNER=${{ github.repository_owner }}
             docker compose -f docker-compose.prod.yml pull
             docker compose -f docker-compose.prod.yml up -d
+            docker image prune -f
 
   deploy-prod:
     needs: deploy-staging
     runs-on: ubuntu-latest
-    environment: production # Pauses deployment until manual approval
+    environment: production
     steps:
       - name: Deploy via SSH a Producción
         uses: appleboy/ssh-action@master
         with:
-          host: ${{ secrets.DROPLET_PROD_IP }}
-          username: root
-          key: ${{ secrets.SSH_KEY }}
+          host: ${{ secrets.DROPLET_PROD_IP }} 
+          username: ${{ secrets.DROPLET_USER }}
+          key: ${{ secrets.DROPLET_PROD_SSH_KEY }}
           script: |
+            set -e
             cd /app/api
-            git pull origin main
+            git fetch --tags --force
+            git checkout ${{ github.ref_name }
+            echo "DATABASE_URL=${{ secrets.DATABASE_URL_PROD }}" > .env
+            export IMAGE_TAG=${{ github.ref_name }}
+            export GITHUB_REPOSITORY_OWNER=${{ github.repository_owner }}
             docker compose -f docker-compose.prod.yml pull
             docker compose -f docker-compose.prod.yml up -d
+            docker image prune -f
