@@ -41,7 +41,7 @@ jobs:
           key: ${{ secrets.DROPLET_STAGING_SSH_KEY }}
           script: |
             set -e
-            cd /app/api
+            cd ~/loresuelvo-api
             git fetch --tags --force
             git checkout ${{ github.ref_name }}
             
@@ -67,7 +67,7 @@ jobs:
           key: ${{ secrets.DROPLET_PROD_SSH_KEY }}
           script: |
             set -e
-            cd /app/api
+            cd ~/loresuelvo-api
             git fetch --tags --force
             git checkout ${{ github.ref_name }}
             
