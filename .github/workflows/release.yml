@@ -54,6 +54,8 @@ jobs:
             
             docker compose -f compose.prod.yml pull
             docker compose -f compose.prod.yml up -d
+            docker compose -f compose.prod.yml exec -T nginx nginx -t
+            docker compose -f compose.prod.yml exec -T nginx nginx -s reload
             docker image prune -f
 
   deploy-prod:
@@ -82,4 +84,6 @@ jobs:
             
             docker compose -f compose.prod.yml pull
             docker compose -f compose.prod.yml up -d
+            docker compose -f compose.prod.yml exec -T nginx nginx -t
+            docker compose -f compose.prod.yml exec -T nginx nginx -s reload
             docker image prune -f
