@@ -4,25 +4,24 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"testing"
+	"sync"
 	"time"
 
 	"github.com/LoResuelvo/loresuelvo-api/pkg/router"
 	"github.com/cucumber/godog"
 )
 
-type testContext struct {
-	responseBody string
-	statusCode   int
-}
+var startAPIServerOnce sync.Once
 
 func queElSistemaEstaIniciado() error {
-	// Encendemos la API en una goroutine (hilo aparte) para no bloquear el test
-	go func() {
-		r := router.SetupRouter()
-		// Usamos un puerto estándar para pruebas
-		_ = r.Run(":8080")
-	}()
+	startAPIServerOnce.Do(func() {
+		// Encendemos la API en una goroutine (hilo aparte) para no bloquear el test
+		go func() {
+			r := router.SetupRouter()
+			// Usamos un puerto estándar para pruebas
+			_ = r.Run(":8080")
+		}()
+	})
 
 	// Damos un respiro de 500ms para que el servidor levante
 	time.Sleep(500 * time.Millisecond)
@@ -35,7 +34,9 @@ func solicitoElSaludoEnLaRutaRaiz(ctx *testContext) error {
 	if err != nil {
 		return fmt.Errorf("fallo la conexión a la API: %v", err)
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 
 	body, _ := io.ReadAll(resp.Body)
 	ctx.responseBody = string(body)
@@ -53,9 +54,7 @@ func laRespuestaDebeSerConUnCodigo(ctx *testContext, mensaje string, codigo int)
 	return nil
 }
 
-func InitializeScenario(ctx *godog.ScenarioContext) {
-	tCtx := &testContext{}
-
+func registrarPasosDeHello(ctx *godog.ScenarioContext, tCtx *testContext) {
 	ctx.Step(`^que el sistema esta iniciado$`, queElSistemaEstaIniciado)
 	ctx.Step(`^solicito el saludo en la ruta raiz$`, func() error {
 		return solicitoElSaludoEnLaRutaRaiz(tCtx)
@@ -63,19 +62,4 @@ func InitializeScenario(ctx *godog.ScenarioContext) {
 	ctx.Step(`^la respuesta debe ser "([^"]*)" con un codigo (\d+)$`, func(msg string, code int) error {
 		return laRespuestaDebeSerConUnCodigo(tCtx, msg, code)
 	})
-}
-
-func TestFeatures(t *testing.T) {
-	suite := godog.TestSuite{
-		ScenarioInitializer: InitializeScenario,
-		Options: &godog.Options{
-			Format:   "pretty",
-			Paths:    []string{".."}, // Mira un nivel arriba para encontrar los archivos .feature
-			TestingT: t,              // Esto es vital para que Go test lo reconozca
-		},
-	}
-
-	if suite.Run() != 0 {
-		t.Fatal("Fallo la ejecución de las pruebas de aceptación")
-	}
 }
