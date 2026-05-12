@@ -7,3 +7,23 @@ services:
       - "8080:8080"
     volumes:
       - .:/app
+    environment:
+      DATABASE_URL: "postgres://postgres:example@dev-db:5432/postgres?sslmode=disable"
+      TEST_DATABASE_URL: "postgres://postgres:example@test-db:5432/postgres?sslmode=disable"
+    depends_on:
+      - dev-db
+      - test-db
+
+  dev-db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_PASSWORD: example
+    ports:
+      - "5434:5432"
+
+  test-db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_PASSWORD: example
+    ports:
+      - "5433:5432"

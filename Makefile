@@ -1,4 +1,4 @@
-.PHONY: up down build bash lint test spec gherkin test-all-once
+.PHONY: up down build bash lint test spec gherkin test-all-once migrate-up migrate-down migrate-test-up migrate-test-down
 
 # Nombre del servicio del compose
 SERVICE = api-dev
@@ -35,3 +35,15 @@ spec:
 # Al finalizar, el contenedor se elimina automáticamente (--rm).
 test-all-once:
 	docker compose run --rm -e GOFLAGS="-buildvcs=false" $(SERVICE) sh -c "go test -v ./... && golangci-lint run"
+
+migrate-up:
+	docker compose run --rm $(SERVICE) migrate -path db/migrations -database "$$DATABASE_URL" up
+
+migrate-down:
+	docker compose run --rm $(SERVICE) migrate -path db/migrations -database "$$DATABASE_URL" down 1
+
+migrate-test-up:
+	docker compose run --rm $(SERVICE) migrate -path db/migrations -database "$$TEST_DATABASE_URL" up
+
+migrate-test-down:
+	docker compose run --rm $(SERVICE) migrate -path db/migrations -database "$$TEST_DATABASE_URL" down 1

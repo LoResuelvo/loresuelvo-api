@@ -8,6 +8,7 @@ WORKDIR /app
 # Linter y Herramientas de gherkin
 RUN go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
 RUN go install github.com/cucumber/godog/cmd/godog@latest
+RUN go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@latest
 
 COPY go.mod go.sum ./
 RUN go mod download
