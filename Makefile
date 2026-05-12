@@ -1,4 +1,4 @@
-.PHONY: up down build bash lint test gherkin test-all-once
+.PHONY: up down build bash lint test spec gherkin test-all-once
 
 # Nombre del servicio del compose
 SERVICE = api-dev
@@ -27,6 +27,9 @@ lint:
 
 test:
 	docker compose run --rm -e GOFLAGS="-buildvcs=false" $(SERVICE) sh -c "go test -v ./..."
+
+spec:
+	docker compose run --rm -e GOFLAGS="-buildvcs=false" $(SERVICE) sh -c "go test -v ./spec/..."
 
 # Levanta un contenedor temporal, corre linter, pruebas unitarias y gherkin.
 # Al finalizar, el contenedor se elimina automáticamente (--rm).
