@@ -1,12 +1,12 @@
 package use_cases
 
+import repositories "github.com/LoResuelvo/loresuelvo-api/model/repositories_interfaces"
+
 type ConsumerManager struct {
-	consumerRepository ConsumerRepository
+	consumerRepository repositories.ConsumerRepository
 }
 
-type ConsumerRepository interface{}
-
-func NewConsumerManager(consumerRepository ConsumerRepository) *ConsumerManager {
+func NewConsumerManager(consumerRepository repositories.ConsumerRepository) *ConsumerManager {
 	return &ConsumerManager{
 		consumerRepository: consumerRepository,
 	}
