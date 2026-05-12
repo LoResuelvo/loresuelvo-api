@@ -26,7 +26,7 @@ lint:
 	docker compose exec -e GOFLAGS="-buildvcs=false" $(SERVICE) golangci-lint run
 
 test:
-	docker compose exec -e GOFLAGS="-buildvcs=false" $(SERVICE) go test -v ./...
+	docker compose run --rm -e GOFLAGS="-buildvcs=false" $(SERVICE) sh -c "go test -v ./..."
 
 # Levanta un contenedor temporal, corre linter, pruebas unitarias y gherkin.
 # Al finalizar, el contenedor se elimina automáticamente (--rm).
