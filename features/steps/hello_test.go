@@ -17,7 +17,7 @@ func queElSistemaEstaIniciado() error {
 	startAPIServerOnce.Do(func() {
 		// Encendemos la API en una goroutine (hilo aparte) para no bloquear el test
 		go func() {
-			r := router.SetupRouter()
+			r := router.SetupRouter(nil) // Pasamos nil porque el endpoint de hello no depende de la base de datos
 			// Usamos un puerto estándar para pruebas
 			_ = r.Run(":8080")
 		}()

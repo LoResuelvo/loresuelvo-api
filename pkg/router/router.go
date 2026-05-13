@@ -1,10 +1,12 @@
 package router
 
 import (
+	"database/sql"
 	"net/http"
 	"strings"
 
 	usecases "github.com/LoResuelvo/loresuelvo-api/app/use_cases"
+	"github.com/LoResuelvo/loresuelvo-api/persistence"
 	"github.com/gin-gonic/gin"
 )
 
@@ -15,9 +17,13 @@ type registerConsumerRequest struct {
 	Password string `json:"password"`
 }
 
-func SetupRouter() *gin.Engine {
+func SetupRouter(database *sql.DB) *gin.Engine {
+	consumerRepository := persistence.NewConsumerRepository(database)
+	consumerManager := usecases.NewConsumerManager(consumerRepository)
 	r := gin.Default()
-	consumerManager := usecases.NewConsumerManager(nil)
+
+	
+	// ENDPOINTS
 
 	r.GET("/", func(c *gin.Context) {
 		c.String(http.StatusOK, "Hello World")
