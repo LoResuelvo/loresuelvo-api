@@ -3,6 +3,7 @@ module github.com/LoResuelvo/loresuelvo-api
 go 1.26.1
 
 require (
+	github.com/DATA-DOG/go-sqlmock v1.5.2
 	github.com/cucumber/godog v0.15.1
 	github.com/gin-gonic/gin v1.12.0
 	github.com/jackc/pgx/v5 v5.9.2
