@@ -43,3 +43,15 @@ func TestConsumerRepositoryCanSaveAConsumer(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Nil(t, mock.ExpectationsWereMet())
 }
+
+func TestConsumerRepositoryCanDeleteAllConsumers(t *testing.T) {
+	repo, mock := newConsumerRepositoryTest(t)
+
+	mock.ExpectExec(regexp.QuoteMeta(`DELETE FROM consumers`)).
+		WillReturnResult(sqlmock.NewResult(1, 1))
+
+	err := repo.DeleteAll()
+
+	assert.Nil(t, err)
+	assert.Nil(t, mock.ExpectationsWereMet())
+}

@@ -7,17 +7,20 @@ import (
 	"sync"
 	"time"
 
+	usecases "github.com/LoResuelvo/loresuelvo-api/app/use_cases"
 	"github.com/LoResuelvo/loresuelvo-api/pkg/router"
 	"github.com/cucumber/godog"
 )
 
 var startAPIServerOnce sync.Once
 
-func queElSistemaEstaIniciado() error {
+func queElSistemaEstaIniciado(ctx *testContext) error {
 	startAPIServerOnce.Do(func() {
 		// Encendemos la API en una goroutine (hilo aparte) para no bloquear el test
 		go func() {
-			r := router.SetupRouter(nil) // Pasamos nil porque el endpoint de hello no depende de la base de datos
+			r := router.NewRouter()
+			consumerManager := usecases.NewConsumerManager(ctx.consumerRepository)
+			router.RegisterConsumerRoutes(r, consumerManager)
 			// Usamos un puerto estándar para pruebas
 			_ = r.Run(":8080")
 		}()
@@ -55,7 +58,9 @@ func laRespuestaDebeSerConUnCodigo(ctx *testContext, mensaje string, codigo int)
 }
 
 func registrarPasosDeHello(ctx *godog.ScenarioContext, tCtx *testContext) {
-	ctx.Step(`^que el sistema esta iniciado$`, queElSistemaEstaIniciado)
+	ctx.Step(`^que el sistema esta iniciado$`, func() error {
+		return queElSistemaEstaIniciado(tCtx)
+	})
 	ctx.Step(`^solicito el saludo en la ruta raiz$`, func() error {
 		return solicitoElSaludoEnLaRutaRaiz(tCtx)
 	})

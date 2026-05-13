@@ -1,12 +1,10 @@
 package router
 
 import (
-	"database/sql"
 	"net/http"
 	"strings"
 
 	usecases "github.com/LoResuelvo/loresuelvo-api/app/use_cases"
-	"github.com/LoResuelvo/loresuelvo-api/persistence"
 	"github.com/gin-gonic/gin"
 )
 
@@ -17,23 +15,24 @@ type registerConsumerRequest struct {
 	Password string `json:"password"`
 }
 
-func SetupRouter(database *sql.DB) *gin.Engine {
-	consumerRepository := persistence.NewConsumerRepository(database)
-	consumerManager := usecases.NewConsumerManager(consumerRepository)
+func NewRouter() *gin.Engine {
 	r := gin.Default()
+	RegisterHealthRoutes(r)
+	return r
+}
 
-	
-	// ENDPOINTS
-
+func RegisterHealthRoutes(r *gin.Engine) {
 	r.GET("/", func(c *gin.Context) {
 		c.String(http.StatusOK, "Hello World")
 	})
+}
 
+func RegisterConsumerRoutes(r *gin.Engine, consumerManager *usecases.ConsumerManager) {
 	r.POST("/consumers", func(c *gin.Context) {
 		var req registerConsumerRequest
 
 		if err := c.ShouldBindJSON(&req); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "datos de registro inválidos"})
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
 
@@ -45,13 +44,11 @@ func SetupRouter(database *sql.DB) *gin.Engine {
 		// si es un consumidor -> lo registró
 		// depende el tipo de error, se devuelve un status code diferente
 		if err := consumerManager.RegisterConsumer(req.Email, req.Name, req.Surname, req.Password); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "datos de registro inválidos"})
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()}) // cambiar a un error user friendly?
 			return
 		}
 
 		// devuelvo en json los campos del nuevo consumidor (DTO)
 		c.JSON(http.StatusCreated, gin.H{"message": "cuenta registrada exitosamente"})
 	})
-
-	return r
 }

@@ -15,6 +15,7 @@ const registerConsumerEndpoint = "http://localhost:8080/consumers"
 type consumerRegistrationRequest struct {
 	Email    string `json:"email"`
 	Name     string `json:"name"`
+	Surname  string `json:"surname"`
 	Password string `json:"password"`
 }
 
@@ -46,14 +47,15 @@ func existeUnConsumidorRegistradoConCorreo(correo string) error {
 	return nil
 }
 
-func noExisteUnConsumidorConCorreo(_ string) error {
-	return nil
+func noExisteUnConsumidorConCorreo(ctx *testContext, _ string) error {
+	return ctx.consumerRepository.DeleteAll()
 }
 
-func solicitoRegistrarUnaCuentaDeConsumidor(ctx *testContext, correo, nombre, contrasena string) error {
+func solicitoRegistrarUnaCuentaDeConsumidor(ctx *testContext, correo, nombre, surname, contrasena string) error {
 	resp, err := postConsumerRegistration(consumerRegistrationRequest{
 		Email:    correo,
 		Name:     nombre,
+		Surname:  surname,
 		Password: contrasena,
 	})
 	if err != nil {
@@ -145,13 +147,12 @@ func postConsumerRegistration(req consumerRegistrationRequest) (*http.Response, 
 }
 
 func registrarPasosDeCuentaConsumidor(ctx *godog.ScenarioContext, tCtx *testContext) {
-	ctx.Step(`^que no existe un consumidor con correo "([^"]*)"$`, noExisteUnConsumidorConCorreo)
-	ctx.Step(`^existe un consumidor registrado con correo "([^"]*)"$`, existeUnConsumidorRegistradoConCorreo)
-	ctx.Step(`^me registro como usuario consumidor con correo "([^"]*)", nombre "([^"]*)" y contraseña "([^"]*)"$`, func(correo, nombre, contrasena string) error {
-		return solicitoRegistrarUnaCuentaDeConsumidor(tCtx, correo, nombre, contrasena)
+	ctx.Step(`^que no existe un consumidor con correo "([^"]*)"$`, func(correo string) error {
+		return noExisteUnConsumidorConCorreo(tCtx, correo)
 	})
-	ctx.Step(`^solicito registrar una cuenta de consumidor con correo "([^"]*)", nombre "([^"]*)" y contraseña "([^"]*)"$`, func(correo, nombre, contrasena string) error {
-		return solicitoRegistrarUnaCuentaDeConsumidor(tCtx, correo, nombre, contrasena)
+	ctx.Step(`^existe un consumidor registrado con correo "([^"]*)"$`, existeUnConsumidorRegistradoConCorreo)
+	ctx.Step(`^me registro como usuario consumidor con correo "([^"]*)", nombre "([^"]*)", apellido "([^"]*)" y contraseña "([^"]*)"$`, func(correo, nombre, surname, contrasenia string) error {
+		return solicitoRegistrarUnaCuentaDeConsumidor(tCtx, correo, nombre, surname, contrasenia)
 	})
 	ctx.Step(`^el sistema confirma el registro$`, func() error {
 		return elSistemaConfirmaElRegistro(tCtx)

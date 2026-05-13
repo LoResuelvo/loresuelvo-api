@@ -3,7 +3,9 @@ package main
 import (
 	"context"
 
+	usecases "github.com/LoResuelvo/loresuelvo-api/app/use_cases"
 	"github.com/LoResuelvo/loresuelvo-api/db"
+	"github.com/LoResuelvo/loresuelvo-api/persistence"
 	"github.com/LoResuelvo/loresuelvo-api/pkg/router"
 )
 
@@ -14,7 +16,12 @@ func main() {
 	}
 	defer database.Close()
 
-	r := router.SetupRouter(database)
+	consumerRepository := persistence.NewConsumerRepository(database)
+	consumerManager := usecases.NewConsumerManager(consumerRepository)
+
+	r := router.NewRouter()
+	router.RegisterConsumerRoutes(r, consumerManager)
+
 	err = r.Run(":8080")
 	if err != nil {
 		panic(err)

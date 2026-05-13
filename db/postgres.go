@@ -9,7 +9,10 @@ import (
 	_ "github.com/jackc/pgx/v5/stdlib"
 )
 
-const defaultPostgresURL = "postgres://postgres:postgres@localhost:5432/loresuelvo?sslmode=disable"
+const (
+	defaultPostgresURL     = "postgres://postgres:postgres@localhost:5432/loresuelvo?sslmode=disable"
+	defaultTestPostgresURL = "postgres://postgres:postgres@localhost:5432/loresuelvo_test?sslmode=disable"
+)
 
 type PostgresConfig struct {
 	URL string
@@ -18,6 +21,12 @@ type PostgresConfig struct {
 func NewPostgresConfigFromEnv() PostgresConfig {
 	return PostgresConfig{
 		URL: envOrDefault("DATABASE_URL", defaultPostgresURL),
+	}
+}
+
+func NewTestPostgresConfigFromEnv() PostgresConfig {
+	return PostgresConfig{
+		URL: envOrDefault("TEST_DATABASE_URL", defaultTestPostgresURL),
 	}
 }
 

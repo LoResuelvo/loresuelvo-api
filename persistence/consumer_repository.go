@@ -28,3 +28,8 @@ func (repository *ConsumerRepository) Save(consumer model.Consumer) error {
 
 	return err
 }
+
+func (repository *ConsumerRepository) DeleteAll() error {
+	_, err := repository.db.Exec(`DELETE FROM consumers`)
+	return err
+}
