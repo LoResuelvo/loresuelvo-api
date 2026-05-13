@@ -37,13 +37,13 @@ test-all-once:
 	docker compose run --rm -e GOFLAGS="-buildvcs=false" $(SERVICE) sh -c "go test -v ./... && golangci-lint run"
 
 migrate-up:
-	docker compose run --rm $(SERVICE) migrate -path db/migrations -database "$$DATABASE_URL" up
+	docker compose run --rm $(SERVICE) sh -c 'migrate -path db/migrations -database "$$DATABASE_URL" up'
 
 migrate-down:
-	docker compose run --rm $(SERVICE) migrate -path db/migrations -database "$$DATABASE_URL" down 1
+	docker compose run --rm $(SERVICE) sh -c 'migrate -path db/migrations -database "$$DATABASE_URL" down 1'
 
 migrate-test-up:
-	docker compose run --rm $(SERVICE) migrate -path db/migrations -database "$$TEST_DATABASE_URL" up
+	docker compose run --rm $(SERVICE) sh -c 'migrate -path db/migrations -database "$$TEST_DATABASE_URL" up'
 
 migrate-test-down:
-	docker compose run --rm $(SERVICE) migrate -path db/migrations -database "$$TEST_DATABASE_URL" down 1
+	docker compose run --rm $(SERVICE) sh -c 'migrate -path db/migrations -database "$$TEST_DATABASE_URL" down 1'
