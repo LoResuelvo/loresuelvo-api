@@ -5,12 +5,12 @@ import (
 	"testing"
 
 	"github.com/DATA-DOG/go-sqlmock"
-	"github.com/LoResuelvo/loresuelvo-api/model"
-	"github.com/LoResuelvo/loresuelvo-api/persistence"
+	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/postgres"
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/consumer"
 	"github.com/stretchr/testify/assert"
 )
 
-func newConsumerRepositoryTest(t *testing.T) (*persistence.ConsumerRepository, sqlmock.Sqlmock) {
+func newConsumerRepositoryTest(t *testing.T) (*postgres.ConsumerRepository, sqlmock.Sqlmock) {
 	t.Helper()
 
 	database, mock, err := sqlmock.New()
@@ -22,11 +22,11 @@ func newConsumerRepositoryTest(t *testing.T) (*persistence.ConsumerRepository, s
 		_ = database.Close()
 	})
 
-	return persistence.NewConsumerRepository(database), mock
+	return postgres.NewConsumerRepository(database), mock
 }
 
-func validConsumer() model.Consumer {
-	return model.NewConsumer("josugod@gmail.com", "Josue", "el pro", "SoyUnCrack123")
+func validConsumer() consumer.Consumer {
+	return consumer.NewConsumer("josugod@gmail.com", "Josue", "el pro", "SoyUnCrack123")
 }
 
 func TestConsumerRepositoryCanSaveAConsumer(t *testing.T) {

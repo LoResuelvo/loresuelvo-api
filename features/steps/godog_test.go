@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/LoResuelvo/loresuelvo-api/db"
-	"github.com/LoResuelvo/loresuelvo-api/persistence"
+	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/repositories"
+	"github.com/LoResuelvo/loresuelvo-api/internal/infrastructure/db"
 	"github.com/cucumber/godog"
 )
 
@@ -17,7 +17,7 @@ type testContext struct {
 	responseBody       string
 	statusCode         int
 	database           *sql.DB
-	consumerRepository *persistence.ConsumerRepository
+	consumerRepository *repositories.ConsumerRepository
 }
 
 func newTestContext() *testContext {
@@ -28,7 +28,7 @@ func newTestContext() *testContext {
 
 	return &testContext{
 		database:           database,
-		consumerRepository: persistence.NewConsumerRepository(database),
+		consumerRepository: repositories.NewConsumerRepository(database),
 	}
 }
 

@@ -7,8 +7,7 @@ import (
 	"sync"
 	"time"
 
-	usecases "github.com/LoResuelvo/loresuelvo-api/app/use_cases"
-	"github.com/LoResuelvo/loresuelvo-api/pkg/router"
+	httpadapter "github.com/LoResuelvo/loresuelvo-api/internal/adapters/http"
 	"github.com/cucumber/godog"
 )
 
@@ -18,11 +17,11 @@ func queElSistemaEstaIniciado(ctx *testContext) error {
 	startAPIServerOnce.Do(func() {
 		// Encendemos la API en una goroutine (hilo aparte) para no bloquear el test
 		go func() {
-			r := router.NewRouter()
-			consumerManager := usecases.NewConsumerManager(ctx.consumerRepository)
-			router.RegisterConsumerRoutes(r, consumerManager)
+			router := httpadapter.NewRouter(null)
+			engine := router.SetUp()
+
 			// Usamos un puerto estándar para pruebas
-			_ = r.Run(":8080")
+			_ = engine.Run(":8080")
 		}()
 	})
 

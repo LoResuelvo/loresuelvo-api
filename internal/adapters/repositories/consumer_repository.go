@@ -1,9 +1,9 @@
-package persistence
+package repositories
 
 import (
 	"database/sql"
 
-	"github.com/LoResuelvo/loresuelvo-api/model"
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/consumer"
 )
 
 type ConsumerRepository struct {
@@ -16,7 +16,7 @@ func NewConsumerRepository(db *sql.DB) *ConsumerRepository {
 	}
 }
 
-func (repository *ConsumerRepository) Save(consumer model.Consumer) error {
+func (repository *ConsumerRepository) Save(consumer consumer.Consumer) error {
 	_, err := repository.db.Exec(
 		`INSERT INTO consumers (email, name, surname, password, created_on, updated_on)
 		VALUES ($1, $2, $3, $4, NOW(), NOW())`,

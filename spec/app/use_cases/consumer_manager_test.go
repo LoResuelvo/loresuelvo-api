@@ -3,22 +3,21 @@ package spec
 import (
 	"testing"
 
-	usecases "github.com/LoResuelvo/loresuelvo-api/app/use_cases"
-	"github.com/LoResuelvo/loresuelvo-api/model"
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/consumer"
 )
 
 type consumerRepositoryMock struct {
-	savedConsumer model.Consumer
+	savedConsumer consumer.Consumer
 }
 
-func (repository *consumerRepositoryMock) Save(consumer model.Consumer) error {
+func (repository *consumerRepositoryMock) Save(consumer consumer.Consumer) error {
 	repository.savedConsumer = consumer
 	return nil
 }
 
 func TestRegisterConsumerWithValidData(t *testing.T) {
 	repository := &consumerRepositoryMock{}
-	consumerManager := usecases.NewConsumerManager(repository)
+	consumerManager := consumer.NewManager(repository)
 
 	err := consumerManager.RegisterConsumer(
 		"ana@example.com",
