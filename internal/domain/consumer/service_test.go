@@ -1,4 +1,4 @@
-package spec
+package consumer_test
 
 import (
 	"testing"
@@ -17,7 +17,7 @@ func (repository *consumerRepositoryMock) Save(consumer consumer.Consumer) error
 
 func TestRegisterConsumerWithValidData(t *testing.T) {
 	repository := &consumerRepositoryMock{}
-	consumerManager := consumer.NewManager(repository)
+	consumerManager := consumer.NewService(repository)
 
 	err := consumerManager.RegisterConsumer(
 		"ana@example.com",

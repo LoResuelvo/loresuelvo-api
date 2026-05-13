@@ -1,4 +1,4 @@
-package steps
+package steps_test
 
 import (
 	"bytes"
@@ -9,8 +9,6 @@ import (
 
 	"github.com/cucumber/godog"
 )
-
-const registerConsumerEndpoint = "http://localhost:8080/consumers"
 
 type consumerRegistrationRequest struct {
 	Email    string `json:"email"`
@@ -24,20 +22,31 @@ type registrationResponse struct {
 	Error   string `json:"error"`
 }
 
-func existeUnConsumidorRegistradoConCorreo(correo string) error {
+func registerConsumerAccountSteps(sc *godog.ScenarioContext, suite *testSuite) {
+	sc.Step(`^que no existe un consumidor con correo "([^"]*)"$`, suite.noExisteUnConsumidorConCorreo)
+	sc.Step(`^existe un consumidor registrado con correo "([^"]*)"$`, suite.existeUnConsumidorRegistradoConCorreo)
+	sc.Step(`^me registro como usuario consumidor con correo "([^"]*)", nombre "([^"]*)", apellido "([^"]*)" y contraseña "([^"]*)"$`, suite.solicitoRegistrarUnaCuentaDeConsumidor)
+	sc.Step(`^el sistema confirma el registro$`, suite.elSistemaConfirmaElRegistro)
+	sc.Step(`^el sistema me indica que el formato del correo es inválido$`, suite.elSistemaMeIndicaQueElFormatoDelCorreoEsInvalido)
+	sc.Step(`^el sistema me indica que la contraseña es demasiado corta$`, suite.elSistemaMeIndicaQueLaContrasenaEsDemasiadoCorta)
+	sc.Step(`^el sistema me indica que la contraseña es insegura$`, suite.elSistemaMeIndicaQueLaContrasenaEsInsegura)
+	sc.Step(`^el sistema me indica que el correo electrónico ya está registrado$`, suite.elSistemaMeIndicaQueElCorreoYaEstaRegistrado)
+	sc.Step(`^la respuesta de registro debe tener un codigo (\d+)$`, suite.laRespuestaDeRegistroDebeTenerUnCodigo)
+	sc.Step(`^la respuesta de registro debe indicar "([^"]*)"$`, suite.laRespuestaDeRegistroDebeIndicar)
+}
+
+func (suite *testSuite) existeUnConsumidorRegistradoConCorreo(correo string) error {
 	req := consumerRegistrationRequest{
 		Email:    correo,
 		Name:     "Consumidor Existente",
 		Password: "Segura12345?",
 	}
 
-	resp, err := postConsumerRegistration(req)
+	resp, err := suite.postConsumerRegistration(req)
 	if err != nil {
 		return err
 	}
-	defer func() {
-		_ = resp.Body.Close()
-	}()
+	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusConflict {
 		body, _ := io.ReadAll(resp.Body)
@@ -47,12 +56,12 @@ func existeUnConsumidorRegistradoConCorreo(correo string) error {
 	return nil
 }
 
-func noExisteUnConsumidorConCorreo(ctx *testContext, _ string) error {
-	return ctx.consumerRepository.DeleteAll()
+func (suite *testSuite) noExisteUnConsumidorConCorreo(_ string) error {
+	return suite.consumerRepository.DeleteAll()
 }
 
-func solicitoRegistrarUnaCuentaDeConsumidor(ctx *testContext, correo, nombre, surname, contrasena string) error {
-	resp, err := postConsumerRegistration(consumerRegistrationRequest{
+func (suite *testSuite) solicitoRegistrarUnaCuentaDeConsumidor(correo, nombre, surname, contrasena string) error {
+	resp, err := suite.postConsumerRegistration(consumerRegistrationRequest{
 		Email:    correo,
 		Name:     nombre,
 		Surname:  surname,
@@ -61,67 +70,69 @@ func solicitoRegistrarUnaCuentaDeConsumidor(ctx *testContext, correo, nombre, su
 	if err != nil {
 		return err
 	}
-	defer func() {
-		_ = resp.Body.Close()
-	}()
+	defer resp.Body.Close()
 
-	body, _ := io.ReadAll(resp.Body)
-	ctx.responseBody = string(body)
-	ctx.statusCode = resp.StatusCode
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("fallo leyendo el cuerpo de la respuesta: %w", err)
+	}
+
+	suite.lastStatus = resp.StatusCode
+	suite.lastBody = body
 
 	return nil
 }
 
-func elSistemaConfirmaElRegistro(ctx *testContext) error {
-	if err := laRespuestaDeRegistroDebeTenerUnCodigo(ctx, http.StatusCreated); err != nil {
+func (suite *testSuite) elSistemaConfirmaElRegistro() error {
+	if err := suite.laRespuestaDeRegistroDebeTenerUnCodigo(http.StatusCreated); err != nil {
 		return err
 	}
 
-	return laRespuestaDeRegistroDebeIndicar(ctx, "cuenta registrada exitosamente")
+	return suite.laRespuestaDeRegistroDebeIndicar("cuenta registrada exitosamente")
 }
 
-func elSistemaMeIndicaQueElFormatoDelCorreoEsInvalido(ctx *testContext) error {
-	if err := laRespuestaDeRegistroDebeTenerUnCodigo(ctx, http.StatusBadRequest); err != nil {
+func (suite *testSuite) elSistemaMeIndicaQueElFormatoDelCorreoEsInvalido() error {
+	if err := suite.laRespuestaDeRegistroDebeTenerUnCodigo(http.StatusBadRequest); err != nil {
 		return err
 	}
 
-	return laRespuestaDeRegistroDebeIndicar(ctx, "correo electronico invalido")
+	return suite.laRespuestaDeRegistroDebeIndicar("correo electronico invalido")
 }
 
-func elSistemaMeIndicaQueLaContrasenaEsDemasiadoCorta(ctx *testContext) error {
-	if err := laRespuestaDeRegistroDebeTenerUnCodigo(ctx, http.StatusBadRequest); err != nil {
+func (suite *testSuite) elSistemaMeIndicaQueLaContrasenaEsDemasiadoCorta() error {
+	if err := suite.laRespuestaDeRegistroDebeTenerUnCodigo(http.StatusBadRequest); err != nil {
 		return err
 	}
 
-	return laRespuestaDeRegistroDebeIndicar(ctx, "contraseña demasiado corta")
+	return suite.laRespuestaDeRegistroDebeIndicar("contraseña demasiado corta")
 }
 
-func elSistemaMeIndicaQueLaContrasenaEsInsegura(ctx *testContext) error {
-	if err := laRespuestaDeRegistroDebeTenerUnCodigo(ctx, http.StatusBadRequest); err != nil {
+func (suite *testSuite) elSistemaMeIndicaQueLaContrasenaEsInsegura() error {
+	if err := suite.laRespuestaDeRegistroDebeTenerUnCodigo(http.StatusBadRequest); err != nil {
 		return err
 	}
 
-	return laRespuestaDeRegistroDebeIndicar(ctx, "contraseña insegura")
+	return suite.laRespuestaDeRegistroDebeIndicar("contraseña insegura")
 }
 
-func elSistemaMeIndicaQueElCorreoYaEstaRegistrado(ctx *testContext) error {
-	if err := laRespuestaDeRegistroDebeTenerUnCodigo(ctx, http.StatusConflict); err != nil {
+func (suite *testSuite) elSistemaMeIndicaQueElCorreoYaEstaRegistrado() error {
+	if err := suite.laRespuestaDeRegistroDebeTenerUnCodigo(http.StatusConflict); err != nil {
 		return err
 	}
 
-	return laRespuestaDeRegistroDebeIndicar(ctx, "correo electronico ya registrado")
+	return suite.laRespuestaDeRegistroDebeIndicar("correo electronico ya registrado")
 }
 
-func laRespuestaDeRegistroDebeTenerUnCodigo(ctx *testContext, codigo int) error {
-	if ctx.statusCode != codigo {
-		return fmt.Errorf("se esperaba codigo %d, pero se obtuvo %d con cuerpo %s", codigo, ctx.statusCode, ctx.responseBody)
+func (suite *testSuite) laRespuestaDeRegistroDebeTenerUnCodigo(codigo int) error {
+	if suite.lastStatus != codigo {
+		return fmt.Errorf("se esperaba codigo %d, pero se obtuvo %d con cuerpo %s", codigo, suite.lastStatus, string(suite.lastBody))
 	}
 	return nil
 }
 
-func laRespuestaDeRegistroDebeIndicar(ctx *testContext, mensaje string) error {
+func (suite *testSuite) laRespuestaDeRegistroDebeIndicar(mensaje string) error {
 	var response registrationResponse
-	if err := json.Unmarshal([]byte(ctx.responseBody), &response); err != nil {
+	if err := json.Unmarshal(suite.lastBody, &response); err != nil {
 		return fmt.Errorf("la respuesta no es JSON valido: %w", err)
 	}
 
@@ -129,50 +140,19 @@ func laRespuestaDeRegistroDebeIndicar(ctx *testContext, mensaje string) error {
 		return nil
 	}
 
-	return fmt.Errorf("se esperaba mensaje %q, pero se obtuvo cuerpo %s", mensaje, ctx.responseBody)
+	return fmt.Errorf("se esperaba mensaje %q, pero se obtuvo cuerpo %s", mensaje, string(suite.lastBody))
 }
 
-func postConsumerRegistration(req consumerRegistrationRequest) (*http.Response, error) {
+func (suite *testSuite) postConsumerRegistration(req consumerRegistrationRequest) (*http.Response, error) {
 	body, err := json.Marshal(req)
 	if err != nil {
 		return nil, err
 	}
 
-	resp, err := http.Post(registerConsumerEndpoint, "application/json", bytes.NewReader(body))
+	resp, err := http.Post(suite.server.URL+"/consumers", "application/json", bytes.NewReader(body))
 	if err != nil {
 		return nil, fmt.Errorf("fallo la conexion a la API: %w", err)
 	}
 
 	return resp, nil
-}
-
-func registrarPasosDeCuentaConsumidor(ctx *godog.ScenarioContext, tCtx *testContext) {
-	ctx.Step(`^que no existe un consumidor con correo "([^"]*)"$`, func(correo string) error {
-		return noExisteUnConsumidorConCorreo(tCtx, correo)
-	})
-	ctx.Step(`^existe un consumidor registrado con correo "([^"]*)"$`, existeUnConsumidorRegistradoConCorreo)
-	ctx.Step(`^me registro como usuario consumidor con correo "([^"]*)", nombre "([^"]*)", apellido "([^"]*)" y contraseña "([^"]*)"$`, func(correo, nombre, surname, contrasenia string) error {
-		return solicitoRegistrarUnaCuentaDeConsumidor(tCtx, correo, nombre, surname, contrasenia)
-	})
-	ctx.Step(`^el sistema confirma el registro$`, func() error {
-		return elSistemaConfirmaElRegistro(tCtx)
-	})
-	ctx.Step(`^el sistema me indica que el formato del correo es inválido$`, func() error {
-		return elSistemaMeIndicaQueElFormatoDelCorreoEsInvalido(tCtx)
-	})
-	ctx.Step(`^el sistema me indica que la contraseña es demasiado corta$`, func() error {
-		return elSistemaMeIndicaQueLaContrasenaEsDemasiadoCorta(tCtx)
-	})
-	ctx.Step(`^el sistema me indica que la contraseña es insegura$`, func() error {
-		return elSistemaMeIndicaQueLaContrasenaEsInsegura(tCtx)
-	})
-	ctx.Step(`^el sistema me indica que el correo electrónico ya está registrado$`, func() error {
-		return elSistemaMeIndicaQueElCorreoYaEstaRegistrado(tCtx)
-	})
-	ctx.Step(`^la respuesta de registro debe tener un codigo (\d+)$`, func(codigo int) error {
-		return laRespuestaDeRegistroDebeTenerUnCodigo(tCtx, codigo)
-	})
-	ctx.Step(`^la respuesta de registro debe indicar "([^"]*)"$`, func(mensaje string) error {
-		return laRespuestaDeRegistroDebeIndicar(tCtx, mensaje)
-	})
 }

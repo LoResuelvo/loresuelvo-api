@@ -1,16 +1,16 @@
-package persistence_test
+package repositories_test
 
 import (
 	"regexp"
 	"testing"
 
 	"github.com/DATA-DOG/go-sqlmock"
-	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/postgres"
+	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/repositories"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/consumer"
 	"github.com/stretchr/testify/assert"
 )
 
-func newConsumerRepositoryTest(t *testing.T) (*postgres.ConsumerRepository, sqlmock.Sqlmock) {
+func newConsumerRepositoryTest(t *testing.T) (*repositories.ConsumerRepository, sqlmock.Sqlmock) {
 	t.Helper()
 
 	database, mock, err := sqlmock.New()
@@ -22,7 +22,7 @@ func newConsumerRepositoryTest(t *testing.T) (*postgres.ConsumerRepository, sqlm
 		_ = database.Close()
 	})
 
-	return postgres.NewConsumerRepository(database), mock
+	return repositories.NewConsumerRepository(database), mock
 }
 
 func validConsumer() consumer.Consumer {
