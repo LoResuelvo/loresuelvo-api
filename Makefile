@@ -23,7 +23,7 @@ bash:
 
 # Ejecuta linter
 lint:
-	docker compose exec -e GOFLAGS="-buildvcs=false" $(SERVICE) golangci-lint run
+	docker compose run --rm --no-deps -e GOFLAGS="-buildvcs=false" $(SERVICE) golangci-lint run
 
 test:
 	docker compose run --rm -e GOFLAGS="-buildvcs=false" $(SERVICE) sh -c 'migrate -path db/migrations -database "$$TEST_DATABASE_URL" up && go test -v ./...'
