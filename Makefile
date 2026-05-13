@@ -26,7 +26,7 @@ lint:
 	docker compose exec -e GOFLAGS="-buildvcs=false" $(SERVICE) golangci-lint run
 
 test:
-	docker compose run --rm -e GOFLAGS="-buildvcs=false" $(SERVICE) sh -c "go test -v ./..."
+	docker compose run --rm -e GOFLAGS="-buildvcs=false" $(SERVICE) sh -c 'migrate -path db/migrations -database "$$TEST_DATABASE_URL" up && go test -v ./...'
 
 spec:
 	docker compose run --rm -e GOFLAGS="-buildvcs=false" $(SERVICE) sh -c "go test -v ./spec/..."
@@ -34,7 +34,7 @@ spec:
 # Levanta un contenedor temporal, corre linter, pruebas unitarias y gherkin.
 # Al finalizar, el contenedor se elimina automáticamente (--rm).
 test-all-once:
-	docker compose run --rm -e GOFLAGS="-buildvcs=false" $(SERVICE) sh -c "go test -v ./... && golangci-lint run"
+	docker compose run --rm -e GOFLAGS="-buildvcs=false" $(SERVICE) sh -c 'migrate -path db/migrations -database "$$TEST_DATABASE_URL" up && go test -v ./... && golangci-lint run'
 
 migrate-up:
 	docker compose run --rm $(SERVICE) sh -c 'migrate -path db/migrations -database "$$DATABASE_URL" up'
