@@ -1,69 +1,51 @@
-package steps
+package steps_test
 
 import (
 	"fmt"
 	"io"
 	"net/http"
-	"sync"
-	"time"
 
-	httpadapter "github.com/LoResuelvo/loresuelvo-api/internal/adapters/http"
 	"github.com/cucumber/godog"
 )
 
-var startAPIServerOnce sync.Once
+func registerHelloWorldSteps(sc *godog.ScenarioContext, s *testSuite) {
+	sc.Step(`^que el sistema esta iniciado$`, s.queElSistemaEstaIniciado)
+	sc.Step(`^solicito el saludo en la ruta raiz$`, s.solicitoElSaludoEnLaRutaRaiz)
+	sc.Step(`^la respuesta debe ser "([^"]*)" con un codigo (\d+)$`, s.laRespuestaDebeSerConUnCodigo)
+}
 
-func queElSistemaEstaIniciado(ctx *testContext) error {
-	startAPIServerOnce.Do(func() {
-		// Encendemos la API en una goroutine (hilo aparte) para no bloquear el test
-		go func() {
-			router := httpadapter.NewRouter(null)
-			engine := router.SetUp()
-
-			// Usamos un puerto estándar para pruebas
-			_ = engine.Run(":8080")
-		}()
-	})
-
-	// Damos un respiro de 500ms para que el servidor levante
-	time.Sleep(500 * time.Millisecond)
+// No need to start anything — the server is already up in testSuite
+func (s *testSuite) queElSistemaEstaIniciado() error {
+	if s.server == nil {
+		return fmt.Errorf("el servidor de pruebas no fue inicializado correctamente")
+	}
 	return nil
 }
 
-func solicitoElSaludoEnLaRutaRaiz(ctx *testContext) error {
-	// ¡Petición HTTP real a localhost!
-	resp, err := http.Get("http://localhost:8080/")
+func (s *testSuite) solicitoElSaludoEnLaRutaRaiz() error {
+	// s.server.URL already has the right host+port — no hardcoded localhost:8080
+	resp, err := http.Get(s.server.URL + "/")
 	if err != nil {
-		return fmt.Errorf("fallo la conexión a la API: %v", err)
+		return fmt.Errorf("fallo la conexión a la API: %w", err)
 	}
-	defer func() {
-		_ = resp.Body.Close()
-	}()
+	defer resp.Body.Close()
 
-	body, _ := io.ReadAll(resp.Body)
-	ctx.responseBody = string(body)
-	ctx.statusCode = resp.StatusCode
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("fallo leyendo el cuerpo de la respuesta: %w", err)
+	}
+
+	s.lastStatus = resp.StatusCode
+	s.lastBody = body
 	return nil
 }
 
-func laRespuestaDebeSerConUnCodigo(ctx *testContext, mensaje string, codigo int) error {
-	if ctx.statusCode != codigo {
-		return fmt.Errorf("se esperaba código %d, pero se obtuvo %d", codigo, ctx.statusCode)
+func (s *testSuite) laRespuestaDebeSerConUnCodigo(mensaje string, codigo int) error {
+	if s.lastStatus != codigo {
+		return fmt.Errorf("se esperaba código %d, pero se obtuvo %d", codigo, s.lastStatus)
 	}
-	if ctx.responseBody != mensaje {
-		return fmt.Errorf("se esperaba '%s', pero se obtuvo '%s'", mensaje, ctx.responseBody)
+	if string(s.lastBody) != mensaje {
+		return fmt.Errorf("se esperaba '%s', pero se obtuvo '%s'", mensaje, string(s.lastBody))
 	}
 	return nil
-}
-
-func registrarPasosDeHello(ctx *godog.ScenarioContext, tCtx *testContext) {
-	ctx.Step(`^que el sistema esta iniciado$`, func() error {
-		return queElSistemaEstaIniciado(tCtx)
-	})
-	ctx.Step(`^solicito el saludo en la ruta raiz$`, func() error {
-		return solicitoElSaludoEnLaRutaRaiz(tCtx)
-	})
-	ctx.Step(`^la respuesta debe ser "([^"]*)" con un codigo (\d+)$`, func(msg string, code int) error {
-		return laRespuestaDebeSerConUnCodigo(tCtx, msg, code)
-	})
 }
