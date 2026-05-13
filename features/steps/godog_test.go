@@ -47,14 +47,16 @@ func InitializeTestSuite(ctx *godog.TestSuiteContext) {
 func InitializeScenario(ctx *godog.ScenarioContext) {
 	tCtx := acceptanceTestContext
 
-	ctx.BeforeScenario(func(*godog.Scenario) {
+	ctx.Before(func(ctx context.Context, _ *godog.Scenario) (context.Context, error) {
 		if err := queElSistemaEstaIniciado(tCtx); err != nil {
-			panic(fmt.Errorf("no se pudo iniciar el sistema para los tests: %w", err))
+			return ctx, fmt.Errorf("no se pudo iniciar el sistema para los tests: %w", err)
 		}
 
 		if err := tCtx.consumerRepository.DeleteAll(); err != nil {
-			panic(fmt.Errorf("no se pudo limpiar la base de datos de test: %w", err))
+			return ctx, fmt.Errorf("no se pudo limpiar la base de datos de test: %w", err)
 		}
+
+		return ctx, nil
 	})
 
 	registrarPasosDeHello(ctx, tCtx)
