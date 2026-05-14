@@ -23,7 +23,12 @@ func main() {
 	consumerManager := consumer.NewService(consumerRepository)
 	consumerHandler := handler.NewConsumerHandler(consumerManager)
 
-	router := httpadapter.NewRouter(consumerHandler)
+	authMiddleware, err := httpadapter.NewAuth0MiddlewareFromEnv()
+	if err != nil {
+		panic(err)
+	}
+
+	router := httpadapter.NewRouter(consumerHandler, authMiddleware)
 	engine := router.SetUp()
 
 	if err := engine.Run(":8080"); err != nil {
