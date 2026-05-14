@@ -1,6 +1,8 @@
 services:
   api:
     image: ghcr.io/${GITHUB_REPOSITORY_OWNER}/api:${IMAGE_TAG:-latest}
+    env_file:
+      - .env
     restart: unless-stopped
     networks:
       - app-network
