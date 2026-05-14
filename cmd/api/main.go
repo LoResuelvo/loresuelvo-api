@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 
+	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/auth0"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/repositories"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/consumer"
 
@@ -23,13 +24,16 @@ func main() {
 	consumerManager := consumer.NewService(consumerRepository)
 	consumerHandler := handler.NewConsumerHandler(consumerManager)
 
-	authMiddleware, err := httpadapter.NewAuth0MiddlewareFromEnv()
+	auth0Validator, err := auth0.NewValidatorFromEnv()
 	if err != nil {
 		panic(err)
 	}
 
-	router := httpadapter.NewRouter(consumerHandler, authMiddleware)
-	engine := router.SetUp()
+	router := httpadapter.NewRouter(consumerHandler, auth0Validator)
+	engine, err := router.SetUp()
+	if err != nil {
+		panic(err)
+	}
 
 	if err := engine.Run(":8080"); err != nil {
 		panic(err)

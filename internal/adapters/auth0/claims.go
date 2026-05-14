@@ -3,6 +3,7 @@ package auth0
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strings"
 )
 
@@ -46,10 +47,5 @@ func (c *CustomClaims) HasScope(expectedScope string) bool {
 
 // HasPermission checks whether our claims include a specific Auth0 RBAC permission.
 func (c *CustomClaims) HasPermission(expectedPermission string) bool {
-	for _, permission := range c.Permissions {
-		if permission == expectedPermission {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(c.Permissions, expectedPermission)
 }

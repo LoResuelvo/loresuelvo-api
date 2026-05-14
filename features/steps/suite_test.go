@@ -7,11 +7,13 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/auth0/testhelper"
 	httpadapter "github.com/LoResuelvo/loresuelvo-api/internal/adapters/http"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/repositories"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/consumer"
 	"github.com/LoResuelvo/loresuelvo-api/internal/infrastructure/db"
+	"github.com/auth0/go-jwt-middleware/v3/validator"
 	"github.com/cucumber/godog"
 )
 
@@ -19,6 +21,8 @@ type testSuite struct {
 	server             *httptest.Server
 	database           *sql.DB
 	consumerRepository *repositories.ConsumerRepository
+	auth0Validator     *validator.Validator
+	tokenBuilder       *testhelper.TokenBuilder
 	lastStatus         int
 	lastBody           []byte
 }
@@ -40,9 +44,14 @@ func newTestSuite(tb testing.TB, database *sql.DB) *testSuite {
 	consumerRepository := repositories.NewConsumerRepository(database)
 	consumerService := consumer.NewService(consumerRepository)
 	consumerHandler := handler.NewConsumerHandler(consumerService)
+	auth0Validator := testhelper.NewTestValidator(tb)
+	tokenBuilder := testhelper.NewTokenBuilder()
 
-	router := httpadapter.NewRouter(consumerHandler)
-	engine := router.SetUp()
+	router := httpadapter.NewRouter(consumerHandler, auth0Validator)
+	engine, err := router.SetUp()
+	if err != nil {
+		tb.Fatalf("could not initialize router: %v", err)
+	}
 
 	// httptest.Server wraps the engine — no port needed
 	server := httptest.NewServer(engine)
@@ -54,6 +63,8 @@ func newTestSuite(tb testing.TB, database *sql.DB) *testSuite {
 		server:             server,
 		database:           database,
 		consumerRepository: consumerRepository,
+		auth0Validator:     auth0Validator,
+		tokenBuilder:       tokenBuilder,
 	}
 }
 
