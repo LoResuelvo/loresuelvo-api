@@ -45,7 +45,7 @@ jobs:
             git fetch --tags --force
             git checkout ${{ github.ref_name }}
             
-            echo "DATABASE_URL=${{ secrets.DATABASE_URL_TEST }}" > .env
+            echo "DATABASE_URL=${{ secrets.DATABASE_URL_STAGING }}" > .env
             
             export IMAGE_TAG=${{ github.ref_name }}
             export GITHUB_REPOSITORY_OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
