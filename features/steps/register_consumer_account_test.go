@@ -24,11 +24,9 @@ type registrationResponse struct {
 func registerConsumerAccountSteps(sc *godog.ScenarioContext, suite *testSuite) {
 	sc.Step(`^que no existe un consumidor con correo "([^"]*)"$`, suite.noExisteUnConsumidorConCorreo)
 	sc.Step(`^existe un consumidor registrado con correo "([^"]*)"$`, suite.existeUnConsumidorRegistradoConCorreo)
-	sc.Step(`^me registro como usuario consumidor con correo "([^"]*)", nombre "([^"]*)", apellido "([^"]*)" y contraseña "([^"]*)"$`, suite.solicitoRegistrarUnaCuentaDeConsumidor)
+	sc.Step(`^me registro como usuario consumidor con correo "([^"]*)", nombre "([^"]*)" y apellido "([^"]*)"`, suite.solicitoRegistrarUnaCuentaDeConsumidor)
 	sc.Step(`^el sistema confirma el registro$`, suite.elSistemaConfirmaElRegistro)
 	sc.Step(`^el sistema me indica que el formato del correo es inválido$`, suite.elSistemaMeIndicaQueElFormatoDelCorreoEsInvalido)
-	sc.Step(`^el sistema me indica que la contraseña es demasiado corta$`, suite.elSistemaMeIndicaQueLaContrasenaEsDemasiadoCorta)
-	sc.Step(`^el sistema me indica que la contraseña es insegura$`, suite.elSistemaMeIndicaQueLaContrasenaEsInsegura)
 	sc.Step(`^el sistema me indica que el correo electrónico ya está registrado$`, suite.elSistemaMeIndicaQueElCorreoYaEstaRegistrado)
 	sc.Step(`^la respuesta de registro debe tener un codigo (\d+)$`, suite.laRespuestaDeRegistroDebeTenerUnCodigo)
 	sc.Step(`^la respuesta de registro debe indicar "([^"]*)"$`, suite.laRespuestaDeRegistroDebeIndicar)
@@ -58,7 +56,7 @@ func (suite *testSuite) noExisteUnConsumidorConCorreo(_ string) error {
 	return suite.consumerRepository.DeleteAll()
 }
 
-func (suite *testSuite) solicitoRegistrarUnaCuentaDeConsumidor(correo, nombre, surname, _ string) error {
+func (suite *testSuite) solicitoRegistrarUnaCuentaDeConsumidor(correo, nombre, surname string) error {
 	resp, err := suite.postConsumerRegistration(consumerRegistrationRequest{
 		Email:   correo,
 		Name:    nombre,
@@ -94,22 +92,6 @@ func (suite *testSuite) elSistemaMeIndicaQueElFormatoDelCorreoEsInvalido() error
 	}
 
 	return suite.laRespuestaDeRegistroDebeIndicar("correo electronico invalido")
-}
-
-func (suite *testSuite) elSistemaMeIndicaQueLaContrasenaEsDemasiadoCorta() error {
-	if err := suite.laRespuestaDeRegistroDebeTenerUnCodigo(http.StatusBadRequest); err != nil {
-		return err
-	}
-
-	return suite.laRespuestaDeRegistroDebeIndicar("contraseña demasiado corta")
-}
-
-func (suite *testSuite) elSistemaMeIndicaQueLaContrasenaEsInsegura() error {
-	if err := suite.laRespuestaDeRegistroDebeTenerUnCodigo(http.StatusBadRequest); err != nil {
-		return err
-	}
-
-	return suite.laRespuestaDeRegistroDebeIndicar("contraseña insegura")
 }
 
 func (suite *testSuite) elSistemaMeIndicaQueElCorreoYaEstaRegistrado() error {
