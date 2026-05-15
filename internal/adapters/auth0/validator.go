@@ -11,7 +11,7 @@ import (
 
 func NewValidator(domain, audience string) (*validator.Validator, error) {
 	// Construct issuer URL (must include trailing slash)
-	issuerURL, err := url.Parse("https://" + domain + "/")
+	issuerURL, err := url.Parse(domain)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse issuer URL: %w", err)
 	}
