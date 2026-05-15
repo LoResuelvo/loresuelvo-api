@@ -8,10 +8,12 @@ import (
 
 type consumerRepositoryMock struct {
 	savedConsumer consumer.Consumer
+	saveCalled    bool
 }
 
 func (repository *consumerRepositoryMock) Save(consumer consumer.Consumer) error {
 	repository.savedConsumer = consumer
+	repository.saveCalled = true
 	return nil
 }
 
@@ -36,5 +38,25 @@ func TestRegisterConsumerWithValidData(t *testing.T) {
 
 	if repository.savedConsumer.Email != "ana@example.com" {
 		t.Fatalf("se esperaba guardar el consumidor con email ana@example.com, pero se obtuvo %s", repository.savedConsumer.Email)
+	}
+}
+
+func TestRegisterConsumerWithEmailWithoutArroba(t *testing.T) {
+	repository := &consumerRepositoryMock{}
+	consumerManager := consumer.NewService(repository)
+
+	err := consumerManager.RegisterConsumer(
+		"auth0|ana",
+		"anaexample.com",
+		"Ana",
+		"Perez",
+	)
+
+	if err != consumer.ErrInvalidEmailFormat {
+		t.Fatalf("se esperaba un error de formato de correo inválido, pero se obtuvo: %v", err)
+	}
+
+	if repository.saveCalled {
+		t.Fatal("no se esperaba guardar el consumidor cuando el correo es inválido")
 	}
 }
