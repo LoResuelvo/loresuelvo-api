@@ -2,7 +2,7 @@ name: Release & Deploy
 
 on:
   push:
-    tags: [ "v*.*.*" ]
+    tags: ["v*.*.*"]
 
 permissions:
   contents: read
@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Login a GitHub Container Registry
         uses: docker/login-action@v3
         with:
@@ -25,7 +25,7 @@ jobs:
         run: |
           OWNER_LC=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
           IMAGE_NAME="ghcr.io/${OWNER_LC}/api:${{ github.ref_name }}"
-          
+
           docker build -t $IMAGE_NAME .
           docker push $IMAGE_NAME
 
@@ -44,14 +44,16 @@ jobs:
             cd ~/loresuelvo-api
             git fetch --tags --force
             git checkout ${{ github.ref_name }}
-            
+
             echo "DATABASE_URL=${{ secrets.DATABASE_URL_STAGING }}" > .env
-            
+            echo "AUTH0_DOMAIN=${{ secrets.AUTH0_DOMAIN_STAGING }}" >> .env
+            echo "AUTH0_AUDIENCE=${{ secrets.AUTH0_AUDIENCE_STAGING }}" >> .env
+
             export IMAGE_TAG=${{ github.ref_name }}
             export GITHUB_REPOSITORY_OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
 
             echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u "${{ secrets.GHCR_USER }}" --password-stdin
-            
+
             docker compose -f compose.prod.yml pull
             docker compose -f compose.prod.yml up -d
             docker compose -f compose.prod.yml exec -T nginx nginx -t
@@ -66,7 +68,7 @@ jobs:
       - name: Deploy via SSH a Producción
         uses: appleboy/ssh-action@master
         with:
-          host: ${{ secrets.DROPLET_PROD_IP }} 
+          host: ${{ secrets.DROPLET_PROD_IP }}
           username: ${{ secrets.DROPLET_USER }}
           key: ${{ secrets.DROPLET_PROD_SSH_KEY }}
           script: |
@@ -74,14 +76,16 @@ jobs:
             cd ~/loresuelvo-api
             git fetch --tags --force
             git checkout ${{ github.ref_name }}
-            
+
             echo "DATABASE_URL=${{ secrets.DATABASE_URL_PROD }}" > .env
-            
+            echo "AUTH0_DOMAIN=${{ secrets.AUTH0_DOMAIN_PROD }}" >> .env
+            echo "AUTH0_AUDIENCE=${{ secrets.AUTH0_AUDIENCE_PROD }}" >> .env
+
             export IMAGE_TAG=${{ github.ref_name }}
             export GITHUB_REPOSITORY_OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
 
             echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u "${{ secrets.GHCR_USER }}" --password-stdin
-            
+
             docker compose -f compose.prod.yml pull
             docker compose -f compose.prod.yml up -d
             docker compose -f compose.prod.yml exec -T nginx nginx -t
