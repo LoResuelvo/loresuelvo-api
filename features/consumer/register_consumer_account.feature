@@ -20,7 +20,6 @@ Feature: Registrar cuenta nueva de consumidor
         When me registro como usuario consumidor con correo "ana@", nombre "Ana Perez" y apellido "Mamani Tipula"
         Then el sistema me indica que el formato del correo es inválido
 
-    @wip
     Scenario: 04-RCN Rechazar un registro con correo sin nombre de usuario
         When me registro como usuario consumidor con correo "@example.com", nombre "Ana Perez" y apellido "Mamani Tipula"
         Then el sistema me indica que el formato del correo es inválido
