@@ -18,5 +18,8 @@ jobs:
       - name: Construir la imagen de desarrollo
         run: docker compose build api-dev
 
+      - name: Crear archivo .env de prueba
+        run: cp .env.example .env
+
       - name: Ejecutar Linter y Pruebas (Todo en uno)
         run: make test-all-once
