@@ -38,7 +38,7 @@ func (router *Router) SetUp() (*gin.Engine, error) {
 	engine.Use(gin.Recovery())
 
 	router.registerHealthRoutes(engine)
-	router.registerConsumerRoutes(engine)
+	router.registerConsumerRoutes(engine, authMiddleware)
 	router.registerAuthenticatedRoutes(engine, authMiddleware)
 
 	return engine, nil
@@ -50,8 +50,8 @@ func (router *Router) registerHealthRoutes(engine *gin.Engine) {
 	})
 }
 
-func (router *Router) registerConsumerRoutes(engine *gin.Engine) {
-	engine.POST("/consumers", router.consumerHandler.RegisterConsumer)
+func (router *Router) registerConsumerRoutes(engine *gin.Engine, authMiddleware gin.HandlerFunc) {
+	engine.POST("/consumers", authMiddleware, router.consumerHandler.RegisterConsumer)
 }
 
 func (router *Router) registerAuthenticatedRoutes(engine *gin.Engine, authMiddleware gin.HandlerFunc) {

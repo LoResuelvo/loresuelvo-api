@@ -10,7 +10,7 @@ func NewService(consumerRepository Repository) *Service {
 	}
 }
 
-func (cm *Service) RegisterConsumer(email string, name string, surname string, password string) error {
-	consumer := NewConsumer(email, name, surname, password)
+func (cm *Service) RegisterConsumer(auth0ID string, email string, name string, surname string) error {
+	consumer := NewConsumer(auth0ID, email, name, surname)
 	return cm.consumerRepository.Save(consumer)
 }

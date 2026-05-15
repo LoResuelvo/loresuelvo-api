@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/middleware"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/consumer"
 	"github.com/gin-gonic/gin"
 )
@@ -13,10 +14,9 @@ type ConsumerHandler struct {
 }
 
 type registerConsumerRequest struct {
-	Email    string `json:"email"`
-	Name     string `json:"name"`
-	Surname  string `json:"surname"`
-	Password string `json:"password"`
+	Email   string `json:"email"`
+	Name    string `json:"name"`
+	Surname string `json:"surname"`
 }
 
 func NewConsumerHandler(consumerService *consumer.Service) *ConsumerHandler {
@@ -26,6 +26,12 @@ func NewConsumerHandler(consumerService *consumer.Service) *ConsumerHandler {
 }
 
 func (h *ConsumerHandler) RegisterConsumer(c *gin.Context) {
+	auth0ID, ok := middleware.GetUserID(c)
+	if !ok || strings.TrimSpace(auth0ID) == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "missing user id"})
+		return
+	}
+
 	var req registerConsumerRequest
 
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -36,15 +42,11 @@ func (h *ConsumerHandler) RegisterConsumer(c *gin.Context) {
 	req.Email = strings.TrimSpace(req.Email)
 	req.Name = strings.TrimSpace(req.Name)
 	req.Surname = strings.TrimSpace(req.Surname)
-	req.Password = strings.TrimSpace(req.Password)
 
-	// si es un consumidor -> lo registró
-	// depende el tipo de error, se devuelve un status code diferente
-	if err := h.consumerService.RegisterConsumer(req.Email, req.Name, req.Surname, req.Password); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()}) // cambiar a un error user friendly?
+	if err := h.consumerService.RegisterConsumer(auth0ID, req.Email, req.Name, req.Surname); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	// devuelvo en json los campos del nuevo consumidor (DTO)
 	c.JSON(http.StatusCreated, gin.H{"message": "cuenta registrada exitosamente"})
 }

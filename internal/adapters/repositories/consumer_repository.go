@@ -18,12 +18,12 @@ func NewConsumerRepository(db *sql.DB) *ConsumerRepository {
 
 func (repository *ConsumerRepository) Save(consumer consumer.Consumer) error {
 	_, err := repository.db.Exec(
-		`INSERT INTO consumers (email, name, surname, password, created_on, updated_on)
+		`INSERT INTO consumers (auth0_id, email, name, surname, created_on, updated_on)
 		VALUES ($1, $2, $3, $4, NOW(), NOW())`,
+		consumer.Auth0ID,
 		consumer.Email,
 		consumer.Name,
 		consumer.Surname,
-		consumer.Password,
 	)
 
 	return err

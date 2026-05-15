@@ -26,16 +26,16 @@ func newConsumerRepositoryTest(t *testing.T) (*repositories.ConsumerRepository, 
 }
 
 func validConsumer() consumer.Consumer {
-	return consumer.NewConsumer("josugod@gmail.com", "Josue", "el pro", "SoyUnCrack123")
+	return consumer.NewConsumer("auth0|josue", "josugod@gmail.com", "Josue", "el pro")
 }
 
 func TestConsumerRepositoryCanSaveAConsumer(t *testing.T) {
 	repo, mock := newConsumerRepositoryTest(t)
 	consumer := validConsumer()
 
-	mock.ExpectExec(regexp.QuoteMeta(`INSERT INTO consumers (email, name, surname, password, created_on, updated_on)
+	mock.ExpectExec(regexp.QuoteMeta(`INSERT INTO consumers (auth0_id, email, name, surname, created_on, updated_on)
 		VALUES ($1, $2, $3, $4, NOW(), NOW())`)).
-		WithArgs(consumer.Email, consumer.Name, consumer.Surname, consumer.Password).
+		WithArgs(consumer.Auth0ID, consumer.Email, consumer.Name, consumer.Surname).
 		WillReturnResult(sqlmock.NewResult(1, 1))
 
 	err := repo.Save(consumer)

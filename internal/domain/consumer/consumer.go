@@ -1,17 +1,17 @@
 package consumer
 
 type Consumer struct {
-	Email    string
-	Name     string
-	Surname  string
-	Password string
+	Auth0ID string
+	Email   string
+	Name    string
+	Surname string
 }
 
-func NewConsumer(email string, name string, surname string, password string) Consumer {
+func NewConsumer(auth0ID string, email string, name string, surname string) Consumer {
 	return Consumer{
-		Email:    email,
-		Name:     name,
-		Surname:  surname,
-		Password: password,
+		Auth0ID: auth0ID,
+		Email:   email,
+		Name:    name,
+		Surname: surname,
 	}
 }
