@@ -11,10 +11,9 @@ import (
 )
 
 type consumerRegistrationRequest struct {
-	Email    string `json:"email"`
-	Name     string `json:"name"`
-	Surname  string `json:"surname"`
-	Password string `json:"password"`
+	Email   string `json:"email"`
+	Name    string `json:"name"`
+	Surname string `json:"surname"`
 }
 
 type registrationResponse struct {
@@ -37,9 +36,8 @@ func registerConsumerAccountSteps(sc *godog.ScenarioContext, suite *testSuite) {
 
 func (suite *testSuite) existeUnConsumidorRegistradoConCorreo(correo string) error {
 	req := consumerRegistrationRequest{
-		Email:    correo,
-		Name:     "Consumidor Existente",
-		Password: "Segura12345?",
+		Email: correo,
+		Name:  "Consumidor Existente",
 	}
 
 	resp, err := suite.postConsumerRegistration(req)
@@ -60,12 +58,11 @@ func (suite *testSuite) noExisteUnConsumidorConCorreo(_ string) error {
 	return suite.consumerRepository.DeleteAll()
 }
 
-func (suite *testSuite) solicitoRegistrarUnaCuentaDeConsumidor(correo, nombre, surname, contrasena string) error {
+func (suite *testSuite) solicitoRegistrarUnaCuentaDeConsumidor(correo, nombre, surname, _ string) error {
 	resp, err := suite.postConsumerRegistration(consumerRegistrationRequest{
-		Email:    correo,
-		Name:     nombre,
-		Surname:  surname,
-		Password: contrasena,
+		Email:   correo,
+		Name:    nombre,
+		Surname: surname,
 	})
 	if err != nil {
 		return err
@@ -149,7 +146,14 @@ func (suite *testSuite) postConsumerRegistration(req consumerRegistrationRequest
 		return nil, err
 	}
 
-	resp, err := http.Post(suite.server.URL+"/consumers", "application/json", bytes.NewReader(body))
+	httpReq, err := http.NewRequest(http.MethodPost, suite.server.URL+"/consumers", bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+	httpReq.Header.Set("Content-Type", "application/json")
+	httpReq.Header.Set("Authorization", "Bearer "+suite.tokenBuilder.BuildToken("auth0|consumer-test", nil))
+
+	resp, err := http.DefaultClient.Do(httpReq)
 	if err != nil {
 		return nil, fmt.Errorf("fallo la conexion a la API: %w", err)
 	}
