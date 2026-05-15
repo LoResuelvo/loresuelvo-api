@@ -60,3 +60,23 @@ func TestRegisterConsumerWithEmailWithoutArroba(t *testing.T) {
 		t.Fatal("no se esperaba guardar el consumidor cuando el correo es inválido")
 	}
 }
+
+func TestRegisterConsumerWithEmailWithoutDomain(t *testing.T) {
+	repository := &consumerRepositoryMock{}
+	consumerManager := consumer.NewService(repository)
+
+	err := consumerManager.RegisterConsumer(
+		"auth0|ana",
+		"ana@",
+		"Ana",
+		"Perez",
+	)
+
+	if err != consumer.ErrInvalidEmailFormat {
+		t.Fatalf("se esperaba un error de formato de correo inválido, pero se obtuvo: %v", err)
+	}
+
+	if repository.saveCalled {
+		t.Fatal("no se esperaba guardar el consumidor cuando el correo es inválido")
+	}
+}
