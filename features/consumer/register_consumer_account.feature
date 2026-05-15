@@ -12,7 +12,6 @@ Feature: Registrar cuenta nueva de consumidor
 
     Rule: El correo electrónico debe tener un formato válido
     
-    @wip
     Scenario: 02-RCN Rechazar un registro con correo sin @
         When me registro como usuario consumidor con correo "anaexample.com", nombre "Ana Perez" y apellido "Mamani Tipula"
         Then el sistema me indica que el formato del correo es inválido
