@@ -6,7 +6,6 @@ Feature: Registrar cuenta nueva de consumidor
     Background:
         Given que no existe un consumidor con correo "ana@example.com"
 
-    @wip
     Scenario: 01-RCN Registrar una cuenta nueva correctamente
         When me registro como usuario consumidor con correo "ana@example.com", nombre "Ana Perez" y apellido "Mamani Tipula"
         Then el sistema confirma el registro
