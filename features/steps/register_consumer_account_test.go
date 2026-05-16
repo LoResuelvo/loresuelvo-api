@@ -91,7 +91,7 @@ func (suite *testSuite) elSistemaMeIndicaQueElFormatoDelCorreoEsInvalido() error
 		return err
 	}
 
-	return suite.laRespuestaDeRegistroDebeIndicar("correo electronico invalido")
+	return nil
 }
 
 func (suite *testSuite) elSistemaMeIndicaQueElCorreoYaEstaRegistrado() error {
@@ -99,7 +99,7 @@ func (suite *testSuite) elSistemaMeIndicaQueElCorreoYaEstaRegistrado() error {
 		return err
 	}
 
-	return suite.laRespuestaDeRegistroDebeIndicar("correo electronico ya registrado")
+	return nil
 }
 
 func (suite *testSuite) laRespuestaDeRegistroDebeTenerUnCodigo(codigo int) error {

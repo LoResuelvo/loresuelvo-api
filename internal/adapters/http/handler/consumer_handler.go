@@ -43,7 +43,13 @@ func (h *ConsumerHandler) RegisterConsumer(c *gin.Context) {
 	req.Name = strings.TrimSpace(req.Name)
 	req.Surname = strings.TrimSpace(req.Surname)
 
-	if err := h.consumerService.RegisterConsumer(auth0ID, req.Email, req.Name, req.Surname); err != nil {
+	err := h.consumerService.RegisterConsumer(auth0ID, req.Email, req.Name, req.Surname)
+	if err == consumer.ErrEmailAlreadyRegistered {
+		c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
+		return
+	}
+
+	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}

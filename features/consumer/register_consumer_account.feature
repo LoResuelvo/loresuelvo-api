@@ -1,4 +1,3 @@
-@wip
 Feature: Registrar cuenta nueva de consumidor
   Como consumidor
   quiero registrarme en la plataforma
@@ -27,7 +26,6 @@ Feature: Registrar cuenta nueva de consumidor
 
     Rule: No se puede registrar con un correo electrónico que ya esté en uso
 
-    @wip
     Scenario: 05-RCN Rechazar un registro con correo ya existente
         Given existe un consumidor registrado con correo "carla@example.com"
         When me registro como usuario consumidor con correo "carla@example.com", nombre "Carla Gomez" y apellido "Mendiola bondiola"
