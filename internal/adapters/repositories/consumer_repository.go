@@ -4,7 +4,6 @@ import (
 	"database/sql"
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/consumer"
-	"github.com/stretchr/testify/assert"
 )
 
 type ConsumerRepository struct {
@@ -36,6 +35,15 @@ func (repository *ConsumerRepository) DeleteAll() error {
 }
 
 func (repository *ConsumerRepository) FindByEmail(email string) bool {
-	assert.FailNow(nil, "FindByEmail method is not implemented yet")
-	return false
+	var exists bool
+	err := repository.db.QueryRow(
+		`SELECT EXISTS(SELECT 1 FROM consumers WHERE email = $1)`,
+		email,
+	).Scan(&exists)
+
+	if err != nil {
+		return false
+	}
+
+	return exists
 }

@@ -1,28 +1,31 @@
 package repositories_test
 
 import (
-	"regexp"
+	"context"
 	"testing"
 
-	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/repositories"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/consumer"
+	"github.com/LoResuelvo/loresuelvo-api/internal/infrastructure/db"
 	"github.com/stretchr/testify/assert"
 )
 
-func newConsumerRepositoryTest(t *testing.T) (*repositories.ConsumerRepository, sqlmock.Sqlmock) {
+func newConsumerRepositoryTest(t *testing.T) *repositories.ConsumerRepository {
 	t.Helper()
 
-	database, mock, err := sqlmock.New()
+	config := db.NewTestPostgresConfigFromEnv()
+
+	database, err := db.ConnectPostgres(context.Background(), config)
 	if err != nil {
-		t.Fatalf("no se pudo crear sqlmock: %v", err)
+		t.Fatalf("error al conectar a la DB de pruebas: %v", err)
 	}
 
 	t.Cleanup(func() {
-		_ = database.Close()
+		_, _ = database.Exec("DELETE FROM consumers")
+		database.Close()
 	})
 
-	return repositories.NewConsumerRepository(database), mock
+	return repositories.NewConsumerRepository(database)
 }
 
 func validConsumer() consumer.Consumer {
@@ -30,28 +33,39 @@ func validConsumer() consumer.Consumer {
 }
 
 func TestConsumerRepositoryCanSaveAConsumer(t *testing.T) {
-	repo, mock := newConsumerRepositoryTest(t)
+	repo := newConsumerRepositoryTest(t)
 	consumer := validConsumer()
-
-	mock.ExpectExec(regexp.QuoteMeta(`INSERT INTO consumers (auth0_id, email, name, surname, created_on, updated_on)
-		VALUES ($1, $2, $3, $4, NOW(), NOW())`)).
-		WithArgs(consumer.Auth0ID, consumer.Email, consumer.Name, consumer.Surname).
-		WillReturnResult(sqlmock.NewResult(1, 1))
 
 	err := repo.Save(consumer)
 
-	assert.Nil(t, err)
-	assert.Nil(t, mock.ExpectationsWereMet())
+	assert.NoError(t, err)
+	exists := repo.FindByEmail(consumer.Email)
+	assert.True(t, exists, "Consumer should be saved on database")
 }
 
 func TestConsumerRepositoryCanDeleteAllConsumers(t *testing.T) {
-	repo, mock := newConsumerRepositoryTest(t)
+	repo := newConsumerRepositoryTest(t)
 
-	mock.ExpectExec(regexp.QuoteMeta(`DELETE FROM consumers`)).
-		WillReturnResult(sqlmock.NewResult(1, 1))
+	_ = repo.Save(validConsumer())
 
 	err := repo.DeleteAll()
 
-	assert.Nil(t, err)
-	assert.Nil(t, mock.ExpectationsWereMet())
+	assert.NoError(t, err)
+	exists := repo.FindByEmail(validConsumer().Email)
+	assert.False(t, exists, "All consumers should be deleted from database")
+}
+
+func TestConsumerRepositoryCanFindByEmail(t *testing.T) {
+	repo := newConsumerRepositoryTest(t)
+	consumer := validConsumer()
+
+	_ = repo.Save(consumer)
+
+	assert.True(t, repo.FindByEmail(consumer.Email), "Consumer should be found by email")
+}
+
+func TestConsumerRepositoryFindByEmailReturnsFalseIfConsumerDoesNotExist(t *testing.T) {
+	repo := newConsumerRepositoryTest(t)
+
+	assert.False(t, repo.FindByEmail("no-existe@ejemplo.com"), "Consumer should not be found by email if it does not exist")
 }
