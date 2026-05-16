@@ -7,14 +7,22 @@ import (
 )
 
 type consumerRepositoryMock struct {
-	savedConsumer consumer.Consumer
-	saveCalled    bool
+	savedConsumer      consumer.Consumer
+	saveCalled         bool
+	existsByEmailValue bool
+	findByEmailCalled  bool
 }
 
 func (repository *consumerRepositoryMock) Save(consumer consumer.Consumer) error {
 	repository.savedConsumer = consumer
 	repository.saveCalled = true
 	return nil
+}
+
+// Implementación del método que falta
+func (repository *consumerRepositoryMock) FindByEmail(email string) bool {
+	repository.findByEmailCalled = true
+	return repository.existsByEmailValue
 }
 
 func TestRegisterConsumerWithValidData(t *testing.T) {
@@ -98,5 +106,29 @@ func TestRegisterConsumerWithEmailWithoutName(t *testing.T) {
 
 	if repository.saveCalled {
 		t.Fatal("no se esperaba guardar el consumidor cuando el correo es inválido")
+	}
+}
+
+func TestRegisterConsumerWithAlreadyRegisteredEmail(t *testing.T) {
+	repository := &consumerRepositoryMock{existsByEmailValue: true}
+	consumerManager := consumer.NewService(repository)
+
+	err := consumerManager.RegisterConsumer(
+		"auth0|ana",
+		"ana@example.com",
+		"Ana",
+		"Perez",
+	)
+
+	if err != consumer.ErrEmailAlreadyRegistered {
+		t.Fatalf("Expected %v, but got %v", consumer.ErrEmailAlreadyRegistered, err)
+	}
+
+	if repository.saveCalled {
+		t.Fatal("was not expected to save the consumer when the email is already registered")
+	}
+
+	if !repository.findByEmailCalled {
+		t.Fatal("was expected to check if the email is already registered")
 	}
 }

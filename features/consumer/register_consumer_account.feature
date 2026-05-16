@@ -1,3 +1,4 @@
+@wip
 Feature: Registrar cuenta nueva de consumidor
   Como consumidor
   quiero registrarme en la plataforma

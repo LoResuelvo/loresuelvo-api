@@ -16,6 +16,9 @@ func (cm *Service) RegisterConsumer(auth0ID string, email string, name string, s
 	if !validator.ValidateEmail(email) {
 		return ErrInvalidEmailFormat
 	}
+	if cm.consumerRepository.FindByEmail(email) {
+		return ErrEmailAlreadyRegistered
+	}
 	consumer := NewConsumer(auth0ID, email, name, surname)
 	return cm.consumerRepository.Save(consumer)
 }

@@ -2,4 +2,6 @@ package consumer
 
 import "errors"
 
-var ErrInvalidEmailFormat = errors.New("correo electronico invalido")
+var ErrInvalidEmailFormat = errors.New("Invalid email format")
+
+var ErrEmailAlreadyRegistered = errors.New("Email is already registered")
