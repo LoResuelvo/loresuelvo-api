@@ -22,4 +22,4 @@ jobs:
         run: cp .env.example .env
 
       - name: Ejecutar Linter y Pruebas (Todo en uno)
-        run: make test-all-once
+        run: docker compose up -d --wait && make test-all-once
