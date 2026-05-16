@@ -1,4 +1,4 @@
-.PHONY: up down build bash lint test spec gherkin test-all-once migrate-up migrate-down migrate-test-up migrate-test-down
+.PHONY: up down clean build bash lint test spec gherkin test-all-once migrate-up migrate-down migrate-test-up migrate-test-down
 
 # Nombre del servicio del compose
 SERVICE = api-dev
@@ -23,27 +23,22 @@ bash:
 
 # Ejecuta linter
 lint:
-	docker compose run --rm --no-deps -e GOFLAGS="-buildvcs=false" $(SERVICE) golangci-lint run
+	docker compose exec -e GOFLAGS="-buildvcs=false" $(SERVICE) golangci-lint run
 
 test:
-	docker compose run --rm -e GOFLAGS="-buildvcs=false" $(SERVICE) sh -c 'migrate -path db/migrations -database "$$TEST_DATABASE_URL" up && go test -v ./...'
+	docker compose exec -e GOFLAGS="-buildvcs=false" $(SERVICE) sh -c 'migrate -path db/migrations -database "$$TEST_DATABASE_URL" up && go test -v ./...'
 
-spec:
-	docker compose run --rm -e GOFLAGS="-buildvcs=false" $(SERVICE) sh -c "go test -v ./spec/..."
-
-# Levanta un contenedor temporal, corre linter, pruebas unitarias y gherkin.
-# Al finalizar, el contenedor se elimina automáticamente (--rm).
 test-all-once:
-	docker compose run --rm -e GOFLAGS="-buildvcs=false" $(SERVICE) sh -c 'migrate -path db/migrations -database "$$TEST_DATABASE_URL" up && go test -v ./... && golangci-lint run'
+	docker compose exec -e GOFLAGS="-buildvcs=false" $(SERVICE) sh -c 'migrate -path db/migrations -database "$$TEST_DATABASE_URL" up && go test -v ./... && golangci-lint run'
 
 migrate-up:
-	docker compose run --rm $(SERVICE) sh -c 'migrate -path db/migrations -database "$$DATABASE_URL" up'
+	docker compose exec $(SERVICE) sh -c 'migrate -path db/migrations -database "$$DATABASE_URL" up'
 
 migrate-down:
-	docker compose run --rm $(SERVICE) sh -c 'migrate -path db/migrations -database "$$DATABASE_URL" down 1'
+	docker compose exec $(SERVICE) sh -c 'migrate -path db/migrations -database "$$DATABASE_URL" down 1'
 
 migrate-test-up:
-	docker compose run --rm $(SERVICE) sh -c 'migrate -path db/migrations -database "$$TEST_DATABASE_URL" up'
+	docker compose exec $(SERVICE) sh -c 'migrate -path db/migrations -database "$$TEST_DATABASE_URL" up'
 
 migrate-test-down:
-	docker compose run --rm $(SERVICE) sh -c 'migrate -path db/migrations -database "$$TEST_DATABASE_URL" down 1'
+	docker compose exec $(SERVICE) sh -c 'migrate -path db/migrations -database "$$TEST_DATABASE_URL" down 1'

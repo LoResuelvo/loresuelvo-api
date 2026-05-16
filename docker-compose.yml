@@ -7,6 +7,8 @@ services:
       - "8080:8080"
     volumes:
       - .:/app
+      - go-build-cache:/root/.cache/go-build
+      - go-mod-cache:/go/pkg/mod
     environment:
       DATABASE_URL: "postgres://postgres:example@dev-db:5432/loresuelvo?sslmode=disable"
       TEST_DATABASE_URL: "postgres://postgres:example@test-db:5432/loresuelvo_test?sslmode=disable"
@@ -43,3 +45,7 @@ services:
       interval: 2s
       timeout: 5s
       retries: 15
+
+volumes:
+  go-build-cache:
+  go-mod-cache:
