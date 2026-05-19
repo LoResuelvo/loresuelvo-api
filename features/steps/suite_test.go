@@ -30,6 +30,7 @@ type testSuite struct {
 func (s *testSuite) registerAllSteps(sc *godog.ScenarioContext) {
 	registerHelloWorldSteps(sc, s)
 	registerConsumerAccountSteps(sc, s)
+	registerProviderAccountSteps(sc, s)
 }
 
 func newTestDb() *sql.DB {
