@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/consumer"
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/validator"
 )
 
 type consumerRepositoryMock struct {
@@ -60,7 +61,7 @@ func TestRegisterConsumerWithEmailWithoutArroba(t *testing.T) {
 		"Perez",
 	)
 
-	if err != consumer.ErrInvalidEmailFormat {
+	if err != validator.ErrInvalidEmailFormat {
 		t.Fatalf("se esperaba un error de formato de correo inválido, pero se obtuvo: %v", err)
 	}
 
@@ -80,7 +81,7 @@ func TestRegisterConsumerWithEmailWithoutDomain(t *testing.T) {
 		"Perez",
 	)
 
-	if err != consumer.ErrInvalidEmailFormat {
+	if err != validator.ErrInvalidEmailFormat {
 		t.Fatalf("se esperaba un error de formato de correo inválido, pero se obtuvo: %v", err)
 	}
 
@@ -100,7 +101,7 @@ func TestRegisterConsumerWithEmailWithoutName(t *testing.T) {
 		"Perez",
 	)
 
-	if err != consumer.ErrInvalidEmailFormat {
+	if err != validator.ErrInvalidEmailFormat {
 		t.Fatalf("se esperaba un error de formato de correo inválido, pero se obtuvo: %v", err)
 	}
 
@@ -120,8 +121,8 @@ func TestRegisterConsumerWithAlreadyRegisteredEmail(t *testing.T) {
 		"Perez",
 	)
 
-	if err != consumer.ErrEmailAlreadyRegistered {
-		t.Fatalf("Expected %v, but got %v", consumer.ErrEmailAlreadyRegistered, err)
+	if err != validator.ErrEmailAlreadyRegistered {
+		t.Fatalf("Expected %v, but got %v", validator.ErrEmailAlreadyRegistered, err)
 	}
 
 	if repository.saveCalled {

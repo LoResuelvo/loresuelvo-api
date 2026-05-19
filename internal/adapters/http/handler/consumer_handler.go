@@ -6,6 +6,7 @@ import (
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/middleware"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/consumer"
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/validator"
 	"github.com/gin-gonic/gin"
 )
 
@@ -44,7 +45,7 @@ func (h *ConsumerHandler) RegisterConsumer(c *gin.Context) {
 	req.Surname = strings.TrimSpace(req.Surname)
 
 	err := h.consumerService.RegisterConsumer(auth0ID, req.Email, req.Name, req.Surname)
-	if err == consumer.ErrEmailAlreadyRegistered {
+	if err == validator.ErrEmailAlreadyRegistered {
 		c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
 		return
 	}

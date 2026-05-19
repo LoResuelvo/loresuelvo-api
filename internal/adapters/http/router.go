@@ -12,13 +12,15 @@ import (
 
 type Router struct {
 	consumerHandler *handler.ConsumerHandler
-	auth0Validator  *validator.Validator
+	// providerHandler *handler.ProviderHandler
+	auth0Validator *validator.Validator
 }
 
 func NewRouter(consumerHandler *handler.ConsumerHandler, auth0Validator *validator.Validator) *Router {
 	router := &Router{
 		consumerHandler: consumerHandler,
-		auth0Validator:  auth0Validator,
+		// providerHandler: providerHandler,
+		auth0Validator: auth0Validator,
 	}
 
 	return router
@@ -39,6 +41,7 @@ func (router *Router) SetUp() (*gin.Engine, error) {
 
 	router.registerHealthRoutes(engine)
 	router.registerConsumerRoutes(engine, authMiddleware)
+	router.registerProviderRoutes(engine, authMiddleware)
 	router.registerAuthenticatedRoutes(engine, authMiddleware)
 
 	return engine, nil
@@ -52,6 +55,10 @@ func (router *Router) registerHealthRoutes(engine *gin.Engine) {
 
 func (router *Router) registerConsumerRoutes(engine *gin.Engine, authMiddleware gin.HandlerFunc) {
 	engine.POST("/consumers", authMiddleware, router.consumerHandler.RegisterConsumer)
+}
+
+func (router *Router) registerProviderRoutes(engine *gin.Engine, authMiddleware gin.HandlerFunc) {
+	// engine.POST("/providers", authMiddleware, router.providerHandler.RegisterProvider)
 }
 
 func (router *Router) registerAuthenticatedRoutes(engine *gin.Engine, authMiddleware gin.HandlerFunc) {
