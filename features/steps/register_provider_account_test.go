@@ -28,7 +28,7 @@ func registerProviderAccountSteps(sc *godog.ScenarioContext, suite *testSuite) {
 }
 
 func (suite *testSuite) thereIsNoUserWithEmail(_ string) error {
-	return suite.consumerRepository.DeleteAll()
+	return suite.userRepository.DeleteAll()
 }
 
 func (suite *testSuite) requestProviderAccountRegistration(email, name, surname, category, coverageZone string) error {

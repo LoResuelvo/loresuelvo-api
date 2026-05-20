@@ -53,7 +53,7 @@ func (suite *testSuite) thereIsRegisteredConsumerWithEmail(email string) error {
 }
 
 func (suite *testSuite) thereIsNoConsumerWithEmail(_ string) error {
-	return suite.consumerRepository.DeleteAll()
+	return suite.userRepository.DeleteAll()
 }
 
 func (suite *testSuite) requestConsumerAccountRegistration(email, name, surname string) error {
