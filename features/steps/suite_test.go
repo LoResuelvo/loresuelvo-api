@@ -9,11 +9,8 @@ import (
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/auth0/testhelper"
 	httpadapter "github.com/LoResuelvo/loresuelvo-api/internal/adapters/http"
-	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/repositories"
-	"github.com/LoResuelvo/loresuelvo-api/internal/domain/consumer"
-	"github.com/LoResuelvo/loresuelvo-api/internal/domain/provider"
-	"github.com/LoResuelvo/loresuelvo-api/internal/domain/user"
+	"github.com/LoResuelvo/loresuelvo-api/internal/bootstrap"
 	"github.com/LoResuelvo/loresuelvo-api/internal/infrastructure/db"
 	"github.com/auth0/go-jwt-middleware/v3/validator"
 	"github.com/cucumber/godog"
@@ -50,19 +47,11 @@ func newTestDb() *sql.DB {
 }
 
 func newTestSuite(tb testing.TB, database *sql.DB) *testSuite {
-	userRepository := repositories.NewUserRepository(database)
-	consumerRepository := repositories.NewConsumerRepository(database, userRepository)
-	providerRepository := repositories.NewProviderRepository(database, userRepository)
-	providerService := provider.NewService(providerRepository)
-	consumerService := consumer.NewService(consumerRepository)
-	userService := user.NewService(userRepository)
-	consumerHandler := handler.NewConsumerHandler(consumerService)
-	providerHandler := handler.NewProviderHandler(providerService)
-	userHandler := handler.NewUserHandler(userService)
+	dependencies := bootstrap.NewDependencies(database)
 	auth0Validator := testhelper.NewTestValidator(tb)
 	tokenBuilder := testhelper.NewTokenBuilder()
 
-	router := httpadapter.NewRouter(consumerHandler, providerHandler, userHandler, auth0Validator)
+	router := httpadapter.NewRouter(dependencies.ConsumerHandler, dependencies.ProviderHandler, dependencies.UserHandler, auth0Validator)
 	engine, err := router.SetUp()
 	require.NoError(tb, err, "could not initialize router")
 
@@ -75,9 +64,9 @@ func newTestSuite(tb testing.TB, database *sql.DB) *testSuite {
 	return &testSuite{
 		server:             server,
 		database:           database,
-		consumerRepository: consumerRepository,
-		providerRepository: providerRepository,
-		userRepository:     userRepository,
+		consumerRepository: dependencies.ConsumerRepository,
+		providerRepository: dependencies.ProviderRepository,
+		userRepository:     dependencies.UserRepository,
 		auth0Validator:     auth0Validator,
 		tokenBuilder:       tokenBuilder,
 	}

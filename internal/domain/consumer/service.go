@@ -13,12 +13,12 @@ func NewService(consumerRepository Repository) *Service {
 }
 
 func (cm *Service) RegisterConsumer(auth0ID string, email string, name string, surname string) error {
-	if !validator.ValidateEmail(email) {
-		return validator.ErrInvalidEmailFormat
-	}
 	if cm.consumerRepository.FindByEmail(email) {
 		return validator.ErrEmailAlreadyRegistered
 	}
-	consumer := NewConsumer(auth0ID, email, name, surname)
-	return cm.consumerRepository.Save(consumer)
+	consumer, err := NewConsumer(auth0ID, email, name, surname)
+	if err != nil {
+		return err
+	}
+	return cm.consumerRepository.Save(*consumer)
 }

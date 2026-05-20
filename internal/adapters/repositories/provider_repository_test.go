@@ -27,15 +27,16 @@ func newProviderRepositoryTest(t *testing.T) *repositories.ProviderRepository {
 	return repositories.NewProviderRepository(database, userRepository)
 }
 
-func validProvider() provider.Provider {
-	return provider.NewProvider("auth0|josue", "josugod@gmail.com", "Josue", "el pro", []string{"Palermo", "Belgrano"})
+func validProvider() *provider.Provider {
+	provider, _ := provider.NewProvider("auth0|josue", "josugod@gmail.com", "Josue", "el pro", []string{"Palermo", "Belgrano"})
+	return provider
 }
 
 func TestProviderRepositoryCanSaveAProvider(t *testing.T) {
 	repo := newProviderRepositoryTest(t)
 	provider := validProvider()
 
-	err := repo.Save(provider)
+	err := repo.Save(*provider)
 
 	assert.NoError(t, err)
 	exists := repo.FindByEmail(provider.User.Email)
@@ -45,7 +46,7 @@ func TestProviderRepositoryCanSaveAProvider(t *testing.T) {
 func TestProviderRepositoryCanDeleteAllProviders(t *testing.T) {
 	repo := newProviderRepositoryTest(t)
 
-	_ = repo.Save(validProvider())
+	_ = repo.Save(*validProvider())
 
 	err := repo.DeleteAll()
 
@@ -58,7 +59,7 @@ func TestProviderRepositoryCanFindByEmail(t *testing.T) {
 	repo := newProviderRepositoryTest(t)
 	provider := validProvider()
 
-	_ = repo.Save(provider)
+	_ = repo.Save(*provider)
 
 	assert.True(t, repo.FindByEmail(provider.User.Email), "Provider should be found by email")
 }

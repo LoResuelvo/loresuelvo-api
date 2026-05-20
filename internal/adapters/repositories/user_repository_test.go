@@ -28,7 +28,8 @@ func newUserRepositoryTest(t *testing.T) *repositories.UserRepository {
 }
 
 func validUser() *user.User {
-	return user.New("auth0|josue", "Josue", "el pro", "josugod@gmail.com", "user")
+	user, _ := user.New("auth0|josue", "Josue", "el pro", "josugod@gmail.com", "user")
+	return user
 }
 
 func TestUserRepositoryCanSaveAUser(t *testing.T) {

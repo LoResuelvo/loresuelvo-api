@@ -28,7 +28,8 @@ func newConsumerRepositoryTest(t *testing.T) *repositories.ConsumerRepository {
 }
 
 func validConsumer() consumer.Consumer {
-	return consumer.NewConsumer("auth0|josue", "josugod@gmail.com", "Josue", "el pro")
+	consumer, _ := consumer.NewConsumer("auth0|josue", "josugod@gmail.com", "Josue", "el pro")
+	return *consumer
 }
 
 func TestConsumerRepositoryCanSaveAConsumer(t *testing.T) {

@@ -11,12 +11,13 @@ func NewService(repository Repository) *Service {
 }
 
 func (s *Service) RegisterProvider(authId, email, name, surname string, coverageZones []string) error {
-	if !validator.ValidateEmail(email) {
-		return validator.ErrInvalidEmailFormat
-	}
 	if s.providerRepository.FindByEmail(email) {
 		return validator.ErrEmailAlreadyRegistered
 	}
-	provider := NewProvider(authId, email, name, surname, coverageZones)
-	return s.providerRepository.Save(provider)
+	provider, err := NewProvider(authId, email, name, surname, coverageZones)
+	if err != nil {
+		return err
+	}
+
+	return s.providerRepository.Save(*provider)
 }
