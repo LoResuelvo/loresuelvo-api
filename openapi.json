@@ -1,0 +1,577 @@
+{
+    "openapi": "3.0.3",
+    "info": {
+        "title": "LoResuelvo API",
+        "description": "OpenAPI documentation for the LoResuelvo HTTP API as implemented by the current Gin routes.",
+        "version": "0.1.0",
+        "license": {
+            "name": "MIT",
+            "url": "https://opensource.org/license/mit"
+        }
+    },
+    "servers": [
+        {
+            "url": "http://localhost:8080",
+            "description": "Local development server"
+        }
+    ],
+    "tags": [
+        {
+            "name": "Health",
+            "description": "Service availability endpoints."
+        },
+        {
+            "name": "Consumers",
+            "description": "Consumer account registration endpoints."
+        },
+        {
+            "name": "Providers",
+            "description": "Provider account registration endpoints."
+        },
+        {
+            "name": "Users",
+            "description": "Authenticated user session endpoints."
+        }
+    ],
+    "security": [],
+    "paths": {
+        "/": {
+            "get": {
+                "tags": [
+                    "Health"
+                ],
+                "operationId": "getHealthGreeting",
+                "summary": "Get service greeting",
+                "description": "Returns the plain-text welcome response used as a basic health check.",
+                "responses": {
+                    "200": {
+                        "description": "The API is running.",
+                        "content": {
+                            "text/plain": {
+                                "schema": {
+                                    "type": "string",
+                                    "example": "Hello World"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/consumers": {
+            "post": {
+                "tags": [
+                    "Consumers"
+                ],
+                "operationId": "registerConsumer",
+                "summary": "Register the authenticated user as a consumer",
+                "description": "Creates a consumer account for the authenticated Auth0 subject. The Auth0 subject is taken from the Bearer JWT and persisted as the user's auth identifier. Unknown JSON properties are ignored by the current handler.",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/RegisterConsumerRequest"
+                            },
+                            "examples": {
+                                "validConsumer": {
+                                    "summary": "Valid consumer registration",
+                                    "value": {
+                                        "email": "ana@example.com",
+                                        "name": "Ana Perez",
+                                        "surname": "Mamani Tipula"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Consumer account registered successfully.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/MessageResponse"
+                                },
+                                "examples": {
+                                    "registered": {
+                                        "value": {
+                                            "message": "cuenta registrada exitosamente"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "The request body is not valid JSON, cannot be bound to the expected payload, or contains an invalid email format.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                },
+                                "examples": {
+                                    "invalidEmail": {
+                                        "summary": "Invalid email format",
+                                        "value": {
+                                            "error": "Invalid email format"
+                                        }
+                                    },
+                                    "invalidJson": {
+                                        "summary": "Invalid JSON body",
+                                        "value": {
+                                            "error": "invalid character '}' looking for beginning of object key string"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Authentication failed or the authenticated user id could not be obtained from the request context.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AuthErrorResponse"
+                                },
+                                "examples": {
+                                    "invalidToken": {
+                                        "summary": "Missing or invalid Bearer token",
+                                        "value": {
+                                            "error": "invalid_token",
+                                            "message": "Failed to validate JWT."
+                                        }
+                                    },
+                                    "missingClaims": {
+                                        "summary": "JWT claims not available after validation",
+                                        "value": {
+                                            "error": "missing claims"
+                                        }
+                                    },
+                                    "missingUserId": {
+                                        "summary": "Subject claim is missing or empty",
+                                        "value": {
+                                            "error": "missing user id"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "A user with the same email already exists.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                },
+                                "examples": {
+                                    "emailAlreadyRegistered": {
+                                        "value": {
+                                            "error": "Email is already registered"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/providers": {
+            "post": {
+                "tags": [
+                    "Providers"
+                ],
+                "operationId": "registerProvider",
+                "summary": "Register the authenticated user as a provider",
+                "description": "Creates a provider account for the authenticated Auth0 subject. The Auth0 subject is taken from the Bearer JWT and persisted as the user's auth identifier. The current implementation consumes email, name, surname, and coverage_zone; unknown JSON properties are ignored by the current handler.",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/RegisterProviderRequest"
+                            },
+                            "examples": {
+                                "validProvider": {
+                                    "summary": "Valid provider registration",
+                                    "value": {
+                                        "email": "prestador@example.com",
+                                        "name": "Juan",
+                                        "surname": "Pérez",
+                                        "coverage_zone": [
+                                            "Zona Norte"
+                                        ]
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Provider account registered successfully.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/MessageResponse"
+                                },
+                                "examples": {
+                                    "registered": {
+                                        "value": {
+                                            "message": "cuenta registrada exitosamente"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "The request body is not valid JSON, cannot be bound to the expected payload, or contains an invalid email format.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                },
+                                "examples": {
+                                    "invalidEmail": {
+                                        "summary": "Invalid email format",
+                                        "value": {
+                                            "error": "Invalid email format"
+                                        }
+                                    },
+                                    "invalidJson": {
+                                        "summary": "Invalid JSON body",
+                                        "value": {
+                                            "error": "invalid character '}' looking for beginning of object key string"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Authentication failed or the authenticated user id could not be obtained from the request context.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AuthErrorResponse"
+                                },
+                                "examples": {
+                                    "invalidToken": {
+                                        "summary": "Missing or invalid Bearer token",
+                                        "value": {
+                                            "error": "invalid_token",
+                                            "message": "Failed to validate JWT."
+                                        }
+                                    },
+                                    "missingClaims": {
+                                        "summary": "JWT claims not available after validation",
+                                        "value": {
+                                            "error": "missing claims"
+                                        }
+                                    },
+                                    "missingUserId": {
+                                        "summary": "Subject claim is missing or empty",
+                                        "value": {
+                                            "error": "missing user id"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "A user with the same email already exists.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                },
+                                "examples": {
+                                    "emailAlreadyRegistered": {
+                                        "value": {
+                                            "error": "Email is already registered"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/me": {
+            "get": {
+                "tags": [
+                    "Users"
+                ],
+                "operationId": "getCurrentUser",
+                "summary": "Get the authenticated user",
+                "description": "Returns the user associated with the Auth0 subject contained in the Bearer JWT. The response property names currently match the exported Go struct fields because the User struct has no json tags.",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Authenticated user found.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/User"
+                                },
+                                "examples": {
+                                    "consumer": {
+                                        "summary": "Consumer user",
+                                        "value": {
+                                            "AuthID": "auth0|login-consumer-test",
+                                            "Name": "Consumer",
+                                            "Surname": "Login",
+                                            "Email": "login-consumer@example.com",
+                                            "Role": "consumer"
+                                        }
+                                    },
+                                    "provider": {
+                                        "summary": "Provider user",
+                                        "value": {
+                                            "AuthID": "auth0|login-provider-test",
+                                            "Name": "Provider",
+                                            "Surname": "Login",
+                                            "Email": "login-provider@example.com",
+                                            "Role": "provider"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Authentication failed or the authenticated user id could not be obtained from the request context.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AuthErrorResponse"
+                                },
+                                "examples": {
+                                    "invalidToken": {
+                                        "summary": "Missing or invalid Bearer token",
+                                        "value": {
+                                            "error": "invalid_token",
+                                            "message": "Failed to validate JWT."
+                                        }
+                                    },
+                                    "missingClaims": {
+                                        "summary": "JWT claims not available after validation",
+                                        "value": {
+                                            "error": "missing claims"
+                                        }
+                                    },
+                                    "missingUserId": {
+                                        "summary": "Subject claim is missing or empty",
+                                        "value": {
+                                            "error": "missing user id"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "No persisted user exists for the authenticated Auth0 subject.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                },
+                                "examples": {
+                                    "userNotFound": {
+                                        "value": {
+                                            "error": "User was not found"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "components": {
+        "securitySchemes": {
+            "BearerAuth": {
+                "type": "http",
+                "scheme": "bearer",
+                "bearerFormat": "JWT",
+                "description": "Auth0-issued JWT. The API uses the token subject claim as the internal auth identifier."
+            }
+        },
+        "schemas": {
+            "RegisterConsumerRequest": {
+                "type": "object",
+                "description": "Payload accepted by POST /consumers. The implementation trims surrounding whitespace from all string fields before validation/persistence.",
+                "required": [
+                    "email"
+                ],
+                "properties": {
+                    "email": {
+                        "type": "string",
+                        "format": "email",
+                        "description": "Consumer email. Must match the server email validation regex.",
+                        "example": "ana@example.com"
+                    },
+                    "name": {
+                        "type": "string",
+                        "description": "Consumer given name or display name. The current implementation persists the value but does not enforce non-empty validation.",
+                        "example": "Ana Perez"
+                    },
+                    "surname": {
+                        "type": "string",
+                        "description": "Consumer surname. The current implementation persists the value but does not enforce non-empty validation.",
+                        "example": "Mamani Tipula"
+                    }
+                }
+            },
+            "RegisterProviderRequest": {
+                "type": "object",
+                "description": "Payload accepted by POST /providers. The implementation trims surrounding whitespace from string fields and each coverage_zone item before validation/persistence. Provider documentation/category fields are not consumed by the current handler.",
+                "required": [
+                    "email"
+                ],
+                "properties": {
+                    "email": {
+                        "type": "string",
+                        "format": "email",
+                        "description": "Provider email. Must match the server email validation regex.",
+                        "example": "prestador@example.com"
+                    },
+                    "name": {
+                        "type": "string",
+                        "description": "Provider given name. The current implementation persists the value but does not enforce non-empty validation.",
+                        "example": "Juan"
+                    },
+                    "surname": {
+                        "type": "string",
+                        "description": "Provider surname. The current implementation persists the value but does not enforce non-empty validation.",
+                        "example": "Pérez"
+                    },
+                    "coverage_zone": {
+                        "type": "array",
+                        "description": "Coverage zones received by the handler and passed to the provider domain object. The current repository only persists the shared user data, not the coverage zones.",
+                        "items": {
+                            "type": "string",
+                            "example": "Zona Norte"
+                        },
+                        "example": [
+                            "Zona Norte"
+                        ]
+                    }
+                }
+            },
+            "MessageResponse": {
+                "type": "object",
+                "required": [
+                    "message"
+                ],
+                "properties": {
+                    "message": {
+                        "type": "string",
+                        "example": "cuenta registrada exitosamente"
+                    }
+                },
+                "additionalProperties": false
+            },
+            "ErrorResponse": {
+                "type": "object",
+                "required": [
+                    "error"
+                ],
+                "properties": {
+                    "error": {
+                        "type": "string",
+                        "example": "Invalid email format"
+                    }
+                },
+                "additionalProperties": false
+            },
+            "AuthErrorResponse": {
+                "type": "object",
+                "required": [
+                    "error"
+                ],
+                "properties": {
+                    "error": {
+                        "type": "string",
+                        "enum": [
+                            "invalid_token",
+                            "missing claims",
+                            "missing user id"
+                        ],
+                        "example": "invalid_token"
+                    },
+                    "message": {
+                        "type": "string",
+                        "description": "Present in JWT middleware validation failures.",
+                        "example": "Failed to validate JWT."
+                    }
+                },
+                "additionalProperties": false
+            },
+            "User": {
+                "type": "object",
+                "description": "Authenticated user response. Field names are currently capitalized because they are serialized from exported Go struct fields without json tags.",
+                "required": [
+                    "AuthID",
+                    "Name",
+                    "Surname",
+                    "Email",
+                    "Role"
+                ],
+                "properties": {
+                    "AuthID": {
+                        "type": "string",
+                        "description": "Auth0 subject persisted for this user.",
+                        "example": "auth0|login-consumer-test"
+                    },
+                    "Name": {
+                        "type": "string",
+                        "example": "Consumer"
+                    },
+                    "Surname": {
+                        "type": "string",
+                        "example": "Login"
+                    },
+                    "Email": {
+                        "type": "string",
+                        "format": "email",
+                        "example": "login-consumer@example.com"
+                    },
+                    "Role": {
+                        "type": "string",
+                        "description": "Persisted user role.",
+                        "enum": [
+                            "consumer",
+                            "provider"
+                        ],
+                        "example": "consumer"
+                    }
+                },
+                "additionalProperties": false
+            }
+        }
+    }
+}
