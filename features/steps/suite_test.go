@@ -13,6 +13,7 @@ import (
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/repositories"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/consumer"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/provider"
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/user"
 	"github.com/LoResuelvo/loresuelvo-api/internal/infrastructure/db"
 	"github.com/auth0/go-jwt-middleware/v3/validator"
 	"github.com/cucumber/godog"
@@ -49,17 +50,19 @@ func newTestDb() *sql.DB {
 }
 
 func newTestSuite(tb testing.TB, database *sql.DB) *testSuite {
-	consumerRepository := repositories.NewConsumerRepository(database)
-	providerRepository := repositories.NewProviderRepository(database)
 	userRepository := repositories.NewUserRepository(database)
+	consumerRepository := repositories.NewConsumerRepository(database, userRepository)
+	providerRepository := repositories.NewProviderRepository(database, userRepository)
 	providerService := provider.NewService(providerRepository)
 	consumerService := consumer.NewService(consumerRepository)
+	userService := user.NewService(userRepository)
 	consumerHandler := handler.NewConsumerHandler(consumerService)
 	providerHandler := handler.NewProviderHandler(providerService)
+	userHandler := handler.NewUserHandler(userService)
 	auth0Validator := testhelper.NewTestValidator(tb)
 	tokenBuilder := testhelper.NewTokenBuilder()
 
-	router := httpadapter.NewRouter(consumerHandler, providerHandler, auth0Validator)
+	router := httpadapter.NewRouter(consumerHandler, providerHandler, userHandler, auth0Validator)
 	engine, err := router.SetUp()
 	require.NoError(tb, err, "could not initialize router")
 

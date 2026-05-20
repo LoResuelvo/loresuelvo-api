@@ -11,10 +11,10 @@ type ProviderRepository struct {
 	repositoryUser *UserRepository
 }
 
-func NewProviderRepository(db *sql.DB) *ProviderRepository {
+func NewProviderRepository(db *sql.DB, repositoryUser *UserRepository) *ProviderRepository {
 	return &ProviderRepository{
 		db:             db,
-		repositoryUser: NewUserRepository(db),
+		repositoryUser: repositoryUser,
 	}
 }
 

@@ -11,10 +11,10 @@ type ConsumerRepository struct {
 	repositoryUser *UserRepository
 }
 
-func NewConsumerRepository(db *sql.DB) *ConsumerRepository {
+func NewConsumerRepository(db *sql.DB, repositoryUser *UserRepository) *ConsumerRepository {
 	return &ConsumerRepository{
 		db:             db,
-		repositoryUser: NewUserRepository(db),
+		repositoryUser: repositoryUser,
 	}
 }
 

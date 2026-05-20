@@ -135,30 +135,8 @@ func (suite *testSuite) getAuthenticatedUserInfo() (*http.Response, error) {
 }
 
 func responseContainsRole(response map[string]any, role string) bool {
-	if returnedRole, ok := response["role"].(string); ok && isExpectedRole(returnedRole, role) {
+	if returnedRole, ok := response["Role"].(string); ok && isExpectedRole(returnedRole, role) {
 		return true
-	}
-
-	if returnedRoles, ok := response["roles"].([]any); ok {
-		for _, returnedRole := range returnedRoles {
-			if returnedRoleString, ok := returnedRole.(string); ok && isExpectedRole(returnedRoleString, role) {
-				return true
-			}
-		}
-	}
-
-	if profiles, ok := response["profiles"].(map[string]any); ok {
-		if _, exists := profiles[role]; exists {
-			return true
-		}
-
-		for profile := range profiles {
-			if isExpectedRole(profile, role) {
-				return true
-			}
-		}
-
-		return false
 	}
 
 	return false

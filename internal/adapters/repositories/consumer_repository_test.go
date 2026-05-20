@@ -23,8 +23,8 @@ func newConsumerRepositoryTest(t *testing.T) *repositories.ConsumerRepository {
 		_, _ = database.Exec("DELETE FROM users")
 		database.Close()
 	})
-
-	return repositories.NewConsumerRepository(database)
+	userRepository := repositories.NewUserRepository(database)
+	return repositories.NewConsumerRepository(database, userRepository)
 }
 
 func validConsumer() consumer.Consumer {

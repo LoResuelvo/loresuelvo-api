@@ -23,8 +23,8 @@ func newProviderRepositoryTest(t *testing.T) *repositories.ProviderRepository {
 		_, _ = database.Exec("DELETE FROM users")
 		database.Close()
 	})
-
-	return repositories.NewProviderRepository(database)
+	userRepository := repositories.NewUserRepository(database)
+	return repositories.NewProviderRepository(database, userRepository)
 }
 
 func validProvider() provider.Provider {

@@ -1,4 +1,3 @@
-@wip
 Feature: Iniciar sesión
 
     Como usuario registrado

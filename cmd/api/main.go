@@ -7,6 +7,7 @@ import (
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/repositories"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/consumer"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/provider"
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/user"
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/infrastructure/db"
 
@@ -21,20 +22,24 @@ func main() {
 	}
 	defer database.Close()
 
-	consumerRepository := repositories.NewConsumerRepository(database)
-	providerRepository := repositories.NewProviderRepository(database)
+	userRepository := repositories.NewUserRepository(database)
+	consumerRepository := repositories.NewConsumerRepository(database, userRepository)
+	providerRepository := repositories.NewProviderRepository(database, userRepository)
 
 	consumerManager := consumer.NewService(consumerRepository)
 	providerManager := provider.NewService(providerRepository)
+	userManager := user.NewService(userRepository)
+
 	consumerHandler := handler.NewConsumerHandler(consumerManager)
 	providerHandler := handler.NewProviderHandler(providerManager)
+	userHandler := handler.NewUserHandler(userManager)
 
 	auth0Validator, err := auth0.NewValidatorFromEnv()
 	if err != nil {
 		panic(err)
 	}
 
-	router := httpadapter.NewRouter(consumerHandler, providerHandler, auth0Validator)
+	router := httpadapter.NewRouter(consumerHandler, providerHandler, userHandler, auth0Validator)
 	engine, err := router.SetUp()
 	if err != nil {
 		panic(err)
