@@ -58,8 +58,9 @@ func TestConsumerRepositoryCanFindByEmail(t *testing.T) {
 	repo := newConsumerRepositoryTest(t)
 	consumer := validConsumer()
 
-	_ = repo.Save(consumer)
+	err := repo.Save(consumer)
 
+	assert.NoError(t, err, "saving consumer should not return an error")
 	assert.True(t, repo.FindByEmail(consumer.User.Email), "Consumer should be found by email")
 }
 
