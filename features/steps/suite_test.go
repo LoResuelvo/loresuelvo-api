@@ -12,47 +12,56 @@ import (
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/repositories"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/consumer"
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/provider"
 	"github.com/LoResuelvo/loresuelvo-api/internal/infrastructure/db"
 	"github.com/auth0/go-jwt-middleware/v3/validator"
 	"github.com/cucumber/godog"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 type testSuite struct {
 	server             *httptest.Server
 	database           *sql.DB
 	consumerRepository *repositories.ConsumerRepository
+	providerRepository *repositories.ProviderRepository
+	userRepository     *repositories.UserRepository
 	auth0Validator     *validator.Validator
 	tokenBuilder       *testhelper.TokenBuilder
 	lastStatus         int
 	lastBody           []byte
+	currentAuth0ID     string
 }
 
 func (s *testSuite) registerAllSteps(sc *godog.ScenarioContext) {
 	registerHelloWorldSteps(sc, s)
 	registerConsumerAccountSteps(sc, s)
 	registerProviderAccountSteps(sc, s)
+	registerLoginSteps(sc, s)
 }
 
 func newTestDb() *sql.DB {
 	database, err := db.ConnectPostgres(context.Background(), db.NewTestPostgresConfigFromEnv())
 	if err != nil {
-		panic(fmt.Errorf("Can not connect to test database: %w", err))
+		panic(fmt.Errorf("cannot connect to test database: %w", err))
 	}
 	return database
 }
 
 func newTestSuite(tb testing.TB, database *sql.DB) *testSuite {
 	consumerRepository := repositories.NewConsumerRepository(database)
+	providerRepository := repositories.NewProviderRepository(database)
+	userRepository := repositories.NewUserRepository(database)
+	providerService := provider.NewService(providerRepository)
 	consumerService := consumer.NewService(consumerRepository)
 	consumerHandler := handler.NewConsumerHandler(consumerService)
+	providerHandler := handler.NewProviderHandler(providerService)
 	auth0Validator := testhelper.NewTestValidator(tb)
 	tokenBuilder := testhelper.NewTokenBuilder()
 
-	router := httpadapter.NewRouter(consumerHandler, auth0Validator)
+	router := httpadapter.NewRouter(consumerHandler, providerHandler, auth0Validator)
 	engine, err := router.SetUp()
-	if err != nil {
-		tb.Fatalf("could not initialize router: %v", err)
-	}
+	require.NoError(tb, err, "could not initialize router")
 
 	// httptest.Server wraps the engine — no port needed
 	server := httptest.NewServer(engine)
@@ -64,6 +73,8 @@ func newTestSuite(tb testing.TB, database *sql.DB) *testSuite {
 		server:             server,
 		database:           database,
 		consumerRepository: consumerRepository,
+		providerRepository: providerRepository,
+		userRepository:     userRepository,
 		auth0Validator:     auth0Validator,
 		tokenBuilder:       tokenBuilder,
 	}
@@ -73,8 +84,8 @@ func ScenarioInitializer(sc *godog.ScenarioContext, t *testing.T, database *sql.
 	testSuite := newTestSuite(t, database)
 	testSuite.registerAllSteps(sc)
 	sc.Before(func(ctx context.Context, sc *godog.Scenario) (context.Context, error) {
-		if err := testSuite.consumerRepository.DeleteAll(); err != nil {
-			return ctx, fmt.Errorf("no se pudo limpiar la base de datos de test: %w", err)
+		if err := testSuite.userRepository.DeleteAll(); err != nil {
+			return ctx, fmt.Errorf("could not clean test database: %w", err)
 		}
 		return ctx, nil
 	})
@@ -98,7 +109,5 @@ func TestFeatures(t *testing.T) {
 		},
 	}
 
-	if suite.Run() != 0 {
-		t.Fatal("godog tests failed")
-	}
+	assert.Equal(t, 0, suite.Run(), "godog tests failed")
 }

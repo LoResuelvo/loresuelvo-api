@@ -8,6 +8,7 @@ import (
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/consumer"
 	"github.com/LoResuelvo/loresuelvo-api/internal/infrastructure/db"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func newConsumerRepositoryTest(t *testing.T) *repositories.ConsumerRepository {
@@ -16,12 +17,10 @@ func newConsumerRepositoryTest(t *testing.T) *repositories.ConsumerRepository {
 	config := db.NewTestPostgresConfigFromEnv()
 
 	database, err := db.ConnectPostgres(context.Background(), config)
-	if err != nil {
-		t.Fatalf("error al conectar a la DB de pruebas: %v", err)
-	}
+	require.NoError(t, err, "could not connect to test database")
 
 	t.Cleanup(func() {
-		_, _ = database.Exec("DELETE FROM consumers")
+		_, _ = database.Exec("DELETE FROM users")
 		database.Close()
 	})
 
@@ -39,7 +38,7 @@ func TestConsumerRepositoryCanSaveAConsumer(t *testing.T) {
 	err := repo.Save(consumer)
 
 	assert.NoError(t, err)
-	exists := repo.FindByEmail(consumer.Email)
+	exists := repo.FindByEmail(consumer.User.Email)
 	assert.True(t, exists, "Consumer should be saved on database")
 }
 
@@ -51,7 +50,7 @@ func TestConsumerRepositoryCanDeleteAllConsumers(t *testing.T) {
 	err := repo.DeleteAll()
 
 	assert.NoError(t, err)
-	exists := repo.FindByEmail(validConsumer().Email)
+	exists := repo.FindByEmail(validConsumer().User.Email)
 	assert.False(t, exists, "All consumers should be deleted from database")
 }
 
@@ -61,7 +60,7 @@ func TestConsumerRepositoryCanFindByEmail(t *testing.T) {
 
 	_ = repo.Save(consumer)
 
-	assert.True(t, repo.FindByEmail(consumer.Email), "Consumer should be found by email")
+	assert.True(t, repo.FindByEmail(consumer.User.Email), "Consumer should be found by email")
 }
 
 func TestConsumerRepositoryFindByEmailReturnsFalseIfConsumerDoesNotExist(t *testing.T) {

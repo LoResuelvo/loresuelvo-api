@@ -11,37 +11,37 @@ import (
 )
 
 type providerRegistrationRequest struct {
-	Email                  string `json:"email"`
-	Name                   string `json:"name"`
-	Surname                string `json:"surname"`
-	Category               string `json:"category"`
-	CoverageZone           string `json:"coverage_zone"`
-	CriminalRecordFile     string `json:"criminal_record_file"`
-	CUITCertificateFile    string `json:"cuit_certificate_file"`
-	BiometricValidationID  string `json:"biometric_validation_id"`
-	ProfessionalCredential string `json:"professional_credential_file"`
+	Email                  string   `json:"email"`
+	Name                   string   `json:"name"`
+	Surname                string   `json:"surname"`
+	Category               string   `json:"category"`
+	CoverageZone           []string `json:"coverage_zone"`
+	CriminalRecordFile     string   `json:"criminal_record_file"`
+	CUITCertificateFile    string   `json:"cuit_certificate_file"`
+	BiometricValidationID  string   `json:"biometric_validation_id"`
+	ProfessionalCredential string   `json:"professional_credential_file"`
 }
 
 func registerProviderAccountSteps(sc *godog.ScenarioContext, suite *testSuite) {
-	sc.Step(`^que no existe un usuario con correo "([^"]*)"$`, suite.noExisteUnUsuarioConCorreo)
-	sc.Step(`^me registro como prestador con correo "([^"]*)", nombre "([^"]*)", apellido "([^"]*)", rubro "([^"]*)", zona de cobertura "([^"]*)" e ingreso mis documentos obligatorios$`, suite.solicitoRegistrarUnaCuentaDePrestador)
+	sc.Step(`^que no existe un usuario con correo "([^"]*)"$`, suite.thereIsNoUserWithEmail)
+	sc.Step(`^me registro como prestador con correo "([^"]*)", nombre "([^"]*)", apellido "([^"]*)", rubro "([^"]*)", zona de cobertura "([^"]*)" e ingreso mis documentos obligatorios$`, suite.requestProviderAccountRegistration)
 }
 
-func (suite *testSuite) noExisteUnUsuarioConCorreo(_ string) error {
+func (suite *testSuite) thereIsNoUserWithEmail(_ string) error {
 	return suite.consumerRepository.DeleteAll()
 }
 
-func (suite *testSuite) solicitoRegistrarUnaCuentaDePrestador(correo, nombre, apellido, rubro, zonaDeCobertura string) error {
+func (suite *testSuite) requestProviderAccountRegistration(email, name, surname, category, coverageZone string) error {
 	resp, err := suite.postProviderRegistration(providerRegistrationRequest{
-		Email:                  correo,
-		Name:                   nombre,
-		Surname:                apellido,
-		Category:               rubro,
-		CoverageZone:           zonaDeCobertura,
-		CriminalRecordFile:     "antecedentes-penales.pdf",
-		CUITCertificateFile:    "constancia-cuit.pdf",
+		Email:                  email,
+		Name:                   name,
+		Surname:                surname,
+		Category:               category,
+		CoverageZone:           []string{coverageZone},
+		CriminalRecordFile:     "criminal-record.pdf",
+		CUITCertificateFile:    "cuit-certificate.pdf",
 		BiometricValidationID:  "biometric-validation-approved",
-		ProfessionalCredential: "matricula-o-certificacion.pdf",
+		ProfessionalCredential: "professional-license-or-certificate.pdf",
 	})
 	if err != nil {
 		return err
@@ -50,7 +50,7 @@ func (suite *testSuite) solicitoRegistrarUnaCuentaDePrestador(correo, nombre, ap
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return fmt.Errorf("fallo leyendo el cuerpo de la respuesta: %w", err)
+		return fmt.Errorf("failed to read response body: %w", err)
 	}
 
 	suite.lastStatus = resp.StatusCode
@@ -60,6 +60,10 @@ func (suite *testSuite) solicitoRegistrarUnaCuentaDePrestador(correo, nombre, ap
 }
 
 func (suite *testSuite) postProviderRegistration(req providerRegistrationRequest) (*http.Response, error) {
+	return suite.postProviderRegistrationWithAuth0ID("auth0|provider-test", req)
+}
+
+func (suite *testSuite) postProviderRegistrationWithAuth0ID(auth0ID string, req providerRegistrationRequest) (*http.Response, error) {
 	body, err := json.Marshal(req)
 	if err != nil {
 		return nil, err
@@ -70,11 +74,11 @@ func (suite *testSuite) postProviderRegistration(req providerRegistrationRequest
 		return nil, err
 	}
 	httpReq.Header.Set("Content-Type", "application/json")
-	httpReq.Header.Set("Authorization", "Bearer "+suite.tokenBuilder.BuildToken("auth0|provider-test", nil))
+	httpReq.Header.Set("Authorization", "Bearer "+suite.tokenBuilder.BuildToken(auth0ID, nil))
 
 	resp, err := http.DefaultClient.Do(httpReq)
 	if err != nil {
-		return nil, fmt.Errorf("fallo la conexion a la API: %w", err)
+		return nil, fmt.Errorf("API connection failed: %w", err)
 	}
 
 	return resp, nil

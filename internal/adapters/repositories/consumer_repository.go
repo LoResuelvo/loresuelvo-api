@@ -7,43 +7,25 @@ import (
 )
 
 type ConsumerRepository struct {
-	db *sql.DB
+	db             *sql.DB
+	repositoryUser *UserRepository
 }
 
 func NewConsumerRepository(db *sql.DB) *ConsumerRepository {
 	return &ConsumerRepository{
-		db: db,
+		db:             db,
+		repositoryUser: NewUserRepository(db),
 	}
 }
 
 func (repository *ConsumerRepository) Save(consumer consumer.Consumer) error {
-	_, err := repository.db.Exec(
-		`INSERT INTO consumers (auth0_id, email, name, surname, created_on, updated_on)
-		VALUES ($1, $2, $3, $4, NOW(), NOW())`,
-		consumer.Auth0ID,
-		consumer.Email,
-		consumer.Name,
-		consumer.Surname,
-	)
-
-	return err
-}
-
-func (repository *ConsumerRepository) DeleteAll() error {
-	_, err := repository.db.Exec(`DELETE FROM consumers`)
-	return err
+	return repository.repositoryUser.Save(*consumer.User)
 }
 
 func (repository *ConsumerRepository) FindByEmail(email string) bool {
-	var exists bool
-	err := repository.db.QueryRow(
-		`SELECT EXISTS(SELECT 1 FROM consumers WHERE email = $1)`,
-		email,
-	).Scan(&exists)
+	return repository.repositoryUser.FindByEmail(email)
+}
 
-	if err != nil {
-		return false
-	}
-
-	return exists
+func (repository *ConsumerRepository) DeleteAll() error {
+	return repository.repositoryUser.DeleteAllOf("consumer")
 }

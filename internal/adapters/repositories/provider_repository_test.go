@@ -8,6 +8,7 @@ import (
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/provider"
 	"github.com/LoResuelvo/loresuelvo-api/internal/infrastructure/db"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func newProviderRepositoryTest(t *testing.T) *repositories.ProviderRepository {
@@ -16,12 +17,10 @@ func newProviderRepositoryTest(t *testing.T) *repositories.ProviderRepository {
 	config := db.NewTestPostgresConfigFromEnv()
 
 	database, err := db.ConnectPostgres(context.Background(), config)
-	if err != nil {
-		t.Fatalf("error al conectar a la DB de pruebas: %v", err)
-	}
+	require.NoError(t, err, "could not connect to test database")
 
 	t.Cleanup(func() {
-		_, _ = database.Exec("DELETE FROM providers")
+		_, _ = database.Exec("DELETE FROM users")
 		database.Close()
 	})
 
@@ -39,7 +38,7 @@ func TestProviderRepositoryCanSaveAProvider(t *testing.T) {
 	err := repo.Save(provider)
 
 	assert.NoError(t, err)
-	exists := repo.FindByEmail(provider.Email)
+	exists := repo.FindByEmail(provider.User.Email)
 	assert.True(t, exists, "Provider should be saved on database")
 }
 
@@ -51,7 +50,7 @@ func TestProviderRepositoryCanDeleteAllProviders(t *testing.T) {
 	err := repo.DeleteAll()
 
 	assert.NoError(t, err)
-	exists := repo.FindByEmail(validProvider().Email)
+	exists := repo.FindByEmail(validProvider().User.Email)
 	assert.False(t, exists, "All providers should be deleted from database")
 }
 
@@ -61,7 +60,7 @@ func TestProviderRepositoryCanFindByEmail(t *testing.T) {
 
 	_ = repo.Save(provider)
 
-	assert.True(t, repo.FindByEmail(provider.Email), "Provider should be found by email")
+	assert.True(t, repo.FindByEmail(provider.User.Email), "Provider should be found by email")
 }
 
 func TestProviderRepositoryFindByEmailReturnsFalseIfProviderDoesNotExist(t *testing.T) {

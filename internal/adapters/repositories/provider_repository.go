@@ -7,43 +7,25 @@ import (
 )
 
 type ProviderRepository struct {
-	db *sql.DB
+	db             *sql.DB
+	repositoryUser *UserRepository
 }
 
 func NewProviderRepository(db *sql.DB) *ProviderRepository {
 	return &ProviderRepository{
-		db: db,
+		db:             db,
+		repositoryUser: NewUserRepository(db),
 	}
 }
 
 func (repository *ProviderRepository) Save(provider provider.Provider) error {
-	_, err := repository.db.Exec(
-		`INSERT INTO providers (auth0_id, email, name, surname, created_on, updated_on)
-		VALUES ($1, $2, $3, $4, NOW(), NOW())`,
-		provider.Auth0ID,
-		provider.Email,
-		provider.Name,
-		provider.Surname,
-	)
-
-	return err
+	return repository.repositoryUser.Save(*provider.User)
 }
 
 func (repository *ProviderRepository) DeleteAll() error {
-	_, err := repository.db.Exec(`DELETE FROM providers`)
-	return err
+	return repository.repositoryUser.DeleteAllOf("provider")
 }
 
 func (repository *ProviderRepository) FindByEmail(email string) bool {
-	var exists bool
-	err := repository.db.QueryRow(
-		`SELECT EXISTS(SELECT 1 FROM providers WHERE email = $1)`,
-		email,
-	).Scan(&exists)
-
-	if err != nil {
-		return false
-	}
-
-	return exists
+	return repository.repositoryUser.FindByEmail(email)
 }

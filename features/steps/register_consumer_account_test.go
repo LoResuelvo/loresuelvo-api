@@ -22,20 +22,20 @@ type registrationResponse struct {
 }
 
 func registerConsumerAccountSteps(sc *godog.ScenarioContext, suite *testSuite) {
-	sc.Step(`^que no existe un consumidor con correo "([^"]*)"$`, suite.noExisteUnConsumidorConCorreo)
-	sc.Step(`^existe un consumidor registrado con correo "([^"]*)"$`, suite.existeUnConsumidorRegistradoConCorreo)
-	sc.Step(`^me registro como usuario consumidor con correo "([^"]*)", nombre "([^"]*)" y apellido "([^"]*)"`, suite.solicitoRegistrarUnaCuentaDeConsumidor)
-	sc.Step(`^el sistema confirma el registro$`, suite.elSistemaConfirmaElRegistro)
-	sc.Step(`^el sistema me indica que el formato del correo es inválido$`, suite.elSistemaMeIndicaQueElFormatoDelCorreoEsInvalido)
-	sc.Step(`^el sistema me indica que el correo electrónico ya está registrado$`, suite.elSistemaMeIndicaQueElCorreoYaEstaRegistrado)
-	sc.Step(`^la respuesta de registro debe tener un codigo (\d+)$`, suite.laRespuestaDeRegistroDebeTenerUnCodigo)
-	sc.Step(`^la respuesta de registro debe indicar "([^"]*)"$`, suite.laRespuestaDeRegistroDebeIndicar)
+	sc.Step(`^que no existe un consumidor con correo "([^"]*)"$`, suite.thereIsNoConsumerWithEmail)
+	sc.Step(`^existe un consumidor registrado con correo "([^"]*)"$`, suite.thereIsRegisteredConsumerWithEmail)
+	sc.Step(`^me registro como usuario consumidor con correo "([^"]*)", nombre "([^"]*)" y apellido "([^"]*)"`, suite.requestConsumerAccountRegistration)
+	sc.Step(`^el sistema confirma el registro$`, suite.systemConfirmsRegistration)
+	sc.Step(`^el sistema me indica que el formato del correo es inválido$`, suite.systemReportsInvalidEmailFormat)
+	sc.Step(`^el sistema me indica que el correo electrónico ya está registrado$`, suite.systemReportsEmailAlreadyRegistered)
+	sc.Step(`^la respuesta de registro debe tener un codigo (\d+)$`, suite.registrationResponseShouldHaveStatusCode)
+	sc.Step(`^la respuesta de registro debe indicar "([^"]*)"$`, suite.registrationResponseShouldSay)
 }
 
-func (suite *testSuite) existeUnConsumidorRegistradoConCorreo(correo string) error {
+func (suite *testSuite) thereIsRegisteredConsumerWithEmail(email string) error {
 	req := consumerRegistrationRequest{
-		Email: correo,
-		Name:  "Consumidor Existente",
+		Email: email,
+		Name:  "Existing Consumer",
 	}
 
 	resp, err := suite.postConsumerRegistration(req)
@@ -46,20 +46,20 @@ func (suite *testSuite) existeUnConsumidorRegistradoConCorreo(correo string) err
 
 	if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusConflict {
 		body, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("no se pudo preparar el consumidor existente: codigo %d, cuerpo %s", resp.StatusCode, string(body))
+		return fmt.Errorf("could not prepare existing consumer: status %d, body %s", resp.StatusCode, string(body))
 	}
 
 	return nil
 }
 
-func (suite *testSuite) noExisteUnConsumidorConCorreo(_ string) error {
+func (suite *testSuite) thereIsNoConsumerWithEmail(_ string) error {
 	return suite.consumerRepository.DeleteAll()
 }
 
-func (suite *testSuite) solicitoRegistrarUnaCuentaDeConsumidor(correo, nombre, surname string) error {
+func (suite *testSuite) requestConsumerAccountRegistration(email, name, surname string) error {
 	resp, err := suite.postConsumerRegistration(consumerRegistrationRequest{
-		Email:   correo,
-		Name:    nombre,
+		Email:   email,
+		Name:    name,
 		Surname: surname,
 	})
 	if err != nil {
@@ -69,7 +69,7 @@ func (suite *testSuite) solicitoRegistrarUnaCuentaDeConsumidor(correo, nombre, s
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return fmt.Errorf("fallo leyendo el cuerpo de la respuesta: %w", err)
+		return fmt.Errorf("failed to read response body: %w", err)
 	}
 
 	suite.lastStatus = resp.StatusCode
@@ -78,51 +78,55 @@ func (suite *testSuite) solicitoRegistrarUnaCuentaDeConsumidor(correo, nombre, s
 	return nil
 }
 
-func (suite *testSuite) elSistemaConfirmaElRegistro() error {
-	if err := suite.laRespuestaDeRegistroDebeTenerUnCodigo(http.StatusCreated); err != nil {
+func (suite *testSuite) systemConfirmsRegistration() error {
+	if err := suite.registrationResponseShouldHaveStatusCode(http.StatusCreated); err != nil {
 		return err
 	}
 
-	return suite.laRespuestaDeRegistroDebeIndicar("cuenta registrada exitosamente")
+	return suite.registrationResponseShouldSay("cuenta registrada exitosamente")
 }
 
-func (suite *testSuite) elSistemaMeIndicaQueElFormatoDelCorreoEsInvalido() error {
-	if err := suite.laRespuestaDeRegistroDebeTenerUnCodigo(http.StatusBadRequest); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (suite *testSuite) elSistemaMeIndicaQueElCorreoYaEstaRegistrado() error {
-	if err := suite.laRespuestaDeRegistroDebeTenerUnCodigo(http.StatusConflict); err != nil {
+func (suite *testSuite) systemReportsInvalidEmailFormat() error {
+	if err := suite.registrationResponseShouldHaveStatusCode(http.StatusBadRequest); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func (suite *testSuite) laRespuestaDeRegistroDebeTenerUnCodigo(codigo int) error {
-	if suite.lastStatus != codigo {
-		return fmt.Errorf("se esperaba codigo %d, pero se obtuvo %d con cuerpo %s", codigo, suite.lastStatus, string(suite.lastBody))
+func (suite *testSuite) systemReportsEmailAlreadyRegistered() error {
+	if err := suite.registrationResponseShouldHaveStatusCode(http.StatusConflict); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (suite *testSuite) registrationResponseShouldHaveStatusCode(statusCode int) error {
+	if suite.lastStatus != statusCode {
+		return fmt.Errorf("expected status code %d, got %d with body %s", statusCode, suite.lastStatus, string(suite.lastBody))
 	}
 	return nil
 }
 
-func (suite *testSuite) laRespuestaDeRegistroDebeIndicar(mensaje string) error {
+func (suite *testSuite) registrationResponseShouldSay(message string) error {
 	var response registrationResponse
 	if err := json.Unmarshal(suite.lastBody, &response); err != nil {
-		return fmt.Errorf("la respuesta no es JSON valido: %w", err)
+		return fmt.Errorf("response is not valid JSON: %w", err)
 	}
 
-	if response.Message == mensaje || response.Error == mensaje {
+	if response.Message == message || response.Error == message {
 		return nil
 	}
 
-	return fmt.Errorf("se esperaba mensaje %q, pero se obtuvo cuerpo %s", mensaje, string(suite.lastBody))
+	return fmt.Errorf("expected message %q, got body %s", message, string(suite.lastBody))
 }
 
 func (suite *testSuite) postConsumerRegistration(req consumerRegistrationRequest) (*http.Response, error) {
+	return suite.postConsumerRegistrationWithAuth0ID("auth0|consumer-test", req)
+}
+
+func (suite *testSuite) postConsumerRegistrationWithAuth0ID(auth0ID string, req consumerRegistrationRequest) (*http.Response, error) {
 	body, err := json.Marshal(req)
 	if err != nil {
 		return nil, err
@@ -133,11 +137,11 @@ func (suite *testSuite) postConsumerRegistration(req consumerRegistrationRequest
 		return nil, err
 	}
 	httpReq.Header.Set("Content-Type", "application/json")
-	httpReq.Header.Set("Authorization", "Bearer "+suite.tokenBuilder.BuildToken("auth0|consumer-test", nil))
+	httpReq.Header.Set("Authorization", "Bearer "+suite.tokenBuilder.BuildToken(auth0ID, nil))
 
 	resp, err := http.DefaultClient.Do(httpReq)
 	if err != nil {
-		return nil, fmt.Errorf("fallo la conexion a la API: %w", err)
+		return nil, fmt.Errorf("API connection failed: %w", err)
 	}
 
 	return resp, nil

@@ -1,21 +1,16 @@
 package provider
 
+import "github.com/LoResuelvo/loresuelvo-api/internal/domain/user"
+
 type Provider struct {
-	Auth0ID                string
-	Email                  string
-	Name                   string
-	Surname                string
+	User                   *user.User
 	CoverageZones          []string
 	CriminalRecord         string
 	ProfessionalCredential string
 }
 
 func NewProvider(auth0ID string, email string, name string, surname string, coverageZone []string) Provider {
-	return Provider{
-		Auth0ID:       auth0ID,
-		Email:         email,
-		Name:          name,
-		Surname:       surname,
+	return Provider{User: user.New(auth0ID, name, surname, email, "provider"),
 		CoverageZones: coverageZone,
 	}
 }

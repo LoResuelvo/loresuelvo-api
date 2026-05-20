@@ -12,14 +12,16 @@ import (
 
 type Router struct {
 	consumerHandler *handler.ConsumerHandler
-	// providerHandler *handler.ProviderHandler
+	providerHandler *handler.ProviderHandler
+	// userHandler     *handler.UserHandler
 	auth0Validator *validator.Validator
 }
 
-func NewRouter(consumerHandler *handler.ConsumerHandler, auth0Validator *validator.Validator) *Router {
+func NewRouter(consumerHandler *handler.ConsumerHandler, providerHandler *handler.ProviderHandler, auth0Validator *validator.Validator) *Router {
 	router := &Router{
 		consumerHandler: consumerHandler,
-		// providerHandler: providerHandler,
+		providerHandler: providerHandler,
+		// userHandler:     userHandler,
 		auth0Validator: auth0Validator,
 	}
 
@@ -58,9 +60,9 @@ func (router *Router) registerConsumerRoutes(engine *gin.Engine, authMiddleware 
 }
 
 func (router *Router) registerProviderRoutes(engine *gin.Engine, authMiddleware gin.HandlerFunc) {
-	// engine.POST("/providers", authMiddleware, router.providerHandler.RegisterProvider)
+	engine.POST("/providers", authMiddleware, router.providerHandler.RegisterProvider)
 }
 
 func (router *Router) registerAuthenticatedRoutes(engine *gin.Engine, authMiddleware gin.HandlerFunc) {
-	engine.GET("/me", authMiddleware)
+	// engine.GET("/me", authMiddleware, router.userHandler.GetCurrentUser)
 }

@@ -5,6 +5,7 @@ import (
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/provider"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/validator"
+	"github.com/stretchr/testify/assert"
 )
 
 type providerRepositoryMock struct {
@@ -37,17 +38,9 @@ func TestRegisterProviderWithValidData(t *testing.T) {
 		[]string{"Palermo", "Belgrano"},
 	)
 
-	if err != nil {
-		t.Fatalf("se esperaba registrar el consumidor sin error, pero se obtuvo: %v", err)
-	}
-
-	if repository.savedProvider.Auth0ID != "auth0|ana" {
-		t.Fatalf("se esperaba guardar el consumidor con auth0_id auth0|ana, pero se obtuvo %s", repository.savedProvider.Auth0ID)
-	}
-
-	if repository.savedProvider.Email != "ana@example.com" {
-		t.Fatalf("se esperaba guardar el consumidor con email ana@example.com, pero se obtuvo %s", repository.savedProvider.Email)
-	}
+	assert.NoError(t, err)
+	assert.Equal(t, "auth0|ana", repository.savedProvider.User.AuthID)
+	assert.Equal(t, "ana@example.com", repository.savedProvider.User.Email)
 }
 
 func TestRegisterProviderWithEmailWithoutArroba(t *testing.T) {
@@ -59,15 +52,11 @@ func TestRegisterProviderWithEmailWithoutArroba(t *testing.T) {
 		"anaexample.com",
 		"Ana",
 		"Perez",
-		[]string{"Palermo", "Belgrano"})
+		[]string{"Palermo", "Belgrano"},
+	)
 
-	if err != validator.ErrInvalidEmailFormat {
-		t.Fatalf("se esperaba un error de formato de correo inválido, pero se obtuvo: %v", err)
-	}
-
-	if repository.saveCalled {
-		t.Fatal("no se esperaba guardar el consumidor cuando el correo es inválido")
-	}
+	assert.ErrorIs(t, err, validator.ErrInvalidEmailFormat)
+	assert.False(t, repository.saveCalled, "provider should not be saved when email is invalid")
 }
 
 func TestRegisterProviderWithEmailWithoutDomain(t *testing.T) {
@@ -82,13 +71,8 @@ func TestRegisterProviderWithEmailWithoutDomain(t *testing.T) {
 		[]string{"Palermo", "Belgrano"},
 	)
 
-	if err != validator.ErrInvalidEmailFormat {
-		t.Fatalf("se esperaba un error de formato de correo inválido, pero se obtuvo: %v", err)
-	}
-
-	if repository.saveCalled {
-		t.Fatal("no se esperaba guardar el consumidor cuando el correo es inválido")
-	}
+	assert.ErrorIs(t, err, validator.ErrInvalidEmailFormat)
+	assert.False(t, repository.saveCalled, "provider should not be saved when email is invalid")
 }
 
 func TestRegisterProviderWithEmailWithoutName(t *testing.T) {
@@ -103,13 +87,8 @@ func TestRegisterProviderWithEmailWithoutName(t *testing.T) {
 		[]string{"Palermo", "Belgrano"},
 	)
 
-	if err != validator.ErrInvalidEmailFormat {
-		t.Fatalf("se esperaba un error de formato de correo inválido, pero se obtuvo: %v", err)
-	}
-
-	if repository.saveCalled {
-		t.Fatal("no se esperaba guardar el consumidor cuando el correo es inválido")
-	}
+	assert.ErrorIs(t, err, validator.ErrInvalidEmailFormat)
+	assert.False(t, repository.saveCalled, "provider should not be saved when email is invalid")
 }
 
 func TestRegisterProviderWithAlreadyRegisteredEmail(t *testing.T) {
@@ -121,17 +100,10 @@ func TestRegisterProviderWithAlreadyRegisteredEmail(t *testing.T) {
 		"ana@example.com",
 		"Ana",
 		"Perez",
-		[]string{"Palermo", "Belgrano"})
+		[]string{"Palermo", "Belgrano"},
+	)
 
-	if err != validator.ErrEmailAlreadyRegistered {
-		t.Fatalf("Expected %v, but got %v", validator.ErrEmailAlreadyRegistered, err)
-	}
-
-	if repository.saveCalled {
-		t.Fatal("was not expected to save the provider when the email is already registered")
-	}
-
-	if !repository.findByEmailCalled {
-		t.Fatal("was expected to check if the email is already registered")
-	}
+	assert.ErrorIs(t, err, validator.ErrEmailAlreadyRegistered)
+	assert.False(t, repository.saveCalled, "provider should not be saved when email is already registered")
+	assert.True(t, repository.findByEmailCalled, "email registration should be checked")
 }
