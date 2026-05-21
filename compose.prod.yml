@@ -7,6 +7,16 @@ services:
     networks:
       - app-network
 
+  migrate:
+    image: migrate/migrate
+    profiles:
+      - tools
+    volumes:
+      - ./db/migrations:/migrations:ro
+    command: ["-path", "/migrations", "-database", "${DATABASE_URL}", "up"]
+    networks:
+      - app-network
+
   nginx:
     image: nginx:alpine
     container_name: nginx-proxy

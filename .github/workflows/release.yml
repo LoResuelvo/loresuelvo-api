@@ -55,6 +55,7 @@ jobs:
             echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u "${{ secrets.GHCR_USER }}" --password-stdin
 
             docker compose -f compose.prod.yml pull
+            docker compose -f compose.prod.yml run --rm migrate
             docker compose -f compose.prod.yml up -d
             docker compose -f compose.prod.yml exec -T nginx nginx -t
             docker compose -f compose.prod.yml exec -T nginx nginx -s reload
@@ -87,6 +88,7 @@ jobs:
             echo "${{ secrets.GHCR_TOKEN }}" | docker login ghcr.io -u "${{ secrets.GHCR_USER }}" --password-stdin
 
             docker compose -f compose.prod.yml pull
+            docker compose -f compose.prod.yml run --rm migrate
             docker compose -f compose.prod.yml up -d
             docker compose -f compose.prod.yml exec -T nginx nginx -t
             docker compose -f compose.prod.yml exec -T nginx nginx -s reload
