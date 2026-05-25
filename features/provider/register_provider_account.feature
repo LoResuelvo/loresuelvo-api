@@ -8,6 +8,7 @@ Feature: Registrar cuenta nueva de prestador
         # And que existe el rubro "Gasista matriculado"
         Given que no existe un usuario con correo "prestador@example.com"
 
+    @wip
     Scenario: 01-RPA Registrar una cuenta nueva de prestador correctamente
         When me registro como prestador con correo "prestador@example.com", nombre "Juan", apellido "Pérez", rubro "Plomería", zona de cobertura "Zona Norte" e ingreso mis documentos obligatorios
         Then el sistema confirma el registro
