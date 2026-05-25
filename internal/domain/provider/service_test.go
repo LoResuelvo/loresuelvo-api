@@ -54,6 +54,10 @@ func (repository *categoryRepositoryMock) Save(categoryToSave category.Category)
 	return &repository.categories[len(repository.categories)-1], nil
 }
 
+func (repository *categoryRepositoryMock) ListAll() ([]category.Category, error) {
+	return repository.categories, nil
+}
+
 func (repository *providerRepositoryMock) Save(provider provider.Provider) error {
 	repository.savedProvider = provider
 	repository.saveCalled = true

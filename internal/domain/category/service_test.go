@@ -10,6 +10,7 @@ import (
 
 type categoryRepositoryMock struct {
 	savedCategory                   category.Category
+	categories                      []category.Category
 	saveCalled                      bool
 	existsByNormalizedNameValue     bool
 	findByNormalizedNameCalled      bool
@@ -21,6 +22,10 @@ func (repository *categoryRepositoryMock) Save(categoryToSave category.Category)
 	repository.savedCategory = categoryToSave
 	repository.saveCalled = true
 	return &repository.savedCategory, nil
+}
+
+func (repository *categoryRepositoryMock) ListAll() ([]category.Category, error) {
+	return repository.categories, nil
 }
 
 func (repository *categoryRepositoryMock) FindByNormalizedName(normalizedName string) *category.Category {
@@ -52,6 +57,33 @@ func TestCreateCategoryWithValidName(t *testing.T) {
 	assert.Equal(t, "plomería", repository.savedCategory.NormalizedName)
 	assert.True(t, repository.findByNormalizedNameCalled, "category existence should be checked")
 	assert.Equal(t, "plomería", repository.requestedCategoryNormalizedName)
+}
+
+func TestListCategories(t *testing.T) {
+	repository := &categoryRepositoryMock{
+		categories: []category.Category{
+			{ID: 1, Name: "Electricidad", NormalizedName: "electricidad"},
+			{ID: 2, Name: "Plomería", NormalizedName: "plomería"},
+		},
+	}
+	categoryManager := category.NewService(repository)
+
+	categories, err := categoryManager.ListCategories()
+
+	require.NoError(t, err)
+	assert.Len(t, categories, 2)
+	assert.Equal(t, "Electricidad", categories[0].Name)
+	assert.Equal(t, "Plomería", categories[1].Name)
+}
+
+func TestListCategoriesWhenThereAreNoCategories(t *testing.T) {
+	repository := &categoryRepositoryMock{categories: []category.Category{}}
+	categoryManager := category.NewService(repository)
+
+	categories, err := categoryManager.ListCategories()
+
+	require.NoError(t, err)
+	assert.Empty(t, categories)
 }
 
 func TestCreateCategoryWithEmptyName(t *testing.T) {

@@ -2,6 +2,7 @@ package category
 
 type Repository interface {
 	Save(category Category) (*Category, error)
+	ListAll() ([]Category, error)
 	FindByID(id int) *Category
 	FindByNormalizedName(normalizedName string) *Category
 }

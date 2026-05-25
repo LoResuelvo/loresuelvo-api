@@ -20,3 +20,7 @@ func (s *Service) CreateCategory(name string) (*Category, error) {
 
 	return s.categoryRepository.Save(*category)
 }
+
+func (s *Service) ListCategories() ([]Category, error) {
+	return s.categoryRepository.ListAll()
+}

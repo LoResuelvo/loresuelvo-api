@@ -39,6 +39,7 @@ func (s *testSuite) registerAllSteps(sc *godog.ScenarioContext) {
 	registerConsumerAccountSteps(sc, s)
 	registerProviderAccountSteps(sc, s)
 	registerCreateCategorySteps(sc, s)
+	registerListCategoriesSteps(sc, s)
 	registerLoginSteps(sc, s)
 }
 

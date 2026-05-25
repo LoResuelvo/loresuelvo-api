@@ -59,6 +59,7 @@ func (router *Router) registerHealthRoutes(engine *gin.Engine) {
 }
 
 func (router *Router) registerCategoryRoutes(engine *gin.Engine, authMiddleware gin.HandlerFunc) {
+	engine.GET("/categories", authMiddleware, router.categoryHandler.ListCategories)
 	engine.POST("/categories", authMiddleware, router.categoryHandler.CreateCategory)
 }
 

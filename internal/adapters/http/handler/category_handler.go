@@ -21,6 +21,11 @@ type categoryResponse struct {
 	NormalizedName string `json:"normalized_name"`
 }
 
+type categoryListItemResponse struct {
+	ID   int    `json:"id"`
+	Name string `json:"name"`
+}
+
 func NewCategoryHandler(categoryService *category.Service) *CategoryHandler {
 	return &CategoryHandler{categoryService: categoryService}
 }
@@ -49,4 +54,22 @@ func (h *CategoryHandler) CreateCategory(c *gin.Context) {
 		Name:           createdCategory.Name,
 		NormalizedName: createdCategory.NormalizedName,
 	})
+}
+
+func (h *CategoryHandler) ListCategories(c *gin.Context) {
+	categories, err := h.categoryService.ListCategories()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	response := make([]categoryListItemResponse, 0, len(categories))
+	for _, category := range categories {
+		response = append(response, categoryListItemResponse{
+			ID:   category.ID,
+			Name: category.Name,
+		})
+	}
+
+	c.JSON(http.StatusOK, response)
 }

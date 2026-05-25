@@ -30,6 +30,34 @@ func (repository *CategoryRepository) Save(categoryToSave category.Category) (*c
 	return &savedCategory, nil
 }
 
+func (repository *CategoryRepository) ListAll() ([]category.Category, error) {
+	rows, err := repository.db.Query(
+		`SELECT id, name, normalized_name FROM categories ORDER BY name ASC`,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		_ = rows.Close()
+	}()
+
+	categories := []category.Category{}
+	for rows.Next() {
+		var category category.Category
+		if err := rows.Scan(&category.ID, &category.Name, &category.NormalizedName); err != nil {
+			return nil, err
+		}
+
+		categories = append(categories, category)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return categories, nil
+}
+
 func (repository *CategoryRepository) FindByNormalizedName(normalizedName string) *category.Category {
 	var category category.Category
 	err := repository.db.QueryRow(

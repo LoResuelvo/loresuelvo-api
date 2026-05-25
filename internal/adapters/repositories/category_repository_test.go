@@ -81,6 +81,33 @@ func TestCategoryRepositoryCanFindByID(t *testing.T) {
 	assert.NotNil(t, repo.FindByID(savedCategory.ID), "Category should be found by id")
 }
 
+func TestCategoryRepositoryCanListAllCategories(t *testing.T) {
+	repo := newCategoryRepositoryTest(t)
+	plumbingCategory := validCategory()
+	electricityCategory, _ := category.New("Electricidad")
+
+	_, err := repo.Save(plumbingCategory)
+	require.NoError(t, err, "saving category should not return an error")
+	_, err = repo.Save(*electricityCategory)
+	require.NoError(t, err, "saving category should not return an error")
+
+	categories, err := repo.ListAll()
+
+	require.NoError(t, err)
+	assert.Len(t, categories, 2)
+	assert.Equal(t, "Electricidad", categories[0].Name)
+	assert.Equal(t, "Plomería", categories[1].Name)
+}
+
+func TestCategoryRepositoryListAllReturnsEmptyListWhenThereAreNoCategories(t *testing.T) {
+	repo := newCategoryRepositoryTest(t)
+
+	categories, err := repo.ListAll()
+
+	require.NoError(t, err)
+	assert.Empty(t, categories)
+}
+
 func TestCategoryRepositoryCanFindByNormalizedNameFromDifferentDisplayNames(t *testing.T) {
 	repo := newCategoryRepositoryTest(t)
 	savedCategory := validCategory()
