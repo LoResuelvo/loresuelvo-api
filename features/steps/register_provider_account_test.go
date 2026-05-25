@@ -25,6 +25,8 @@ type providerRegistrationRequest struct {
 func registerProviderAccountSteps(sc *godog.ScenarioContext, suite *testSuite) {
 	sc.Step(`^que no existe un usuario con correo "([^"]*)"$`, suite.thereIsNoUserWithEmail)
 	sc.Step(`^me registro como prestador con correo "([^"]*)", nombre "([^"]*)", apellido "([^"]*)" y rubro "([^"]*)"$`, suite.requestProviderAccountRegistration)
+	sc.Step(`^me registro como prestador con correo "([^"]*)", nombre "([^"]*)", apellido "([^"]*)" y sin rubro$`, suite.requestProviderAccountRegistrationWithoutCategory)
+	sc.Step(`^el sistema me indica que el rubro es obligatorio$`, suite.systemReportsProviderCategoryIsRequired)
 }
 
 func (suite *testSuite) thereIsNoUserWithEmail(_ string) error {
@@ -37,7 +39,7 @@ func (suite *testSuite) requestProviderAccountRegistration(email, name, surname,
 		return err
 	}
 
-	resp, err := suite.postProviderRegistration(providerRegistrationRequest{
+	return suite.requestProviderRegistration(providerRegistrationRequest{
 		Email:                  email,
 		Name:                   name,
 		Surname:                surname,
@@ -47,6 +49,22 @@ func (suite *testSuite) requestProviderAccountRegistration(email, name, surname,
 		BiometricValidationID:  "biometric-validation-approved",
 		ProfessionalCredential: "professional-license-or-certificate.pdf",
 	})
+}
+
+func (suite *testSuite) requestProviderAccountRegistrationWithoutCategory(email, name, surname string) error {
+	return suite.requestProviderRegistration(map[string]any{
+		"email":                        email,
+		"name":                         name,
+		"surname":                      surname,
+		"criminal_record_file":         "criminal-record.pdf",
+		"cuit_certificate_file":        "cuit-certificate.pdf",
+		"biometric_validation_id":      "biometric-validation-approved",
+		"professional_credential_file": "professional-license-or-certificate.pdf",
+	})
+}
+
+func (suite *testSuite) requestProviderRegistration(payload any) error {
+	resp, err := suite.postProviderRegistrationPayload("auth0|provider-test", payload)
 	if err != nil {
 		return err
 	}
@@ -63,12 +81,20 @@ func (suite *testSuite) requestProviderAccountRegistration(email, name, surname,
 	return nil
 }
 
-func (suite *testSuite) postProviderRegistration(req providerRegistrationRequest) (*http.Response, error) {
-	return suite.postProviderRegistrationWithAuth0ID("auth0|provider-test", req)
+func (suite *testSuite) systemReportsProviderCategoryIsRequired() error {
+	if err := suite.registrationResponseShouldHaveStatusCode(http.StatusBadRequest); err != nil {
+		return err
+	}
+
+	return suite.registrationResponseShouldSay("Category id is required")
 }
 
 func (suite *testSuite) postProviderRegistrationWithAuth0ID(auth0ID string, req providerRegistrationRequest) (*http.Response, error) {
-	body, err := json.Marshal(req)
+	return suite.postProviderRegistrationPayload(auth0ID, req)
+}
+
+func (suite *testSuite) postProviderRegistrationPayload(auth0ID string, payload any) (*http.Response, error) {
+	body, err := json.Marshal(payload)
 	if err != nil {
 		return nil, err
 	}

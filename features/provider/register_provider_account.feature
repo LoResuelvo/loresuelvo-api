@@ -14,7 +14,6 @@ Feature: Registrar cuenta nueva de prestador
 
     Rule: El prestador debe indicar su rubro
 
-    @wip
     Scenario: 02-RPA Rechazar registro sin rubro
         When me registro como prestador con correo "prestador@example.com", nombre "Juan", apellido "Pérez" y sin rubro
         Then el sistema me indica que el rubro es obligatorio
