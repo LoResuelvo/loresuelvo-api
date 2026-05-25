@@ -4,24 +4,26 @@ Feature: Registrar cuenta nueva de prestador
     para poder ofrecer mis servicios a los consumidores
 
     Background:
-        # Given que existe el rubro "Plomería"
+        Given que existe el rubro "Plomería"
         # And que existe el rubro "Gasista matriculado"
-        Given que no existe un usuario con correo "prestador@example.com"
+        And que no existe un usuario con correo "prestador@example.com"
 
-    @wip
     Scenario: 01-RPA Registrar una cuenta nueva de prestador correctamente
-        When me registro como prestador con correo "prestador@example.com", nombre "Juan", apellido "Pérez", rubro "Plomería", zona de cobertura "Zona Norte" e ingreso mis documentos obligatorios
+        When me registro como prestador con correo "prestador@example.com", nombre "Juan", apellido "Pérez" y rubro "Plomería"
         Then el sistema confirma el registro
 
-    Rule: El prestador debe indicar su rubro y zona de cobertura
+    Rule: El prestador debe indicar su rubro
 
     @wip
     Scenario: 02-RPA Rechazar registro sin rubro
-        When me registro como prestador con correo "prestador@example.com", nombre "Juan", apellido "Pérez", sin rubro, zona de cobertura "Zona Norte" e ingreso mis documentos obligatorios
+        When me registro como prestador con correo "prestador@example.com", nombre "Juan", apellido "Pérez" y sin rubro
         Then el sistema me indica que el rubro es obligatorio
+    
+    Rule: El prestador debe indicar su zona de cobertura
+    
     @wip
     Scenario: 03-RPA Rechazar registro sin zona de cobertura
-        When me registro como prestador con correo "prestador@example.com", nombre "Juan", apellido "Pérez", rubro "Plomería", sin zona de cobertura e ingreso mis documentos obligatorios
+        When me registro como prestador con correo "prestador@example.com", nombre "Juan", apellido "Pérez", rubro "Plomería" y sin zona de cobertura
         Then el sistema me indica que la zona de cobertura es obligatoria
 
     Rule: El prestador debe presentar documentación obligatoria

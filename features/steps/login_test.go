@@ -44,11 +44,20 @@ func (suite *testSuite) iAmRegisteredAsConsumer() error {
 }
 
 func (suite *testSuite) iAmRegisteredAsProvider() error {
+	if err := suite.thereIsCategoryNamed("Plomería"); err != nil {
+		return err
+	}
+
+	categoryID, err := suite.categoryIDFor("Plomería")
+	if err != nil {
+		return err
+	}
+
 	resp, err := suite.postProviderRegistrationWithAuth0ID(loginProviderAuth0ID, providerRegistrationRequest{
 		Email:                  "login-provider@example.com",
 		Name:                   "Provider",
 		Surname:                "Login",
-		Category:               "Plomería",
+		CategoryID:             categoryID,
 		CoverageZone:           []string{"Zona Norte"},
 		CriminalRecordFile:     "criminal-record.pdf",
 		CUITCertificateFile:    "cuit-certificate.pdf",

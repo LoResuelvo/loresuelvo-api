@@ -2,6 +2,7 @@ package repositories_test
 
 import (
 	"context"
+	"database/sql"
 	"testing"
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/repositories"
@@ -10,6 +11,16 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func cleanCategoryRepositoryTestDatabase(t *testing.T, database *sql.DB) {
+	t.Helper()
+
+	_, err := database.Exec("DELETE FROM users")
+	require.NoError(t, err, "could not clean users")
+
+	_, err = database.Exec("DELETE FROM categories")
+	require.NoError(t, err, "could not clean categories")
+}
 
 func newCategoryRepositoryTest(t *testing.T) *repositories.CategoryRepository {
 	t.Helper()
@@ -20,11 +31,11 @@ func newCategoryRepositoryTest(t *testing.T) *repositories.CategoryRepository {
 	require.NoError(t, err, "could not connect to test database")
 
 	t.Cleanup(func() {
-		_, _ = database.Exec("DELETE FROM categories")
+		cleanCategoryRepositoryTestDatabase(t, database)
 		database.Close()
 	})
 
-	_, _ = database.Exec("DELETE FROM categories")
+	cleanCategoryRepositoryTestDatabase(t, database)
 
 	return repositories.NewCategoryRepository(database)
 }
@@ -38,21 +49,36 @@ func TestCategoryRepositoryCanSaveACategory(t *testing.T) {
 	repo := newCategoryRepositoryTest(t)
 	savedCategory := validCategory()
 
-	err := repo.Save(savedCategory)
+	createdCategory, err := repo.Save(savedCategory)
 
-	assert.NoError(t, err)
-	exists := repo.FindByNormalizedName(savedCategory.NormalizedName)
-	assert.True(t, exists, "Category should be saved on database")
+	require.NoError(t, err)
+	require.NotNil(t, createdCategory)
+	assert.NotZero(t, createdCategory.ID, "saved category should return its generated id")
+	assert.Equal(t, savedCategory.Name, createdCategory.Name)
+	assert.Equal(t, savedCategory.NormalizedName, createdCategory.NormalizedName)
+	foundCategory := repo.FindByNormalizedName(savedCategory.NormalizedName)
+	assert.NotNil(t, foundCategory, "Category should be saved on database")
 }
 
 func TestCategoryRepositoryCanFindByNormalizedName(t *testing.T) {
 	repo := newCategoryRepositoryTest(t)
 	savedCategory := validCategory()
 
-	err := repo.Save(savedCategory)
+	_, err := repo.Save(savedCategory)
 
 	assert.NoError(t, err, "saving category should not return an error")
-	assert.True(t, repo.FindByNormalizedName(savedCategory.NormalizedName), "Category should be found by normalized name")
+	assert.NotNil(t, repo.FindByNormalizedName(savedCategory.NormalizedName), "Category should be found by normalized name")
+}
+
+func TestCategoryRepositoryCanFindByID(t *testing.T) {
+	repo := newCategoryRepositoryTest(t)
+	categoryToSave := validCategory()
+
+	savedCategory, err := repo.Save(categoryToSave)
+
+	require.NoError(t, err, "saving category should not return an error")
+	require.NotNil(t, savedCategory)
+	assert.NotNil(t, repo.FindByID(savedCategory.ID), "Category should be found by id")
 }
 
 func TestCategoryRepositoryCanFindByNormalizedNameFromDifferentDisplayNames(t *testing.T) {
@@ -60,28 +86,34 @@ func TestCategoryRepositoryCanFindByNormalizedNameFromDifferentDisplayNames(t *t
 	savedCategory := validCategory()
 	sameCategory, _ := category.New("  plomería  ")
 
-	err := repo.Save(savedCategory)
+	_, err := repo.Save(savedCategory)
 
 	assert.NoError(t, err, "saving category should not return an error")
-	assert.True(t, repo.FindByNormalizedName(sameCategory.NormalizedName), "Category should be found by normalized name")
+	assert.NotNil(t, repo.FindByNormalizedName(sameCategory.NormalizedName), "Category should be found by normalized name")
 }
 
 func TestCategoryRepositoryCanDeleteAllCategories(t *testing.T) {
 	repo := newCategoryRepositoryTest(t)
 	savedCategory := validCategory()
 
-	err := repo.Save(savedCategory)
+	_, err := repo.Save(savedCategory)
 
 	assert.NoError(t, err, "saving category should not return an error")
 
 	err = repo.DeleteAll()
 
 	assert.NoError(t, err)
-	assert.False(t, repo.FindByNormalizedName(savedCategory.NormalizedName), "All categories should be deleted from database")
+	assert.Nil(t, repo.FindByNormalizedName(savedCategory.NormalizedName), "All categories should be deleted from database")
 }
 
 func TestCategoryRepositoryFindByNormalizedNameReturnsFalseIfCategoryDoesNotExist(t *testing.T) {
 	repo := newCategoryRepositoryTest(t)
 
-	assert.False(t, repo.FindByNormalizedName("no existe"), "Category should not be found by normalized name if it does not exist")
+	assert.Nil(t, repo.FindByNormalizedName("no existe"), "Category should not be found by normalized name if it does not exist")
+}
+
+func TestCategoryRepositoryFindByIDReturnsFalseIfCategoryDoesNotExist(t *testing.T) {
+	repo := newCategoryRepositoryTest(t)
+
+	assert.Nil(t, repo.FindByID(999), "Category should not be found by id if it does not exist")
 }

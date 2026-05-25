@@ -24,12 +24,12 @@ Feature: Crear rubro de prestador
     Rule: No se puede crear un rubro duplicado
 
     Scenario: 04-CR Rechazar creación de un rubro con nombre ya existente
-        Given existe el rubro "Plomería"
+        Given que existe el rubro "Plomería"
         When intento crear el rubro "Plomería"
         Then el sistema me indica que el rubro ya existe
 
     Scenario: 05-CR Rechazar creación de un rubro duplicado con diferencias de mayúsculas o espacios
-        Given existe el rubro "Plomería"
+        Given que existe el rubro "Plomería"
         When intento crear el rubro "  plomería  "
         Then el sistema me indica que el rubro ya existe
 

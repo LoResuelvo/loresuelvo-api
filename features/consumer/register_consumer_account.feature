@@ -4,7 +4,7 @@ Feature: Registrar cuenta nueva de consumidor
   para poder contactar profesionales que resuelvan problemas en mi hogar
 
     Background:
-        Given que no existe un consumidor con correo "ana@example.com"
+        Given que no existe un usuario con correo "ana@example.com"
 
     Scenario: 01-RCN Registrar una cuenta nueva correctamente
         When me registro como usuario consumidor con correo "ana@example.com", nombre "Ana Perez" y apellido "Mamani Tipula"

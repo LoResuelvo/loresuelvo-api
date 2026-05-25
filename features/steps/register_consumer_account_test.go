@@ -22,7 +22,6 @@ type registrationResponse struct {
 }
 
 func registerConsumerAccountSteps(sc *godog.ScenarioContext, suite *testSuite) {
-	sc.Step(`^que no existe un consumidor con correo "([^"]*)"$`, suite.thereIsNoConsumerWithEmail)
 	sc.Step(`^existe un consumidor registrado con correo "([^"]*)"$`, suite.thereIsRegisteredConsumerWithEmail)
 	sc.Step(`^me registro como usuario consumidor con correo "([^"]*)", nombre "([^"]*)" y apellido "([^"]*)"`, suite.requestConsumerAccountRegistration)
 	sc.Step(`^el sistema confirma el registro$`, suite.systemConfirmsRegistration)
@@ -50,10 +49,6 @@ func (suite *testSuite) thereIsRegisteredConsumerWithEmail(email string) error {
 	}
 
 	return nil
-}
-
-func (suite *testSuite) thereIsNoConsumerWithEmail(_ string) error {
-	return suite.userRepository.DeleteAll()
 }
 
 func (suite *testSuite) requestConsumerAccountRegistration(email, name, surname string) error {

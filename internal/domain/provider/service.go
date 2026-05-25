@@ -1,23 +1,49 @@
 package provider
 
-import "github.com/LoResuelvo/loresuelvo-api/internal/domain/validator"
+import (
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/category"
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/validator"
+)
 
 type Service struct {
 	providerRepository Repository
+	categoryRepository category.Repository
 }
 
-func NewService(repository Repository) *Service {
-	return &Service{providerRepository: repository}
+func NewService(repository Repository, categoryRepository category.Repository) *Service {
+	return &Service{
+		providerRepository: repository,
+		categoryRepository: categoryRepository,
+	}
 }
 
-func (s *Service) RegisterProvider(authId, email, name, surname string, coverageZones []string) error {
+func (s *Service) RegisterProvider(authId, email, name, surname string, categoryID int) error {
 	if s.providerRepository.FindByEmail(email) {
 		return validator.ErrEmailAlreadyRegistered
 	}
-	provider, err := NewProvider(authId, email, name, surname, coverageZones)
+
+	category, err := s.validateCategory(categoryID)
+	if err != nil {
+		return err
+	}
+
+	provider, err := NewProvider(authId, email, name, surname, category)
 	if err != nil {
 		return err
 	}
 
 	return s.providerRepository.Save(*provider)
+}
+
+func (s *Service) validateCategory(categoryID int) (*category.Category, error) {
+	if categoryID == 0 {
+		return nil, category.ErrIDRequired
+	}
+
+	existingCategory := s.categoryRepository.FindByID(categoryID)
+	if existingCategory == nil {
+		return nil, category.ErrDoesNotExist
+	}
+
+	return existingCategory, nil
 }

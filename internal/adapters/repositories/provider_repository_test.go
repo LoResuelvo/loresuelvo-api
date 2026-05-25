@@ -2,16 +2,33 @@ package repositories_test
 
 import (
 	"context"
+	"database/sql"
 	"testing"
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/repositories"
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/category"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/provider"
 	"github.com/LoResuelvo/loresuelvo-api/internal/infrastructure/db"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func newProviderRepositoryTest(t *testing.T) *repositories.ProviderRepository {
+func cleanProviderRepositoryTestDatabase(t *testing.T, database *sql.DB) {
+	t.Helper()
+
+	_, err := database.Exec("DELETE FROM users")
+	require.NoError(t, err, "could not clean users")
+
+	_, err = database.Exec("DELETE FROM categories")
+	require.NoError(t, err, "could not clean categories")
+}
+
+type providerRepositoryTestContext struct {
+	providerRepository *repositories.ProviderRepository
+	categoryRepository *repositories.CategoryRepository
+}
+
+func newProviderRepositoryTest(t *testing.T) providerRepositoryTestContext {
 	t.Helper()
 
 	config := db.NewTestPostgresConfigFromEnv()
@@ -20,21 +37,35 @@ func newProviderRepositoryTest(t *testing.T) *repositories.ProviderRepository {
 	require.NoError(t, err, "could not connect to test database")
 
 	t.Cleanup(func() {
-		_, _ = database.Exec("DELETE FROM users")
+		cleanProviderRepositoryTestDatabase(t, database)
 		database.Close()
 	})
+
+	cleanProviderRepositoryTestDatabase(t, database)
+
 	userRepository := repositories.NewUserRepository(database)
-	return repositories.NewProviderRepository(database, userRepository)
+	return providerRepositoryTestContext{
+		providerRepository: repositories.NewProviderRepository(database, userRepository),
+		categoryRepository: repositories.NewCategoryRepository(database),
+	}
 }
 
-func validProvider() *provider.Provider {
-	provider, _ := provider.NewProvider("auth0|josue", "josugod@gmail.com", "Josue", "el pro", []string{"Palermo", "Belgrano"})
+func validProvider(t *testing.T, categoryRepository *repositories.CategoryRepository) *provider.Provider {
+	t.Helper()
+
+	categoryToSave, _ := category.New("Plomería")
+	savedCategory, err := categoryRepository.Save(*categoryToSave)
+	require.NoError(t, err, "could not prepare provider category")
+	require.NotNil(t, savedCategory, "provider category should exist")
+
+	provider, _ := provider.NewProvider("auth0|josue", "josugod@gmail.com", "Josue", "el pro", savedCategory)
 	return provider
 }
 
 func TestProviderRepositoryCanSaveAProvider(t *testing.T) {
-	repo := newProviderRepositoryTest(t)
-	provider := validProvider()
+	testContext := newProviderRepositoryTest(t)
+	repo := testContext.providerRepository
+	provider := validProvider(t, testContext.categoryRepository)
 
 	err := repo.Save(*provider)
 
@@ -44,20 +75,23 @@ func TestProviderRepositoryCanSaveAProvider(t *testing.T) {
 }
 
 func TestProviderRepositoryCanDeleteAllProviders(t *testing.T) {
-	repo := newProviderRepositoryTest(t)
+	testContext := newProviderRepositoryTest(t)
+	repo := testContext.providerRepository
+	provider := validProvider(t, testContext.categoryRepository)
 
-	_ = repo.Save(*validProvider())
+	_ = repo.Save(*provider)
 
 	err := repo.DeleteAll()
 
 	assert.NoError(t, err)
-	exists := repo.FindByEmail(validProvider().User.Email)
+	exists := repo.FindByEmail(provider.User.Email)
 	assert.False(t, exists, "All providers should be deleted from database")
 }
 
 func TestProviderRepositoryCanFindByEmail(t *testing.T) {
-	repo := newProviderRepositoryTest(t)
-	provider := validProvider()
+	testContext := newProviderRepositoryTest(t)
+	repo := testContext.providerRepository
+	provider := validProvider(t, testContext.categoryRepository)
 
 	_ = repo.Save(*provider)
 
@@ -65,7 +99,8 @@ func TestProviderRepositoryCanFindByEmail(t *testing.T) {
 }
 
 func TestProviderRepositoryFindByEmailReturnsFalseIfProviderDoesNotExist(t *testing.T) {
-	repo := newProviderRepositoryTest(t)
+	testContext := newProviderRepositoryTest(t)
+	repo := testContext.providerRepository
 
 	assert.False(t, repo.FindByEmail("no-existe@ejemplo.com"), "Provider should not be found by email if it does not exist")
 }

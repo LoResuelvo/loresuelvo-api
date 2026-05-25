@@ -14,7 +14,7 @@ type providerRegistrationRequest struct {
 	Email                  string   `json:"email"`
 	Name                   string   `json:"name"`
 	Surname                string   `json:"surname"`
-	Category               string   `json:"category"`
+	CategoryID             int      `json:"category_id"`
 	CoverageZone           []string `json:"coverage_zone"`
 	CriminalRecordFile     string   `json:"criminal_record_file"`
 	CUITCertificateFile    string   `json:"cuit_certificate_file"`
@@ -24,20 +24,24 @@ type providerRegistrationRequest struct {
 
 func registerProviderAccountSteps(sc *godog.ScenarioContext, suite *testSuite) {
 	sc.Step(`^que no existe un usuario con correo "([^"]*)"$`, suite.thereIsNoUserWithEmail)
-	sc.Step(`^me registro como prestador con correo "([^"]*)", nombre "([^"]*)", apellido "([^"]*)", rubro "([^"]*)", zona de cobertura "([^"]*)" e ingreso mis documentos obligatorios$`, suite.requestProviderAccountRegistration)
+	sc.Step(`^me registro como prestador con correo "([^"]*)", nombre "([^"]*)", apellido "([^"]*)" y rubro "([^"]*)"$`, suite.requestProviderAccountRegistration)
 }
 
 func (suite *testSuite) thereIsNoUserWithEmail(_ string) error {
 	return suite.userRepository.DeleteAll()
 }
 
-func (suite *testSuite) requestProviderAccountRegistration(email, name, surname, category, coverageZone string) error {
+func (suite *testSuite) requestProviderAccountRegistration(email, name, surname, categoryName string) error {
+	categoryID, err := suite.categoryIDFor(categoryName)
+	if err != nil {
+		return err
+	}
+
 	resp, err := suite.postProviderRegistration(providerRegistrationRequest{
 		Email:                  email,
 		Name:                   name,
 		Surname:                surname,
-		Category:               category,
-		CoverageZone:           []string{coverageZone},
+		CategoryID:             categoryID,
 		CriminalRecordFile:     "criminal-record.pdf",
 		CUITCertificateFile:    "cuit-certificate.pdf",
 		BiometricValidationID:  "biometric-validation-approved",

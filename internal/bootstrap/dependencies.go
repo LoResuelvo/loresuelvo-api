@@ -30,7 +30,7 @@ func NewDependencies(database *sql.DB) *Dependencies {
 	providerRepository := repositories.NewProviderRepository(database, userRepository)
 
 	categoryService := category.NewService(categoryRepository)
-	providerService := provider.NewService(providerRepository)
+	providerService := provider.NewService(providerRepository, categoryRepository)
 	consumerService := consumer.NewService(consumerRepository)
 	userService := user.NewService(userRepository)
 

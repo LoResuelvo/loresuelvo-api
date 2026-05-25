@@ -18,6 +18,7 @@ type registerProviderRequest struct {
 	Email        string   `json:"email"`
 	Name         string   `json:"name"`
 	Surname      string   `json:"surname"`
+	CategoryID   int      `json:"category_id"`
 	CoverageZone []string `json:"coverage_zone"`
 }
 
@@ -44,11 +45,8 @@ func (h *ProviderHandler) RegisterProvider(c *gin.Context) {
 	req.Email = strings.TrimSpace(req.Email)
 	req.Name = strings.TrimSpace(req.Name)
 	req.Surname = strings.TrimSpace(req.Surname)
-	for i, zone := range req.CoverageZone {
-		req.CoverageZone[i] = strings.TrimSpace(zone)
-	}
 
-	err := h.providerService.RegisterProvider(auth0ID, req.Email, req.Name, req.Surname, req.CoverageZone)
+	err := h.providerService.RegisterProvider(auth0ID, req.Email, req.Name, req.Surname, req.CategoryID)
 	if err == validator.ErrEmailAlreadyRegistered {
 		c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
 		return

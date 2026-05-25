@@ -3,6 +3,7 @@ package category
 import "strings"
 
 type Category struct {
+	ID             int
 	Name           string
 	NormalizedName string
 }

@@ -8,14 +8,14 @@ func NewService(categoryRepository Repository) *Service {
 	return &Service{categoryRepository: categoryRepository}
 }
 
-func (s *Service) CreateCategory(name string) error {
+func (s *Service) CreateCategory(name string) (*Category, error) {
 	category, err := New(name)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	if s.categoryRepository.FindByNormalizedName(category.NormalizedName) {
-		return ErrAlreadyExists
+	if s.categoryRepository.FindByNormalizedName(category.NormalizedName) != nil {
+		return nil, ErrAlreadyExists
 	}
 
 	return s.categoryRepository.Save(*category)

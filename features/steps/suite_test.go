@@ -30,6 +30,8 @@ type testSuite struct {
 	lastStatus         int
 	lastBody           []byte
 	currentAuth0ID     string
+
+	categoryIDsByName map[string]int
 }
 
 func (s *testSuite) registerAllSteps(sc *godog.ScenarioContext) {
@@ -48,6 +50,8 @@ func (s *testSuite) cleanDatabase() error {
 	if err := s.categoryRepository.DeleteAll(); err != nil {
 		return fmt.Errorf("could not clean categories: %w", err)
 	}
+
+	s.categoryIDsByName = map[string]int{}
 
 	return nil
 }
@@ -84,6 +88,8 @@ func newTestSuite(tb testing.TB, database *sql.DB) *testSuite {
 		userRepository:     dependencies.UserRepository,
 		auth0Validator:     auth0Validator,
 		tokenBuilder:       tokenBuilder,
+
+		categoryIDsByName: map[string]int{},
 	}
 }
 

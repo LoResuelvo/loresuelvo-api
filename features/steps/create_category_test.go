@@ -17,9 +17,15 @@ type categoryCreationRequest struct {
 	Name string `json:"name"`
 }
 
+type categoryCreationResponse struct {
+	ID             int    `json:"id"`
+	Name           string `json:"name"`
+	NormalizedName string `json:"normalized_name"`
+}
+
 func registerCreateCategorySteps(sc *godog.ScenarioContext, suite *testSuite) {
 	sc.Step(`^que no existe el rubro "([^"]*)"$`, suite.thereIsNoCategoryNamed)
-	sc.Step(`^existe el rubro "([^"]*)"$`, suite.thereIsCategoryNamed)
+	sc.Step(`^que existe el rubro "([^"]*)"$`, suite.thereIsCategoryNamed)
 	sc.Step(`^creo el rubro "([^"]*)"$`, suite.requestCategoryCreationWithName)
 	sc.Step(`^intento crear un rubro sin nombre$`, suite.tryCreateCategoryWithoutName)
 	sc.Step(`^intento crear el rubro "([^"]*)"$`, suite.requestCategoryCreationWithName)
@@ -29,7 +35,13 @@ func registerCreateCategorySteps(sc *godog.ScenarioContext, suite *testSuite) {
 }
 
 func (suite *testSuite) thereIsNoCategoryNamed(_ string) error {
-	return suite.categoryRepository.DeleteAll()
+	if err := suite.categoryRepository.DeleteAll(); err != nil {
+		return err
+	}
+
+	suite.categoryIDsByName = map[string]int{}
+
+	return nil
 }
 
 func (suite *testSuite) thereIsCategoryNamed(name string) error {
@@ -39,11 +51,20 @@ func (suite *testSuite) thereIsCategoryNamed(name string) error {
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode == http.StatusCreated || resp.StatusCode == http.StatusConflict {
-		return nil
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("failed to read response body: %w", err)
 	}
 
-	body, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode == http.StatusCreated {
+		return suite.storeCategoryIDFromResponse(name, body)
+	}
+
+	if resp.StatusCode == http.StatusConflict {
+		_, err := suite.categoryIDFor(name)
+		return err
+	}
+
 	return fmt.Errorf("could not prepare existing category: status %d, body %s", resp.StatusCode, string(body))
 }
 
@@ -74,7 +95,11 @@ func (suite *testSuite) requestCategoryCreation(payload any) error {
 }
 
 func (suite *testSuite) systemConfirmsCategoryCreation() error {
-	return suite.categoryCreationResponseShouldHaveStatusCode(http.StatusCreated)
+	if err := suite.categoryCreationResponseShouldHaveStatusCode(http.StatusCreated); err != nil {
+		return err
+	}
+
+	return suite.categoryCreationResponseShouldHaveCreatedCategory()
 }
 
 func (suite *testSuite) systemReportsCategoryNameIsRequired() error {
@@ -111,6 +136,43 @@ func (suite *testSuite) categoryCreationResponseShouldHaveError() error {
 	}
 
 	return nil
+}
+
+func (suite *testSuite) categoryCreationResponseShouldHaveCreatedCategory() error {
+	return suite.storeCategoryIDFromResponse("", suite.lastBody)
+}
+
+func (suite *testSuite) storeCategoryIDFromResponse(name string, body []byte) error {
+	var response categoryCreationResponse
+	if err := json.Unmarshal(body, &response); err != nil {
+		return fmt.Errorf("response is not valid JSON: %w", err)
+	}
+
+	if response.ID == 0 {
+		return fmt.Errorf("expected created category id, got body %s", string(body))
+	}
+
+	if strings.TrimSpace(response.Name) == "" {
+		return fmt.Errorf("expected created category name, got body %s", string(body))
+	}
+
+	if strings.TrimSpace(response.NormalizedName) == "" {
+		return fmt.Errorf("expected created category normalized_name, got body %s", string(body))
+	}
+
+	if name != "" {
+		suite.categoryIDsByName[name] = response.ID
+	}
+
+	return nil
+}
+
+func (suite *testSuite) categoryIDFor(name string) (int, error) {
+	if categoryID, ok := suite.categoryIDsByName[name]; ok && categoryID != 0 {
+		return categoryID, nil
+	}
+
+	return 0, fmt.Errorf("category %q does not exist", name)
 }
 
 func (suite *testSuite) postCategoryCreation(payload any) (*http.Response, error) {

@@ -15,6 +15,12 @@ type createCategoryRequest struct {
 	Name string `json:"name"`
 }
 
+type categoryResponse struct {
+	ID             int    `json:"id"`
+	Name           string `json:"name"`
+	NormalizedName string `json:"normalized_name"`
+}
+
 func NewCategoryHandler(categoryService *category.Service) *CategoryHandler {
 	return &CategoryHandler{categoryService: categoryService}
 }
@@ -27,7 +33,7 @@ func (h *CategoryHandler) CreateCategory(c *gin.Context) {
 		return
 	}
 
-	err := h.categoryService.CreateCategory(req.Name)
+	createdCategory, err := h.categoryService.CreateCategory(req.Name)
 	if err == category.ErrAlreadyExists {
 		c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
 		return
@@ -38,5 +44,9 @@ func (h *CategoryHandler) CreateCategory(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusCreated, gin.H{"message": "rubro creado exitosamente"})
+	c.JSON(http.StatusCreated, categoryResponse{
+		ID:             createdCategory.ID,
+		Name:           createdCategory.Name,
+		NormalizedName: createdCategory.NormalizedName,
+	})
 }
