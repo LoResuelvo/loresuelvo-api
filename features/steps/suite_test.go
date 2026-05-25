@@ -21,6 +21,7 @@ import (
 type testSuite struct {
 	server             *httptest.Server
 	database           *sql.DB
+	categoryRepository *repositories.CategoryRepository
 	consumerRepository *repositories.ConsumerRepository
 	providerRepository *repositories.ProviderRepository
 	userRepository     *repositories.UserRepository
@@ -39,6 +40,18 @@ func (s *testSuite) registerAllSteps(sc *godog.ScenarioContext) {
 	registerLoginSteps(sc, s)
 }
 
+func (s *testSuite) cleanDatabase() error {
+	if err := s.userRepository.DeleteAll(); err != nil {
+		return fmt.Errorf("could not clean users: %w", err)
+	}
+
+	if err := s.categoryRepository.DeleteAll(); err != nil {
+		return fmt.Errorf("could not clean categories: %w", err)
+	}
+
+	return nil
+}
+
 func newTestDb() *sql.DB {
 	database, err := db.ConnectPostgres(context.Background(), db.NewTestPostgresConfigFromEnv())
 	if err != nil {
@@ -52,7 +65,7 @@ func newTestSuite(tb testing.TB, database *sql.DB) *testSuite {
 	auth0Validator := testhelper.NewTestValidator(tb)
 	tokenBuilder := testhelper.NewTokenBuilder()
 
-	router := httpadapter.NewRouter(dependencies.ConsumerHandler, dependencies.ProviderHandler, dependencies.UserHandler, auth0Validator)
+	router := httpadapter.NewRouter(dependencies.CategoryHandler, dependencies.ConsumerHandler, dependencies.ProviderHandler, dependencies.UserHandler, auth0Validator)
 	engine, err := router.SetUp()
 	require.NoError(tb, err, "could not initialize router")
 
@@ -65,6 +78,7 @@ func newTestSuite(tb testing.TB, database *sql.DB) *testSuite {
 	return &testSuite{
 		server:             server,
 		database:           database,
+		categoryRepository: dependencies.CategoryRepository,
 		consumerRepository: dependencies.ConsumerRepository,
 		providerRepository: dependencies.ProviderRepository,
 		userRepository:     dependencies.UserRepository,
@@ -77,7 +91,7 @@ func ScenarioInitializer(sc *godog.ScenarioContext, t *testing.T, database *sql.
 	testSuite := newTestSuite(t, database)
 	testSuite.registerAllSteps(sc)
 	sc.Before(func(ctx context.Context, sc *godog.Scenario) (context.Context, error) {
-		if err := testSuite.userRepository.DeleteAll(); err != nil {
+		if err := testSuite.cleanDatabase(); err != nil {
 			return ctx, fmt.Errorf("could not clean test database: %w", err)
 		}
 		return ctx, nil

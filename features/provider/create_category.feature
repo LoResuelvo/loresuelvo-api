@@ -7,32 +7,27 @@ Feature: Crear rubro de prestador
         # Given que soy administrador con sesión válida
         Given que no existe el rubro "Plomería"
 
-    @wip
     Scenario: 01-CR Crear un rubro correctamente
         When creo el rubro "Plomería"
         Then el sistema confirma la creación del rubro
 
     Rule: El rubro debe tener un nombre válido
 
-    @wip
     Scenario: 02-CR Rechazar creación sin nombre
         When intento crear un rubro sin nombre
         Then el sistema me indica que el nombre del rubro es obligatorio
 
-    @wip
     Scenario: 03-CR Rechazar creación con nombre vacío
         When intento crear el rubro "   "
         Then el sistema me indica que el nombre del rubro es obligatorio
 
     Rule: No se puede crear un rubro duplicado
 
-    @wip
     Scenario: 04-CR Rechazar creación de un rubro con nombre ya existente
         Given existe el rubro "Plomería"
         When intento crear el rubro "Plomería"
         Then el sistema me indica que el rubro ya existe
 
-    @wip
     Scenario: 05-CR Rechazar creación de un rubro duplicado con diferencias de mayúsculas o espacios
         Given existe el rubro "Plomería"
         When intento crear el rubro "  plomería  "

@@ -11,14 +11,16 @@ import (
 )
 
 type Router struct {
+	categoryHandler *handler.CategoryHandler
 	consumerHandler *handler.ConsumerHandler
 	providerHandler *handler.ProviderHandler
 	userHandler     *handler.UserHandler
 	auth0Validator  *validator.Validator
 }
 
-func NewRouter(consumerHandler *handler.ConsumerHandler, providerHandler *handler.ProviderHandler, userHandler *handler.UserHandler, auth0Validator *validator.Validator) *Router {
+func NewRouter(categoryHandler *handler.CategoryHandler, consumerHandler *handler.ConsumerHandler, providerHandler *handler.ProviderHandler, userHandler *handler.UserHandler, auth0Validator *validator.Validator) *Router {
 	router := &Router{
+		categoryHandler: categoryHandler,
 		consumerHandler: consumerHandler,
 		providerHandler: providerHandler,
 		userHandler:     userHandler,
@@ -42,6 +44,7 @@ func (router *Router) SetUp() (*gin.Engine, error) {
 	engine.Use(gin.Recovery())
 
 	router.registerHealthRoutes(engine)
+	router.registerCategoryRoutes(engine, authMiddleware)
 	router.registerConsumerRoutes(engine, authMiddleware)
 	router.registerProviderRoutes(engine, authMiddleware)
 	router.registerAuthenticatedRoutes(engine, authMiddleware)
@@ -53,6 +56,10 @@ func (router *Router) registerHealthRoutes(engine *gin.Engine) {
 	engine.GET("/", func(context *gin.Context) {
 		context.String(http.StatusOK, "Hello World")
 	})
+}
+
+func (router *Router) registerCategoryRoutes(engine *gin.Engine, authMiddleware gin.HandlerFunc) {
+	engine.POST("/categories", authMiddleware, router.categoryHandler.CreateCategory)
 }
 
 func (router *Router) registerConsumerRoutes(engine *gin.Engine, authMiddleware gin.HandlerFunc) {

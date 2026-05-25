@@ -11,16 +11,7 @@ import (
 	"github.com/cucumber/godog"
 )
 
-const categoryCreationAdminAuth0ID = "auth0|category-admin-test"
-
-var categoryCreationAdminPermissions = []string{
-	"create:categories",
-	"create:category",
-	"create:rubros",
-	"create:rubro",
-	"manage:categories",
-	"manage:rubros",
-}
+const categoryCreationAuth0ID = "auth0|category-test"
 
 type categoryCreationRequest struct {
 	Name string `json:"name"`
@@ -37,13 +28,8 @@ func registerCreateCategorySteps(sc *godog.ScenarioContext, suite *testSuite) {
 	sc.Step(`^el sistema me indica que el rubro ya existe$`, suite.systemReportsCategoryAlreadyExists)
 }
 
-func (suite *testSuite) thereIsNoCategoryNamed(name string) error {
-	_, err := suite.database.Exec(`DELETE FROM categories WHERE lower(trim(name)) = lower(trim($1))`, name)
-	if err != nil {
-		return fmt.Errorf("could not remove category %q: %w", name, err)
-	}
-
-	return nil
+func (suite *testSuite) thereIsNoCategoryNamed(_ string) error {
+	return suite.categoryRepository.DeleteAll()
 }
 
 func (suite *testSuite) thereIsCategoryNamed(name string) error {
@@ -138,7 +124,7 @@ func (suite *testSuite) postCategoryCreation(payload any) (*http.Response, error
 		return nil, err
 	}
 	httpReq.Header.Set("Content-Type", "application/json")
-	httpReq.Header.Set("Authorization", "Bearer "+suite.tokenBuilder.BuildToken(categoryCreationAdminAuth0ID, categoryCreationAdminPermissions))
+	httpReq.Header.Set("Authorization", "Bearer "+suite.tokenBuilder.BuildToken(categoryCreationAuth0ID, nil))
 
 	resp, err := http.DefaultClient.Do(httpReq)
 	if err != nil {
