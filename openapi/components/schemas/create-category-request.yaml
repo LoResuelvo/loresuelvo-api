@@ -1,0 +1,11 @@
+type: object
+description: Payload accepted by POST /categories. The implementation trims surrounding
+  whitespace from name before validation and duplicate checks.
+required:
+- name
+properties:
+  name:
+    type: string
+    description: Category display name. Must be non-empty after trimming. Duplicate
+      detection uses a lowercase normalized version.
+    example: Plomería

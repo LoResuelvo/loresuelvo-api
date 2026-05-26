@@ -1,0 +1,81 @@
+post:
+  tags:
+  - Consumers
+  operationId: registerConsumer
+  summary: Register the authenticated user as a consumer
+  description: Creates a consumer account for the authenticated Auth0 subject. The
+    Auth0 subject is taken from the Bearer JWT and persisted as the user's auth identifier.
+    Unknown JSON properties are ignored by the current handler.
+  security:
+  - BearerAuth: []
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/RegisterConsumerRequest'
+        examples:
+          validConsumer:
+            summary: Valid consumer registration
+            value:
+              email: ana@example.com
+              name: Ana Perez
+              surname: Mamani Tipula
+  responses:
+    '201':
+      description: Consumer account registered successfully.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/MessageResponse'
+          examples:
+            registered:
+              value:
+                message: cuenta registrada exitosamente
+    '400':
+      description: The request body is not valid JSON, cannot be bound to the expected
+        payload, or contains an invalid email format.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            invalidEmail:
+              summary: Invalid email format
+              value:
+                error: Invalid email format
+            invalidJson:
+              summary: Invalid JSON body
+              value:
+                error: invalid character '}' looking for beginning of object key string
+    '401':
+      description: Authentication failed or the authenticated user id could not be
+        obtained from the request context.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/AuthErrorResponse'
+          examples:
+            invalidToken:
+              summary: Missing or invalid Bearer token
+              value:
+                error: invalid_token
+                message: Failed to validate JWT.
+            missingClaims:
+              summary: JWT claims not available after validation
+              value:
+                error: missing claims
+            missingUserId:
+              summary: Subject claim is missing or empty
+              value:
+                error: missing user id
+    '409':
+      description: A user with the same email already exists.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            emailAlreadyRegistered:
+              value:
+                error: Email is already registered

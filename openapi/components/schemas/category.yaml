@@ -1,0 +1,19 @@
+type: object
+description: Category creation response.
+required:
+- id
+- name
+- normalized_name
+properties:
+  id:
+    type: integer
+    format: int32
+    example: 1
+  name:
+    type: string
+    example: Plomería
+  normalized_name:
+    type: string
+    description: Lowercase category name used by the server for duplicate checks.
+    example: plomería
+additionalProperties: false

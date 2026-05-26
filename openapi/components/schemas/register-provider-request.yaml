@@ -1,0 +1,40 @@
+type: object
+description: Payload accepted by POST /providers. The implementation trims surrounding
+  whitespace from email, name, and surname before validation/persistence. category_id
+  is required by the domain service. coverage_zone is currently accepted by the request
+  struct but ignored by the service.
+required:
+- email
+- category_id
+properties:
+  email:
+    type: string
+    format: email
+    description: Provider email. Must match the server email validation regex.
+    example: prestador@example.com
+  name:
+    type: string
+    description: Provider given name. The current implementation persists the value
+      but does not enforce non-empty validation.
+    example: Juan
+  surname:
+    type: string
+    description: Provider surname. The current implementation persists the value but
+      does not enforce non-empty validation.
+    example: Pérez
+  coverage_zone:
+    type: array
+    description: Accepted by JSON binding for backwards compatibility, but the current
+      handler does not pass this value to the provider service and it is not persisted.
+    items:
+      type: string
+      example: Zona Norte
+    example:
+    - Zona Norte
+    deprecated: true
+  category_id:
+    type: integer
+    format: int32
+    description: Existing category identifier for the provider. Missing or zero values
+      return "Category id is required"; unknown ids return "Category does not exist".
+    example: 1

@@ -1,0 +1,16 @@
+type: object
+required:
+- error
+properties:
+  error:
+    type: string
+    enum:
+    - invalid_token
+    - missing claims
+    - missing user id
+    example: invalid_token
+  message:
+    type: string
+    description: Present in JWT middleware validation failures.
+    example: Failed to validate JWT.
+additionalProperties: false

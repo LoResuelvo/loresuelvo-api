@@ -1,0 +1,32 @@
+type: object
+description: Authenticated user response. Field names are currently capitalized because
+  they are serialized from exported Go struct fields without json tags.
+required:
+- AuthID
+- Name
+- Surname
+- Email
+- Role
+properties:
+  AuthID:
+    type: string
+    description: Auth0 subject persisted for this user.
+    example: auth0|login-consumer-test
+  Name:
+    type: string
+    example: Consumer
+  Surname:
+    type: string
+    example: Login
+  Email:
+    type: string
+    format: email
+    example: login-consumer@example.com
+  Role:
+    type: string
+    description: Persisted user role.
+    enum:
+    - consumer
+    - provider
+    example: consumer
+additionalProperties: false

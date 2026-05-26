@@ -1,0 +1,57 @@
+openapi: 3.0.3
+info:
+  title: LoResuelvo API
+  description: OpenAPI documentation for the LoResuelvo HTTP API as implemented by
+    the current Gin routes.
+  version: 0.1.0
+  license:
+    name: MIT
+    url: https://opensource.org/license/mit
+servers:
+- url: http://localhost:8080
+  description: Local development server
+tags:
+- name: Health
+  description: Service availability endpoints.
+- name: Categories
+  description: Service category management endpoints.
+- name: Consumers
+  description: Consumer account registration endpoints.
+- name: Providers
+  description: Provider account registration endpoints.
+- name: Users
+  description: Authenticated user session endpoints.
+security: []
+paths:
+  /:
+    $ref: ./paths/health.yaml
+  /categories:
+    $ref: ./paths/categories.yaml
+  /consumers:
+    $ref: ./paths/consumers.yaml
+  /providers:
+    $ref: ./paths/providers.yaml
+  /me:
+    $ref: ./paths/users.yaml
+components:
+  securitySchemes:
+    $ref: ./components/security-schemes.yaml
+  schemas:
+    RegisterConsumerRequest:
+      $ref: ./components/schemas/register-consumer-request.yaml
+    RegisterProviderRequest:
+      $ref: ./components/schemas/register-provider-request.yaml
+    MessageResponse:
+      $ref: ./components/schemas/message-response.yaml
+    ErrorResponse:
+      $ref: ./components/schemas/error-response.yaml
+    AuthErrorResponse:
+      $ref: ./components/schemas/auth-error-response.yaml
+    User:
+      $ref: ./components/schemas/user.yaml
+    CreateCategoryRequest:
+      $ref: ./components/schemas/create-category-request.yaml
+    Category:
+      $ref: ./components/schemas/category.yaml
+    CategoryListItem:
+      $ref: ./components/schemas/category-list-item.yaml

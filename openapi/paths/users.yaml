@@ -1,0 +1,65 @@
+get:
+  tags:
+  - Users
+  operationId: getCurrentUser
+  summary: Get the authenticated user
+  description: Returns the user associated with the Auth0 subject contained in the
+    Bearer JWT. The response property names currently match the exported Go struct
+    fields because the User struct has no json tags.
+  security:
+  - BearerAuth: []
+  responses:
+    '200':
+      description: Authenticated user found.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/User'
+          examples:
+            consumer:
+              summary: Consumer user
+              value:
+                AuthID: auth0|login-consumer-test
+                Name: Consumer
+                Surname: Login
+                Email: login-consumer@example.com
+                Role: consumer
+            provider:
+              summary: Provider user
+              value:
+                AuthID: auth0|login-provider-test
+                Name: Provider
+                Surname: Login
+                Email: login-provider@example.com
+                Role: provider
+    '401':
+      description: Authentication failed or the authenticated user id could not be
+        obtained from the request context.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/AuthErrorResponse'
+          examples:
+            invalidToken:
+              summary: Missing or invalid Bearer token
+              value:
+                error: invalid_token
+                message: Failed to validate JWT.
+            missingClaims:
+              summary: JWT claims not available after validation
+              value:
+                error: missing claims
+            missingUserId:
+              summary: Subject claim is missing or empty
+              value:
+                error: missing user id
+    '404':
+      description: No persisted user exists for the authenticated Auth0 subject.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            userNotFound:
+              value:
+                error: User was not found

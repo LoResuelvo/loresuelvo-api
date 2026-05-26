@@ -21,6 +21,10 @@
             "description": "Service availability endpoints."
         },
         {
+            "name": "Categories",
+            "description": "Service category management endpoints."
+        },
+        {
             "name": "Consumers",
             "description": "Consumer account registration endpoints."
         },
@@ -51,6 +55,224 @@
                                 "schema": {
                                     "type": "string",
                                     "example": "Hello World"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/categories": {
+            "get": {
+                "tags": [
+                    "Categories"
+                ],
+                "operationId": "listCategories",
+                "summary": "List service categories",
+                "description": "Returns all registered categories. Each list item contains only id and name; normalized_name is intentionally omitted by the current handler.",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Categories returned successfully. The array may be empty.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/CategoryListItem"
+                                    }
+                                },
+                                "examples": {
+                                    "withCategories": {
+                                        "value": [
+                                            {
+                                                "id": 1,
+                                                "name": "Electricidad"
+                                            },
+                                            {
+                                                "id": 2,
+                                                "name": "Plomería"
+                                            }
+                                        ]
+                                    },
+                                    "empty": {
+                                        "value": []
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Authentication failed or the authenticated user id could not be obtained from the request context.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AuthErrorResponse"
+                                },
+                                "examples": {
+                                    "invalidToken": {
+                                        "summary": "Missing or invalid Bearer token",
+                                        "value": {
+                                            "error": "invalid_token",
+                                            "message": "Failed to validate JWT."
+                                        }
+                                    },
+                                    "missingClaims": {
+                                        "summary": "JWT claims not available after validation",
+                                        "value": {
+                                            "error": "missing claims"
+                                        }
+                                    },
+                                    "missingUserId": {
+                                        "summary": "Subject claim is missing or empty",
+                                        "value": {
+                                            "error": "missing user id"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "The category repository returned an unexpected error.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                },
+                                "examples": {
+                                    "repositoryError": {
+                                        "value": {
+                                            "error": "database error"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "post": {
+                "tags": [
+                    "Categories"
+                ],
+                "operationId": "createCategory",
+                "summary": "Create a service category",
+                "description": "Creates a category using the provided name. The domain trims surrounding whitespace and stores a lowercase normalized_name for duplicate checks. Unknown JSON properties are ignored by the current handler.",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CreateCategoryRequest"
+                            },
+                            "examples": {
+                                "validCategory": {
+                                    "summary": "Valid category creation",
+                                    "value": {
+                                        "name": "Plomería"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Category created successfully.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Category"
+                                },
+                                "examples": {
+                                    "created": {
+                                        "value": {
+                                            "id": 1,
+                                            "name": "Plomería",
+                                            "normalized_name": "plomería"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "The request body is not valid JSON, cannot be bound to the expected payload, or the category name is empty after trimming.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                },
+                                "examples": {
+                                    "nameRequired": {
+                                        "value": {
+                                            "error": "Category name is required"
+                                        }
+                                    },
+                                    "invalidJson": {
+                                        "summary": "Invalid JSON body",
+                                        "value": {
+                                            "error": "invalid character '}' looking for beginning of object key string"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Authentication failed or the authenticated user id could not be obtained from the request context.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AuthErrorResponse"
+                                },
+                                "examples": {
+                                    "invalidToken": {
+                                        "summary": "Missing or invalid Bearer token",
+                                        "value": {
+                                            "error": "invalid_token",
+                                            "message": "Failed to validate JWT."
+                                        }
+                                    },
+                                    "missingClaims": {
+                                        "summary": "JWT claims not available after validation",
+                                        "value": {
+                                            "error": "missing claims"
+                                        }
+                                    },
+                                    "missingUserId": {
+                                        "summary": "Subject claim is missing or empty",
+                                        "value": {
+                                            "error": "missing user id"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "A category with the same normalized name already exists.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                },
+                                "examples": {
+                                    "categoryAlreadyExists": {
+                                        "value": {
+                                            "error": "Category already exists"
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -191,7 +413,7 @@
                 ],
                 "operationId": "registerProvider",
                 "summary": "Register the authenticated user as a provider",
-                "description": "Creates a provider account for the authenticated Auth0 subject. The Auth0 subject is taken from the Bearer JWT and persisted as the user's auth identifier. The current implementation consumes email, name, surname, and coverage_zone; unknown JSON properties are ignored by the current handler.",
+                "description": "Creates a provider account for the authenticated Auth0 subject. The Auth0 subject is taken from the Bearer JWT and persisted as the user auth identifier. The current implementation consumes email, name, surname, and category_id; coverage_zone is accepted by JSON binding but is not passed to the provider service or persisted.",
                 "security": [
                     {
                         "BearerAuth": []
@@ -211,6 +433,7 @@
                                         "email": "prestador@example.com",
                                         "name": "Juan",
                                         "surname": "Pérez",
+                                        "category_id": 1,
                                         "coverage_zone": [
                                             "Zona Norte"
                                         ]
@@ -239,7 +462,7 @@
                         }
                     },
                     "400": {
-                        "description": "The request body is not valid JSON, cannot be bound to the expected payload, or contains an invalid email format.",
+                        "description": "The request body is not valid JSON, cannot be bound to the expected payload, contains an invalid email format, omits category_id, or references a category that does not exist.",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -256,6 +479,18 @@
                                         "summary": "Invalid JSON body",
                                         "value": {
                                             "error": "invalid character '}' looking for beginning of object key string"
+                                        }
+                                    },
+                                    "categoryRequired": {
+                                        "summary": "Missing or zero category id",
+                                        "value": {
+                                            "error": "Category id is required"
+                                        }
+                                    },
+                                    "categoryNotFound": {
+                                        "summary": "Category id does not exist",
+                                        "value": {
+                                            "error": "Category does not exist"
                                         }
                                     }
                                 }
@@ -448,9 +683,10 @@
             },
             "RegisterProviderRequest": {
                 "type": "object",
-                "description": "Payload accepted by POST /providers. The implementation trims surrounding whitespace from string fields and each coverage_zone item before validation/persistence. Provider documentation/category fields are not consumed by the current handler.",
+                "description": "Payload accepted by POST /providers. The implementation trims surrounding whitespace from email, name, and surname before validation/persistence. category_id is required by the domain service. coverage_zone is currently accepted by the request struct but ignored by the service.",
                 "required": [
-                    "email"
+                    "email",
+                    "category_id"
                 ],
                 "properties": {
                     "email": {
@@ -471,14 +707,21 @@
                     },
                     "coverage_zone": {
                         "type": "array",
-                        "description": "Coverage zones received by the handler and passed to the provider domain object. The current repository only persists the shared user data, not the coverage zones.",
+                        "description": "Accepted by JSON binding for backwards compatibility, but the current handler does not pass this value to the provider service and it is not persisted.",
                         "items": {
                             "type": "string",
                             "example": "Zona Norte"
                         },
                         "example": [
                             "Zona Norte"
-                        ]
+                        ],
+                        "deprecated": true
+                    },
+                    "category_id": {
+                        "type": "integer",
+                        "format": "int32",
+                        "description": "Existing category identifier for the provider. Missing or zero values return \"Category id is required\"; unknown ids return \"Category does not exist\".",
+                        "example": 1
                     }
                 }
             },
@@ -568,6 +811,66 @@
                             "provider"
                         ],
                         "example": "consumer"
+                    }
+                },
+                "additionalProperties": false
+            },
+            "CreateCategoryRequest": {
+                "type": "object",
+                "description": "Payload accepted by POST /categories. The implementation trims surrounding whitespace from name before validation and duplicate checks.",
+                "required": [
+                    "name"
+                ],
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "description": "Category display name. Must be non-empty after trimming. Duplicate detection uses a lowercase normalized version.",
+                        "example": "Plomería"
+                    }
+                }
+            },
+            "Category": {
+                "type": "object",
+                "description": "Category creation response.",
+                "required": [
+                    "id",
+                    "name",
+                    "normalized_name"
+                ],
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "format": "int32",
+                        "example": 1
+                    },
+                    "name": {
+                        "type": "string",
+                        "example": "Plomería"
+                    },
+                    "normalized_name": {
+                        "type": "string",
+                        "description": "Lowercase category name used by the server for duplicate checks.",
+                        "example": "plomería"
+                    }
+                },
+                "additionalProperties": false
+            },
+            "CategoryListItem": {
+                "type": "object",
+                "description": "Category list item returned by GET /categories. normalized_name is not included in list responses.",
+                "required": [
+                    "id",
+                    "name"
+                ],
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "format": "int32",
+                        "example": 1
+                    },
+                    "name": {
+                        "type": "string",
+                        "example": "Plomería"
                     }
                 },
                 "additionalProperties": false

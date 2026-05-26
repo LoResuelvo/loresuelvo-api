@@ -1,0 +1,138 @@
+get:
+  tags:
+  - Categories
+  operationId: listCategories
+  summary: List service categories
+  description: Returns all registered categories. Each list item contains only id
+    and name; normalized_name is intentionally omitted by the current handler.
+  security:
+  - BearerAuth: []
+  responses:
+    '200':
+      description: Categories returned successfully. The array may be empty.
+      content:
+        application/json:
+          schema:
+            type: array
+            items:
+              $ref: '#/components/schemas/CategoryListItem'
+          examples:
+            withCategories:
+              value:
+              - id: 1
+                name: Electricidad
+              - id: 2
+                name: Plomería
+            empty:
+              value: []
+    '401':
+      description: Authentication failed or the authenticated user id could not be
+        obtained from the request context.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/AuthErrorResponse'
+          examples:
+            invalidToken:
+              summary: Missing or invalid Bearer token
+              value:
+                error: invalid_token
+                message: Failed to validate JWT.
+            missingClaims:
+              summary: JWT claims not available after validation
+              value:
+                error: missing claims
+            missingUserId:
+              summary: Subject claim is missing or empty
+              value:
+                error: missing user id
+    '500':
+      description: The category repository returned an unexpected error.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            repositoryError:
+              value:
+                error: database error
+post:
+  tags:
+  - Categories
+  operationId: createCategory
+  summary: Create a service category
+  description: Creates a category using the provided name. The domain trims surrounding
+    whitespace and stores a lowercase normalized_name for duplicate checks. Unknown
+    JSON properties are ignored by the current handler.
+  security:
+  - BearerAuth: []
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/CreateCategoryRequest'
+        examples:
+          validCategory:
+            summary: Valid category creation
+            value:
+              name: Plomería
+  responses:
+    '201':
+      description: Category created successfully.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Category'
+          examples:
+            created:
+              value:
+                id: 1
+                name: Plomería
+                normalized_name: plomería
+    '400':
+      description: The request body is not valid JSON, cannot be bound to the expected
+        payload, or the category name is empty after trimming.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            nameRequired:
+              value:
+                error: Category name is required
+            invalidJson:
+              summary: Invalid JSON body
+              value:
+                error: invalid character '}' looking for beginning of object key string
+    '401':
+      description: Authentication failed or the authenticated user id could not be
+        obtained from the request context.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/AuthErrorResponse'
+          examples:
+            invalidToken:
+              summary: Missing or invalid Bearer token
+              value:
+                error: invalid_token
+                message: Failed to validate JWT.
+            missingClaims:
+              summary: JWT claims not available after validation
+              value:
+                error: missing claims
+            missingUserId:
+              summary: Subject claim is missing or empty
+              value:
+                error: missing user id
+    '409':
+      description: A category with the same normalized name already exists.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            categoryAlreadyExists:
+              value:
+                error: Category already exists

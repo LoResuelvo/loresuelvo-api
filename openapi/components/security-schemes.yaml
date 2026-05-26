@@ -1,0 +1,6 @@
+BearerAuth:
+  type: http
+  scheme: bearer
+  bearerFormat: JWT
+  description: Auth0-issued JWT. The API uses the token subject claim as the internal
+    auth identifier.

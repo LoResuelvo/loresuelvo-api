@@ -1,0 +1,21 @@
+type: object
+description: Payload accepted by POST /consumers. The implementation trims surrounding
+  whitespace from all string fields before validation/persistence.
+required:
+- email
+properties:
+  email:
+    type: string
+    format: email
+    description: Consumer email. Must match the server email validation regex.
+    example: ana@example.com
+  name:
+    type: string
+    description: Consumer given name or display name. The current implementation persists
+      the value but does not enforce non-empty validation.
+    example: Ana Perez
+  surname:
+    type: string
+    description: Consumer surname. The current implementation persists the value but
+      does not enforce non-empty validation.
+    example: Mamani Tipula

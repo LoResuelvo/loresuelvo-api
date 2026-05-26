@@ -1,4 +1,4 @@
-.PHONY: up down clean build bash lint test spec gherkin test-all-once migrate-up migrate-down migrate-test-up migrate-test-down
+.PHONY: up down clean build bash lint test openapi swagger swagger-down spec gherkin test-all-once migrate-up migrate-down migrate-test-up migrate-test-down
 
 # Nombre del servicio del compose
 SERVICE = api-dev
@@ -30,6 +30,15 @@ test:
 
 test-all-once:
 	docker compose exec -e GOFLAGS="-buildvcs=false" $(SERVICE) sh -c 'migrate -path db/migrations -database "$$TEST_DATABASE_URL" up && go test -count=1 -p 1 -v ./... && golangci-lint run'
+
+openapi:
+	python3 scripts/bundle_openapi.py
+
+swagger: openapi
+	docker compose up swagger-ui
+
+swagger-down:
+	docker compose stop swagger-ui
 
 migrate-up:
 	docker compose exec $(SERVICE) sh -c 'migrate -path db/migrations -database "$$DATABASE_URL" up'
