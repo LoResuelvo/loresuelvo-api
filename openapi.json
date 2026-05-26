@@ -30,7 +30,7 @@
         },
         {
             "name": "Providers",
-            "description": "Provider account registration endpoints."
+            "description": "Provider account registration and search endpoints."
         },
         {
             "name": "Users",
@@ -407,6 +407,130 @@
             }
         },
         "/providers": {
+            "get": {
+                "tags": [
+                    "Providers"
+                ],
+                "operationId": "filterProvidersByCategory",
+                "summary": "Filter providers by category",
+                "description": "Returns providers whose registered category matches the category_id query parameter selected by the frontend from GET /categories.",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "name": "category_id",
+                        "in": "query",
+                        "required": true,
+                        "description": "Existing category identifier selected from GET /categories.",
+                        "schema": {
+                            "type": "integer",
+                            "format": "int32",
+                            "example": 1
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Providers matching the requested category. The array is empty when the category exists but has no registered providers.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/ProviderSummary"
+                                    }
+                                },
+                                "examples": {
+                                    "providersFound": {
+                                        "value": [
+                                            {
+                                                "id": 1,
+                                                "name": "Juan",
+                                                "surname": "Pérez",
+                                                "category_name": "Plomería"
+                                            },
+                                            {
+                                                "id": 2,
+                                                "name": "Pedro",
+                                                "surname": "Dib",
+                                                "category_name": "Plomería"
+                                            }
+                                        ]
+                                    },
+                                    "noProviders": {
+                                        "value": []
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "The category_id query parameter is missing, invalid, zero or negative.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                },
+                                "examples": {
+                                    "categoryRequired": {
+                                        "value": {
+                                            "error": "Category id is required"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Authentication failed.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AuthErrorResponse"
+                                },
+                                "examples": {
+                                    "invalidToken": {
+                                        "value": {
+                                            "error": "invalid_token",
+                                            "message": "Failed to validate JWT."
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "No category exists with the requested id.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                },
+                                "examples": {
+                                    "categoryNotFound": {
+                                        "value": {
+                                            "error": "Category does not exist"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Unexpected error while searching providers.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
             "post": {
                 "tags": [
                     "Providers"
@@ -724,6 +848,40 @@
                         "example": 1
                     }
                 }
+            },
+            "ProviderSummary": {
+                "type": "object",
+                "description": "Provider summary returned by GET /providers when filtering by category_id.",
+                "required": [
+                    "id",
+                    "name",
+                    "surname",
+                    "category_name"
+                ],
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "format": "int32",
+                        "description": "Provider identifier.",
+                        "example": 1
+                    },
+                    "name": {
+                        "type": "string",
+                        "description": "Provider given name.",
+                        "example": "Juan"
+                    },
+                    "surname": {
+                        "type": "string",
+                        "description": "Provider surname.",
+                        "example": "Pérez"
+                    },
+                    "category_name": {
+                        "type": "string",
+                        "description": "Provider category display name.",
+                        "example": "Plomería"
+                    }
+                },
+                "additionalProperties": false
             },
             "MessageResponse": {
                 "type": "object",

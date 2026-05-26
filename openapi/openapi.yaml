@@ -18,7 +18,7 @@ tags:
 - name: Consumers
   description: Consumer account registration endpoints.
 - name: Providers
-  description: Provider account registration endpoints.
+  description: Provider account registration and search endpoints.
 - name: Users
   description: Authenticated user session endpoints.
 security: []
@@ -41,6 +41,8 @@ components:
       $ref: ./components/schemas/register-consumer-request.yaml
     RegisterProviderRequest:
       $ref: ./components/schemas/register-provider-request.yaml
+    ProviderSummary:
+      $ref: ./components/schemas/provider-summary.yaml
     MessageResponse:
       $ref: ./components/schemas/message-response.yaml
     ErrorResponse:

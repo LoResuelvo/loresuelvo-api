@@ -35,6 +35,7 @@ openapi:
 	python3 scripts/bundle_openapi.py
 
 swagger: openapi
+	docker compose up -d --force-recreate $(SERVICE)
 	docker compose up swagger-ui
 
 swagger-down:
