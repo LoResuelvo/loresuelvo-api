@@ -53,13 +53,33 @@ func newProviderRepositoryTest(t *testing.T) providerRepositoryTestContext {
 func validProvider(t *testing.T, categoryRepository *repositories.CategoryRepository) *provider.Provider {
 	t.Helper()
 
-	categoryToSave, _ := category.New("Plomería")
+	return validProviderWithData(t, categoryRepository, "auth0|josue", "josugod@gmail.com", "Josue", "el pro", "Plomería")
+}
+
+func validProviderWithData(t *testing.T, categoryRepository *repositories.CategoryRepository, authID, email, name, surname, categoryName string) *provider.Provider {
+	t.Helper()
+
+	savedCategory := savedCategoryForProvider(t, categoryRepository, categoryName)
+	provider, err := provider.NewProvider(authID, email, name, surname, savedCategory)
+	require.NoError(t, err, "could not prepare provider")
+	return provider
+}
+
+func savedCategoryForProvider(t *testing.T, categoryRepository *repositories.CategoryRepository, categoryName string) *category.Category {
+	t.Helper()
+
+	categoryToSave, err := category.New(categoryName)
+	require.NoError(t, err, "could not prepare provider category")
+
+	existingCategory := categoryRepository.FindByNormalizedName(categoryToSave.NormalizedName)
+	if existingCategory != nil {
+		return existingCategory
+	}
+
 	savedCategory, err := categoryRepository.Save(*categoryToSave)
 	require.NoError(t, err, "could not prepare provider category")
 	require.NotNil(t, savedCategory, "provider category should exist")
-
-	provider, _ := provider.NewProvider("auth0|josue", "josugod@gmail.com", "Josue", "el pro", savedCategory)
-	return provider
+	return savedCategory
 }
 
 func TestProviderRepositoryCanSaveAProvider(t *testing.T) {
@@ -103,4 +123,38 @@ func TestProviderRepositoryFindByEmailReturnsFalseIfProviderDoesNotExist(t *test
 	repo := testContext.providerRepository
 
 	assert.False(t, repo.FindByEmail("no-existe@ejemplo.com"), "Provider should not be found by email if it does not exist")
+}
+
+func TestProviderRepositoryCanFindProvidersByCategoryID(t *testing.T) {
+	testContext := newProviderRepositoryTest(t)
+	repo := testContext.providerRepository
+	plumbingProvider := validProviderWithData(t, testContext.categoryRepository, "auth0|juan", "juan.plomero@example.com", "Juan", "Pérez", "Plomería")
+	anotherPlumbingProvider := validProviderWithData(t, testContext.categoryRepository, "auth0|pedro", "pedro.plomero@example.com", "Pedro", "Dib", "Plomería")
+	electricProvider := validProviderWithData(t, testContext.categoryRepository, "auth0|laura", "laura.electricista@example.com", "Laura", "Gómez", "Electricidad")
+
+	require.NoError(t, repo.Save(*plumbingProvider))
+	require.NoError(t, repo.Save(*anotherPlumbingProvider))
+	require.NoError(t, repo.Save(*electricProvider))
+
+	providers, err := repo.FindByCategoryID(plumbingProvider.Category.ID)
+
+	require.NoError(t, err)
+	assert.Len(t, providers, 2)
+	assert.NotZero(t, providers[0].ID)
+	assert.Equal(t, "Juan", providers[0].User.Name)
+	assert.Equal(t, "Pérez", providers[0].User.Surname)
+	assert.NotZero(t, providers[1].ID)
+	assert.Equal(t, "Pedro", providers[1].User.Name)
+	assert.Equal(t, "Dib", providers[1].User.Surname)
+}
+
+func TestProviderRepositoryFindByCategoryIDReturnsEmptyListIfNoProvidersExistForCategory(t *testing.T) {
+	testContext := newProviderRepositoryTest(t)
+	repo := testContext.providerRepository
+	emptyCategory := savedCategoryForProvider(t, testContext.categoryRepository, "Gasista")
+
+	providers, err := repo.FindByCategoryID(emptyCategory.ID)
+
+	require.NoError(t, err)
+	assert.Empty(t, providers)
 }

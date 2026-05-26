@@ -86,11 +86,7 @@ func (suite *testSuite) systemReportsCategoryIsRequired() error {
 		return err
 	}
 
-	if suite.registrationResponseSays("Category id is required") || suite.registrationResponseSays("Category name is required") {
-		return nil
-	}
-
-	return fmt.Errorf("expected category required error, got body %s", string(suite.lastBody))
+	return suite.registrationResponseShouldSay("Category id is required")
 }
 
 func (suite *testSuite) postProviderRegistrationWithAuth0ID(auth0ID string, req providerRegistrationRequest) (*http.Response, error) {

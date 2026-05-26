@@ -31,7 +31,8 @@ type testSuite struct {
 	lastBody           []byte
 	currentAuth0ID     string
 
-	categoryIDsByName map[string]int
+	categoryIDsByName              map[string]int
+	lastProviderFilterCategoryName string
 }
 
 func (s *testSuite) registerAllSteps(sc *godog.ScenarioContext) {
@@ -40,7 +41,7 @@ func (s *testSuite) registerAllSteps(sc *godog.ScenarioContext) {
 	registerProviderAccountSteps(sc, s)
 	registerCreateCategorySteps(sc, s)
 	registerListCategoriesSteps(sc, s)
-	registerSearchProvidersByCategorySteps(sc, s)
+	registerFilterProvidersByCategorySteps(sc, s)
 	registerLoginSteps(sc, s)
 }
 

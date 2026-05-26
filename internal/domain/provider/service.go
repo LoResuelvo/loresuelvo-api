@@ -35,8 +35,26 @@ func (s *Service) RegisterProvider(authId, email, name, surname string, category
 	return s.providerRepository.Save(*provider)
 }
 
+func (s *Service) FilterProvidersByCategoryID(categoryID int) ([]Provider, error) {
+	existingCategory, err := s.validateCategory(categoryID)
+	if err != nil {
+		return nil, err
+	}
+
+	providers, err := s.providerRepository.FindByCategoryID(existingCategory.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	for i := range providers {
+		providers[i].Category = existingCategory
+	}
+
+	return providers, nil
+}
+
 func (s *Service) validateCategory(categoryID int) (*category.Category, error) {
-	if categoryID == 0 {
+	if categoryID <= 0 {
 		return nil, category.ErrIDRequired
 	}
 

@@ -11,20 +11,23 @@ import (
 	"github.com/cucumber/godog"
 )
 
-const providerSearchAuth0ID = "auth0|provider-search-test"
+const providerFilterAuth0ID = "auth0|provider-search-test"
 
-type providerSearchResponse struct {
-	Name    string `json:"name"`
-	Surname string `json:"surname"`
+type providerSummaryResponse struct {
+	ID           int    `json:"id"`
+	Name         string `json:"name"`
+	Surname      string `json:"surname"`
+	CategoryName string `json:"category_name"`
 }
 
-func registerSearchProvidersByCategorySteps(sc *godog.ScenarioContext, suite *testSuite) {
+func registerFilterProvidersByCategorySteps(sc *godog.ScenarioContext, suite *testSuite) {
 	sc.Step(`^existe un prestador registrado con correo "([^"]*)", nombre "([^"]*)", apellido "([^"]*)" y rubro "([^"]*)"$`, suite.thereIsRegisteredProviderWithEmailNameSurnameAndCategory)
-	sc.Step(`^busco técnicos del rubro "([^"]*)"$`, suite.searchProvidersByCategory)
-	sc.Step(`^intento buscar técnicos sin indicar rubro$`, suite.trySearchProvidersWithoutCategory)
+	sc.Step(`^filtro técnicos por el rubro "([^"]*)"$`, suite.filterProvidersByCategory)
+	sc.Step(`^intento filtrar técnicos sin indicar rubro$`, suite.tryFilterProvidersWithoutCategory)
 	sc.Step(`^el sistema muestra al técnico "([^"]*)"$`, suite.systemShowsProvider)
 	sc.Step(`^el sistema muestra solamente al técnico "([^"]*)" en el resultado$`, suite.systemShowsOnlyProvider)
 	sc.Step(`^el sistema muestra un listado de técnicos vacío$`, suite.systemShowsEmptyProviderList)
+	sc.Step(`^filtro técnicos por un rubro inexistente$`, suite.filterProvidersByNonExistingCategoryID)
 	sc.Step(`^el sistema me indica que el rubro no existe$`, suite.systemReportsCategoryDoesNotExist)
 }
 
@@ -58,15 +61,27 @@ func (suite *testSuite) thereIsRegisteredProviderWithEmailNameSurnameAndCategory
 	return fmt.Errorf("could not prepare registered provider: status %d, body %s", resp.StatusCode, string(body))
 }
 
-func (suite *testSuite) searchProvidersByCategory(categoryName string) error {
-	return suite.requestProviderSearch(url.Values{"category": []string{categoryName}})
+func (suite *testSuite) filterProvidersByCategory(categoryName string) error {
+	categoryID, err := suite.categoryIDFor(categoryName)
+	if err != nil {
+		return err
+	}
+
+	suite.lastProviderFilterCategoryName = categoryName
+	return suite.requestProviderFilter(url.Values{"category_id": []string{fmt.Sprintf("%d", categoryID)}})
 }
 
-func (suite *testSuite) trySearchProvidersWithoutCategory() error {
-	return suite.requestProviderSearch(url.Values{})
+func (suite *testSuite) tryFilterProvidersWithoutCategory() error {
+	suite.lastProviderFilterCategoryName = ""
+	return suite.requestProviderFilter(url.Values{})
 }
 
-func (suite *testSuite) requestProviderSearch(query url.Values) error {
+func (suite *testSuite) filterProvidersByNonExistingCategoryID() error {
+	suite.lastProviderFilterCategoryName = ""
+	return suite.requestProviderFilter(url.Values{"category_id": []string{"999999999"}})
+}
+
+func (suite *testSuite) requestProviderFilter(query url.Values) error {
 	requestURL := suite.server.URL + "/providers"
 	if encodedQuery := query.Encode(); encodedQuery != "" {
 		requestURL += "?" + encodedQuery
@@ -76,7 +91,7 @@ func (suite *testSuite) requestProviderSearch(query url.Values) error {
 	if err != nil {
 		return err
 	}
-	httpReq.Header.Set("Authorization", "Bearer "+suite.tokenBuilder.BuildToken(providerSearchAuth0ID, nil))
+	httpReq.Header.Set("Authorization", "Bearer "+suite.tokenBuilder.BuildToken(providerFilterAuth0ID, nil))
 
 	resp, err := http.DefaultClient.Do(httpReq)
 	if err != nil {
@@ -96,7 +111,7 @@ func (suite *testSuite) requestProviderSearch(query url.Values) error {
 }
 
 func (suite *testSuite) systemShowsProvider(fullName string) error {
-	providers, err := suite.providerSearchResponseShouldHaveStatusCode(http.StatusOK)
+	providers, err := suite.providerSummaryResponseShouldHaveStatusCode(http.StatusOK)
 	if err != nil {
 		return err
 	}
@@ -109,7 +124,7 @@ func (suite *testSuite) systemShowsProvider(fullName string) error {
 }
 
 func (suite *testSuite) systemShowsOnlyProvider(fullName string) error {
-	providers, err := suite.providerSearchResponseShouldHaveStatusCode(http.StatusOK)
+	providers, err := suite.providerSummaryResponseShouldHaveStatusCode(http.StatusOK)
 	if err != nil {
 		return err
 	}
@@ -126,7 +141,7 @@ func (suite *testSuite) systemShowsOnlyProvider(fullName string) error {
 }
 
 func (suite *testSuite) systemShowsEmptyProviderList() error {
-	providers, err := suite.providerSearchResponseShouldHaveStatusCode(http.StatusOK)
+	providers, err := suite.providerSummaryResponseShouldHaveStatusCode(http.StatusOK)
 	if err != nil {
 		return err
 	}
@@ -146,26 +161,34 @@ func (suite *testSuite) systemReportsCategoryDoesNotExist() error {
 	return suite.registrationResponseShouldSay("Category does not exist")
 }
 
-func (suite *testSuite) providerSearchResponseShouldHaveStatusCode(statusCode int) ([]providerSearchResponse, error) {
+func (suite *testSuite) providerSummaryResponseShouldHaveStatusCode(statusCode int) ([]providerSummaryResponse, error) {
 	if suite.lastStatus != statusCode {
 		return nil, fmt.Errorf("expected status code %d, got %d with body %s", statusCode, suite.lastStatus, string(suite.lastBody))
 	}
 
-	var providers []providerSearchResponse
+	var providers []providerSummaryResponse
 	if err := json.Unmarshal(suite.lastBody, &providers); err != nil {
-		return nil, fmt.Errorf("response is not valid JSON provider list with name and surname: %w", err)
+		return nil, fmt.Errorf("response is not valid JSON provider summary list with id, name, surname and category_name: %w", err)
 	}
 
 	for _, provider := range providers {
-		if strings.TrimSpace(provider.Name) == "" || strings.TrimSpace(provider.Surname) == "" {
-			return nil, fmt.Errorf("expected each provider to include name and surname, got body %s", string(suite.lastBody))
+		if provider.ID == 0 {
+			return nil, fmt.Errorf("expected each provider to include id, got body %s", string(suite.lastBody))
+		}
+
+		if strings.TrimSpace(provider.Name) == "" || strings.TrimSpace(provider.Surname) == "" || strings.TrimSpace(provider.CategoryName) == "" {
+			return nil, fmt.Errorf("expected each provider to include name, surname and category_name, got body %s", string(suite.lastBody))
+		}
+
+		if strings.TrimSpace(suite.lastProviderFilterCategoryName) != "" && !sameNormalizedName(provider.CategoryName, suite.lastProviderFilterCategoryName) {
+			return nil, fmt.Errorf("expected provider category %q to match searched category %q, got body %s", provider.CategoryName, suite.lastProviderFilterCategoryName, string(suite.lastBody))
 		}
 	}
 
 	return providers, nil
 }
 
-func providerListIncludesFullName(providers []providerSearchResponse, fullName string) bool {
+func providerListIncludesFullName(providers []providerSummaryResponse, fullName string) bool {
 	for _, provider := range providers {
 		if providerMatchesFullName(provider, fullName) {
 			return true
@@ -175,12 +198,16 @@ func providerListIncludesFullName(providers []providerSearchResponse, fullName s
 	return false
 }
 
-func providerMatchesFullName(provider providerSearchResponse, expectedFullName string) bool {
+func providerMatchesFullName(provider providerSummaryResponse, expectedFullName string) bool {
 	return normalizeComparableName(providerFullName(provider)) == normalizeComparableName(expectedFullName)
 }
 
-func providerFullName(provider providerSearchResponse) string {
+func providerFullName(provider providerSummaryResponse) string {
 	return strings.TrimSpace(strings.Join([]string{provider.Name, provider.Surname}, " "))
+}
+
+func sameNormalizedName(left, right string) bool {
+	return normalizeComparableName(left) == normalizeComparableName(right)
 }
 
 func normalizeComparableName(name string) string {

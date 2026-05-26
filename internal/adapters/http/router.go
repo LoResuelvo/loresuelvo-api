@@ -45,7 +45,7 @@ func (router *Router) SetUp() (*gin.Engine, error) {
 	engine.Use(middleware.CORSLayer(middleware.NewCORSConfigFromEnv()))
 
 	router.registerHealthRoutes(engine)
-	router.registerCategoryRoutes(engine, authMiddleware)
+	router.registerCategoryRoutes(engine)
 	router.registerConsumerRoutes(engine, authMiddleware)
 	router.registerProviderRoutes(engine, authMiddleware)
 	router.registerAuthenticatedRoutes(engine, authMiddleware)
@@ -59,7 +59,7 @@ func (router *Router) registerHealthRoutes(engine *gin.Engine) {
 	})
 }
 
-func (router *Router) registerCategoryRoutes(engine *gin.Engine, authMiddleware gin.HandlerFunc) {
+func (router *Router) registerCategoryRoutes(engine *gin.Engine) {
 	engine.GET("/categories", router.categoryHandler.ListCategories)
 	engine.POST("/categories", router.categoryHandler.CreateCategory)
 }
@@ -69,6 +69,7 @@ func (router *Router) registerConsumerRoutes(engine *gin.Engine, authMiddleware 
 }
 
 func (router *Router) registerProviderRoutes(engine *gin.Engine, authMiddleware gin.HandlerFunc) {
+	engine.GET("/providers", router.providerHandler.FilterProvidersByCategory)
 	engine.POST("/providers", authMiddleware, router.providerHandler.RegisterProvider)
 }
 

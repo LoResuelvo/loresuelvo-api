@@ -117,15 +117,6 @@ func (suite *testSuite) registrationResponseShouldSay(message string) error {
 	return fmt.Errorf("expected message %q, got body %s", message, string(suite.lastBody))
 }
 
-func (suite *testSuite) registrationResponseSays(message string) bool {
-	var response registrationResponse
-	if err := json.Unmarshal(suite.lastBody, &response); err != nil {
-		return false
-	}
-
-	return response.Message == message || response.Error == message
-}
-
 func (suite *testSuite) postConsumerRegistration(req consumerRegistrationRequest) (*http.Response, error) {
 	return suite.postConsumerRegistrationWithAuth0ID("auth0|consumer-test", req)
 }

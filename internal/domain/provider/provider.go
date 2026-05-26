@@ -6,6 +6,7 @@ import (
 )
 
 type Provider struct {
+	ID       int
 	User     *user.User
 	Category *category.Category
 }

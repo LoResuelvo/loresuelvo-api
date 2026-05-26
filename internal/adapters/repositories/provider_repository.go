@@ -4,6 +4,7 @@ import (
 	"database/sql"
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/provider"
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/user"
 )
 
 type ProviderRepository struct {
@@ -61,4 +62,45 @@ func (repository *ProviderRepository) DeleteAll() error {
 
 func (repository *ProviderRepository) FindByEmail(email string) bool {
 	return repository.repositoryUser.FindByEmail(email)
+}
+
+func (repository *ProviderRepository) FindByCategoryID(categoryID int) ([]provider.Provider, error) {
+	rows, err := repository.db.Query(
+		`SELECT providers.id, users.auth_id, users.email, users.name, users.surname, users.role
+		FROM providers
+		INNER JOIN users ON users.id = providers.user_id
+		WHERE providers.category_id = $1
+		ORDER BY users.name ASC, users.surname ASC`,
+		categoryID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		_ = rows.Close()
+	}()
+
+	providers := []provider.Provider{}
+	for rows.Next() {
+		var providerID int
+		var providerUser user.User
+		if err := rows.Scan(
+			&providerID,
+			&providerUser.AuthID,
+			&providerUser.Email,
+			&providerUser.Name,
+			&providerUser.Surname,
+			&providerUser.Role,
+		); err != nil {
+			return nil, err
+		}
+
+		providers = append(providers, provider.Provider{ID: providerID, User: &providerUser})
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return providers, nil
 }
