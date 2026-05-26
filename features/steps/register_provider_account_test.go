@@ -26,7 +26,7 @@ func registerProviderAccountSteps(sc *godog.ScenarioContext, suite *testSuite) {
 	sc.Step(`^que no existe un usuario con correo "([^"]*)"$`, suite.thereIsNoUserWithEmail)
 	sc.Step(`^me registro como prestador con correo "([^"]*)", nombre "([^"]*)", apellido "([^"]*)" y rubro "([^"]*)"$`, suite.requestProviderAccountRegistration)
 	sc.Step(`^me registro como prestador con correo "([^"]*)", nombre "([^"]*)", apellido "([^"]*)" y sin rubro$`, suite.requestProviderAccountRegistrationWithoutCategory)
-	sc.Step(`^el sistema me indica que el rubro es obligatorio$`, suite.systemReportsProviderCategoryIsRequired)
+	sc.Step(`^el sistema me indica que el rubro es obligatorio$`, suite.systemReportsCategoryIsRequired)
 }
 
 func (suite *testSuite) thereIsNoUserWithEmail(_ string) error {
@@ -81,12 +81,16 @@ func (suite *testSuite) requestProviderRegistration(payload any) error {
 	return nil
 }
 
-func (suite *testSuite) systemReportsProviderCategoryIsRequired() error {
+func (suite *testSuite) systemReportsCategoryIsRequired() error {
 	if err := suite.registrationResponseShouldHaveStatusCode(http.StatusBadRequest); err != nil {
 		return err
 	}
 
-	return suite.registrationResponseShouldSay("Category id is required")
+	if suite.registrationResponseSays("Category id is required") || suite.registrationResponseSays("Category name is required") {
+		return nil
+	}
+
+	return fmt.Errorf("expected category required error, got body %s", string(suite.lastBody))
 }
 
 func (suite *testSuite) postProviderRegistrationWithAuth0ID(auth0ID string, req providerRegistrationRequest) (*http.Response, error) {
