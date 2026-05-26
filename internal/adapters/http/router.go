@@ -42,6 +42,7 @@ func (router *Router) SetUp() (*gin.Engine, error) {
 
 	engine := gin.New()
 	engine.Use(gin.Recovery())
+	engine.Use(middleware.CORSLayer(middleware.NewCORSConfigFromEnv()))
 
 	router.registerHealthRoutes(engine)
 	router.registerCategoryRoutes(engine, authMiddleware)
