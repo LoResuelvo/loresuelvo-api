@@ -3,21 +3,18 @@ package steps_test
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"strings"
 
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/conversation"
 	"github.com/cucumber/godog"
 )
 
 const (
-	conversationStatusPending = "pending"
-	nonExistingProviderID     = 999999999
+	nonExistingProviderID = 999999999
 )
-
-var errRepositoryStepPending = errors.New("repository-backed step pending implementation")
 
 type conversationCreationRequest struct {
 	ProviderID int    `json:"provider_id"`
@@ -67,16 +64,17 @@ func (suite *testSuite) thereIsRegisteredConsumerWithEmailNameAndSurname(email, 
 }
 
 func (suite *testSuite) thereIsNoConversationBetweenConsumerAndProvider(consumerEmail, providerEmail string) error {
-	if _, err := suite.providerIDByEmail(providerEmail); err != nil {
+	consumerID, err := suite.consumerRepository.FindIDByEmail(consumerEmail)
+	if err != nil {
 		return err
 	}
 
-	// consumerID, err := suite.consumerRepository.FindIDByEmail(consumerEmail)
-	// providerID, err := suite.providerRepository.FindIDByEmail(providerEmail)
-	// return suite.conversationRepository.DeleteBetween(consumerID, providerID)
-	_ = consumerEmail
+	providerID, err := suite.providerIDByEmail(providerEmail)
+	if err != nil {
+		return err
+	}
 
-	return nil
+	return suite.conversationRepository.DeleteBetween(consumerID, providerID)
 }
 
 func (suite *testSuite) iAmAuthenticatedAsConsumer(email string) error {
@@ -129,18 +127,34 @@ func (suite *testSuite) systemCreatesPendingConversationBetweenConsumerAndProvid
 		return fmt.Errorf("expected created conversation id, got body %s", string(suite.lastBody))
 	}
 
-	if strings.TrimSpace(response.Status) != conversationStatusPending {
-		return fmt.Errorf("expected conversation status %q, got %q", conversationStatusPending, response.Status)
+	if strings.TrimSpace(response.Status) != conversation.StatusPending {
+		return fmt.Errorf("expected conversation status %q, got %q", conversation.StatusPending, response.Status)
 	}
 
 	suite.lastConversationID = response.ID
 
-	// consumerID, err := suite.consumerRepository.FindIDByEmail(consumerEmail)
-	// providerID, err := suite.providerRepository.FindIDByEmail(providerEmail)
-	// conversation, err := suite.conversationRepository.FindBetween(consumerID, providerID)
-	// assert conversation.Status == conversationStatusPending
-	_ = consumerEmail
-	_ = providerEmail
+	consumerID, err := suite.consumerRepository.FindIDByEmail(consumerEmail)
+	if err != nil {
+		return err
+	}
+
+	providerID, err := suite.providerIDByEmail(providerEmail)
+	if err != nil {
+		return err
+	}
+
+	createdConversation, err := suite.conversationRepository.FindBetween(consumerID, providerID)
+	if err != nil {
+		return err
+	}
+
+	if createdConversation.ID != response.ID {
+		return fmt.Errorf("expected persisted conversation id %d, got %d", response.ID, createdConversation.ID)
+	}
+
+	if createdConversation.Status != conversation.StatusPending {
+		return fmt.Errorf("expected persisted conversation status %q, got %q", conversation.StatusPending, createdConversation.Status)
+	}
 
 	return nil
 }
@@ -154,9 +168,16 @@ func (suite *testSuite) conversationContainsInitialMessage(message *godog.DocStr
 		return fmt.Errorf("expected a previously created conversation before checking its initial message")
 	}
 
-	// exists, err := suite.messageRepository.ExistsInConversation(suite.lastConversationID, content)
-	// assert exists == true
-	return repositoryStepNotImplemented("messageRepository.ExistsInConversation(conversationID, content)")
+	exists, err := suite.messageRepository.ExistsInConversation(suite.lastConversationID, content)
+	if err != nil {
+		return err
+	}
+
+	if !exists {
+		return fmt.Errorf("expected initial message %q in conversation %d", content, suite.lastConversationID)
+	}
+
+	return nil
 }
 
 func (suite *testSuite) systemReportsProviderDoesNotExist() error {
@@ -177,12 +198,29 @@ func (suite *testSuite) thereIsPendingConversationBetweenConsumerAndProvider(con
 		return err
 	}
 
-	// consumerID, err := suite.consumerRepository.FindIDByEmail(consumerEmail)
-	// return suite.conversationRepository.CreatePending(consumerID, providerID)
-	_ = consumerEmail
-	_ = providerID
+	consumerID, err := suite.consumerRepository.FindIDByEmail(consumerEmail)
+	if err != nil {
+		return err
+	}
 
-	return repositoryStepNotImplemented("conversationRepository.CreatePending(consumerID, providerID)")
+	pendingConversation, err := conversation.NewPendingConversation(consumerID, providerID)
+	if err != nil {
+		return err
+	}
+
+	message, err := conversation.NewConsumerMessage("Existing work request")
+	if err != nil {
+		return err
+	}
+
+	createdConversation, err := suite.conversationRepository.SaveWithMessage(*pendingConversation, *message)
+	if err != nil {
+		return err
+	}
+
+	suite.lastConversationID = createdConversation.ID
+
+	return nil
 }
 
 func (suite *testSuite) systemReportsConversationWithProviderAlreadyExists() error {
@@ -190,9 +228,20 @@ func (suite *testSuite) systemReportsConversationWithProviderAlreadyExists() err
 		return err
 	}
 
-	// consumerID, err := suite.consumerRepository.FindIDByAuthID(suite.currentAuth0ID)
-	// conversations, err := suite.conversationRepository.FindByConsumerID(consumerID)
-	// assert len(conversations) == 1
+	consumerID, err := suite.consumerRepository.FindIDByAuthID(suite.currentAuth0ID)
+	if err != nil {
+		return err
+	}
+
+	conversations, err := suite.conversationRepository.FindByConsumerID(consumerID)
+	if err != nil {
+		return err
+	}
+
+	if len(conversations) != 1 {
+		return fmt.Errorf("expected exactly one conversation after duplicate rejection, found %d", len(conversations))
+	}
+
 	return nil
 }
 
@@ -281,13 +330,7 @@ func (suite *testSuite) lastResponseShouldHaveError() error {
 }
 
 func (suite *testSuite) providerIDByEmail(email string) (int, error) {
-	providerID, ok := suite.providerIDsByEmail[email]
-	if !ok || providerID == 0 {
-		// return suite.providerRepository.FindIDByEmail(email)
-		return 0, repositoryStepNotImplemented("providerRepository.FindIDByEmail(email)")
-	}
-
-	return providerID, nil
+	return suite.providerRepository.FindIDByEmail(email)
 }
 
 func normalizeDocString(docString *godog.DocString) string {
@@ -296,10 +339,6 @@ func normalizeDocString(docString *godog.DocString) string {
 	}
 
 	return strings.TrimSpace(docString.Content)
-}
-
-func repositoryStepNotImplemented(call string) error {
-	return fmt.Errorf("%w: %s", errRepositoryStepPending, call)
 }
 
 func stringPointer(value string) *string {

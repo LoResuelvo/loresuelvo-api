@@ -125,6 +125,47 @@ func TestProviderRepositoryFindByEmailReturnsFalseIfProviderDoesNotExist(t *test
 	assert.False(t, repo.FindByEmail("no-existe@ejemplo.com"), "Provider should not be found by email if it does not exist")
 }
 
+func TestProviderRepositoryCanFindIDByEmail(t *testing.T) {
+	testContext := newProviderRepositoryTest(t)
+	repo := testContext.providerRepository
+	provider := validProvider(t, testContext.categoryRepository)
+
+	err := repo.Save(*provider)
+	require.NoError(t, err, "saving provider should not return an error")
+
+	providerID, err := repo.FindIDByEmail(provider.User.Email)
+
+	require.NoError(t, err)
+	assert.NotZero(t, providerID)
+}
+
+func TestProviderRepositoryCanCheckExistenceByID(t *testing.T) {
+	testContext := newProviderRepositoryTest(t)
+	repo := testContext.providerRepository
+	provider := validProvider(t, testContext.categoryRepository)
+
+	err := repo.Save(*provider)
+	require.NoError(t, err, "saving provider should not return an error")
+
+	providerID, err := repo.FindIDByEmail(provider.User.Email)
+	require.NoError(t, err)
+
+	exists, err := repo.ExistsByID(providerID)
+
+	require.NoError(t, err)
+	assert.True(t, exists)
+}
+
+func TestProviderRepositoryExistsByIDReturnsFalseIfProviderDoesNotExist(t *testing.T) {
+	testContext := newProviderRepositoryTest(t)
+	repo := testContext.providerRepository
+
+	exists, err := repo.ExistsByID(999999999)
+
+	require.NoError(t, err)
+	assert.False(t, exists)
+}
+
 func TestProviderRepositoryCanFindProvidersByCategoryID(t *testing.T) {
 	testContext := newProviderRepositoryTest(t)
 	repo := testContext.providerRepository

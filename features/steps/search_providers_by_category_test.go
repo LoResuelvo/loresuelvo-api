@@ -54,7 +54,7 @@ func (suite *testSuite) thereIsRegisteredProviderWithEmailNameSurnameAndCategory
 	defer resp.Body.Close()
 
 	if resp.StatusCode == http.StatusCreated || resp.StatusCode == http.StatusConflict {
-		return suite.rememberProviderIDByEmail(email, name, surname, categoryID)
+		return nil
 	}
 
 	body, _ := io.ReadAll(resp.Body)
@@ -108,55 +108,6 @@ func (suite *testSuite) requestProviderFilter(query url.Values) error {
 	suite.lastBody = body
 
 	return nil
-}
-
-func (suite *testSuite) rememberProviderIDByEmail(email, name, surname string, categoryID int) error {
-	providers, err := suite.getProviderSummariesByCategoryID(categoryID)
-	if err != nil {
-		return err
-	}
-
-	fullName := strings.TrimSpace(strings.Join([]string{name, surname}, " "))
-	for _, provider := range providers {
-		if providerMatchesFullName(provider, fullName) {
-			suite.providerIDsByEmail[email] = provider.ID
-			return nil
-		}
-	}
-
-	return fmt.Errorf("could not find provider %q after registration", fullName)
-}
-
-func (suite *testSuite) getProviderSummariesByCategoryID(categoryID int) ([]providerSummaryResponse, error) {
-	requestURL := suite.server.URL + "/providers?category_id=" + url.QueryEscape(fmt.Sprintf("%d", categoryID))
-
-	httpReq, err := http.NewRequest(http.MethodGet, requestURL, nil)
-	if err != nil {
-		return nil, err
-	}
-	httpReq.Header.Set("Authorization", "Bearer "+suite.tokenBuilder.BuildToken(providerFilterAuth0ID, nil))
-
-	resp, err := http.DefaultClient.Do(httpReq)
-	if err != nil {
-		return nil, fmt.Errorf("API connection failed: %w", err)
-	}
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read response body: %w", err)
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("expected status code %d, got %d with body %s", http.StatusOK, resp.StatusCode, string(body))
-	}
-
-	var providers []providerSummaryResponse
-	if err := json.Unmarshal(body, &providers); err != nil {
-		return nil, fmt.Errorf("response is not valid JSON provider summary list: %w", err)
-	}
-
-	return providers, nil
 }
 
 func (suite *testSuite) systemShowsProvider(fullName string) error {

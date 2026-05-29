@@ -20,7 +20,7 @@ type providerRepositoryMock struct {
 	findByEmailCalled      bool
 }
 
-type categoryRepositoryMock struct {
+type categoryFinderMock struct {
 	categories []category.Category
 }
 
@@ -30,35 +30,17 @@ func existingCategory() category.Category {
 	return *category
 }
 
-func categoryRepositoryWithExistingCategory() *categoryRepositoryMock {
-	return &categoryRepositoryMock{categories: []category.Category{existingCategory()}}
+func categoryFinderWithExistingCategory() *categoryFinderMock {
+	return &categoryFinderMock{categories: []category.Category{existingCategory()}}
 }
 
-func (repository *categoryRepositoryMock) FindByID(id int) *category.Category {
-	for i := range repository.categories {
-		if repository.categories[i].ID == id {
-			return &repository.categories[i]
+func (finder *categoryFinderMock) FindByID(id int) *category.Category {
+	for i := range finder.categories {
+		if finder.categories[i].ID == id {
+			return &finder.categories[i]
 		}
 	}
 	return nil
-}
-
-func (repository *categoryRepositoryMock) FindByNormalizedName(normalizedName string) *category.Category {
-	for i := range repository.categories {
-		if repository.categories[i].NormalizedName == normalizedName {
-			return &repository.categories[i]
-		}
-	}
-	return nil
-}
-
-func (repository *categoryRepositoryMock) Save(categoryToSave category.Category) (*category.Category, error) {
-	repository.categories = append(repository.categories, categoryToSave)
-	return &repository.categories[len(repository.categories)-1], nil
-}
-
-func (repository *categoryRepositoryMock) ListAll() ([]category.Category, error) {
-	return repository.categories, nil
 }
 
 func (repository *providerRepositoryMock) Save(provider provider.Provider) error {
@@ -80,8 +62,8 @@ func (repository *providerRepositoryMock) FindByCategoryID(categoryID int) ([]pr
 
 func TestRegisterProviderWithValidData(t *testing.T) {
 	repository := &providerRepositoryMock{}
-	categoryRepository := categoryRepositoryWithExistingCategory()
-	providerManager := provider.NewService(repository, categoryRepository)
+	categoryFinder := categoryFinderWithExistingCategory()
+	providerManager := provider.NewService(repository, categoryFinder)
 
 	err := providerManager.RegisterProvider(
 		"auth0|ana",
@@ -99,8 +81,8 @@ func TestRegisterProviderWithValidData(t *testing.T) {
 
 func TestRegisterProviderWithEmailWithoutArroba(t *testing.T) {
 	repository := &providerRepositoryMock{}
-	categoryRepository := categoryRepositoryWithExistingCategory()
-	providerManager := provider.NewService(repository, categoryRepository)
+	categoryFinder := categoryFinderWithExistingCategory()
+	providerManager := provider.NewService(repository, categoryFinder)
 
 	err := providerManager.RegisterProvider(
 		"auth0|ana",
@@ -116,8 +98,8 @@ func TestRegisterProviderWithEmailWithoutArroba(t *testing.T) {
 
 func TestRegisterProviderWithEmailWithoutDomain(t *testing.T) {
 	repository := &providerRepositoryMock{}
-	categoryRepository := categoryRepositoryWithExistingCategory()
-	providerManager := provider.NewService(repository, categoryRepository)
+	categoryFinder := categoryFinderWithExistingCategory()
+	providerManager := provider.NewService(repository, categoryFinder)
 
 	err := providerManager.RegisterProvider(
 		"auth0|ana",
@@ -133,8 +115,8 @@ func TestRegisterProviderWithEmailWithoutDomain(t *testing.T) {
 
 func TestRegisterProviderWithEmailWithoutName(t *testing.T) {
 	repository := &providerRepositoryMock{}
-	categoryRepository := categoryRepositoryWithExistingCategory()
-	providerManager := provider.NewService(repository, categoryRepository)
+	categoryFinder := categoryFinderWithExistingCategory()
+	providerManager := provider.NewService(repository, categoryFinder)
 
 	err := providerManager.RegisterProvider(
 		"auth0|ana",
@@ -150,8 +132,8 @@ func TestRegisterProviderWithEmailWithoutName(t *testing.T) {
 
 func TestRegisterProviderWithAlreadyRegisteredEmail(t *testing.T) {
 	repository := &providerRepositoryMock{existsByEmailValue: true}
-	categoryRepository := categoryRepositoryWithExistingCategory()
-	providerManager := provider.NewService(repository, categoryRepository)
+	categoryFinder := categoryFinderWithExistingCategory()
+	providerManager := provider.NewService(repository, categoryFinder)
 
 	err := providerManager.RegisterProvider(
 		"auth0|ana",
@@ -168,8 +150,8 @@ func TestRegisterProviderWithAlreadyRegisteredEmail(t *testing.T) {
 
 func TestRegisterProviderWithMissingCategory(t *testing.T) {
 	repository := &providerRepositoryMock{}
-	categoryRepository := categoryRepositoryWithExistingCategory()
-	providerManager := provider.NewService(repository, categoryRepository)
+	categoryFinder := categoryFinderWithExistingCategory()
+	providerManager := provider.NewService(repository, categoryFinder)
 
 	err := providerManager.RegisterProvider(
 		"auth0|ana",
@@ -185,8 +167,8 @@ func TestRegisterProviderWithMissingCategory(t *testing.T) {
 
 func TestRegisterProviderWithNonExistingCategory(t *testing.T) {
 	repository := &providerRepositoryMock{}
-	categoryRepository := categoryRepositoryWithExistingCategory()
-	providerManager := provider.NewService(repository, categoryRepository)
+	categoryFinder := categoryFinderWithExistingCategory()
+	providerManager := provider.NewService(repository, categoryFinder)
 
 	err := providerManager.RegisterProvider(
 		"auth0|ana",
@@ -202,8 +184,8 @@ func TestRegisterProviderWithNonExistingCategory(t *testing.T) {
 
 func TestRegisterProviderWithWrongCategoryID(t *testing.T) {
 	repository := &providerRepositoryMock{}
-	categoryRepository := categoryRepositoryWithExistingCategory()
-	providerManager := provider.NewService(repository, categoryRepository)
+	categoryFinder := categoryFinderWithExistingCategory()
+	providerManager := provider.NewService(repository, categoryFinder)
 
 	err := providerManager.RegisterProvider(
 		"auth0|ana",
@@ -227,8 +209,8 @@ func TestFilterProvidersByCategoryID(t *testing.T) {
 			providerCategory.ID: {*providerToReturn},
 		},
 	}
-	categoryRepository := categoryRepositoryWithExistingCategory()
-	providerManager := provider.NewService(repository, categoryRepository)
+	categoryFinder := categoryFinderWithExistingCategory()
+	providerManager := provider.NewService(repository, categoryFinder)
 
 	providers, err := providerManager.FilterProvidersByCategoryID(1)
 
@@ -244,8 +226,8 @@ func TestFilterProvidersByCategoryID(t *testing.T) {
 
 func TestFilterProvidersByCategoryIDFindsExistingCategory(t *testing.T) {
 	repository := &providerRepositoryMock{providersByCategoryID: map[int][]provider.Provider{}}
-	categoryRepository := categoryRepositoryWithExistingCategory()
-	providerManager := provider.NewService(repository, categoryRepository)
+	categoryFinder := categoryFinderWithExistingCategory()
+	providerManager := provider.NewService(repository, categoryFinder)
 
 	_, err := providerManager.FilterProvidersByCategoryID(1)
 
@@ -256,8 +238,8 @@ func TestFilterProvidersByCategoryIDFindsExistingCategory(t *testing.T) {
 
 func TestFilterProvidersByCategoryIDReturnsEmptyListWhenNoProvidersExist(t *testing.T) {
 	repository := &providerRepositoryMock{providersByCategoryID: map[int][]provider.Provider{}}
-	categoryRepository := categoryRepositoryWithExistingCategory()
-	providerManager := provider.NewService(repository, categoryRepository)
+	categoryFinder := categoryFinderWithExistingCategory()
+	providerManager := provider.NewService(repository, categoryFinder)
 
 	providers, err := providerManager.FilterProvidersByCategoryID(1)
 
@@ -267,8 +249,8 @@ func TestFilterProvidersByCategoryIDReturnsEmptyListWhenNoProvidersExist(t *test
 
 func TestFilterProvidersByCategoryIDRequiresCategoryID(t *testing.T) {
 	repository := &providerRepositoryMock{}
-	categoryRepository := categoryRepositoryWithExistingCategory()
-	providerManager := provider.NewService(repository, categoryRepository)
+	categoryFinder := categoryFinderWithExistingCategory()
+	providerManager := provider.NewService(repository, categoryFinder)
 
 	providers, err := providerManager.FilterProvidersByCategoryID(0)
 
@@ -279,8 +261,8 @@ func TestFilterProvidersByCategoryIDRequiresCategoryID(t *testing.T) {
 
 func TestFilterProvidersByCategoryIDRequiresExistingCategory(t *testing.T) {
 	repository := &providerRepositoryMock{}
-	categoryRepository := categoryRepositoryWithExistingCategory()
-	providerManager := provider.NewService(repository, categoryRepository)
+	categoryFinder := categoryFinderWithExistingCategory()
+	providerManager := provider.NewService(repository, categoryFinder)
 
 	providers, err := providerManager.FilterProvidersByCategoryID(999)
 

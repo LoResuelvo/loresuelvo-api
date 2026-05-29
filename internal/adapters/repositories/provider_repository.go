@@ -2,6 +2,7 @@ package repositories
 
 import (
 	"database/sql"
+	"fmt"
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/provider"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/user"
@@ -22,25 +23,12 @@ func NewProviderRepository(db *sql.DB, repositoryUser *UserRepository) *Provider
 func (repository *ProviderRepository) Save(provider provider.Provider) error {
 	tx, err := repository.db.Begin()
 	if err != nil {
-		return err
+		return fmt.Errorf("beginning provider transaction: %w", err)
 	}
-	defer func() {
-		_ = tx.Rollback()
-	}()
 
-	var userID int
-	err = tx.QueryRow(
-		`INSERT INTO users (auth_id, email, name, surname, role, created_on, updated_on)
-		VALUES ($1, $2, $3, $4, $5, NOW(), NOW())
-		RETURNING id`,
-		provider.User.AuthID,
-		provider.User.Email,
-		provider.User.Name,
-		provider.User.Surname,
-		provider.User.Role,
-	).Scan(&userID)
+	userID, err := repository.repositoryUser.saveWithTx(tx, *provider.User)
 	if err != nil {
-		return err
+		return rollbackProviderTx(tx, fmt.Errorf("saving provider user: %w", err))
 	}
 
 	_, err = tx.Exec(
@@ -50,10 +38,14 @@ func (repository *ProviderRepository) Save(provider provider.Provider) error {
 		provider.Category.ID,
 	)
 	if err != nil {
-		return err
+		return rollbackProviderTx(tx, fmt.Errorf("saving provider profile: %w", err))
 	}
 
-	return tx.Commit()
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("committing provider transaction: %w", err)
+	}
+
+	return nil
 }
 
 func (repository *ProviderRepository) DeleteAll() error {
@@ -62,6 +54,35 @@ func (repository *ProviderRepository) DeleteAll() error {
 
 func (repository *ProviderRepository) FindByEmail(email string) bool {
 	return repository.repositoryUser.FindByEmail(email)
+}
+
+func (repository *ProviderRepository) ExistsByID(id int) (bool, error) {
+	var exists bool
+	err := repository.db.QueryRow(
+		`SELECT EXISTS(SELECT 1 FROM providers WHERE id = $1)`,
+		id,
+	).Scan(&exists)
+	if err != nil {
+		return false, fmt.Errorf("checking provider existence by id: %w", err)
+	}
+
+	return exists, nil
+}
+
+func (repository *ProviderRepository) FindIDByEmail(email string) (int, error) {
+	var providerID int
+	err := repository.db.QueryRow(
+		`SELECT providers.id
+		FROM providers
+		INNER JOIN users ON users.id = providers.user_id
+		WHERE users.email = $1`,
+		email,
+	).Scan(&providerID)
+	if err != nil {
+		return 0, fmt.Errorf("finding provider id by email: %w", err)
+	}
+
+	return providerID, nil
 }
 
 func (repository *ProviderRepository) FindByCategoryID(categoryID int) ([]provider.Provider, error) {
@@ -103,4 +124,12 @@ func (repository *ProviderRepository) FindByCategoryID(categoryID int) ([]provid
 	}
 
 	return providers, nil
+}
+
+func rollbackProviderTx(tx *sql.Tx, originalErr error) error {
+	if rollbackErr := tx.Rollback(); rollbackErr != nil {
+		return fmt.Errorf("%w; additionally could not rollback provider transaction: %v", originalErr, rollbackErr)
+	}
+
+	return originalErr
 }

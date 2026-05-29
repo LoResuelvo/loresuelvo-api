@@ -19,21 +19,22 @@ import (
 )
 
 type testSuite struct {
-	server             *httptest.Server
-	database           *sql.DB
-	categoryRepository *repositories.CategoryRepository
-	consumerRepository *repositories.ConsumerRepository
-	providerRepository *repositories.ProviderRepository
-	userRepository     *repositories.UserRepository
-	auth0Validator     *validator.Validator
-	tokenBuilder       *testhelper.TokenBuilder
-	lastStatus         int
-	lastBody           []byte
-	currentAuth0ID     string
-	lastConversationID int
+	server                 *httptest.Server
+	database               *sql.DB
+	categoryRepository     *repositories.CategoryRepository
+	consumerRepository     *repositories.ConsumerRepository
+	providerRepository     *repositories.ProviderRepository
+	conversationRepository *repositories.ConversationRepository
+	messageRepository      *repositories.MessageRepository
+	userRepository         *repositories.UserRepository
+	auth0Validator         *validator.Validator
+	tokenBuilder           *testhelper.TokenBuilder
+	lastStatus             int
+	lastBody               []byte
+	currentAuth0ID         string
+	lastConversationID     int
 
 	categoryIDsByName              map[string]int
-	providerIDsByEmail             map[string]int
 	lastProviderFilterCategoryName string
 }
 
@@ -49,6 +50,14 @@ func (s *testSuite) registerAllSteps(sc *godog.ScenarioContext) {
 }
 
 func (s *testSuite) cleanDatabase() error {
+	if err := s.messageRepository.DeleteAll(); err != nil {
+		return fmt.Errorf("could not clean messages: %w", err)
+	}
+
+	if err := s.conversationRepository.DeleteAll(); err != nil {
+		return fmt.Errorf("could not clean conversations: %w", err)
+	}
+
 	if err := s.userRepository.DeleteAll(); err != nil {
 		return fmt.Errorf("could not clean users: %w", err)
 	}
@@ -58,7 +67,6 @@ func (s *testSuite) cleanDatabase() error {
 	}
 
 	s.categoryIDsByName = map[string]int{}
-	s.providerIDsByEmail = map[string]int{}
 
 	return nil
 }
@@ -76,7 +84,7 @@ func newTestSuite(tb testing.TB, database *sql.DB) *testSuite {
 	auth0Validator := testhelper.NewTestValidator(tb)
 	tokenBuilder := testhelper.NewTokenBuilder()
 
-	router := httpadapter.NewRouter(dependencies.CategoryHandler, dependencies.ConsumerHandler, dependencies.ProviderHandler, dependencies.UserHandler, auth0Validator)
+	router := httpadapter.NewRouter(dependencies.CategoryHandler, dependencies.ConsumerHandler, dependencies.ProviderHandler, dependencies.ConversationHandler, dependencies.UserHandler, auth0Validator)
 	engine, err := router.SetUp()
 	require.NoError(tb, err, "could not initialize router")
 
@@ -87,17 +95,18 @@ func newTestSuite(tb testing.TB, database *sql.DB) *testSuite {
 	})
 
 	return &testSuite{
-		server:             server,
-		database:           database,
-		categoryRepository: dependencies.CategoryRepository,
-		consumerRepository: dependencies.ConsumerRepository,
-		providerRepository: dependencies.ProviderRepository,
-		userRepository:     dependencies.UserRepository,
-		auth0Validator:     auth0Validator,
-		tokenBuilder:       tokenBuilder,
+		server:                 server,
+		database:               database,
+		categoryRepository:     dependencies.CategoryRepository,
+		consumerRepository:     dependencies.ConsumerRepository,
+		providerRepository:     dependencies.ProviderRepository,
+		conversationRepository: dependencies.ConversationRepository,
+		messageRepository:      dependencies.MessageRepository,
+		userRepository:         dependencies.UserRepository,
+		auth0Validator:         auth0Validator,
+		tokenBuilder:           tokenBuilder,
 
-		categoryIDsByName:  map[string]int{},
-		providerIDsByEmail: map[string]int{},
+		categoryIDsByName: map[string]int{},
 	}
 }
 

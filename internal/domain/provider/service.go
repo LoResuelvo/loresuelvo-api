@@ -7,13 +7,13 @@ import (
 
 type Service struct {
 	providerRepository Repository
-	categoryRepository category.Repository
+	categoryFinder     CategoryFinder
 }
 
-func NewService(repository Repository, categoryRepository category.Repository) *Service {
+func NewService(repository Repository, categoryFinder CategoryFinder) *Service {
 	return &Service{
 		providerRepository: repository,
-		categoryRepository: categoryRepository,
+		categoryFinder:     categoryFinder,
 	}
 }
 
@@ -58,7 +58,7 @@ func (s *Service) validateCategory(categoryID int) (*category.Category, error) {
 		return nil, category.ErrIDRequired
 	}
 
-	existingCategory := s.categoryRepository.FindByID(categoryID)
+	existingCategory := s.categoryFinder.FindByID(categoryID)
 	if existingCategory == nil {
 		return nil, category.ErrDoesNotExist
 	}

@@ -23,6 +23,10 @@ func newConsumerRepositoryTest(t *testing.T) *repositories.ConsumerRepository {
 		_, _ = database.Exec("DELETE FROM users")
 		database.Close()
 	})
+
+	_, err = database.Exec("DELETE FROM users")
+	require.NoError(t, err, "could not clean users")
+
 	userRepository := repositories.NewUserRepository(database)
 	return repositories.NewConsumerRepository(database, userRepository)
 }
@@ -69,4 +73,30 @@ func TestConsumerRepositoryFindByEmailReturnsFalseIfConsumerDoesNotExist(t *test
 	repo := newConsumerRepositoryTest(t)
 
 	assert.False(t, repo.FindByEmail("no-existe@ejemplo.com"), "Consumer should not be found by email if it does not exist")
+}
+
+func TestConsumerRepositoryCanFindIDByEmail(t *testing.T) {
+	repo := newConsumerRepositoryTest(t)
+	consumer := validConsumer()
+
+	err := repo.Save(consumer)
+	require.NoError(t, err, "saving consumer should not return an error")
+
+	consumerID, err := repo.FindIDByEmail(consumer.User.Email)
+
+	require.NoError(t, err)
+	assert.NotZero(t, consumerID)
+}
+
+func TestConsumerRepositoryCanFindIDByAuthID(t *testing.T) {
+	repo := newConsumerRepositoryTest(t)
+	consumer := validConsumer()
+
+	err := repo.Save(consumer)
+	require.NoError(t, err, "saving consumer should not return an error")
+
+	consumerID, err := repo.FindIDByAuthID(consumer.User.AuthID)
+
+	require.NoError(t, err)
+	assert.NotZero(t, consumerID)
 }

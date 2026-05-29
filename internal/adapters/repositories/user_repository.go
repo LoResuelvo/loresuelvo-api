@@ -2,6 +2,7 @@ package repositories
 
 import (
 	"database/sql"
+	"fmt"
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/user"
 )
@@ -16,18 +17,40 @@ func NewUserRepository(db *sql.DB) *UserRepository {
 	}
 }
 
-func (repository *UserRepository) Save(user user.User) error {
-	_, err := repository.db.Exec(
-		`INSERT INTO users (auth_id, email, name, surname, role, created_on, updated_on)
-		VALUES ($1, $2, $3, $4, $5, NOW(), NOW())`,
-		user.AuthID,
-		user.Email,
-		user.Name,
-		user.Surname,
-		user.Role,
-	)
-
+func (repository *UserRepository) Save(userToSave user.User) error {
+	_, err := repository.save(userToSave)
 	return err
+}
+
+func (repository *UserRepository) save(userToSave user.User) (int, error) {
+	return saveUser(repository.db, userToSave)
+}
+
+func (repository *UserRepository) saveWithTx(tx *sql.Tx, userToSave user.User) (int, error) {
+	return saveUser(tx, userToSave)
+}
+
+type userQueryRower interface {
+	QueryRow(query string, args ...any) *sql.Row
+}
+
+func saveUser(queryRower userQueryRower, userToSave user.User) (int, error) {
+	var userID int
+	err := queryRower.QueryRow(
+		`INSERT INTO users (auth_id, email, name, surname, role, created_on, updated_on)
+		VALUES ($1, $2, $3, $4, $5, NOW(), NOW())
+		RETURNING id`,
+		userToSave.AuthID,
+		userToSave.Email,
+		userToSave.Name,
+		userToSave.Surname,
+		userToSave.Role,
+	).Scan(&userID)
+	if err != nil {
+		return 0, fmt.Errorf("saving user: %w", err)
+	}
+
+	return userID, nil
 }
 
 func (repository *UserRepository) FindByEmail(email string) bool {
