@@ -1,4 +1,3 @@
-@wip
 Feature: Enviar solicitud a prestador
     Como consumidor
     quiero enviar un mensaje de solicitud de contacto a un prestador con el que nunca interactué

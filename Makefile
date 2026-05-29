@@ -26,7 +26,7 @@ lint:
 	docker compose exec -e GOFLAGS="-buildvcs=false" $(SERVICE) golangci-lint run
 
 test:
-	docker compose exec -e GOFLAGS="-buildvcs=false" $(SERVICE) sh -c 'migrate -path db/migrations -database "$$TEST_DATABASE_URL" up && go test -v ./...'
+	docker compose exec -e GOFLAGS="-buildvcs=false" $(SERVICE) sh -c 'migrate -path db/migrations -database "$$TEST_DATABASE_URL" up && go test -p 1 -v ./...'
 
 test-all-once:
 	docker compose exec -e GOFLAGS="-buildvcs=false" $(SERVICE) sh -c 'migrate -path db/migrations -database "$$TEST_DATABASE_URL" up && go test -count=1 -p 1 -v ./... && golangci-lint run'

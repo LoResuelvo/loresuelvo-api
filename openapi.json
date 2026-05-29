@@ -33,6 +33,10 @@
             "description": "Provider account registration and search endpoints."
         },
         {
+            "name": "Conversations",
+            "description": "Provider work request conversation endpoints."
+        },
+        {
             "name": "Users",
             "description": "Authenticated user session endpoints."
         }
@@ -672,6 +676,180 @@
                 }
             }
         },
+        "/conversations": {
+            "post": {
+                "tags": [
+                    "Conversations"
+                ],
+                "operationId": "createConversation",
+                "summary": "Start a provider work request",
+                "description": "Creates a pending conversation between the authenticated consumer and the selected provider, and persists the initial consumer message. The authenticated JWT subject determines the consumer; the request body intentionally does not accept consumer_id or receiver_id.",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CreateConversationRequest"
+                            },
+                            "examples": {
+                                "validRequest": {
+                                    "summary": "Valid work request",
+                                    "value": {
+                                        "provider_id": 1,
+                                        "content": "Hola Juan, necesito reparar una pérdida de agua en la cocina. ¿Podrías ayudarme esta semana?"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Work request conversation created successfully.",
+                        "headers": {
+                            "Location": {
+                                "description": "Path of the created conversation resource.",
+                                "schema": {
+                                    "type": "string",
+                                    "example": "/conversations/1"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Conversation"
+                                },
+                                "examples": {
+                                    "created": {
+                                        "value": {
+                                            "id": 1,
+                                            "status": "pending"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "The request body is not valid JSON, cannot be bound to the expected payload, provider_id is missing or zero, or the initial message is empty after trimming.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                },
+                                "examples": {
+                                    "messageRequired": {
+                                        "value": {
+                                            "error": "Message is required"
+                                        }
+                                    },
+                                    "providerRequired": {
+                                        "value": {
+                                            "error": "Provider id is required"
+                                        }
+                                    },
+                                    "invalidJson": {
+                                        "value": {
+                                            "error": "invalid character '}' looking for beginning of object key string"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Authentication failed or the authenticated user id could not be obtained from the request context.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AuthErrorResponse"
+                                },
+                                "examples": {
+                                    "invalidToken": {
+                                        "value": {
+                                            "error": "invalid_token",
+                                            "message": "Failed to validate JWT."
+                                        }
+                                    },
+                                    "missingUserId": {
+                                        "value": {
+                                            "error": "missing user id"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "The authenticated user is not a consumer and cannot start a work request.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                },
+                                "examples": {
+                                    "onlyConsumer": {
+                                        "value": {
+                                            "error": "Only consumers can start work requests"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "No provider exists with the requested id.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                },
+                                "examples": {
+                                    "providerNotFound": {
+                                        "value": {
+                                            "error": "Provider does not exist"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "A conversation between this consumer and provider already exists.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                },
+                                "examples": {
+                                    "alreadyExists": {
+                                        "value": {
+                                            "error": "Conversation already exists"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Unexpected error while creating the conversation.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/me": {
             "get": {
                 "tags": [
@@ -879,6 +1057,53 @@
                         "type": "string",
                         "description": "Provider category display name.",
                         "example": "Plomería"
+                    }
+                },
+                "additionalProperties": false
+            },
+            "CreateConversationRequest": {
+                "type": "object",
+                "description": "Payload accepted by POST /conversations to start a provider work request. The consumer is inferred from the authenticated JWT subject; clients must not send consumer_id or receiver_id.",
+                "required": [
+                    "provider_id",
+                    "content"
+                ],
+                "properties": {
+                    "provider_id": {
+                        "type": "integer",
+                        "format": "int32",
+                        "description": "Existing provider identifier selected by the consumer.",
+                        "example": 1
+                    },
+                    "content": {
+                        "type": "string",
+                        "description": "Initial message content. Must be non-empty after trimming.",
+                        "example": "Hola Juan, necesito reparar una pérdida de agua en la cocina. ¿Podrías ayudarme esta semana?"
+                    }
+                },
+                "additionalProperties": false
+            },
+            "Conversation": {
+                "type": "object",
+                "description": "Conversation created for a provider work request.",
+                "required": [
+                    "id",
+                    "status"
+                ],
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "format": "int32",
+                        "description": "Conversation identifier.",
+                        "example": 1
+                    },
+                    "status": {
+                        "type": "string",
+                        "description": "Current conversation status.",
+                        "enum": [
+                            "pending"
+                        ],
+                        "example": "pending"
                     }
                 },
                 "additionalProperties": false
