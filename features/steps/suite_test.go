@@ -47,6 +47,7 @@ func (s *testSuite) registerAllSteps(sc *godog.ScenarioContext) {
 	registerFilterProvidersByCategorySteps(sc, s)
 	registerLoginSteps(sc, s)
 	registerSendContactRequestToProviderSteps(sc, s)
+	registerGetConversationSteps(sc, s)
 }
 
 func (s *testSuite) cleanDatabase() error {

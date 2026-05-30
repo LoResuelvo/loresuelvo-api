@@ -193,34 +193,7 @@ func (suite *testSuite) systemReportsOnlyConsumerCanStartWorkRequest() error {
 }
 
 func (suite *testSuite) thereIsPendingConversationBetweenConsumerAndProvider(consumerEmail, providerEmail string) error {
-	providerID, err := suite.providerIDByEmail(providerEmail)
-	if err != nil {
-		return err
-	}
-
-	consumerID, err := suite.consumerRepository.FindIDByEmail(consumerEmail)
-	if err != nil {
-		return err
-	}
-
-	pendingConversation, err := conversation.NewPendingConversation(consumerID, providerID)
-	if err != nil {
-		return err
-	}
-
-	message, err := conversation.NewConsumerMessage("Existing work request")
-	if err != nil {
-		return err
-	}
-
-	createdConversation, err := suite.conversationRepository.SaveWithMessage(*pendingConversation, *message)
-	if err != nil {
-		return err
-	}
-
-	suite.lastConversationID = createdConversation.ID
-
-	return nil
+	return suite.createPendingConversationBetweenConsumerAndProvider(consumerEmail, providerEmail, "Existing work request")
 }
 
 func (suite *testSuite) systemReportsConversationWithProviderAlreadyExists() error {
