@@ -2,6 +2,7 @@ package steps_test
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -206,7 +207,7 @@ func (suite *testSuite) systemReportsConversationWithProviderAlreadyExists() err
 		return err
 	}
 
-	conversations, err := suite.conversationRepository.FindByConsumerID(consumerID)
+	conversations, err := suite.conversationRepository.FindByConsumerID(context.Background(), consumerID)
 	if err != nil {
 		return err
 	}

@@ -1,5 +1,7 @@
 package conversation
 
+import "time"
+
 const StatusPending = "pending"
 
 type Conversation struct {
@@ -7,6 +9,7 @@ type Conversation struct {
 	ConsumerID int
 	ProviderID int
 	Status     string
+	UpdatedOn  time.Time
 	Messages   []Message
 }
 

@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/middleware"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/conversation"
@@ -39,6 +40,29 @@ type conversationMessageResponse struct {
 	ConversationID int    `json:"conversation_id"`
 	SenderRole     string `json:"sender_role"`
 	Content        string `json:"content"`
+}
+
+type conversationSummaryResponse struct {
+	ID          int                              `json:"id"`
+	Status      string                           `json:"status"`
+	Counterpart conversationCounterpartResponse  `json:"counterpart"`
+	LastMessage *conversationLastMessageResponse `json:"last_message"`
+	UpdatedOn   time.Time                        `json:"updated_on"`
+}
+
+type conversationCounterpartResponse struct {
+	ID           int    `json:"id"`
+	Role         string `json:"role"`
+	Name         string `json:"name"`
+	Surname      string `json:"surname"`
+	CategoryName string `json:"category_name,omitempty"`
+}
+
+type conversationLastMessageResponse struct {
+	ID         int       `json:"id"`
+	SenderRole string    `json:"sender_role"`
+	Content    string    `json:"content"`
+	CreatedOn  time.Time `json:"created_on"`
 }
 
 func NewConversationHandler(conversationService *conversation.Service) *ConversationHandler {
@@ -117,6 +141,26 @@ func (h *ConversationHandler) GetConversation(c *gin.Context) {
 	c.JSON(http.StatusOK, conversationDetailResponseFromDomain(*foundConversation))
 }
 
+func (h *ConversationHandler) ListConversations(c *gin.Context) {
+	auth0ID, ok := middleware.GetUserID(c)
+	if !ok || strings.TrimSpace(auth0ID) == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "missing user id"})
+		return
+	}
+
+	summaries, err := h.conversationService.List(c.Request.Context(), auth0ID)
+	if errors.Is(err, conversation.ErrConversationAccessDenied) {
+		c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
+		return
+	}
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, conversationSummaryResponsesFromDomain(summaries))
+}
+
 func conversationIDFromPath(value string) (int, error) {
 	conversationID, err := strconv.Atoi(value)
 	if err != nil || conversationID <= 0 {
@@ -143,5 +187,43 @@ func conversationDetailResponseFromDomain(foundConversation conversation.Convers
 		ProviderID: foundConversation.ProviderID,
 		Status:     foundConversation.Status,
 		Messages:   messages,
+	}
+}
+
+func conversationSummaryResponsesFromDomain(summaries []conversation.ConversationSummary) []conversationSummaryResponse {
+	response := make([]conversationSummaryResponse, 0, len(summaries))
+	for _, summary := range summaries {
+		response = append(response, conversationSummaryResponseFromDomain(summary))
+	}
+
+	return response
+}
+
+func conversationSummaryResponseFromDomain(summary conversation.ConversationSummary) conversationSummaryResponse {
+	return conversationSummaryResponse{
+		ID:     summary.ID,
+		Status: summary.Status,
+		Counterpart: conversationCounterpartResponse{
+			ID:           summary.Counterpart.ID,
+			Role:         summary.Counterpart.Role,
+			Name:         summary.Counterpart.Name,
+			Surname:      summary.Counterpart.Surname,
+			CategoryName: summary.Counterpart.CategoryName,
+		},
+		LastMessage: conversationLastMessageResponseFromDomain(summary.LastMessage),
+		UpdatedOn:   summary.UpdatedOn,
+	}
+}
+
+func conversationLastMessageResponseFromDomain(message *conversation.MessageSummary) *conversationLastMessageResponse {
+	if message == nil {
+		return nil
+	}
+
+	return &conversationLastMessageResponse{
+		ID:         message.ID,
+		SenderRole: message.SenderRole,
+		Content:    message.Content,
+		CreatedOn:  message.CreatedOn,
 	}
 }

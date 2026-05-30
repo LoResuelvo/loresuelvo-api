@@ -1,20 +1,39 @@
 package conversation
 
-import "context"
+import (
+	"context"
+
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/consumer"
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/provider"
+)
 
 type Service struct {
 	conversationRepository   Repository
-	consumerIDFinder         ConsumerIDFinder
+	consumerIDFinder        ConsumerIDFinder
+	providerFinder          ProviderFinder
 	providerExistenceChecker ProviderExistenceChecker
-	providerIDFinder         ProviderIDFinder
+	providerIDFinder        ProviderIDFinder
+	consumerFinder          ConsumerFinder
+	messageFinder           MessageFinder
 }
 
-func NewService(conversationRepository Repository, consumerIDFinder ConsumerIDFinder, providerExistenceChecker ProviderExistenceChecker, providerIDFinder ProviderIDFinder) *Service {
+func NewService(
+	conversationRepository Repository,
+	consumerIDFinder ConsumerIDFinder,
+	providerFinder ProviderFinder,
+	providerExistenceChecker ProviderExistenceChecker,
+	providerIDFinder ProviderIDFinder,
+	consumerFinder ConsumerFinder,
+	messageFinder MessageFinder,
+) *Service {
 	return &Service{
 		conversationRepository:   conversationRepository,
 		consumerIDFinder:         consumerIDFinder,
+		providerFinder:           providerFinder,
 		providerExistenceChecker: providerExistenceChecker,
 		providerIDFinder:         providerIDFinder,
+		consumerFinder:           consumerFinder,
+		messageFinder:            messageFinder,
 	}
 }
 
@@ -51,6 +70,88 @@ func (s *Service) GetByID(ctx context.Context, authID string, conversationID int
 	}
 
 	return foundConversation, nil
+}
+
+func (s *Service) List(ctx context.Context, authID string) ([]ConversationSummary, error) {
+	if consumerID, err := s.consumerIDFinder.FindIDByAuthID(authID); err == nil {
+		return s.listForConsumer(ctx, consumerID)
+	}
+
+	if providerID, err := s.providerIDFinder.FindIDByAuthID(authID); err == nil {
+		return s.listForProvider(ctx, providerID)
+	}
+
+	return nil, ErrConversationAccessDenied
+}
+
+func (s *Service) listForConsumer(ctx context.Context, consumerID int) ([]ConversationSummary, error) {
+	conversations, err := s.conversationRepository.FindByConsumerID(ctx, consumerID)
+	if err != nil {
+		return nil, err
+	}
+	if len(conversations) == 0 {
+		return []ConversationSummary{}, nil
+	}
+
+	providerIDs := make([]int, len(conversations))
+	for i, conv := range conversations {
+		providerIDs[i] = conv.ProviderID
+	}
+
+	providers, err := s.providerFinder.FindByIDs(ctx, providerIDs)
+	if err != nil {
+		return nil, err
+	}
+	providerMap := make(map[int]provider.Provider)
+	for _, p := range providers {
+		providerMap[p.ID] = p
+	}
+
+	lastMessages, err := s.messageFinder.FindLastMessagesByConversationIDs(ctx, conversationIDsFrom(conversations))
+	if err != nil {
+		return nil, err
+	}
+
+	return BuildConsumerSummaries(conversations, providerMap, lastMessages), nil
+}
+
+func (s *Service) listForProvider(ctx context.Context, providerID int) ([]ConversationSummary, error) {
+	conversations, err := s.conversationRepository.FindByProviderID(ctx, providerID)
+	if err != nil {
+		return nil, err
+	}
+	if len(conversations) == 0 {
+		return []ConversationSummary{}, nil
+	}
+
+	consumerIDs := make([]int, len(conversations))
+	for i, conv := range conversations {
+		consumerIDs[i] = conv.ConsumerID
+	}
+
+	consumers, err := s.consumerFinder.FindByIDs(ctx, consumerIDs)
+	if err != nil {
+		return nil, err
+	}
+	consumerMap := make(map[int]consumer.Consumer)
+	for _, c := range consumers {
+		consumerMap[c.ID] = c
+	}
+
+	lastMessages, err := s.messageFinder.FindLastMessagesByConversationIDs(ctx, conversationIDsFrom(conversations))
+	if err != nil {
+		return nil, err
+	}
+
+	return BuildProviderSummaries(conversations, consumerMap, lastMessages), nil
+}
+
+func conversationIDsFrom(conversations []Conversation) []int {
+	ids := make([]int, len(conversations))
+	for i, conv := range conversations {
+		ids[i] = conv.ID
+	}
+	return ids
 }
 
 func (s *Service) consumerIDForWorkRequest(consumerAuthID string) (int, error) {

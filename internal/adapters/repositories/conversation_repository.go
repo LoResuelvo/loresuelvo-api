@@ -148,34 +148,79 @@ func (repository *ConversationRepository) FindByID(ctx context.Context, conversa
 	return &foundConversation, nil
 }
 
-func (repository *ConversationRepository) FindByConsumerID(consumerID int) ([]conversation.Conversation, error) {
-	rows, err := repository.db.Query(
-		`SELECT id, consumer_id, provider_id, status
+func (repository *ConversationRepository) FindByConsumerID(ctx context.Context, consumerID int) ([]conversation.Conversation, error) {
+	rows, err := repository.db.QueryContext(
+		ctx,
+		`SELECT
+			conversations.id,
+			conversations.consumer_id,
+			conversations.provider_id,
+			conversations.status,
+			conversations.updated_on
 		FROM conversations
-		WHERE consumer_id = $1
-		ORDER BY id ASC`,
+		WHERE conversations.consumer_id = $1
+		ORDER BY conversations.updated_on DESC, conversations.id DESC`,
 		consumerID,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("finding conversations by consumer id: %w", err)
 	}
-	defer func() {
-		_ = rows.Close()
-	}()
+	defer func() { _ = rows.Close() }()
 
-	conversations := []conversation.Conversation{}
+	var conversations []conversation.Conversation
 	for rows.Next() {
-		var conversationItem conversation.Conversation
+		var conv conversation.Conversation
 		if err := rows.Scan(
-			&conversationItem.ID,
-			&conversationItem.ConsumerID,
-			&conversationItem.ProviderID,
-			&conversationItem.Status,
+			&conv.ID,
+			&conv.ConsumerID,
+			&conv.ProviderID,
+			&conv.Status,
+			&conv.UpdatedOn,
 		); err != nil {
 			return nil, fmt.Errorf("scanning conversation: %w", err)
 		}
+		conversations = append(conversations, conv)
+	}
 
-		conversations = append(conversations, conversationItem)
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterating conversations: %w", err)
+	}
+
+	return conversations, nil
+}
+
+func (repository *ConversationRepository) FindByProviderID(ctx context.Context, providerID int) ([]conversation.Conversation, error) {
+	rows, err := repository.db.QueryContext(
+		ctx,
+		`SELECT
+			conversations.id,
+			conversations.consumer_id,
+			conversations.provider_id,
+			conversations.status,
+			conversations.updated_on
+		FROM conversations
+		WHERE conversations.provider_id = $1
+		ORDER BY conversations.updated_on DESC, conversations.id DESC`,
+		providerID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("finding conversations by provider id: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	var conversations []conversation.Conversation
+	for rows.Next() {
+		var conv conversation.Conversation
+		if err := rows.Scan(
+			&conv.ID,
+			&conv.ConsumerID,
+			&conv.ProviderID,
+			&conv.Status,
+			&conv.UpdatedOn,
+		); err != nil {
+			return nil, fmt.Errorf("scanning conversation: %w", err)
+		}
+		conversations = append(conversations, conv)
 	}
 
 	if err := rows.Err(); err != nil {

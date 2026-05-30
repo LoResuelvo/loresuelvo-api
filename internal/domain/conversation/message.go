@@ -1,6 +1,9 @@
 package conversation
 
-import "strings"
+import (
+	"strings"
+	"time"
+)
 
 const (
 	SenderConsumer = "consumer"
@@ -12,6 +15,7 @@ type Message struct {
 	ConversationID int
 	SenderRole     string
 	Content        string
+	CreatedOn      time.Time
 }
 
 func NewConsumerMessage(content string) (*Message, error) {

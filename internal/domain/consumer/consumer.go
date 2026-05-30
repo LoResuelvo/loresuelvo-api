@@ -3,6 +3,7 @@ package consumer
 import "github.com/LoResuelvo/loresuelvo-api/internal/domain/user"
 
 type Consumer struct {
+	ID   int
 	User *user.User
 }
 

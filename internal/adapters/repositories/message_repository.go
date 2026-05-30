@@ -79,6 +79,45 @@ func (repository *MessageRepository) DeleteAll() error {
 	return nil
 }
 
+func (repository *MessageRepository) FindLastMessagesByConversationIDs(ctx context.Context, conversationIDs []int) (map[int]conversation.Message, error) {
+	if len(conversationIDs) == 0 {
+		return nil, nil
+	}
+
+	rows, err := repository.db.QueryContext(
+		ctx,
+		`SELECT m.id, m.conversation_id, m.sender_role, m.content, m.created_on
+		FROM messages m
+		INNER JOIN (
+			SELECT id, conversation_id, MAX(created_on) as max_created
+			FROM messages
+			WHERE conversation_id = ANY($1)
+			GROUP BY id, conversation_id
+		) latest ON m.id = latest.id AND m.conversation_id = latest.conversation_id
+		WHERE m.conversation_id = ANY($1)`,
+		conversationIDs,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("finding last messages by conversation ids: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	result := make(map[int]conversation.Message)
+	for rows.Next() {
+		var msg conversation.Message
+		if err := rows.Scan(&msg.ID, &msg.ConversationID, &msg.SenderRole, &msg.Content, &msg.CreatedOn); err != nil {
+			return nil, fmt.Errorf("scanning last message: %w", err)
+		}
+		result[msg.ConversationID] = msg
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterating last messages: %w", err)
+	}
+
+	return result, nil
+}
+
 func (repository *MessageRepository) saveWithTx(tx *sql.Tx, conversationID int, message conversation.Message) (*conversation.Message, error) {
 	var savedMessage conversation.Message
 	err := tx.QueryRow(

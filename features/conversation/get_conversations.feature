@@ -1,4 +1,3 @@
-@wip
 Feature: Obtener conversaciones
     Como usuario
     quiero ver mis conversaciones
