@@ -48,6 +48,7 @@ func (s *testSuite) registerAllSteps(sc *godog.ScenarioContext) {
 	registerLoginSteps(sc, s)
 	registerSendContactRequestToProviderSteps(sc, s)
 	registerGetConversationSteps(sc, s)
+	registerGetConversationsSteps(sc, s)
 }
 
 func (s *testSuite) cleanDatabase() error {
