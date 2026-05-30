@@ -13,12 +13,13 @@ import (
 )
 
 type Dependencies struct {
-	UserRepository         *repositories.UserRepository
-	CategoryRepository     *repositories.CategoryRepository
-	ConsumerRepository     *repositories.ConsumerRepository
-	ProviderRepository     *repositories.ProviderRepository
-	ConversationRepository *repositories.ConversationRepository
-	MessageRepository      *repositories.MessageRepository
+	UserRepository            *repositories.UserRepository
+	CategoryRepository        *repositories.CategoryRepository
+	ConsumerRepository        *repositories.ConsumerRepository
+	ProviderRepository        *repositories.ProviderRepository
+	ConversationRepository    *repositories.ConversationRepository
+	MessageRepository         *repositories.MessageRepository
+	ConversationSummaryReader *repositories.ConversationSummaryReader
 
 	CategoryHandler     *handler.CategoryHandler
 	ConsumerHandler     *handler.ConsumerHandler
@@ -34,6 +35,7 @@ func NewDependencies(database *sql.DB) *Dependencies {
 	providerRepository := repositories.NewProviderRepository(database, userRepository)
 	messageRepository := repositories.NewMessageRepository(database)
 	conversationRepository := repositories.NewConversationRepository(database, messageRepository)
+	conversationSummaryReader := repositories.NewConversationSummaryReader(database)
 
 	categoryService := category.NewService(categoryRepository)
 	providerService := provider.NewService(providerRepository, categoryRepository)
@@ -43,23 +45,22 @@ func NewDependencies(database *sql.DB) *Dependencies {
 		consumerRepository,
 		providerRepository,
 		providerRepository,
-		providerRepository,
-		consumerRepository,
-		messageRepository,
+		conversationSummaryReader,
 	)
 	userService := user.NewService(userRepository)
 
 	return &Dependencies{
-		UserRepository:         userRepository,
-		CategoryRepository:     categoryRepository,
-		ConsumerRepository:     consumerRepository,
-		ProviderRepository:     providerRepository,
-		ConversationRepository: conversationRepository,
-		MessageRepository:      messageRepository,
-		CategoryHandler:        handler.NewCategoryHandler(categoryService),
-		ConsumerHandler:        handler.NewConsumerHandler(consumerService),
-		ProviderHandler:        handler.NewProviderHandler(providerService),
-		ConversationHandler:    handler.NewConversationHandler(conversationService),
-		UserHandler:            handler.NewUserHandler(userService),
+		UserRepository:            userRepository,
+		CategoryRepository:        categoryRepository,
+		ConsumerRepository:        consumerRepository,
+		ProviderRepository:        providerRepository,
+		ConversationRepository:    conversationRepository,
+		MessageRepository:         messageRepository,
+		ConversationSummaryReader: conversationSummaryReader,
+		CategoryHandler:           handler.NewCategoryHandler(categoryService),
+		ConsumerHandler:           handler.NewConsumerHandler(consumerService),
+		ProviderHandler:           handler.NewProviderHandler(providerService),
+		ConversationHandler:       handler.NewConversationHandler(conversationService),
+		UserHandler:               handler.NewUserHandler(userService),
 	}
 }

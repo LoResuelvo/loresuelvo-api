@@ -1,11 +1,9 @@
 package repositories
 
 import (
-	"context"
 	"database/sql"
 	"fmt"
 
-	"github.com/LoResuelvo/loresuelvo-api/internal/domain/category"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/provider"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/user"
 )
@@ -142,60 +140,6 @@ func (repository *ProviderRepository) FindByCategoryID(categoryID int) ([]provid
 	}
 
 	return providers, nil
-}
-
-func (repository *ProviderRepository) FindByIDs(ctx context.Context, ids []int) ([]provider.Provider, error) {
-	if len(ids) == 0 {
-		return nil, nil
-	}
-
-	rows, err := repository.db.QueryContext(
-		ctx,
-		`SELECT
-			providers.id,
-			users.auth_id,
-			users.email,
-			users.name,
-			users.surname,
-			users.role,
-			COALESCE(categories.name, ''),
-			categories.id
-		FROM providers
-		INNER JOIN users ON users.id = providers.user_id
-		LEFT JOIN categories ON categories.id = providers.category_id
-		WHERE providers.id = ANY($1)
-		ORDER BY users.name ASC, users.surname ASC`,
-		ids,
-	)
-	if err != nil {
-		return nil, fmt.Errorf("finding providers by ids: %w", err)
-	}
-	defer func() { _ = rows.Close() }()
-
-	var results []provider.Provider
-	for rows.Next() {
-		var prov provider.Provider
-		var user user.User
-		var categoryName string
-		var categoryID sql.NullInt64
-
-		if err := rows.Scan(&prov.ID, &user.AuthID, &user.Email, &user.Name, &user.Surname, &user.Role, &categoryName, &categoryID); err != nil {
-			return nil, fmt.Errorf("scanning provider: %w", err)
-		}
-
-		prov.User = &user
-		if categoryID.Valid {
-			prov.Category = &category.Category{ID: int(categoryID.Int64), Name: categoryName}
-		}
-
-		results = append(results, prov)
-	}
-
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterating providers: %w", err)
-	}
-
-	return results, nil
 }
 
 func rollbackProviderTx(tx *sql.Tx, originalErr error) error {

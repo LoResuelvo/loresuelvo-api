@@ -14,6 +14,7 @@ import (
 )
 
 type conversationRepositoryTestContext struct {
+	database               *sql.DB
 	consumerRepository     *repositories.ConsumerRepository
 	providerRepository     *repositories.ProviderRepository
 	categoryRepository     *repositories.CategoryRepository
@@ -47,6 +48,7 @@ func newConversationRepositoryTest(t *testing.T) conversationRepositoryTestConte
 	userRepository := repositories.NewUserRepository(database)
 	messageRepository := repositories.NewMessageRepository(database)
 	return conversationRepositoryTestContext{
+		database:               database,
 		consumerRepository:     repositories.NewConsumerRepository(database, userRepository),
 		providerRepository:     repositories.NewProviderRepository(database, userRepository),
 		categoryRepository:     repositories.NewCategoryRepository(database),
@@ -164,40 +166,6 @@ func TestConversationRepositoryCanFindConversationBetweenParticipants(t *testing
 	require.NotNil(t, foundConversation)
 	assert.Equal(t, savedConversation.ID, foundConversation.ID)
 	assert.Equal(t, conversation.StatusPending, foundConversation.Status)
-}
-
-func TestConversationRepositoryCanFindByConsumerID(t *testing.T) {
-	testContext := newConversationRepositoryTest(t)
-	consumerID, providerID := savedConversationParticipants(t, testContext)
-	conversationToSave, messageToSave := pendingConversationWithMessage(t, consumerID, providerID)
-	savedConversation, err := testContext.conversationRepository.SaveWithMessage(conversationToSave, messageToSave)
-	require.NoError(t, err)
-
-	conversations, err := testContext.conversationRepository.FindByConsumerID(context.Background(), consumerID)
-
-	require.NoError(t, err)
-	require.Len(t, conversations, 1)
-	assert.Equal(t, savedConversation.ID, conversations[0].ID)
-	assert.Equal(t, consumerID, conversations[0].ConsumerID)
-	assert.Equal(t, providerID, conversations[0].ProviderID)
-	assert.Equal(t, conversation.StatusPending, conversations[0].Status)
-}
-
-func TestConversationRepositoryCanFindByProviderID(t *testing.T) {
-	testContext := newConversationRepositoryTest(t)
-	consumerID, providerID := savedConversationParticipants(t, testContext)
-	conversationToSave, messageToSave := pendingConversationWithMessage(t, consumerID, providerID)
-	savedConversation, err := testContext.conversationRepository.SaveWithMessage(conversationToSave, messageToSave)
-	require.NoError(t, err)
-
-	conversations, err := testContext.conversationRepository.FindByProviderID(context.Background(), providerID)
-
-	require.NoError(t, err)
-	require.Len(t, conversations, 1)
-	assert.Equal(t, savedConversation.ID, conversations[0].ID)
-	assert.Equal(t, consumerID, conversations[0].ConsumerID)
-	assert.Equal(t, providerID, conversations[0].ProviderID)
-	assert.Equal(t, conversation.StatusPending, conversations[0].Status)
 }
 
 func TestConversationRepositoryCanDeleteBetweenParticipants(t *testing.T) {

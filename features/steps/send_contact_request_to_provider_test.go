@@ -2,7 +2,6 @@ package steps_test
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -207,13 +206,16 @@ func (suite *testSuite) systemReportsConversationWithProviderAlreadyExists() err
 		return err
 	}
 
-	conversations, err := suite.conversationRepository.FindByConsumerID(context.Background(), consumerID)
+	if suite.lastWorkRequestProviderID == 0 {
+		return fmt.Errorf("expected attempted provider id to be recorded before duplicate rejection assertion")
+	}
+
+	exists, err := suite.conversationRepository.ExistsBetween(consumerID, suite.lastWorkRequestProviderID)
 	if err != nil {
 		return err
 	}
-
-	if len(conversations) != 1 {
-		return fmt.Errorf("expected exactly one conversation after duplicate rejection, found %d", len(conversations))
+	if !exists {
+		return fmt.Errorf("expected existing conversation after duplicate rejection")
 	}
 
 	return nil
@@ -225,6 +227,7 @@ func (suite *testSuite) requestWorkRequestToProvider(providerEmail string, conte
 		return err
 	}
 
+	suite.lastWorkRequestProviderID = providerID
 	payload := conversationCreationRequest{ProviderID: providerID}
 	if content != nil {
 		payload.Content = *content

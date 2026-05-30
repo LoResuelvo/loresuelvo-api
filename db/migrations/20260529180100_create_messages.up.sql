@@ -10,3 +10,7 @@ CREATE TABLE messages (
 
 CREATE INDEX messages_conversation_id_idx
     ON messages (conversation_id);
+
+CREATE INDEX messages_conversation_created_on_id_idx
+    ON messages (conversation_id, created_on DESC, id DESC);
+

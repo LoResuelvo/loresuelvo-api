@@ -19,20 +19,21 @@ import (
 )
 
 type testSuite struct {
-	server                 *httptest.Server
-	database               *sql.DB
-	categoryRepository     *repositories.CategoryRepository
-	consumerRepository     *repositories.ConsumerRepository
-	providerRepository     *repositories.ProviderRepository
-	conversationRepository *repositories.ConversationRepository
-	messageRepository      *repositories.MessageRepository
-	userRepository         *repositories.UserRepository
-	auth0Validator         *validator.Validator
-	tokenBuilder           *testhelper.TokenBuilder
-	lastStatus             int
-	lastBody               []byte
-	currentAuth0ID         string
-	lastConversationID     int
+	server                    *httptest.Server
+	database                  *sql.DB
+	categoryRepository        *repositories.CategoryRepository
+	consumerRepository        *repositories.ConsumerRepository
+	providerRepository        *repositories.ProviderRepository
+	conversationRepository    *repositories.ConversationRepository
+	messageRepository         *repositories.MessageRepository
+	userRepository            *repositories.UserRepository
+	auth0Validator            *validator.Validator
+	tokenBuilder              *testhelper.TokenBuilder
+	lastStatus                int
+	lastBody                  []byte
+	currentAuth0ID            string
+	lastConversationID        int
+	lastWorkRequestProviderID int
 
 	categoryIDsByName              map[string]int
 	lastProviderFilterCategoryName string
@@ -69,6 +70,7 @@ func (s *testSuite) cleanDatabase() error {
 	}
 
 	s.categoryIDsByName = map[string]int{}
+	s.lastWorkRequestProviderID = 0
 
 	return nil
 }

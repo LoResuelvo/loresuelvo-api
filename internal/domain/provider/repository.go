@@ -1,10 +1,6 @@
 package provider
 
-import (
-	"context"
-
-	"github.com/LoResuelvo/loresuelvo-api/internal/domain/category"
-)
+import "github.com/LoResuelvo/loresuelvo-api/internal/domain/category"
 
 type Repository interface {
 	Save(provider Provider) error
@@ -14,8 +10,4 @@ type Repository interface {
 
 type CategoryFinder interface {
 	FindByID(id int) *category.Category
-}
-
-type ProviderFinder interface {
-	FindByIDs(ctx context.Context, ids []int) ([]Provider, error)
 }

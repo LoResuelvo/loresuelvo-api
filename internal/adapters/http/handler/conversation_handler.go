@@ -10,6 +10,7 @@ import (
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/middleware"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/conversation"
+	readmodel "github.com/LoResuelvo/loresuelvo-api/internal/domain/conversation/read_model"
 	"github.com/gin-gonic/gin"
 )
 
@@ -190,7 +191,7 @@ func conversationDetailResponseFromDomain(foundConversation conversation.Convers
 	}
 }
 
-func conversationSummaryResponsesFromDomain(summaries []conversation.ConversationSummary) []conversationSummaryResponse {
+func conversationSummaryResponsesFromDomain(summaries []readmodel.ConversationSummary) []conversationSummaryResponse {
 	response := make([]conversationSummaryResponse, 0, len(summaries))
 	for _, summary := range summaries {
 		response = append(response, conversationSummaryResponseFromDomain(summary))
@@ -199,7 +200,7 @@ func conversationSummaryResponsesFromDomain(summaries []conversation.Conversatio
 	return response
 }
 
-func conversationSummaryResponseFromDomain(summary conversation.ConversationSummary) conversationSummaryResponse {
+func conversationSummaryResponseFromDomain(summary readmodel.ConversationSummary) conversationSummaryResponse {
 	return conversationSummaryResponse{
 		ID:     summary.ID,
 		Status: summary.Status,
@@ -215,7 +216,7 @@ func conversationSummaryResponseFromDomain(summary conversation.ConversationSumm
 	}
 }
 
-func conversationLastMessageResponseFromDomain(message *conversation.MessageSummary) *conversationLastMessageResponse {
+func conversationLastMessageResponseFromDomain(message *readmodel.MessageSummary) *conversationLastMessageResponse {
 	if message == nil {
 		return nil
 	}
