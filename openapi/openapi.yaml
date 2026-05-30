@@ -53,6 +53,12 @@ components:
       $ref: ./components/schemas/create-conversation-request.yaml
     Conversation:
       $ref: ./components/schemas/conversation.yaml
+    ConversationSummary:
+      $ref: ./components/schemas/conversation-summary.yaml
+    ConversationCounterpart:
+      $ref: ./components/schemas/conversation-counterpart.yaml
+    ConversationLastMessage:
+      $ref: ./components/schemas/conversation-last-message.yaml
     ConversationDetail:
       $ref: ./components/schemas/conversation-detail.yaml
     ConversationMessage:

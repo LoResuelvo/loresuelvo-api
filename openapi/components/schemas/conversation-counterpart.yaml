@@ -1,0 +1,33 @@
+type: object
+description: Participant shown as the other side of a conversation summary.
+required:
+- id
+- role
+- name
+- surname
+properties:
+  id:
+    type: integer
+    format: int32
+    description: Counterpart profile identifier. It is a provider id when role is provider, or a consumer id when role is consumer.
+    example: 20
+  role:
+    type: string
+    description: Counterpart role in the conversation.
+    enum:
+    - consumer
+    - provider
+    example: provider
+  name:
+    type: string
+    description: Counterpart given name.
+    example: Juan
+  surname:
+    type: string
+    description: Counterpart surname.
+    example: Gómez
+  category_name:
+    type: string
+    description: Provider category display name. Present only when the counterpart is a provider.
+    example: Plomería
+additionalProperties: false

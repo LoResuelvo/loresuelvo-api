@@ -1,3 +1,85 @@
+get:
+  tags:
+  - Conversations
+  operationId: listConversations
+  summary: List my conversations
+  description: Returns conversation summaries for the authenticated consumer or provider. The response is intentionally scoped to the authenticated participant and does not expose consumer_id, provider_id, or current_user_role at the top level.
+  security:
+  - BearerAuth: []
+  responses:
+    '200':
+      description: Conversation summaries returned successfully. The array is empty when the authenticated user has no conversations.
+      content:
+        application/json:
+          schema:
+            type: array
+            items:
+              $ref: '#/components/schemas/ConversationSummary'
+          examples:
+            consumerConversations:
+              value:
+              - id: 1
+                status: pending
+                counterpart:
+                  id: 20
+                  role: provider
+                  name: Juan
+                  surname: Gómez
+                  category_name: Plomería
+                last_message:
+                  id: 1
+                  sender_role: consumer
+                  content: Hola Juan, necesito reparar una pérdida de agua en la cocina. ¿Podrías ayudarme esta semana?
+                  created_on: '2026-05-30T14:20:00Z'
+                updated_on: '2026-05-30T14:20:00Z'
+            providerConversations:
+              value:
+              - id: 1
+                status: pending
+                counterpart:
+                  id: 10
+                  role: consumer
+                  name: Ana
+                  surname: Pérez
+                last_message:
+                  id: 1
+                  sender_role: consumer
+                  content: Hola Juan, necesito reparar una pérdida de agua en la cocina. ¿Podrías ayudarme esta semana?
+                  created_on: '2026-05-30T14:20:00Z'
+                updated_on: '2026-05-30T14:20:00Z'
+            empty:
+              value: []
+    '401':
+      description: Authentication failed or the authenticated user id could not be obtained from the request context.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/AuthErrorResponse'
+          examples:
+            invalidToken:
+              value:
+                error: invalid_token
+                message: Failed to validate JWT.
+            missingUserId:
+              value:
+                error: missing user id
+    '403':
+      description: The authenticated user does not have a consumer or provider profile.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            accessDenied:
+              value:
+                error: Cannot access conversation
+    '500':
+      description: Unexpected error while listing conversations.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
 post:
   tags:
   - Conversations
