@@ -2,7 +2,10 @@ package conversation
 
 import "strings"
 
-const SenderConsumer = "consumer"
+const (
+	SenderConsumer = "consumer"
+	SenderProvider = "provider"
+)
 
 type Message struct {
 	ID             int

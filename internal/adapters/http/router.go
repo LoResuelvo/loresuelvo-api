@@ -78,6 +78,7 @@ func (router *Router) registerProviderRoutes(engine *gin.Engine, authMiddleware 
 
 func (router *Router) registerConversationRoutes(engine *gin.Engine, authMiddleware gin.HandlerFunc) {
 	engine.POST("/conversations", authMiddleware, router.conversationHandler.CreateConversation)
+	engine.GET("/conversations/:conversationID", authMiddleware, router.conversationHandler.GetConversation)
 }
 
 func (router *Router) registerAuthenticatedRoutes(engine *gin.Engine, authMiddleware gin.HandlerFunc) {

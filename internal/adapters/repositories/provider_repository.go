@@ -69,6 +69,22 @@ func (repository *ProviderRepository) ExistsByID(id int) (bool, error) {
 	return exists, nil
 }
 
+func (repository *ProviderRepository) FindIDByAuthID(authID string) (int, error) {
+	var providerID int
+	err := repository.db.QueryRow(
+		`SELECT providers.id
+		FROM providers
+		INNER JOIN users ON users.id = providers.user_id
+		WHERE users.auth_id = $1`,
+		authID,
+	).Scan(&providerID)
+	if err != nil {
+		return 0, fmt.Errorf("finding provider id by auth id: %w", err)
+	}
+
+	return providerID, nil
+}
+
 func (repository *ProviderRepository) FindIDByEmail(email string) (int, error) {
 	var providerID int
 	err := repository.db.QueryRow(

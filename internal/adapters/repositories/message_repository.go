@@ -1,6 +1,7 @@
 package repositories
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 
@@ -29,6 +30,44 @@ func (repository *MessageRepository) ExistsInConversation(conversationID int, co
 	}
 
 	return exists, nil
+}
+
+func (repository *MessageRepository) FindByConversationID(ctx context.Context, conversationID int) ([]conversation.Message, error) {
+	rows, err := repository.db.QueryContext(
+		ctx,
+		`SELECT id, conversation_id, sender_role, content
+		FROM messages
+		WHERE conversation_id = $1
+		ORDER BY id ASC`,
+		conversationID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("finding messages by conversation id: %w", err)
+	}
+	defer func() {
+		_ = rows.Close()
+	}()
+
+	messages := []conversation.Message{}
+	for rows.Next() {
+		var message conversation.Message
+		if err := rows.Scan(
+			&message.ID,
+			&message.ConversationID,
+			&message.SenderRole,
+			&message.Content,
+		); err != nil {
+			return nil, fmt.Errorf("scanning message: %w", err)
+		}
+
+		messages = append(messages, message)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterating messages: %w", err)
+	}
+
+	return messages, nil
 }
 
 func (repository *MessageRepository) DeleteAll() error {

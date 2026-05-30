@@ -199,3 +199,17 @@ func TestProviderRepositoryFindByCategoryIDReturnsEmptyListIfNoProvidersExistFor
 	require.NoError(t, err)
 	assert.Empty(t, providers)
 }
+
+func TestProviderRepositoryCanFindIDByAuthID(t *testing.T) {
+	testContext := newProviderRepositoryTest(t)
+	repo := testContext.providerRepository
+	provider := validProvider(t, testContext.categoryRepository)
+
+	err := repo.Save(*provider)
+	require.NoError(t, err, "saving provider should not return an error")
+
+	providerID, err := repo.FindIDByAuthID(provider.User.AuthID)
+
+	require.NoError(t, err)
+	assert.NotZero(t, providerID)
+}

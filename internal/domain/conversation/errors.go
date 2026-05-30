@@ -11,3 +11,7 @@ var ErrMessageRequired = errors.New("Message is required")
 var ErrOnlyConsumerCanStartWorkRequest = errors.New("Only consumers can start work requests")
 
 var ErrAlreadyExists = errors.New("Conversation already exists")
+
+var ErrConversationDoesNotExist = errors.New("Conversation does not exist")
+
+var ErrConversationAccessDenied = errors.New("Cannot access conversation")

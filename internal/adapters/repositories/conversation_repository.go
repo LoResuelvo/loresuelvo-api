@@ -1,6 +1,7 @@
 package repositories
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"fmt"
@@ -60,10 +61,11 @@ func (repository *ConversationRepository) SaveWithMessage(conversationToSave con
 		return nil, rollbackConversationTx(tx, mapConversationInsertError(err))
 	}
 
-	_, err = repository.messageRepository.saveWithTx(tx, savedConversation.ID, message)
+	savedMessage, err := repository.messageRepository.saveWithTx(tx, savedConversation.ID, message)
 	if err != nil {
 		return nil, rollbackConversationTx(tx, err)
 	}
+	savedConversation.Messages = []conversation.Message{*savedMessage}
 
 	if err := tx.Commit(); err != nil {
 		return nil, fmt.Errorf("committing conversation transaction: %w", err)
@@ -111,6 +113,37 @@ func (repository *ConversationRepository) FindBetween(consumerID, providerID int
 	if err != nil {
 		return nil, fmt.Errorf("finding conversation between consumer and provider: %w", err)
 	}
+
+	return &foundConversation, nil
+}
+
+func (repository *ConversationRepository) FindByID(ctx context.Context, conversationID int) (*conversation.Conversation, error) {
+	var foundConversation conversation.Conversation
+	err := repository.db.QueryRowContext(
+		ctx,
+		`SELECT id, consumer_id, provider_id, status
+		FROM conversations
+		WHERE id = $1`,
+		conversationID,
+	).Scan(
+		&foundConversation.ID,
+		&foundConversation.ConsumerID,
+		&foundConversation.ProviderID,
+		&foundConversation.Status,
+	)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, conversation.ErrConversationDoesNotExist
+	}
+	if err != nil {
+		return nil, fmt.Errorf("finding conversation by id: %w", err)
+	}
+
+	messages, err := repository.messageRepository.FindByConversationID(ctx, foundConversation.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	foundConversation.Messages = messages
 
 	return &foundConversation, nil
 }

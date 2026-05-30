@@ -7,6 +7,7 @@ type Conversation struct {
 	ConsumerID int
 	ProviderID int
 	Status     string
+	Messages   []Message
 }
 
 func NewPendingConversation(consumerID, providerID int) (*Conversation, error) {

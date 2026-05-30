@@ -109,6 +109,11 @@ func TestConversationRepositoryCanSaveConversationWithMessage(t *testing.T) {
 	assert.Equal(t, consumerID, savedConversation.ConsumerID)
 	assert.Equal(t, providerID, savedConversation.ProviderID)
 	assert.Equal(t, conversation.StatusPending, savedConversation.Status)
+	require.Len(t, savedConversation.Messages, 1)
+	assert.NotZero(t, savedConversation.Messages[0].ID)
+	assert.Equal(t, savedConversation.ID, savedConversation.Messages[0].ConversationID)
+	assert.Equal(t, conversation.SenderConsumer, savedConversation.Messages[0].SenderRole)
+	assert.Equal(t, messageToSave.Content, savedConversation.Messages[0].Content)
 
 	messageExists, err := testContext.messageRepository.ExistsInConversation(savedConversation.ID, messageToSave.Content)
 	require.NoError(t, err)
@@ -235,4 +240,51 @@ func TestMessageRepositoryCanDeleteAllMessages(t *testing.T) {
 	conversationExists, err := testContext.conversationRepository.ExistsBetween(consumerID, providerID)
 	require.NoError(t, err)
 	assert.True(t, conversationExists)
+}
+
+func TestConversationRepositoryCanFindByIDWithMessages(t *testing.T) {
+	testContext := newConversationRepositoryTest(t)
+	consumerID, providerID := savedConversationParticipants(t, testContext)
+	conversationToSave, messageToSave := pendingConversationWithMessage(t, consumerID, providerID)
+	savedConversation, err := testContext.conversationRepository.SaveWithMessage(conversationToSave, messageToSave)
+	require.NoError(t, err)
+
+	foundConversation, err := testContext.conversationRepository.FindByID(context.Background(), savedConversation.ID)
+
+	require.NoError(t, err)
+	require.NotNil(t, foundConversation)
+	assert.Equal(t, savedConversation.ID, foundConversation.ID)
+	assert.Equal(t, consumerID, foundConversation.ConsumerID)
+	assert.Equal(t, providerID, foundConversation.ProviderID)
+	assert.Equal(t, conversation.StatusPending, foundConversation.Status)
+	require.Len(t, foundConversation.Messages, 1)
+	assert.Equal(t, savedConversation.ID, foundConversation.Messages[0].ConversationID)
+	assert.Equal(t, conversation.SenderConsumer, foundConversation.Messages[0].SenderRole)
+	assert.Equal(t, messageToSave.Content, foundConversation.Messages[0].Content)
+}
+
+func TestConversationRepositoryFindByIDReturnsNotFoundIfConversationDoesNotExist(t *testing.T) {
+	testContext := newConversationRepositoryTest(t)
+
+	foundConversation, err := testContext.conversationRepository.FindByID(context.Background(), 999999999)
+
+	assert.ErrorIs(t, err, conversation.ErrConversationDoesNotExist)
+	assert.Nil(t, foundConversation)
+}
+
+func TestMessageRepositoryCanFindMessagesByConversationID(t *testing.T) {
+	testContext := newConversationRepositoryTest(t)
+	consumerID, providerID := savedConversationParticipants(t, testContext)
+	conversationToSave, messageToSave := pendingConversationWithMessage(t, consumerID, providerID)
+	savedConversation, err := testContext.conversationRepository.SaveWithMessage(conversationToSave, messageToSave)
+	require.NoError(t, err)
+
+	messages, err := testContext.messageRepository.FindByConversationID(context.Background(), savedConversation.ID)
+
+	require.NoError(t, err)
+	require.Len(t, messages, 1)
+	assert.NotZero(t, messages[0].ID)
+	assert.Equal(t, savedConversation.ID, messages[0].ConversationID)
+	assert.Equal(t, conversation.SenderConsumer, messages[0].SenderRole)
+	assert.Equal(t, messageToSave.Content, messages[0].Content)
 }

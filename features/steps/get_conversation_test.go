@@ -5,16 +5,12 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"strings"
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/conversation"
 	"github.com/cucumber/godog"
 )
 
-const (
-	nonExistingConversationID = 999999999
-	providerSenderRole        = "provider"
-)
+const nonExistingConversationID = 999999999
 
 type conversationDetailResponse struct {
 	ID         int                           `json:"id"`
@@ -28,7 +24,6 @@ type conversationMessageResponse struct {
 	ID             int    `json:"id"`
 	ConversationID int    `json:"conversation_id"`
 	SenderRole     string `json:"sender_role"`
-	SenderEmail    string `json:"sender_email,omitempty"`
 	Content        string `json:"content"`
 }
 
@@ -193,10 +188,6 @@ func (suite *testSuite) conversationDetailIncludesInitialMessageSentBy(senderEma
 		if responseMessage.ConversationID != 0 && responseMessage.ConversationID != response.ID {
 			return fmt.Errorf("expected message conversation id %d, got %d", response.ID, responseMessage.ConversationID)
 		}
-		if strings.TrimSpace(responseMessage.SenderEmail) != "" && responseMessage.SenderEmail != senderEmail {
-			return fmt.Errorf("expected message sender email %q, got %q", senderEmail, responseMessage.SenderEmail)
-		}
-
 		return nil
 	}
 
@@ -226,7 +217,7 @@ func (suite *testSuite) senderRoleForEmail(email string) (string, error) {
 	}
 
 	if _, err := suite.providerIDByEmail(email); err == nil {
-		return providerSenderRole, nil
+		return conversation.SenderProvider, nil
 	}
 
 	return "", fmt.Errorf("could not resolve sender role for email %q", email)
