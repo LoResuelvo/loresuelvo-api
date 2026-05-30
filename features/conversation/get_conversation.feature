@@ -1,4 +1,3 @@
-@wip
 Feature: Obtener conversación
     Como usuario
     quiero consultar el detalle de una conversación existente

@@ -1,0 +1,38 @@
+type: object
+description: Conversation detail visible to its consumer and provider participants.
+required:
+- id
+- consumer_id
+- provider_id
+- status
+- messages
+properties:
+  id:
+    type: integer
+    format: int32
+    description: Conversation identifier.
+    example: 1
+  consumer_id:
+    type: integer
+    format: int32
+    description: Consumer participant identifier.
+    example: 10
+  provider_id:
+    type: integer
+    format: int32
+    description: Provider participant identifier.
+    example: 20
+  status:
+    type: string
+    description: Current conversation status.
+    enum:
+    - pending
+    - active
+    - rejected
+    example: pending
+  messages:
+    type: array
+    description: Messages in chronological order.
+    items:
+      $ref: '#/components/schemas/ConversationMessage'
+additionalProperties: false

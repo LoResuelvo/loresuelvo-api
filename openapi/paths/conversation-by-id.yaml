@@ -1,0 +1,87 @@
+get:
+  tags:
+  - Conversations
+  operationId: getConversation
+  summary: Get a conversation detail
+  description: Returns a conversation with its messages when the authenticated user is either the consumer or provider participant.
+  security:
+  - BearerAuth: []
+  parameters:
+  - name: conversationId
+    in: path
+    required: true
+    description: Conversation identifier.
+    schema:
+      type: integer
+      format: int32
+      minimum: 1
+      example: 1
+  responses:
+    '200':
+      description: Conversation detail returned successfully.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ConversationDetail'
+          examples:
+            pendingConversation:
+              value:
+                id: 1
+                consumer_id: 10
+                provider_id: 20
+                status: pending
+                messages:
+                - id: 1
+                  conversation_id: 1
+                  sender_role: consumer
+                  content: Hola Juan, necesito reparar una pérdida de agua en la cocina. ¿Podrías ayudarme esta semana?
+    '400':
+      description: The conversation id path parameter is not a positive integer.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            invalidConversationId:
+              value:
+                error: conversation id must be a positive integer
+    '401':
+      description: Authentication failed or the authenticated user id could not be obtained from the request context.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/AuthErrorResponse'
+          examples:
+            invalidToken:
+              value:
+                error: invalid_token
+                message: Failed to validate JWT.
+            missingUserId:
+              value:
+                error: missing user id
+    '403':
+      description: The authenticated user exists but is not a participant of this conversation.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            accessDenied:
+              value:
+                error: Cannot access conversation
+    '404':
+      description: No conversation exists with the requested id.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            conversationNotFound:
+              value:
+                error: Conversation does not exist
+    '500':
+      description: Unexpected error while retrieving the conversation.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'

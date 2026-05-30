@@ -35,6 +35,8 @@ paths:
     $ref: ./paths/providers.yaml
   /conversations:
     $ref: ./paths/conversations.yaml
+  /conversations/{conversationId}:
+    $ref: ./paths/conversation-by-id.yaml
   /me:
     $ref: ./paths/users.yaml
 components:
@@ -51,6 +53,10 @@ components:
       $ref: ./components/schemas/create-conversation-request.yaml
     Conversation:
       $ref: ./components/schemas/conversation.yaml
+    ConversationDetail:
+      $ref: ./components/schemas/conversation-detail.yaml
+    ConversationMessage:
+      $ref: ./components/schemas/conversation-message.yaml
     MessageResponse:
       $ref: ./components/schemas/message-response.yaml
     ErrorResponse:
