@@ -183,17 +183,11 @@ func conversationDetailResponseFromDomain(foundConversation readmodel.Conversati
 	}
 
 	return conversationDetailResponse{
-		ID:     foundConversation.ID,
-		Status: foundConversation.Status,
-		Counterpart: conversationCounterpartResponse{
-			ID:           foundConversation.Counterpart.ID,
-			Role:         foundConversation.Counterpart.Role,
-			Name:         foundConversation.Counterpart.Name,
-			Surname:      foundConversation.Counterpart.Surname,
-			CategoryName: foundConversation.Counterpart.CategoryName,
-		},
-		Messages:  messages,
-		UpdatedOn: foundConversation.UpdatedOn,
+		ID:          foundConversation.ID,
+		Status:      foundConversation.Status,
+		Counterpart: conversationCounterpartResponseFromDomain(foundConversation.Counterpart),
+		Messages:    messages,
+		UpdatedOn:   foundConversation.UpdatedOn,
 	}
 }
 
@@ -208,17 +202,21 @@ func conversationSummaryResponsesFromDomain(summaries []readmodel.ConversationSu
 
 func conversationSummaryResponseFromDomain(summary readmodel.ConversationSummary) conversationSummaryResponse {
 	return conversationSummaryResponse{
-		ID:     summary.ID,
-		Status: summary.Status,
-		Counterpart: conversationCounterpartResponse{
-			ID:           summary.Counterpart.ID,
-			Role:         summary.Counterpart.Role,
-			Name:         summary.Counterpart.Name,
-			Surname:      summary.Counterpart.Surname,
-			CategoryName: summary.Counterpart.CategoryName,
-		},
+		ID:          summary.ID,
+		Status:      summary.Status,
+		Counterpart: conversationCounterpartResponseFromDomain(summary.Counterpart),
 		LastMessage: conversationLastMessageResponseFromDomain(summary.LastMessage),
 		UpdatedOn:   summary.UpdatedOn,
+	}
+}
+
+func conversationCounterpartResponseFromDomain(counterpart readmodel.ConversationParticipant) conversationCounterpartResponse {
+	return conversationCounterpartResponse{
+		ID:           counterpart.ID,
+		Role:         counterpart.Role,
+		Name:         counterpart.Name,
+		Surname:      counterpart.Surname,
+		CategoryName: counterpart.CategoryName,
 	}
 }
 

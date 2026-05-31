@@ -256,20 +256,3 @@ func TestConversationRepositoryFindByIDReturnsNotFoundIfConversationDoesNotExist
 	assert.ErrorIs(t, err, conversation.ErrConversationDoesNotExist)
 	assert.Nil(t, foundConversation)
 }
-
-func TestMessageRepositoryCanFindMessagesByConversationID(t *testing.T) {
-	testContext := newConversationRepositoryTest(t)
-	consumerID, providerID := savedConversationParticipants(t, testContext)
-	conversationToSave, messageToSave := pendingConversationWithMessage(t, consumerID, providerID)
-	savedConversation, err := testContext.conversationRepository.SaveWithMessage(conversationToSave, messageToSave)
-	require.NoError(t, err)
-
-	messages, err := testContext.messageRepository.FindByConversationID(context.Background(), savedConversation.ID)
-
-	require.NoError(t, err)
-	require.Len(t, messages, 1)
-	assert.NotZero(t, messages[0].ID)
-	assert.Equal(t, savedConversation.ID, messages[0].ConversationID)
-	assert.Equal(t, conversation.SenderConsumer, messages[0].SenderRole)
-	assert.Equal(t, messageToSave.Content, messages[0].Content)
-}

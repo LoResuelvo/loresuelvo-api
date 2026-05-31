@@ -14,17 +14,9 @@ import (
 type conversationSummaryResponse struct {
 	ID          int                                     `json:"id"`
 	Status      string                                  `json:"status"`
-	Counterpart conversationCounterpartSummaryResponse  `json:"counterpart"`
+	Counterpart conversationCounterpartResponse         `json:"counterpart"`
 	LastMessage *conversationLastMessageSummaryResponse `json:"last_message"`
 	UpdatedOn   string                                  `json:"updated_on"`
-}
-
-type conversationCounterpartSummaryResponse struct {
-	ID           int    `json:"id"`
-	Role         string `json:"role"`
-	Name         string `json:"name"`
-	Surname      string `json:"surname"`
-	CategoryName string `json:"category_name,omitempty"`
 }
 
 type conversationLastMessageSummaryResponse struct {
@@ -203,6 +195,6 @@ func (suite *testSuite) assertValidConversationSummary(summary conversationSumma
 	return nil
 }
 
-func conversationCounterpartMatches(counterpart conversationCounterpartSummaryResponse, role, fullName string) bool {
+func conversationCounterpartMatches(counterpart conversationCounterpartResponse, role, fullName string) bool {
 	return counterpart.Role == role && strings.TrimSpace(counterpart.Name+" "+counterpart.Surname) == fullName
 }

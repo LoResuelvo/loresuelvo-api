@@ -10,53 +10,69 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestConversationReaderFindsConsumerSummaries(t *testing.T) {
+type conversationReaderFixture struct {
+	reader            *repositories.ConversationReader
+	consumerID        int
+	providerID        int
+	savedConversation *conversation.Conversation
+	initialMessage    conversation.Message
+}
+
+func newSavedConversationReaderFixture(t *testing.T) conversationReaderFixture {
+	t.Helper()
+
 	testContext := newConversationRepositoryTest(t)
-	reader := repositories.NewConversationReader(testContext.database)
 	consumerID, providerID := savedConversationParticipants(t, testContext)
 	conversationToSave, messageToSave := pendingConversationWithMessage(t, consumerID, providerID)
 	savedConversation, err := testContext.conversationRepository.SaveWithMessage(conversationToSave, messageToSave)
 	require.NoError(t, err)
 
-	summaries, err := reader.FindSummariesByConsumerID(context.Background(), consumerID)
+	return conversationReaderFixture{
+		reader:            repositories.NewConversationReader(testContext.database),
+		consumerID:        consumerID,
+		providerID:        providerID,
+		savedConversation: savedConversation,
+		initialMessage:    messageToSave,
+	}
+}
+
+func TestConversationReaderFindsConsumerSummaries(t *testing.T) {
+	fixture := newSavedConversationReaderFixture(t)
+
+	summaries, err := fixture.reader.FindSummariesByConsumerID(context.Background(), fixture.consumerID)
 
 	require.NoError(t, err)
 	require.Len(t, summaries, 1)
-	assert.Equal(t, savedConversation.ID, summaries[0].ID)
+	assert.Equal(t, fixture.savedConversation.ID, summaries[0].ID)
 	assert.Equal(t, conversation.StatusPending, summaries[0].Status)
-	assert.Equal(t, providerID, summaries[0].Counterpart.ID)
+	assert.Equal(t, fixture.providerID, summaries[0].Counterpart.ID)
 	assert.Equal(t, conversation.SenderProvider, summaries[0].Counterpart.Role)
 	assert.Equal(t, "Juan", summaries[0].Counterpart.Name)
 	assert.Equal(t, "Gómez", summaries[0].Counterpart.Surname)
 	assert.Equal(t, "Plomería", summaries[0].Counterpart.CategoryName)
 	require.NotNil(t, summaries[0].LastMessage)
 	assert.Equal(t, conversation.SenderConsumer, summaries[0].LastMessage.SenderRole)
-	assert.Equal(t, messageToSave.Content, summaries[0].LastMessage.Content)
+	assert.Equal(t, fixture.initialMessage.Content, summaries[0].LastMessage.Content)
 	assert.NotZero(t, summaries[0].UpdatedOn)
 }
 
 func TestConversationReaderFindsProviderSummaries(t *testing.T) {
-	testContext := newConversationRepositoryTest(t)
-	reader := repositories.NewConversationReader(testContext.database)
-	consumerID, providerID := savedConversationParticipants(t, testContext)
-	conversationToSave, messageToSave := pendingConversationWithMessage(t, consumerID, providerID)
-	savedConversation, err := testContext.conversationRepository.SaveWithMessage(conversationToSave, messageToSave)
-	require.NoError(t, err)
+	fixture := newSavedConversationReaderFixture(t)
 
-	summaries, err := reader.FindSummariesByProviderID(context.Background(), providerID)
+	summaries, err := fixture.reader.FindSummariesByProviderID(context.Background(), fixture.providerID)
 
 	require.NoError(t, err)
 	require.Len(t, summaries, 1)
-	assert.Equal(t, savedConversation.ID, summaries[0].ID)
+	assert.Equal(t, fixture.savedConversation.ID, summaries[0].ID)
 	assert.Equal(t, conversation.StatusPending, summaries[0].Status)
-	assert.Equal(t, consumerID, summaries[0].Counterpart.ID)
+	assert.Equal(t, fixture.consumerID, summaries[0].Counterpart.ID)
 	assert.Equal(t, conversation.SenderConsumer, summaries[0].Counterpart.Role)
 	assert.Equal(t, "Ana", summaries[0].Counterpart.Name)
 	assert.Equal(t, "Pérez", summaries[0].Counterpart.Surname)
 	assert.Empty(t, summaries[0].Counterpart.CategoryName)
 	require.NotNil(t, summaries[0].LastMessage)
 	assert.Equal(t, conversation.SenderConsumer, summaries[0].LastMessage.SenderRole)
-	assert.Equal(t, messageToSave.Content, summaries[0].LastMessage.Content)
+	assert.Equal(t, fixture.initialMessage.Content, summaries[0].LastMessage.Content)
 	assert.NotZero(t, summaries[0].UpdatedOn)
 }
 
@@ -74,53 +90,43 @@ func TestConversationReaderReturnsEmptySummaryLists(t *testing.T) {
 }
 
 func TestConversationReaderFindsDetailForConsumer(t *testing.T) {
-	testContext := newConversationRepositoryTest(t)
-	reader := repositories.NewConversationReader(testContext.database)
-	consumerID, providerID := savedConversationParticipants(t, testContext)
-	conversationToSave, messageToSave := pendingConversationWithMessage(t, consumerID, providerID)
-	savedConversation, err := testContext.conversationRepository.SaveWithMessage(conversationToSave, messageToSave)
-	require.NoError(t, err)
+	fixture := newSavedConversationReaderFixture(t)
 
-	detail, err := reader.FindDetailByIDForConsumer(context.Background(), savedConversation.ID)
+	detail, err := fixture.reader.FindDetailByIDForConsumer(context.Background(), fixture.savedConversation.ID)
 
 	require.NoError(t, err)
 	require.NotNil(t, detail)
-	assert.Equal(t, savedConversation.ID, detail.ID)
+	assert.Equal(t, fixture.savedConversation.ID, detail.ID)
 	assert.Equal(t, conversation.StatusPending, detail.Status)
-	assert.Equal(t, providerID, detail.Counterpart.ID)
+	assert.Equal(t, fixture.providerID, detail.Counterpart.ID)
 	assert.Equal(t, conversation.SenderProvider, detail.Counterpart.Role)
 	assert.Equal(t, "Juan", detail.Counterpart.Name)
 	assert.Equal(t, "Gómez", detail.Counterpart.Surname)
 	assert.Equal(t, "Plomería", detail.Counterpart.CategoryName)
 	require.Len(t, detail.Messages, 1)
 	assert.Equal(t, conversation.SenderConsumer, detail.Messages[0].SenderRole)
-	assert.Equal(t, messageToSave.Content, detail.Messages[0].Content)
+	assert.Equal(t, fixture.initialMessage.Content, detail.Messages[0].Content)
 	assert.NotZero(t, detail.Messages[0].CreatedOn)
 	assert.NotZero(t, detail.UpdatedOn)
 }
 
 func TestConversationReaderFindsDetailForProvider(t *testing.T) {
-	testContext := newConversationRepositoryTest(t)
-	reader := repositories.NewConversationReader(testContext.database)
-	consumerID, providerID := savedConversationParticipants(t, testContext)
-	conversationToSave, messageToSave := pendingConversationWithMessage(t, consumerID, providerID)
-	savedConversation, err := testContext.conversationRepository.SaveWithMessage(conversationToSave, messageToSave)
-	require.NoError(t, err)
+	fixture := newSavedConversationReaderFixture(t)
 
-	detail, err := reader.FindDetailByIDForProvider(context.Background(), savedConversation.ID)
+	detail, err := fixture.reader.FindDetailByIDForProvider(context.Background(), fixture.savedConversation.ID)
 
 	require.NoError(t, err)
 	require.NotNil(t, detail)
-	assert.Equal(t, savedConversation.ID, detail.ID)
+	assert.Equal(t, fixture.savedConversation.ID, detail.ID)
 	assert.Equal(t, conversation.StatusPending, detail.Status)
-	assert.Equal(t, consumerID, detail.Counterpart.ID)
+	assert.Equal(t, fixture.consumerID, detail.Counterpart.ID)
 	assert.Equal(t, conversation.SenderConsumer, detail.Counterpart.Role)
 	assert.Equal(t, "Ana", detail.Counterpart.Name)
 	assert.Equal(t, "Pérez", detail.Counterpart.Surname)
 	assert.Empty(t, detail.Counterpart.CategoryName)
 	require.Len(t, detail.Messages, 1)
 	assert.Equal(t, conversation.SenderConsumer, detail.Messages[0].SenderRole)
-	assert.Equal(t, messageToSave.Content, detail.Messages[0].Content)
+	assert.Equal(t, fixture.initialMessage.Content, detail.Messages[0].Content)
 	assert.NotZero(t, detail.Messages[0].CreatedOn)
 	assert.NotZero(t, detail.UpdatedOn)
 }

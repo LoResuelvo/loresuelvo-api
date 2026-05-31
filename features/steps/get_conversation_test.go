@@ -14,19 +14,11 @@ import (
 const nonExistingConversationID = 999999999
 
 type conversationDetailResponse struct {
-	ID          int                                   `json:"id"`
-	Status      string                                `json:"status"`
-	Counterpart conversationCounterpartDetailResponse `json:"counterpart"`
-	Messages    []conversationMessageResponse         `json:"messages"`
-	UpdatedOn   time.Time                             `json:"updated_on"`
-}
-
-type conversationCounterpartDetailResponse struct {
-	ID           int    `json:"id"`
-	Role         string `json:"role"`
-	Name         string `json:"name"`
-	Surname      string `json:"surname"`
-	CategoryName string `json:"category_name,omitempty"`
+	ID          int                             `json:"id"`
+	Status      string                          `json:"status"`
+	Counterpart conversationCounterpartResponse `json:"counterpart"`
+	Messages    []conversationMessageResponse   `json:"messages"`
+	UpdatedOn   time.Time                       `json:"updated_on"`
 }
 
 type conversationMessageResponse struct {
