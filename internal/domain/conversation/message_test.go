@@ -18,8 +18,25 @@ func TestNewConsumerMessageCreatesTrimmedConsumerMessage(t *testing.T) {
 	assert.Zero(t, message.ConversationID)
 }
 
+func TestNewProviderMessageCreatesTrimmedProviderMessage(t *testing.T) {
+	message, err := conversation.NewProviderMessage("  Sí, puedo pasar el jueves  ")
+
+	require.NoError(t, err)
+	require.NotNil(t, message)
+	assert.Equal(t, conversation.SenderProvider, message.SenderRole)
+	assert.Equal(t, "Sí, puedo pasar el jueves", message.Content)
+	assert.Zero(t, message.ConversationID)
+}
+
 func TestNewConsumerMessageRejectsEmptyContent(t *testing.T) {
 	message, err := conversation.NewConsumerMessage("   ")
+
+	assert.ErrorIs(t, err, conversation.ErrMessageRequired)
+	assert.Nil(t, message)
+}
+
+func TestNewProviderMessageRejectsEmptyContent(t *testing.T) {
+	message, err := conversation.NewProviderMessage("   ")
 
 	assert.ErrorIs(t, err, conversation.ErrMessageRequired)
 	assert.Nil(t, message)

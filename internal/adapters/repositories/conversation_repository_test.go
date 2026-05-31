@@ -116,6 +116,8 @@ func TestConversationRepositoryCanSaveConversationWithMessage(t *testing.T) {
 	assert.Equal(t, savedConversation.ID, savedConversation.Messages[0].ConversationID)
 	assert.Equal(t, conversation.SenderConsumer, savedConversation.Messages[0].SenderRole)
 	assert.Equal(t, messageToSave.Content, savedConversation.Messages[0].Content)
+	assert.NotZero(t, savedConversation.Messages[0].CreatedOn)
+	assert.NotZero(t, savedConversation.UpdatedOn)
 
 	messageExists, err := testContext.messageRepository.ExistsInConversation(savedConversation.ID, messageToSave.Content)
 	require.NoError(t, err)
@@ -255,4 +257,44 @@ func TestConversationRepositoryFindByIDReturnsNotFoundIfConversationDoesNotExist
 
 	assert.ErrorIs(t, err, conversation.ErrConversationDoesNotExist)
 	assert.Nil(t, foundConversation)
+}
+
+func TestConversationRepositoryCanAddMessageToConversation(t *testing.T) {
+	testContext := newConversationRepositoryTest(t)
+	consumerID, providerID := savedConversationParticipants(t, testContext)
+	conversationToSave, messageToSave := pendingConversationWithMessage(t, consumerID, providerID)
+	savedConversation, err := testContext.conversationRepository.SaveWithMessage(conversationToSave, messageToSave)
+	require.NoError(t, err)
+
+	providerMessage, err := conversation.NewProviderMessage("Sí, puedo pasar el jueves a las 10")
+	require.NoError(t, err)
+
+	savedMessage, err := testContext.conversationRepository.AddMessage(context.Background(), savedConversation.ID, *providerMessage)
+
+	require.NoError(t, err)
+	require.NotNil(t, savedMessage)
+	assert.NotZero(t, savedMessage.ID)
+	assert.Equal(t, savedConversation.ID, savedMessage.ConversationID)
+	assert.Equal(t, conversation.SenderProvider, savedMessage.SenderRole)
+	assert.Equal(t, "Sí, puedo pasar el jueves a las 10", savedMessage.Content)
+	assert.NotZero(t, savedMessage.CreatedOn)
+
+	messageExists, err := testContext.messageRepository.ExistsInConversation(savedConversation.ID, savedMessage.Content)
+	require.NoError(t, err)
+	assert.True(t, messageExists)
+
+	foundConversation, err := testContext.conversationRepository.FindByID(context.Background(), savedConversation.ID)
+	require.NoError(t, err)
+	assert.Equal(t, savedMessage.CreatedOn, foundConversation.UpdatedOn)
+}
+
+func TestConversationRepositoryAddMessageReturnsNotFoundForMissingConversation(t *testing.T) {
+	testContext := newConversationRepositoryTest(t)
+	providerMessage, err := conversation.NewProviderMessage("Sí, puedo pasar el jueves a las 10")
+	require.NoError(t, err)
+
+	savedMessage, err := testContext.conversationRepository.AddMessage(context.Background(), 999999999, *providerMessage)
+
+	assert.ErrorIs(t, err, conversation.ErrConversationDoesNotExist)
+	assert.Nil(t, savedMessage)
 }

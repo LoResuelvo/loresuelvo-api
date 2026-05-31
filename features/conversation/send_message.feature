@@ -1,4 +1,3 @@
-@wip
 Feature: Envío de mensaje
     Como consumidor
     quiero intercambiar mensajes de texto con un prestador

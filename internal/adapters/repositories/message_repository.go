@@ -1,6 +1,7 @@
 package repositories
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 
@@ -40,12 +41,13 @@ func (repository *MessageRepository) DeleteAll() error {
 	return nil
 }
 
-func (repository *MessageRepository) saveWithTx(tx *sql.Tx, conversationID int, message conversation.Message) (*conversation.Message, error) {
+func (repository *MessageRepository) saveWithTx(ctx context.Context, tx *sql.Tx, conversationID int, message conversation.Message) (*conversation.Message, error) {
 	var savedMessage conversation.Message
-	err := tx.QueryRow(
+	err := tx.QueryRowContext(
+		ctx,
 		`INSERT INTO messages (conversation_id, sender_role, content, created_on)
 		VALUES ($1, $2, $3, NOW())
-		RETURNING id, conversation_id, sender_role, content`,
+		RETURNING id, conversation_id, sender_role, content, created_on`,
 		conversationID,
 		message.SenderRole,
 		message.Content,
@@ -54,6 +56,7 @@ func (repository *MessageRepository) saveWithTx(tx *sql.Tx, conversationID int, 
 		&savedMessage.ConversationID,
 		&savedMessage.SenderRole,
 		&savedMessage.Content,
+		&savedMessage.CreatedOn,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("saving message: %w", err)

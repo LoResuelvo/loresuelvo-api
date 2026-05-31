@@ -69,6 +69,20 @@ func (s *Service) GetByID(ctx context.Context, authID string, conversationID int
 	return nil, ErrConversationAccessDenied
 }
 
+func (s *Service) SendMessage(ctx context.Context, authID string, conversationID int, content string) (*Message, error) {
+	foundConversation, err := s.conversationRepository.FindByID(ctx, conversationID)
+	if err != nil {
+		return nil, err
+	}
+
+	message, err := s.newMessageForAuthenticatedParticipant(authID, *foundConversation, content)
+	if err != nil {
+		return nil, err
+	}
+
+	return s.conversationRepository.AddMessage(ctx, conversationID, *message)
+}
+
 func (s *Service) List(ctx context.Context, authID string) ([]readmodel.ConversationSummary, error) {
 	if consumerID, err := s.consumerIDFinder.FindIDByAuthID(authID); err == nil {
 		return s.conversationReader.FindSummariesByConsumerID(ctx, consumerID)
@@ -126,6 +140,18 @@ func (s *Service) authenticatedConsumerMatches(authID string, consumerID int) bo
 func (s *Service) authenticatedProviderMatches(authID string, providerID int) bool {
 	authenticatedProviderID, err := s.providerIDFinder.FindIDByAuthID(authID)
 	return err == nil && authenticatedProviderID == providerID
+}
+
+func (s *Service) newMessageForAuthenticatedParticipant(authID string, foundConversation Conversation, content string) (*Message, error) {
+	if s.authenticatedConsumerMatches(authID, foundConversation.ConsumerID) {
+		return NewConsumerMessage(content)
+	}
+
+	if s.authenticatedProviderMatches(authID, foundConversation.ProviderID) {
+		return NewProviderMessage(content)
+	}
+
+	return nil, ErrConversationAccessDenied
 }
 
 func newPendingWorkRequest(consumerID, providerID int, content string) (*Conversation, *Message, error) {

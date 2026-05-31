@@ -23,9 +23,21 @@ type createConversationRequest struct {
 	Content    string `json:"content"`
 }
 
+type sendMessageRequest struct {
+	Content string `json:"content"`
+}
+
 type conversationResponse struct {
 	ID     int    `json:"id"`
 	Status string `json:"status"`
+}
+
+type sentMessageResponse struct {
+	ID             int       `json:"id"`
+	ConversationID int       `json:"conversation_id"`
+	SenderRole     string    `json:"sender_role"`
+	Content        string    `json:"content"`
+	CreatedOn      time.Time `json:"created_on"`
 }
 
 type conversationDetailResponse struct {
@@ -142,6 +154,47 @@ func (h *ConversationHandler) GetConversation(c *gin.Context) {
 	c.JSON(http.StatusOK, conversationDetailResponseFromDomain(*foundConversation))
 }
 
+func (h *ConversationHandler) SendMessage(c *gin.Context) {
+	auth0ID, ok := middleware.GetUserID(c)
+	if !ok || strings.TrimSpace(auth0ID) == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "missing user id"})
+		return
+	}
+
+	conversationID, err := conversationIDFromPath(c.Param("conversationID"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	var req sendMessageRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	sentMessage, err := h.conversationService.SendMessage(c.Request.Context(), auth0ID, conversationID, req.Content)
+	if errors.Is(err, conversation.ErrMessageRequired) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if errors.Is(err, conversation.ErrConversationDoesNotExist) {
+		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		return
+	}
+	if errors.Is(err, conversation.ErrConversationAccessDenied) {
+		c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
+		return
+	}
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.Header("Location", fmt.Sprintf("/conversations/%d/messages/%d", conversationID, sentMessage.ID))
+	c.JSON(http.StatusCreated, sentMessageResponseFromDomain(*sentMessage))
+}
+
 func (h *ConversationHandler) ListConversations(c *gin.Context) {
 	auth0ID, ok := middleware.GetUserID(c)
 	if !ok || strings.TrimSpace(auth0ID) == "" {
@@ -169,6 +222,16 @@ func conversationIDFromPath(value string) (int, error) {
 	}
 
 	return conversationID, nil
+}
+
+func sentMessageResponseFromDomain(message conversation.Message) sentMessageResponse {
+	return sentMessageResponse{
+		ID:             message.ID,
+		ConversationID: message.ConversationID,
+		SenderRole:     message.SenderRole,
+		Content:        message.Content,
+		CreatedOn:      message.CreatedOn,
+	}
 }
 
 func conversationDetailResponseFromDomain(foundConversation readmodel.ConversationDetail) conversationDetailResponse {

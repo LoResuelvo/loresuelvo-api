@@ -10,6 +10,7 @@ type Repository interface {
 	ExistsBetween(consumerID, providerID int) (bool, error)
 	SaveWithMessage(conversation Conversation, message Message) (*Conversation, error)
 	FindByID(ctx context.Context, conversationID int) (*Conversation, error)
+	AddMessage(ctx context.Context, conversationID int, message Message) (*Message, error)
 }
 
 type ConsumerIDFinder interface {

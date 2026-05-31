@@ -11,11 +11,12 @@ import (
 )
 
 type conversationReaderFixture struct {
-	reader            *repositories.ConversationReader
-	consumerID        int
-	providerID        int
-	savedConversation *conversation.Conversation
-	initialMessage    conversation.Message
+	reader                 *repositories.ConversationReader
+	conversationRepository *repositories.ConversationRepository
+	consumerID             int
+	providerID             int
+	savedConversation      *conversation.Conversation
+	initialMessage         conversation.Message
 }
 
 func newSavedConversationReaderFixture(t *testing.T) conversationReaderFixture {
@@ -28,11 +29,12 @@ func newSavedConversationReaderFixture(t *testing.T) conversationReaderFixture {
 	require.NoError(t, err)
 
 	return conversationReaderFixture{
-		reader:            repositories.NewConversationReader(testContext.database),
-		consumerID:        consumerID,
-		providerID:        providerID,
-		savedConversation: savedConversation,
-		initialMessage:    messageToSave,
+		reader:                 repositories.NewConversationReader(testContext.database),
+		conversationRepository: testContext.conversationRepository,
+		consumerID:             consumerID,
+		providerID:             providerID,
+		savedConversation:      savedConversation,
+		initialMessage:         messageToSave,
 	}
 }
 
@@ -129,6 +131,32 @@ func TestConversationReaderFindsDetailForProvider(t *testing.T) {
 	assert.Equal(t, fixture.initialMessage.Content, detail.Messages[0].Content)
 	assert.NotZero(t, detail.Messages[0].CreatedOn)
 	assert.NotZero(t, detail.UpdatedOn)
+}
+
+func TestConversationReaderReflectsSentMessageAsLatestAndDetailLastMessage(t *testing.T) {
+	fixture := newSavedConversationReaderFixture(t)
+	providerMessage, err := conversation.NewProviderMessage("Sí, puedo pasar el jueves a las 10")
+	require.NoError(t, err)
+	sentMessage, err := fixture.conversationRepository.AddMessage(context.Background(), fixture.savedConversation.ID, *providerMessage)
+	require.NoError(t, err)
+
+	consumerSummaries, err := fixture.reader.FindSummariesByConsumerID(context.Background(), fixture.consumerID)
+	require.NoError(t, err)
+	require.Len(t, consumerSummaries, 1)
+	require.NotNil(t, consumerSummaries[0].LastMessage)
+	assert.Equal(t, sentMessage.ID, consumerSummaries[0].LastMessage.ID)
+	assert.Equal(t, conversation.SenderProvider, consumerSummaries[0].LastMessage.SenderRole)
+	assert.Equal(t, sentMessage.Content, consumerSummaries[0].LastMessage.Content)
+	assert.Equal(t, sentMessage.CreatedOn, consumerSummaries[0].UpdatedOn)
+
+	detail, err := fixture.reader.FindDetailByIDForConsumer(context.Background(), fixture.savedConversation.ID)
+	require.NoError(t, err)
+	require.Len(t, detail.Messages, 2)
+	assert.Equal(t, fixture.initialMessage.Content, detail.Messages[0].Content)
+	assert.Equal(t, sentMessage.ID, detail.Messages[1].ID)
+	assert.Equal(t, conversation.SenderProvider, detail.Messages[1].SenderRole)
+	assert.Equal(t, sentMessage.Content, detail.Messages[1].Content)
+	assert.Equal(t, sentMessage.CreatedOn, detail.UpdatedOn)
 }
 
 func TestConversationReaderReturnsNotFoundForMissingConversationDetail(t *testing.T) {

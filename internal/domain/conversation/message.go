@@ -19,13 +19,21 @@ type Message struct {
 }
 
 func NewConsumerMessage(content string) (*Message, error) {
+	return newMessage(SenderConsumer, content)
+}
+
+func NewProviderMessage(content string) (*Message, error) {
+	return newMessage(SenderProvider, content)
+}
+
+func newMessage(senderRole, content string) (*Message, error) {
 	trimmedContent := strings.TrimSpace(content)
 	if trimmedContent == "" {
 		return nil, ErrMessageRequired
 	}
 
 	return &Message{
-		SenderRole: SenderConsumer,
+		SenderRole: senderRole,
 		Content:    trimmedContent,
 	}, nil
 }

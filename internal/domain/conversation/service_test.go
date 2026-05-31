@@ -15,10 +15,13 @@ import (
 type conversationRepositoryMock struct {
 	savedConversation conversation.Conversation
 	savedMessage      conversation.Message
+	addedMessage      conversation.Message
 	savedResult       *conversation.Conversation
+	addedResult       *conversation.Message
 	existsValue       bool
 	existsCalled      bool
 	saveCalled        bool
+	addMessageCalled  bool
 	findByIDCalled    bool
 	foundResult       *conversation.Conversation
 	err               error
@@ -58,6 +61,21 @@ func (r *conversationRepositoryMock) FindByID(ctx context.Context, conversationI
 		return r.foundResult, nil
 	}
 	return nil, conversation.ErrConversationDoesNotExist
+}
+
+func (r *conversationRepositoryMock) AddMessage(ctx context.Context, conversationID int, m conversation.Message) (*conversation.Message, error) {
+	r.addMessageCalled = true
+	r.addedMessage = m
+	if r.err != nil {
+		return nil, r.err
+	}
+	if r.addedResult != nil {
+		return r.addedResult, nil
+	}
+	m.ID = 2
+	m.ConversationID = conversationID
+	m.CreatedOn = time.Now()
+	return &m, nil
 }
 
 type consumerIDFinderMock struct {
@@ -348,6 +366,92 @@ func TestGetByIDReturnsNotFoundWhenConversationDoesNotExist(t *testing.T) {
 	assert.ErrorIs(t, err, conversation.ErrConversationDoesNotExist)
 	assert.Nil(t, foundConversation)
 	assert.True(t, repo.findByIDCalled)
+}
+
+func TestSendMessageAddsConsumerMessageForParticipantConsumer(t *testing.T) {
+	repo := &conversationRepositoryMock{foundResult: conversationFixture()}
+	consumerIDFinder := &consumerIDFinderMock{consumerID: 10}
+	providerExistenceChecker := &providerExistenceCheckerMock{}
+	providerIDFinder := &providerIDFinderMock{err: errors.New("provider not found")}
+
+	service := conversation.NewService(repo, consumerIDFinder, providerExistenceChecker, providerIDFinder, &conversationReaderMock{})
+
+	sentMessage, err := service.SendMessage(context.Background(), "auth0|consumer", 1, "  ¿El jueves te queda cómodo?  ")
+
+	require.NoError(t, err)
+	require.NotNil(t, sentMessage)
+	assert.True(t, repo.findByIDCalled)
+	assert.True(t, repo.addMessageCalled)
+	assert.Equal(t, conversation.SenderConsumer, repo.addedMessage.SenderRole)
+	assert.Equal(t, "¿El jueves te queda cómodo?", repo.addedMessage.Content)
+	assert.Equal(t, 1, sentMessage.ConversationID)
+}
+
+func TestSendMessageAddsProviderMessageForParticipantProvider(t *testing.T) {
+	repo := &conversationRepositoryMock{foundResult: conversationFixture()}
+	consumerIDFinder := &consumerIDFinderMock{err: errors.New("consumer not found")}
+	providerExistenceChecker := &providerExistenceCheckerMock{}
+	providerIDFinder := &providerIDFinderMock{providerID: 20}
+
+	service := conversation.NewService(repo, consumerIDFinder, providerExistenceChecker, providerIDFinder, &conversationReaderMock{})
+
+	sentMessage, err := service.SendMessage(context.Background(), "auth0|provider", 1, "Sí, puedo pasar el jueves a las 10")
+
+	require.NoError(t, err)
+	require.NotNil(t, sentMessage)
+	assert.True(t, repo.findByIDCalled)
+	assert.True(t, repo.addMessageCalled)
+	assert.Equal(t, conversation.SenderProvider, repo.addedMessage.SenderRole)
+	assert.Equal(t, "Sí, puedo pasar el jueves a las 10", repo.addedMessage.Content)
+	assert.Equal(t, 1, sentMessage.ConversationID)
+}
+
+func TestSendMessageRejectsAuthenticatedUserThatIsNotParticipant(t *testing.T) {
+	repo := &conversationRepositoryMock{foundResult: conversationFixture()}
+	consumerIDFinder := &consumerIDFinderMock{consumerID: 999}
+	providerExistenceChecker := &providerExistenceCheckerMock{}
+	providerIDFinder := &providerIDFinderMock{providerID: 888}
+
+	service := conversation.NewService(repo, consumerIDFinder, providerExistenceChecker, providerIDFinder, &conversationReaderMock{})
+
+	sentMessage, err := service.SendMessage(context.Background(), "auth0|other", 1, "Hola")
+
+	assert.ErrorIs(t, err, conversation.ErrConversationAccessDenied)
+	assert.Nil(t, sentMessage)
+	assert.True(t, repo.findByIDCalled)
+	assert.False(t, repo.addMessageCalled)
+}
+
+func TestSendMessageReturnsNotFoundWhenConversationDoesNotExist(t *testing.T) {
+	repo := &conversationRepositoryMock{err: conversation.ErrConversationDoesNotExist}
+	consumerIDFinder := &consumerIDFinderMock{consumerID: 10}
+	providerExistenceChecker := &providerExistenceCheckerMock{}
+	providerIDFinder := &providerIDFinderMock{providerID: 20}
+
+	service := conversation.NewService(repo, consumerIDFinder, providerExistenceChecker, providerIDFinder, &conversationReaderMock{})
+
+	sentMessage, err := service.SendMessage(context.Background(), "auth0|consumer", 999, "Hola")
+
+	assert.ErrorIs(t, err, conversation.ErrConversationDoesNotExist)
+	assert.Nil(t, sentMessage)
+	assert.True(t, repo.findByIDCalled)
+	assert.False(t, repo.addMessageCalled)
+}
+
+func TestSendMessageRejectsEmptyContent(t *testing.T) {
+	repo := &conversationRepositoryMock{foundResult: conversationFixture()}
+	consumerIDFinder := &consumerIDFinderMock{consumerID: 10}
+	providerExistenceChecker := &providerExistenceCheckerMock{}
+	providerIDFinder := &providerIDFinderMock{err: errors.New("provider not found")}
+
+	service := conversation.NewService(repo, consumerIDFinder, providerExistenceChecker, providerIDFinder, &conversationReaderMock{})
+
+	sentMessage, err := service.SendMessage(context.Background(), "auth0|consumer", 1, "   ")
+
+	assert.ErrorIs(t, err, conversation.ErrMessageRequired)
+	assert.Nil(t, sentMessage)
+	assert.True(t, repo.findByIDCalled)
+	assert.False(t, repo.addMessageCalled)
 }
 
 func TestListReturnsConversationSummariesForConsumer(t *testing.T) {
