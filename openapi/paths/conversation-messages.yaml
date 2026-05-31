@@ -1,0 +1,106 @@
+post:
+  tags:
+  - Conversations
+  operationId: sendConversationMessage
+  summary: Send a message in a conversation
+  description: Creates a text message in an existing conversation. The authenticated user must be either the consumer or provider participant; the sender role is inferred from the JWT subject.
+  security:
+  - BearerAuth: []
+  parameters:
+  - name: conversationId
+    in: path
+    required: true
+    description: Conversation identifier.
+    schema:
+      type: integer
+      format: int32
+      minimum: 1
+      example: 1
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/SendMessageRequest'
+        examples:
+          validMessage:
+            summary: Consumer message
+            value:
+              content: ¿El jueves por la mañana te queda cómodo para pasar a revisar el problema?
+  responses:
+    '201':
+      description: Message created successfully.
+      headers:
+        Location:
+          description: Path of the created message resource.
+          schema:
+            type: string
+            example: /conversations/1/messages/2
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/SentMessage'
+          examples:
+            created:
+              value:
+                id: 2
+                conversation_id: 1
+                sender_role: consumer
+                content: ¿El jueves por la mañana te queda cómodo para pasar a revisar el problema?
+                created_on: '2026-05-31T12:00:00Z'
+    '400':
+      description: The conversation id path parameter is not a positive integer, the request body is invalid, or the message content is empty after trimming.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            invalidConversationId:
+              value:
+                error: conversation id must be a positive integer
+            messageRequired:
+              value:
+                error: Message is required
+            invalidJson:
+              value:
+                error: invalid character '}' looking for beginning of object key string
+    '401':
+      description: Authentication failed or the authenticated user id could not be obtained from the request context.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/AuthErrorResponse'
+          examples:
+            invalidToken:
+              value:
+                error: invalid_token
+                message: Failed to validate JWT.
+            missingUserId:
+              value:
+                error: missing user id
+    '403':
+      description: The authenticated user exists but is not a participant of this conversation.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            accessDenied:
+              value:
+                error: Cannot access conversation
+    '404':
+      description: No conversation exists with the requested id.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            conversationNotFound:
+              value:
+                error: Conversation does not exist
+    '500':
+      description: Unexpected error while sending the message.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'

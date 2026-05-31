@@ -1,0 +1,10 @@
+type: object
+description: Payload accepted by POST /conversations/{conversationId}/messages to append a text message. The sender is inferred from the authenticated JWT subject.
+required:
+- content
+properties:
+  content:
+    type: string
+    description: Message text. Must be non-empty after trimming.
+    example: ¿El jueves por la mañana te queda cómodo para pasar a revisar el problema?
+additionalProperties: false
