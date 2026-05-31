@@ -11,7 +11,7 @@ type Service struct {
 	consumerIDFinder         ConsumerIDFinder
 	providerExistenceChecker ProviderExistenceChecker
 	providerIDFinder         ProviderIDFinder
-	summaryReader            SummaryReader
+	conversationReader       Reader
 }
 
 func NewService(
@@ -19,14 +19,14 @@ func NewService(
 	consumerIDFinder ConsumerIDFinder,
 	providerExistenceChecker ProviderExistenceChecker,
 	providerIDFinder ProviderIDFinder,
-	summaryReader SummaryReader,
+	conversationReader Reader,
 ) *Service {
 	return &Service{
 		conversationRepository:   conversationRepository,
 		consumerIDFinder:         consumerIDFinder,
 		providerExistenceChecker: providerExistenceChecker,
 		providerIDFinder:         providerIDFinder,
-		summaryReader:            summaryReader,
+		conversationReader:       conversationReader,
 	}
 }
 
@@ -52,26 +52,30 @@ func (s *Service) StartWorkRequest(consumerAuthID string, providerID int, conten
 	return s.conversationRepository.SaveWithMessage(*conversation, *message)
 }
 
-func (s *Service) GetByID(ctx context.Context, authID string, conversationID int) (*Conversation, error) {
+func (s *Service) GetByID(ctx context.Context, authID string, conversationID int) (*readmodel.ConversationDetail, error) {
 	foundConversation, err := s.conversationRepository.FindByID(ctx, conversationID)
 	if err != nil {
 		return nil, err
 	}
 
-	if !s.authenticatedUserCanAccessConversation(authID, *foundConversation) {
-		return nil, ErrConversationAccessDenied
+	if s.authenticatedConsumerMatches(authID, foundConversation.ConsumerID) {
+		return s.conversationReader.FindDetailByIDForConsumer(ctx, conversationID)
 	}
 
-	return foundConversation, nil
+	if s.authenticatedProviderMatches(authID, foundConversation.ProviderID) {
+		return s.conversationReader.FindDetailByIDForProvider(ctx, conversationID)
+	}
+
+	return nil, ErrConversationAccessDenied
 }
 
 func (s *Service) List(ctx context.Context, authID string) ([]readmodel.ConversationSummary, error) {
 	if consumerID, err := s.consumerIDFinder.FindIDByAuthID(authID); err == nil {
-		return s.summaryReader.FindByConsumerID(ctx, consumerID)
+		return s.conversationReader.FindSummariesByConsumerID(ctx, consumerID)
 	}
 
 	if providerID, err := s.providerIDFinder.FindIDByAuthID(authID); err == nil {
-		return s.summaryReader.FindByProviderID(ctx, providerID)
+		return s.conversationReader.FindSummariesByProviderID(ctx, providerID)
 	}
 
 	return nil, ErrConversationAccessDenied
@@ -112,11 +116,6 @@ func (s *Service) ensureConversationDoesNotExist(consumerID, providerID int) err
 	}
 
 	return nil
-}
-
-func (s *Service) authenticatedUserCanAccessConversation(authID string, conversation Conversation) bool {
-	return s.authenticatedConsumerMatches(authID, conversation.ConsumerID) ||
-		s.authenticatedProviderMatches(authID, conversation.ProviderID)
 }
 
 func (s *Service) authenticatedConsumerMatches(authID string, consumerID int) bool {

@@ -230,7 +230,7 @@ func TestMessageRepositoryCanDeleteAllMessages(t *testing.T) {
 	assert.True(t, conversationExists)
 }
 
-func TestConversationRepositoryCanFindByIDWithMessages(t *testing.T) {
+func TestConversationRepositoryCanFindByID(t *testing.T) {
 	testContext := newConversationRepositoryTest(t)
 	consumerID, providerID := savedConversationParticipants(t, testContext)
 	conversationToSave, messageToSave := pendingConversationWithMessage(t, consumerID, providerID)
@@ -245,10 +245,7 @@ func TestConversationRepositoryCanFindByIDWithMessages(t *testing.T) {
 	assert.Equal(t, consumerID, foundConversation.ConsumerID)
 	assert.Equal(t, providerID, foundConversation.ProviderID)
 	assert.Equal(t, conversation.StatusPending, foundConversation.Status)
-	require.Len(t, foundConversation.Messages, 1)
-	assert.Equal(t, savedConversation.ID, foundConversation.Messages[0].ConversationID)
-	assert.Equal(t, conversation.SenderConsumer, foundConversation.Messages[0].SenderRole)
-	assert.Equal(t, messageToSave.Content, foundConversation.Messages[0].Content)
+	assert.Empty(t, foundConversation.Messages)
 }
 
 func TestConversationRepositoryFindByIDReturnsNotFoundIfConversationDoesNotExist(t *testing.T) {

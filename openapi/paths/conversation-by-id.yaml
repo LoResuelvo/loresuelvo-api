@@ -27,14 +27,19 @@ get:
             pendingConversation:
               value:
                 id: 1
-                consumer_id: 10
-                provider_id: 20
                 status: pending
+                counterpart:
+                  id: 20
+                  role: provider
+                  name: Juan
+                  surname: Gómez
+                  category_name: Plomería
                 messages:
                 - id: 1
-                  conversation_id: 1
                   sender_role: consumer
                   content: Hola Juan, necesito reparar una pérdida de agua en la cocina. ¿Podrías ayudarme esta semana?
+                  created_on: '2026-05-29T18:01:00Z'
+                updated_on: '2026-05-29T18:01:00Z'
     '400':
       description: The conversation id path parameter is not a positive integer.
       content:

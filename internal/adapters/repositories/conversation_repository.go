@@ -138,13 +138,6 @@ func (repository *ConversationRepository) FindByID(ctx context.Context, conversa
 		return nil, fmt.Errorf("finding conversation by id: %w", err)
 	}
 
-	messages, err := repository.messageRepository.FindByConversationID(ctx, foundConversation.ID)
-	if err != nil {
-		return nil, err
-	}
-
-	foundConversation.Messages = messages
-
 	return &foundConversation, nil
 }
 

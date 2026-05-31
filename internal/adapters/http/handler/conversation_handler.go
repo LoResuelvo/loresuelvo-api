@@ -29,18 +29,18 @@ type conversationResponse struct {
 }
 
 type conversationDetailResponse struct {
-	ID         int                           `json:"id"`
-	ConsumerID int                           `json:"consumer_id"`
-	ProviderID int                           `json:"provider_id"`
-	Status     string                        `json:"status"`
-	Messages   []conversationMessageResponse `json:"messages"`
+	ID          int                             `json:"id"`
+	Status      string                          `json:"status"`
+	Counterpart conversationCounterpartResponse `json:"counterpart"`
+	Messages    []conversationMessageResponse   `json:"messages"`
+	UpdatedOn   time.Time                       `json:"updated_on"`
 }
 
 type conversationMessageResponse struct {
-	ID             int    `json:"id"`
-	ConversationID int    `json:"conversation_id"`
-	SenderRole     string `json:"sender_role"`
-	Content        string `json:"content"`
+	ID         int       `json:"id"`
+	SenderRole string    `json:"sender_role"`
+	Content    string    `json:"content"`
+	CreatedOn  time.Time `json:"created_on"`
 }
 
 type conversationSummaryResponse struct {
@@ -171,23 +171,29 @@ func conversationIDFromPath(value string) (int, error) {
 	return conversationID, nil
 }
 
-func conversationDetailResponseFromDomain(foundConversation conversation.Conversation) conversationDetailResponse {
+func conversationDetailResponseFromDomain(foundConversation readmodel.ConversationDetail) conversationDetailResponse {
 	messages := make([]conversationMessageResponse, 0, len(foundConversation.Messages))
 	for _, message := range foundConversation.Messages {
 		messages = append(messages, conversationMessageResponse{
-			ID:             message.ID,
-			ConversationID: message.ConversationID,
-			SenderRole:     message.SenderRole,
-			Content:        message.Content,
+			ID:         message.ID,
+			SenderRole: message.SenderRole,
+			Content:    message.Content,
+			CreatedOn:  message.CreatedOn,
 		})
 	}
 
 	return conversationDetailResponse{
-		ID:         foundConversation.ID,
-		ConsumerID: foundConversation.ConsumerID,
-		ProviderID: foundConversation.ProviderID,
-		Status:     foundConversation.Status,
-		Messages:   messages,
+		ID:     foundConversation.ID,
+		Status: foundConversation.Status,
+		Counterpart: conversationCounterpartResponse{
+			ID:           foundConversation.Counterpart.ID,
+			Role:         foundConversation.Counterpart.Role,
+			Name:         foundConversation.Counterpart.Name,
+			Surname:      foundConversation.Counterpart.Surname,
+			CategoryName: foundConversation.Counterpart.CategoryName,
+		},
+		Messages:  messages,
+		UpdatedOn: foundConversation.UpdatedOn,
 	}
 }
 

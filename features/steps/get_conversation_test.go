@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"time"
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/conversation"
 	"github.com/cucumber/godog"
@@ -13,18 +14,26 @@ import (
 const nonExistingConversationID = 999999999
 
 type conversationDetailResponse struct {
-	ID         int                           `json:"id"`
-	ConsumerID int                           `json:"consumer_id"`
-	ProviderID int                           `json:"provider_id"`
-	Status     string                        `json:"status"`
-	Messages   []conversationMessageResponse `json:"messages"`
+	ID          int                                   `json:"id"`
+	Status      string                                `json:"status"`
+	Counterpart conversationCounterpartDetailResponse `json:"counterpart"`
+	Messages    []conversationMessageResponse         `json:"messages"`
+	UpdatedOn   time.Time                             `json:"updated_on"`
+}
+
+type conversationCounterpartDetailResponse struct {
+	ID           int    `json:"id"`
+	Role         string `json:"role"`
+	Name         string `json:"name"`
+	Surname      string `json:"surname"`
+	CategoryName string `json:"category_name,omitempty"`
 }
 
 type conversationMessageResponse struct {
-	ID             int    `json:"id"`
-	ConversationID int    `json:"conversation_id"`
-	SenderRole     string `json:"sender_role"`
-	Content        string `json:"content"`
+	ID         int       `json:"id"`
+	SenderRole string    `json:"sender_role"`
+	Content    string    `json:"content"`
+	CreatedOn  time.Time `json:"created_on"`
 }
 
 func registerGetConversationSteps(sc *godog.ScenarioContext, suite *testSuite) {
@@ -152,11 +161,16 @@ func (suite *testSuite) systemShowsConversationBetweenConsumerAndProvider(consum
 	if response.ID != suite.lastConversationID {
 		return fmt.Errorf("expected conversation id %d, got %d", suite.lastConversationID, response.ID)
 	}
-	if response.ConsumerID != consumerID {
-		return fmt.Errorf("expected consumer id %d, got %d", consumerID, response.ConsumerID)
-	}
-	if response.ProviderID != providerID {
-		return fmt.Errorf("expected provider id %d, got %d", providerID, response.ProviderID)
+	if suite.currentAuth0ID == auth0IDForConsumerEmail(consumerEmail) {
+		if response.Counterpart.ID != providerID || response.Counterpart.Role != conversation.SenderProvider {
+			return fmt.Errorf("expected provider counterpart id %d and role %q, got id %d and role %q", providerID, conversation.SenderProvider, response.Counterpart.ID, response.Counterpart.Role)
+		}
+	} else if suite.currentAuth0ID == auth0IDForProviderEmail(providerEmail) {
+		if response.Counterpart.ID != consumerID || response.Counterpart.Role != conversation.SenderConsumer {
+			return fmt.Errorf("expected consumer counterpart id %d and role %q, got id %d and role %q", consumerID, conversation.SenderConsumer, response.Counterpart.ID, response.Counterpart.Role)
+		}
+	} else {
+		return fmt.Errorf("authenticated user is not one of the expected conversation participants")
 	}
 	if response.Status != conversation.StatusPending {
 		return fmt.Errorf("expected conversation status %q, got %q", conversation.StatusPending, response.Status)
@@ -185,8 +199,8 @@ func (suite *testSuite) conversationDetailIncludesInitialMessageSentBy(senderEma
 		if responseMessage.SenderRole != expectedSenderRole {
 			return fmt.Errorf("expected message sender role %q, got %q", expectedSenderRole, responseMessage.SenderRole)
 		}
-		if responseMessage.ConversationID != 0 && responseMessage.ConversationID != response.ID {
-			return fmt.Errorf("expected message conversation id %d, got %d", response.ID, responseMessage.ConversationID)
+		if responseMessage.CreatedOn.IsZero() {
+			return fmt.Errorf("expected message created_on to be present")
 		}
 		return nil
 	}

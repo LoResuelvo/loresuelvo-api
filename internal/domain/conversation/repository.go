@@ -24,7 +24,9 @@ type ProviderIDFinder interface {
 	FindIDByAuthID(authID string) (int, error)
 }
 
-type SummaryReader interface {
-	FindByConsumerID(ctx context.Context, consumerID int) ([]readmodel.ConversationSummary, error)
-	FindByProviderID(ctx context.Context, providerID int) ([]readmodel.ConversationSummary, error)
+type Reader interface {
+	FindSummariesByConsumerID(ctx context.Context, consumerID int) ([]readmodel.ConversationSummary, error)
+	FindSummariesByProviderID(ctx context.Context, providerID int) ([]readmodel.ConversationSummary, error)
+	FindDetailByIDForConsumer(ctx context.Context, conversationID int) (*readmodel.ConversationDetail, error)
+	FindDetailByIDForProvider(ctx context.Context, conversationID int) (*readmodel.ConversationDetail, error)
 }
