@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"strings"
 
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/conversation"
 	"github.com/cucumber/godog"
 )
 
@@ -54,6 +55,7 @@ func (suite *testSuite) thereIsRegisteredProviderWithEmailNameSurnameAndCategory
 	defer resp.Body.Close()
 
 	if resp.StatusCode == http.StatusCreated || resp.StatusCode == http.StatusConflict {
+		suite.rememberParticipantFullName(name, surname, conversation.SenderProvider)
 		return nil
 	}
 

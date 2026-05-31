@@ -37,6 +37,7 @@ type testSuite struct {
 
 	categoryIDsByName              map[string]int
 	lastProviderFilterCategoryName string
+	participantRolesByFullName     map[string]string
 }
 
 func (s *testSuite) registerAllSteps(sc *godog.ScenarioContext) {
@@ -50,6 +51,7 @@ func (s *testSuite) registerAllSteps(sc *godog.ScenarioContext) {
 	registerSendContactRequestToProviderSteps(sc, s)
 	registerGetConversationSteps(sc, s)
 	registerGetConversationsSteps(sc, s)
+	registerSendMessageSteps(sc, s)
 }
 
 func (s *testSuite) cleanDatabase() error {
@@ -70,6 +72,7 @@ func (s *testSuite) cleanDatabase() error {
 	}
 
 	s.categoryIDsByName = map[string]int{}
+	s.participantRolesByFullName = map[string]string{}
 	s.lastWorkRequestProviderID = 0
 
 	return nil
@@ -110,7 +113,8 @@ func newTestSuite(tb testing.TB, database *sql.DB) *testSuite {
 		auth0Validator:         auth0Validator,
 		tokenBuilder:           tokenBuilder,
 
-		categoryIDsByName: map[string]int{},
+		categoryIDsByName:          map[string]int{},
+		participantRolesByFullName: map[string]string{},
 	}
 }
 

@@ -56,6 +56,7 @@ func (suite *testSuite) thereIsRegisteredConsumerWithEmailNameAndSurname(email, 
 	defer resp.Body.Close()
 
 	if resp.StatusCode == http.StatusCreated || resp.StatusCode == http.StatusConflict {
+		suite.rememberParticipantFullName(name, surname, conversation.SenderConsumer)
 		return nil
 	}
 
