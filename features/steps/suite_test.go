@@ -26,6 +26,7 @@ type testSuite struct {
 	providerRepository        *repositories.ProviderRepository
 	conversationRepository    *repositories.ConversationRepository
 	messageRepository         *repositories.MessageRepository
+	jobRequestRepository      *repositories.JobRequestRepository
 	userRepository            *repositories.UserRepository
 	auth0Validator            *validator.Validator
 	tokenBuilder              *testhelper.TokenBuilder
@@ -52,11 +53,16 @@ func (s *testSuite) registerAllSteps(sc *godog.ScenarioContext) {
 	registerGetConversationSteps(sc, s)
 	registerGetConversationsSteps(sc, s)
 	registerSendMessageSteps(sc, s)
+	registerPostJobRequestSteps(sc, s)
 }
 
 func (s *testSuite) cleanDatabase() error {
 	if err := s.messageRepository.DeleteAll(); err != nil {
 		return fmt.Errorf("could not clean messages: %w", err)
+	}
+
+	if err := s.jobRequestRepository.DeleteAll(); err != nil {
+		return fmt.Errorf("could not clean job requests: %w", err)
 	}
 
 	if err := s.conversationRepository.DeleteAll(); err != nil {
@@ -91,7 +97,7 @@ func newTestSuite(tb testing.TB, database *sql.DB) *testSuite {
 	auth0Validator := testhelper.NewTestValidator(tb)
 	tokenBuilder := testhelper.NewTokenBuilder()
 
-	router := httpadapter.NewRouter(dependencies.CategoryHandler, dependencies.ConsumerHandler, dependencies.ProviderHandler, dependencies.ConversationHandler, dependencies.UserHandler, auth0Validator)
+	router := httpadapter.NewRouter(dependencies.CategoryHandler, dependencies.ConsumerHandler, dependencies.ProviderHandler, dependencies.ConversationHandler, dependencies.JobRequestHandler, dependencies.UserHandler, auth0Validator)
 	engine, err := router.SetUp()
 	require.NoError(tb, err, "could not initialize router")
 
@@ -109,6 +115,7 @@ func newTestSuite(tb testing.TB, database *sql.DB) *testSuite {
 		providerRepository:     dependencies.ProviderRepository,
 		conversationRepository: dependencies.ConversationRepository,
 		messageRepository:      dependencies.MessageRepository,
+		jobRequestRepository:   dependencies.JobRequestRepository,
 		userRepository:         dependencies.UserRepository,
 		auth0Validator:         auth0Validator,
 		tokenBuilder:           tokenBuilder,

@@ -9,7 +9,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/LoResuelvo/loresuelvo-api/internal/domain/conversation"
 	"github.com/cucumber/godog"
 )
 
@@ -38,11 +37,11 @@ func registerSendMessageSteps(sc *godog.ScenarioContext, suite *testSuite) {
 }
 
 func (suite *testSuite) sendMessageInPendingConversationWithProvider(providerFullName string, message *godog.DocString) error {
-	return suite.sendMessageInPendingConversationWithParticipant(providerFullName, conversation.SenderProvider, message)
+	return suite.sendMessageInPendingConversationWithParticipant(providerFullName, participantRoleProvider, message)
 }
 
 func (suite *testSuite) sendMessageInPendingConversationWithConsumer(consumerFullName string, message *godog.DocString) error {
-	return suite.sendMessageInPendingConversationWithParticipant(consumerFullName, conversation.SenderConsumer, message)
+	return suite.sendMessageInPendingConversationWithParticipant(consumerFullName, participantRoleConsumer, message)
 }
 
 func (suite *testSuite) trySendMessageInPendingConversationWithProvider(providerFullName string, message *godog.DocString) error {
@@ -60,7 +59,7 @@ func (suite *testSuite) trySendMessageInNonExistingConversation(message *godog.D
 }
 
 func (suite *testSuite) trySendMessageInPendingConversationWithProviderWithoutContent(providerFullName string) error {
-	if err := suite.ensureKnownParticipantFullName(providerFullName, conversation.SenderProvider); err != nil {
+	if err := suite.ensureKnownParticipantFullName(providerFullName, participantRoleProvider); err != nil {
 		return err
 	}
 
@@ -68,7 +67,7 @@ func (suite *testSuite) trySendMessageInPendingConversationWithProviderWithoutCo
 }
 
 func (suite *testSuite) trySendMessageInPendingConversationWithProviderWithInlineContent(providerFullName, content string) error {
-	if err := suite.ensureKnownParticipantFullName(providerFullName, conversation.SenderProvider); err != nil {
+	if err := suite.ensureKnownParticipantFullName(providerFullName, participantRoleProvider); err != nil {
 		return err
 	}
 
@@ -212,10 +211,10 @@ func (suite *testSuite) sentMessageResponseFromLastBody() (sentMessageResponse, 
 
 func (suite *testSuite) currentAuthenticatedParticipantRole() (string, error) {
 	if _, err := suite.consumerRepository.FindIDByAuthID(suite.currentAuth0ID); err == nil {
-		return conversation.SenderConsumer, nil
+		return participantRoleConsumer, nil
 	}
 	if _, err := suite.providerRepository.FindIDByAuthID(suite.currentAuth0ID); err == nil {
-		return conversation.SenderProvider, nil
+		return participantRoleProvider, nil
 	}
 
 	return "", fmt.Errorf("authenticated user is not a registered conversation participant")

@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/LoResuelvo/loresuelvo-api/internal/domain/conversation"
 	"github.com/cucumber/godog"
 )
 
@@ -56,7 +55,7 @@ func (suite *testSuite) thereIsRegisteredConsumerWithEmailNameAndSurname(email, 
 	defer resp.Body.Close()
 
 	if resp.StatusCode == http.StatusCreated || resp.StatusCode == http.StatusConflict {
-		suite.rememberParticipantFullName(name, surname, conversation.SenderConsumer)
+		suite.rememberParticipantFullName(name, surname, participantRoleConsumer)
 		return nil
 	}
 
@@ -128,8 +127,8 @@ func (suite *testSuite) systemCreatesPendingConversationBetweenConsumerAndProvid
 		return fmt.Errorf("expected created conversation id, got body %s", string(suite.lastBody))
 	}
 
-	if strings.TrimSpace(response.Status) != conversation.StatusPending {
-		return fmt.Errorf("expected conversation status %q, got %q", conversation.StatusPending, response.Status)
+	if strings.TrimSpace(response.Status) != conversationStatusPending {
+		return fmt.Errorf("expected conversation status %q, got %q", conversationStatusPending, response.Status)
 	}
 
 	suite.lastConversationID = response.ID
@@ -153,8 +152,8 @@ func (suite *testSuite) systemCreatesPendingConversationBetweenConsumerAndProvid
 		return fmt.Errorf("expected persisted conversation id %d, got %d", response.ID, createdConversation.ID)
 	}
 
-	if createdConversation.Status != conversation.StatusPending {
-		return fmt.Errorf("expected persisted conversation status %q, got %q", conversation.StatusPending, createdConversation.Status)
+	if createdConversation.Status != conversationStatusPending {
+		return fmt.Errorf("expected persisted conversation status %q, got %q", conversationStatusPending, createdConversation.Status)
 	}
 
 	return nil

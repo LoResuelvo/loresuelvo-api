@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/LoResuelvo/loresuelvo-api/internal/domain/conversation"
 	"github.com/cucumber/godog"
 )
 
@@ -92,7 +91,7 @@ func (suite *testSuite) systemShowsOnlyConversationWithProvider(fullName string)
 		return fmt.Errorf("expected exactly one conversation, got %d with body %s", len(summaries), string(suite.lastBody))
 	}
 
-	if !conversationCounterpartMatches(summaries[0].Counterpart, conversation.SenderProvider, fullName) {
+	if !conversationCounterpartMatches(summaries[0].Counterpart, participantRoleProvider, fullName) {
 		return fmt.Errorf("expected only conversation with provider %q, got body %s", fullName, string(suite.lastBody))
 	}
 
@@ -106,12 +105,12 @@ func (suite *testSuite) systemShowsPendingConversationWithConsumer(fullName stri
 	}
 
 	for _, summary := range summaries {
-		if !conversationCounterpartMatches(summary.Counterpart, conversation.SenderConsumer, fullName) {
+		if !conversationCounterpartMatches(summary.Counterpart, participantRoleConsumer, fullName) {
 			continue
 		}
 
-		if summary.Status != conversation.StatusPending {
-			return fmt.Errorf("expected conversation status %q, got %q", conversation.StatusPending, summary.Status)
+		if summary.Status != conversationStatusPending {
+			return fmt.Errorf("expected conversation status %q, got %q", conversationStatusPending, summary.Status)
 		}
 
 		return suite.assertValidConversationSummary(summary)

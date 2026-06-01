@@ -1,13 +1,13 @@
 package steps_test
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"time"
 
-	"github.com/LoResuelvo/loresuelvo-api/internal/domain/conversation"
 	"github.com/cucumber/godog"
 )
 
@@ -56,23 +56,12 @@ func (suite *testSuite) createPendingConversationBetweenConsumerAndProvider(cons
 		return err
 	}
 
-	pendingConversation, err := conversation.NewPendingConversation(consumerID, providerID)
+	conversationID, err := suite.insertPendingConversationFixture(context.Background(), consumerID, providerID, content)
 	if err != nil {
 		return err
 	}
 
-	message, err := conversation.NewConsumerMessage(content)
-	if err != nil {
-		return err
-	}
-
-	createdConversation, err := suite.conversationRepository.SaveWithMessage(*pendingConversation, *message)
-	if err != nil {
-		return err
-	}
-
-	suite.lastConversationID = createdConversation.ID
-
+	suite.lastConversationID = conversationID
 	return nil
 }
 
@@ -154,18 +143,18 @@ func (suite *testSuite) systemShowsConversationBetweenConsumerAndProvider(consum
 		return fmt.Errorf("expected conversation id %d, got %d", suite.lastConversationID, response.ID)
 	}
 	if suite.currentAuth0ID == auth0IDForConsumerEmail(consumerEmail) {
-		if response.Counterpart.ID != providerID || response.Counterpart.Role != conversation.SenderProvider {
-			return fmt.Errorf("expected provider counterpart id %d and role %q, got id %d and role %q", providerID, conversation.SenderProvider, response.Counterpart.ID, response.Counterpart.Role)
+		if response.Counterpart.ID != providerID || response.Counterpart.Role != participantRoleProvider {
+			return fmt.Errorf("expected provider counterpart id %d and role %q, got id %d and role %q", providerID, participantRoleProvider, response.Counterpart.ID, response.Counterpart.Role)
 		}
 	} else if suite.currentAuth0ID == auth0IDForProviderEmail(providerEmail) {
-		if response.Counterpart.ID != consumerID || response.Counterpart.Role != conversation.SenderConsumer {
-			return fmt.Errorf("expected consumer counterpart id %d and role %q, got id %d and role %q", consumerID, conversation.SenderConsumer, response.Counterpart.ID, response.Counterpart.Role)
+		if response.Counterpart.ID != consumerID || response.Counterpart.Role != participantRoleConsumer {
+			return fmt.Errorf("expected consumer counterpart id %d and role %q, got id %d and role %q", consumerID, participantRoleConsumer, response.Counterpart.ID, response.Counterpart.Role)
 		}
 	} else {
 		return fmt.Errorf("authenticated user is not one of the expected conversation participants")
 	}
-	if response.Status != conversation.StatusPending {
-		return fmt.Errorf("expected conversation status %q, got %q", conversation.StatusPending, response.Status)
+	if response.Status != conversationStatusPending {
+		return fmt.Errorf("expected conversation status %q, got %q", conversationStatusPending, response.Status)
 	}
 
 	return nil
@@ -219,12 +208,55 @@ func (suite *testSuite) conversationDetailResponseFromLastBody() (conversationDe
 
 func (suite *testSuite) senderRoleForEmail(email string) (string, error) {
 	if _, err := suite.consumerRepository.FindIDByEmail(email); err == nil {
-		return conversation.SenderConsumer, nil
+		return participantRoleConsumer, nil
 	}
 
 	if _, err := suite.providerIDByEmail(email); err == nil {
-		return conversation.SenderProvider, nil
+		return participantRoleProvider, nil
 	}
 
 	return "", fmt.Errorf("could not resolve sender role for email %q", email)
+}
+
+func (suite *testSuite) insertPendingConversationFixture(ctx context.Context, consumerID, providerID int, initialMessage string) (int, error) {
+	tx, err := suite.database.BeginTx(ctx, nil)
+	if err != nil {
+		return 0, fmt.Errorf("beginning pending conversation fixture transaction: %w", err)
+	}
+
+	var conversationID int
+	err = tx.QueryRowContext(
+		ctx,
+		`INSERT INTO conversations (consumer_id, provider_id, status, created_on, updated_on)
+		VALUES ($1, $2, $3, NOW(), NOW())
+		RETURNING id`,
+		consumerID,
+		providerID,
+		conversationStatusPending,
+	).Scan(&conversationID)
+	if err != nil {
+		_ = tx.Rollback()
+		return 0, fmt.Errorf("inserting pending conversation fixture: %w", err)
+	}
+
+	trimmedMessage := normalizeDocString(&godog.DocString{Content: initialMessage})
+	if trimmedMessage != "" {
+		if _, err := tx.ExecContext(
+			ctx,
+			`INSERT INTO messages (conversation_id, sender_role, content, created_on)
+			VALUES ($1, $2, $3, NOW())`,
+			conversationID,
+			participantRoleConsumer,
+			trimmedMessage,
+		); err != nil {
+			_ = tx.Rollback()
+			return 0, fmt.Errorf("inserting pending conversation fixture message: %w", err)
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		return 0, fmt.Errorf("committing pending conversation fixture transaction: %w", err)
+	}
+
+	return conversationID, nil
 }

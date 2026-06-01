@@ -39,7 +39,7 @@ func (suite *testSuite) requestProviderAccountRegistration(email, name, surname,
 		return err
 	}
 
-	return suite.requestProviderRegistration(providerRegistrationRequest{
+	if err := suite.requestProviderRegistration(providerRegistrationRequest{
 		Email:                  email,
 		Name:                   name,
 		Surname:                surname,
@@ -48,7 +48,11 @@ func (suite *testSuite) requestProviderAccountRegistration(email, name, surname,
 		CUITCertificateFile:    "cuit-certificate.pdf",
 		BiometricValidationID:  "biometric-validation-approved",
 		ProfessionalCredential: "professional-license-or-certificate.pdf",
-	})
+	}); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (suite *testSuite) requestProviderAccountRegistrationWithoutCategory(email, name, surname string) error {
