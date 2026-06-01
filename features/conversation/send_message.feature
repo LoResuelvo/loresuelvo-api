@@ -25,18 +25,14 @@ Feature: Envío de mensaje
             """
             ¿El jueves por la mañana te queda cómodo para pasar a revisar el problema?
             """
-
-    Scenario: 02-EM Prestador responde en una conversación existente
+    @wip
+    Scenario: 02-EM Rechazar mensaje de prestador en una conversación pendiente
         Given que estoy autenticado como prestador "juan.plomero@example.com"
-        When envío un mensaje en la conversación pendiente con el consumidor "Ana Pérez":
+        When intento enviar un mensaje en la conversación pendiente con el consumidor "Ana Pérez":
             """
             Sí, puedo pasar el jueves a las 10. ¿Te queda cómodo?
             """
-        Then el sistema registra el mensaje en la conversación
-        And el último mensaje de la conversación fue enviado por "Juan Gómez" con el contenido:
-            """
-            Sí, puedo pasar el jueves a las 10. ¿Te queda cómodo?
-            """
+        Then el sistema muestra un mensaje de error indicando que no se puede enviar mensajes en el chat pendiente sin aceptar la solicitud de trabajo vinculada
 
     Rule: Solo los participantes pueden enviar mensajes en una conversación
 
