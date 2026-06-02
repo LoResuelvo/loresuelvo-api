@@ -11,7 +11,7 @@ import (
 )
 
 type jobRequestRepositoryMock struct {
-	savedJobRequest   jobrequest.JobRequest
+	savedJobRequest   []jobrequest.JobRequest
 	savedConversation conversation.Conversation
 	saveCalled        bool
 	err               error
@@ -19,7 +19,7 @@ type jobRequestRepositoryMock struct {
 
 func (r *jobRequestRepositoryMock) SaveWithConversation(jobRequest jobrequest.JobRequest, pendingConversation conversation.Conversation) (*jobrequest.JobRequest, error) {
 	r.saveCalled = true
-	r.savedJobRequest = jobRequest
+	r.savedJobRequest = append(r.savedJobRequest, jobRequest)
 	r.savedConversation = pendingConversation
 	if r.err != nil {
 		return nil, r.err
@@ -34,7 +34,7 @@ func (r *jobRequestRepositoryMock) FindByUserID(userAuthID string) ([]jobrequest
 	if r.err != nil {
 		return nil, r.err
 	}
-	return []jobrequest.JobRequest{}, nil
+	return r.savedJobRequest, nil
 }
 
 type consumerRepo struct {
@@ -84,13 +84,14 @@ func TestCreateJobRequestSavesRequestWithPendingConversation(t *testing.T) {
 
 	createdRequest, err := service.Create("auth0|consumer", 20, "  Reparación de fuga  ", "  Necesito ayuda esta semana  ")
 
+	firstSavedRequest := repo.savedJobRequest[0]
 	require.NoError(t, err)
 	require.NotNil(t, createdRequest)
 	assert.True(t, repo.saveCalled)
-	assert.Equal(t, 10, repo.savedJobRequest.ConsumerID)
-	assert.Equal(t, 20, repo.savedJobRequest.ProviderID)
-	assert.Equal(t, "Reparación de fuga", repo.savedJobRequest.Title)
-	assert.Equal(t, "Necesito ayuda esta semana", repo.savedJobRequest.Description)
+	assert.Equal(t, 10, firstSavedRequest.ConsumerID)
+	assert.Equal(t, 20, firstSavedRequest.ProviderID)
+	assert.Equal(t, "Reparación de fuga", firstSavedRequest.Title)
+	assert.Equal(t, "Necesito ayuda esta semana", firstSavedRequest.Description)
 	assert.Equal(t, conversation.StatusPending, repo.savedConversation.Status)
 	assert.Equal(t, 10, repo.savedConversation.ConsumerID)
 	assert.Equal(t, 20, repo.savedConversation.ProviderID)
@@ -111,7 +112,7 @@ func TestCreateJobRequestAllowsEmptyDescription(t *testing.T) {
 
 	require.NoError(t, err)
 	require.NotNil(t, createdRequest)
-	assert.Equal(t, "", repo.savedJobRequest.Description)
+	assert.Equal(t, "", repo.savedJobRequest[0].Description)
 }
 
 func TestCreateJobRequestRejectsMissingTitle(t *testing.T) {
@@ -174,4 +175,25 @@ func TestShouldGetNoJobRequests(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.Empty(t, jobRequests)
+}
+
+func TestSHouldGetListOfJobRequests(t *testing.T) {
+	repo := &jobRequestRepositoryMock{}
+	service := jobrequest.NewService(
+		repo,
+		&consumerRepo{consumerID: 10},
+		&providerRepo{exists: true},
+		&conversationRepo{},
+	)
+
+	repo.savedJobRequest = []jobrequest.JobRequest{
+		{ID: 1, ConsumerID: 10, ProviderID: 20, Title: "Reparación de fuga", Description: "Necesito ayuda esta semana"},
+		{ID: 2, ConsumerID: 10, ProviderID: 30, Title: "Instalación de grifo", Description: "¿Alguien disponible?"},
+	}
+	expectedJobRequests := repo.savedJobRequest
+
+	jobRequests, err := service.GetJobRequests("auth0|consumer")
+
+	require.NoError(t, err)
+	assert.Equal(t, expectedJobRequests, jobRequests)
 }
