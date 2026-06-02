@@ -981,6 +981,69 @@
             }
         },
         "/job-requests": {
+            "get": {
+                "tags": [
+                    "JobRequests"
+                ],
+                "operationId": "listPendingJobRequests",
+                "summary": "List pending job requests",
+                "description": "Returns pending job requests where the authenticated user participates as consumer or provider. The authenticated JWT subject is matched against the user auth id; job request records keep internal consumer and provider identifiers.",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Pending job requests for the authenticated user. The array is empty when there are no pending requests.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/JobRequest"
+                                    }
+                                },
+                                "examples": {
+                                    "withRequests": {
+                                        "value": [
+                                            {
+                                                "id": 1,
+                                                "conversation_id": 10,
+                                                "title": "Reparación de fuga en la cocina",
+                                                "description": "Hola Ana, necesito reparar una fuga de agua en la cocina. ¿Podrías ayudarme esta semana?"
+                                            }
+                                        ]
+                                    },
+                                    "empty": {
+                                        "value": []
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Authentication failed or the authenticated user id could not be obtained from the request context.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AuthErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Unexpected error while listing job requests.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
             "post": {
                 "tags": [
                     "JobRequests"
