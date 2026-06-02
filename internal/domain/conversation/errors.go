@@ -15,3 +15,7 @@ var ErrAlreadyExists = errors.New("Conversation already exists")
 var ErrConversationDoesNotExist = errors.New("Conversation does not exist")
 
 var ErrConversationAccessDenied = errors.New("Cannot access conversation")
+
+var ErrPendingConversationMessageLimitReached = errors.New("Pending conversation message limit reached")
+
+var ErrPendingConversationRequiresAcceptance = errors.New("Pending conversation must be accepted before provider can send messages")

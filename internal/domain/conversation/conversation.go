@@ -1,8 +1,12 @@
 package conversation
 
-import "time"
+import (
+	"time"
+)
 
 const StatusPending = "pending"
+
+const PendingConsumerMessageLimit = 5
 
 type Conversation struct {
 	ID         int

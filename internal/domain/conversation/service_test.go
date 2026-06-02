@@ -23,7 +23,9 @@ type conversationRepositoryMock struct {
 	saveCalled        bool
 	addMessageCalled  bool
 	findByIDCalled    bool
+	countCalled       bool
 	foundResult       *conversation.Conversation
+	countResult       int
 	err               error
 }
 
@@ -76,6 +78,14 @@ func (r *conversationRepositoryMock) AddMessage(ctx context.Context, conversatio
 	m.ConversationID = conversationID
 	m.CreatedOn = time.Now()
 	return &m, nil
+}
+
+func (r *conversationRepositoryMock) CountMessagesBySenderRole(ctx context.Context, conversationID int, senderRole string) (int, error) {
+	r.countCalled = true
+	if r.err != nil {
+		return 0, r.err
+	}
+	return r.countResult, nil
 }
 
 type consumerIDFinderMock struct {
@@ -388,7 +398,7 @@ func TestSendMessageAddsConsumerMessageForParticipantConsumer(t *testing.T) {
 }
 
 func TestSendMessageAddsProviderMessageForParticipantProvider(t *testing.T) {
-	repo := &conversationRepositoryMock{foundResult: conversationFixture()}
+	repo := &conversationRepositoryMock{foundResult: activeConversationFixture()}
 	consumerIDFinder := &consumerIDFinderMock{err: errors.New("consumer not found")}
 	providerExistenceChecker := &providerExistenceCheckerMock{}
 	providerIDFinder := &providerIDFinderMock{providerID: 20}
@@ -404,6 +414,41 @@ func TestSendMessageAddsProviderMessageForParticipantProvider(t *testing.T) {
 	assert.Equal(t, conversation.SenderProvider, repo.addedMessage.SenderRole)
 	assert.Equal(t, "Sí, puedo pasar el jueves a las 10", repo.addedMessage.Content)
 	assert.Equal(t, 1, sentMessage.ConversationID)
+}
+
+func TestSendMessageRejectsProviderMessageInPendingConversation(t *testing.T) {
+	repo := &conversationRepositoryMock{foundResult: conversationFixture()}
+	consumerIDFinder := &consumerIDFinderMock{err: errors.New("consumer not found")}
+	providerExistenceChecker := &providerExistenceCheckerMock{}
+	providerIDFinder := &providerIDFinderMock{providerID: 20}
+
+	service := conversation.NewService(repo, consumerIDFinder, providerExistenceChecker, providerIDFinder, &conversationReaderMock{})
+
+	sentMessage, err := service.SendMessage(context.Background(), "auth0|provider", 1, "Sí, puedo pasar el jueves a las 10")
+
+	assert.ErrorIs(t, err, conversation.ErrPendingConversationRequiresAcceptance)
+	assert.Nil(t, sentMessage)
+	assert.True(t, repo.findByIDCalled)
+	assert.False(t, repo.addMessageCalled)
+}
+
+func TestSendMessageRejectsConsumerMessageWhenPendingLimitWasReached(t *testing.T) {
+	repo := &conversationRepositoryMock{
+		foundResult: conversationFixture(),
+		countResult: conversation.PendingConsumerMessageLimit,
+	}
+	consumerIDFinder := &consumerIDFinderMock{consumerID: 10}
+	providerExistenceChecker := &providerExistenceCheckerMock{}
+	providerIDFinder := &providerIDFinderMock{err: errors.New("provider not found")}
+
+	service := conversation.NewService(repo, consumerIDFinder, providerExistenceChecker, providerIDFinder, &conversationReaderMock{})
+
+	sentMessage, err := service.SendMessage(context.Background(), "auth0|consumer", 1, "Otro detalle")
+
+	assert.ErrorIs(t, err, conversation.ErrPendingConversationMessageLimitReached)
+	assert.Nil(t, sentMessage)
+	assert.True(t, repo.countCalled)
+	assert.False(t, repo.addMessageCalled)
 }
 
 func TestSendMessageRejectsAuthenticatedUserThatIsNotParticipant(t *testing.T) {
@@ -603,4 +648,10 @@ func conversationFixture() *conversation.Conversation {
 			},
 		},
 	}
+}
+
+func activeConversationFixture() *conversation.Conversation {
+	fixture := conversationFixture()
+	fixture.Status = "active"
+	return fixture
 }

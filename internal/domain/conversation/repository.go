@@ -11,6 +11,7 @@ type Repository interface {
 	SaveWithMessage(conversation Conversation, message Message) (*Conversation, error)
 	FindByID(ctx context.Context, conversationID int) (*Conversation, error)
 	AddMessage(ctx context.Context, conversationID int, message Message) (*Message, error)
+	CountMessagesBySenderRole(ctx context.Context, conversationID int, senderRole string) (int, error)
 }
 
 type ConsumerIDFinder interface {

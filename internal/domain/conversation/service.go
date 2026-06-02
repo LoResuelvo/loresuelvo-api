@@ -79,6 +79,9 @@ func (s *Service) SendMessage(ctx context.Context, authID string, conversationID
 	if err != nil {
 		return nil, err
 	}
+	if err := s.ensureMessageAllowedInCurrentConversationState(ctx, *foundConversation, *message); err != nil {
+		return nil, err
+	}
 
 	return s.conversationRepository.AddMessage(ctx, conversationID, *message)
 }
@@ -152,6 +155,26 @@ func (s *Service) newMessageForAuthenticatedParticipant(authID string, foundConv
 	}
 
 	return nil, ErrConversationAccessDenied
+}
+
+func (s *Service) ensureMessageAllowedInCurrentConversationState(ctx context.Context, foundConversation Conversation, message Message) error {
+	if foundConversation.Status != StatusPending {
+		return nil
+	}
+
+	if message.SenderRole == SenderProvider {
+		return ErrPendingConversationRequiresAcceptance
+	}
+
+	sentMessages, err := s.conversationRepository.CountMessagesBySenderRole(ctx, foundConversation.ID, SenderConsumer)
+	if err != nil {
+		return err
+	}
+	if sentMessages >= PendingConsumerMessageLimit {
+		return ErrPendingConversationMessageLimitReached
+	}
+
+	return nil
 }
 
 func newPendingWorkRequest(consumerID, providerID int, content string) (*Conversation, *Message, error) {
