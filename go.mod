@@ -3,7 +3,6 @@ module github.com/LoResuelvo/loresuelvo-api
 go 1.26.1
 
 require (
-	github.com/DATA-DOG/go-sqlmock v1.5.2
 	github.com/auth0/go-jwt-middleware/v3 v3.1.0
 	github.com/cucumber/godog v0.15.1
 	github.com/gin-gonic/gin v1.12.0
