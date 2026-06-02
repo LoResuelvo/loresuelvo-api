@@ -47,7 +47,7 @@ func (s *Service) Create(consumerAuthID string, providerID int, title, descripti
 }
 
 func (s *Service) GetJobRequests(userAuthID string) ([]JobRequest, error) {
-	return s.repository.FindByUserID(userAuthID)
+	return s.repository.FindByUserAuthID(userAuthID)
 }
 
 func (s *Service) consumerIDForJobRequest(consumerAuthID string) (int, error) {

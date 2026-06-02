@@ -92,9 +92,55 @@ func (repository *JobRequestRepository) FindByConversationID(conversationID int)
 	return &foundJobRequest, nil
 }
 
-func (repository *JobRequestRepository) FindByUserID(userAuthID string) ([]jobrequest.JobRequest, error) {
-	// Implementation would go here, but it's not included in the provided code snippets.
-	return nil, nil
+func (repository *JobRequestRepository) FindByUserAuthID(userAuthID string) ([]jobrequest.JobRequest, error) {
+	rows, err := repository.db.Query(
+		`SELECT job_requests.id,
+			job_requests.consumer_id,
+			job_requests.provider_id,
+			job_requests.conversation_id,
+			job_requests.title,
+			job_requests.description
+		FROM job_requests
+		INNER JOIN conversations ON conversations.id = job_requests.conversation_id
+		INNER JOIN consumers ON consumers.id = job_requests.consumer_id
+		INNER JOIN users AS consumer_users ON consumer_users.id = consumers.user_id
+		INNER JOIN providers ON providers.id = job_requests.provider_id
+		INNER JOIN users AS provider_users ON provider_users.id = providers.user_id
+		WHERE conversations.status = $1
+			AND (consumer_users.auth_id = $2 OR provider_users.auth_id = $2)
+		ORDER BY job_requests.created_on DESC, job_requests.id DESC`,
+		conversation.StatusPending,
+		userAuthID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("finding job requests by user auth id: %w", err)
+	}
+	defer func() {
+		_ = rows.Close()
+	}()
+
+	jobRequests := []jobrequest.JobRequest{}
+	for rows.Next() {
+		var foundJobRequest jobrequest.JobRequest
+		if err := rows.Scan(
+			&foundJobRequest.ID,
+			&foundJobRequest.ConsumerID,
+			&foundJobRequest.ProviderID,
+			&foundJobRequest.ConversationID,
+			&foundJobRequest.Title,
+			&foundJobRequest.Description,
+		); err != nil {
+			return nil, fmt.Errorf("scanning job request by user auth id: %w", err)
+		}
+
+		jobRequests = append(jobRequests, foundJobRequest)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterating job requests by user auth id: %w", err)
+	}
+
+	return jobRequests, nil
 }
 
 func (repository *JobRequestRepository) DeleteAll() error {

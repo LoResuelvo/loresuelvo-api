@@ -30,7 +30,7 @@ func (r *jobRequestRepositoryMock) SaveWithConversation(jobRequest jobrequest.Jo
 	return &jobRequest, nil
 }
 
-func (r *jobRequestRepositoryMock) FindByUserID(userAuthID string) ([]jobrequest.JobRequest, error) {
+func (r *jobRequestRepositoryMock) FindByUserAuthID(userAuthID string) ([]jobrequest.JobRequest, error) {
 	if r.err != nil {
 		return nil, r.err
 	}

@@ -62,7 +62,13 @@ func newJobRequestRepositoryTest(t *testing.T) jobRequestRepositoryTestContext {
 func savedConsumerIDForJobRequest(t *testing.T, testContext jobRequestRepositoryTestContext) int {
 	t.Helper()
 
-	consumerToSave, err := consumer.NewConsumer("auth0|job-request-consumer", "job.request.consumer@example.com", "Ana", "Perez")
+	return savedConsumerIDWithData(t, testContext, "auth0|job-request-consumer", "job.request.consumer@example.com", "Ana", "Perez")
+}
+
+func savedConsumerIDWithData(t *testing.T, testContext jobRequestRepositoryTestContext, authID, email, name, surname string) int {
+	t.Helper()
+
+	consumerToSave, err := consumer.NewConsumer(authID, email, name, surname)
 	require.NoError(t, err)
 	require.NoError(t, testContext.consumerRepository.Save(*consumerToSave))
 
@@ -75,7 +81,13 @@ func savedConsumerIDForJobRequest(t *testing.T, testContext jobRequestRepository
 func savedProviderIDForJobRequest(t *testing.T, testContext jobRequestRepositoryTestContext) int {
 	t.Helper()
 
-	providerToSave := validProviderWithData(t, testContext.categoryRepository, "auth0|job-request-provider", "job.request.provider@example.com", "Juan", "Gomez", "Plomeria")
+	return savedProviderIDWithData(t, testContext, "auth0|job-request-provider", "job.request.provider@example.com", "Juan", "Gomez", "Plomeria")
+}
+
+func savedProviderIDWithData(t *testing.T, testContext jobRequestRepositoryTestContext, authID, email, name, surname, categoryName string) int {
+	t.Helper()
+
+	providerToSave := validProviderWithData(t, testContext.categoryRepository, authID, email, name, surname, categoryName)
 	require.NoError(t, testContext.providerRepository.Save(*providerToSave))
 
 	providerID, err := testContext.providerRepository.FindIDByEmail(providerToSave.User.Email)
@@ -165,6 +177,66 @@ func TestJobRequestRepositoryCanFindByConversationID(t *testing.T) {
 	assert.Equal(t, savedJobRequest.ConversationID, foundJobRequest.ConversationID)
 	assert.Equal(t, requestToSave.Title, foundJobRequest.Title)
 	assert.Equal(t, requestToSave.Description, foundJobRequest.Description)
+}
+
+func TestJobRequestRepositoryCanFindPendingRequestsByConsumerAuthID(t *testing.T) {
+	testContext := newJobRequestRepositoryTest(t)
+	consumerID := savedConsumerIDWithData(t, testContext, "auth0|job-request-consumer-owner", "job.request.consumer.owner@example.com", "Ana", "Perez")
+	providerID := savedProviderIDWithData(t, testContext, "auth0|job-request-provider-owner", "job.request.provider.owner@example.com", "Juan", "Gomez", "Plomeria")
+	unrelatedConsumerID := savedConsumerIDWithData(t, testContext, "auth0|job-request-other-consumer", "job.request.other.consumer@example.com", "Carla", "Lopez")
+	unrelatedProviderID := savedProviderIDWithData(t, testContext, "auth0|job-request-other-provider", "job.request.other.provider@example.com", "Pedro", "Diaz", "Electricidad")
+
+	requestToFind := validJobRequest(t, consumerID, providerID)
+	savedJobRequest, err := testContext.jobRequestRepository.SaveWithConversation(requestToFind, conversationForJobRequest(t, consumerID, providerID))
+	require.NoError(t, err)
+	_, err = testContext.jobRequestRepository.SaveWithConversation(validJobRequest(t, unrelatedConsumerID, unrelatedProviderID), conversationForJobRequest(t, unrelatedConsumerID, unrelatedProviderID))
+	require.NoError(t, err)
+
+	foundJobRequests, err := testContext.jobRequestRepository.FindByUserAuthID("auth0|job-request-consumer-owner")
+
+	require.NoError(t, err)
+	require.Len(t, foundJobRequests, 1)
+	assert.Equal(t, savedJobRequest.ID, foundJobRequests[0].ID)
+	assert.Equal(t, consumerID, foundJobRequests[0].ConsumerID)
+	assert.Equal(t, providerID, foundJobRequests[0].ProviderID)
+}
+
+func TestJobRequestRepositoryCanFindPendingRequestsByProviderAuthID(t *testing.T) {
+	testContext := newJobRequestRepositoryTest(t)
+	consumerID := savedConsumerIDWithData(t, testContext, "auth0|job-request-provider-view-consumer", "job.request.provider.view.consumer@example.com", "Ana", "Perez")
+	providerID := savedProviderIDWithData(t, testContext, "auth0|job-request-provider-view-owner", "job.request.provider.view.owner@example.com", "Juan", "Gomez", "Plomeria")
+	unrelatedConsumerID := savedConsumerIDWithData(t, testContext, "auth0|job-request-provider-view-other-consumer", "job.request.provider.view.other.consumer@example.com", "Carla", "Lopez")
+	unrelatedProviderID := savedProviderIDWithData(t, testContext, "auth0|job-request-provider-view-other-provider", "job.request.provider.view.other.provider@example.com", "Pedro", "Diaz", "Electricidad")
+
+	requestToFind := validJobRequest(t, consumerID, providerID)
+	savedJobRequest, err := testContext.jobRequestRepository.SaveWithConversation(requestToFind, conversationForJobRequest(t, consumerID, providerID))
+	require.NoError(t, err)
+	_, err = testContext.jobRequestRepository.SaveWithConversation(validJobRequest(t, unrelatedConsumerID, unrelatedProviderID), conversationForJobRequest(t, unrelatedConsumerID, unrelatedProviderID))
+	require.NoError(t, err)
+
+	foundJobRequests, err := testContext.jobRequestRepository.FindByUserAuthID("auth0|job-request-provider-view-owner")
+
+	require.NoError(t, err)
+	require.Len(t, foundJobRequests, 1)
+	assert.Equal(t, savedJobRequest.ID, foundJobRequests[0].ID)
+	assert.Equal(t, consumerID, foundJobRequests[0].ConsumerID)
+	assert.Equal(t, providerID, foundJobRequests[0].ProviderID)
+}
+
+func TestJobRequestRepositoryFindByUserAuthIDReturnsOnlyPendingRequests(t *testing.T) {
+	testContext := newJobRequestRepositoryTest(t)
+	consumerID := savedConsumerIDWithData(t, testContext, "auth0|job-request-active-consumer", "job.request.active.consumer@example.com", "Ana", "Perez")
+	providerID := savedProviderIDWithData(t, testContext, "auth0|job-request-active-provider", "job.request.active.provider@example.com", "Juan", "Gomez", "Plomeria")
+	requestToSave := validJobRequest(t, consumerID, providerID)
+	savedJobRequest, err := testContext.jobRequestRepository.SaveWithConversation(requestToSave, conversationForJobRequest(t, consumerID, providerID))
+	require.NoError(t, err)
+	_, err = testContext.database.Exec(`UPDATE conversations SET status = 'active' WHERE id = $1`, savedJobRequest.ConversationID)
+	require.NoError(t, err)
+
+	foundJobRequests, err := testContext.jobRequestRepository.FindByUserAuthID("auth0|job-request-active-consumer")
+
+	require.NoError(t, err)
+	assert.Empty(t, foundJobRequests)
 }
 
 func TestJobRequestRepositoryCanDeleteAllRequests(t *testing.T) {
