@@ -21,6 +21,8 @@ tags:
   description: Provider account registration and search endpoints.
 - name: Conversations
   description: Provider work request conversation endpoints.
+- name: JobRequests
+  description: Job request creation endpoints.
 - name: Users
   description: Authenticated user session endpoints.
 security: []
@@ -35,6 +37,8 @@ paths:
     $ref: ./paths/providers.yaml
   /conversations:
     $ref: ./paths/conversations.yaml
+  /job-requests:
+    $ref: ./paths/job-requests.yaml
   /conversations/{conversationId}:
     $ref: ./paths/conversation-by-id.yaml
   /conversations/{conversationId}/messages:
@@ -53,6 +57,10 @@ components:
       $ref: ./components/schemas/provider-summary.yaml
     CreateConversationRequest:
       $ref: ./components/schemas/create-conversation-request.yaml
+    CreateJobRequestRequest:
+      $ref: ./components/schemas/create-job-request-request.yaml
+    JobRequest:
+      $ref: ./components/schemas/job-request.yaml
     SendMessageRequest:
       $ref: ./components/schemas/send-message-request.yaml
     SentMessage:

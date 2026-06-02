@@ -8,6 +8,7 @@ import (
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/category"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/consumer"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/conversation"
+	jobrequest "github.com/LoResuelvo/loresuelvo-api/internal/domain/job_request"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/provider"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/user"
 )
@@ -19,12 +20,14 @@ type Dependencies struct {
 	ProviderRepository     *repositories.ProviderRepository
 	ConversationRepository *repositories.ConversationRepository
 	MessageRepository      *repositories.MessageRepository
+	JobRequestRepository   *repositories.JobRequestRepository
 	ConversationReader     *repositories.ConversationReader
 
 	CategoryHandler     *handler.CategoryHandler
 	ConsumerHandler     *handler.ConsumerHandler
 	ProviderHandler     *handler.ProviderHandler
 	ConversationHandler *handler.ConversationHandler
+	JobRequestHandler   *handler.JobRequestHandler
 	UserHandler         *handler.UserHandler
 }
 
@@ -35,6 +38,7 @@ func NewDependencies(database *sql.DB) *Dependencies {
 	providerRepository := repositories.NewProviderRepository(database, userRepository)
 	messageRepository := repositories.NewMessageRepository(database)
 	conversationRepository := repositories.NewConversationRepository(database, messageRepository)
+	jobRequestRepository := repositories.NewJobRequestRepository(database)
 	conversationReader := repositories.NewConversationReader(database)
 
 	categoryService := category.NewService(categoryRepository)
@@ -47,6 +51,12 @@ func NewDependencies(database *sql.DB) *Dependencies {
 		providerRepository,
 		conversationReader,
 	)
+	jobRequestService := jobrequest.NewService(
+		jobRequestRepository,
+		consumerRepository,
+		providerRepository,
+		conversationRepository,
+	)
 	userService := user.NewService(userRepository)
 
 	return &Dependencies{
@@ -56,11 +66,13 @@ func NewDependencies(database *sql.DB) *Dependencies {
 		ProviderRepository:     providerRepository,
 		ConversationRepository: conversationRepository,
 		MessageRepository:      messageRepository,
+		JobRequestRepository:   jobRequestRepository,
 		ConversationReader:     conversationReader,
 		CategoryHandler:        handler.NewCategoryHandler(categoryService),
 		ConsumerHandler:        handler.NewConsumerHandler(consumerService),
 		ProviderHandler:        handler.NewProviderHandler(providerService),
 		ConversationHandler:    handler.NewConversationHandler(conversationService),
+		JobRequestHandler:      handler.NewJobRequestHandler(jobRequestService),
 		UserHandler:            handler.NewUserHandler(userService),
 	}
 }

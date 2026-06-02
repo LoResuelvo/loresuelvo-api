@@ -15,16 +15,18 @@ type Router struct {
 	consumerHandler     *handler.ConsumerHandler
 	providerHandler     *handler.ProviderHandler
 	conversationHandler *handler.ConversationHandler
+	jobRequestHandler   *handler.JobRequestHandler
 	userHandler         *handler.UserHandler
 	auth0Validator      *validator.Validator
 }
 
-func NewRouter(categoryHandler *handler.CategoryHandler, consumerHandler *handler.ConsumerHandler, providerHandler *handler.ProviderHandler, conversationHandler *handler.ConversationHandler, userHandler *handler.UserHandler, auth0Validator *validator.Validator) *Router {
+func NewRouter(categoryHandler *handler.CategoryHandler, consumerHandler *handler.ConsumerHandler, providerHandler *handler.ProviderHandler, conversationHandler *handler.ConversationHandler, jobRequestHandler *handler.JobRequestHandler, userHandler *handler.UserHandler, auth0Validator *validator.Validator) *Router {
 	router := &Router{
 		categoryHandler:     categoryHandler,
 		consumerHandler:     consumerHandler,
 		providerHandler:     providerHandler,
 		conversationHandler: conversationHandler,
+		jobRequestHandler:   jobRequestHandler,
 		userHandler:         userHandler,
 		auth0Validator:      auth0Validator,
 	}
@@ -50,6 +52,7 @@ func (router *Router) SetUp() (*gin.Engine, error) {
 	router.registerCategoryRoutes(engine)
 	router.registerConsumerRoutes(engine, authMiddleware)
 	router.registerProviderRoutes(engine, authMiddleware)
+	router.registerJobRequestRoutes(engine, authMiddleware)
 	router.registerConversationRoutes(engine, authMiddleware)
 	router.registerAuthenticatedRoutes(engine, authMiddleware)
 
@@ -74,6 +77,10 @@ func (router *Router) registerConsumerRoutes(engine *gin.Engine, authMiddleware 
 func (router *Router) registerProviderRoutes(engine *gin.Engine, authMiddleware gin.HandlerFunc) {
 	engine.GET("/providers", router.providerHandler.FilterProvidersByCategory)
 	engine.POST("/providers", authMiddleware, router.providerHandler.RegisterProvider)
+}
+
+func (router *Router) registerJobRequestRoutes(engine *gin.Engine, authMiddleware gin.HandlerFunc) {
+	engine.POST("/job-requests", authMiddleware, router.jobRequestHandler.CreateJobRequest)
 }
 
 func (router *Router) registerConversationRoutes(engine *gin.Engine, authMiddleware gin.HandlerFunc) {

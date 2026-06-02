@@ -1,0 +1,20 @@
+type: object
+description: Payload accepted by POST /job-requests to create a job request and its linked pending conversation. The consumer is inferred from the authenticated JWT subject.
+required:
+- provider_id
+- title
+properties:
+  provider_id:
+    type: integer
+    format: int32
+    description: Existing provider identifier selected by the consumer.
+    example: 1
+  title:
+    type: string
+    description: Required job request title. Must be non-empty after trimming.
+    example: Reparación de fuga en la cocina
+  description:
+    type: string
+    description: Optional job request description.
+    example: Hola Ana, necesito reparar una fuga de agua en la cocina. ¿Podrías ayudarme esta semana?
+additionalProperties: false

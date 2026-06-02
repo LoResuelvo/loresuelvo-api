@@ -1,0 +1,27 @@
+type: object
+description: Job request created by a consumer and linked to a pending conversation.
+required:
+- id
+- conversation_id
+- title
+- description
+properties:
+  id:
+    type: integer
+    format: int32
+    description: Job request identifier.
+    example: 1
+  conversation_id:
+    type: integer
+    format: int32
+    description: Pending conversation linked to this job request.
+    example: 10
+  title:
+    type: string
+    description: Job request title.
+    example: Reparación de fuga en la cocina
+  description:
+    type: string
+    description: Optional job request description. Empty when omitted.
+    example: Hola Ana, necesito reparar una fuga de agua en la cocina. ¿Podrías ayudarme esta semana?
+additionalProperties: false
