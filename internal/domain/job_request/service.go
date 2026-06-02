@@ -46,6 +46,10 @@ func (s *Service) Create(consumerAuthID string, providerID int, title, descripti
 	return s.repository.SaveWithConversation(*jobRequest, *pendingConversation)
 }
 
+func (s *Service) GetJobRequests(userAuthID string) ([]JobRequest, error) {
+	return s.repository.FindByUserID(userAuthID)
+}
+
 func (s *Service) consumerIDForJobRequest(consumerAuthID string) (int, error) {
 	consumerID, err := s.consumerRepository.FindIDByAuthID(consumerAuthID)
 	if err != nil {

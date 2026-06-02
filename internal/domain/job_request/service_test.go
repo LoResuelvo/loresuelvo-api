@@ -30,6 +30,13 @@ func (r *jobRequestRepositoryMock) SaveWithConversation(jobRequest jobrequest.Jo
 	return &jobRequest, nil
 }
 
+func (r *jobRequestRepositoryMock) FindByUserID(userAuthID string) ([]jobrequest.JobRequest, error) {
+	if r.err != nil {
+		return nil, r.err
+	}
+	return []jobrequest.JobRequest{}, nil
+}
+
 type consumerRepo struct {
 	consumerID int
 	err        error
@@ -153,4 +160,18 @@ func TestCreateJobRequestRejectsNonExistingProvider(t *testing.T) {
 	assert.ErrorIs(t, err, jobrequest.ErrProviderDoesNotExist)
 	assert.Nil(t, createdRequest)
 	assert.False(t, repo.saveCalled)
+}
+
+func TestShouldGetNoJobRequests(t *testing.T) {
+	service := jobrequest.NewService(
+		&jobRequestRepositoryMock{},
+		&consumerRepo{consumerID: 10},
+		&providerRepo{exists: true},
+		&conversationRepo{},
+	)
+
+	jobRequests, err := service.GetJobRequests("auth0|consumer")
+
+	require.NoError(t, err)
+	assert.Empty(t, jobRequests)
 }

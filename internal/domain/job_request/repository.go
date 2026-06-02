@@ -4,6 +4,7 @@ import "github.com/LoResuelvo/loresuelvo-api/internal/domain/conversation"
 
 type Repository interface {
 	SaveWithConversation(jobRequest JobRequest, pendingConversation conversation.Conversation) (*JobRequest, error)
+	FindByUserID(userAuthID string) ([]JobRequest, error)
 }
 
 type ConsumerRepository interface {

@@ -92,6 +92,11 @@ func (repository *JobRequestRepository) FindByConversationID(conversationID int)
 	return &foundJobRequest, nil
 }
 
+func (repository *JobRequestRepository) FindByUserID(userAuthID string) ([]jobrequest.JobRequest, error) {
+	// Implementation would go here, but it's not included in the provided code snippets.
+	return nil, nil
+}
+
 func (repository *JobRequestRepository) DeleteAll() error {
 	_, err := repository.db.Exec(`DELETE FROM job_requests`)
 	if err != nil {
