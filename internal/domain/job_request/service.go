@@ -43,7 +43,7 @@ func (s *Service) Create(consumerAuthID string, providerID int, title, descripti
 		return nil, err
 	}
 
-	return s.repository.SaveWithPendingConversation(*jobRequest, *pendingConversation)
+	return s.repository.SaveWithConversation(*jobRequest, *pendingConversation)
 }
 
 func (s *Service) consumerIDForJobRequest(consumerAuthID string) (int, error) {

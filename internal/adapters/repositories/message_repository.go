@@ -32,6 +32,22 @@ func (repository *MessageRepository) ExistsInConversation(conversationID int, co
 	return exists, nil
 }
 
+func (repository *MessageRepository) CountByConversationIDAndSenderRole(conversationID int, senderRole string) (int, error) {
+	var count int
+	err := repository.db.QueryRow(
+		`SELECT COUNT(*)
+		FROM messages
+		WHERE conversation_id = $1 AND sender_role = $2`,
+		conversationID,
+		senderRole,
+	).Scan(&count)
+	if err != nil {
+		return 0, fmt.Errorf("counting messages in conversation by sender role: %w", err)
+	}
+
+	return count, nil
+}
+
 func (repository *MessageRepository) DeleteAll() error {
 	_, err := repository.db.Exec(`DELETE FROM messages`)
 	if err != nil {

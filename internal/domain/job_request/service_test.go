@@ -17,7 +17,7 @@ type jobRequestRepositoryMock struct {
 	err               error
 }
 
-func (r *jobRequestRepositoryMock) SaveWithPendingConversation(jobRequest jobrequest.JobRequest, pendingConversation conversation.Conversation) (*jobrequest.JobRequest, error) {
+func (r *jobRequestRepositoryMock) SaveWithConversation(jobRequest jobrequest.JobRequest, pendingConversation conversation.Conversation) (*jobrequest.JobRequest, error) {
 	r.saveCalled = true
 	r.savedJobRequest = jobRequest
 	r.savedConversation = pendingConversation

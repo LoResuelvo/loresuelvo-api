@@ -3,7 +3,7 @@ package jobrequest
 import "github.com/LoResuelvo/loresuelvo-api/internal/domain/conversation"
 
 type Repository interface {
-	SaveWithPendingConversation(jobRequest JobRequest, pendingConversation conversation.Conversation) (*JobRequest, error)
+	SaveWithConversation(jobRequest JobRequest, pendingConversation conversation.Conversation) (*JobRequest, error)
 }
 
 type ConsumerRepository interface {

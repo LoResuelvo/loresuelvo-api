@@ -119,6 +119,23 @@ func (repository *ConversationRepository) AddMessage(ctx context.Context, conver
 	return savedMessage, nil
 }
 
+func (repository *ConversationRepository) CountMessagesBySenderRole(ctx context.Context, conversationID int, senderRole string) (int, error) {
+	var count int
+	err := repository.db.QueryRowContext(
+		ctx,
+		`SELECT COUNT(*)
+		FROM messages
+		WHERE conversation_id = $1 AND sender_role = $2`,
+		conversationID,
+		senderRole,
+	).Scan(&count)
+	if err != nil {
+		return 0, fmt.Errorf("counting messages by sender role: %w", err)
+	}
+
+	return count, nil
+}
+
 func lockConversationByID(ctx context.Context, tx *sql.Tx, conversationID int) error {
 	var id int
 	err := tx.QueryRowContext(
