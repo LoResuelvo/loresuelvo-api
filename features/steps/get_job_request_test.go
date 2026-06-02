@@ -39,6 +39,9 @@ func (suite *testSuite) thereIsPendingJobRequestForProvider(providerEmail string
 	if err := suite.thereIsRegisteredConsumerWithEmailNameAndSurname(consumerEmail, "Consumidor", "Solicitud"); err != nil {
 		return err
 	}
+	if err := suite.thereIsRegisteredProviderWithEmailNameSurnameAndCategory(providerEmail, "Prestador", "Solicitud", "Plomería"); err != nil {
+		return err
+	}
 	if err := suite.createPendingJobRequest(consumerEmail, providerEmail); err != nil {
 		return err
 	}
@@ -64,6 +67,14 @@ func (suite *testSuite) createPendingJobRequest(consumerEmail, providerEmail str
 
 	if suite.lastStatus != http.StatusCreated && suite.lastStatus != http.StatusConflict {
 		return fmt.Errorf("could not prepare pending job request: status %d, body %s", suite.lastStatus, string(suite.lastBody))
+	}
+	if suite.lastStatus == http.StatusCreated {
+		createdJobRequest, err := suite.jobRequestCreationResponseFromLastBody()
+		if err != nil {
+			return err
+		}
+		suite.lastJobRequestID = createdJobRequest.ID
+		suite.lastConversationID = createdJobRequest.ConversationID
 	}
 
 	return nil

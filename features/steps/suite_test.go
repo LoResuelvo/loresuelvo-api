@@ -34,6 +34,7 @@ type testSuite struct {
 	lastBody                  []byte
 	currentAuth0ID            string
 	lastConversationID        int
+	lastJobRequestID          int
 	lastWorkRequestProviderID int
 
 	categoryIDsByName              map[string]int
@@ -55,6 +56,7 @@ func (s *testSuite) registerAllSteps(sc *godog.ScenarioContext) {
 	registerSendMessageSteps(sc, s)
 	registerPostJobRequestSteps(sc, s)
 	registerGetJobRequestSteps(sc, s)
+	registerAcceptJobRequestSteps(sc, s)
 }
 
 func (s *testSuite) cleanDatabase() error {
@@ -81,6 +83,7 @@ func (s *testSuite) cleanDatabase() error {
 	s.categoryIDsByName = map[string]int{}
 	s.participantRolesByFullName = map[string]string{}
 	s.lastWorkRequestProviderID = 0
+	s.lastJobRequestID = 0
 
 	return nil
 }

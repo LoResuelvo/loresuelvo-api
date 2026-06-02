@@ -18,6 +18,7 @@ Scenario: Aceptar solicitud pendiente como prestador destinatario
 
 Scenario: No permitir aceptar solicitud a otro prestador
   Given que existe una solicitud de trabajo pendiente para el prestador "prestador@example.com"
+  And existe un prestador registrado con correo "otro-prestador@example.com", nombre "Otro", apellido "Prestador" y rubro "Plomería"
   And que estoy autenticado como prestador "otro-prestador@example.com"
   When intento aceptar la solicitud de trabajo pendiente
   Then el sistema deniega la aceptación de la solicitud
