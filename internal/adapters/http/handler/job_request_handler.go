@@ -71,6 +71,22 @@ func (h *JobRequestHandler) CreateJobRequest(c *gin.Context) {
 	c.JSON(http.StatusCreated, jobRequestResponseFromDomain(*createdJobRequest))
 }
 
+func (h *JobRequestHandler) GetJobRequests(c *gin.Context) {
+	auth0ID, ok := middleware.GetUserID(c)
+	if !ok || strings.TrimSpace(auth0ID) == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "missing user id"})
+		return
+	}
+
+	jobRequests, err := h.jobRequestService.GetJobRequests(auth0ID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, jobRequests)
+}
+
 func jobRequestResponseFromDomain(createdJobRequest jobrequest.JobRequest) jobRequestResponse {
 	return jobRequestResponse{
 		ID:             createdJobRequest.ID,
