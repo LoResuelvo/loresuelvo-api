@@ -1,6 +1,9 @@
 package jobrequest
 
-import "github.com/LoResuelvo/loresuelvo-api/internal/domain/conversation"
+import (
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/conversation"
+	readmodel "github.com/LoResuelvo/loresuelvo-api/internal/domain/job_request/read_model"
+)
 
 type Service struct {
 	repository             Repository
@@ -46,7 +49,7 @@ func (s *Service) Create(consumerAuthID string, providerID int, title, descripti
 	return s.repository.SaveWithConversation(*jobRequest, *pendingConversation)
 }
 
-func (s *Service) GetJobRequests(userAuthID string) ([]JobRequest, error) {
+func (s *Service) GetJobRequests(userAuthID string) ([]readmodel.JobRequestSummary, error) {
 	return s.repository.FindByUserAuthID(userAuthID)
 }
 

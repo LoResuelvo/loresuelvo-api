@@ -61,6 +61,10 @@ components:
       $ref: ./components/schemas/create-job-request-request.yaml
     JobRequest:
       $ref: ./components/schemas/job-request.yaml
+    JobRequestSummary:
+      $ref: ./components/schemas/job-request-summary.yaml
+    JobRequestRequester:
+      $ref: ./components/schemas/job-request-requester.yaml
     SendMessageRequest:
       $ref: ./components/schemas/send-message-request.yaml
     SentMessage:

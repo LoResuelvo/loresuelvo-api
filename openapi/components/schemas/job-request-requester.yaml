@@ -1,0 +1,15 @@
+type: object
+description: Person who created the job request.
+required:
+- name
+- surname
+properties:
+  name:
+    type: string
+    description: Requester first name.
+    example: Ana
+  surname:
+    type: string
+    description: Requester surname.
+    example: Pérez
+additionalProperties: false

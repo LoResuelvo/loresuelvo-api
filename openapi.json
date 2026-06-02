@@ -1001,7 +1001,7 @@
                                 "schema": {
                                     "type": "array",
                                     "items": {
-                                        "$ref": "#/components/schemas/JobRequest"
+                                        "$ref": "#/components/schemas/JobRequestSummary"
                                     }
                                 },
                                 "examples": {
@@ -1011,7 +1011,11 @@
                                                 "id": 1,
                                                 "conversation_id": 10,
                                                 "title": "Reparación de fuga en la cocina",
-                                                "description": "Hola Ana, necesito reparar una fuga de agua en la cocina. ¿Podrías ayudarme esta semana?"
+                                                "description": "Hola Ana, necesito reparar una fuga de agua en la cocina. ¿Podrías ayudarme esta semana?",
+                                                "requester": {
+                                                    "name": "Ana",
+                                                    "surname": "Pérez"
+                                                }
                                             }
                                         ]
                                     },
@@ -1815,6 +1819,66 @@
                         "type": "string",
                         "description": "Optional job request description. Empty when omitted.",
                         "example": "Hola Ana, necesito reparar una fuga de agua en la cocina. ¿Podrías ayudarme esta semana?"
+                    }
+                },
+                "additionalProperties": false
+            },
+            "JobRequestSummary": {
+                "type": "object",
+                "description": "Pending job request item returned for the authenticated user.",
+                "required": [
+                    "id",
+                    "conversation_id",
+                    "title",
+                    "description",
+                    "requester"
+                ],
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "format": "int32",
+                        "description": "Job request identifier.",
+                        "example": 1
+                    },
+                    "conversation_id": {
+                        "type": "integer",
+                        "format": "int32",
+                        "description": "Pending conversation linked to this job request.",
+                        "example": 10
+                    },
+                    "title": {
+                        "type": "string",
+                        "description": "Job request title.",
+                        "example": "Reparación de fuga en la cocina"
+                    },
+                    "description": {
+                        "type": "string",
+                        "description": "Optional job request description. Empty when omitted.",
+                        "example": "Hola Ana, necesito reparar una fuga de agua en la cocina. ¿Podrías ayudarme esta semana?"
+                    },
+                    "requester": {
+                        "$ref": "#/components/schemas/JobRequestRequester"
+                    }
+                },
+                "additionalProperties": false
+            },
+            "JobRequestRequester": {
+                "type": "object",
+                "description": "Person who created the job request.",
+                "required": [
+                    "name",
+                    "surname"
+                ],
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "description": "Requester first name.",
+                        "example": "Ana"
+                    },
+                    "surname": {
+                        "type": "string",
+                        "description": "Requester surname.",
+                        "example": "Pérez"
                     }
                 },
                 "additionalProperties": false

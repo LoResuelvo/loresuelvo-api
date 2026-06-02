@@ -8,6 +8,7 @@ import (
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/conversation"
 	jobrequest "github.com/LoResuelvo/loresuelvo-api/internal/domain/job_request"
+	readmodel "github.com/LoResuelvo/loresuelvo-api/internal/domain/job_request/read_model"
 	"github.com/jackc/pgx/v5/pgconn"
 )
 
@@ -92,14 +93,14 @@ func (repository *JobRequestRepository) FindByConversationID(conversationID int)
 	return &foundJobRequest, nil
 }
 
-func (repository *JobRequestRepository) FindByUserAuthID(userAuthID string) ([]jobrequest.JobRequest, error) {
+func (repository *JobRequestRepository) FindByUserAuthID(userAuthID string) ([]readmodel.JobRequestSummary, error) {
 	rows, err := repository.db.Query(
 		`SELECT job_requests.id,
-			job_requests.consumer_id,
-			job_requests.provider_id,
 			job_requests.conversation_id,
 			job_requests.title,
-			job_requests.description
+			job_requests.description,
+			consumer_users.name,
+			consumer_users.surname
 		FROM job_requests
 		INNER JOIN conversations ON conversations.id = job_requests.conversation_id
 		INNER JOIN consumers ON consumers.id = job_requests.consumer_id
@@ -119,16 +120,16 @@ func (repository *JobRequestRepository) FindByUserAuthID(userAuthID string) ([]j
 		_ = rows.Close()
 	}()
 
-	jobRequests := []jobrequest.JobRequest{}
+	jobRequests := []readmodel.JobRequestSummary{}
 	for rows.Next() {
-		var foundJobRequest jobrequest.JobRequest
+		var foundJobRequest readmodel.JobRequestSummary
 		if err := rows.Scan(
 			&foundJobRequest.ID,
-			&foundJobRequest.ConsumerID,
-			&foundJobRequest.ProviderID,
 			&foundJobRequest.ConversationID,
 			&foundJobRequest.Title,
 			&foundJobRequest.Description,
+			&foundJobRequest.Requester.Name,
+			&foundJobRequest.Requester.Surname,
 		); err != nil {
 			return nil, fmt.Errorf("scanning job request by user auth id: %w", err)
 		}

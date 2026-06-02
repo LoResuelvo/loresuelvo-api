@@ -14,6 +14,10 @@ type jobRequestListItemResponse struct {
 	ConversationID int    `json:"conversation_id"`
 	Title          string `json:"title"`
 	Description    string `json:"description"`
+	Requester      struct {
+		Name    string `json:"name"`
+		Surname string `json:"surname"`
+	} `json:"requester"`
 }
 
 func registerGetJobRequestSteps(sc *godog.ScenarioContext, suite *testSuite) {
@@ -125,6 +129,9 @@ func (suite *testSuite) systemShowsPendingJobRequestListWithCount(expectedCount 
 		}
 		if jobRequest.Title == "" {
 			return fmt.Errorf("expected each job request to include title, got body %s", string(suite.lastBody))
+		}
+		if jobRequest.Requester.Name == "" || jobRequest.Requester.Surname == "" {
+			return fmt.Errorf("expected each job request to include requester name and surname, got body %s", string(suite.lastBody))
 		}
 	}
 

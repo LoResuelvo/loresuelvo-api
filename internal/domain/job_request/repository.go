@@ -1,10 +1,13 @@
 package jobrequest
 
-import "github.com/LoResuelvo/loresuelvo-api/internal/domain/conversation"
+import (
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/conversation"
+	readmodel "github.com/LoResuelvo/loresuelvo-api/internal/domain/job_request/read_model"
+)
 
 type Repository interface {
 	SaveWithConversation(jobRequest JobRequest, pendingConversation conversation.Conversation) (*JobRequest, error)
-	FindByUserAuthID(userAuthID string) ([]JobRequest, error)
+	FindByUserAuthID(userAuthID string) ([]readmodel.JobRequestSummary, error)
 }
 
 type ConsumerRepository interface {

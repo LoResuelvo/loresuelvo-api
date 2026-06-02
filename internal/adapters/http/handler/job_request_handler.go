@@ -28,6 +28,19 @@ type jobRequestResponse struct {
 	Description    string `json:"description"`
 }
 
+type jobRequestSummaryResponse struct {
+	ID             int                         `json:"id"`
+	ConversationID int                         `json:"conversation_id"`
+	Title          string                      `json:"title"`
+	Description    string                      `json:"description"`
+	Requester      jobRequestRequesterResponse `json:"requester"`
+}
+
+type jobRequestRequesterResponse struct {
+	Name    string `json:"name"`
+	Surname string `json:"surname"`
+}
+
 func NewJobRequestHandler(jobRequestService *jobrequest.Service) *JobRequestHandler {
 	return &JobRequestHandler{jobRequestService: jobRequestService}
 }
@@ -84,9 +97,18 @@ func (h *JobRequestHandler) GetJobRequests(c *gin.Context) {
 		return
 	}
 
-	formatedJobRequests := make([]jobRequestResponse, len(jobRequests))
+	formatedJobRequests := make([]jobRequestSummaryResponse, len(jobRequests))
 	for i, jobRequest := range jobRequests {
-		formatedJobRequests[i] = jobRequestResponseFromDomain(jobRequest)
+		formatedJobRequests[i] = jobRequestSummaryResponse{
+			ID:             jobRequest.ID,
+			ConversationID: jobRequest.ConversationID,
+			Title:          jobRequest.Title,
+			Description:    jobRequest.Description,
+			Requester: jobRequestRequesterResponse{
+				Name:    jobRequest.Requester.Name,
+				Surname: jobRequest.Requester.Surname,
+			},
+		}
 	}
 
 	c.JSON(http.StatusOK, formatedJobRequests)

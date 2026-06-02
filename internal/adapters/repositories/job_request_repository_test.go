@@ -197,8 +197,9 @@ func TestJobRequestRepositoryCanFindPendingRequestsByConsumerAuthID(t *testing.T
 	require.NoError(t, err)
 	require.Len(t, foundJobRequests, 1)
 	assert.Equal(t, savedJobRequest.ID, foundJobRequests[0].ID)
-	assert.Equal(t, consumerID, foundJobRequests[0].ConsumerID)
-	assert.Equal(t, providerID, foundJobRequests[0].ProviderID)
+	assert.Equal(t, savedJobRequest.ConversationID, foundJobRequests[0].ConversationID)
+	assert.Equal(t, "Ana", foundJobRequests[0].Requester.Name)
+	assert.Equal(t, "Perez", foundJobRequests[0].Requester.Surname)
 }
 
 func TestJobRequestRepositoryCanFindPendingRequestsByProviderAuthID(t *testing.T) {
@@ -219,8 +220,9 @@ func TestJobRequestRepositoryCanFindPendingRequestsByProviderAuthID(t *testing.T
 	require.NoError(t, err)
 	require.Len(t, foundJobRequests, 1)
 	assert.Equal(t, savedJobRequest.ID, foundJobRequests[0].ID)
-	assert.Equal(t, consumerID, foundJobRequests[0].ConsumerID)
-	assert.Equal(t, providerID, foundJobRequests[0].ProviderID)
+	assert.Equal(t, savedJobRequest.ConversationID, foundJobRequests[0].ConversationID)
+	assert.Equal(t, "Ana", foundJobRequests[0].Requester.Name)
+	assert.Equal(t, "Perez", foundJobRequests[0].Requester.Surname)
 }
 
 func TestJobRequestRepositoryFindByUserAuthIDReturnsOnlyPendingRequests(t *testing.T) {

@@ -6,12 +6,14 @@ import (
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/conversation"
 	jobrequest "github.com/LoResuelvo/loresuelvo-api/internal/domain/job_request"
+	readmodel "github.com/LoResuelvo/loresuelvo-api/internal/domain/job_request/read_model"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 type jobRequestRepositoryMock struct {
 	savedJobRequest   []jobrequest.JobRequest
+	foundJobRequests  []readmodel.JobRequestSummary
 	savedConversation conversation.Conversation
 	saveCalled        bool
 	err               error
@@ -30,11 +32,11 @@ func (r *jobRequestRepositoryMock) SaveWithConversation(jobRequest jobrequest.Jo
 	return &jobRequest, nil
 }
 
-func (r *jobRequestRepositoryMock) FindByUserAuthID(userAuthID string) ([]jobrequest.JobRequest, error) {
+func (r *jobRequestRepositoryMock) FindByUserAuthID(userAuthID string) ([]readmodel.JobRequestSummary, error) {
 	if r.err != nil {
 		return nil, r.err
 	}
-	return r.savedJobRequest, nil
+	return r.foundJobRequests, nil
 }
 
 type consumerRepo struct {
@@ -186,11 +188,11 @@ func TestSHouldGetListOfJobRequests(t *testing.T) {
 		&conversationRepo{},
 	)
 
-	repo.savedJobRequest = []jobrequest.JobRequest{
-		{ID: 1, ConsumerID: 10, ProviderID: 20, Title: "Reparación de fuga", Description: "Necesito ayuda esta semana"},
-		{ID: 2, ConsumerID: 10, ProviderID: 30, Title: "Instalación de grifo", Description: "¿Alguien disponible?"},
+	repo.foundJobRequests = []readmodel.JobRequestSummary{
+		{ID: 1, ConversationID: 11, Title: "Reparación de fuga", Description: "Necesito ayuda esta semana", Requester: readmodel.JobRequestRequester{Name: "Ana", Surname: "Perez"}},
+		{ID: 2, ConversationID: 12, Title: "Instalación de grifo", Description: "¿Alguien disponible?", Requester: readmodel.JobRequestRequester{Name: "Ana", Surname: "Perez"}},
 	}
-	expectedJobRequests := repo.savedJobRequest
+	expectedJobRequests := repo.foundJobRequests
 
 	jobRequests, err := service.GetJobRequests("auth0|consumer")
 
