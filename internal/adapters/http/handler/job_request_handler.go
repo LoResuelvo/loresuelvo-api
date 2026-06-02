@@ -84,7 +84,12 @@ func (h *JobRequestHandler) GetJobRequests(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, jobRequests)
+	formatedJobRequests := make([]jobRequestResponse, len(jobRequests))
+	for i, jobRequest := range jobRequests {
+		formatedJobRequests[i] = jobRequestResponseFromDomain(jobRequest)
+	}
+
+	c.JSON(http.StatusOK, formatedJobRequests)
 }
 
 func jobRequestResponseFromDomain(createdJobRequest jobrequest.JobRequest) jobRequestResponse {

@@ -1,4 +1,3 @@
-@wip
 Feature: Obtencion de solicitudes de trabajo
     Como usuario
     quiero obtener mis solicitudes pendientes
