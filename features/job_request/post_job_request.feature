@@ -1,4 +1,3 @@
-@wip
 Feature: Enviar solicitud de trabajo
     Como consumidor
     quiero enviar una solicitud de trabajo a un prestador

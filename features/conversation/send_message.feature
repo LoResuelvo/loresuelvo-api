@@ -25,7 +25,7 @@ Feature: Envío de mensaje
             """
             ¿El jueves por la mañana te queda cómodo para pasar a revisar el problema?
             """
-    @wip
+            
     Scenario: 02-EM Rechazar mensaje de prestador en una conversación pendiente
         Given que estoy autenticado como prestador "juan.plomero@example.com"
         When intento enviar un mensaje en la conversación pendiente con el consumidor "Ana Pérez":
