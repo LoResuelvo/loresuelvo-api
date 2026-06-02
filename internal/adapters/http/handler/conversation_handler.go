@@ -194,6 +194,14 @@ func (h *ConversationHandler) SendMessage(c *gin.Context) {
 		c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
 		return
 	}
+	if errors.Is(err, conversation.ErrPendingConversationRequiresAcceptance) {
+		c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
+		return
+	}
+	if errors.Is(err, conversation.ErrPendingConversationMessageLimitReached) {
+		c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
+		return
+	}
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

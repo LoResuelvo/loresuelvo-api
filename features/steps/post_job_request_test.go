@@ -252,6 +252,13 @@ func (suite *testSuite) requestJobRequest(payload any) error {
 
 	suite.lastStatus = resp.StatusCode
 	suite.lastBody = responseBody
+	if resp.StatusCode == http.StatusCreated {
+		createdJobRequest, err := suite.jobRequestCreationResponseFromLastBody()
+		if err != nil {
+			return err
+		}
+		suite.lastConversationID = createdJobRequest.ConversationID
+	}
 
 	return nil
 }
