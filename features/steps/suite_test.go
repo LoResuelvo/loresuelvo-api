@@ -54,6 +54,7 @@ func (s *testSuite) registerAllSteps(sc *godog.ScenarioContext) {
 	registerGetConversationsSteps(sc, s)
 	registerSendMessageSteps(sc, s)
 	registerPostJobRequestSteps(sc, s)
+	registerGetJobRequestSteps(sc, s)
 }
 
 func (s *testSuite) cleanDatabase() error {
