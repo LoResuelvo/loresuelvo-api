@@ -33,18 +33,18 @@ func TestNewPendingConversationRejectsMissingProviderID(t *testing.T) {
 }
 
 func TestCanActivateAConversation(t *testing.T) {
-	pendingConversation, err := conversation.NewPendingConversation(10, 20)
-	err = pendingConversation.Activate()
+	pendingConversation, _ := conversation.NewPendingConversation(10, 20)
+	err := pendingConversation.Activate()
 	require.NoError(t, err)
 	assert.Equal(t, conversation.StatusActive, pendingConversation.Status)
 }
 
 func TestCannotActivateNonPendingConversation(t *testing.T) {
-	pendingConversation, err := conversation.NewPendingConversation(10, 20)
-	err = pendingConversation.Activate()
-	require.NoError(t, err)
+	pendingConversation, _ := conversation.NewPendingConversation(10, 20)
+	_ = pendingConversation.Activate()
 
-	err = pendingConversation.Activate()
+	err := pendingConversation.Activate()
+
 	assert.ErrorIs(t, err, conversation.ErrOnlyPendingConversationCanBeActivated)
 	assert.Equal(t, conversation.StatusActive, pendingConversation.Status)
 }

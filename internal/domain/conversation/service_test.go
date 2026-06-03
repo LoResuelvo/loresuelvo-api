@@ -23,10 +23,8 @@ type conversationRepositoryMock struct {
 	saveCalled        bool
 	addMessageCalled  bool
 	findByIDCalled    bool
-	saveStatusCalled  bool
 	countCalled       bool
 	foundResult       *conversation.Conversation
-	savedStatus       conversation.Conversation
 	countResult       int
 	err               error
 }
@@ -66,15 +64,6 @@ func (r *conversationRepositoryMock) FindByID(ctx context.Context, conversationI
 	}
 	return nil, conversation.ErrConversationDoesNotExist
 }
-
-// func (r *conversationRepositoryMock) SaveStatus(ctx context.Context, conversation conversation.Conversation) error {
-// 	r.saveStatusCalled = true
-// 	r.savedStatus = conversation
-// 	if r.err != nil {
-// 		return r.err
-// 	}
-// 	return nil
-// }
 
 func (r *conversationRepositoryMock) AddMessage(ctx context.Context, conversationID int, m conversation.Message) (*conversation.Message, error) {
 	r.addMessageCalled = true
