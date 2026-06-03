@@ -1,4 +1,3 @@
-@wip 
 Feature: 46 Aceptar solicitud de trabajo
 
 Como prestador
