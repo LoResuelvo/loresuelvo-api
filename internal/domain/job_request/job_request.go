@@ -31,3 +31,7 @@ func New(consumerID, providerID int, title, description string) (*JobRequest, er
 		Description: strings.TrimSpace(description),
 	}, nil
 }
+
+func (jobRequest JobRequest) CanBeAcceptedBy(providerID int) bool {
+	return jobRequest.ProviderID == providerID
+}
