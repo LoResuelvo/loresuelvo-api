@@ -93,6 +93,10 @@ func (repository *JobRequestRepository) FindByConversationID(conversationID int)
 	return &foundJobRequest, nil
 }
 
+func (repository *JobRequestRepository) FindByID(id int) (*jobrequest.JobRequest, error) {
+	return nil, fmt.Errorf("finding job request by id is not implemented")
+}
+
 func (repository *JobRequestRepository) FindByUserAuthID(userAuthID string) ([]readmodel.JobRequestSummary, error) {
 	rows, err := repository.db.Query(
 		`SELECT job_requests.id,

@@ -1,6 +1,8 @@
 package jobrequest
 
 import (
+	"context"
+
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/conversation"
 	readmodel "github.com/LoResuelvo/loresuelvo-api/internal/domain/job_request/read_model"
 )
@@ -51,6 +53,37 @@ func (s *Service) Create(consumerAuthID string, providerID int, title, descripti
 
 func (s *Service) GetJobRequests(userAuthID string) ([]readmodel.JobRequestSummary, error) {
 	return s.repository.FindByUserAuthID(userAuthID)
+}
+
+func (s *Service) Accept(ctx context.Context, providerAuthID string, jobRequestID int) (*JobRequest, error) {
+	jobRequest, err := s.repository.FindByID(jobRequestID)
+	if err != nil {
+		return nil, err
+	}
+
+	providerID, err := s.providerRepository.FindIDByAuthID(providerAuthID)
+	if err != nil {
+		return nil, ErrOnlyAssignedProviderCanAcceptJobRequest
+	}
+
+	if !jobRequest.CanBeAcceptedBy(providerID) {
+		return nil, ErrOnlyAssignedProviderCanAcceptJobRequest
+	}
+
+	linkedConversation, err := s.conversationRepository.FindByID(ctx, jobRequest.ConversationID)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := linkedConversation.Activate(); err != nil {
+		return nil, err
+	}
+
+	if err := s.conversationRepository.SaveStatus(ctx, *linkedConversation); err != nil {
+		return nil, err
+	}
+
+	return jobRequest, nil
 }
 
 func (s *Service) consumerIDForJobRequest(consumerAuthID string) (int, error) {

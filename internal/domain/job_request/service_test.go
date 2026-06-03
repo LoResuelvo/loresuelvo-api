@@ -1,6 +1,7 @@
 package jobrequest_test
 
 import (
+	"context"
 	"errors"
 	"testing"
 
@@ -14,8 +15,10 @@ import (
 type jobRequestRepositoryMock struct {
 	savedJobRequest   []jobrequest.JobRequest
 	foundJobRequests  []readmodel.JobRequestSummary
+	foundJobRequest   *jobrequest.JobRequest
 	savedConversation conversation.Conversation
 	saveCalled        bool
+	findByIDCalled    bool
 	err               error
 }
 
@@ -39,6 +42,17 @@ func (r *jobRequestRepositoryMock) FindByUserAuthID(userAuthID string) ([]readmo
 	return r.foundJobRequests, nil
 }
 
+func (r *jobRequestRepositoryMock) FindByID(id int) (*jobrequest.JobRequest, error) {
+	r.findByIDCalled = true
+	if r.err != nil {
+		return nil, r.err
+	}
+	if r.foundJobRequest != nil {
+		return r.foundJobRequest, nil
+	}
+	return nil, jobrequest.ErrJobRequestNotFound
+}
+
 type consumerRepo struct {
 	consumerID int
 	err        error
@@ -52,8 +66,9 @@ func (m *consumerRepo) FindIDByAuthID(authID string) (int, error) {
 }
 
 type providerRepo struct {
-	exists bool
-	err    error
+	exists     bool
+	providerID int
+	err        error
 }
 
 func (m *providerRepo) ExistsByID(id int) (bool, error) {
@@ -63,9 +78,20 @@ func (m *providerRepo) ExistsByID(id int) (bool, error) {
 	return m.exists, nil
 }
 
+func (m *providerRepo) FindIDByAuthID(authID string) (int, error) {
+	if m.err != nil {
+		return 0, m.err
+	}
+	return m.providerID, nil
+}
+
 type conversationRepo struct {
-	exists bool
-	err    error
+	exists            bool
+	foundConversation *conversation.Conversation
+	savedConversation conversation.Conversation
+	findByIDCalled    bool
+	saveStatusCalled  bool
+	err               error
 }
 
 func (m *conversationRepo) ExistsBetween(consumerID, providerID int) (bool, error) {
@@ -73,6 +99,26 @@ func (m *conversationRepo) ExistsBetween(consumerID, providerID int) (bool, erro
 		return false, m.err
 	}
 	return m.exists, nil
+}
+
+func (m *conversationRepo) FindByID(ctx context.Context, conversationID int) (*conversation.Conversation, error) {
+	m.findByIDCalled = true
+	if m.err != nil {
+		return nil, m.err
+	}
+	if m.foundConversation != nil {
+		return m.foundConversation, nil
+	}
+	return nil, conversation.ErrConversationDoesNotExist
+}
+
+func (m *conversationRepo) SaveStatus(ctx context.Context, conversation conversation.Conversation) error {
+	m.saveStatusCalled = true
+	m.savedConversation = conversation
+	if m.err != nil {
+		return m.err
+	}
+	return nil
 }
 
 func TestCreateJobRequestSavesRequestWithPendingConversation(t *testing.T) {
@@ -198,4 +244,87 @@ func TestSHouldGetListOfJobRequests(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.Equal(t, expectedJobRequests, jobRequests)
+}
+
+func TestAcceptJobRequestActivatesLinkedConversationForAssignedProvider(t *testing.T) {
+	repo := &jobRequestRepositoryMock{
+		foundJobRequest: &jobrequest.JobRequest{
+			ID:             1,
+			ConsumerID:     10,
+			ProviderID:     20,
+			ConversationID: 30,
+			Title:          "Reparación de fuga",
+			Description:    "Necesito ayuda esta semana",
+		},
+	}
+	conversationRepo := &conversationRepo{
+		foundConversation: &conversation.Conversation{
+			ID:         30,
+			ConsumerID: 10,
+			ProviderID: 20,
+			Status:     conversation.StatusPending,
+		},
+	}
+	service := jobrequest.NewService(
+		repo,
+		&consumerRepo{},
+		&providerRepo{providerID: 20},
+		conversationRepo,
+	)
+
+	acceptedJobRequest, err := service.Accept(context.Background(), "auth0|provider", 1)
+
+	require.NoError(t, err)
+	require.NotNil(t, acceptedJobRequest)
+	assert.Equal(t, 1, acceptedJobRequest.ID)
+	assert.True(t, repo.findByIDCalled)
+	assert.True(t, conversationRepo.findByIDCalled)
+	assert.True(t, conversationRepo.saveStatusCalled)
+	assert.Equal(t, conversation.StatusActive, conversationRepo.savedConversation.Status)
+}
+
+func TestAcceptJobRequestRejectsProviderThatIsNotAssigned(t *testing.T) {
+	repo := &jobRequestRepositoryMock{
+		foundJobRequest: &jobrequest.JobRequest{
+			ID:             1,
+			ConsumerID:     10,
+			ProviderID:     20,
+			ConversationID: 30,
+			Title:          "Reparación de fuga",
+		},
+	}
+	conversationRepo := &conversationRepo{}
+	service := jobrequest.NewService(
+		repo,
+		&consumerRepo{},
+		&providerRepo{providerID: 99},
+		conversationRepo,
+	)
+
+	acceptedJobRequest, err := service.Accept(context.Background(), "auth0|other-provider", 1)
+
+	assert.ErrorIs(t, err, jobrequest.ErrOnlyAssignedProviderCanAcceptJobRequest)
+	assert.Nil(t, acceptedJobRequest)
+	assert.True(t, repo.findByIDCalled)
+	assert.False(t, conversationRepo.findByIDCalled)
+	assert.False(t, conversationRepo.saveStatusCalled)
+}
+
+func TestAcceptJobRequestReturnsNotFoundWhenRequestDoesNotExist(t *testing.T) {
+	repo := &jobRequestRepositoryMock{err: jobrequest.ErrJobRequestNotFound}
+	conversationRepo := &conversationRepo{}
+	service := jobrequest.NewService(
+		repo,
+		&consumerRepo{},
+		&providerRepo{providerID: 20},
+		conversationRepo,
+	)
+
+	acceptedJobRequest, err := service.Accept(context.Background(), "auth0|provider", 999)
+
+	assert.ErrorIs(t, err, jobrequest.ErrJobRequestNotFound)
+	assert.Nil(t, acceptedJobRequest)
+	assert.True(t, repo.findByIDCalled)
+	assert.False(t, conversationRepo.findByIDCalled)
+	assert.False(t, conversationRepo.saveStatusCalled)
 }

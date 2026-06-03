@@ -225,6 +225,10 @@ func (repository *ConversationRepository) FindByID(ctx context.Context, conversa
 	return &foundConversation, nil
 }
 
+func (repository *ConversationRepository) SaveStatus(ctx context.Context, conversationToSave conversation.Conversation) error {
+	return fmt.Errorf("saving conversation status is not implemented")
+}
+
 func rollbackConversationTx(tx *sql.Tx, originalErr error) error {
 	if rollbackErr := tx.Rollback(); rollbackErr != nil {
 		return fmt.Errorf("%w; additionally could not rollback conversation transaction: %v", originalErr, rollbackErr)
