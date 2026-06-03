@@ -94,7 +94,29 @@ func (repository *JobRequestRepository) FindByConversationID(conversationID int)
 }
 
 func (repository *JobRequestRepository) FindByID(id int) (*jobrequest.JobRequest, error) {
-	return nil, fmt.Errorf("finding job request by id is not implemented")
+	var foundJobRequest jobrequest.JobRequest
+	err := repository.db.QueryRow(
+		`SELECT id, consumer_id, provider_id, conversation_id, title, description
+		FROM job_requests
+		WHERE id = $1`,
+		id,
+	).Scan(
+		&foundJobRequest.ID,
+		&foundJobRequest.ConsumerID,
+		&foundJobRequest.ProviderID,
+		&foundJobRequest.ConversationID,
+		&foundJobRequest.Title,
+		&foundJobRequest.Description,
+	)
+
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, jobrequest.ErrJobRequestNotFound
+		}
+		return nil, fmt.Errorf("finding job request by id: %w", err)
+	}
+
+	return &foundJobRequest, nil
 }
 
 func (repository *JobRequestRepository) FindByUserAuthID(userAuthID string) ([]readmodel.JobRequestSummary, error) {

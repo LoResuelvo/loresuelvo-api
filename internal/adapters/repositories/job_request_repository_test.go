@@ -179,6 +179,35 @@ func TestJobRequestRepositoryCanFindByConversationID(t *testing.T) {
 	assert.Equal(t, requestToSave.Description, foundJobRequest.Description)
 }
 
+func TestJobRequestRepositoryCanFindByID(t *testing.T) {
+	testContext := newJobRequestRepositoryTest(t)
+	consumerID, providerID := savedJobRequestParticipants(t, testContext)
+	requestToSave := validJobRequest(t, consumerID, providerID)
+	pendingConversation := conversationForJobRequest(t, consumerID, providerID)
+	savedJobRequest, err := testContext.jobRequestRepository.SaveWithConversation(requestToSave, pendingConversation)
+	require.NoError(t, err)
+
+	foundJobRequest, err := testContext.jobRequestRepository.FindByID(savedJobRequest.ID)
+
+	require.NoError(t, err)
+	require.NotNil(t, foundJobRequest)
+	assert.Equal(t, savedJobRequest.ID, foundJobRequest.ID)
+	assert.Equal(t, consumerID, foundJobRequest.ConsumerID)
+	assert.Equal(t, providerID, foundJobRequest.ProviderID)
+	assert.Equal(t, savedJobRequest.ConversationID, foundJobRequest.ConversationID)
+	assert.Equal(t, requestToSave.Title, foundJobRequest.Title)
+	assert.Equal(t, requestToSave.Description, foundJobRequest.Description)
+}
+
+func TestJobRequestRepositoryFindByIDReturnsNotFoundIfRequestDoesNotExist(t *testing.T) {
+	testContext := newJobRequestRepositoryTest(t)
+
+	foundJobRequest, err := testContext.jobRequestRepository.FindByID(999999999)
+
+	assert.ErrorIs(t, err, jobrequest.ErrJobRequestNotFound)
+	assert.Nil(t, foundJobRequest)
+}
+
 func TestJobRequestRepositoryCanFindPendingRequestsByConsumerAuthID(t *testing.T) {
 	testContext := newJobRequestRepositoryTest(t)
 	consumerID := savedConsumerIDWithData(t, testContext, "auth0|job-request-consumer-owner", "job.request.consumer.owner@example.com", "Ana", "Perez")
