@@ -6,6 +6,8 @@ import (
 
 const StatusPending = "pending"
 
+const StatusActive = "active"
+
 const PendingConsumerMessageLimit = 5
 
 type Conversation struct {
@@ -31,4 +33,13 @@ func NewPendingConversation(consumerID, providerID int) (*Conversation, error) {
 		ProviderID: providerID,
 		Status:     StatusPending,
 	}, nil
+}
+
+func (conversation *Conversation) Activate() error {
+	if conversation.Status != StatusPending {
+		return ErrOnlyPendingConversationCanBeActivated
+	}
+
+	conversation.Status = StatusActive
+	return nil
 }

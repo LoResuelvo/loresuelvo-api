@@ -31,3 +31,20 @@ func TestNewPendingConversationRejectsMissingProviderID(t *testing.T) {
 	assert.ErrorIs(t, err, conversation.ErrProviderRequired)
 	assert.Nil(t, pendingConversation)
 }
+
+func TestCanActivateAConversation(t *testing.T) {
+	pendingConversation, err := conversation.NewPendingConversation(10, 20)
+	err = pendingConversation.Activate()
+	require.NoError(t, err)
+	assert.Equal(t, conversation.StatusActive, pendingConversation.Status)
+}
+
+func TestCannotActivateNonPendingConversation(t *testing.T) {
+	pendingConversation, err := conversation.NewPendingConversation(10, 20)
+	err = pendingConversation.Activate()
+	require.NoError(t, err)
+
+	err = pendingConversation.Activate()
+	assert.ErrorIs(t, err, conversation.ErrOnlyPendingConversationCanBeActivated)
+	assert.Equal(t, conversation.StatusActive, pendingConversation.Status)
+}
