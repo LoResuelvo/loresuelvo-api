@@ -4,9 +4,11 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/middleware"
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/conversation"
 	jobrequest "github.com/LoResuelvo/loresuelvo-api/internal/domain/job_request"
 	"github.com/gin-gonic/gin"
 )
@@ -112,6 +114,49 @@ func (h *JobRequestHandler) GetJobRequests(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, formatedJobRequests)
+}
+
+func (h *JobRequestHandler) AcceptJobRequest(c *gin.Context) {
+	auth0ID, ok := middleware.GetUserID(c)
+	if !ok || strings.TrimSpace(auth0ID) == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "missing user id"})
+		return
+	}
+
+	jobRequestID, err := jobRequestIDFromPath(c.Param("jobRequestID"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	acceptedJobRequest, err := h.jobRequestService.Accept(c.Request.Context(), auth0ID, jobRequestID)
+	if errors.Is(err, jobrequest.ErrJobRequestNotFound) || errors.Is(err, conversation.ErrConversationDoesNotExist) {
+		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		return
+	}
+	if errors.Is(err, jobrequest.ErrOnlyAssignedProviderCanAcceptJobRequest) {
+		c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
+		return
+	}
+	if errors.Is(err, conversation.ErrOnlyPendingConversationCanBeActivated) {
+		c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
+		return
+	}
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, jobRequestResponseFromDomain(*acceptedJobRequest))
+}
+
+func jobRequestIDFromPath(value string) (int, error) {
+	jobRequestID, err := strconv.Atoi(value)
+	if err != nil || jobRequestID <= 0 {
+		return 0, fmt.Errorf("job request id must be a positive integer")
+	}
+
+	return jobRequestID, nil
 }
 
 func jobRequestResponseFromDomain(createdJobRequest jobrequest.JobRequest) jobRequestResponse {

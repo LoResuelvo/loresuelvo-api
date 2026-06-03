@@ -82,6 +82,7 @@ func (router *Router) registerProviderRoutes(engine *gin.Engine, authMiddleware 
 func (router *Router) registerJobRequestRoutes(engine *gin.Engine, authMiddleware gin.HandlerFunc) {
 	engine.POST("/job-requests", authMiddleware, router.jobRequestHandler.CreateJobRequest)
 	engine.GET("/job-requests", authMiddleware, router.jobRequestHandler.GetJobRequests)
+	engine.POST("/job-requests/:jobRequestID/accept", authMiddleware, router.jobRequestHandler.AcceptJobRequest)
 }
 
 func (router *Router) registerConversationRoutes(engine *gin.Engine, authMiddleware gin.HandlerFunc) {
