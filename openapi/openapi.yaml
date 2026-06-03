@@ -39,6 +39,8 @@ paths:
     $ref: ./paths/conversations.yaml
   /job-requests:
     $ref: ./paths/job-requests.yaml
+  /job-requests/{jobRequestID}/accept:
+    $ref: ./paths/job-request-accept.yaml
   /conversations/{conversationId}:
     $ref: ./paths/conversation-by-id.yaml
   /conversations/{conversationId}/messages:

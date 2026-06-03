@@ -1,0 +1,86 @@
+post:
+  tags:
+  - JobRequests
+  operationId: acceptJobRequest
+  summary: Accept a job request
+  description: Accepts the specified job request as the assigned provider and activates the linked conversation.
+  security:
+  - BearerAuth: []
+  parameters:
+  - name: jobRequestID
+    in: path
+    required: true
+    description: Identifier of the job request to accept.
+    schema:
+      type: integer
+      format: int32
+      minimum: 1
+  responses:
+    '200':
+      description: Job request accepted successfully.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/JobRequest'
+          examples:
+            accepted:
+              value:
+                id: 1
+                conversation_id: 10
+                title: Reparación de fuga en la cocina
+                description: Hola Ana, necesito reparar una fuga de agua en la cocina. ¿Podrías ayudarme esta semana?
+    '400':
+      description: The job request id path parameter is not a positive integer.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            invalidJobRequestID:
+              value:
+                error: job request id must be a positive integer
+    '401':
+      description: Authentication failed or the authenticated user id could not be obtained from the request context.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/AuthErrorResponse'
+    '403':
+      description: The authenticated provider is not the assignee of the job request.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            onlyAssignedProvider:
+              value:
+                error: Only the assigned provider can accept job requests
+    '404':
+      description: No job request or linked conversation exists with the requested id.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            requestNotFound:
+              value:
+                error: Job request not found
+            conversationNotFound:
+              value:
+                error: Conversation does not exist
+    '409':
+      description: The linked conversation is no longer pending and cannot be accepted again.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            conversationNotPending:
+              value:
+                error: Only pending conversations can be activated
+    '500':
+      description: Unexpected error while accepting the job request.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
