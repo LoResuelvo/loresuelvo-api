@@ -36,6 +36,7 @@ type testSuite struct {
 	lastConversationID        int
 	lastJobRequestID          int
 	lastWorkRequestProviderID int
+	realtimeConnections       map[string]*realtimeTestConnection
 
 	categoryIDsByName              map[string]int
 	lastProviderFilterCategoryName string
@@ -57,9 +58,12 @@ func (s *testSuite) registerAllSteps(sc *godog.ScenarioContext) {
 	registerPostJobRequestSteps(sc, s)
 	registerGetJobRequestSteps(sc, s)
 	registerAcceptJobRequestSteps(sc, s)
+	registerRealtimeMessageSteps(sc, s)
 }
 
 func (s *testSuite) cleanDatabase() error {
+	s.closeRealtimeConnections()
+
 	if err := s.messageRepository.DeleteAll(); err != nil {
 		return fmt.Errorf("could not clean messages: %w", err)
 	}
@@ -82,6 +86,7 @@ func (s *testSuite) cleanDatabase() error {
 
 	s.categoryIDsByName = map[string]int{}
 	s.participantRolesByFullName = map[string]string{}
+	s.realtimeConnections = map[string]*realtimeTestConnection{}
 	s.lastWorkRequestProviderID = 0
 	s.lastJobRequestID = 0
 
@@ -126,6 +131,7 @@ func newTestSuite(tb testing.TB, database *sql.DB) *testSuite {
 
 		categoryIDsByName:          map[string]int{},
 		participantRolesByFullName: map[string]string{},
+		realtimeConnections:        map[string]*realtimeTestConnection{},
 	}
 }
 
