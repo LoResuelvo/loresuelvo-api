@@ -226,7 +226,28 @@ func (repository *ConversationRepository) FindByID(ctx context.Context, conversa
 }
 
 func (repository *ConversationRepository) SaveStatus(ctx context.Context, conversationToSave conversation.Conversation) error {
-	return fmt.Errorf("saving conversation status is not implemented")
+	result, err := repository.db.ExecContext(
+		ctx,
+		`UPDATE conversations
+		SET status = $2, updated_on = NOW()
+		WHERE id = $1`,
+		conversationToSave.ID,
+		conversationToSave.Status,
+	)
+
+	if err != nil {
+		return fmt.Errorf("updating conversation status: %w", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("checking updated conversation rows: %w", err)
+	}
+	if rowsAffected == 0 {
+		return conversation.ErrConversationDoesNotExist
+	}
+
+	return nil
 }
 
 func rollbackConversationTx(tx *sql.Tx, originalErr error) error {
