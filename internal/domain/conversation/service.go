@@ -30,6 +30,7 @@ func NewService(
 	}
 }
 
+// TODO: Eliminar método
 func (s *Service) StartWorkRequest(consumerAuthID string, providerID int, content string) (*Conversation, error) {
 	consumerID, err := s.consumerIDForWorkRequest(consumerAuthID)
 	if err != nil {

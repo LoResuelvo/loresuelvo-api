@@ -239,7 +239,6 @@ func (connection *realtimeTestConnection) readMessageEvent(timeout time.Duration
 	if err := connection.conn.SetReadDeadline(time.Now().Add(timeout)); err != nil {
 		return realtimeMessageEvent{}, err
 	}
-	defer connection.conn.SetReadDeadline(time.Time{})
 
 	payload, err := connection.readTextFrame()
 	if err != nil {
@@ -251,6 +250,7 @@ func (connection *realtimeTestConnection) readMessageEvent(timeout time.Duration
 		return realtimeMessageEvent{}, fmt.Errorf("realtime message is not valid JSON: %w", err)
 	}
 
+	_ = connection.conn.SetReadDeadline(time.Time{})
 	return event, nil
 }
 

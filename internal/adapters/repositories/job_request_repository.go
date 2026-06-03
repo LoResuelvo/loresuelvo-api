@@ -20,6 +20,7 @@ func NewJobRequestRepository(db *sql.DB) *JobRequestRepository {
 	return &JobRequestRepository{db: db}
 }
 
+// TODO: reemplazar inserción de Conversación y remover ids de consumer y provider de JobRequest para tener como fuente de verdad a Conversation
 func (repository *JobRequestRepository) SaveWithConversation(jobRequest jobrequest.JobRequest, pendingConversation conversation.Conversation) (*jobrequest.JobRequest, error) {
 	ctx := context.Background()
 	tx, err := repository.db.BeginTx(ctx, nil)
