@@ -77,15 +77,15 @@ func (suite *testSuite) sendMessageInChatWithConsumer(consumerFullName string, m
 }
 
 func (suite *testSuite) consumerIsAvailableForRealtimeMessages(email string) error {
-	return suite.participantIsAvailableForRealtimeMessages(email, auth0IDForConsumerEmail(email))
+	return suite.participantIsAvailableForRealtimeMessages(email, auth0IDForConsumerEmail(email), "consumer")
 }
 
 func (suite *testSuite) providerIsAvailableForRealtimeMessages(email string) error {
-	return suite.participantIsAvailableForRealtimeMessages(email, auth0IDForProviderEmail(email))
+	return suite.participantIsAvailableForRealtimeMessages(email, auth0IDForProviderEmail(email), "provider")
 }
 
-func (suite *testSuite) participantIsAvailableForRealtimeMessages(email, auth0ID string) error {
-	connection, err := suite.openRealtimeConnection(auth0ID)
+func (suite *testSuite) participantIsAvailableForRealtimeMessages(email, auth0ID, role string) error {
+	connection, err := suite.openRealtimeConnection(auth0ID, role)
 	if err != nil {
 		return err
 	}
@@ -171,10 +171,30 @@ func (suite *testSuite) realtimeConnectionForEmail(email string) (*realtimeTestC
 	return connection, nil
 }
 
-func (suite *testSuite) openRealtimeConnection(auth0ID string) (*realtimeTestConnection, error) {
+func (suite *testSuite) openRealtimeConnection(auth0ID, role string) (*realtimeTestConnection, error) {
 	serverURL, err := url.Parse(suite.server.URL)
 	if err != nil {
 		return nil, err
+	}
+
+	req, err := http.NewRequest("POST", suite.server.URL+"/ws-tickets", nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Authorization", "Bearer "+suite.tokenBuilder.BuildToken(auth0ID, nil))
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("requesting ticket: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("expected 200 for ticket, got %d", resp.StatusCode)
+	}
+	var ticketPayload struct {
+		Ticket string `json:"ticket"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&ticketPayload); err != nil {
+		return nil, fmt.Errorf("decoding ticket: %w", err)
 	}
 
 	conn, err := net.Dial("tcp", serverURL.Host)
@@ -188,14 +208,15 @@ func (suite *testSuite) openRealtimeConnection(auth0ID string) (*realtimeTestCon
 		return nil, err
 	}
 
+	requestPath := fmt.Sprintf("/ws?ticket=%s&role=%s", ticketPayload.Ticket, role)
+
 	request := strings.Join([]string{
-		"GET /ws HTTP/1.1",
+		"GET " + requestPath + " HTTP/1.1",
 		"Host: " + serverURL.Host,
 		"Upgrade: websocket",
 		"Connection: Upgrade",
 		"Sec-WebSocket-Key: " + key,
 		"Sec-WebSocket-Version: 13",
-		"Authorization: Bearer " + suite.tokenBuilder.BuildToken(auth0ID, nil),
 		"",
 		"",
 	}, "\r\n")

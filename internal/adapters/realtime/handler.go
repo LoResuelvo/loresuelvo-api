@@ -1,6 +1,7 @@
 package realtime
 
 import (
+	"errors"
 	"net/http"
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/middleware"
@@ -10,25 +11,55 @@ import (
 )
 
 type Handler struct {
-	hub                *Hub
-	consumerIDFinder   conversation.ConsumerIDFinder
-	providerIDFinder   conversation.ProviderIDFinder
+	hub              *Hub
+	consumerIDFinder conversation.ConsumerIDFinder
+	providerIDFinder conversation.ProviderIDFinder
+	ticketStore      *TicketStore
 }
 
-func NewHandler(hub *Hub, consumerIDFinder conversation.ConsumerIDFinder, providerIDFinder conversation.ProviderIDFinder) *Handler {
+func NewHandler(hub *Hub, consumerIDFinder conversation.ConsumerIDFinder, providerIDFinder conversation.ProviderIDFinder, ticketStore *TicketStore) *Handler {
 	return &Handler{
-		hub:                hub,
-		consumerIDFinder:   consumerIDFinder,
-		providerIDFinder:   providerIDFinder,
+		hub:              hub,
+		consumerIDFinder: consumerIDFinder,
+		providerIDFinder: providerIDFinder,
+		ticketStore:      ticketStore,
 	}
 }
 
-// Handle upgrades an HTTP connection to WebSocket after auth middleware has validated the JWT.
-// It expects auth middleware to have already set userID in context.
-func (h *Handler) Handle(c *gin.Context) {
+func (h *Handler) IssueTicket(c *gin.Context) {
 	auth0ID, ok := middleware.GetUserID(c)
 	if !ok || auth0ID == "" {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "missing user id"})
+		return
+	}
+
+	ticket, err := h.ticketStore.Issue(auth0ID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to issue ticket"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"ticket": ticket})
+}
+
+// Handle upgrades an HTTP connection to WebSocket.
+// It expects a valid one-time ticket in the query parameter.
+func (h *Handler) Handle(c *gin.Context) {
+	ticket := c.Query("ticket")
+	if ticket == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "missing ticket query parameter"})
+		return
+	}
+
+	auth0ID, valid := h.ticketStore.Consume(ticket)
+	if !valid || auth0ID == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid or expired ticket"})
+		return
+	}
+
+	role := c.Query("role")
+	if role != "consumer" && role != "provider" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "missing or invalid role query parameter"})
 		return
 	}
 
@@ -38,7 +69,7 @@ func (h *Handler) Handle(c *gin.Context) {
 		return
 	}
 
-	role, profileID, err := h.resolveParticipant(auth0ID)
+	profileID, err := h.resolveParticipantForRole(auth0ID, role)
 	if err != nil {
 		_ = conn.Close()
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "failed to resolve user role"})
@@ -56,14 +87,13 @@ func (h *Handler) upgrade(w http.ResponseWriter, r *http.Request) (*websocket.Co
 	return upgrader.Upgrade(w, r, nil)
 }
 
-func (h *Handler) resolveParticipant(auth0ID string) (role string, profileID int, err error) {
-	if profileID, err = h.consumerIDFinder.FindIDByAuthID(auth0ID); err == nil {
-		return conversation.SenderConsumer, profileID, nil
+func (h *Handler) resolveParticipantForRole(auth0ID, role string) (profileID int, err error) {
+	switch role {
+	case conversation.SenderConsumer:
+		return h.consumerIDFinder.FindIDByAuthID(auth0ID)
+	case conversation.SenderProvider:
+		return h.providerIDFinder.FindIDByAuthID(auth0ID)
+	default:
+		return 0, errors.New("unsupported participant role")
 	}
-
-	if profileID, err = h.providerIDFinder.FindIDByAuthID(auth0ID); err == nil {
-		return conversation.SenderProvider, profileID, nil
-	}
-
-	return "", 0, err
 }

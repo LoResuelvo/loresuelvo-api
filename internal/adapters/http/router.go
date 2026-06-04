@@ -101,5 +101,6 @@ func (router *Router) registerAuthenticatedRoutes(engine *gin.Engine, authMiddle
 }
 
 func (router *Router) registerRealtimeRoutes(engine *gin.Engine, authMiddleware gin.HandlerFunc) {
-	engine.GET("/ws", authMiddleware, router.realtimeHandler.Handle)
+	engine.POST("/ws-tickets", authMiddleware, router.realtimeHandler.IssueTicket)
+	engine.GET("/ws", router.realtimeHandler.Handle)
 }

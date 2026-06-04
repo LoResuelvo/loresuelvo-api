@@ -52,8 +52,10 @@ func NewDependencies(database *sql.DB) *Dependencies {
 	ctx, cancel := context.WithCancel(context.Background())
 	go hub.Run(ctx)
 
+	ticketStore := realtime.NewTicketStore()
+
 	messagePublisher := realtime.NewPublisher(hub, consumerRepository, providerRepository)
-	realtimeHandler := realtime.NewHandler(hub, consumerRepository, providerRepository)
+	realtimeHandler := realtime.NewHandler(hub, consumerRepository, providerRepository, ticketStore)
 
 	categoryService := category.NewService(categoryRepository)
 	providerService := provider.NewService(providerRepository, categoryRepository)
