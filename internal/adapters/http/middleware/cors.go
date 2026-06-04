@@ -20,7 +20,7 @@ func NewCORSConfigFromEnv() CORSConfig {
 	return CORSConfig{
 		AllowedOrigins: splitCommaSeparated(os.Getenv(corsAllowedOriginsEnv)),
 		AllowedMethods: []string{http.MethodGet, http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete, http.MethodOptions},
-		AllowedHeaders: []string{"Authorization", "Content-Type"},
+		AllowedHeaders: []string{"Authorization", "Content-Type", "Upgrade", "Connection"},
 	}
 }
 

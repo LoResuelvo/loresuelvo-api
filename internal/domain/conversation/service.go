@@ -12,6 +12,7 @@ type Service struct {
 	providerExistenceChecker ProviderExistenceChecker
 	providerIDFinder         ProviderIDFinder
 	conversationReader       Reader
+	messagePublisher         MessagePublisher
 }
 
 func NewService(
@@ -20,6 +21,7 @@ func NewService(
 	providerExistenceChecker ProviderExistenceChecker,
 	providerIDFinder ProviderIDFinder,
 	conversationReader Reader,
+	messagePublisher MessagePublisher,
 ) *Service {
 	return &Service{
 		conversationRepository:   conversationRepository,
@@ -27,6 +29,7 @@ func NewService(
 		providerExistenceChecker: providerExistenceChecker,
 		providerIDFinder:         providerIDFinder,
 		conversationReader:       conversationReader,
+		messagePublisher:         messagePublisher,
 	}
 }
 
@@ -84,7 +87,14 @@ func (s *Service) SendMessage(ctx context.Context, authID string, conversationID
 		return nil, err
 	}
 
-	return s.conversationRepository.AddMessage(ctx, conversationID, *message)
+	sentMessage, err := s.conversationRepository.AddMessage(ctx, conversationID, *message)
+	if err != nil {
+		return nil, err
+	}
+
+	s.messagePublisher.PublishMessage(ctx, *foundConversation, authID, *sentMessage)
+
+	return sentMessage, nil
 }
 
 func (s *Service) List(ctx context.Context, authID string) ([]readmodel.ConversationSummary, error) {

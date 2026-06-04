@@ -1,5 +1,5 @@
 {
-    "openapi": "3.0.3",
+    "openapi": "3.1.0",
     "info": {
         "title": "LoResuelvo API",
         "description": "OpenAPI documentation for the LoResuelvo HTTP API as implemented by the current Gin routes.",
@@ -43,9 +43,12 @@
         {
             "name": "Users",
             "description": "Authenticated user session endpoints."
+        },
+        {
+            "name": "Realtime",
+            "description": "WebSocket real-time messaging endpoints."
         }
     ],
-    "security": [],
     "paths": {
         "/": {
             "get": {
@@ -1764,6 +1767,23 @@
                                 }
                             }
                         }
+                    }
+                }
+            }
+        },
+        "/ws": {
+            "get": {
+                "summary": "WebSocket for real-time messages",
+                "description": "Establishes a WebSocket connection for real-time message delivery.\nAuthentication is handled by the Gin middleware chain — the JWT token\nmust be provided in the `Authorization` header, identical to HTTP endpoints.\n\nOnce connected, the client receives push events for message activity\nin conversations where they participate. No query parameters are needed;\nconversation filtering happens at publish time based on the sender's context.\n\n**Event format:**\n```json\n{\n  \"type\": \"conversation.message.created\",\n  \"conversation_id\": 123,\n  \"message\": {\n    \"id\": 456,\n    \"sender_role\": \"consumer\",\n    \"content\": \"Hola, necesito un presupuesto\",\n    \"created_on\": \"2026-06-04T12:00:00Z\"\n  }\n}\n```\n",
+                "tags": [
+                    "Realtime"
+                ],
+                "responses": {
+                    "101": {
+                        "description": "Switching Protocols — WebSocket connection upgraded successfully"
+                    },
+                    "401": {
+                        "description": "Unauthorized — Missing or invalid JWT token"
                     }
                 }
             }

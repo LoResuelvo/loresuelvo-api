@@ -1,4 +1,3 @@
-@wip
 Feature: Chat en tiempo real
     Como participante de un chat
     quiero recibir los mensajes nuevos en el momento en que son enviados

@@ -1,4 +1,4 @@
-openapi: 3.0.3
+openapi: 3.1.0
 info:
   title: LoResuelvo API
   description: OpenAPI documentation for the LoResuelvo HTTP API as implemented by
@@ -25,7 +25,8 @@ tags:
   description: Job request creation endpoints.
 - name: Users
   description: Authenticated user session endpoints.
-security: []
+- name: Realtime
+  description: WebSocket real-time messaging endpoints.
 paths:
   /:
     $ref: ./paths/health.yaml
@@ -47,6 +48,38 @@ paths:
     $ref: ./paths/conversation-messages.yaml
   /me:
     $ref: ./paths/users.yaml
+  /ws:
+    get:
+      summary: WebSocket for real-time messages
+      description: |
+        Establishes a WebSocket connection for real-time message delivery.
+        Authentication is handled by the Gin middleware chain — the JWT token
+        must be provided in the `Authorization` header, identical to HTTP endpoints.
+
+        Once connected, the client receives push events for message activity
+        in conversations where they participate. No query parameters are needed;
+        conversation filtering happens at publish time based on the sender's context.
+
+        **Event format:**
+        ```json
+        {
+          "type": "conversation.message.created",
+          "conversation_id": 123,
+          "message": {
+            "id": 456,
+            "sender_role": "consumer",
+            "content": "Hola, necesito un presupuesto",
+            "created_on": "2026-06-04T12:00:00Z"
+          }
+        }
+        ```
+      tags:
+        - Realtime
+      responses:
+        '101':
+          description: Switching Protocols — WebSocket connection upgraded successfully
+        '401':
+          description: Unauthorized — Missing or invalid JWT token
 components:
   securitySchemes:
     $ref: ./components/security-schemes.yaml

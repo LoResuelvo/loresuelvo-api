@@ -6,6 +6,7 @@ import (
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/middleware"
+	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/realtime"
 	"github.com/auth0/go-jwt-middleware/v3/validator"
 	"github.com/gin-gonic/gin"
 )
@@ -17,10 +18,11 @@ type Router struct {
 	conversationHandler *handler.ConversationHandler
 	jobRequestHandler   *handler.JobRequestHandler
 	userHandler         *handler.UserHandler
+	realtimeHandler     *realtime.Handler
 	auth0Validator      *validator.Validator
 }
 
-func NewRouter(categoryHandler *handler.CategoryHandler, consumerHandler *handler.ConsumerHandler, providerHandler *handler.ProviderHandler, conversationHandler *handler.ConversationHandler, jobRequestHandler *handler.JobRequestHandler, userHandler *handler.UserHandler, auth0Validator *validator.Validator) *Router {
+func NewRouter(categoryHandler *handler.CategoryHandler, consumerHandler *handler.ConsumerHandler, providerHandler *handler.ProviderHandler, conversationHandler *handler.ConversationHandler, jobRequestHandler *handler.JobRequestHandler, userHandler *handler.UserHandler, realtimeHandler *realtime.Handler, auth0Validator *validator.Validator) *Router {
 	router := &Router{
 		categoryHandler:     categoryHandler,
 		consumerHandler:     consumerHandler,
@@ -28,6 +30,7 @@ func NewRouter(categoryHandler *handler.CategoryHandler, consumerHandler *handle
 		conversationHandler: conversationHandler,
 		jobRequestHandler:   jobRequestHandler,
 		userHandler:         userHandler,
+		realtimeHandler:     realtimeHandler,
 		auth0Validator:      auth0Validator,
 	}
 
@@ -55,6 +58,7 @@ func (router *Router) SetUp() (*gin.Engine, error) {
 	router.registerJobRequestRoutes(engine, authMiddleware)
 	router.registerConversationRoutes(engine, authMiddleware)
 	router.registerAuthenticatedRoutes(engine, authMiddleware)
+	router.registerRealtimeRoutes(engine, authMiddleware)
 
 	return engine, nil
 }
@@ -94,4 +98,8 @@ func (router *Router) registerConversationRoutes(engine *gin.Engine, authMiddlew
 
 func (router *Router) registerAuthenticatedRoutes(engine *gin.Engine, authMiddleware gin.HandlerFunc) {
 	engine.GET("/me", authMiddleware, router.userHandler.GetCurrentUser)
+}
+
+func (router *Router) registerRealtimeRoutes(engine *gin.Engine, authMiddleware gin.HandlerFunc) {
+	engine.GET("/ws", authMiddleware, router.realtimeHandler.Handle)
 }

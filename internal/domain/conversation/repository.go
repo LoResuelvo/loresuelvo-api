@@ -16,6 +16,7 @@ type Repository interface {
 
 type ConsumerIDFinder interface {
 	FindIDByAuthID(authID string) (int, error)
+	FindAuthIDByID(id int) (string, error)
 }
 
 type ProviderExistenceChecker interface {
@@ -24,6 +25,7 @@ type ProviderExistenceChecker interface {
 
 type ProviderIDFinder interface {
 	FindIDByAuthID(authID string) (int, error)
+	FindAuthIDByID(id int) (string, error)
 }
 
 type Reader interface {

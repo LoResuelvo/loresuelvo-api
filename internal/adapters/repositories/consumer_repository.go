@@ -66,6 +66,22 @@ func (repository *ConsumerRepository) FindIDByAuthID(authID string) (int, error)
 	return consumerID, nil
 }
 
+func (repository *ConsumerRepository) FindAuthIDByID(consumerID int) (string, error) {
+	var authID string
+	err := repository.db.QueryRow(
+		`SELECT users.auth_id
+		FROM consumers
+		INNER JOIN users ON users.id = consumers.user_id
+		WHERE consumers.id = $1`,
+		consumerID,
+	).Scan(&authID)
+	if err != nil {
+		return "", fmt.Errorf("finding consumer auth id by id: %w", err)
+	}
+
+	return authID, nil
+}
+
 func (repository *ConsumerRepository) FindIDByEmail(email string) (int, error) {
 	var consumerID int
 	err := repository.db.QueryRow(

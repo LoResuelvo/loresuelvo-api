@@ -1,10 +1,12 @@
 package bootstrap
 
 import (
+	"context"
 	"database/sql"
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/repositories"
+	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/realtime"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/category"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/consumer"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/conversation"
@@ -29,6 +31,10 @@ type Dependencies struct {
 	ConversationHandler *handler.ConversationHandler
 	JobRequestHandler   *handler.JobRequestHandler
 	UserHandler         *handler.UserHandler
+
+	Hub              *realtime.Hub
+	RealtimeHandler  *realtime.Handler
+	MessagePublisher conversation.MessagePublisher
 }
 
 func NewDependencies(database *sql.DB) *Dependencies {
@@ -41,6 +47,14 @@ func NewDependencies(database *sql.DB) *Dependencies {
 	jobRequestRepository := repositories.NewJobRequestRepository(database)
 	conversationReader := repositories.NewConversationReader(database)
 
+	// Realtime infrastructure
+	hub := realtime.NewHub()
+	ctx, cancel := context.WithCancel(context.Background())
+	go hub.Run(ctx)
+
+	messagePublisher := realtime.NewPublisher(hub, consumerRepository, providerRepository)
+	realtimeHandler := realtime.NewHandler(hub, consumerRepository, providerRepository)
+
 	categoryService := category.NewService(categoryRepository)
 	providerService := provider.NewService(providerRepository, categoryRepository)
 	consumerService := consumer.NewService(consumerRepository)
@@ -50,6 +64,7 @@ func NewDependencies(database *sql.DB) *Dependencies {
 		providerRepository,
 		providerRepository,
 		conversationReader,
+		messagePublisher,
 	)
 	jobRequestService := jobrequest.NewService(
 		jobRequestRepository,
@@ -58,6 +73,8 @@ func NewDependencies(database *sql.DB) *Dependencies {
 		conversationRepository,
 	)
 	userService := user.NewService(userRepository)
+
+	_ = cancel // TODO: wire shutdown signal to cancel context
 
 	return &Dependencies{
 		UserRepository:         userRepository,
@@ -74,5 +91,8 @@ func NewDependencies(database *sql.DB) *Dependencies {
 		ConversationHandler:    handler.NewConversationHandler(conversationService),
 		JobRequestHandler:      handler.NewJobRequestHandler(jobRequestService),
 		UserHandler:            handler.NewUserHandler(userService),
+		Hub:                    hub,
+		RealtimeHandler:        realtimeHandler,
+		MessagePublisher:       messagePublisher,
 	}
 }
