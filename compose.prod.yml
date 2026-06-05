@@ -7,6 +7,15 @@ services:
     networks:
       - app-network
 
+  swagger-ui:
+    image: swaggerapi/swagger-ui:v5.17.14
+    environment:
+      BASE_URL: /docs
+      URL: /openapi.json
+    restart: unless-stopped
+    networks:
+      - app-network
+
   migrate:
     image: migrate/migrate
     profiles:
@@ -25,6 +34,7 @@ services:
       - "443:443"
     volumes:
       - ./nginx:/etc/nginx/conf.d:ro
+      - ./openapi.json:/etc/nginx/openapi/openapi.json:ro
       - ./certbot/www:/var/www/certbot:ro
       - ./certbot/conf:/etc/letsencrypt:ro
     restart: unless-stopped
