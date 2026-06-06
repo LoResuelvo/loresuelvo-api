@@ -21,6 +21,8 @@ tags:
   description: Consumer account registration endpoints.
 - name: Providers
   description: Provider account registration and search endpoints.
+- name: Files
+  description: File upload endpoints.
 - name: Conversations
   description: Provider work request conversation endpoints.
 - name: JobRequests
@@ -38,6 +40,10 @@ paths:
     $ref: ./paths/consumers.yaml
   /providers:
     $ref: ./paths/providers.yaml
+  /files/presign:
+    $ref: ./paths/files-presign.yaml
+  /files/{fileID}/confirm:
+    $ref: ./paths/file-confirm.yaml
   /conversations:
     $ref: ./paths/conversations.yaml
   /job-requests:
@@ -92,6 +98,14 @@ components:
       $ref: ./components/schemas/register-provider-request.yaml
     ProviderSummary:
       $ref: ./components/schemas/provider-summary.yaml
+    PresignFileRequest:
+      $ref: ./components/schemas/presign-file-request.yaml
+    PresignFileResponse:
+      $ref: ./components/schemas/presign-file-response.yaml
+    ConfirmFileRequest:
+      $ref: ./components/schemas/confirm-file-request.yaml
+    FileResponse:
+      $ref: ./components/schemas/file-response.yaml
     CreateConversationRequest:
       $ref: ./components/schemas/create-conversation-request.yaml
     CreateJobRequestRequest:

@@ -1,0 +1,43 @@
+post:
+  tags:
+  - Files
+  operationId: presignFileUpload
+  summary: Request a file upload URL
+  description: Creates a pending file record and returns a direct upload URL. For provider profile photos, only JPG/JPEG and PNG images up to 5 MB are accepted.
+  security:
+  - BearerAuth: []
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/PresignFileRequest'
+  responses:
+    '200':
+      description: Upload URL generated successfully.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/PresignFileResponse'
+    '400':
+      description: Invalid file request, unsupported format, or file too large.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            invalidProfilePhoto:
+              value:
+                error: Profile photo could not be uploaded
+    '401':
+      description: Authentication failed.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/AuthErrorResponse'
+    '500':
+      description: Unexpected error while preparing the upload.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'

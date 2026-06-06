@@ -1,0 +1,21 @@
+type: object
+required:
+- id
+- url
+- original_name
+properties:
+  id:
+    type: string
+    format: uuid
+    description: Confirmed file identifier.
+    example: 4af47f1b-97b6-4b32-baa0-b95d6077f919
+  url:
+    type: string
+    format: uri
+    description: Public URL for confirmed public files.
+    example: https://cdn.example/files/2026/06/provider_profile_photo/4af47f1b-97b6-4b32-baa0-b95d6077f919.jpg
+  original_name:
+    type: string
+    description: Original file name selected by the user.
+    example: foto-perfil.jpg
+additionalProperties: false

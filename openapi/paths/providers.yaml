@@ -33,10 +33,12 @@ get:
                 name: Juan
                 surname: Pérez
                 category_name: Plomería
+                profile_photo_url: https://cdn.example/files/2026/06/provider_profile_photo/juan.jpg
               - id: 2
                 name: Pedro
                 surname: Dib
                 category_name: Plomería
+                profile_photo_url: https://cdn.example/files/2026/06/provider_profile_photo/pedro.jpg
             noProviders:
               value: []
     '400':
@@ -84,7 +86,7 @@ post:
   summary: Register the authenticated user as a provider
   description: Creates a provider account for the authenticated Auth0 subject. The
     Auth0 subject is taken from the Bearer JWT and persisted as the user auth identifier.
-    The current implementation consumes email, name, surname, and category_id; coverage_zone
+    The current implementation consumes email, name, surname, category_id, and a confirmed profile_photo_file_id; coverage_zone
     is accepted by JSON binding but is not passed to the provider service or persisted.
   security:
   - BearerAuth: []
@@ -102,6 +104,7 @@ post:
               name: Juan
               surname: Pérez
               category_id: 1
+              profile_photo_file_id: 4af47f1b-97b6-4b32-baa0-b95d6077f919
               coverage_zone:
               - Zona Norte
   responses:
@@ -118,7 +121,7 @@ post:
     '400':
       description: The request body is not valid JSON, cannot be bound to the expected
         payload, contains an invalid email format, omits category_id, or references
-        a category that does not exist.
+        a category that does not exist, omits a profile photo, or references a profile photo that cannot be used.
       content:
         application/json:
           schema:
@@ -140,6 +143,14 @@ post:
               summary: Category id does not exist
               value:
                 error: Category does not exist
+            profilePhotoRequired:
+              summary: Profile photo missing
+              value:
+                error: Profile photo is required
+            profilePhotoUnavailable:
+              summary: Profile photo cannot be used
+              value:
+                error: Profile photo could not be uploaded
     '401':
       description: Authentication failed or the authenticated user id could not be
         obtained from the request context.

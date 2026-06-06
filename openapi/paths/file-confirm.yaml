@@ -1,0 +1,51 @@
+post:
+  tags:
+  - Files
+  operationId: confirmFileUpload
+  summary: Confirm a file upload
+  description: Confirms that the uploaded object exists and that its metadata matches the original upload request.
+  security:
+  - BearerAuth: []
+  parameters:
+  - name: fileID
+    in: path
+    required: true
+    schema:
+      type: string
+      format: uuid
+    description: Pending file identifier returned by POST /files/presign.
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/ConfirmFileRequest'
+  responses:
+    '200':
+      description: File confirmed successfully.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/FileResponse'
+    '400':
+      description: The upload cannot be confirmed.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            cannotConfirm:
+              value:
+                error: Profile photo could not be uploaded
+    '401':
+      description: Authentication failed.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/AuthErrorResponse'
+    '500':
+      description: Unexpected error while confirming the upload.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'

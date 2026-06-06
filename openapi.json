@@ -37,6 +37,10 @@
             "description": "Provider account registration and search endpoints."
         },
         {
+            "name": "Files",
+            "description": "File upload endpoints."
+        },
+        {
             "name": "Conversations",
             "description": "Provider work request conversation endpoints."
         },
@@ -465,13 +469,15 @@
                                                 "id": 1,
                                                 "name": "Juan",
                                                 "surname": "Pérez",
-                                                "category_name": "Plomería"
+                                                "category_name": "Plomería",
+                                                "profile_photo_url": "https://cdn.example/files/2026/06/provider_profile_photo/juan.jpg"
                                             },
                                             {
                                                 "id": 2,
                                                 "name": "Pedro",
                                                 "surname": "Dib",
-                                                "category_name": "Plomería"
+                                                "category_name": "Plomería",
+                                                "profile_photo_url": "https://cdn.example/files/2026/06/provider_profile_photo/pedro.jpg"
                                             }
                                         ]
                                     },
@@ -552,7 +558,7 @@
                 ],
                 "operationId": "registerProvider",
                 "summary": "Register the authenticated user as a provider",
-                "description": "Creates a provider account for the authenticated Auth0 subject. The Auth0 subject is taken from the Bearer JWT and persisted as the user auth identifier. The current implementation consumes email, name, surname, and category_id; coverage_zone is accepted by JSON binding but is not passed to the provider service or persisted.",
+                "description": "Creates a provider account for the authenticated Auth0 subject. The Auth0 subject is taken from the Bearer JWT and persisted as the user auth identifier. The current implementation consumes email, name, surname, category_id, and a confirmed profile_photo_file_id; coverage_zone is accepted by JSON binding but is not passed to the provider service or persisted.",
                 "security": [
                     {
                         "BearerAuth": []
@@ -573,6 +579,7 @@
                                         "name": "Juan",
                                         "surname": "Pérez",
                                         "category_id": 1,
+                                        "profile_photo_file_id": "4af47f1b-97b6-4b32-baa0-b95d6077f919",
                                         "coverage_zone": [
                                             "Zona Norte"
                                         ]
@@ -601,7 +608,7 @@
                         }
                     },
                     "400": {
-                        "description": "The request body is not valid JSON, cannot be bound to the expected payload, contains an invalid email format, omits category_id, or references a category that does not exist.",
+                        "description": "The request body is not valid JSON, cannot be bound to the expected payload, contains an invalid email format, omits category_id, or references a category that does not exist, omits a profile photo, or references a profile photo that cannot be used.",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -630,6 +637,18 @@
                                         "summary": "Category id does not exist",
                                         "value": {
                                             "error": "Category does not exist"
+                                        }
+                                    },
+                                    "profilePhotoRequired": {
+                                        "summary": "Profile photo missing",
+                                        "value": {
+                                            "error": "Profile photo is required"
+                                        }
+                                    },
+                                    "profilePhotoUnavailable": {
+                                        "summary": "Profile photo cannot be used",
+                                        "value": {
+                                            "error": "Profile photo could not be uploaded"
                                         }
                                     }
                                 }
@@ -680,6 +699,166 @@
                                             "error": "Email is already registered"
                                         }
                                     }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/files/presign": {
+            "post": {
+                "tags": [
+                    "Files"
+                ],
+                "operationId": "presignFileUpload",
+                "summary": "Request a file upload URL",
+                "description": "Creates a pending file record and returns a direct upload URL. For provider profile photos, only JPG/JPEG and PNG images up to 5 MB are accepted.",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/PresignFileRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Upload URL generated successfully.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PresignFileResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid file request, unsupported format, or file too large.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                },
+                                "examples": {
+                                    "invalidProfilePhoto": {
+                                        "value": {
+                                            "error": "Profile photo could not be uploaded"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Authentication failed.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AuthErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Unexpected error while preparing the upload.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/files/{fileID}/confirm": {
+            "post": {
+                "tags": [
+                    "Files"
+                ],
+                "operationId": "confirmFileUpload",
+                "summary": "Confirm a file upload",
+                "description": "Confirms that the uploaded object exists and that its metadata matches the original upload request.",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "name": "fileID",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "description": "Pending file identifier returned by POST /files/presign."
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ConfirmFileRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "File confirmed successfully.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/FileResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "The upload cannot be confirmed.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                },
+                                "examples": {
+                                    "cannotConfirm": {
+                                        "value": {
+                                            "error": "Profile photo could not be uploaded"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Authentication failed.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AuthErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Unexpected error while confirming the upload.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
                                 }
                             }
                         }
@@ -1830,10 +2009,11 @@
             },
             "RegisterProviderRequest": {
                 "type": "object",
-                "description": "Payload accepted by POST /providers. The implementation trims surrounding whitespace from email, name, and surname before validation/persistence. category_id is required by the domain service. coverage_zone is currently accepted by the request struct but ignored by the service.",
+                "description": "Payload accepted by POST /providers. The implementation trims surrounding whitespace from email, name, and surname before validation/persistence. category_id and profile_photo_file_id are required by the domain service. coverage_zone is currently accepted by the request struct but ignored by the service.",
                 "required": [
                     "email",
-                    "category_id"
+                    "category_id",
+                    "profile_photo_file_id"
                 ],
                 "properties": {
                     "email": {
@@ -1864,6 +2044,12 @@
                         ],
                         "deprecated": true
                     },
+                    "profile_photo_file_id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "Confirmed provider profile photo file identifier returned by the file upload flow.",
+                        "example": "4af47f1b-97b6-4b32-baa0-b95d6077f919"
+                    },
                     "category_id": {
                         "type": "integer",
                         "format": "int32",
@@ -1879,7 +2065,8 @@
                     "id",
                     "name",
                     "surname",
-                    "category_name"
+                    "category_name",
+                    "profile_photo_url"
                 ],
                 "properties": {
                     "id": {
@@ -1902,6 +2089,143 @@
                         "type": "string",
                         "description": "Provider category display name.",
                         "example": "Plomería"
+                    },
+                    "profile_photo_url": {
+                        "type": "string",
+                        "format": "uri",
+                        "description": "Public provider profile photo URL.",
+                        "example": "https://cdn.example/files/2026/06/provider_profile_photo/4af47f1b-97b6-4b32-baa0-b95d6077f919.jpg"
+                    }
+                },
+                "additionalProperties": false
+            },
+            "PresignFileRequest": {
+                "type": "object",
+                "description": "Request a direct upload URL for a file that will later be associated with a business resource.",
+                "required": [
+                    "original_name",
+                    "mime_type",
+                    "size_bytes",
+                    "purpose"
+                ],
+                "properties": {
+                    "original_name": {
+                        "type": "string",
+                        "description": "Original file name selected by the user.",
+                        "example": "foto-perfil.jpg"
+                    },
+                    "mime_type": {
+                        "type": "string",
+                        "description": "File MIME type. Provider profile photos accept image/jpeg, image/png, and image/webp.",
+                        "example": "image/jpeg"
+                    },
+                    "size_bytes": {
+                        "type": "integer",
+                        "format": "int32",
+                        "description": "File size in bytes. Provider profile photos must not exceed 5 MB.",
+                        "example": 1048576
+                    },
+                    "purpose": {
+                        "type": "string",
+                        "description": "Intended business use for the file.",
+                        "enum": [
+                            "provider_profile_photo"
+                        ],
+                        "example": "provider_profile_photo"
+                    }
+                },
+                "additionalProperties": false
+            },
+            "PresignFileResponse": {
+                "type": "object",
+                "required": [
+                    "file_id",
+                    "key",
+                    "upload_url",
+                    "headers"
+                ],
+                "properties": {
+                    "file_id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "API file identifier to use when confirming the upload and associating the file.",
+                        "example": "4af47f1b-97b6-4b32-baa0-b95d6077f919"
+                    },
+                    "key": {
+                        "type": "string",
+                        "description": "Storage object key generated by the API.",
+                        "example": "files/2026/06/provider_profile_photo/4af47f1b-97b6-4b32-baa0-b95d6077f919.jpg"
+                    },
+                    "upload_url": {
+                        "type": "string",
+                        "format": "uri",
+                        "description": "URL where the client uploads the file bytes directly.",
+                        "example": "https://storage.example/upload-url"
+                    },
+                    "headers": {
+                        "type": "object",
+                        "additionalProperties": {
+                            "type": "string"
+                        },
+                        "description": "Headers the client must include when uploading the file bytes.",
+                        "example": {
+                            "Content-Type": "image/jpeg"
+                        }
+                    }
+                },
+                "additionalProperties": false
+            },
+            "ConfirmFileRequest": {
+                "type": "object",
+                "required": [
+                    "key",
+                    "mime_type",
+                    "size_bytes"
+                ],
+                "properties": {
+                    "key": {
+                        "type": "string",
+                        "description": "Storage object key returned by the presign endpoint.",
+                        "example": "files/2026/06/provider_profile_photo/4af47f1b-97b6-4b32-baa0-b95d6077f919.jpg"
+                    },
+                    "mime_type": {
+                        "type": "string",
+                        "description": "MIME type originally requested for the upload.",
+                        "example": "image/jpeg"
+                    },
+                    "size_bytes": {
+                        "type": "integer",
+                        "format": "int32",
+                        "description": "File size originally requested for the upload.",
+                        "example": 1048576
+                    }
+                },
+                "additionalProperties": false
+            },
+            "FileResponse": {
+                "type": "object",
+                "required": [
+                    "id",
+                    "url",
+                    "original_name"
+                ],
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "Confirmed file identifier.",
+                        "example": "4af47f1b-97b6-4b32-baa0-b95d6077f919"
+                    },
+                    "url": {
+                        "type": "string",
+                        "format": "uri",
+                        "description": "Public URL for confirmed public files.",
+                        "example": "https://cdn.example/files/2026/06/provider_profile_photo/4af47f1b-97b6-4b32-baa0-b95d6077f919.jpg"
+                    },
+                    "original_name": {
+                        "type": "string",
+                        "description": "Original file name selected by the user.",
+                        "example": "foto-perfil.jpg"
                     }
                 },
                 "additionalProperties": false

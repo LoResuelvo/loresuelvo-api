@@ -1,0 +1,20 @@
+type: object
+required:
+- key
+- mime_type
+- size_bytes
+properties:
+  key:
+    type: string
+    description: Storage object key returned by the presign endpoint.
+    example: files/2026/06/provider_profile_photo/4af47f1b-97b6-4b32-baa0-b95d6077f919.jpg
+  mime_type:
+    type: string
+    description: MIME type originally requested for the upload.
+    example: image/jpeg
+  size_bytes:
+    type: integer
+    format: int32
+    description: File size originally requested for the upload.
+    example: 1048576
+additionalProperties: false

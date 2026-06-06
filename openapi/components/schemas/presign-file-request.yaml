@@ -1,0 +1,28 @@
+type: object
+description: Request a direct upload URL for a file that will later be associated with a business resource.
+required:
+- original_name
+- mime_type
+- size_bytes
+- purpose
+properties:
+  original_name:
+    type: string
+    description: Original file name selected by the user.
+    example: foto-perfil.jpg
+  mime_type:
+    type: string
+    description: File MIME type. Provider profile photos accept image/jpeg, image/png, and image/webp.
+    example: image/jpeg
+  size_bytes:
+    type: integer
+    format: int32
+    description: File size in bytes. Provider profile photos must not exceed 5 MB.
+    example: 1048576
+  purpose:
+    type: string
+    description: Intended business use for the file.
+    enum:
+    - provider_profile_photo
+    example: provider_profile_photo
+additionalProperties: false

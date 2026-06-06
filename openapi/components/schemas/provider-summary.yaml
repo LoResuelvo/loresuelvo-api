@@ -5,6 +5,7 @@ required:
 - name
 - surname
 - category_name
+- profile_photo_url
 properties:
   id:
     type: integer
@@ -23,4 +24,9 @@ properties:
     type: string
     description: Provider category display name.
     example: Plomería
+  profile_photo_url:
+    type: string
+    format: uri
+    description: Public provider profile photo URL.
+    example: https://cdn.example/files/2026/06/provider_profile_photo/4af47f1b-97b6-4b32-baa0-b95d6077f919.jpg
 additionalProperties: false
