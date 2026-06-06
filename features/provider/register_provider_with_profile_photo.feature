@@ -7,25 +7,25 @@ Feature: Completar registro de prestador con foto de perfil
         Given que existe el rubro "Plomería"
         And que no existe un usuario con correo "prestador@example.com"
 
-    Scenario: 01-RPF Registrar una cuenta nueva de prestador con foto de perfil correctamente
+    Scenario: 35.4.1-RPWPP Registrar una cuenta nueva de prestador con foto de perfil correctamente
         Given que cargué una foto de perfil válida
         When me registro como prestador con correo "prestador@example.com", nombre "Juan", apellido "Pérez" y rubro "Plomería"
         Then el sistema confirma el registro
 
     Rule: El prestador debe cargar una foto de perfil
 
-    Scenario: 02-RPF Rechazar registro sin foto de perfil
+    Scenario: 35.4.2-RPWPP Rechazar registro sin foto de perfil
         When me registro como prestador con correo "prestador@example.com", nombre "Juan", apellido "Pérez" y rubro "Plomería" sin cargar foto de perfil
         Then el sistema me indica que la foto de perfil es obligatoria
 
     Rule: La foto de perfil debe tener formato png, jpg, jpeg o webp
 
-    Scenario: 03-RPF Rechazar registro con foto de perfil no válida
+    Scenario: 35.4.3-RPWPP Rechazar registro con foto de perfil no válida
         When intento cargar una foto de perfil con formato no válido para el registro
         Then el sistema me indica que la foto de perfil no pudo ser cargada
 
     Rule: La foto de perfil no debe superar los 5MB
 
-    Scenario: 04-RPF Rechazar registro con foto de perfil que supera el tamaño máximo
+    Scenario: 35.4.4-RPWPP Rechazar registro con foto de perfil que supera el tamaño máximo
         When intento cargar una foto de perfil que pesa 6 MB para el registro
         Then el sistema me indica que la foto de perfil no pudo ser cargada
