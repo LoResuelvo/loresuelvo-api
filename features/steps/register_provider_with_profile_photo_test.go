@@ -24,8 +24,10 @@ type presignFileRequest struct {
 }
 
 type presignFileResponse struct {
-	FileID string `json:"file_id"`
-	Key    string `json:"key"`
+	FileID    string            `json:"file_id"`
+	Key       string            `json:"key"`
+	UploadURL string            `json:"upload_url"`
+	Headers   map[string]string `json:"headers"`
 }
 
 type confirmFileRequest struct {
@@ -72,7 +74,13 @@ func (suite *testSuite) uploadValidProviderProfilePhotoFor(auth0ID string) (stri
 	if response.Key == "" {
 		return "", fmt.Errorf("expected profile photo upload response to include key, got body %s", string(suite.lastBody))
 	}
+	if response.UploadURL == "" {
+		return "", fmt.Errorf("expected profile photo upload response to include upload_url, got body %s", string(suite.lastBody))
+	}
 
+	if err := suite.putProfilePhotoObject(*response, "image/jpeg", validProfilePhotoSizeBytes); err != nil {
+		return "", err
+	}
 	if err := suite.confirmProfilePhotoUpload(auth0ID, *response); err != nil {
 		return "", err
 	}
@@ -160,6 +168,35 @@ func (suite *testSuite) requestProfilePhotoPresign(auth0ID string, payload presi
 	}
 
 	return &response, nil
+}
+
+func (suite *testSuite) putProfilePhotoObject(upload presignFileResponse, mimeType string, sizeBytes int) error {
+	body := bytes.Repeat([]byte{0xff}, sizeBytes)
+	httpReq, err := http.NewRequest(http.MethodPut, upload.UploadURL, bytes.NewReader(body))
+	if err != nil {
+		return fmt.Errorf("failed to prepare profile photo object upload: %w", err)
+	}
+	for key, value := range upload.Headers {
+		httpReq.Header.Set(key, value)
+	}
+	httpReq.Header.Set("Content-Type", mimeType)
+	httpReq.ContentLength = int64(sizeBytes)
+
+	resp, err := http.DefaultClient.Do(httpReq)
+	if err != nil {
+		return fmt.Errorf("profile photo object upload failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	responseBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("failed to read profile photo object upload response: %w", err)
+	}
+	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
+		return fmt.Errorf("expected profile photo object upload status 2xx, got %d with body %s", resp.StatusCode, string(responseBody))
+	}
+
+	return nil
 }
 
 func (suite *testSuite) confirmProfilePhotoUpload(auth0ID string, upload presignFileResponse) error {

@@ -12,7 +12,16 @@ services:
     environment:
       DATABASE_URL: "postgres://postgres:example@dev-db:5432/loresuelvo?sslmode=disable"
       TEST_DATABASE_URL: "postgres://postgres:example@test-db:5432/loresuelvo_test?sslmode=disable"
-      CORS_ALLOWED_ORIGINS: "http://localhost:8081"
+      CORS_ALLOWED_ORIGINS: "http://localhost:8081,http://localhost:3000"
+      STORAGE_PROVIDER: "s3"
+      STORAGE_ENDPOINT: "http://minio.localhost:${MINIO_API_PORT:-9000}"
+      STORAGE_REGION: "us-east-1"
+      STORAGE_PUBLIC_BUCKET: "loresuelvo-public-local"
+      STORAGE_PRIVATE_BUCKET: "loresuelvo-private-local"
+      STORAGE_PUBLIC_BASE_URL: "http://minio.localhost:${MINIO_API_PORT:-9000}/loresuelvo-public-local"
+      STORAGE_ACCESS_KEY_ID: "loresuelvo-local"
+      STORAGE_SECRET_ACCESS_KEY: "loresuelvo-local-secret"
+      STORAGE_PRESIGN_EXPIRATION_SECONDS: "600"
     env_file:
       - .env
     depends_on:
@@ -20,6 +29,14 @@ services:
         condition: service_healthy
       test-db:
         condition: service_healthy
+      minio:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+    networks:
+      default:
+        aliases:
+          - api.localhost
 
   swagger-ui:
     image: swaggerapi/swagger-ui:v5.17.14
@@ -29,6 +46,49 @@ services:
       SWAGGER_JSON: /spec/openapi.json
     volumes:
       - ./openapi.json:/spec/openapi.json:ro
+
+  minio:
+    image: quay.io/minio/minio:latest
+    command: server /data --address ":${MINIO_API_PORT:-9000}" --console-address ":${MINIO_CONSOLE_PORT:-9001}"
+    environment:
+      MINIO_ROOT_USER: "loresuelvo-local"
+      MINIO_ROOT_PASSWORD: "loresuelvo-local-secret"
+      MINIO_REGION_NAME: "us-east-1"
+      MINIO_API_CORS_ALLOW_ORIGIN: "http://localhost:3000,http://127.0.0.1:3000,http://localhost:8081,http://127.0.0.1:8081"
+      MINIO_BROWSER_REDIRECT_URL: "http://minio.localhost:${MINIO_CONSOLE_PORT:-9001}"
+    ports:
+      - "${MINIO_API_PORT:-9000}:${MINIO_API_PORT:-9000}"
+      - "${MINIO_CONSOLE_PORT:-9001}:${MINIO_CONSOLE_PORT:-9001}"
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:${MINIO_API_PORT:-9000}/minio/health/live"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+    networks:
+      default:
+        aliases:
+          - minio.localhost
+
+  minio-init:
+    image: quay.io/minio/mc:latest
+    depends_on:
+      minio:
+        condition: service_healthy
+    environment:
+      MINIO_ROOT_USER: "loresuelvo-local"
+      MINIO_ROOT_PASSWORD: "loresuelvo-local-secret"
+      MINIO_API_PORT: "${MINIO_API_PORT:-9000}"
+      STORAGE_PUBLIC_BUCKET: "loresuelvo-public-local"
+      STORAGE_PRIVATE_BUCKET: "loresuelvo-private-local"
+    volumes:
+      - ./scripts/minio:/minio-init:ro
+    entrypoint: ["/bin/sh", "/minio-init/init.sh"]
+    networks:
+      default:
+        aliases:
+          - minio-init.localhost
 
   dev-db:
     image: postgres:16-alpine
@@ -59,3 +119,4 @@ services:
 volumes:
   go-build-cache:
   go-mod-cache:
+  minio-data:

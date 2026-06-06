@@ -1,10 +1,24 @@
-.PHONY: up down clean build bash lint test openapi swagger swagger-down spec gherkin test-all-once migrate-up migrate-down migrate-test-up migrate-test-down
+.PHONY: up down clean build bash lint test openapi swagger swagger-down spec gherkin test-all-once migrate-up migrate-down migrate-test-up migrate-test-down storage storage-console storage-reset
 
 # Nombre del servicio del compose
 SERVICE = api-dev
 
 up:
 	docker compose up -d $(SERVICE)
+
+storage:
+	docker compose up -d minio minio-init
+
+storage-console:
+	docker compose up -d minio minio-init
+	@echo "MinIO API:     http://minio.localhost:$${MINIO_API_PORT:-9000}"
+	@echo "MinIO Console: http://minio.localhost:$${MINIO_CONSOLE_PORT:-9001}"
+	@echo "Credentials:   loresuelvo-local / loresuelvo-local-secret"
+
+storage-reset:
+	docker compose rm -sfv minio minio-init
+	docker volume rm loresuelvo-api_minio-data || true
+	docker compose up -d minio minio-init
 
 down:
 	docker compose down
