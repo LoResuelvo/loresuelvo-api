@@ -13,12 +13,17 @@ services:
       DATABASE_URL: "postgres://postgres:example@dev-db:5432/loresuelvo?sslmode=disable"
       TEST_DATABASE_URL: "postgres://postgres:example@test-db:5432/loresuelvo_test?sslmode=disable"
       CORS_ALLOWED_ORIGINS: "http://localhost:8081,http://localhost:3000"
+      MINIO_API_PORT: "${MINIO_API_PORT:-9000}"
+      MINIO_CONSOLE_PORT: "${MINIO_CONSOLE_PORT:-9001}"
       STORAGE_PROVIDER: "s3"
       STORAGE_ENDPOINT: "http://minio.localhost:${MINIO_API_PORT:-9000}"
       STORAGE_REGION: "us-east-1"
       STORAGE_PUBLIC_BUCKET: "loresuelvo-public-local"
       STORAGE_PRIVATE_BUCKET: "loresuelvo-private-local"
       STORAGE_PUBLIC_BASE_URL: "http://minio.localhost:${MINIO_API_PORT:-9000}/loresuelvo-public-local"
+      TEST_STORAGE_PUBLIC_BUCKET: "loresuelvo-public-test"
+      TEST_STORAGE_PRIVATE_BUCKET: "loresuelvo-private-test"
+      TEST_STORAGE_PUBLIC_BASE_URL: "http://minio.localhost:${MINIO_API_PORT:-9000}/loresuelvo-public-test"
       STORAGE_ACCESS_KEY_ID: "loresuelvo-local"
       STORAGE_SECRET_ACCESS_KEY: "loresuelvo-local-secret"
       STORAGE_PRESIGN_EXPIRATION_SECONDS: "600"
@@ -82,6 +87,8 @@ services:
       MINIO_API_PORT: "${MINIO_API_PORT:-9000}"
       STORAGE_PUBLIC_BUCKET: "loresuelvo-public-local"
       STORAGE_PRIVATE_BUCKET: "loresuelvo-private-local"
+      TEST_STORAGE_PUBLIC_BUCKET: "loresuelvo-public-test"
+      TEST_STORAGE_PRIVATE_BUCKET: "loresuelvo-private-test"
     volumes:
       - ./scripts/minio:/minio-init:ro
     entrypoint: ["/bin/sh", "/minio-init/init.sh"]
@@ -89,6 +96,25 @@ services:
       default:
         aliases:
           - minio-init.localhost
+
+  minio-clean-tests:
+    image: quay.io/minio/mc:latest
+    depends_on:
+      minio:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+    environment:
+      MINIO_ROOT_USER: "loresuelvo-local"
+      MINIO_ROOT_PASSWORD: "loresuelvo-local-secret"
+      MINIO_API_PORT: "${MINIO_API_PORT:-9000}"
+      TEST_STORAGE_PUBLIC_BUCKET: "loresuelvo-public-test"
+      TEST_STORAGE_PRIVATE_BUCKET: "loresuelvo-private-test"
+    volumes:
+      - ./scripts/minio:/minio-init:ro
+    entrypoint: ["/bin/sh", "/minio-init/clean-test-buckets.sh"]
+    profiles:
+      - tools
 
   dev-db:
     image: postgres:16-alpine

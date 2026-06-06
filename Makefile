@@ -40,10 +40,16 @@ lint:
 	docker compose exec -e GOFLAGS="-buildvcs=false" $(SERVICE) golangci-lint run
 
 test:
-	docker compose exec -e GOFLAGS="-buildvcs=false" $(SERVICE) sh -c 'migrate -path db/migrations -database "$$TEST_DATABASE_URL" up && go test -p 1 -v ./...'
+	@docker compose run --rm minio-clean-tests >/dev/null 2>&1
+	docker compose exec \
+		-e GOFLAGS="-buildvcs=false" \
+		$(SERVICE) sh -c 'export STORAGE_PUBLIC_BUCKET="$$TEST_STORAGE_PUBLIC_BUCKET"; export STORAGE_PRIVATE_BUCKET="$$TEST_STORAGE_PRIVATE_BUCKET"; export STORAGE_PUBLIC_BASE_URL="$$TEST_STORAGE_PUBLIC_BASE_URL"; migrate -path db/migrations -database "$$TEST_DATABASE_URL" up && go test -p 1 -v ./...'; status=$$?; docker compose run --rm minio-clean-tests >/dev/null 2>&1; exit $$status
 
 test-all-once:
-	docker compose exec -e GOFLAGS="-buildvcs=false" $(SERVICE) sh -c 'migrate -path db/migrations -database "$$TEST_DATABASE_URL" up && go test -count=1 -p 1 -v ./... && golangci-lint run'
+	@docker compose run --rm minio-clean-tests >/dev/null 2>&1
+	docker compose exec \
+		-e GOFLAGS="-buildvcs=false" \
+		$(SERVICE) sh -c 'export STORAGE_PUBLIC_BUCKET="$$TEST_STORAGE_PUBLIC_BUCKET"; export STORAGE_PRIVATE_BUCKET="$$TEST_STORAGE_PRIVATE_BUCKET"; export STORAGE_PUBLIC_BASE_URL="$$TEST_STORAGE_PUBLIC_BASE_URL"; migrate -path db/migrations -database "$$TEST_DATABASE_URL" up && go test -count=1 -p 1 -v ./... && golangci-lint run'; status=$$?; docker compose run --rm minio-clean-tests >/dev/null 2>&1; exit $$status
 
 openapi:
 	python3 scripts/bundle_openapi.py
