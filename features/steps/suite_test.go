@@ -19,24 +19,25 @@ import (
 )
 
 type testSuite struct {
-	server                    *httptest.Server
-	database                  *sql.DB
-	categoryRepository        *repositories.CategoryRepository
-	consumerRepository        *repositories.ConsumerRepository
-	providerRepository        *repositories.ProviderRepository
-	conversationRepository    *repositories.ConversationRepository
-	messageRepository         *repositories.MessageRepository
-	jobRequestRepository      *repositories.JobRequestRepository
-	userRepository            *repositories.UserRepository
-	auth0Validator            *validator.Validator
-	tokenBuilder              *testhelper.TokenBuilder
-	lastStatus                int
-	lastBody                  []byte
-	currentAuth0ID            string
-	lastConversationID        int
-	lastJobRequestID          int
-	lastWorkRequestProviderID int
-	realtimeConnections       map[string]*realtimeTestConnection
+	server                     *httptest.Server
+	database                   *sql.DB
+	categoryRepository         *repositories.CategoryRepository
+	consumerRepository         *repositories.ConsumerRepository
+	providerRepository         *repositories.ProviderRepository
+	conversationRepository     *repositories.ConversationRepository
+	messageRepository          *repositories.MessageRepository
+	jobRequestRepository       *repositories.JobRequestRepository
+	userRepository             *repositories.UserRepository
+	auth0Validator             *validator.Validator
+	tokenBuilder               *testhelper.TokenBuilder
+	lastStatus                 int
+	lastBody                   []byte
+	currentAuth0ID             string
+	lastConversationID         int
+	lastJobRequestID           int
+	lastWorkRequestProviderID  int
+	providerProfilePhotoFileID string
+	realtimeConnections        map[string]*realtimeTestConnection
 
 	categoryIDsByName              map[string]int
 	lastProviderFilterCategoryName string
@@ -47,6 +48,7 @@ func (s *testSuite) registerAllSteps(sc *godog.ScenarioContext) {
 	registerHelloWorldSteps(sc, s)
 	registerConsumerAccountSteps(sc, s)
 	registerProviderAccountSteps(sc, s)
+	registerProviderWithProfilePhotoSteps(sc, s)
 	registerCreateCategorySteps(sc, s)
 	registerListCategoriesSteps(sc, s)
 	registerFilterProvidersByCategorySteps(sc, s)
@@ -89,6 +91,7 @@ func (s *testSuite) cleanDatabase() error {
 	s.realtimeConnections = map[string]*realtimeTestConnection{}
 	s.lastWorkRequestProviderID = 0
 	s.lastJobRequestID = 0
+	s.providerProfilePhotoFileID = ""
 
 	return nil
 }

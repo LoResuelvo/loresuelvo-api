@@ -20,6 +20,7 @@ type providerRegistrationRequest struct {
 	CUITCertificateFile    string   `json:"cuit_certificate_file"`
 	BiometricValidationID  string   `json:"biometric_validation_id"`
 	ProfessionalCredential string   `json:"professional_credential_file"`
+	ProfilePhotoFileID     string   `json:"profile_photo_file_id,omitempty"`
 }
 
 func registerProviderAccountSteps(sc *godog.ScenarioContext, suite *testSuite) {
@@ -48,6 +49,7 @@ func (suite *testSuite) requestProviderAccountRegistration(email, name, surname,
 		CUITCertificateFile:    "cuit-certificate.pdf",
 		BiometricValidationID:  "biometric-validation-approved",
 		ProfessionalCredential: "professional-license-or-certificate.pdf",
+		ProfilePhotoFileID:     suite.providerProfilePhotoFileID,
 	}); err != nil {
 		return err
 	}

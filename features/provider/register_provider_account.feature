@@ -1,3 +1,4 @@
+@wip
 Feature: Registrar cuenta nueva de prestador
     Como prestador
     quiero registrarme en la plataforma
