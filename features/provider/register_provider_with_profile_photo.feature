@@ -1,4 +1,3 @@
-@wip
 Feature: Completar registro de prestador con foto de perfil
     Como prestador
     quiero cargar una foto de perfil al registrarme
@@ -19,7 +18,7 @@ Feature: Completar registro de prestador con foto de perfil
         When me registro como prestador con correo "prestador@example.com", nombre "Juan", apellido "Pérez" y rubro "Plomería" sin cargar foto de perfil
         Then el sistema me indica que la foto de perfil es obligatoria
 
-    Rule: La foto de perfil debe tener formato png, jpg o jpeg
+    Rule: La foto de perfil debe tener formato png, jpg, jpeg o webp
 
     Scenario: 03-RPF Rechazar registro con foto de perfil no válida
         When intento cargar una foto de perfil con formato no válido para el registro
@@ -28,5 +27,5 @@ Feature: Completar registro de prestador con foto de perfil
     Rule: La foto de perfil no debe superar los 5MB
 
     Scenario: 04-RPF Rechazar registro con foto de perfil que supera el tamaño máximo
-        When intento cargar una foto de perfil que pesa 6 MB para el registro 
+        When intento cargar una foto de perfil que pesa 6 MB para el registro
         Then el sistema me indica que la foto de perfil no pudo ser cargada

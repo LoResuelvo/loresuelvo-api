@@ -35,6 +35,12 @@ func (suite *testSuite) thereIsNoUserWithEmail(_ string) error {
 }
 
 func (suite *testSuite) requestProviderAccountRegistration(email, name, surname, categoryName string) error {
+	if suite.providerProfilePhotoFileID == "" {
+		if err := suite.uploadValidProviderProfilePhoto(); err != nil {
+			return err
+		}
+	}
+
 	categoryID, err := suite.categoryIDFor(categoryName)
 	if err != nil {
 		return err
@@ -96,6 +102,13 @@ func (suite *testSuite) systemReportsCategoryIsRequired() error {
 }
 
 func (suite *testSuite) postProviderRegistrationWithAuth0ID(auth0ID string, req providerRegistrationRequest) (*http.Response, error) {
+	if req.ProfilePhotoFileID == "" {
+		fileID, err := suite.uploadValidProviderProfilePhotoFor(auth0ID)
+		if err != nil {
+			return nil, err
+		}
+		req.ProfilePhotoFileID = fileID
+	}
 	return suite.postProviderRegistrationPayload(auth0ID, req)
 }
 

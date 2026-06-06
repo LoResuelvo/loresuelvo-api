@@ -7,6 +7,7 @@ import (
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/middleware"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/category"
+	filedomain "github.com/LoResuelvo/loresuelvo-api/internal/domain/file"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/provider"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/validator"
 	"github.com/gin-gonic/gin"
@@ -17,18 +18,20 @@ type ProviderHandler struct {
 }
 
 type registerProviderRequest struct {
-	Email        string   `json:"email"`
-	Name         string   `json:"name"`
-	Surname      string   `json:"surname"`
-	CategoryID   int      `json:"category_id"`
-	CoverageZone []string `json:"coverage_zone"`
+	Email              string   `json:"email"`
+	Name               string   `json:"name"`
+	Surname            string   `json:"surname"`
+	CategoryID         int      `json:"category_id"`
+	CoverageZone       []string `json:"coverage_zone"`
+	ProfilePhotoFileID string   `json:"profile_photo_file_id"`
 }
 
 type providerSummaryResponse struct {
-	ID           int    `json:"id"`
-	Name         string `json:"name"`
-	Surname      string `json:"surname"`
-	CategoryName string `json:"category_name"`
+	ID              int    `json:"id"`
+	Name            string `json:"name"`
+	Surname         string `json:"surname"`
+	CategoryName    string `json:"category_name"`
+	ProfilePhotoURL string `json:"profile_photo_url,omitempty"`
 }
 
 func NewProviderHandler(providerService *provider.Service) *ProviderHandler {
@@ -55,9 +58,14 @@ func (h *ProviderHandler) RegisterProvider(c *gin.Context) {
 	req.Name = strings.TrimSpace(req.Name)
 	req.Surname = strings.TrimSpace(req.Surname)
 
-	err := h.providerService.RegisterProvider(auth0ID, req.Email, req.Name, req.Surname, req.CategoryID)
+	err := h.providerService.RegisterProvider(c.Request.Context(), auth0ID, req.Email, req.Name, req.Surname, req.CategoryID, strings.TrimSpace(req.ProfilePhotoFileID))
 	if err == validator.ErrEmailAlreadyRegistered {
 		c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
+		return
+	}
+
+	if err == filedomain.ErrProfilePhotoRequired || err == filedomain.ErrProfilePhotoNotAvailable {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
@@ -76,7 +84,7 @@ func (h *ProviderHandler) FilterProvidersByCategory(c *gin.Context) {
 		return
 	}
 
-	providers, err := h.providerService.FilterProvidersByCategoryID(categoryID)
+	providers, err := h.providerService.FilterProvidersByCategoryID(c.Request.Context(), categoryID)
 	if err == category.ErrIDRequired {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -95,10 +103,11 @@ func (h *ProviderHandler) FilterProvidersByCategory(c *gin.Context) {
 	response := make([]providerSummaryResponse, 0, len(providers))
 	for _, provider := range providers {
 		response = append(response, providerSummaryResponse{
-			ID:           provider.ID,
-			Name:         provider.User.Name,
-			Surname:      provider.User.Surname,
-			CategoryName: provider.Category.Name,
+			ID:              provider.ID,
+			Name:            provider.Name,
+			Surname:         provider.Surname,
+			CategoryName:    provider.CategoryName,
+			ProfilePhotoURL: provider.ProfilePhotoURL,
 		})
 	}
 

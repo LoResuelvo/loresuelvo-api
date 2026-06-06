@@ -5,24 +5,44 @@ import (
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/user"
 )
 
+const Role = "provider"
+
 type Provider struct {
-	ID       int
-	User     *user.User
-	Category *category.Category
+	ID                 int
+	User               *user.User
+	Category           *category.Category
+	ProfilePhotoFileID string
 }
 
-func NewProvider(auth0ID string, email string, name string, surname string, providerCategory *category.Category) (*Provider, error) {
+func NewProvider(auth0ID string, email string, name string, surname string, providerCategory *category.Category, profilePhotoFileID string) (*Provider, error) {
 	if providerCategory == nil {
 		return nil, category.ErrDoesNotExist
 	}
 
-	user, err := user.New(auth0ID, name, surname, email, "provider")
+	providerUser, err := user.New(auth0ID, name, surname, email, Role)
 	if err != nil {
 		return nil, err
 	}
 
 	return &Provider{
-		User:     user,
-		Category: providerCategory,
+		User:               providerUser,
+		Category:           providerCategory,
+		ProfilePhotoFileID: profilePhotoFileID,
 	}, nil
+}
+
+func (p Provider) AuthID() string {
+	return p.User.AuthID
+}
+
+func (p Provider) Email() string {
+	return p.User.Email
+}
+
+func (p Provider) Name() string {
+	return p.User.Name
+}
+
+func (p Provider) Surname() string {
+	return p.User.Surname
 }

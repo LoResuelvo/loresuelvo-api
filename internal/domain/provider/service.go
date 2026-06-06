@@ -1,23 +1,35 @@
 package provider
 
 import (
+	"context"
+	"errors"
+	"fmt"
+
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/category"
+	filedomain "github.com/LoResuelvo/loresuelvo-api/internal/domain/file"
+	readmodel "github.com/LoResuelvo/loresuelvo-api/internal/domain/provider/read_model"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/validator"
 )
 
 type Service struct {
 	providerRepository Repository
 	categoryFinder     CategoryFinder
+	fileService        FileValidator
 }
 
-func NewService(repository Repository, categoryFinder CategoryFinder) *Service {
+func NewService(repository Repository, categoryFinder CategoryFinder, fileService FileValidator) *Service {
+	if fileService == nil {
+		panic("provider file validator is required")
+	}
+
 	return &Service{
 		providerRepository: repository,
 		categoryFinder:     categoryFinder,
+		fileService:        fileService,
 	}
 }
 
-func (s *Service) RegisterProvider(authId, email, name, surname string, categoryID int) error {
+func (s *Service) RegisterProvider(ctx context.Context, authID, email, name, surname string, categoryID int, profilePhotoFileID string) error {
 	if s.providerRepository.FindByEmail(email) {
 		return validator.ErrEmailAlreadyRegistered
 	}
@@ -27,7 +39,11 @@ func (s *Service) RegisterProvider(authId, email, name, surname string, category
 		return err
 	}
 
-	provider, err := NewProvider(authId, email, name, surname, category)
+	if err := s.validateProfilePhoto(ctx, authID, profilePhotoFileID); err != nil {
+		return err
+	}
+
+	provider, err := NewProvider(authID, email, name, surname, category, profilePhotoFileID)
 	if err != nil {
 		return err
 	}
@@ -35,22 +51,38 @@ func (s *Service) RegisterProvider(authId, email, name, surname string, category
 	return s.providerRepository.Save(*provider)
 }
 
-func (s *Service) FilterProvidersByCategoryID(categoryID int) ([]Provider, error) {
-	existingCategory, err := s.validateCategory(categoryID)
+func (s *Service) FilterProvidersByCategoryID(ctx context.Context, categoryID int) ([]readmodel.ProviderSummary, error) {
+	if _, err := s.validateCategory(categoryID); err != nil {
+		return nil, err
+	}
+
+	providers, err := s.providerRepository.FindByCategoryID(categoryID)
 	if err != nil {
 		return nil, err
 	}
 
-	providers, err := s.providerRepository.FindByCategoryID(existingCategory.ID)
-	if err != nil {
-		return nil, err
-	}
-
+	profilePhotoFileIDs := make([]string, 0, len(providers))
 	for i := range providers {
-		providers[i].Category = existingCategory
+		profilePhotoFileIDs = append(profilePhotoFileIDs, providers[i].ProfilePhotoFileID)
 	}
 
-	return providers, nil
+	profilePhotoURLs, err := s.fileService.ResolvePublicURLs(ctx, profilePhotoFileIDs)
+	if err != nil {
+		return nil, fmt.Errorf("resolving provider profile photo urls: %w", err)
+	}
+
+	providerSummaries := make([]readmodel.ProviderSummary, 0, len(providers))
+	for _, provider := range providers {
+		providerSummaries = append(providerSummaries, readmodel.ProviderSummary{
+			ID:              provider.ID,
+			Name:            provider.Name(),
+			Surname:         provider.Surname(),
+			CategoryName:    provider.Category.Name,
+			ProfilePhotoURL: profilePhotoURLs[provider.ProfilePhotoFileID],
+		})
+	}
+
+	return providerSummaries, nil
 }
 
 func (s *Service) validateCategory(categoryID int) (*category.Category, error) {
@@ -64,4 +96,15 @@ func (s *Service) validateCategory(categoryID int) (*category.Category, error) {
 	}
 
 	return existingCategory, nil
+}
+
+func (s *Service) validateProfilePhoto(ctx context.Context, authID, profilePhotoFileID string) error {
+	err := s.fileService.ValidateProviderProfilePhoto(ctx, authID, profilePhotoFileID)
+	if errors.Is(err, filedomain.ErrProfilePhotoRequired) || errors.Is(err, filedomain.ErrProfilePhotoNotAvailable) {
+		return err
+	}
+	if err != nil {
+		return filedomain.ErrProfilePhotoNotAvailable
+	}
+	return nil
 }

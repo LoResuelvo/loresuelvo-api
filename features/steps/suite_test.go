@@ -28,6 +28,7 @@ type testSuite struct {
 	messageRepository          *repositories.MessageRepository
 	jobRequestRepository       *repositories.JobRequestRepository
 	userRepository             *repositories.UserRepository
+	fileRepository             *repositories.FileRepository
 	auth0Validator             *validator.Validator
 	tokenBuilder               *testhelper.TokenBuilder
 	lastStatus                 int
@@ -82,6 +83,10 @@ func (s *testSuite) cleanDatabase() error {
 		return fmt.Errorf("could not clean users: %w", err)
 	}
 
+	if err := s.fileRepository.DeleteAll(); err != nil {
+		return fmt.Errorf("could not clean files: %w", err)
+	}
+
 	if err := s.categoryRepository.DeleteAll(); err != nil {
 		return fmt.Errorf("could not clean categories: %w", err)
 	}
@@ -109,7 +114,7 @@ func newTestSuite(tb testing.TB, database *sql.DB) *testSuite {
 	auth0Validator := testhelper.NewTestValidator(tb)
 	tokenBuilder := testhelper.NewTokenBuilder()
 
-	router := httpadapter.NewRouter(dependencies.CategoryHandler, dependencies.ConsumerHandler, dependencies.ProviderHandler, dependencies.ConversationHandler, dependencies.JobRequestHandler, dependencies.UserHandler, dependencies.RealtimeHandler, auth0Validator)
+	router := httpadapter.NewRouter(dependencies.CategoryHandler, dependencies.ConsumerHandler, dependencies.ProviderHandler, dependencies.ConversationHandler, dependencies.JobRequestHandler, dependencies.UserHandler, dependencies.FileHandler, dependencies.RealtimeHandler, auth0Validator)
 	engine, err := router.SetUp()
 	require.NoError(tb, err, "could not initialize router")
 
@@ -129,6 +134,7 @@ func newTestSuite(tb testing.TB, database *sql.DB) *testSuite {
 		messageRepository:      dependencies.MessageRepository,
 		jobRequestRepository:   dependencies.JobRequestRepository,
 		userRepository:         dependencies.UserRepository,
+		fileRepository:         dependencies.FileRepository,
 		auth0Validator:         auth0Validator,
 		tokenBuilder:           tokenBuilder,
 

@@ -44,47 +44,65 @@ func registerProviderWithProfilePhotoSteps(sc *godog.ScenarioContext, suite *tes
 }
 
 func (suite *testSuite) uploadValidProviderProfilePhoto() error {
-	response, err := suite.requestProfilePhotoPresign(presignFileRequest{
+	fileID, err := suite.uploadValidProviderProfilePhotoFor("auth0|provider-test")
+	if err != nil {
+		return err
+	}
+	suite.providerProfilePhotoFileID = fileID
+	return nil
+}
+
+func (suite *testSuite) uploadValidProviderProfilePhotoFor(auth0ID string) (string, error) {
+	response, err := suite.requestProfilePhotoPresign(auth0ID, presignFileRequest{
 		OriginalName: "foto-perfil.jpg",
 		MimeType:     "image/jpeg",
 		SizeBytes:    validProfilePhotoSizeBytes,
 		Purpose:      providerProfilePhotoPurpose,
 	})
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	if err := suite.lastResponseShouldHaveStatusCode(http.StatusOK); err != nil {
-		return err
+		return "", err
 	}
 	if response.FileID == "" {
-		return fmt.Errorf("expected profile photo upload response to include file_id, got body %s", string(suite.lastBody))
+		return "", fmt.Errorf("expected profile photo upload response to include file_id, got body %s", string(suite.lastBody))
 	}
 	if response.Key == "" {
-		return fmt.Errorf("expected profile photo upload response to include key, got body %s", string(suite.lastBody))
+		return "", fmt.Errorf("expected profile photo upload response to include key, got body %s", string(suite.lastBody))
 	}
 
-	if err := suite.confirmProfilePhotoUpload(*response); err != nil {
-		return err
+	if err := suite.confirmProfilePhotoUpload(auth0ID, *response); err != nil {
+		return "", err
 	}
 	if err := suite.lastResponseShouldHaveStatusCode(http.StatusOK); err != nil {
-		return err
+		return "", err
 	}
 
-	suite.providerProfilePhotoFileID = response.FileID
-	return nil
+	return response.FileID, nil
 }
 
 func (suite *testSuite) requestProviderAccountRegistrationWithoutProfilePhoto(email, name, surname, categoryName string) error {
-	previousProfilePhotoID := suite.providerProfilePhotoFileID
-	suite.providerProfilePhotoFileID = ""
-	defer func() { suite.providerProfilePhotoFileID = previousProfilePhotoID }()
+	categoryID, err := suite.categoryIDFor(categoryName)
+	if err != nil {
+		return err
+	}
 
-	return suite.requestProviderAccountRegistration(email, name, surname, categoryName)
+	return suite.requestProviderRegistration(providerRegistrationRequest{
+		Email:                  email,
+		Name:                   name,
+		Surname:                surname,
+		CategoryID:             categoryID,
+		CriminalRecordFile:     "criminal-record.pdf",
+		CUITCertificateFile:    "cuit-certificate.pdf",
+		BiometricValidationID:  "biometric-validation-approved",
+		ProfessionalCredential: "professional-license-or-certificate.pdf",
+	})
 }
 
 func (suite *testSuite) tryUploadProviderProfilePhotoWithInvalidFormat() error {
-	_, err := suite.requestProfilePhotoPresign(presignFileRequest{
+	_, err := suite.requestProfilePhotoPresign("auth0|provider-test", presignFileRequest{
 		OriginalName: "foto-perfil.gif",
 		MimeType:     "image/gif",
 		SizeBytes:    validProfilePhotoSizeBytes,
@@ -94,7 +112,7 @@ func (suite *testSuite) tryUploadProviderProfilePhotoWithInvalidFormat() error {
 }
 
 func (suite *testSuite) tryUploadOversizedProviderProfilePhoto() error {
-	_, err := suite.requestProfilePhotoPresign(presignFileRequest{
+	_, err := suite.requestProfilePhotoPresign("auth0|provider-test", presignFileRequest{
 		OriginalName: "foto-perfil.jpg",
 		MimeType:     "image/jpeg",
 		SizeBytes:    oversizedProfilePhotoBytes,
@@ -119,8 +137,8 @@ func (suite *testSuite) systemReportsProfilePhotoCouldNotBeUploaded() error {
 	return suite.registrationResponseShouldSay("Profile photo could not be uploaded")
 }
 
-func (suite *testSuite) requestProfilePhotoPresign(payload presignFileRequest) (*presignFileResponse, error) {
-	resp, err := suite.postJSONWithAuth("auth0|provider-test", "/files/presign", payload)
+func (suite *testSuite) requestProfilePhotoPresign(auth0ID string, payload presignFileRequest) (*presignFileResponse, error) {
+	resp, err := suite.postJSONWithAuth(auth0ID, "/files/presign", payload)
 	if err != nil {
 		return nil, err
 	}
@@ -144,8 +162,8 @@ func (suite *testSuite) requestProfilePhotoPresign(payload presignFileRequest) (
 	return &response, nil
 }
 
-func (suite *testSuite) confirmProfilePhotoUpload(upload presignFileResponse) error {
-	resp, err := suite.postJSONWithAuth("auth0|provider-test", "/files/"+upload.FileID+"/confirm", confirmFileRequest{
+func (suite *testSuite) confirmProfilePhotoUpload(auth0ID string, upload presignFileResponse) error {
+	resp, err := suite.postJSONWithAuth(auth0ID, "/files/"+upload.FileID+"/confirm", confirmFileRequest{
 		Key:       upload.Key,
 		MimeType:  "image/jpeg",
 		SizeBytes: validProfilePhotoSizeBytes,

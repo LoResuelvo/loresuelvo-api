@@ -26,8 +26,14 @@ type jobRequestRepositoryTestContext struct {
 func cleanJobRequestRepositoryTestDatabase(t *testing.T, database *sql.DB) {
 	t.Helper()
 
-	_, err := database.Exec("DELETE FROM users")
+	_, err := database.Exec("DELETE FROM providers")
+	require.NoError(t, err, "could not clean providers")
+
+	_, err = database.Exec("DELETE FROM users")
 	require.NoError(t, err, "could not clean users")
+
+	_, err = database.Exec("DELETE FROM files")
+	require.NoError(t, err, "could not clean files")
 
 	_, err = database.Exec("DELETE FROM categories")
 	require.NoError(t, err, "could not clean categories")
@@ -87,10 +93,10 @@ func savedProviderIDForJobRequest(t *testing.T, testContext jobRequestRepository
 func savedProviderIDWithData(t *testing.T, testContext jobRequestRepositoryTestContext, authID, email, name, surname, categoryName string) int {
 	t.Helper()
 
-	providerToSave := validProviderWithData(t, testContext.categoryRepository, authID, email, name, surname, categoryName)
+	providerToSave := validProviderWithData(t, testContext.categoryRepository, testContext.database, authID, email, name, surname, categoryName)
 	require.NoError(t, testContext.providerRepository.Save(*providerToSave))
 
-	providerID, err := testContext.providerRepository.FindIDByEmail(providerToSave.User.Email)
+	providerID, err := testContext.providerRepository.FindIDByEmail(providerToSave.Email())
 	require.NoError(t, err)
 
 	return providerID

@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/category"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/provider"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/user"
 )
@@ -20,22 +21,23 @@ func NewProviderRepository(db *sql.DB, repositoryUser *UserRepository) *Provider
 	}
 }
 
-func (repository *ProviderRepository) Save(provider provider.Provider) error {
+func (repository *ProviderRepository) Save(providerToSave provider.Provider) error {
 	tx, err := repository.db.Begin()
 	if err != nil {
 		return fmt.Errorf("beginning provider transaction: %w", err)
 	}
 
-	userID, err := repository.repositoryUser.saveWithTx(tx, *provider.User)
+	userID, err := repository.repositoryUser.saveWithTx(tx, *providerToSave.User)
 	if err != nil {
 		return rollbackProviderTx(tx, fmt.Errorf("saving provider user: %w", err))
 	}
 
 	_, err = tx.Exec(
-		`INSERT INTO providers (user_id, category_id)
-		VALUES ($1, $2)`,
+		`INSERT INTO providers (user_id, category_id, profile_photo_file_id)
+		VALUES ($1, $2, $3)`,
 		userID,
-		provider.Category.ID,
+		providerToSave.Category.ID,
+		providerToSave.ProfilePhotoFileID,
 	)
 	if err != nil {
 		return rollbackProviderTx(tx, fmt.Errorf("saving provider profile: %w", err))
@@ -119,9 +121,19 @@ func (repository *ProviderRepository) FindIDByEmail(email string) (int, error) {
 
 func (repository *ProviderRepository) FindByCategoryID(categoryID int) ([]provider.Provider, error) {
 	rows, err := repository.db.Query(
-		`SELECT providers.id, users.auth_id, users.email, users.name, users.surname, users.role
+		`SELECT providers.id,
+			users.auth_id,
+			users.email,
+			users.name,
+			users.surname,
+			users.role,
+			categories.id,
+			categories.name,
+			categories.normalized_name,
+			COALESCE(providers.profile_photo_file_id::text, '')
 		FROM providers
 		INNER JOIN users ON users.id = providers.user_id
+		INNER JOIN categories ON categories.id = providers.category_id
 		WHERE providers.category_id = $1
 		ORDER BY users.name ASC, users.surname ASC`,
 		categoryID,
@@ -136,7 +148,9 @@ func (repository *ProviderRepository) FindByCategoryID(categoryID int) ([]provid
 	providers := []provider.Provider{}
 	for rows.Next() {
 		var providerID int
+		var providerCategory category.Category
 		var providerUser user.User
+		var providerProfilePhotoFileID string
 		if err := rows.Scan(
 			&providerID,
 			&providerUser.AuthID,
@@ -144,11 +158,20 @@ func (repository *ProviderRepository) FindByCategoryID(categoryID int) ([]provid
 			&providerUser.Name,
 			&providerUser.Surname,
 			&providerUser.Role,
+			&providerCategory.ID,
+			&providerCategory.Name,
+			&providerCategory.NormalizedName,
+			&providerProfilePhotoFileID,
 		); err != nil {
 			return nil, err
 		}
 
-		providers = append(providers, provider.Provider{ID: providerID, User: &providerUser})
+		providers = append(providers, provider.Provider{
+			ID:                 providerID,
+			User:               &providerUser,
+			Category:           &providerCategory,
+			ProfilePhotoFileID: providerProfilePhotoFileID,
+		})
 	}
 
 	if err := rows.Err(); err != nil {

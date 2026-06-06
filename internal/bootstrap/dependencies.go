@@ -5,11 +5,13 @@ import (
 	"database/sql"
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler"
-	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/repositories"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/realtime"
+	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/repositories"
+	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/storage"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/category"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/consumer"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/conversation"
+	filedomain "github.com/LoResuelvo/loresuelvo-api/internal/domain/file"
 	jobrequest "github.com/LoResuelvo/loresuelvo-api/internal/domain/job_request"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/provider"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/user"
@@ -24,6 +26,7 @@ type Dependencies struct {
 	MessageRepository      *repositories.MessageRepository
 	JobRequestRepository   *repositories.JobRequestRepository
 	ConversationReader     *repositories.ConversationReader
+	FileRepository         *repositories.FileRepository
 
 	CategoryHandler     *handler.CategoryHandler
 	ConsumerHandler     *handler.ConsumerHandler
@@ -31,6 +34,7 @@ type Dependencies struct {
 	ConversationHandler *handler.ConversationHandler
 	JobRequestHandler   *handler.JobRequestHandler
 	UserHandler         *handler.UserHandler
+	FileHandler         *handler.FileHandler
 
 	Hub              *realtime.Hub
 	RealtimeHandler  *realtime.Handler
@@ -46,6 +50,11 @@ func NewDependencies(database *sql.DB) *Dependencies {
 	conversationRepository := repositories.NewConversationRepository(database, messageRepository)
 	jobRequestRepository := repositories.NewJobRequestRepository(database)
 	conversationReader := repositories.NewConversationReader(database)
+	fileRepository := repositories.NewFileRepository(database)
+
+	storageConfig := storage.NewConfigFromEnv()
+	fileStorage := storage.NewStorageFromConfig(storageConfig)
+	fileService := filedomain.NewService(fileRepository, fileStorage, storageConfig.PublicBucket, storageConfig.PrivateBucket, filedomain.SystemClock{})
 
 	// Realtime infrastructure
 	hub := realtime.NewHub()
@@ -58,7 +67,7 @@ func NewDependencies(database *sql.DB) *Dependencies {
 	realtimeHandler := realtime.NewHandler(hub, consumerRepository, providerRepository, ticketStore)
 
 	categoryService := category.NewService(categoryRepository)
-	providerService := provider.NewService(providerRepository, categoryRepository)
+	providerService := provider.NewService(providerRepository, categoryRepository, fileService)
 	consumerService := consumer.NewService(consumerRepository)
 	conversationService := conversation.NewService(
 		conversationRepository,
@@ -87,12 +96,14 @@ func NewDependencies(database *sql.DB) *Dependencies {
 		MessageRepository:      messageRepository,
 		JobRequestRepository:   jobRequestRepository,
 		ConversationReader:     conversationReader,
+		FileRepository:         fileRepository,
 		CategoryHandler:        handler.NewCategoryHandler(categoryService),
 		ConsumerHandler:        handler.NewConsumerHandler(consumerService),
 		ProviderHandler:        handler.NewProviderHandler(providerService),
 		ConversationHandler:    handler.NewConversationHandler(conversationService),
 		JobRequestHandler:      handler.NewJobRequestHandler(jobRequestService),
 		UserHandler:            handler.NewUserHandler(userService),
+		FileHandler:            handler.NewFileHandler(fileService),
 		Hub:                    hub,
 		RealtimeHandler:        realtimeHandler,
 		MessagePublisher:       messagePublisher,

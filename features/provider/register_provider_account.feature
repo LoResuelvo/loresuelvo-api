@@ -1,4 +1,3 @@
-@wip
 Feature: Registrar cuenta nueva de prestador
     Como prestador
     quiero registrarme en la plataforma
@@ -10,12 +9,14 @@ Feature: Registrar cuenta nueva de prestador
         And que no existe un usuario con correo "prestador@example.com"
 
     Scenario: 01-RPA Registrar una cuenta nueva de prestador correctamente
+        And que cargué una foto de perfil válida
         When me registro como prestador con correo "prestador@example.com", nombre "Juan", apellido "Pérez" y rubro "Plomería"
         Then el sistema confirma el registro
 
     Rule: El prestador debe indicar su rubro
 
     Scenario: 02-RPA Rechazar registro sin rubro
+        And que cargué una foto de perfil válida
         When me registro como prestador con correo "prestador@example.com", nombre "Juan", apellido "Pérez" y sin rubro
         Then el sistema me indica que el rubro es obligatorio
     

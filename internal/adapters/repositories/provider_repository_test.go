@@ -4,11 +4,14 @@ import (
 	"context"
 	"database/sql"
 	"testing"
+	"time"
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/repositories"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/category"
+	filedomain "github.com/LoResuelvo/loresuelvo-api/internal/domain/file"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/provider"
 	"github.com/LoResuelvo/loresuelvo-api/internal/infrastructure/db"
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -16,8 +19,14 @@ import (
 func cleanProviderRepositoryTestDatabase(t *testing.T, database *sql.DB) {
 	t.Helper()
 
-	_, err := database.Exec("DELETE FROM users")
+	_, err := database.Exec("DELETE FROM providers")
+	require.NoError(t, err, "could not clean providers")
+
+	_, err = database.Exec("DELETE FROM users")
 	require.NoError(t, err, "could not clean users")
+
+	_, err = database.Exec("DELETE FROM files")
+	require.NoError(t, err, "could not clean files")
 
 	_, err = database.Exec("DELETE FROM categories")
 	require.NoError(t, err, "could not clean categories")
@@ -26,6 +35,7 @@ func cleanProviderRepositoryTestDatabase(t *testing.T, database *sql.DB) {
 type providerRepositoryTestContext struct {
 	providerRepository *repositories.ProviderRepository
 	categoryRepository *repositories.CategoryRepository
+	database           *sql.DB
 }
 
 func newProviderRepositoryTest(t *testing.T) providerRepositoryTestContext {
@@ -47,22 +57,48 @@ func newProviderRepositoryTest(t *testing.T) providerRepositoryTestContext {
 	return providerRepositoryTestContext{
 		providerRepository: repositories.NewProviderRepository(database, userRepository),
 		categoryRepository: repositories.NewCategoryRepository(database),
+		database:           database,
 	}
 }
 
-func validProvider(t *testing.T, categoryRepository *repositories.CategoryRepository) *provider.Provider {
+func validProvider(t *testing.T, testContext providerRepositoryTestContext) *provider.Provider {
 	t.Helper()
 
-	return validProviderWithData(t, categoryRepository, "auth0|josue", "josugod@gmail.com", "Josue", "el pro", "Plomería")
+	return validProviderWithData(t, testContext.categoryRepository, testContext.database, "auth0|josue", "josugod@gmail.com", "Josue", "el pro", "Plomería")
 }
 
-func validProviderWithData(t *testing.T, categoryRepository *repositories.CategoryRepository, authID, email, name, surname, categoryName string) *provider.Provider {
+func validProviderWithData(t *testing.T, categoryRepository *repositories.CategoryRepository, database *sql.DB, authID, email, name, surname, categoryName string) *provider.Provider {
 	t.Helper()
 
 	savedCategory := savedCategoryForProvider(t, categoryRepository, categoryName)
-	provider, err := provider.NewProvider(authID, email, name, surname, savedCategory)
+	profilePhotoFileID := savedProviderProfilePhotoFileID(t, database, authID)
+	provider, err := provider.NewProvider(authID, email, name, surname, savedCategory, profilePhotoFileID)
 	require.NoError(t, err, "could not prepare provider")
 	return provider
+}
+
+func savedProviderProfilePhotoFileID(t *testing.T, database *sql.DB, authID string) string {
+	t.Helper()
+
+	fileID := uuid.NewString()
+	_, err := database.Exec(
+		`INSERT INTO files (id, key, bucket, original_name, mime_type, size_bytes, status, visibility, purpose, uploaded_by_auth_id, created_on, updated_on)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+		fileID,
+		"files/2026/06/provider_profile_photo/"+fileID+".jpg",
+		"public-bucket",
+		"foto.jpg",
+		"image/jpeg",
+		1024,
+		filedomain.StatusConfirmed,
+		filedomain.VisibilityPublic,
+		filedomain.PurposeProviderProfilePhoto,
+		authID,
+		time.Date(2026, 6, 6, 0, 0, 0, 0, time.UTC),
+		time.Date(2026, 6, 6, 0, 0, 0, 0, time.UTC),
+	)
+	require.NoError(t, err, "could not prepare provider profile photo")
+	return fileID
 }
 
 func savedCategoryForProvider(t *testing.T, categoryRepository *repositories.CategoryRepository, categoryName string) *category.Category {
@@ -85,37 +121,37 @@ func savedCategoryForProvider(t *testing.T, categoryRepository *repositories.Cat
 func TestProviderRepositoryCanSaveAProvider(t *testing.T) {
 	testContext := newProviderRepositoryTest(t)
 	repo := testContext.providerRepository
-	provider := validProvider(t, testContext.categoryRepository)
+	provider := validProvider(t, testContext)
 
 	err := repo.Save(*provider)
 
 	assert.NoError(t, err)
-	exists := repo.FindByEmail(provider.User.Email)
+	exists := repo.FindByEmail(provider.Email())
 	assert.True(t, exists, "Provider should be saved on database")
 }
 
 func TestProviderRepositoryCanDeleteAllProviders(t *testing.T) {
 	testContext := newProviderRepositoryTest(t)
 	repo := testContext.providerRepository
-	provider := validProvider(t, testContext.categoryRepository)
+	provider := validProvider(t, testContext)
 
 	_ = repo.Save(*provider)
 
 	err := repo.DeleteAll()
 
 	assert.NoError(t, err)
-	exists := repo.FindByEmail(provider.User.Email)
+	exists := repo.FindByEmail(provider.Email())
 	assert.False(t, exists, "All providers should be deleted from database")
 }
 
 func TestProviderRepositoryCanFindByEmail(t *testing.T) {
 	testContext := newProviderRepositoryTest(t)
 	repo := testContext.providerRepository
-	provider := validProvider(t, testContext.categoryRepository)
+	provider := validProvider(t, testContext)
 
 	_ = repo.Save(*provider)
 
-	assert.True(t, repo.FindByEmail(provider.User.Email), "Provider should be found by email")
+	assert.True(t, repo.FindByEmail(provider.Email()), "Provider should be found by email")
 }
 
 func TestProviderRepositoryFindByEmailReturnsFalseIfProviderDoesNotExist(t *testing.T) {
@@ -128,12 +164,12 @@ func TestProviderRepositoryFindByEmailReturnsFalseIfProviderDoesNotExist(t *test
 func TestProviderRepositoryCanFindIDByEmail(t *testing.T) {
 	testContext := newProviderRepositoryTest(t)
 	repo := testContext.providerRepository
-	provider := validProvider(t, testContext.categoryRepository)
+	provider := validProvider(t, testContext)
 
 	err := repo.Save(*provider)
 	require.NoError(t, err, "saving provider should not return an error")
 
-	providerID, err := repo.FindIDByEmail(provider.User.Email)
+	providerID, err := repo.FindIDByEmail(provider.Email())
 
 	require.NoError(t, err)
 	assert.NotZero(t, providerID)
@@ -142,12 +178,12 @@ func TestProviderRepositoryCanFindIDByEmail(t *testing.T) {
 func TestProviderRepositoryCanCheckExistenceByID(t *testing.T) {
 	testContext := newProviderRepositoryTest(t)
 	repo := testContext.providerRepository
-	provider := validProvider(t, testContext.categoryRepository)
+	provider := validProvider(t, testContext)
 
 	err := repo.Save(*provider)
 	require.NoError(t, err, "saving provider should not return an error")
 
-	providerID, err := repo.FindIDByEmail(provider.User.Email)
+	providerID, err := repo.FindIDByEmail(provider.Email())
 	require.NoError(t, err)
 
 	exists, err := repo.ExistsByID(providerID)
@@ -169,9 +205,9 @@ func TestProviderRepositoryExistsByIDReturnsFalseIfProviderDoesNotExist(t *testi
 func TestProviderRepositoryCanFindProvidersByCategoryID(t *testing.T) {
 	testContext := newProviderRepositoryTest(t)
 	repo := testContext.providerRepository
-	plumbingProvider := validProviderWithData(t, testContext.categoryRepository, "auth0|juan", "juan.plomero@example.com", "Juan", "Pérez", "Plomería")
-	anotherPlumbingProvider := validProviderWithData(t, testContext.categoryRepository, "auth0|pedro", "pedro.plomero@example.com", "Pedro", "Dib", "Plomería")
-	electricProvider := validProviderWithData(t, testContext.categoryRepository, "auth0|laura", "laura.electricista@example.com", "Laura", "Gómez", "Electricidad")
+	plumbingProvider := validProviderWithData(t, testContext.categoryRepository, testContext.database, "auth0|juan", "juan.plomero@example.com", "Juan", "Pérez", "Plomería")
+	anotherPlumbingProvider := validProviderWithData(t, testContext.categoryRepository, testContext.database, "auth0|pedro", "pedro.plomero@example.com", "Pedro", "Dib", "Plomería")
+	electricProvider := validProviderWithData(t, testContext.categoryRepository, testContext.database, "auth0|laura", "laura.electricista@example.com", "Laura", "Gómez", "Electricidad")
 
 	require.NoError(t, repo.Save(*plumbingProvider))
 	require.NoError(t, repo.Save(*anotherPlumbingProvider))
@@ -182,11 +218,19 @@ func TestProviderRepositoryCanFindProvidersByCategoryID(t *testing.T) {
 	require.NoError(t, err)
 	assert.Len(t, providers, 2)
 	assert.NotZero(t, providers[0].ID)
-	assert.Equal(t, "Juan", providers[0].User.Name)
-	assert.Equal(t, "Pérez", providers[0].User.Surname)
+	assert.Equal(t, "Juan", providers[0].Name())
+	assert.Equal(t, "Pérez", providers[0].Surname())
+	require.NotNil(t, providers[0].Category)
+	assert.Equal(t, plumbingProvider.Category.ID, providers[0].Category.ID)
+	assert.Equal(t, "Plomería", providers[0].Category.Name)
+	assert.Equal(t, plumbingProvider.ProfilePhotoFileID, providers[0].ProfilePhotoFileID)
 	assert.NotZero(t, providers[1].ID)
-	assert.Equal(t, "Pedro", providers[1].User.Name)
-	assert.Equal(t, "Dib", providers[1].User.Surname)
+	assert.Equal(t, "Pedro", providers[1].Name())
+	assert.Equal(t, "Dib", providers[1].Surname())
+	require.NotNil(t, providers[1].Category)
+	assert.Equal(t, anotherPlumbingProvider.Category.ID, providers[1].Category.ID)
+	assert.Equal(t, "Plomería", providers[1].Category.Name)
+	assert.Equal(t, anotherPlumbingProvider.ProfilePhotoFileID, providers[1].ProfilePhotoFileID)
 }
 
 func TestProviderRepositoryFindByCategoryIDReturnsEmptyListIfNoProvidersExistForCategory(t *testing.T) {
@@ -203,12 +247,12 @@ func TestProviderRepositoryFindByCategoryIDReturnsEmptyListIfNoProvidersExistFor
 func TestProviderRepositoryCanFindIDByAuthID(t *testing.T) {
 	testContext := newProviderRepositoryTest(t)
 	repo := testContext.providerRepository
-	provider := validProvider(t, testContext.categoryRepository)
+	provider := validProvider(t, testContext)
 
 	err := repo.Save(*provider)
 	require.NoError(t, err, "saving provider should not return an error")
 
-	providerID, err := repo.FindIDByAuthID(provider.User.AuthID)
+	providerID, err := repo.FindIDByAuthID(provider.AuthID())
 
 	require.NoError(t, err)
 	assert.NotZero(t, providerID)

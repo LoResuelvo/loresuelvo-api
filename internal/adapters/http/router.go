@@ -18,11 +18,12 @@ type Router struct {
 	conversationHandler *handler.ConversationHandler
 	jobRequestHandler   *handler.JobRequestHandler
 	userHandler         *handler.UserHandler
+	fileHandler         *handler.FileHandler
 	realtimeHandler     *realtime.Handler
 	auth0Validator      *validator.Validator
 }
 
-func NewRouter(categoryHandler *handler.CategoryHandler, consumerHandler *handler.ConsumerHandler, providerHandler *handler.ProviderHandler, conversationHandler *handler.ConversationHandler, jobRequestHandler *handler.JobRequestHandler, userHandler *handler.UserHandler, realtimeHandler *realtime.Handler, auth0Validator *validator.Validator) *Router {
+func NewRouter(categoryHandler *handler.CategoryHandler, consumerHandler *handler.ConsumerHandler, providerHandler *handler.ProviderHandler, conversationHandler *handler.ConversationHandler, jobRequestHandler *handler.JobRequestHandler, userHandler *handler.UserHandler, fileHandler *handler.FileHandler, realtimeHandler *realtime.Handler, auth0Validator *validator.Validator) *Router {
 	router := &Router{
 		categoryHandler:     categoryHandler,
 		consumerHandler:     consumerHandler,
@@ -30,6 +31,7 @@ func NewRouter(categoryHandler *handler.CategoryHandler, consumerHandler *handle
 		conversationHandler: conversationHandler,
 		jobRequestHandler:   jobRequestHandler,
 		userHandler:         userHandler,
+		fileHandler:         fileHandler,
 		realtimeHandler:     realtimeHandler,
 		auth0Validator:      auth0Validator,
 	}
@@ -58,6 +60,7 @@ func (router *Router) SetUp() (*gin.Engine, error) {
 	router.registerJobRequestRoutes(engine, authMiddleware)
 	router.registerConversationRoutes(engine, authMiddleware)
 	router.registerAuthenticatedRoutes(engine, authMiddleware)
+	router.registerFileRoutes(engine, authMiddleware)
 	router.registerRealtimeRoutes(engine, authMiddleware)
 
 	return engine, nil
@@ -98,6 +101,11 @@ func (router *Router) registerConversationRoutes(engine *gin.Engine, authMiddlew
 
 func (router *Router) registerAuthenticatedRoutes(engine *gin.Engine, authMiddleware gin.HandlerFunc) {
 	engine.GET("/me", authMiddleware, router.userHandler.GetCurrentUser)
+}
+
+func (router *Router) registerFileRoutes(engine *gin.Engine, authMiddleware gin.HandlerFunc) {
+	engine.POST("/files/presign", authMiddleware, router.fileHandler.PresignUpload)
+	engine.POST("/files/:fileID/confirm", authMiddleware, router.fileHandler.ConfirmUpload)
 }
 
 func (router *Router) registerRealtimeRoutes(engine *gin.Engine, authMiddleware gin.HandlerFunc) {

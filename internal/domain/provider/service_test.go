@@ -1,9 +1,12 @@
 package provider_test
 
 import (
+	"context"
+	"errors"
 	"testing"
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/category"
+	filedomain "github.com/LoResuelvo/loresuelvo-api/internal/domain/file"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/provider"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/validator"
 	"github.com/stretchr/testify/assert"
@@ -18,10 +21,38 @@ type providerRepositoryMock struct {
 	findByCategoryIDCalled bool
 	existsByEmailValue     bool
 	findByEmailCalled      bool
+	saveErr                error
+	findByCategoryIDErr    error
 }
 
 type categoryFinderMock struct {
 	categories []category.Category
+}
+
+type profilePhotoValidatorMock struct {
+	err                    error
+	validatedAuthID        string
+	validatedFileID        string
+	resolvedFileIDs        []string
+	profilePhotoURLsByFile map[string]string
+	resolveErr             error
+}
+
+func (m *profilePhotoValidatorMock) ValidateProviderProfilePhoto(_ context.Context, authID, fileID string) error {
+	m.validatedAuthID = authID
+	m.validatedFileID = fileID
+	return m.err
+}
+
+func (m *profilePhotoValidatorMock) ResolvePublicURLs(_ context.Context, fileIDs []string) (map[string]string, error) {
+	m.resolvedFileIDs = fileIDs
+	if m.resolveErr != nil {
+		return nil, m.resolveErr
+	}
+	if m.profilePhotoURLsByFile != nil {
+		return m.profilePhotoURLsByFile, nil
+	}
+	return map[string]string{}, nil
 }
 
 func existingCategory() category.Category {
@@ -46,7 +77,7 @@ func (finder *categoryFinderMock) FindByID(id int) *category.Category {
 func (repository *providerRepositoryMock) Save(provider provider.Provider) error {
 	repository.savedProvider = provider
 	repository.saveCalled = true
-	return nil
+	return repository.saveErr
 }
 
 func (repository *providerRepositoryMock) FindByEmail(email string) bool {
@@ -57,56 +88,110 @@ func (repository *providerRepositoryMock) FindByEmail(email string) bool {
 func (repository *providerRepositoryMock) FindByCategoryID(categoryID int) ([]provider.Provider, error) {
 	repository.findByCategoryIDCalled = true
 	repository.requestedCategoryID = categoryID
+	if repository.findByCategoryIDErr != nil {
+		return nil, repository.findByCategoryIDErr
+	}
 	return repository.providersByCategoryID[categoryID], nil
 }
 
 func TestRegisterProviderWithValidData(t *testing.T) {
 	repository := &providerRepositoryMock{}
 	categoryFinder := categoryFinderWithExistingCategory()
-	providerManager := provider.NewService(repository, categoryFinder)
+	providerManager := provider.NewService(repository, categoryFinder, &profilePhotoValidatorMock{})
 
 	err := providerManager.RegisterProvider(
+		context.Background(),
 		"auth0|ana",
 		"ana@example.com",
 		"Ana",
 		"Perez",
 		1,
+		"profile-photo-file-id",
 	)
 
 	require.NoError(t, err)
-	assert.Equal(t, "auth0|ana", repository.savedProvider.User.AuthID)
-	assert.Equal(t, "ana@example.com", repository.savedProvider.User.Email)
+	assert.Equal(t, "auth0|ana", repository.savedProvider.AuthID())
+	assert.Equal(t, "ana@example.com", repository.savedProvider.Email())
 	assert.Equal(t, "Plomería", repository.savedProvider.Category.Name)
+}
+
+func TestNewServiceRequiresFileValidator(t *testing.T) {
+	assert.PanicsWithValue(t, "provider file validator is required", func() {
+		provider.NewService(&providerRepositoryMock{}, categoryFinderWithExistingCategory(), nil)
+	})
+}
+
+func TestNewProviderRequiresCategory(t *testing.T) {
+	createdProvider, err := provider.NewProvider("auth0|ana", "ana@example.com", "Ana", "Perez", nil, "profile-photo-file-id")
+
+	assert.Nil(t, createdProvider)
+	assert.ErrorIs(t, err, category.ErrDoesNotExist)
+}
+
+func TestNewProviderExposesUserFieldsThroughAccessors(t *testing.T) {
+	providerCategory := existingCategory()
+	createdProvider, err := provider.NewProvider("auth0|ana", "ana@example.com", "Ana", "Perez", &providerCategory, "profile-photo-file-id")
+
+	require.NoError(t, err)
+	assert.Equal(t, "auth0|ana", createdProvider.AuthID())
+	assert.Equal(t, "ana@example.com", createdProvider.Email())
+	assert.Equal(t, "Ana", createdProvider.Name())
+	assert.Equal(t, "Perez", createdProvider.Surname())
+	assert.Equal(t, provider.Role, createdProvider.User.Role)
 }
 
 func TestRegisterProviderWithEmailWithoutArroba(t *testing.T) {
 	repository := &providerRepositoryMock{}
 	categoryFinder := categoryFinderWithExistingCategory()
-	providerManager := provider.NewService(repository, categoryFinder)
+	providerManager := provider.NewService(repository, categoryFinder, &profilePhotoValidatorMock{})
 
 	err := providerManager.RegisterProvider(
+		context.Background(),
 		"auth0|ana",
 		"anaexample.com",
 		"Ana",
 		"Perez",
 		1,
+		"",
 	)
 
 	assert.ErrorIs(t, err, validator.ErrInvalidEmailFormat)
 	assert.False(t, repository.saveCalled, "provider should not be saved when email is invalid")
 }
 
+func TestRegisterProviderReturnsRepositorySaveError(t *testing.T) {
+	expectedErr := errors.New("save provider")
+	repository := &providerRepositoryMock{saveErr: expectedErr}
+	categoryFinder := categoryFinderWithExistingCategory()
+	providerManager := provider.NewService(repository, categoryFinder, &profilePhotoValidatorMock{})
+
+	err := providerManager.RegisterProvider(
+		context.Background(),
+		"auth0|ana",
+		"ana@example.com",
+		"Ana",
+		"Perez",
+		1,
+		"profile-photo-file-id",
+	)
+
+	assert.ErrorIs(t, err, expectedErr)
+	assert.True(t, repository.saveCalled)
+}
+
 func TestRegisterProviderWithEmailWithoutDomain(t *testing.T) {
 	repository := &providerRepositoryMock{}
 	categoryFinder := categoryFinderWithExistingCategory()
-	providerManager := provider.NewService(repository, categoryFinder)
+	providerManager := provider.NewService(repository, categoryFinder, &profilePhotoValidatorMock{})
 
 	err := providerManager.RegisterProvider(
+		context.Background(),
 		"auth0|ana",
 		"ana@",
 		"Ana",
 		"Perez",
 		1,
+		"",
 	)
 
 	assert.ErrorIs(t, err, validator.ErrInvalidEmailFormat)
@@ -116,14 +201,16 @@ func TestRegisterProviderWithEmailWithoutDomain(t *testing.T) {
 func TestRegisterProviderWithEmailWithoutName(t *testing.T) {
 	repository := &providerRepositoryMock{}
 	categoryFinder := categoryFinderWithExistingCategory()
-	providerManager := provider.NewService(repository, categoryFinder)
+	providerManager := provider.NewService(repository, categoryFinder, &profilePhotoValidatorMock{})
 
 	err := providerManager.RegisterProvider(
+		context.Background(),
 		"auth0|ana",
 		"@example.com",
 		"Ana",
 		"Perez",
 		1,
+		"",
 	)
 
 	assert.ErrorIs(t, err, validator.ErrInvalidEmailFormat)
@@ -133,14 +220,16 @@ func TestRegisterProviderWithEmailWithoutName(t *testing.T) {
 func TestRegisterProviderWithAlreadyRegisteredEmail(t *testing.T) {
 	repository := &providerRepositoryMock{existsByEmailValue: true}
 	categoryFinder := categoryFinderWithExistingCategory()
-	providerManager := provider.NewService(repository, categoryFinder)
+	providerManager := provider.NewService(repository, categoryFinder, &profilePhotoValidatorMock{})
 
 	err := providerManager.RegisterProvider(
+		context.Background(),
 		"auth0|ana",
 		"ana@example.com",
 		"Ana",
 		"Perez",
 		1,
+		"",
 	)
 
 	assert.ErrorIs(t, err, validator.ErrEmailAlreadyRegistered)
@@ -151,14 +240,16 @@ func TestRegisterProviderWithAlreadyRegisteredEmail(t *testing.T) {
 func TestRegisterProviderWithMissingCategory(t *testing.T) {
 	repository := &providerRepositoryMock{}
 	categoryFinder := categoryFinderWithExistingCategory()
-	providerManager := provider.NewService(repository, categoryFinder)
+	providerManager := provider.NewService(repository, categoryFinder, &profilePhotoValidatorMock{})
 
 	err := providerManager.RegisterProvider(
+		context.Background(),
 		"auth0|ana",
 		"ana@example.com",
 		"Ana",
 		"Perez",
 		0,
+		"",
 	)
 
 	assert.ErrorIs(t, err, category.ErrIDRequired)
@@ -168,14 +259,16 @@ func TestRegisterProviderWithMissingCategory(t *testing.T) {
 func TestRegisterProviderWithNonExistingCategory(t *testing.T) {
 	repository := &providerRepositoryMock{}
 	categoryFinder := categoryFinderWithExistingCategory()
-	providerManager := provider.NewService(repository, categoryFinder)
+	providerManager := provider.NewService(repository, categoryFinder, &profilePhotoValidatorMock{})
 
 	err := providerManager.RegisterProvider(
+		context.Background(),
 		"auth0|ana",
 		"ana@example.com",
 		"Ana",
 		"Perez",
 		999,
+		"",
 	)
 
 	assert.ErrorIs(t, err, category.ErrDoesNotExist)
@@ -185,14 +278,16 @@ func TestRegisterProviderWithNonExistingCategory(t *testing.T) {
 func TestRegisterProviderWithWrongCategoryID(t *testing.T) {
 	repository := &providerRepositoryMock{}
 	categoryFinder := categoryFinderWithExistingCategory()
-	providerManager := provider.NewService(repository, categoryFinder)
+	providerManager := provider.NewService(repository, categoryFinder, &profilePhotoValidatorMock{})
 
 	err := providerManager.RegisterProvider(
+		context.Background(),
 		"auth0|ana",
 		"ana@example.com",
 		"Ana",
 		"Perez",
 		2,
+		"",
 	)
 
 	assert.ErrorIs(t, err, category.ErrDoesNotExist)
@@ -201,7 +296,7 @@ func TestRegisterProviderWithWrongCategoryID(t *testing.T) {
 
 func TestFilterProvidersByCategoryID(t *testing.T) {
 	providerCategory := existingCategory()
-	providerToReturn, err := provider.NewProvider("auth0|ana", "ana@example.com", "Ana", "Perez", &providerCategory)
+	providerToReturn, err := provider.NewProvider("auth0|ana", "ana@example.com", "Ana", "Perez", &providerCategory, "profile-photo-file-id")
 	require.NoError(t, err)
 	providerToReturn.ID = 1
 	repository := &providerRepositoryMock{
@@ -210,16 +305,19 @@ func TestFilterProvidersByCategoryID(t *testing.T) {
 		},
 	}
 	categoryFinder := categoryFinderWithExistingCategory()
-	providerManager := provider.NewService(repository, categoryFinder)
+	profilePhotoValidator := &profilePhotoValidatorMock{profilePhotoURLsByFile: map[string]string{"profile-photo-file-id": "https://cdn/profile-photo.jpg"}}
+	providerManager := provider.NewService(repository, categoryFinder, profilePhotoValidator)
 
-	providers, err := providerManager.FilterProvidersByCategoryID(1)
+	providers, err := providerManager.FilterProvidersByCategoryID(context.Background(), 1)
 
 	require.NoError(t, err)
 	assert.Len(t, providers, 1)
 	assert.Equal(t, 1, providers[0].ID)
-	assert.Equal(t, "Ana", providers[0].User.Name)
-	assert.Equal(t, "Perez", providers[0].User.Surname)
-	assert.Equal(t, "Plomería", providers[0].Category.Name)
+	assert.Equal(t, "Ana", providers[0].Name)
+	assert.Equal(t, "Perez", providers[0].Surname)
+	assert.Equal(t, "Plomería", providers[0].CategoryName)
+	assert.Equal(t, "https://cdn/profile-photo.jpg", providers[0].ProfilePhotoURL)
+	assert.Equal(t, []string{"profile-photo-file-id"}, profilePhotoValidator.resolvedFileIDs)
 	assert.True(t, repository.findByCategoryIDCalled, "providers should be searched by category id")
 	assert.Equal(t, providerCategory.ID, repository.requestedCategoryID)
 }
@@ -227,9 +325,9 @@ func TestFilterProvidersByCategoryID(t *testing.T) {
 func TestFilterProvidersByCategoryIDFindsExistingCategory(t *testing.T) {
 	repository := &providerRepositoryMock{providersByCategoryID: map[int][]provider.Provider{}}
 	categoryFinder := categoryFinderWithExistingCategory()
-	providerManager := provider.NewService(repository, categoryFinder)
+	providerManager := provider.NewService(repository, categoryFinder, &profilePhotoValidatorMock{})
 
-	_, err := providerManager.FilterProvidersByCategoryID(1)
+	_, err := providerManager.FilterProvidersByCategoryID(context.Background(), 1)
 
 	require.NoError(t, err)
 	assert.True(t, repository.findByCategoryIDCalled, "providers should be searched when category exists")
@@ -239,20 +337,52 @@ func TestFilterProvidersByCategoryIDFindsExistingCategory(t *testing.T) {
 func TestFilterProvidersByCategoryIDReturnsEmptyListWhenNoProvidersExist(t *testing.T) {
 	repository := &providerRepositoryMock{providersByCategoryID: map[int][]provider.Provider{}}
 	categoryFinder := categoryFinderWithExistingCategory()
-	providerManager := provider.NewService(repository, categoryFinder)
+	providerManager := provider.NewService(repository, categoryFinder, &profilePhotoValidatorMock{})
 
-	providers, err := providerManager.FilterProvidersByCategoryID(1)
+	providers, err := providerManager.FilterProvidersByCategoryID(context.Background(), 1)
 
 	require.NoError(t, err)
 	assert.Empty(t, providers)
 }
 
+func TestFilterProvidersByCategoryIDReturnsRepositoryError(t *testing.T) {
+	expectedErr := errors.New("find providers")
+	repository := &providerRepositoryMock{findByCategoryIDErr: expectedErr}
+	categoryFinder := categoryFinderWithExistingCategory()
+	providerManager := provider.NewService(repository, categoryFinder, &profilePhotoValidatorMock{})
+
+	providers, err := providerManager.FilterProvidersByCategoryID(context.Background(), 1)
+
+	assert.Nil(t, providers)
+	assert.ErrorIs(t, err, expectedErr)
+}
+
+func TestFilterProvidersByCategoryIDWrapsProfilePhotoURLResolutionError(t *testing.T) {
+	expectedErr := errors.New("resolve urls")
+	providerCategory := existingCategory()
+	providerToReturn, err := provider.NewProvider("auth0|ana", "ana@example.com", "Ana", "Perez", &providerCategory, "profile-photo-file-id")
+	require.NoError(t, err)
+	repository := &providerRepositoryMock{
+		providersByCategoryID: map[int][]provider.Provider{
+			providerCategory.ID: {*providerToReturn},
+		},
+	}
+	categoryFinder := categoryFinderWithExistingCategory()
+	providerManager := provider.NewService(repository, categoryFinder, &profilePhotoValidatorMock{resolveErr: expectedErr})
+
+	providers, err := providerManager.FilterProvidersByCategoryID(context.Background(), 1)
+
+	assert.Nil(t, providers)
+	assert.ErrorIs(t, err, expectedErr)
+	assert.ErrorContains(t, err, "resolving provider profile photo urls")
+}
+
 func TestFilterProvidersByCategoryIDRequiresCategoryID(t *testing.T) {
 	repository := &providerRepositoryMock{}
 	categoryFinder := categoryFinderWithExistingCategory()
-	providerManager := provider.NewService(repository, categoryFinder)
+	providerManager := provider.NewService(repository, categoryFinder, &profilePhotoValidatorMock{})
 
-	providers, err := providerManager.FilterProvidersByCategoryID(0)
+	providers, err := providerManager.FilterProvidersByCategoryID(context.Background(), 0)
 
 	assert.ErrorIs(t, err, category.ErrIDRequired)
 	assert.Nil(t, providers)
@@ -262,11 +392,73 @@ func TestFilterProvidersByCategoryIDRequiresCategoryID(t *testing.T) {
 func TestFilterProvidersByCategoryIDRequiresExistingCategory(t *testing.T) {
 	repository := &providerRepositoryMock{}
 	categoryFinder := categoryFinderWithExistingCategory()
-	providerManager := provider.NewService(repository, categoryFinder)
+	providerManager := provider.NewService(repository, categoryFinder, &profilePhotoValidatorMock{})
 
-	providers, err := providerManager.FilterProvidersByCategoryID(999)
+	providers, err := providerManager.FilterProvidersByCategoryID(context.Background(), 999)
 
 	assert.ErrorIs(t, err, category.ErrDoesNotExist)
 	assert.Nil(t, providers)
 	assert.False(t, repository.findByCategoryIDCalled, "providers should not be searched when category does not exist")
+}
+
+func TestRegisterProviderRequiresProfilePhoto(t *testing.T) {
+	repository := &providerRepositoryMock{}
+	categoryFinder := categoryFinderWithExistingCategory()
+	profilePhotoValidator := &profilePhotoValidatorMock{err: filedomain.ErrProfilePhotoRequired}
+	providerManager := provider.NewService(repository, categoryFinder, profilePhotoValidator)
+
+	err := providerManager.RegisterProvider(
+		context.Background(),
+		"auth0|ana",
+		"ana@example.com",
+		"Ana",
+		"Perez",
+		1,
+		"",
+	)
+
+	assert.ErrorIs(t, err, filedomain.ErrProfilePhotoRequired)
+	assert.False(t, repository.saveCalled, "provider should not be saved without profile photo")
+}
+
+func TestRegisterProviderRejectsUnavailableProfilePhoto(t *testing.T) {
+	repository := &providerRepositoryMock{}
+	categoryFinder := categoryFinderWithExistingCategory()
+	profilePhotoValidator := &profilePhotoValidatorMock{err: filedomain.ErrProfilePhotoNotAvailable}
+	providerManager := provider.NewService(repository, categoryFinder, profilePhotoValidator)
+
+	err := providerManager.RegisterProvider(
+		context.Background(),
+		"auth0|ana",
+		"ana@example.com",
+		"Ana",
+		"Perez",
+		1,
+		"file-id",
+	)
+
+	assert.ErrorIs(t, err, filedomain.ErrProfilePhotoNotAvailable)
+	assert.False(t, repository.saveCalled, "provider should not be saved with unavailable profile photo")
+	assert.Equal(t, "auth0|ana", profilePhotoValidator.validatedAuthID)
+	assert.Equal(t, "file-id", profilePhotoValidator.validatedFileID)
+}
+
+func TestRegisterProviderMapsUnexpectedProfilePhotoValidationError(t *testing.T) {
+	repository := &providerRepositoryMock{}
+	categoryFinder := categoryFinderWithExistingCategory()
+	profilePhotoValidator := &profilePhotoValidatorMock{err: errors.New("storage unavailable")}
+	providerManager := provider.NewService(repository, categoryFinder, profilePhotoValidator)
+
+	err := providerManager.RegisterProvider(
+		context.Background(),
+		"auth0|ana",
+		"ana@example.com",
+		"Ana",
+		"Perez",
+		1,
+		"file-id",
+	)
+
+	assert.ErrorIs(t, err, filedomain.ErrProfilePhotoNotAvailable)
+	assert.False(t, repository.saveCalled, "provider should not be saved with unavailable profile photo")
 }
