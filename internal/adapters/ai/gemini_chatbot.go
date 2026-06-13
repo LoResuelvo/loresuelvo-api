@@ -57,7 +57,7 @@ Consulta del consumidor:
 %s`, userPrompt)
 }
 
-func parseChatbotResponse(_userPrompt, rawResponse string) (*conversation.ChatbotResponse, error) {
+func parseChatbotResponse(_, rawResponse string) (*conversation.ChatbotResponse, error) {
 	var payload struct {
 		Title   string `json:"title"`
 		Content string `json:"content"`
