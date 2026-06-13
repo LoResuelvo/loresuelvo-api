@@ -8,10 +8,19 @@ import (
 
 type Repository interface {
 	ExistsBetween(consumerID, providerID int) (bool, error)
-	SaveWithMessage(conversation Conversation, message Message) (*Conversation, error)
-	FindByID(ctx context.Context, conversationID int) (*Conversation, error)
+	SaveConversation(ctx context.Context, conversation Conversation) (Conversation, error)
+	FindByID(ctx context.Context, conversationID int) (Conversation, error)
 	AddMessage(ctx context.Context, conversationID int, message Message) (*Message, error)
 	CountMessagesBySenderRole(ctx context.Context, conversationID int, senderRole string) (int, error)
+}
+
+type Chatbot interface {
+	GetResponse(ctx context.Context, prompt string) (*ChatbotResponse, error)
+}
+
+type ChatbotResponse struct {
+	Title   string
+	Content string
 }
 
 type ConsumerIDFinder interface {

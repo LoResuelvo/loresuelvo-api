@@ -24,6 +24,6 @@ type ProviderRepository interface {
 
 type ConversationRepository interface {
 	ExistsBetween(consumerID, providerID int) (bool, error)
-	FindByID(ctx context.Context, conversationID int) (*conversation.Conversation, error)
+	FindByID(ctx context.Context, conversationID int) (conversation.Conversation, error)
 	SaveStatus(ctx context.Context, conversation conversation.Conversation) error
 }

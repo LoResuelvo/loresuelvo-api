@@ -28,6 +28,16 @@ func TestNewProviderMessageCreatesTrimmedProviderMessage(t *testing.T) {
 	assert.Zero(t, message.ConversationID)
 }
 
+func TestNewChatbotMessageCreatesTrimmedChatbotMessage(t *testing.T) {
+	message, err := conversation.NewChatbotMessage("  Revisá el sifón y cerrá la llave de paso.  ")
+
+	require.NoError(t, err)
+	require.NotNil(t, message)
+	assert.Equal(t, conversation.SenderChatbot, message.SenderRole)
+	assert.Equal(t, "Revisá el sifón y cerrá la llave de paso.", message.Content)
+	assert.Zero(t, message.ConversationID)
+}
+
 func TestNewConsumerMessageRejectsEmptyContent(t *testing.T) {
 	message, err := conversation.NewConsumerMessage("   ")
 

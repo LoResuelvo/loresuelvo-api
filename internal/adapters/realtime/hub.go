@@ -36,8 +36,8 @@ func newConnection(hub *Hub, conn *websocket.Conn, authID, role string, profileI
 		hub:       hub,
 		conn:      conn,
 		send:      make(chan []byte, 256),
-		authID:   authID,
-		role:     role,
+		authID:    authID,
+		role:      role,
 		profileID: profileID,
 	}
 }
@@ -109,7 +109,7 @@ func newHub() *Hub {
 	return &Hub{
 		connections: make(map[string]map[string]map[int]*Connection),
 		register:    make(chan *Connection),
-		unregister: make(chan *Connection),
+		unregister:  make(chan *Connection),
 	}
 }
 
@@ -180,6 +180,13 @@ func (h *Hub) BroadcastMessage(ctx context.Context, consumerAuthID string, consu
 	if providerAuthID != senderAuthID {
 		h.deliverToAuthIDRoleAndProfile(providerAuthID, conversation.SenderProvider, providerProfileID, event)
 	}
+}
+
+func (h *Hub) BroadcastToParticipant(ctx context.Context, authID string, role string, profileID int, event []byte) {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+
+	h.deliverToAuthIDRoleAndProfile(authID, role, profileID, event)
 }
 
 func (h *Hub) deliverToAuthIDRoleAndProfile(authID, role string, profileID int, event []byte) {

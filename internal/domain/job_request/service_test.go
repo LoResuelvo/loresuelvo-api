@@ -87,7 +87,7 @@ func (m *providerRepo) FindIDByAuthID(authID string) (int, error) {
 
 type conversationRepo struct {
 	exists            bool
-	foundConversation *conversation.Conversation
+	foundConversation conversation.Conversation
 	savedConversation conversation.Conversation
 	findByIDCalled    bool
 	saveStatusCalled  bool
@@ -101,7 +101,7 @@ func (m *conversationRepo) ExistsBetween(consumerID, providerID int) (bool, erro
 	return m.exists, nil
 }
 
-func (m *conversationRepo) FindByID(ctx context.Context, conversationID int) (*conversation.Conversation, error) {
+func (m *conversationRepo) FindByID(ctx context.Context, conversationID int) (conversation.Conversation, error) {
 	m.findByIDCalled = true
 	if m.err != nil {
 		return nil, m.err
@@ -140,9 +140,10 @@ func TestCreateJobRequestSavesRequestWithPendingConversation(t *testing.T) {
 	assert.Equal(t, 20, firstSavedRequest.ProviderID)
 	assert.Equal(t, "Reparación de fuga", firstSavedRequest.Title)
 	assert.Equal(t, "Necesito ayuda esta semana", firstSavedRequest.Description)
-	assert.Equal(t, conversation.StatusPending, repo.savedConversation.Status)
-	assert.Equal(t, 10, repo.savedConversation.ConsumerID)
-	assert.Equal(t, 20, repo.savedConversation.ProviderID)
+	savedConversation := repo.savedConversation.(*conversation.WorkConversation)
+	assert.Equal(t, conversation.StatusPending, savedConversation.Base().Status)
+	assert.Equal(t, 10, savedConversation.ConsumerID)
+	assert.Equal(t, 20, savedConversation.ProviderID)
 	assert.Equal(t, 1, createdRequest.ID)
 	assert.Equal(t, 2, createdRequest.ConversationID)
 }
@@ -258,11 +259,14 @@ func TestAcceptJobRequestActivatesLinkedConversationForAssignedProvider(t *testi
 		},
 	}
 	conversationRepo := &conversationRepo{
-		foundConversation: &conversation.Conversation{
-			ID:         30,
+		foundConversation: &conversation.WorkConversation{
+			BaseConversation: &conversation.BaseConversation{
+				ID:     30,
+				Type:   conversation.TypeWork,
+				Status: conversation.StatusPending,
+			},
 			ConsumerID: 10,
 			ProviderID: 20,
-			Status:     conversation.StatusPending,
 		},
 	}
 	service := jobrequest.NewService(
@@ -280,7 +284,7 @@ func TestAcceptJobRequestActivatesLinkedConversationForAssignedProvider(t *testi
 	assert.True(t, repo.findByIDCalled)
 	assert.True(t, conversationRepo.findByIDCalled)
 	assert.True(t, conversationRepo.saveStatusCalled)
-	assert.Equal(t, conversation.StatusActive, conversationRepo.savedConversation.Status)
+	assert.Equal(t, conversation.StatusActive, conversationRepo.savedConversation.Base().Status)
 }
 
 func TestAcceptJobRequestRejectsProviderThatIsNotAssigned(t *testing.T) {

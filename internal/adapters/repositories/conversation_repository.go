@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/conversation"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -25,7 +26,7 @@ func (repository *ConversationRepository) ExistsBetween(consumerID, providerID i
 	var exists bool
 	err := repository.db.QueryRow(
 		`SELECT EXISTS(
-			SELECT 1 FROM conversations WHERE consumer_id = $1 AND provider_id = $2
+			SELECT 1 FROM work_conversations WHERE consumer_id = $1 AND provider_id = $2
 		)`,
 		consumerID,
 		providerID,
@@ -37,44 +38,77 @@ func (repository *ConversationRepository) ExistsBetween(consumerID, providerID i
 	return exists, nil
 }
 
-func (repository *ConversationRepository) SaveWithMessage(conversationToSave conversation.Conversation, message conversation.Message) (*conversation.Conversation, error) {
-	ctx := context.Background()
+func (repository *ConversationRepository) SaveConversation(ctx context.Context, conversationToSave conversation.Conversation) (conversation.Conversation, error) {
 	tx, err := repository.db.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, fmt.Errorf("beginning conversation transaction: %w", err)
 	}
 
-	var savedConversation conversation.Conversation
-	err = tx.QueryRowContext(
-		ctx,
-		`INSERT INTO conversations (consumer_id, provider_id, status, created_on, updated_on)
-		VALUES ($1, $2, $3, NOW(), NOW())
-		RETURNING id, consumer_id, provider_id, status, updated_on`,
-		conversationToSave.ConsumerID,
-		conversationToSave.ProviderID,
-		conversationToSave.Status,
-	).Scan(
-		&savedConversation.ID,
-		&savedConversation.ConsumerID,
-		&savedConversation.ProviderID,
-		&savedConversation.Status,
-		&savedConversation.UpdatedOn,
-	)
-	if err != nil {
-		return nil, rollbackConversationTx(tx, mapConversationInsertError(err))
-	}
-
-	savedMessage, err := repository.messageRepository.saveWithTx(ctx, tx, savedConversation.ID, message)
-	if err != nil {
+	if err := repository.saveConversationWithTx(ctx, tx, conversationToSave); err != nil {
 		return nil, rollbackConversationTx(tx, err)
 	}
-	savedConversation.Messages = []conversation.Message{*savedMessage}
 
 	if err := tx.Commit(); err != nil {
 		return nil, fmt.Errorf("committing conversation transaction: %w", err)
 	}
 
-	return &savedConversation, nil
+	return conversationToSave, nil
+}
+
+func (repository *ConversationRepository) SaveWithMessage(conversationToSave conversation.Conversation, message conversation.Message) (conversation.Conversation, error) {
+	conversationToSave.AddMessage(message)
+	return repository.SaveConversation(context.Background(), conversationToSave)
+}
+
+func (repository *ConversationRepository) saveConversationWithTx(ctx context.Context, tx *sql.Tx, conversationToSave conversation.Conversation) error {
+	base := conversationToSave.Base()
+	err := tx.QueryRowContext(
+		ctx,
+		`INSERT INTO conversations (status, created_on, updated_on)
+		VALUES ($1, NOW(), NOW())
+		RETURNING id, status, updated_on`,
+		base.Status,
+	).Scan(
+		&base.ID,
+		&base.Status,
+		&base.UpdatedOn,
+	)
+	if err != nil {
+		return mapConversationInsertError(err)
+	}
+
+	messages := conversationToSave.Messages()
+	baseMessages := make([]conversation.Message, 0, len(messages))
+	for _, message := range messages {
+		savedMessage, err := repository.messageRepository.saveWithTx(ctx, tx, base.ID, message)
+		if err != nil {
+			return err
+		}
+		baseMessages = append(baseMessages, *savedMessage)
+		base.UpdatedOn = savedMessage.CreatedOn
+	}
+	base.SetMessages(baseMessages)
+
+	switch typedConversation := conversationToSave.(type) {
+	case *conversation.WorkConversation:
+		if err := repository.saveWorkConversationWithTx(ctx, tx, typedConversation); err != nil {
+			return err
+		}
+	case *conversation.ChatBotConversation:
+		if err := repository.saveChatbotConversationWithTx(ctx, tx, typedConversation); err != nil {
+			return err
+		}
+	default:
+		return fmt.Errorf("saving conversation: unsupported conversation type %q", conversationToSave.ConversationType())
+	}
+
+	if len(base.Messages()) > 0 {
+		if err := repository.updateTimestampWithTx(ctx, tx, base.ID, base.UpdatedOn); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (repository *ConversationRepository) AddMessage(ctx context.Context, conversationID int, message conversation.Message) (*conversation.Message, error) {
@@ -92,24 +126,8 @@ func (repository *ConversationRepository) AddMessage(ctx context.Context, conver
 		return nil, rollbackConversationTx(tx, err)
 	}
 
-	result, err := tx.ExecContext(
-		ctx,
-		`UPDATE conversations
-		SET updated_on = $2
-		WHERE id = $1`,
-		conversationID,
-		savedMessage.CreatedOn,
-	)
-	if err != nil {
-		return nil, rollbackConversationTx(tx, fmt.Errorf("updating conversation timestamp after message: %w", err))
-	}
-
-	rowsAffected, err := result.RowsAffected()
-	if err != nil {
-		return nil, rollbackConversationTx(tx, fmt.Errorf("checking updated conversation rows: %w", err))
-	}
-	if rowsAffected == 0 {
-		return nil, rollbackConversationTx(tx, conversation.ErrConversationDoesNotExist)
+	if err := repository.updateTimestampWithTx(ctx, tx, conversationID, savedMessage.CreatedOn); err != nil {
+		return nil, rollbackConversationTx(tx, err)
 	}
 
 	if err := tx.Commit(); err != nil {
@@ -136,29 +154,13 @@ func (repository *ConversationRepository) CountMessagesBySenderRole(ctx context.
 	return count, nil
 }
 
-func lockConversationByID(ctx context.Context, tx *sql.Tx, conversationID int) error {
-	var id int
-	err := tx.QueryRowContext(
-		ctx,
-		`SELECT id
-		FROM conversations
-		WHERE id = $1
-		FOR UPDATE`,
-		conversationID,
-	).Scan(&id)
-	if errors.Is(err, sql.ErrNoRows) {
-		return conversation.ErrConversationDoesNotExist
-	}
-	if err != nil {
-		return fmt.Errorf("locking conversation by id: %w", err)
-	}
-
-	return nil
-}
-
 func (repository *ConversationRepository) DeleteBetween(consumerID, providerID int) error {
 	_, err := repository.db.Exec(
-		`DELETE FROM conversations WHERE consumer_id = $1 AND provider_id = $2`,
+		`DELETE FROM conversations c
+		USING work_conversations wc
+		WHERE wc.conversation_id = c.id
+			AND wc.consumer_id = $1
+			AND wc.provider_id = $2`,
 		consumerID,
 		providerID,
 	)
@@ -178,42 +180,60 @@ func (repository *ConversationRepository) DeleteAll() error {
 	return nil
 }
 
-func (repository *ConversationRepository) FindBetween(consumerID, providerID int) (*conversation.Conversation, error) {
-	var foundConversation conversation.Conversation
+func (repository *ConversationRepository) FindBetween(consumerID, providerID int) (conversation.Conversation, error) {
+	foundConversation := &conversation.WorkConversation{BaseConversation: &conversation.BaseConversation{Type: conversation.TypeWork}}
 	err := repository.db.QueryRow(
-		`SELECT id, consumer_id, provider_id, status, updated_on
-		FROM conversations
-		WHERE consumer_id = $1 AND provider_id = $2`,
+		`SELECT c.id, wc.consumer_id, wc.provider_id, c.status, c.updated_on
+		FROM conversations c
+		INNER JOIN work_conversations wc ON wc.conversation_id = c.id
+		WHERE wc.consumer_id = $1 AND wc.provider_id = $2`,
 		consumerID,
 		providerID,
 	).Scan(
-		&foundConversation.ID,
+		&foundConversation.BaseConversation.ID,
 		&foundConversation.ConsumerID,
 		&foundConversation.ProviderID,
-		&foundConversation.Status,
-		&foundConversation.UpdatedOn,
+		&foundConversation.BaseConversation.Status,
+		&foundConversation.BaseConversation.UpdatedOn,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("finding conversation between consumer and provider: %w", err)
 	}
 
-	return &foundConversation, nil
+	return foundConversation, nil
 }
 
-func (repository *ConversationRepository) FindByID(ctx context.Context, conversationID int) (*conversation.Conversation, error) {
-	var foundConversation conversation.Conversation
+func (repository *ConversationRepository) FindByID(ctx context.Context, conversationID int) (conversation.Conversation, error) {
+	var base conversation.BaseConversation
+	var consumerID int
+	var providerID int
+	var title string
+	var conversationType string
 	err := repository.db.QueryRowContext(
 		ctx,
-		`SELECT id, consumer_id, provider_id, status, updated_on
-		FROM conversations
-		WHERE id = $1`,
+		`SELECT
+			c.id,
+			COALESCE(wc.consumer_id, cc.consumer_id),
+			COALESCE(wc.provider_id, 0),
+			COALESCE(cc.title, ''),
+			c.status,
+			c.updated_on,
+			CASE WHEN cc.conversation_id IS NOT NULL THEN $2 ELSE $3 END
+		FROM conversations c
+		LEFT JOIN work_conversations wc ON wc.conversation_id = c.id
+		LEFT JOIN chatbot_conversations cc ON cc.conversation_id = c.id
+		WHERE c.id = $1`,
 		conversationID,
+		conversation.TypeChatbot,
+		conversation.TypeWork,
 	).Scan(
-		&foundConversation.ID,
-		&foundConversation.ConsumerID,
-		&foundConversation.ProviderID,
-		&foundConversation.Status,
-		&foundConversation.UpdatedOn,
+		&base.ID,
+		&consumerID,
+		&providerID,
+		&title,
+		&base.Status,
+		&base.UpdatedOn,
+		&conversationType,
 	)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, conversation.ErrConversationDoesNotExist
@@ -222,17 +242,31 @@ func (repository *ConversationRepository) FindByID(ctx context.Context, conversa
 		return nil, fmt.Errorf("finding conversation by id: %w", err)
 	}
 
-	return &foundConversation, nil
+	base.Type = conversationType
+	if conversationType == conversation.TypeChatbot {
+		return &conversation.ChatBotConversation{
+			BaseConversation: &base,
+			ConsumerID:       consumerID,
+			Title:            title,
+		}, nil
+	}
+
+	return &conversation.WorkConversation{
+		BaseConversation: &base,
+		ConsumerID:       consumerID,
+		ProviderID:       providerID,
+	}, nil
 }
 
 func (repository *ConversationRepository) SaveStatus(ctx context.Context, conversationToSave conversation.Conversation) error {
+	base := conversationToSave.Base()
 	result, err := repository.db.ExecContext(
 		ctx,
 		`UPDATE conversations
 		SET status = $2, updated_on = NOW()
 		WHERE id = $1`,
-		conversationToSave.ID,
-		conversationToSave.Status,
+		base.ID,
+		base.Status,
 	)
 
 	if err != nil {
@@ -245,6 +279,82 @@ func (repository *ConversationRepository) SaveStatus(ctx context.Context, conver
 	}
 	if rowsAffected == 0 {
 		return conversation.ErrConversationDoesNotExist
+	}
+
+	return nil
+}
+
+func (repository *ConversationRepository) saveWorkConversationWithTx(ctx context.Context, tx *sql.Tx, conversationToSave *conversation.WorkConversation) error {
+	_, err := tx.ExecContext(
+		ctx,
+		`INSERT INTO work_conversations (conversation_id, consumer_id, provider_id)
+		VALUES ($1, $2, $3)`,
+		conversationToSave.Base().ID,
+		conversationToSave.ConsumerID,
+		conversationToSave.ProviderID,
+	)
+	if err != nil {
+		return mapConversationInsertError(err)
+	}
+
+	return nil
+}
+
+func (repository *ConversationRepository) saveChatbotConversationWithTx(ctx context.Context, tx *sql.Tx, conversationToSave *conversation.ChatBotConversation) error {
+	_, err := tx.ExecContext(
+		ctx,
+		`INSERT INTO chatbot_conversations (conversation_id, consumer_id, title)
+		VALUES ($1, $2, $3)`,
+		conversationToSave.Base().ID,
+		conversationToSave.ConsumerID,
+		conversationToSave.Title,
+	)
+	if err != nil {
+		return mapConversationInsertError(err)
+	}
+
+	return nil
+}
+
+func (repository *ConversationRepository) updateTimestampWithTx(ctx context.Context, tx *sql.Tx, conversationID int, updatedOn time.Time) error {
+	result, err := tx.ExecContext(
+		ctx,
+		`UPDATE conversations
+		SET updated_on = $2
+		WHERE id = $1`,
+		conversationID,
+		updatedOn,
+	)
+	if err != nil {
+		return fmt.Errorf("updating conversation timestamp after message: %w", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("checking updated conversation rows: %w", err)
+	}
+	if rowsAffected == 0 {
+		return conversation.ErrConversationDoesNotExist
+	}
+
+	return nil
+}
+
+func lockConversationByID(ctx context.Context, tx *sql.Tx, conversationID int) error {
+	var id int
+	err := tx.QueryRowContext(
+		ctx,
+		`SELECT id
+		FROM conversations
+		WHERE id = $1
+		FOR UPDATE`,
+		conversationID,
+	).Scan(&id)
+	if errors.Is(err, sql.ErrNoRows) {
+		return conversation.ErrConversationDoesNotExist
+	}
+	if err != nil {
+		return fmt.Errorf("locking conversation by id: %w", err)
 	}
 
 	return nil

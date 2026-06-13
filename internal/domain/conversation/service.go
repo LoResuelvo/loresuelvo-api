@@ -2,6 +2,7 @@ package conversation
 
 import (
 	"context"
+	"strings"
 
 	readmodel "github.com/LoResuelvo/loresuelvo-api/internal/domain/conversation/read_model"
 )
@@ -13,6 +14,7 @@ type Service struct {
 	providerIDFinder         ProviderIDFinder
 	conversationReader       Reader
 	messagePublisher         MessagePublisher
+	chatbot                  Chatbot
 }
 
 func NewService(
@@ -22,7 +24,13 @@ func NewService(
 	providerIDFinder ProviderIDFinder,
 	conversationReader Reader,
 	messagePublisher MessagePublisher,
+	chatbots ...Chatbot,
 ) *Service {
+	var chatbot Chatbot
+	if len(chatbots) > 0 {
+		chatbot = chatbots[0]
+	}
+
 	return &Service{
 		conversationRepository:   conversationRepository,
 		consumerIDFinder:         consumerIDFinder,
@@ -30,11 +38,12 @@ func NewService(
 		providerIDFinder:         providerIDFinder,
 		conversationReader:       conversationReader,
 		messagePublisher:         messagePublisher,
+		chatbot:                  chatbot,
 	}
 }
 
 // TODO: Eliminar método
-func (s *Service) StartWorkRequest(consumerAuthID string, providerID int, content string) (*Conversation, error) {
+func (s *Service) StartWorkRequest(consumerAuthID string, providerID int, content string) (Conversation, error) {
 	consumerID, err := s.consumerIDForWorkRequest(consumerAuthID)
 	if err != nil {
 		return nil, err
@@ -53,7 +62,8 @@ func (s *Service) StartWorkRequest(consumerAuthID string, providerID int, conten
 		return nil, err
 	}
 
-	return s.conversationRepository.SaveWithMessage(*conversation, *message)
+	conversation.AddMessage(*message)
+	return s.conversationRepository.SaveConversation(context.Background(), conversation)
 }
 
 func (s *Service) GetByID(ctx context.Context, authID string, conversationID int) (*readmodel.ConversationDetail, error) {
@@ -62,38 +72,43 @@ func (s *Service) GetByID(ctx context.Context, authID string, conversationID int
 		return nil, err
 	}
 
-	if s.authenticatedConsumerMatches(authID, foundConversation.ConsumerID) {
+	workConversation, ok := foundConversation.(*WorkConversation)
+	if !ok {
+		return nil, ErrConversationAccessDenied
+	}
+
+	if s.authenticatedConsumerMatches(authID, workConversation.ConsumerID) {
 		return s.conversationReader.FindDetailByIDForConsumer(ctx, conversationID)
 	}
 
-	if s.authenticatedProviderMatches(authID, foundConversation.ProviderID) {
+	if s.authenticatedProviderMatches(authID, workConversation.ProviderID) {
 		return s.conversationReader.FindDetailByIDForProvider(ctx, conversationID)
 	}
 
 	return nil, ErrConversationAccessDenied
 }
 
-// TODO: El Mensaje debería añadirse a la Conversación y después guardar la Conversación
 func (s *Service) SendMessage(ctx context.Context, authID string, conversationID int, content string) (*Message, error) {
 	foundConversation, err := s.conversationRepository.FindByID(ctx, conversationID)
 	if err != nil {
 		return nil, err
 	}
 
-	message, err := s.newMessageForAuthenticatedParticipant(authID, *foundConversation, content)
+	message, err := s.newMessageForAuthenticatedParticipant(authID, foundConversation, content)
 	if err != nil {
 		return nil, err
 	}
-	if err := s.ensureMessageAllowedInCurrentConversationState(ctx, *foundConversation, *message); err != nil {
+	if err := s.ensureMessageAllowedInCurrentConversationState(ctx, foundConversation, *message); err != nil {
 		return nil, err
 	}
+	foundConversation.AddMessage(*message)
 
 	sentMessage, err := s.conversationRepository.AddMessage(ctx, conversationID, *message)
 	if err != nil {
 		return nil, err
 	}
 
-	s.messagePublisher.PublishMessage(ctx, *foundConversation, authID, *sentMessage)
+	s.messagePublisher.PublishMessage(ctx, foundConversation, authID, *sentMessage)
 
 	return sentMessage, nil
 }
@@ -110,8 +125,83 @@ func (s *Service) List(ctx context.Context, authID string) ([]readmodel.Conversa
 	return nil, ErrConversationAccessDenied
 }
 
-func (s *Service) CreateChatbotConversation(authID string, content string) (*Conversation, error) {
-	return nil, nil
+func (s *Service) CreateChatbotConversation(ctx context.Context, authID string, content string) (Conversation, error) {
+	if s.chatbot == nil {
+		return nil, ErrChatbotUnavailable
+	}
+
+	consumerID, err := s.consumerIDFinder.FindIDByAuthID(authID)
+	if err != nil {
+		return nil, ErrOnlyConsumerCanMessageChatbot
+	}
+
+	consumerMessage, err := NewConsumerMessage(content)
+	if err != nil {
+		return nil, err
+	}
+	if !isHomeProblemQuestion(consumerMessage.Content) {
+		return nil, ErrChatbotQuestionOutOfScope
+	}
+
+	chatbotResponse, err := s.chatbot.GetResponse(ctx, consumerMessage.Content)
+	if err != nil {
+		return nil, err
+	}
+	if chatbotResponse == nil {
+		return nil, ErrChatbotResponseRequired
+	}
+	chatbotMessage, err := NewChatbotMessage(chatbotResponse.Content)
+	if err != nil {
+		return nil, err
+	}
+
+	chatbotConversation, err := NewChatBotConversation(consumerID, chatbotResponse.Title)
+	if err != nil {
+		return nil, err
+	}
+
+	chatbotConversation.AddMessage(*consumerMessage)
+	chatbotConversation.AddMessage(*chatbotMessage)
+
+	savedConversation, err := s.conversationRepository.SaveConversation(ctx, chatbotConversation)
+	if err != nil {
+		return nil, err
+	}
+
+	s.messagePublisher.PublishChatbotMessage(ctx, savedConversation, *chatbotMessage)
+
+	return savedConversation, nil
+}
+
+func isHomeProblemQuestion(content string) bool {
+	normalizedContent := strings.ToLower(strings.TrimSpace(content))
+	homeProblemKeywords := []string{
+		"agua",
+		"baño",
+		"bacha",
+		"calefacción",
+		"canilla",
+		"casa",
+		"cocina",
+		"electricidad",
+		"gas",
+		"hogar",
+		"humedad",
+		"luz",
+		"mueble",
+		"pared",
+		"pileta",
+		"pérdida",
+		"plomer",
+		"techo",
+	}
+	for _, keyword := range homeProblemKeywords {
+		if strings.Contains(normalizedContent, keyword) {
+			return true
+		}
+	}
+
+	return false
 }
 
 func (s *Service) consumerIDForWorkRequest(consumerAuthID string) (int, error) {
@@ -162,11 +252,16 @@ func (s *Service) authenticatedProviderMatches(authID string, providerID int) bo
 }
 
 func (s *Service) newMessageForAuthenticatedParticipant(authID string, foundConversation Conversation, content string) (*Message, error) {
-	if s.authenticatedConsumerMatches(authID, foundConversation.ConsumerID) {
+	workConversation, ok := foundConversation.(*WorkConversation)
+	if !ok {
+		return nil, ErrConversationAccessDenied
+	}
+
+	if s.authenticatedConsumerMatches(authID, workConversation.ConsumerID) {
 		return NewConsumerMessage(content)
 	}
 
-	if s.authenticatedProviderMatches(authID, foundConversation.ProviderID) {
+	if s.authenticatedProviderMatches(authID, workConversation.ProviderID) {
 		return NewProviderMessage(content)
 	}
 
@@ -174,7 +269,7 @@ func (s *Service) newMessageForAuthenticatedParticipant(authID string, foundConv
 }
 
 func (s *Service) ensureMessageAllowedInCurrentConversationState(ctx context.Context, foundConversation Conversation, message Message) error {
-	if foundConversation.Status != StatusPending {
+	if foundConversation.Base().Status != StatusPending {
 		return nil
 	}
 
@@ -182,7 +277,7 @@ func (s *Service) ensureMessageAllowedInCurrentConversationState(ctx context.Con
 		return ErrPendingConversationRequiresAcceptance
 	}
 
-	sentMessages, err := s.conversationRepository.CountMessagesBySenderRole(ctx, foundConversation.ID, SenderConsumer)
+	sentMessages, err := s.conversationRepository.CountMessagesBySenderRole(ctx, foundConversation.Base().ID, SenderConsumer)
 	if err != nil {
 		return err
 	}
@@ -193,7 +288,7 @@ func (s *Service) ensureMessageAllowedInCurrentConversationState(ctx context.Con
 	return nil
 }
 
-func newPendingWorkRequest(consumerID, providerID int, content string) (*Conversation, *Message, error) {
+func newPendingWorkRequest(consumerID, providerID int, content string) (Conversation, *Message, error) {
 	conversation, err := NewPendingConversation(consumerID, providerID)
 	if err != nil {
 		return nil, nil, err

@@ -8,6 +8,7 @@ import (
 const (
 	SenderConsumer = "consumer"
 	SenderProvider = "provider"
+	SenderChatbot  = "chatbot"
 )
 
 type Message struct {
@@ -24,6 +25,10 @@ func NewConsumerMessage(content string) (*Message, error) {
 
 func NewProviderMessage(content string) (*Message, error) {
 	return newMessage(SenderProvider, content)
+}
+
+func NewChatbotMessage(content string) (*Message, error) {
+	return newMessage(SenderChatbot, content)
 }
 
 func newMessage(senderRole, content string) (*Message, error) {

@@ -10,9 +10,9 @@ import (
 
 // Publisher broadcasts message events to connected clients.
 type Publisher struct {
-	hub            *Hub
-	consumerRepo   *repositories.ConsumerRepository
-	providerRepo   *repositories.ProviderRepository
+	hub          *Hub
+	consumerRepo *repositories.ConsumerRepository
+	providerRepo *repositories.ProviderRepository
 }
 
 // NewPublisher creates a new realtime Publisher.
@@ -26,25 +26,56 @@ func NewPublisher(hub *Hub, consumerRepo *repositories.ConsumerRepository, provi
 
 // PublishMessage broadcasts a message event to the counterpart participant.
 func (p *Publisher) PublishMessage(ctx context.Context, conv conversation.Conversation, senderAuthID string, message conversation.Message) {
-	consumerAuthID, err := p.consumerRepo.FindAuthIDByID(conv.ConsumerID)
+	workConversation, ok := conv.(*conversation.WorkConversation)
+	if !ok {
+		slog.Warn("realtime publisher: expected work conversation",
+			"conversationType", conv.ConversationType())
+		return
+	}
+
+	consumerAuthID, err := p.consumerRepo.FindAuthIDByID(workConversation.ConsumerID)
 	if err != nil {
 		slog.Warn("realtime publisher: failed to find consumer auth id",
-			"consumerID", conv.ConsumerID, "error", err)
+			"consumerID", workConversation.ConsumerID, "error", err)
 		return
 	}
 
-	providerAuthID, err := p.providerRepo.FindAuthIDByID(conv.ProviderID)
+	providerAuthID, err := p.providerRepo.FindAuthIDByID(workConversation.ProviderID)
 	if err != nil {
 		slog.Warn("realtime publisher: failed to find provider auth id",
-			"providerID", conv.ProviderID, "error", err)
+			"providerID", workConversation.ProviderID, "error", err)
 		return
 	}
 
-	event, err := BuildMessageEvent(conv.ID, message.ID, message.SenderRole, message.Content, message.CreatedOn)
+	event, err := BuildMessageEvent(conv.Base().ID, message.ID, message.SenderRole, message.Content, message.CreatedOn)
 	if err != nil {
 		slog.Error("realtime publisher: failed to build event", "error", err)
 		return
 	}
 
-	p.hub.BroadcastMessage(ctx, consumerAuthID, conv.ConsumerID, providerAuthID, conv.ProviderID, senderAuthID, message.SenderRole, event)
+	p.hub.BroadcastMessage(ctx, consumerAuthID, workConversation.ConsumerID, providerAuthID, workConversation.ProviderID, senderAuthID, message.SenderRole, event)
+}
+
+func (p *Publisher) PublishChatbotMessage(ctx context.Context, conv conversation.Conversation, message conversation.Message) {
+	chatbotConversation, ok := conv.(*conversation.ChatBotConversation)
+	if !ok {
+		slog.Warn("realtime publisher: expected chatbot conversation",
+			"conversationType", conv.ConversationType())
+		return
+	}
+
+	consumerAuthID, err := p.consumerRepo.FindAuthIDByID(chatbotConversation.ConsumerID)
+	if err != nil {
+		slog.Warn("realtime publisher: failed to find chatbot conversation consumer auth id",
+			"consumerID", chatbotConversation.ConsumerID, "error", err)
+		return
+	}
+
+	event, err := BuildMessageEvent(conv.Base().ID, message.ID, message.SenderRole, message.Content, message.CreatedOn)
+	if err != nil {
+		slog.Error("realtime publisher: failed to build chatbot event", "error", err)
+		return
+	}
+
+	p.hub.BroadcastToParticipant(ctx, consumerAuthID, conversation.SenderConsumer, chatbotConversation.ConsumerID, event)
 }

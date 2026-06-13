@@ -13,20 +13,22 @@ import (
 )
 
 type conversationRepositoryMock struct {
-	savedConversation conversation.Conversation
-	savedMessage      conversation.Message
-	addedMessage      conversation.Message
-	savedResult       *conversation.Conversation
-	addedResult       *conversation.Message
-	existsValue       bool
-	existsCalled      bool
-	saveCalled        bool
-	addMessageCalled  bool
-	findByIDCalled    bool
-	countCalled       bool
-	foundResult       *conversation.Conversation
-	countResult       int
-	err               error
+	savedConversation  conversation.Conversation
+	savedMessage       conversation.Message
+	addedMessage       conversation.Message
+	savedResult        conversation.Conversation
+	addedResult        *conversation.Message
+	savedChatbot       conversation.Conversation
+	savedChatbotResult conversation.Conversation
+	existsValue        bool
+	existsCalled       bool
+	saveCalled         bool
+	addMessageCalled   bool
+	findByIDCalled     bool
+	countCalled        bool
+	foundResult        conversation.Conversation
+	countResult        int
+	err                error
 }
 
 func (r *conversationRepositoryMock) ExistsBetween(consumerID, providerID int) (bool, error) {
@@ -37,24 +39,36 @@ func (r *conversationRepositoryMock) ExistsBetween(consumerID, providerID int) (
 	return r.existsValue, nil
 }
 
-func (r *conversationRepositoryMock) SaveWithMessage(c conversation.Conversation, m conversation.Message) (*conversation.Conversation, error) {
+func (r *conversationRepositoryMock) SaveConversation(ctx context.Context, c conversation.Conversation) (conversation.Conversation, error) {
 	r.saveCalled = true
 	r.savedConversation = c
-	r.savedMessage = m
+	if c.ConversationType() == conversation.TypeChatbot {
+		r.savedChatbot = c
+	}
 	if r.err != nil {
 		return nil, r.err
 	}
 	if r.savedResult != nil {
 		return r.savedResult, nil
 	}
-	c.ID = 1
-	m.ConversationID = c.ID
-	m.ID = 1
-	c.Messages = []conversation.Message{m}
-	return &c, nil
+	if r.savedChatbotResult != nil {
+		return r.savedChatbotResult, nil
+	}
+	c.Base().ID = 1
+	messages := c.Messages()
+	for index := range messages {
+		messages[index].ID = index + 1
+		messages[index].ConversationID = c.Base().ID
+		messages[index].CreatedOn = time.Now()
+	}
+	c.SetMessages(messages)
+	if len(messages) > 0 {
+		r.savedMessage = messages[0]
+	}
+	return c, nil
 }
 
-func (r *conversationRepositoryMock) FindByID(ctx context.Context, conversationID int) (*conversation.Conversation, error) {
+func (r *conversationRepositoryMock) FindByID(ctx context.Context, conversationID int) (conversation.Conversation, error) {
 	r.findByIDCalled = true
 	if r.err != nil {
 		return nil, r.err
@@ -171,8 +185,8 @@ func (m *conversationReaderMock) FindDetailByIDForProvider(ctx context.Context, 
 type messagePublisherMock struct {
 	publishedConversation conversation.Conversation
 	publishedSenderAuthID string
-	publishedMessage     conversation.Message
-	publishCalled        bool
+	publishedMessage      conversation.Message
+	publishCalled         bool
 }
 
 func (m *messagePublisherMock) PublishMessage(ctx context.Context, conv conversation.Conversation, senderAuthID string, msg conversation.Message) {
@@ -180,6 +194,28 @@ func (m *messagePublisherMock) PublishMessage(ctx context.Context, conv conversa
 	m.publishedConversation = conv
 	m.publishedSenderAuthID = senderAuthID
 	m.publishedMessage = msg
+}
+
+func (m *messagePublisherMock) PublishChatbotMessage(ctx context.Context, conv conversation.Conversation, msg conversation.Message) {
+	m.publishCalled = true
+	m.publishedConversation = conv
+	m.publishedMessage = msg
+}
+
+type chatbotMock struct {
+	response *conversation.ChatbotResponse
+	called   bool
+	prompt   string
+	err      error
+}
+
+func (m *chatbotMock) GetResponse(ctx context.Context, prompt string) (*conversation.ChatbotResponse, error) {
+	m.called = true
+	m.prompt = prompt
+	if m.err != nil {
+		return nil, m.err
+	}
+	return m.response, nil
 }
 
 func TestStartWorkRequestCreatesPendingConversationWithInitialMessage(t *testing.T) {
@@ -194,17 +230,110 @@ func TestStartWorkRequestCreatesPendingConversationWithInitialMessage(t *testing
 
 	require.NoError(t, err)
 	require.NotNil(t, createdConversation)
-	assert.Equal(t, 1, createdConversation.ID)
+	assert.Equal(t, 1, createdConversation.Base().ID)
 	assert.True(t, repo.existsCalled)
 	assert.True(t, repo.saveCalled)
-	assert.Equal(t, 10, repo.savedConversation.ConsumerID)
-	assert.Equal(t, 20, repo.savedConversation.ProviderID)
-	assert.Equal(t, conversation.StatusPending, repo.savedConversation.Status)
+	savedWorkConversation := repo.savedConversation.(*conversation.WorkConversation)
+	assert.Equal(t, 10, savedWorkConversation.ConsumerID)
+	assert.Equal(t, 20, savedWorkConversation.ProviderID)
+	assert.Equal(t, conversation.StatusPending, savedWorkConversation.Base().Status)
 	assert.Equal(t, conversation.SenderConsumer, repo.savedMessage.SenderRole)
 	assert.Equal(t, "Hola, necesito un presupuesto", repo.savedMessage.Content)
-	require.Len(t, createdConversation.Messages, 1)
-	assert.Equal(t, conversation.SenderConsumer, createdConversation.Messages[0].SenderRole)
-	assert.Equal(t, "Hola, necesito un presupuesto", createdConversation.Messages[0].Content)
+	require.Len(t, createdConversation.Messages(), 1)
+	assert.Equal(t, conversation.SenderConsumer, createdConversation.Messages()[0].SenderRole)
+	assert.Equal(t, "Hola, necesito un presupuesto", createdConversation.Messages()[0].Content)
+}
+
+func TestCreateChatbotConversationCreatesActiveConversationWithConsumerAndChatbotMessages(t *testing.T) {
+	repo := &conversationRepositoryMock{}
+	consumerIDFinder := &consumerIDFinderMock{consumerID: 10}
+	chatbot := &chatbotMock{response: &conversation.ChatbotResponse{
+		Title:   "Pérdida de agua en la cocina",
+		Content: "Cerrá la llave de paso y revisá el sifón.",
+	}}
+	publisher := &messagePublisherMock{}
+
+	service := conversation.NewService(repo, consumerIDFinder, &providerExistenceCheckerMock{}, &providerIDFinderMock{}, &conversationReaderMock{}, publisher, chatbot)
+
+	createdConversation, err := service.CreateChatbotConversation(context.Background(), "auth0|consumer", "  Tengo una pérdida de agua en la cocina  ")
+
+	require.NoError(t, err)
+	require.NotNil(t, createdConversation)
+	assert.True(t, chatbot.called)
+	assert.Equal(t, "Tengo una pérdida de agua en la cocina", chatbot.prompt)
+	assert.True(t, repo.saveCalled)
+	savedChatbotConversation := repo.savedChatbot.(*conversation.ChatBotConversation)
+	assert.Equal(t, conversation.TypeChatbot, savedChatbotConversation.ConversationType())
+	assert.Equal(t, 10, savedChatbotConversation.ConsumerID)
+	assert.Equal(t, "Pérdida de agua en la cocina", savedChatbotConversation.Title)
+	assert.Equal(t, conversation.StatusActive, savedChatbotConversation.Base().Status)
+	require.Len(t, savedChatbotConversation.Messages(), 2)
+	assert.Equal(t, conversation.SenderConsumer, savedChatbotConversation.Messages()[0].SenderRole)
+	assert.Equal(t, "Tengo una pérdida de agua en la cocina", savedChatbotConversation.Messages()[0].Content)
+	assert.Equal(t, conversation.SenderChatbot, savedChatbotConversation.Messages()[1].SenderRole)
+	assert.Equal(t, "Cerrá la llave de paso y revisá el sifón.", savedChatbotConversation.Messages()[1].Content)
+	assert.True(t, publisher.publishCalled)
+	assert.Equal(t, conversation.SenderChatbot, publisher.publishedMessage.SenderRole)
+}
+
+func TestCreateChatbotConversationRejectsNonConsumerUser(t *testing.T) {
+	repo := &conversationRepositoryMock{}
+	consumerIDFinder := &consumerIDFinderMock{err: errors.New("consumer not found")}
+	chatbot := &chatbotMock{response: &conversation.ChatbotResponse{Title: "Consulta", Content: "Respuesta"}}
+
+	service := conversation.NewService(repo, consumerIDFinder, &providerExistenceCheckerMock{}, &providerIDFinderMock{}, &conversationReaderMock{}, &messagePublisherMock{}, chatbot)
+
+	createdConversation, err := service.CreateChatbotConversation(context.Background(), "auth0|provider", "Tengo una pérdida de agua")
+
+	assert.ErrorIs(t, err, conversation.ErrOnlyConsumerCanMessageChatbot)
+	assert.Nil(t, createdConversation)
+	assert.False(t, chatbot.called)
+	assert.False(t, repo.saveCalled)
+}
+
+func TestCreateChatbotConversationRejectsEmptyMessage(t *testing.T) {
+	repo := &conversationRepositoryMock{}
+	consumerIDFinder := &consumerIDFinderMock{consumerID: 10}
+	chatbot := &chatbotMock{response: &conversation.ChatbotResponse{Title: "Consulta", Content: "Respuesta"}}
+
+	service := conversation.NewService(repo, consumerIDFinder, &providerExistenceCheckerMock{}, &providerIDFinderMock{}, &conversationReaderMock{}, &messagePublisherMock{}, chatbot)
+
+	createdConversation, err := service.CreateChatbotConversation(context.Background(), "auth0|consumer", "   ")
+
+	assert.ErrorIs(t, err, conversation.ErrMessageRequired)
+	assert.Nil(t, createdConversation)
+	assert.False(t, chatbot.called)
+	assert.False(t, repo.saveCalled)
+}
+
+func TestCreateChatbotConversationRejectsOutOfScopeQuestionBeforeCallingChatbot(t *testing.T) {
+	repo := &conversationRepositoryMock{}
+	consumerIDFinder := &consumerIDFinderMock{consumerID: 10}
+	chatbot := &chatbotMock{response: &conversation.ChatbotResponse{Title: "Consulta", Content: "Respuesta"}}
+
+	service := conversation.NewService(repo, consumerIDFinder, &providerExistenceCheckerMock{}, &providerIDFinderMock{}, &conversationReaderMock{}, &messagePublisherMock{}, chatbot)
+
+	createdConversation, err := service.CreateChatbotConversation(context.Background(), "auth0|consumer", "¿Qué equipo ganó el último partido de fútbol?")
+
+	assert.ErrorIs(t, err, conversation.ErrChatbotQuestionOutOfScope)
+	assert.Nil(t, createdConversation)
+	assert.False(t, chatbot.called)
+	assert.False(t, repo.saveCalled)
+}
+
+func TestCreateChatbotConversationReturnsChatbotErrors(t *testing.T) {
+	repo := &conversationRepositoryMock{}
+	consumerIDFinder := &consumerIDFinderMock{consumerID: 10}
+	chatbot := &chatbotMock{err: errors.New("chatbot unavailable")}
+
+	service := conversation.NewService(repo, consumerIDFinder, &providerExistenceCheckerMock{}, &providerIDFinderMock{}, &conversationReaderMock{}, &messagePublisherMock{}, chatbot)
+
+	createdConversation, err := service.CreateChatbotConversation(context.Background(), "auth0|consumer", "Tengo una pérdida de agua")
+
+	assert.Error(t, err)
+	assert.Nil(t, createdConversation)
+	assert.True(t, chatbot.called)
+	assert.False(t, repo.saveCalled)
 }
 
 func TestStartWorkRequestRejectsNonConsumerUser(t *testing.T) {
@@ -537,7 +666,7 @@ func TestSendMessagePublishesMessageAfterSuccessfulPersistence(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, sentMessage)
 	assert.True(t, publisher.publishCalled)
-	assert.Equal(t, 1, publisher.publishedConversation.ID)
+	assert.Equal(t, 1, publisher.publishedConversation.Base().ID)
 	assert.Equal(t, "auth0|consumer", publisher.publishedSenderAuthID)
 }
 
@@ -688,28 +817,33 @@ func conversationDetailFixture(counterpartRole string) *readmodel.ConversationDe
 	}
 }
 
-func conversationFixture() *conversation.Conversation {
+func conversationFixture() conversation.Conversation {
 	now := time.Now()
-	return &conversation.Conversation{
-		ID:         1,
+	fixture := &conversation.WorkConversation{
+		BaseConversation: &conversation.BaseConversation{
+			ID:        1,
+			Type:      conversation.TypeWork,
+			Status:    conversation.StatusPending,
+			UpdatedOn: now,
+		},
 		ConsumerID: 10,
 		ProviderID: 20,
-		Status:     conversation.StatusPending,
-		UpdatedOn:  now,
-		Messages: []conversation.Message{
-			{
-				ID:             1,
-				ConversationID: 1,
-				SenderRole:     conversation.SenderConsumer,
-				Content:        "Hola, necesito un presupuesto",
-				CreatedOn:      now,
-			},
-		},
 	}
+	fixture.SetMessages([]conversation.Message{
+		{
+			ID:             1,
+			ConversationID: 1,
+			SenderRole:     conversation.SenderConsumer,
+			Content:        "Hola, necesito un presupuesto",
+			CreatedOn:      now,
+		},
+	})
+
+	return fixture
 }
 
-func activeConversationFixture() *conversation.Conversation {
+func activeConversationFixture() conversation.Conversation {
 	fixture := conversationFixture()
-	fixture.Status = "active"
+	fixture.Base().Status = "active"
 	return fixture
 }

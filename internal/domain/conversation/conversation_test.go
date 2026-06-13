@@ -13,9 +13,10 @@ func TestNewPendingConversationCreatesPendingConversation(t *testing.T) {
 
 	require.NoError(t, err)
 	require.NotNil(t, pendingConversation)
-	assert.Equal(t, 10, pendingConversation.ConsumerID)
-	assert.Equal(t, 20, pendingConversation.ProviderID)
-	assert.Equal(t, conversation.StatusPending, pendingConversation.Status)
+	workConversation := pendingConversation.(*conversation.WorkConversation)
+	assert.Equal(t, 10, workConversation.ConsumerID)
+	assert.Equal(t, 20, workConversation.ProviderID)
+	assert.Equal(t, conversation.StatusPending, workConversation.Base().Status)
 }
 
 func TestNewPendingConversationRejectsMissingConsumerID(t *testing.T) {
@@ -32,11 +33,36 @@ func TestNewPendingConversationRejectsMissingProviderID(t *testing.T) {
 	assert.Nil(t, pendingConversation)
 }
 
+func TestNewChatbotConversationCreatesActiveConversation(t *testing.T) {
+	chatbotConversation, err := conversation.NewChatbotConversation(10, "Pérdida de agua en la cocina")
+
+	require.NoError(t, err)
+	require.NotNil(t, chatbotConversation)
+	typedConversation := chatbotConversation.(*conversation.ChatBotConversation)
+	assert.Equal(t, conversation.TypeChatbot, typedConversation.ConversationType())
+	assert.Equal(t, 10, typedConversation.ConsumerID)
+	assert.Equal(t, "Pérdida de agua en la cocina", typedConversation.Title)
+	assert.Equal(t, conversation.StatusActive, typedConversation.Base().Status)
+}
+
+func TestConversationCanAddMessages(t *testing.T) {
+	chatbotConversation, err := conversation.NewChatbotConversation(10, "Pérdida de agua en la cocina")
+	require.NoError(t, err)
+	message, err := conversation.NewConsumerMessage("Tengo una pérdida de agua")
+	require.NoError(t, err)
+
+	chatbotConversation.AddMessage(*message)
+
+	require.Len(t, chatbotConversation.Messages(), 1)
+	assert.Equal(t, conversation.SenderConsumer, chatbotConversation.Messages()[0].SenderRole)
+	assert.Equal(t, "Tengo una pérdida de agua", chatbotConversation.Messages()[0].Content)
+}
+
 func TestCanActivateAConversation(t *testing.T) {
 	pendingConversation, _ := conversation.NewPendingConversation(10, 20)
 	err := pendingConversation.Activate()
 	require.NoError(t, err)
-	assert.Equal(t, conversation.StatusActive, pendingConversation.Status)
+	assert.Equal(t, conversation.StatusActive, pendingConversation.Base().Status)
 }
 
 func TestCannotActivateNonPendingConversation(t *testing.T) {
@@ -46,5 +72,5 @@ func TestCannotActivateNonPendingConversation(t *testing.T) {
 	err := pendingConversation.Activate()
 
 	assert.ErrorIs(t, err, conversation.ErrOnlyPendingConversationCanBeActivated)
-	assert.Equal(t, conversation.StatusActive, pendingConversation.Status)
+	assert.Equal(t, conversation.StatusActive, pendingConversation.Base().Status)
 }

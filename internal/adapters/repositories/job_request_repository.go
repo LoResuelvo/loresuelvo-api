@@ -22,6 +22,11 @@ func NewJobRequestRepository(db *sql.DB) *JobRequestRepository {
 
 // TODO: reemplazar inserción de Conversación y remover ids de consumer y provider de JobRequest para tener como fuente de verdad a Conversation
 func (repository *JobRequestRepository) SaveWithConversation(jobRequest jobrequest.JobRequest, pendingConversation conversation.Conversation) (*jobrequest.JobRequest, error) {
+	workConversation, ok := pendingConversation.(*conversation.WorkConversation)
+	if !ok {
+		return nil, fmt.Errorf("saving job request: expected work conversation, got %s", pendingConversation.ConversationType())
+	}
+
 	ctx := context.Background()
 	tx, err := repository.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -31,13 +36,23 @@ func (repository *JobRequestRepository) SaveWithConversation(jobRequest jobreque
 	var conversationID int
 	err = tx.QueryRowContext(
 		ctx,
-		`INSERT INTO conversations (consumer_id, provider_id, status, created_on, updated_on)
-		VALUES ($1, $2, $3, NOW(), NOW())
+		`INSERT INTO conversations (status, created_on, updated_on)
+		VALUES ($1, NOW(), NOW())
 		RETURNING id`,
-		pendingConversation.ConsumerID,
-		pendingConversation.ProviderID,
-		pendingConversation.Status,
+		workConversation.Status,
 	).Scan(&conversationID)
+	if err != nil {
+		return nil, rollbackJobRequestTx(tx, mapJobRequestInsertError(err))
+	}
+
+	_, err = tx.ExecContext(
+		ctx,
+		`INSERT INTO work_conversations (conversation_id, consumer_id, provider_id)
+		VALUES ($1, $2, $3)`,
+		conversationID,
+		workConversation.ConsumerID,
+		workConversation.ProviderID,
+	)
 	if err != nil {
 		return nil, rollbackJobRequestTx(tx, mapJobRequestInsertError(err))
 	}

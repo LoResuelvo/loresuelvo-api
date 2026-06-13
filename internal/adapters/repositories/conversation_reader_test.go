@@ -15,7 +15,7 @@ type conversationReaderFixture struct {
 	conversationRepository *repositories.ConversationRepository
 	consumerID             int
 	providerID             int
-	savedConversation      *conversation.Conversation
+	savedConversation      conversation.Conversation
 	initialMessage         conversation.Message
 }
 
@@ -45,7 +45,7 @@ func TestConversationReaderFindsConsumerSummaries(t *testing.T) {
 
 	require.NoError(t, err)
 	require.Len(t, summaries, 1)
-	assert.Equal(t, fixture.savedConversation.ID, summaries[0].ID)
+	assert.Equal(t, fixture.savedConversation.Base().ID, summaries[0].ID)
 	assert.Equal(t, conversation.StatusPending, summaries[0].Status)
 	assert.Equal(t, fixture.providerID, summaries[0].Counterpart.ID)
 	assert.Equal(t, conversation.SenderProvider, summaries[0].Counterpart.Role)
@@ -65,7 +65,7 @@ func TestConversationReaderFindsProviderSummaries(t *testing.T) {
 
 	require.NoError(t, err)
 	require.Len(t, summaries, 1)
-	assert.Equal(t, fixture.savedConversation.ID, summaries[0].ID)
+	assert.Equal(t, fixture.savedConversation.Base().ID, summaries[0].ID)
 	assert.Equal(t, conversation.StatusPending, summaries[0].Status)
 	assert.Equal(t, fixture.consumerID, summaries[0].Counterpart.ID)
 	assert.Equal(t, conversation.SenderConsumer, summaries[0].Counterpart.Role)
@@ -94,11 +94,11 @@ func TestConversationReaderReturnsEmptySummaryLists(t *testing.T) {
 func TestConversationReaderFindsDetailForConsumer(t *testing.T) {
 	fixture := newSavedConversationReaderFixture(t)
 
-	detail, err := fixture.reader.FindDetailByIDForConsumer(context.Background(), fixture.savedConversation.ID)
+	detail, err := fixture.reader.FindDetailByIDForConsumer(context.Background(), fixture.savedConversation.Base().ID)
 
 	require.NoError(t, err)
 	require.NotNil(t, detail)
-	assert.Equal(t, fixture.savedConversation.ID, detail.ID)
+	assert.Equal(t, fixture.savedConversation.Base().ID, detail.ID)
 	assert.Equal(t, conversation.StatusPending, detail.Status)
 	assert.Equal(t, fixture.providerID, detail.Counterpart.ID)
 	assert.Equal(t, conversation.SenderProvider, detail.Counterpart.Role)
@@ -115,11 +115,11 @@ func TestConversationReaderFindsDetailForConsumer(t *testing.T) {
 func TestConversationReaderFindsDetailForProvider(t *testing.T) {
 	fixture := newSavedConversationReaderFixture(t)
 
-	detail, err := fixture.reader.FindDetailByIDForProvider(context.Background(), fixture.savedConversation.ID)
+	detail, err := fixture.reader.FindDetailByIDForProvider(context.Background(), fixture.savedConversation.Base().ID)
 
 	require.NoError(t, err)
 	require.NotNil(t, detail)
-	assert.Equal(t, fixture.savedConversation.ID, detail.ID)
+	assert.Equal(t, fixture.savedConversation.Base().ID, detail.ID)
 	assert.Equal(t, conversation.StatusPending, detail.Status)
 	assert.Equal(t, fixture.consumerID, detail.Counterpart.ID)
 	assert.Equal(t, conversation.SenderConsumer, detail.Counterpart.Role)
@@ -137,7 +137,7 @@ func TestConversationReaderReflectsSentMessageAsLatestAndDetailLastMessage(t *te
 	fixture := newSavedConversationReaderFixture(t)
 	providerMessage, err := conversation.NewProviderMessage("Sí, puedo pasar el jueves a las 10")
 	require.NoError(t, err)
-	sentMessage, err := fixture.conversationRepository.AddMessage(context.Background(), fixture.savedConversation.ID, *providerMessage)
+	sentMessage, err := fixture.conversationRepository.AddMessage(context.Background(), fixture.savedConversation.Base().ID, *providerMessage)
 	require.NoError(t, err)
 
 	consumerSummaries, err := fixture.reader.FindSummariesByConsumerID(context.Background(), fixture.consumerID)
@@ -149,7 +149,7 @@ func TestConversationReaderReflectsSentMessageAsLatestAndDetailLastMessage(t *te
 	assert.Equal(t, sentMessage.Content, consumerSummaries[0].LastMessage.Content)
 	assert.Equal(t, sentMessage.CreatedOn, consumerSummaries[0].UpdatedOn)
 
-	detail, err := fixture.reader.FindDetailByIDForConsumer(context.Background(), fixture.savedConversation.ID)
+	detail, err := fixture.reader.FindDetailByIDForConsumer(context.Background(), fixture.savedConversation.Base().ID)
 	require.NoError(t, err)
 	require.Len(t, detail.Messages, 2)
 	assert.Equal(t, fixture.initialMessage.Content, detail.Messages[0].Content)

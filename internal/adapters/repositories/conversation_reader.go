@@ -33,7 +33,8 @@ func (reader *ConversationReader) FindSummariesByConsumerID(ctx context.Context,
 			lm.created_on,
 			c.updated_on
 		FROM conversations c
-		INNER JOIN providers p ON p.id = c.provider_id
+		INNER JOIN work_conversations wc ON wc.conversation_id = c.id
+		INNER JOIN providers p ON p.id = wc.provider_id
 		INNER JOIN users u ON u.id = p.user_id
 		LEFT JOIN categories cat ON cat.id = p.category_id
 		LEFT JOIN LATERAL (
@@ -43,7 +44,7 @@ func (reader *ConversationReader) FindSummariesByConsumerID(ctx context.Context,
 			ORDER BY m.created_on DESC, m.id DESC
 			LIMIT 1
 		) lm ON true
-		WHERE c.consumer_id = $1
+		WHERE wc.consumer_id = $1
 		ORDER BY c.updated_on DESC, c.id DESC`,
 		consumerID,
 	)
@@ -71,7 +72,8 @@ func (reader *ConversationReader) FindSummariesByProviderID(ctx context.Context,
 			lm.created_on,
 			c.updated_on
 		FROM conversations c
-		INNER JOIN consumers consumer ON consumer.id = c.consumer_id
+		INNER JOIN work_conversations wc ON wc.conversation_id = c.id
+		INNER JOIN consumers consumer ON consumer.id = wc.consumer_id
 		INNER JOIN users u ON u.id = consumer.user_id
 		LEFT JOIN LATERAL (
 			SELECT m.id, m.sender_role, m.content, m.created_on
@@ -80,7 +82,7 @@ func (reader *ConversationReader) FindSummariesByProviderID(ctx context.Context,
 			ORDER BY m.created_on DESC, m.id DESC
 			LIMIT 1
 		) lm ON true
-		WHERE c.provider_id = $1
+		WHERE wc.provider_id = $1
 		ORDER BY c.updated_on DESC, c.id DESC`,
 		providerID,
 	)
@@ -108,7 +110,8 @@ func (reader *ConversationReader) FindDetailByIDForConsumer(ctx context.Context,
 			m.created_on,
 			c.updated_on
 		FROM conversations c
-		INNER JOIN providers p ON p.id = c.provider_id
+		INNER JOIN work_conversations wc ON wc.conversation_id = c.id
+		INNER JOIN providers p ON p.id = wc.provider_id
 		INNER JOIN users u ON u.id = p.user_id
 		LEFT JOIN categories cat ON cat.id = p.category_id
 		LEFT JOIN messages m ON m.conversation_id = c.id
@@ -140,7 +143,8 @@ func (reader *ConversationReader) FindDetailByIDForProvider(ctx context.Context,
 			m.created_on,
 			c.updated_on
 		FROM conversations c
-		INNER JOIN consumers consumer ON consumer.id = c.consumer_id
+		INNER JOIN work_conversations wc ON wc.conversation_id = c.id
+		INNER JOIN consumers consumer ON consumer.id = wc.consumer_id
 		INNER JOIN users u ON u.id = consumer.user_id
 		LEFT JOIN messages m ON m.conversation_id = c.id
 		WHERE c.id = $1

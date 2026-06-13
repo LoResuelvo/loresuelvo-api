@@ -26,7 +26,16 @@ type jobRequestRepositoryTestContext struct {
 func cleanJobRequestRepositoryTestDatabase(t *testing.T, database *sql.DB) {
 	t.Helper()
 
-	_, err := database.Exec("DELETE FROM providers")
+	_, err := database.Exec("DELETE FROM job_requests")
+	require.NoError(t, err, "could not clean job requests")
+
+	_, err = database.Exec("DELETE FROM messages")
+	require.NoError(t, err, "could not clean messages")
+
+	_, err = database.Exec("DELETE FROM conversations")
+	require.NoError(t, err, "could not clean conversations")
+
+	_, err = database.Exec("DELETE FROM providers")
 	require.NoError(t, err, "could not clean providers")
 
 	_, err = database.Exec("DELETE FROM users")
@@ -114,7 +123,7 @@ func conversationForJobRequest(t *testing.T, consumerID, providerID int) convers
 	pendingConversation, err := conversation.NewPendingConversation(consumerID, providerID)
 	require.NoError(t, err)
 
-	return *pendingConversation
+	return pendingConversation
 }
 
 func validJobRequest(t *testing.T, consumerID, providerID int) jobrequest.JobRequest {
@@ -145,9 +154,10 @@ func TestJobRequestRepositoryCanSaveRequestWithConversation(t *testing.T) {
 
 	foundConversation, err := testContext.conversationRepository.FindByID(context.Background(), savedJobRequest.ConversationID)
 	require.NoError(t, err)
-	assert.Equal(t, consumerID, foundConversation.ConsumerID)
-	assert.Equal(t, providerID, foundConversation.ProviderID)
-	assert.Equal(t, conversation.StatusPending, foundConversation.Status)
+	foundWorkConversation := foundConversation.(*conversation.WorkConversation)
+	assert.Equal(t, consumerID, foundWorkConversation.ConsumerID)
+	assert.Equal(t, providerID, foundWorkConversation.ProviderID)
+	assert.Equal(t, conversation.StatusPending, foundWorkConversation.Base().Status)
 }
 
 func TestJobRequestRepositoryRejectsDuplicateRequestBetweenSameConsumerAndProvider(t *testing.T) {

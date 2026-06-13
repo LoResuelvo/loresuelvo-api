@@ -4,42 +4,56 @@ import (
 	"time"
 )
 
-const StatusPending = "pending"
+const (
+	StatusPending               = "pending"
+	StatusActive                = "active"
+	PendingConsumerMessageLimit = 5
+	TypeWork                    = "work"
+	TypeChatbot                 = "chatbot"
+)
 
-const StatusActive = "active"
-
-const PendingConsumerMessageLimit = 5
-
-type Conversation struct {
-	ID         int
-	ConsumerID int
-	ProviderID int
-	Status     string
-	UpdatedOn  time.Time
-	Messages   []Message
+type Conversation interface {
+	ConversationType() string
+	Base() *BaseConversation
+	Activate() error
+	AddMessage(message Message)
+	Messages() []Message
+	SetMessages(messages []Message)
 }
 
-func NewPendingConversation(consumerID, providerID int) (*Conversation, error) {
-	if consumerID <= 0 {
-		return nil, ErrOnlyConsumerCanStartWorkRequest
-	}
-
-	if providerID <= 0 {
-		return nil, ErrProviderRequired
-	}
-
-	return &Conversation{
-		ConsumerID: consumerID,
-		ProviderID: providerID,
-		Status:     StatusPending,
-	}, nil
+type BaseConversation struct {
+	ID        int
+	Type      string
+	Status    string
+	UpdatedOn time.Time
+	messages  []Message
 }
 
-func (conversation *Conversation) Activate() error {
+func (conversation *BaseConversation) AddMessage(message Message) {
+	conversation.messages = append(conversation.messages, message)
+}
+
+func (conversation *BaseConversation) Activate() error {
 	if conversation.Status != StatusPending {
 		return ErrOnlyPendingConversationCanBeActivated
 	}
 
 	conversation.Status = StatusActive
 	return nil
+}
+
+func (conversation *BaseConversation) ConversationType() string {
+	return conversation.Type
+}
+
+func (conversation *BaseConversation) Base() *BaseConversation {
+	return conversation
+}
+
+func (conversation *BaseConversation) Messages() []Message {
+	return conversation.messages
+}
+
+func (conversation *BaseConversation) SetMessages(messages []Message) {
+	conversation.messages = messages
 }

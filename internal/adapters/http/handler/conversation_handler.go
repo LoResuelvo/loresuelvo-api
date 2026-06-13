@@ -121,10 +121,10 @@ func (h *ConversationHandler) CreateConversation(c *gin.Context) {
 		return
 	}
 
-	c.Header("Location", fmt.Sprintf("/conversations/%d", createdConversation.ID))
+	c.Header("Location", fmt.Sprintf("/conversations/%d", createdConversation.Base().ID))
 	c.JSON(http.StatusCreated, conversationResponse{
-		ID:     createdConversation.ID,
-		Status: createdConversation.Status,
+		ID:     createdConversation.Base().ID,
+		Status: createdConversation.Base().Status,
 	})
 }
 
@@ -248,13 +248,22 @@ func (h *ConversationHandler) CreateChatbotConversation(c *gin.Context) {
 		return
 	}
 
-	createdConversation, err := h.conversationService.CreateChatbotConversation(auth0ID, req.Content)
+	createdConversation, err := h.conversationService.CreateChatbotConversation(c.Request.Context(), auth0ID, req.Content)
+	if errors.Is(err, conversation.ErrMessageRequired) || errors.Is(err, conversation.ErrChatbotResponseRequired) || errors.Is(err, conversation.ErrChatbotQuestionOutOfScope) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if errors.Is(err, conversation.ErrOnlyConsumerCanMessageChatbot) {
+		c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
+		return
+	}
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusCreated, gin.H{"id": createdConversation.ID})
+	c.Header("Location", fmt.Sprintf("/chatbot/conversations/%d", createdConversation.Base().ID))
+	c.JSON(http.StatusCreated, chatbotConversationResponseFromDomain(createdConversation))
 }
 
 func conversationIDFromPath(value string) (int, error) {
@@ -273,6 +282,45 @@ func sentMessageResponseFromDomain(message conversation.Message) sentMessageResp
 		SenderRole:     message.SenderRole,
 		Content:        message.Content,
 		CreatedOn:      message.CreatedOn,
+	}
+}
+
+type chatbotConversationResponse struct {
+	ID       int                           `json:"id"`
+	Status   string                        `json:"status"`
+	Title    string                        `json:"title"`
+	Messages []conversationMessageResponse `json:"messages"`
+	Response *conversationMessageResponse  `json:"response,omitempty"`
+}
+
+func chatbotConversationResponseFromDomain(createdConversation conversation.Conversation) chatbotConversationResponse {
+	chatbotConversation, _ := createdConversation.(*conversation.ChatBotConversation)
+	messages := make([]conversationMessageResponse, 0, len(createdConversation.Messages()))
+	var chatbotResponse *conversationMessageResponse
+	for _, message := range createdConversation.Messages() {
+		messageResponse := conversationMessageResponse{
+			ID:         message.ID,
+			SenderRole: message.SenderRole,
+			Content:    message.Content,
+			CreatedOn:  message.CreatedOn,
+		}
+		messages = append(messages, messageResponse)
+		if message.SenderRole == conversation.SenderChatbot {
+			chatbotResponse = &messageResponse
+		}
+	}
+
+	title := ""
+	if chatbotConversation != nil {
+		title = chatbotConversation.Title
+	}
+
+	return chatbotConversationResponse{
+		ID:       createdConversation.Base().ID,
+		Status:   createdConversation.Base().Status,
+		Title:    title,
+		Messages: messages,
+		Response: chatbotResponse,
 	}
 }
 

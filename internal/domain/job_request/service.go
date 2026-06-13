@@ -48,7 +48,7 @@ func (s *Service) Create(consumerAuthID string, providerID int, title, descripti
 		return nil, err
 	}
 
-	return s.repository.SaveWithConversation(*jobRequest, *pendingConversation)
+	return s.repository.SaveWithConversation(*jobRequest, pendingConversation)
 }
 
 func (s *Service) GetJobRequests(userAuthID string) ([]readmodel.JobRequestSummary, error) {
@@ -79,7 +79,7 @@ func (s *Service) Accept(ctx context.Context, providerAuthID string, jobRequestI
 		return nil, err
 	}
 
-	if err := s.conversationRepository.SaveStatus(ctx, *linkedConversation); err != nil {
+	if err := s.conversationRepository.SaveStatus(ctx, linkedConversation); err != nil {
 		return nil, err
 	}
 

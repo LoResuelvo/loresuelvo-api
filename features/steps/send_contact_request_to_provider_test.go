@@ -148,12 +148,12 @@ func (suite *testSuite) systemCreatesPendingConversationBetweenConsumerAndProvid
 		return err
 	}
 
-	if createdConversation.ID != response.ID {
-		return fmt.Errorf("expected persisted conversation id %d, got %d", response.ID, createdConversation.ID)
+	if createdConversation.Base().ID != response.ID {
+		return fmt.Errorf("expected persisted conversation id %d, got %d", response.ID, createdConversation.Base().ID)
 	}
 
-	if createdConversation.Status != conversationStatusPending {
-		return fmt.Errorf("expected persisted conversation status %q, got %q", conversationStatusPending, createdConversation.Status)
+	if createdConversation.Base().Status != conversationStatusPending {
+		return fmt.Errorf("expected persisted conversation status %q, got %q", conversationStatusPending, createdConversation.Base().Status)
 	}
 
 	return nil

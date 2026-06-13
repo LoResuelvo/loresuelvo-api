@@ -227,11 +227,9 @@ func (suite *testSuite) insertPendingConversationFixture(ctx context.Context, co
 	var conversationID int
 	err = tx.QueryRowContext(
 		ctx,
-		`INSERT INTO conversations (consumer_id, provider_id, status, created_on, updated_on)
-		VALUES ($1, $2, $3, NOW(), NOW())
+		`INSERT INTO conversations (status, created_on, updated_on)
+		VALUES ($1, NOW(), NOW())
 		RETURNING id`,
-		consumerID,
-		providerID,
 		conversationStatusPending,
 	).Scan(&conversationID)
 	if err != nil {
@@ -252,6 +250,18 @@ func (suite *testSuite) insertPendingConversationFixture(ctx context.Context, co
 			_ = tx.Rollback()
 			return 0, fmt.Errorf("inserting pending conversation fixture message: %w", err)
 		}
+	}
+
+	if _, err := tx.ExecContext(
+		ctx,
+		`INSERT INTO work_conversations (conversation_id, consumer_id, provider_id)
+		VALUES ($1, $2, $3)`,
+		conversationID,
+		consumerID,
+		providerID,
+	); err != nil {
+		_ = tx.Rollback()
+		return 0, fmt.Errorf("inserting pending work conversation fixture: %w", err)
 	}
 
 	if err := tx.Commit(); err != nil {
