@@ -20,6 +20,7 @@ type chatbotConversationRequest struct {
 type chatbotConversationResponse struct {
 	ID       int                           `json:"id"`
 	Status   string                        `json:"status"`
+	Title    string                        `json:"title"`
 	Messages []conversationMessageResponse `json:"messages"`
 	Response *conversationMessageResponse  `json:"response"`
 }
@@ -32,7 +33,12 @@ func registerChatbotSteps(sc *godog.ScenarioContext, suite *testSuite) {
 	sc.Step(`^envío un mensaje al chatbot asistido por IA:$`, suite.sendMessageToChatbot)
 	sc.Step(`^intento enviar un mensaje al chatbot asistido por IA:$`, suite.trySendMessageToChatbot)
 	sc.Step(`^intento enviar una pregunta fuera del ámbito del problema del hogar al chatbot asistido por IA:$`, suite.trySendOutOfScopeQuestionToChatbot)
+	sc.Step(`^ya tengo una conversación activa con el chatbot$`, suite.iAlreadyHaveActiveChatbotConversation)
+	sc.Step(`^inicio una nueva conversacion enviando un mensaje al chatbot asistido por IA:$`, suite.startNewChatbotConversationWithMessage)
 	sc.Step(`^el sistema crea una conversación con el chatbot asistido por IA para el consumidor "([^"]*)"$`, suite.systemCreatesChatbotConversationForConsumer)
+	sc.Step(`^el sistema crea una nueva conversación con el chatbot asistido por IA para el nuevo mensaje$`, suite.systemCreatesNewChatbotConversationForNewMessage)
+	sc.Step(`^tengo un total de dos conversaciones activas con el chatbot asistido por IA$`, suite.iHaveTwoActiveChatbotConversations)
+	sc.Step(`^el sistema crea una conversación con el chatbot asistido por IA con el título "([^"]*)"$`, suite.systemCreatesChatbotConversationWithTitle)
 	sc.Step(`^la conversación contiene mi mensaje:$`, suite.chatbotConversationContainsMyMessage)
 	sc.Step(`^el sistema muestra la respuesta del chatbot asistido por IA:$`, suite.systemShowsChatbotResponse)
 	sc.Step(`^el sistema registra mi mensaje en la conversación con el chatbot asistido por IA:$`, suite.systemRegistersMyMessageInChatbotConversation)
@@ -47,6 +53,8 @@ func registerChatbotSteps(sc *godog.ScenarioContext, suite *testSuite) {
 func (suite *testSuite) chatbotIsAvailable() error {
 	suite.nextChatbotResponse = ""
 	suite.chatbotAdapterRequestCount = 0
+	suite.chatbotConversationIDs = nil
+	suite.chatbotConversationStatuses = nil
 	return nil
 }
 
@@ -56,6 +64,8 @@ func (suite *testSuite) thereIsNoChatbotConversationForConsumer(consumerEmail st
 	}
 
 	suite.lastConversationID = 0
+	suite.chatbotConversationIDs = nil
+	suite.chatbotConversationStatuses = nil
 	return nil
 }
 
@@ -84,11 +94,53 @@ func (suite *testSuite) trySendOutOfScopeQuestionToChatbot(message *godog.DocStr
 	})
 }
 
+func (suite *testSuite) iAlreadyHaveActiveChatbotConversation() error {
+	if err := suite.requestCreateChatbotConversation(chatbotConversationRequest{
+		Content: "Tengo una pérdida de agua en el baño y necesito orientación.",
+	}); err != nil {
+		return err
+	}
+
+	return suite.rememberCreatedChatbotConversation()
+}
+
+func (suite *testSuite) startNewChatbotConversationWithMessage(message *godog.DocString) error {
+	return suite.sendMessageToChatbot(message)
+}
+
 func (suite *testSuite) systemCreatesChatbotConversationForConsumer(consumerEmail string) error {
 	if _, err := suite.consumerRepository.FindIDByEmail(consumerEmail); err != nil {
 		return err
 	}
-	if err := suite.lastResponseShouldHaveStatusCode(http.StatusCreated); err != nil {
+
+	return suite.rememberCreatedChatbotConversation()
+}
+
+func (suite *testSuite) systemCreatesNewChatbotConversationForNewMessage() error {
+	previousConversationID := suite.lastConversationID
+
+	if err := suite.rememberCreatedChatbotConversation(); err != nil {
+		return err
+	}
+
+	if previousConversationID != 0 && suite.lastConversationID == previousConversationID {
+		return fmt.Errorf("expected a new chatbot conversation id different from %d", previousConversationID)
+	}
+
+	return nil
+}
+
+func (suite *testSuite) iHaveTwoActiveChatbotConversations() error {
+	activeConversationIDs := uniqueActiveChatbotConversationIDs(suite.chatbotConversationIDs, suite.chatbotConversationStatuses)
+	if len(activeConversationIDs) != 2 {
+		return fmt.Errorf("expected 2 active chatbot conversations, got ids %v with statuses %v", suite.chatbotConversationIDs, suite.chatbotConversationStatuses)
+	}
+
+	return nil
+}
+
+func (suite *testSuite) systemCreatesChatbotConversationWithTitle(expectedTitle string) error {
+	if err := suite.rememberCreatedChatbotConversation(); err != nil {
 		return err
 	}
 
@@ -96,11 +148,10 @@ func (suite *testSuite) systemCreatesChatbotConversationForConsumer(consumerEmai
 	if err != nil {
 		return err
 	}
-	if response.ID == 0 {
-		return fmt.Errorf("expected created chatbot conversation id, got body %s", string(suite.lastBody))
+	if response.Title != expectedTitle {
+		return fmt.Errorf("expected chatbot conversation title %q, got %q with body %s", expectedTitle, response.Title, string(suite.lastBody))
 	}
 
-	suite.lastConversationID = response.ID
 	return nil
 }
 
@@ -227,6 +278,47 @@ func (suite *testSuite) chatbotConversationResponseFromLastBody() (chatbotConver
 	}
 
 	return response, nil
+}
+
+func (suite *testSuite) rememberCreatedChatbotConversation() error {
+	if err := suite.lastResponseShouldHaveStatusCode(http.StatusCreated); err != nil {
+		return err
+	}
+
+	response, err := suite.chatbotConversationResponseFromLastBody()
+	if err != nil {
+		return err
+	}
+	if response.ID == 0 {
+		return fmt.Errorf("expected created chatbot conversation id, got body %s", string(suite.lastBody))
+	}
+
+	suite.lastConversationID = response.ID
+	suite.chatbotConversationIDs = append(suite.chatbotConversationIDs, response.ID)
+	suite.chatbotConversationStatuses = append(suite.chatbotConversationStatuses, response.Status)
+
+	return nil
+}
+
+func uniqueActiveChatbotConversationIDs(ids []int, statuses []string) []int {
+	seen := make(map[int]struct{}, len(ids))
+	unique := make([]int, 0, len(ids))
+	for index, id := range ids {
+		if id <= 0 {
+			continue
+		}
+		if index >= len(statuses) || statuses[index] != conversationStatusActive {
+			continue
+		}
+		if _, ok := seen[id]; ok {
+			continue
+		}
+
+		seen[id] = struct{}{}
+		unique = append(unique, id)
+	}
+
+	return unique
 }
 
 func (response chatbotConversationResponse) chatbotMessages() []conversationMessageResponse {

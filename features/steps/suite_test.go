@@ -19,28 +19,30 @@ import (
 )
 
 type testSuite struct {
-	server                     *httptest.Server
-	database                   *sql.DB
-	categoryRepository         *repositories.CategoryRepository
-	consumerRepository         *repositories.ConsumerRepository
-	providerRepository         *repositories.ProviderRepository
-	conversationRepository     *repositories.ConversationRepository
-	messageRepository          *repositories.MessageRepository
-	jobRequestRepository       *repositories.JobRequestRepository
-	userRepository             *repositories.UserRepository
-	fileRepository             *repositories.FileRepository
-	auth0Validator             *validator.Validator
-	tokenBuilder               *testhelper.TokenBuilder
-	lastStatus                 int
-	lastBody                   []byte
-	currentAuth0ID             string
-	lastConversationID         int
-	lastJobRequestID           int
-	lastWorkRequestProviderID  int
-	providerProfilePhotoFileID string
-	realtimeConnections        map[string]*realtimeTestConnection
-	nextChatbotResponse        string
-	chatbotAdapterRequestCount int
+	server                      *httptest.Server
+	database                    *sql.DB
+	categoryRepository          *repositories.CategoryRepository
+	consumerRepository          *repositories.ConsumerRepository
+	providerRepository          *repositories.ProviderRepository
+	conversationRepository      *repositories.ConversationRepository
+	messageRepository           *repositories.MessageRepository
+	jobRequestRepository        *repositories.JobRequestRepository
+	userRepository              *repositories.UserRepository
+	fileRepository              *repositories.FileRepository
+	auth0Validator              *validator.Validator
+	tokenBuilder                *testhelper.TokenBuilder
+	lastStatus                  int
+	lastBody                    []byte
+	currentAuth0ID              string
+	lastConversationID          int
+	lastJobRequestID            int
+	lastWorkRequestProviderID   int
+	providerProfilePhotoFileID  string
+	realtimeConnections         map[string]*realtimeTestConnection
+	nextChatbotResponse         string
+	chatbotAdapterRequestCount  int
+	chatbotConversationIDs      []int
+	chatbotConversationStatuses []string
 
 	categoryIDsByName              map[string]int
 	lastProviderFilterCategoryName string
@@ -102,6 +104,8 @@ func (s *testSuite) cleanDatabase() error {
 	s.providerProfilePhotoFileID = ""
 	s.nextChatbotResponse = ""
 	s.chatbotAdapterRequestCount = 0
+	s.chatbotConversationIDs = nil
+	s.chatbotConversationStatuses = nil
 
 	return nil
 }

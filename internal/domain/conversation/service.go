@@ -73,6 +73,7 @@ func (s *Service) GetByID(ctx context.Context, authID string, conversationID int
 	return nil, ErrConversationAccessDenied
 }
 
+// TODO: El Mensaje debería añadirse a la Conversación y después guardar la Conversación
 func (s *Service) SendMessage(ctx context.Context, authID string, conversationID int, content string) (*Message, error) {
 	foundConversation, err := s.conversationRepository.FindByID(ctx, conversationID)
 	if err != nil {
