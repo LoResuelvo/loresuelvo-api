@@ -1,7 +1,4 @@
-.agents
-skills*
 .env
 certbot/
-AGENTS.md
 coverage.out
 .vscode
