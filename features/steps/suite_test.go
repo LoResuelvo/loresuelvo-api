@@ -39,6 +39,8 @@ type testSuite struct {
 	lastWorkRequestProviderID  int
 	providerProfilePhotoFileID string
 	realtimeConnections        map[string]*realtimeTestConnection
+	nextChatbotResponse        string
+	chatbotAdapterRequestCount int
 
 	categoryIDsByName              map[string]int
 	lastProviderFilterCategoryName string
@@ -62,6 +64,7 @@ func (s *testSuite) registerAllSteps(sc *godog.ScenarioContext) {
 	registerGetJobRequestSteps(sc, s)
 	registerAcceptJobRequestSteps(sc, s)
 	registerRealtimeMessageSteps(sc, s)
+	registerChatbotSteps(sc, s)
 }
 
 func (s *testSuite) cleanDatabase() error {
@@ -97,6 +100,8 @@ func (s *testSuite) cleanDatabase() error {
 	s.lastWorkRequestProviderID = 0
 	s.lastJobRequestID = 0
 	s.providerProfilePhotoFileID = ""
+	s.nextChatbotResponse = ""
+	s.chatbotAdapterRequestCount = 0
 
 	return nil
 }
