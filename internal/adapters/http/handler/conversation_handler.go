@@ -27,6 +27,10 @@ type sendMessageRequest struct {
 	Content string `json:"content"`
 }
 
+type createChatbotConversationRequest struct {
+	Content string `json:"content"`
+}
+
 type conversationResponse struct {
 	ID     int    `json:"id"`
 	Status string `json:"status"`
@@ -229,6 +233,28 @@ func (h *ConversationHandler) ListConversations(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, conversationSummaryResponsesFromDomain(summaries))
+}
+
+func (h *ConversationHandler) CreateChatbotConversation(c *gin.Context) {
+	auth0ID, ok := middleware.GetUserID(c)
+	if !ok || strings.TrimSpace(auth0ID) == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "missing user id"})
+		return
+	}
+
+	var req createChatbotConversationRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	createdConversation, err := h.conversationService.CreateChatbotConversation(auth0ID, req.Content)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusCreated, gin.H{"id": createdConversation.ID})
 }
 
 func conversationIDFromPath(value string) (int, error) {

@@ -110,6 +110,10 @@ func (s *Service) List(ctx context.Context, authID string) ([]readmodel.Conversa
 	return nil, ErrConversationAccessDenied
 }
 
+func (s *Service) CreateChatbotConversation(authID string, content string) (*Conversation, error) {
+	return nil, nil
+}
+
 func (s *Service) consumerIDForWorkRequest(consumerAuthID string) (int, error) {
 	consumerID, err := s.consumerIDFinder.FindIDByAuthID(consumerAuthID)
 	if err != nil {
