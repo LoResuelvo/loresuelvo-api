@@ -18,11 +18,12 @@ type chatbotConversationRequest struct {
 }
 
 type chatbotConversationResponse struct {
-	ID       int                           `json:"id"`
-	Status   string                        `json:"status"`
-	Title    string                        `json:"title"`
-	Messages []conversationMessageResponse `json:"messages"`
-	Response *conversationMessageResponse  `json:"response"`
+	ID             int                           `json:"id"`
+	Status         string                        `json:"status"`
+	Title          string                        `json:"title"`
+	ResponseStatus string                        `json:"response_status"`
+	Messages       []conversationMessageResponse `json:"messages"`
+	Response       *conversationMessageResponse  `json:"response"`
 }
 
 func registerChatbotSteps(sc *godog.ScenarioContext, suite *testSuite) {
@@ -47,12 +48,10 @@ func registerChatbotSteps(sc *godog.ScenarioContext, suite *testSuite) {
 	sc.Step(`^el sistema no crea una conversación con el chatbot asistido por IA$`, suite.systemDoesNotCreateChatbotConversation)
 	sc.Step(`^el sistema muestra un pre diagnóstico del problema del hogar:$`, suite.systemShowsPreDiagnosis)
 	sc.Step(`^el sistema me indica que el chatbot solo responde preguntas relacionadas con problemas del hogar$`, suite.systemReportsChatbotScopeRestriction)
-	sc.Step(`^el sistema no envía la pregunta al adaptador de IA$`, suite.systemDoesNotSendQuestionToAIAdapter)
 }
 
 func (suite *testSuite) chatbotIsAvailable() error {
-	suite.nextChatbotResponse = ""
-	suite.chatbotAdapterRequestCount = 0
+	suite.chatbot.Reset()
 	suite.chatbotConversationIDs = nil
 	suite.chatbotConversationStatuses = nil
 	return nil
@@ -70,7 +69,7 @@ func (suite *testSuite) thereIsNoChatbotConversationForConsumer(consumerEmail st
 }
 
 func (suite *testSuite) chatbotWillRespond(message *godog.DocString) error {
-	suite.nextChatbotResponse = normalizeDocString(message)
+	suite.chatbot.SetResponse("Pérdida de agua en la cocina", normalizeDocString(message))
 	return nil
 }
 
@@ -89,6 +88,7 @@ func (suite *testSuite) trySendMessageToChatbot(message *godog.DocString) error 
 }
 
 func (suite *testSuite) trySendOutOfScopeQuestionToChatbot(message *godog.DocString) error {
+	suite.chatbot.SetOutOfScopeResponse("Consulta fuera de alcance", "Solo puedo responder consultas relacionadas con problemas del hogar.")
 	return suite.requestCreateChatbotConversation(chatbotConversationRequest{
 		Content: normalizeDocString(message),
 	})
@@ -201,19 +201,19 @@ func (suite *testSuite) systemShowsPreDiagnosis(message *godog.DocString) error 
 }
 
 func (suite *testSuite) systemReportsChatbotScopeRestriction() error {
-	if err := suite.lastResponseShouldHaveStatusCode(http.StatusBadRequest); err != nil {
+	if err := suite.lastResponseShouldHaveStatusCode(http.StatusCreated); err != nil {
 		return err
 	}
 
-	return suite.lastResponseShouldHaveError()
-}
-
-func (suite *testSuite) systemDoesNotSendQuestionToAIAdapter() error {
-	if suite.chatbotAdapterRequestCount != 0 {
-		return fmt.Errorf("expected chatbot adapter not to be called, got %d calls", suite.chatbotAdapterRequestCount)
+	response, err := suite.chatbotConversationResponseFromLastBody()
+	if err != nil {
+		return err
+	}
+	if response.ResponseStatus != chatbotResponseOutOfScope {
+		return fmt.Errorf("expected chatbot response status %q, got %q", chatbotResponseOutOfScope, response.ResponseStatus)
 	}
 
-	return nil
+	return suite.chatbotConversationContainsMessage(participantRoleChatbot, "Solo puedo responder consultas relacionadas con problemas del hogar.")
 }
 
 func (suite *testSuite) requestCreateChatbotConversation(payload chatbotConversationRequest) error {

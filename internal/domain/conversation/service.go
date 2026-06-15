@@ -2,7 +2,6 @@ package conversation
 
 import (
 	"context"
-	"strings"
 
 	readmodel "github.com/LoResuelvo/loresuelvo-api/internal/domain/conversation/read_model"
 )
@@ -24,12 +23,8 @@ func NewService(
 	providerIDFinder ProviderIDFinder,
 	conversationReader Reader,
 	messagePublisher MessagePublisher,
-	chatbots ...Chatbot,
+	chatbot Chatbot,
 ) *Service {
-	var chatbot Chatbot
-	if len(chatbots) > 0 {
-		chatbot = chatbots[0]
-	}
 
 	return &Service{
 		conversationRepository:   conversationRepository,
@@ -125,11 +120,7 @@ func (s *Service) List(ctx context.Context, authID string) ([]readmodel.Conversa
 	return nil, ErrConversationAccessDenied
 }
 
-func (s *Service) CreateChatbotConversation(ctx context.Context, authID string, content string) (Conversation, error) {
-	if s.chatbot == nil {
-		return nil, ErrChatbotUnavailable
-	}
-
+func (s *Service) CreateChatbotConversation(ctx context.Context, authID string, content string) (*ChatbotConversationResult, error) {
 	consumerID, err := s.consumerIDFinder.FindIDByAuthID(authID)
 	if err != nil {
 		return nil, ErrOnlyConsumerCanMessageChatbot
@@ -139,11 +130,8 @@ func (s *Service) CreateChatbotConversation(ctx context.Context, authID string, 
 	if err != nil {
 		return nil, err
 	}
-	if !isHomeProblemQuestion(consumerMessage.Content) {
-		return nil, ErrChatbotQuestionOutOfScope
-	}
 
-	chatbotResponse, err := s.chatbot.GetResponse(ctx, consumerMessage.Content)
+	chatbotResponse, err := s.chatbot.AnswerHomeProblemQuestion(ctx, consumerMessage.Content)
 	if err != nil {
 		return nil, err
 	}
@@ -155,7 +143,7 @@ func (s *Service) CreateChatbotConversation(ctx context.Context, authID string, 
 		return nil, err
 	}
 
-	chatbotConversation, err := NewChatBotConversation(consumerID, chatbotResponse.Title)
+	chatbotConversation, err := NewChatbotConversation(consumerID, chatbotResponse.Title)
 	if err != nil {
 		return nil, err
 	}
@@ -170,38 +158,10 @@ func (s *Service) CreateChatbotConversation(ctx context.Context, authID string, 
 
 	s.messagePublisher.PublishChatbotMessage(ctx, savedConversation, *chatbotMessage)
 
-	return savedConversation, nil
-}
-
-func isHomeProblemQuestion(content string) bool {
-	normalizedContent := strings.ToLower(strings.TrimSpace(content))
-	homeProblemKeywords := []string{
-		"agua",
-		"baño",
-		"bacha",
-		"calefacción",
-		"canilla",
-		"casa",
-		"cocina",
-		"electricidad",
-		"gas",
-		"hogar",
-		"humedad",
-		"luz",
-		"mueble",
-		"pared",
-		"pileta",
-		"pérdida",
-		"plomer",
-		"techo",
-	}
-	for _, keyword := range homeProblemKeywords {
-		if strings.Contains(normalizedContent, keyword) {
-			return true
-		}
-	}
-
-	return false
+	return &ChatbotConversationResult{
+		Conversation:   savedConversation,
+		ResponseStatus: chatbotResponse.Status,
+	}, nil
 }
 
 func (s *Service) consumerIDForWorkRequest(consumerAuthID string) (int, error) {

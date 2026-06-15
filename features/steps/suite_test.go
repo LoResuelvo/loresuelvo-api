@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/auth0/testhelper"
+	chatbotadapter "github.com/LoResuelvo/loresuelvo-api/internal/adapters/chatbot"
 	httpadapter "github.com/LoResuelvo/loresuelvo-api/internal/adapters/http"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/repositories"
 	"github.com/LoResuelvo/loresuelvo-api/internal/bootstrap"
@@ -31,6 +32,7 @@ type testSuite struct {
 	fileRepository              *repositories.FileRepository
 	auth0Validator              *validator.Validator
 	tokenBuilder                *testhelper.TokenBuilder
+	chatbot                     *chatbotadapter.FakeChatbot
 	lastStatus                  int
 	lastBody                    []byte
 	currentAuth0ID              string
@@ -39,8 +41,6 @@ type testSuite struct {
 	lastWorkRequestProviderID   int
 	providerProfilePhotoFileID  string
 	realtimeConnections         map[string]*realtimeTestConnection
-	nextChatbotResponse         string
-	chatbotAdapterRequestCount  int
 	chatbotConversationIDs      []int
 	chatbotConversationStatuses []string
 
@@ -102,8 +102,7 @@ func (s *testSuite) cleanDatabase() error {
 	s.lastWorkRequestProviderID = 0
 	s.lastJobRequestID = 0
 	s.providerProfilePhotoFileID = ""
-	s.nextChatbotResponse = ""
-	s.chatbotAdapterRequestCount = 0
+	s.chatbot.Reset()
 	s.chatbotConversationIDs = nil
 	s.chatbotConversationStatuses = nil
 
@@ -119,7 +118,8 @@ func newTestDb() *sql.DB {
 }
 
 func newTestSuite(tb testing.TB, database *sql.DB) *testSuite {
-	dependencies := bootstrap.NewDependencies(database)
+	chatbot := chatbotadapter.NewFakeChatbot()
+	dependencies := bootstrap.NewDependenciesWithChatbot(database, chatbot)
 	auth0Validator := testhelper.NewTestValidator(tb)
 	tokenBuilder := testhelper.NewTokenBuilder()
 
@@ -146,6 +146,7 @@ func newTestSuite(tb testing.TB, database *sql.DB) *testSuite {
 		fileRepository:         dependencies.FileRepository,
 		auth0Validator:         auth0Validator,
 		tokenBuilder:           tokenBuilder,
+		chatbot:                chatbot,
 
 		categoryIDsByName:          map[string]int{},
 		participantRolesByFullName: map[string]string{},

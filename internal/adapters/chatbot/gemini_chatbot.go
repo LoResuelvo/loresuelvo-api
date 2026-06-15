@@ -1,10 +1,9 @@
-package ai
+package chatbot
 
 import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"os"
 	"strings"
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/conversation"
@@ -18,14 +17,14 @@ type GeminiChatbot struct {
 	model  string
 }
 
-func NewGeminiChatbotFromEnv() *GeminiChatbot {
+func NewGeminiChatbot(model, apiKey string) *GeminiChatbot {
 	return &GeminiChatbot{
-		apiKey: strings.TrimSpace(os.Getenv("GEMINI_API_KEY")),
-		model:  envOrDefault("GEMINI_MODEL", defaultGeminiModel),
+		apiKey: strings.TrimSpace(apiKey),
+		model:  model,
 	}
 }
 
-func (chatbot *GeminiChatbot) GetResponse(ctx context.Context, prompt string) (*conversation.ChatbotResponse, error) {
+func (chatbot *GeminiChatbot) AnswerHomeProblemQuestion(ctx context.Context, prompt string) (*conversation.ChatbotResponse, error) {
 	if strings.TrimSpace(chatbot.apiKey) == "" {
 		return nil, conversation.ErrChatbotUnavailable
 	}
@@ -49,8 +48,9 @@ func (chatbot *GeminiChatbot) GetResponse(ctx context.Context, prompt string) (*
 func (chatbot *GeminiChatbot) prompt(userPrompt string) string {
 	return fmt.Sprintf(`Sos un asistente de pre diagnóstico para problemas del hogar en Argentina.
 Respondé únicamente si la consulta se relaciona con problemas del hogar como plomería, electricidad, gas, humedad, cerraduras, calefacción o reparaciones.
+Si la consulta no se relaciona con problemas del hogar, no respondas la consulta; devolvé una negativa breve y prudente.
 Devolvé exclusivamente JSON válido con este formato:
-{"title":"título breve de la conversación","content":"orientación preliminar clara y prudente"}
+{"status":"answered|out_of_scope","title":"título breve de la conversación","content":"orientación preliminar clara y prudente o negativa breve"}
 No diagnostiques emergencias médicas. Si hay riesgo eléctrico, gas o inundación, recomendá cortar el suministro y contactar a un profesional.
 
 Consulta del consumidor:
@@ -59,6 +59,7 @@ Consulta del consumidor:
 
 func parseChatbotResponse(_, rawResponse string) (*conversation.ChatbotResponse, error) {
 	var payload struct {
+		Status  string `json:"status"`
 		Title   string `json:"title"`
 		Content string `json:"content"`
 	}
@@ -68,22 +69,18 @@ func parseChatbotResponse(_, rawResponse string) (*conversation.ChatbotResponse,
 
 	payload.Title = strings.TrimSpace(payload.Title)
 	payload.Content = strings.TrimSpace(payload.Content)
+	status, err := conversation.ParseChatbotResponseStatus(payload.Status)
+	if err != nil {
+		return nil, err
+	}
 
 	if payload.Content == "" || payload.Title == "" {
 		return nil, conversation.ErrChatbotResponseRequired
 	}
 
 	return &conversation.ChatbotResponse{
+		Status:  status,
 		Title:   payload.Title,
 		Content: payload.Content,
 	}, nil
-}
-
-func envOrDefault(key, fallback string) string {
-	value := strings.TrimSpace(os.Getenv(key))
-	if value == "" {
-		return fallback
-	}
-
-	return value
 }

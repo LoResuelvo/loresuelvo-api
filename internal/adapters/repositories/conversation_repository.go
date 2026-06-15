@@ -64,13 +64,13 @@ func (repository *ConversationRepository) saveConversationWithTx(ctx context.Con
 	base := conversationToSave.Base()
 	err := tx.QueryRowContext(
 		ctx,
-		`INSERT INTO conversations (status, created_on, updated_on)
-		VALUES ($1, NOW(), NOW())
-		RETURNING id, status, updated_on`,
+		`INSERT INTO conversations (type, status, created_on, updated_on)
+		VALUES ($1, $2, NOW(), NOW())
+		RETURNING id, updated_on`,
+		base.Type,
 		base.Status,
 	).Scan(
 		&base.ID,
-		&base.Status,
 		&base.UpdatedOn,
 	)
 	if err != nil {
@@ -85,7 +85,6 @@ func (repository *ConversationRepository) saveConversationWithTx(ctx context.Con
 			return err
 		}
 		baseMessages = append(baseMessages, *savedMessage)
-		base.UpdatedOn = savedMessage.CreatedOn
 	}
 	base.SetMessages(baseMessages)
 
@@ -100,12 +99,6 @@ func (repository *ConversationRepository) saveConversationWithTx(ctx context.Con
 		}
 	default:
 		return fmt.Errorf("saving conversation: unsupported conversation type %q", conversationToSave.ConversationType())
-	}
-
-	if len(base.Messages()) > 0 {
-		if err := repository.updateTimestampWithTx(ctx, tx, base.ID, base.UpdatedOn); err != nil {
-			return err
-		}
 	}
 
 	return nil
@@ -218,14 +211,12 @@ func (repository *ConversationRepository) FindByID(ctx context.Context, conversa
 			COALESCE(cc.title, ''),
 			c.status,
 			c.updated_on,
-			CASE WHEN cc.conversation_id IS NOT NULL THEN $2 ELSE $3 END
+			c.type
 		FROM conversations c
 		LEFT JOIN work_conversations wc ON wc.conversation_id = c.id
 		LEFT JOIN chatbot_conversations cc ON cc.conversation_id = c.id
 		WHERE c.id = $1`,
 		conversationID,
-		conversation.TypeChatbot,
-		conversation.TypeWork,
 	).Scan(
 		&base.ID,
 		&consumerID,
@@ -243,19 +234,22 @@ func (repository *ConversationRepository) FindByID(ctx context.Context, conversa
 	}
 
 	base.Type = conversationType
-	if conversationType == conversation.TypeChatbot {
+	switch conversationType {
+	case conversation.TypeChatbot:
 		return &conversation.ChatBotConversation{
 			BaseConversation: &base,
 			ConsumerID:       consumerID,
 			Title:            title,
 		}, nil
+	case conversation.TypeWork:
+		return &conversation.WorkConversation{
+			BaseConversation: &base,
+			ConsumerID:       consumerID,
+			ProviderID:       providerID,
+		}, nil
+	default:
+		return nil, fmt.Errorf("finding conversation by id: unsupported conversation type %q", conversationType)
 	}
-
-	return &conversation.WorkConversation{
-		BaseConversation: &base,
-		ConsumerID:       consumerID,
-		ProviderID:       providerID,
-	}, nil
 }
 
 func (repository *ConversationRepository) SaveStatus(ctx context.Context, conversationToSave conversation.Conversation) error {

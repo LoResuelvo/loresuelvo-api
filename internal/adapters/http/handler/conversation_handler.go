@@ -249,7 +249,7 @@ func (h *ConversationHandler) CreateChatbotConversation(c *gin.Context) {
 	}
 
 	createdConversation, err := h.conversationService.CreateChatbotConversation(c.Request.Context(), auth0ID, req.Content)
-	if errors.Is(err, conversation.ErrMessageRequired) || errors.Is(err, conversation.ErrChatbotResponseRequired) || errors.Is(err, conversation.ErrChatbotQuestionOutOfScope) {
+	if errors.Is(err, conversation.ErrMessageRequired) || errors.Is(err, conversation.ErrChatbotResponseRequired) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
@@ -262,8 +262,8 @@ func (h *ConversationHandler) CreateChatbotConversation(c *gin.Context) {
 		return
 	}
 
-	c.Header("Location", fmt.Sprintf("/chatbot/conversations/%d", createdConversation.Base().ID))
-	c.JSON(http.StatusCreated, chatbotConversationResponseFromDomain(createdConversation))
+	c.Header("Location", fmt.Sprintf("/chatbot/conversations/%d", createdConversation.Conversation.Base().ID))
+	c.JSON(http.StatusCreated, chatbotConversationResponseFromDomain(*createdConversation))
 }
 
 func conversationIDFromPath(value string) (int, error) {
@@ -286,18 +286,19 @@ func sentMessageResponseFromDomain(message conversation.Message) sentMessageResp
 }
 
 type chatbotConversationResponse struct {
-	ID       int                           `json:"id"`
-	Status   string                        `json:"status"`
-	Title    string                        `json:"title"`
-	Messages []conversationMessageResponse `json:"messages"`
-	Response *conversationMessageResponse  `json:"response,omitempty"`
+	ID             int                           `json:"id"`
+	Status         string                        `json:"status"`
+	Title          string                        `json:"title"`
+	ResponseStatus string                        `json:"response_status"`
+	Messages       []conversationMessageResponse `json:"messages"`
+	Response       *conversationMessageResponse  `json:"response,omitempty"`
 }
 
-func chatbotConversationResponseFromDomain(createdConversation conversation.Conversation) chatbotConversationResponse {
-	chatbotConversation, _ := createdConversation.(*conversation.ChatBotConversation)
-	messages := make([]conversationMessageResponse, 0, len(createdConversation.Messages()))
+func chatbotConversationResponseFromDomain(result conversation.ChatbotConversationResult) chatbotConversationResponse {
+	chatbotConversation, _ := result.Conversation.(*conversation.ChatBotConversation)
+	messages := make([]conversationMessageResponse, 0, len(result.Conversation.Messages()))
 	var chatbotResponse *conversationMessageResponse
-	for _, message := range createdConversation.Messages() {
+	for _, message := range result.Conversation.Messages() {
 		messageResponse := conversationMessageResponse{
 			ID:         message.ID,
 			SenderRole: message.SenderRole,
@@ -311,16 +312,19 @@ func chatbotConversationResponseFromDomain(createdConversation conversation.Conv
 	}
 
 	title := ""
+	responseStatus := ""
 	if chatbotConversation != nil {
 		title = chatbotConversation.Title
+		responseStatus = string(result.ResponseStatus)
 	}
 
 	return chatbotConversationResponse{
-		ID:       createdConversation.Base().ID,
-		Status:   createdConversation.Base().Status,
-		Title:    title,
-		Messages: messages,
-		Response: chatbotResponse,
+		ID:             result.Conversation.Base().ID,
+		Status:         result.Conversation.Base().Status,
+		Title:          title,
+		ResponseStatus: responseStatus,
+		Messages:       messages,
+		Response:       chatbotResponse,
 	}
 }
 

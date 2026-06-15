@@ -8,7 +8,8 @@ type ChatBotConversation struct {
 	Title      string
 }
 
-func NewChatBotConversation(consumerID int, title string) (Conversation, error) {
+// Si el no recibe título, debería devolver un error, no debe settear un título por defecto.
+func NewChatbotConversation(consumerID int, title string) (Conversation, error) {
 	if consumerID <= 0 {
 		return nil, ErrOnlyConsumerCanMessageChatbot
 	}
@@ -24,8 +25,4 @@ func NewChatBotConversation(consumerID int, title string) (Conversation, error) 
 		ConsumerID: consumerID,
 		Title:      trimmedTitle,
 	}, nil
-}
-
-func NewChatbotConversation(consumerID int, title string) (Conversation, error) {
-	return NewChatBotConversation(consumerID, title)
 }

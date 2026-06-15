@@ -26,3 +26,7 @@ ALTER TABLE conversations
 
 DROP TABLE chatbot_conversations;
 DROP TABLE work_conversations;
+
+ALTER TABLE conversations
+    DROP CONSTRAINT conversations_type_check,
+    DROP COLUMN type;

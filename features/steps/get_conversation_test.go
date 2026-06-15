@@ -218,6 +218,7 @@ func (suite *testSuite) senderRoleForEmail(email string) (string, error) {
 	return "", fmt.Errorf("could not resolve sender role for email %q", email)
 }
 
+// TODO: no debe haber sql en steps
 func (suite *testSuite) insertPendingConversationFixture(ctx context.Context, consumerID, providerID int, initialMessage string) (int, error) {
 	tx, err := suite.database.BeginTx(ctx, nil)
 	if err != nil {
@@ -227,9 +228,10 @@ func (suite *testSuite) insertPendingConversationFixture(ctx context.Context, co
 	var conversationID int
 	err = tx.QueryRowContext(
 		ctx,
-		`INSERT INTO conversations (status, created_on, updated_on)
-		VALUES ($1, NOW(), NOW())
+		`INSERT INTO conversations (type, status, created_on, updated_on)
+		VALUES ($1, $2, NOW(), NOW())
 		RETURNING id`,
+		conversationTypeWork,
 		conversationStatusPending,
 	).Scan(&conversationID)
 	if err != nil {

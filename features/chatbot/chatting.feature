@@ -89,7 +89,6 @@ Feature: Chatbot asistido por IA
             ¿Qué equipo ganó el último partido de fútbol?
             """
         Then el sistema me indica que el chatbot solo responde preguntas relacionadas con problemas del hogar
-        And el sistema no envía la pregunta al adaptador de IA
 
     Scenario: 11.1.7 - Puedo tener mas de una conversación con el chatbot asistido por IA
         Given que estoy autenticado como consumidor "ana@example.com"

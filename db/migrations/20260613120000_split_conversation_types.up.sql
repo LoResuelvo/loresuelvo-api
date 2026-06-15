@@ -5,6 +5,13 @@ CREATE TABLE work_conversations (
     CONSTRAINT work_conversations_consumer_provider_unique UNIQUE (consumer_id, provider_id)
 );
 
+ALTER TABLE conversations
+    ADD COLUMN type VARCHAR(50) NOT NULL DEFAULT 'work',
+    ADD CONSTRAINT conversations_type_check CHECK (type IN ('work', 'chatbot'));
+
+ALTER TABLE conversations
+    ALTER COLUMN type DROP DEFAULT;
+
 INSERT INTO work_conversations (conversation_id, consumer_id, provider_id)
 SELECT id, consumer_id, provider_id
 FROM conversations;

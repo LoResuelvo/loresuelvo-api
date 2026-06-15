@@ -36,9 +36,10 @@ func (repository *JobRequestRepository) SaveWithConversation(jobRequest jobreque
 	var conversationID int
 	err = tx.QueryRowContext(
 		ctx,
-		`INSERT INTO conversations (status, created_on, updated_on)
-		VALUES ($1, NOW(), NOW())
+		`INSERT INTO conversations (type, status, created_on, updated_on)
+		VALUES ($1, $2, NOW(), NOW())
 		RETURNING id`,
+		workConversation.ConversationType(),
 		workConversation.Status,
 	).Scan(&conversationID)
 	if err != nil {

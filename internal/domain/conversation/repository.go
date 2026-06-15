@@ -14,15 +14,6 @@ type Repository interface {
 	CountMessagesBySenderRole(ctx context.Context, conversationID int, senderRole string) (int, error)
 }
 
-type Chatbot interface {
-	GetResponse(ctx context.Context, prompt string) (*ChatbotResponse, error)
-}
-
-type ChatbotResponse struct {
-	Title   string
-	Content string
-}
-
 type ConsumerIDFinder interface {
 	FindIDByAuthID(authID string) (int, error)
 	FindAuthIDByID(id int) (string, error)

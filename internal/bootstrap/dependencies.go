@@ -4,7 +4,7 @@ import (
 	"context"
 	"database/sql"
 
-	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/ai"
+	chatbotadapter "github.com/LoResuelvo/loresuelvo-api/internal/adapters/chatbot"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/realtime"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/repositories"
@@ -43,6 +43,10 @@ type Dependencies struct {
 }
 
 func NewDependencies(database *sql.DB) *Dependencies {
+	return NewDependenciesWithChatbot(database, chatbotadapter.NewChatbotFromEnv())
+}
+
+func NewDependenciesWithChatbot(database *sql.DB, chatbot conversation.Chatbot) *Dependencies {
 	userRepository := repositories.NewUserRepository(database)
 	categoryRepository := repositories.NewCategoryRepository(database)
 	consumerRepository := repositories.NewConsumerRepository(database, userRepository)
@@ -66,7 +70,6 @@ func NewDependencies(database *sql.DB) *Dependencies {
 
 	messagePublisher := realtime.NewPublisher(hub, consumerRepository, providerRepository)
 	realtimeHandler := realtime.NewHandler(hub, consumerRepository, providerRepository, ticketStore)
-	chatbot := ai.NewGeminiChatbotFromEnv()
 
 	categoryService := category.NewService(categoryRepository)
 	providerService := provider.NewService(providerRepository, categoryRepository, fileService)
