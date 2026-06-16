@@ -46,6 +46,8 @@ paths:
     $ref: ./paths/file-confirm.yaml
   /conversations:
     $ref: ./paths/conversations.yaml
+  /chatbot/conversations:
+    $ref: ./paths/chatbot-conversations.yaml
   /job-requests:
     $ref: ./paths/job-requests.yaml
   /job-requests/{jobRequestID}/accept:
@@ -116,6 +118,10 @@ components:
       $ref: ./components/schemas/job-request-requester.yaml
     SendMessageRequest:
       $ref: ./components/schemas/send-message-request.yaml
+    CreateChatbotConversationRequest:
+      $ref: ./components/schemas/create-chatbot-conversation-request.yaml
+    ChatbotConversationResponse:
+      $ref: ./components/schemas/chatbot-conversation-response.yaml
     SentMessage:
       $ref: ./components/schemas/sent-message.yaml
     Conversation:

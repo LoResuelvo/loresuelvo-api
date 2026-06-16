@@ -999,6 +999,152 @@
                 }
             }
         },
+        "/chatbot/conversations": {
+            "post": {
+                "tags": [
+                    "Conversations"
+                ],
+                "operationId": "createChatbotConversation",
+                "summary": "Send a message to the AI-assisted chatbot",
+                "description": "Creates a chatbot conversation for the authenticated consumer and returns the persisted consumer message, chatbot answer, and recommended providers in the same response when the chatbot concludes a pre-diagnosis and recommends an appropriate provider category.",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CreateChatbotConversationRequest"
+                            },
+                            "examples": {
+                                "plumbingProblem": {
+                                    "value": {
+                                        "content": "Hay agua acumulada dentro del mueble bajo mesada cada vez que uso la pileta."
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Chatbot conversation created successfully.",
+                        "headers": {
+                            "Location": {
+                                "description": "Path of the created chatbot conversation resource.",
+                                "schema": {
+                                    "type": "string",
+                                    "example": "/chatbot/conversations/1"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ChatbotConversationResponse"
+                                },
+                                "examples": {
+                                    "concludedDiagnosisWithProviders": {
+                                        "value": {
+                                            "id": 1,
+                                            "status": "active",
+                                            "title": "Diagnóstico concluido",
+                                            "response_status": "answered",
+                                            "messages": [
+                                                {
+                                                    "id": 1,
+                                                    "sender_role": "consumer",
+                                                    "content": "Hay agua acumulada dentro del mueble bajo mesada cada vez que uso la pileta.",
+                                                    "created_on": "2026-06-16T12:00:00Z"
+                                                },
+                                                {
+                                                    "id": 2,
+                                                    "sender_role": "chatbot",
+                                                    "content": "El problema parece ser una pérdida en el sifón o en una conexión flexible de la bacha. Te recomiendo contactar a un plomero.",
+                                                    "created_on": "2026-06-16T12:00:01Z"
+                                                }
+                                            ],
+                                            "response": {
+                                                "id": 2,
+                                                "sender_role": "chatbot",
+                                                "content": "El problema parece ser una pérdida en el sifón o en una conexión flexible de la bacha. Te recomiendo contactar a un plomero.",
+                                                "created_on": "2026-06-16T12:00:01Z"
+                                            },
+                                            "recommended_providers": [
+                                                {
+                                                    "id": 10,
+                                                    "name": "Juan",
+                                                    "surname": "Gómez",
+                                                    "category_name": "Plomería",
+                                                    "profile_photo_url": "https://cdn.example/files/provider.jpg"
+                                                }
+                                            ]
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "The request body is invalid or the message content is empty after trimming.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                },
+                                "examples": {
+                                    "messageRequired": {
+                                        "value": {
+                                            "error": "Message is required"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Authentication failed or the authenticated user id could not be obtained from the request context.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AuthErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "The authenticated user is not a consumer.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                },
+                                "examples": {
+                                    "onlyConsumer": {
+                                        "value": {
+                                            "error": "Only consumers can send messages to the AI chatbot"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Unexpected error while creating the chatbot conversation.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/job-requests": {
             "get": {
                 "tags": [
@@ -2229,6 +2375,82 @@
                 },
                 "additionalProperties": false
             },
+            "CreateChatbotConversationRequest": {
+                "type": "object",
+                "description": "Message sent by a consumer to start a chatbot-assisted home problem conversation.",
+                "required": [
+                    "content"
+                ],
+                "properties": {
+                    "content": {
+                        "type": "string",
+                        "description": "Consumer question or description of the home problem.",
+                        "minLength": 1,
+                        "example": "Hay agua acumulada dentro del mueble bajo mesada cada vez que uso la pileta."
+                    }
+                },
+                "additionalProperties": false
+            },
+            "ChatbotConversationResponse": {
+                "type": "object",
+                "description": "Chatbot conversation creation response, including the chatbot answer and recommended providers when the pre-diagnosis is concluded.",
+                "required": [
+                    "id",
+                    "status",
+                    "title",
+                    "response_status",
+                    "messages",
+                    "recommended_providers"
+                ],
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "format": "int32",
+                        "description": "Chatbot conversation identifier.",
+                        "example": 1
+                    },
+                    "status": {
+                        "type": "string",
+                        "description": "Conversation status.",
+                        "enum": [
+                            "active"
+                        ],
+                        "example": "active"
+                    },
+                    "title": {
+                        "type": "string",
+                        "description": "Short title generated by the chatbot for the conversation.",
+                        "example": "Pérdida de agua en la cocina"
+                    },
+                    "response_status": {
+                        "type": "string",
+                        "description": "Scope/status of the chatbot answer.",
+                        "enum": [
+                            "answered",
+                            "out_of_scope"
+                        ],
+                        "example": "answered"
+                    },
+                    "messages": {
+                        "type": "array",
+                        "description": "Messages persisted in the created chatbot conversation.",
+                        "items": {
+                            "$ref": "#/components/schemas/ConversationMessage"
+                        }
+                    },
+                    "response": {
+                        "$ref": "#/components/schemas/ConversationMessage"
+                    },
+                    "recommended_providers": {
+                        "type": "array",
+                        "description": "Providers recommended for the concluded pre-diagnosis. Empty when no matching providers are available or no provider recommendation applies yet.",
+                        "items": {
+                            "$ref": "#/components/schemas/ProviderSummary"
+                        }
+                    }
+                },
+                "additionalProperties": false
+            },
             "SentMessage": {
                 "type": "object",
                 "description": "Message created in a conversation by one of its participants.",
@@ -2496,7 +2718,8 @@
                         "description": "Role of the participant that sent the message.",
                         "enum": [
                             "consumer",
-                            "provider"
+                            "provider",
+                            "chatbot"
                         ],
                         "example": "consumer"
                     },

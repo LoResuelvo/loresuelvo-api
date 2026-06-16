@@ -1,0 +1,11 @@
+type: object
+description: Message sent by a consumer to start a chatbot-assisted home problem conversation.
+required:
+- content
+properties:
+  content:
+    type: string
+    description: Consumer question or description of the home problem.
+    minLength: 1
+    example: Hay agua acumulada dentro del mueble bajo mesada cada vez que uso la pileta.
+additionalProperties: false
