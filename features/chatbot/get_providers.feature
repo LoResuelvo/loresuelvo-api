@@ -1,4 +1,3 @@
-@wip
 Feature: Recomendaciones de Prestadores por IA
     Como consumidor
     quiero recibir recomendaciones de prestadores por parte de un chatbot asistido por IA

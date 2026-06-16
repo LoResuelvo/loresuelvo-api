@@ -235,12 +235,13 @@ func sentMessageResponseFromDomain(message conversation.Message) sentMessageResp
 }
 
 type chatbotConversationResponse struct {
-	ID             int                           `json:"id"`
-	Status         string                        `json:"status"`
-	Title          string                        `json:"title"`
-	ResponseStatus string                        `json:"response_status"`
-	Messages       []conversationMessageResponse `json:"messages"`
-	Response       *conversationMessageResponse  `json:"response,omitempty"`
+	ID                   int                           `json:"id"`
+	Status               string                        `json:"status"`
+	Title                string                        `json:"title"`
+	ResponseStatus       string                        `json:"response_status"`
+	Messages             []conversationMessageResponse `json:"messages"`
+	Response             *conversationMessageResponse  `json:"response,omitempty"`
+	RecommendedProviders []providerSummaryResponse     `json:"recommended_providers"`
 }
 
 func chatbotConversationResponseFromDomain(result conversation.ChatbotConversationResult) chatbotConversationResponse {
@@ -267,13 +268,19 @@ func chatbotConversationResponseFromDomain(result conversation.ChatbotConversati
 		responseStatus = string(result.ResponseStatus)
 	}
 
+	recommendedProviders := make([]providerSummaryResponse, 0, len(result.RecommendedProviders))
+	for _, recommendedProvider := range result.RecommendedProviders {
+		recommendedProviders = append(recommendedProviders, providerSummaryResponseFromDomain(recommendedProvider))
+	}
+
 	return chatbotConversationResponse{
-		ID:             result.Conversation.Base().ID,
-		Status:         result.Conversation.Base().Status,
-		Title:          title,
-		ResponseStatus: responseStatus,
-		Messages:       messages,
-		Response:       chatbotResponse,
+		ID:                   result.Conversation.Base().ID,
+		Status:               result.Conversation.Base().Status,
+		Title:                title,
+		ResponseStatus:       responseStatus,
+		Messages:             messages,
+		Response:             chatbotResponse,
+		RecommendedProviders: recommendedProviders,
 	}
 }
 

@@ -3,10 +3,12 @@ package conversation
 import (
 	"context"
 	"strings"
+
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/category"
 )
 
 type Chatbot interface {
-	AnswerHomeProblemQuestion(ctx context.Context, question string) (*ChatbotResponse, error)
+	AnswerHomeProblemQuestion(ctx context.Context, question string, availableCategories []category.Category) (*ChatbotResponse, error)
 }
 
 type ChatbotResponseStatus string
@@ -17,9 +19,11 @@ const (
 )
 
 type ChatbotResponse struct {
-	Status  ChatbotResponseStatus
-	Title   string
-	Content string
+	Status                  ChatbotResponseStatus
+	Title                   string
+	Content                 string
+	DiagnosisCompleted      bool
+	RecommendedCategoryName string
 }
 
 func ParseChatbotResponseStatus(value string) (ChatbotResponseStatus, error) {

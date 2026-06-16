@@ -83,18 +83,7 @@ func (s *Service) FilterProvidersByCategoryID(ctx context.Context, categoryID in
 		return nil, fmt.Errorf("resolving provider profile photo urls: %w", err)
 	}
 
-	providerSummaries := make([]readmodel.ProviderSummary, 0, len(providers))
-	for _, provider := range providers {
-		providerSummaries = append(providerSummaries, readmodel.ProviderSummary{
-			ID:              provider.ID,
-			Name:            provider.Name(),
-			Surname:         provider.Surname(),
-			CategoryName:    provider.Category.Name,
-			ProfilePhotoURL: profilePhotoURLs[provider.ProfilePhotoFileID],
-		})
-	}
-
-	return providerSummaries, nil
+	return SummariesWithProfilePhotoURLs(providers, profilePhotoURLs), nil
 }
 
 func (s *Service) validateCategory(categoryID int) (*category.Category, error) {

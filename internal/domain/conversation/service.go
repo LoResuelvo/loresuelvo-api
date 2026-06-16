@@ -3,27 +3,33 @@ package conversation
 import (
 	"context"
 	"fmt"
+	"strings"
 
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/category"
 	readmodel "github.com/LoResuelvo/loresuelvo-api/internal/domain/conversation/read_model"
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/provider"
+	providerreadmodel "github.com/LoResuelvo/loresuelvo-api/internal/domain/provider/read_model"
 )
 
 type Service struct {
 	conversationRepository Repository
 	consumerRepository     ConsumerIDFinder
-	providerRepository     ProviderIDFinder
+	providerRepository     ProviderRepository
 	conversationReader     Reader
 	messagePublisher       MessagePublisher
 	chatbot                Chatbot
+	categoryRepository     RecommendationCategoryLister
 	fileService            FileURLResolver
 }
 
 func NewService(
 	conversationRepository Repository,
 	consumerRepository ConsumerIDFinder,
-	providerRepository ProviderIDFinder,
+	providerRepository ProviderRepository,
 	conversationReader Reader,
 	messagePublisher MessagePublisher,
 	chatbot Chatbot,
+	categoryRepository RecommendationCategoryLister,
 	fileService FileURLResolver,
 ) *Service {
 	return &Service{
@@ -33,6 +39,7 @@ func NewService(
 		conversationReader:     conversationReader,
 		messagePublisher:       messagePublisher,
 		chatbot:                chatbot,
+		categoryRepository:     categoryRepository,
 		fileService:            fileService,
 	}
 }
@@ -123,7 +130,12 @@ func (s *Service) CreateChatbotConversation(ctx context.Context, authID string, 
 		return nil, err
 	}
 
-	chatbotResponse, err := s.chatbot.AnswerHomeProblemQuestion(ctx, consumerMessage.Content)
+	availableCategories, err := s.availableCategoriesForChatbot()
+	if err != nil {
+		return nil, err
+	}
+
+	chatbotResponse, err := s.chatbot.AnswerHomeProblemQuestion(ctx, consumerMessage.Content, availableCategories)
 	if err != nil {
 		return nil, err
 	}
@@ -131,6 +143,11 @@ func (s *Service) CreateChatbotConversation(ctx context.Context, authID string, 
 		return nil, ErrChatbotResponseRequired
 	}
 	chatbotMessage, err := NewChatbotMessage(chatbotResponse.Content)
+	if err != nil {
+		return nil, err
+	}
+
+	recommendedProviders, err := s.recommendedProvidersForChatbotResponse(ctx, *chatbotResponse, availableCategories)
 	if err != nil {
 		return nil, err
 	}
@@ -151,8 +168,11 @@ func (s *Service) CreateChatbotConversation(ctx context.Context, authID string, 
 	s.messagePublisher.PublishChatbotMessage(ctx, savedConversation, *chatbotMessage)
 
 	return &ChatbotConversationResult{
-		Conversation:   savedConversation,
-		ResponseStatus: chatbotResponse.Status,
+		Conversation:            savedConversation,
+		ResponseStatus:          chatbotResponse.Status,
+		RecommendedProviders:    recommendedProviders,
+		DiagnosisCompleted:      chatbotResponse.DiagnosisCompleted,
+		RecommendedCategoryName: strings.TrimSpace(chatbotResponse.RecommendedCategoryName),
 	}, nil
 }
 
@@ -227,4 +247,65 @@ func (s *Service) withCounterpartProfilePhotoURL(ctx context.Context, detail *re
 	detail.Counterpart.ProfilePhotoURL = profilePhotoURL
 
 	return detail, nil
+}
+
+// TODO: Let the chatbot rank providers using richer provider attributes when recommendation criteria evolve.
+func (s *Service) recommendedProvidersForChatbotResponse(ctx context.Context, chatbotResponse ChatbotResponse, availableCategories []category.Category) ([]providerreadmodel.ProviderSummary, error) {
+	if !chatbotResponse.DiagnosisCompleted {
+		return nil, nil
+	}
+
+	categoryName := strings.TrimSpace(chatbotResponse.RecommendedCategoryName)
+	if categoryName == "" {
+		return []providerreadmodel.ProviderSummary{}, nil
+	}
+
+	recommendedCategory, err := category.New(categoryName)
+	if err != nil {
+		return []providerreadmodel.ProviderSummary{}, nil
+	}
+	matchedCategory := findCategoryByNormalizedName(availableCategories, recommendedCategory.NormalizedName)
+	if matchedCategory == nil {
+		return []providerreadmodel.ProviderSummary{}, nil
+	}
+
+	providers, err := s.providerRepository.FindByCategoryID(matchedCategory.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	return s.providerSummariesWithProfilePhotoURLs(ctx, providers)
+}
+
+func (s *Service) providerSummariesWithProfilePhotoURLs(ctx context.Context, providers []provider.Provider) ([]providerreadmodel.ProviderSummary, error) {
+	profilePhotoFileIDs := make([]string, 0, len(providers))
+	for i := range providers {
+		profilePhotoFileIDs = append(profilePhotoFileIDs, providers[i].ProfilePhotoFileID)
+	}
+
+	profilePhotoURLs, err := s.fileService.ResolvePublicURLs(ctx, profilePhotoFileIDs)
+	if err != nil {
+		return nil, fmt.Errorf("resolving chatbot recommended provider profile photo urls: %w", err)
+	}
+
+	return provider.SummariesWithProfilePhotoURLs(providers, profilePhotoURLs), nil
+}
+
+func (s *Service) availableCategoriesForChatbot() ([]category.Category, error) {
+	categories, err := s.categoryRepository.ListAll()
+	if err != nil {
+		return nil, fmt.Errorf("listing categories for chatbot prompt: %w", err)
+	}
+
+	return categories, nil
+}
+
+func findCategoryByNormalizedName(categories []category.Category, normalizedName string) *category.Category {
+	for i := range categories {
+		if categories[i].NormalizedName == normalizedName {
+			return &categories[i]
+		}
+	}
+
+	return nil
 }

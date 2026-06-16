@@ -26,7 +26,7 @@ func (suite *testSuite) chatbotWillConcludeDiagnosisAndRecommendCategory(categor
 	}
 
 	suite.lastChatbotRecommendedCategoryName = categoryName
-	suite.chatbot.SetResponse("Diagnóstico concluido", normalizeDocString(message))
+	suite.chatbot.SetConcludedDiagnosisResponse("Diagnóstico concluido", normalizeDocString(message), categoryName)
 	return nil
 }
 

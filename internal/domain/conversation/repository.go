@@ -4,6 +4,7 @@ import (
 	"context"
 
 	readmodel "github.com/LoResuelvo/loresuelvo-api/internal/domain/conversation/read_model"
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/provider"
 )
 
 type Repository interface {
@@ -21,6 +22,11 @@ type ConsumerIDFinder interface {
 type ProviderIDFinder interface {
 	FindIDByAuthID(authID string) (int, error)
 	FindAuthIDByID(id int) (string, error)
+}
+
+type ProviderRepository interface {
+	ProviderIDFinder
+	FindByCategoryID(categoryID int) ([]provider.Provider, error)
 }
 
 type Reader interface {
