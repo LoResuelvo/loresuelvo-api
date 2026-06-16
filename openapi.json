@@ -595,12 +595,16 @@
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/MessageResponse"
+                                    "$ref": "#/components/schemas/ProviderSummary"
                                 },
                                 "examples": {
                                     "registered": {
                                         "value": {
-                                            "message": "cuenta registrada exitosamente"
+                                            "id": 1,
+                                            "name": "Juan",
+                                            "surname": "Pérez",
+                                            "category_name": "Plomería",
+                                            "profile_photo_url": "https://cdn.example/files/2026/06/provider_profile_photo/juan.jpg"
                                         }
                                     }
                                 }
@@ -901,7 +905,8 @@
                                                     "role": "provider",
                                                     "name": "Juan",
                                                     "surname": "Gómez",
-                                                    "category_name": "Plomería"
+                                                    "category_name": "Plomería",
+                                                    "profile_photo_url": "https://cdn.example/files/2026/06/provider_profile_photo/juan.jpg"
                                                 },
                                                 "last_message": {
                                                     "id": 1,
@@ -1416,7 +1421,8 @@
                                                 "role": "provider",
                                                 "name": "Juan",
                                                 "surname": "Gómez",
-                                                "category_name": "Plomería"
+                                                "category_name": "Plomería",
+                                                "profile_photo_url": "https://cdn.example/files/2026/06/provider_profile_photo/juan.jpg"
                                             },
                                             "messages": [
                                                 {
@@ -1896,7 +1902,7 @@
             },
             "ProviderSummary": {
                 "type": "object",
-                "description": "Provider summary returned by GET /providers when filtering by category_id.",
+                "description": "Provider summary returned after provider registration and by GET /providers when filtering by category_id.",
                 "required": [
                     "id",
                     "name",
@@ -2375,6 +2381,12 @@
                         "type": "string",
                         "description": "Provider category display name. Present only when the counterpart is a provider.",
                         "example": "Plomería"
+                    },
+                    "profile_photo_url": {
+                        "type": "string",
+                        "format": "uri",
+                        "description": "Public provider profile photo URL. Present only when the counterpart is a provider.",
+                        "example": "https://cdn.example/files/2026/06/provider_profile_photo/juan.jpg"
                     }
                 },
                 "additionalProperties": false

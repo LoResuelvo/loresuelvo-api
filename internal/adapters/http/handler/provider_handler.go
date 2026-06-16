@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"errors"
 	"net/http"
 	"strconv"
 	"strings"
@@ -9,6 +10,7 @@ import (
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/category"
 	filedomain "github.com/LoResuelvo/loresuelvo-api/internal/domain/file"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/provider"
+	providerreadmodel "github.com/LoResuelvo/loresuelvo-api/internal/domain/provider/read_model"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/validator"
 	"github.com/gin-gonic/gin"
 )
@@ -31,7 +33,7 @@ type providerSummaryResponse struct {
 	Name            string `json:"name"`
 	Surname         string `json:"surname"`
 	CategoryName    string `json:"category_name"`
-	ProfilePhotoURL string `json:"profile_photo_url,omitempty"`
+	ProfilePhotoURL string `json:"profile_photo_url"`
 }
 
 func NewProviderHandler(providerService *provider.Service) *ProviderHandler {
@@ -58,23 +60,28 @@ func (h *ProviderHandler) RegisterProvider(c *gin.Context) {
 	req.Name = strings.TrimSpace(req.Name)
 	req.Surname = strings.TrimSpace(req.Surname)
 
-	err := h.providerService.RegisterProvider(c.Request.Context(), auth0ID, req.Email, req.Name, req.Surname, req.CategoryID, strings.TrimSpace(req.ProfilePhotoFileID))
-	if err == validator.ErrEmailAlreadyRegistered {
+	createdProvider, err := h.providerService.RegisterProvider(c.Request.Context(), auth0ID, req.Email, req.Name, req.Surname, req.CategoryID, strings.TrimSpace(req.ProfilePhotoFileID))
+	if errors.Is(err, validator.ErrEmailAlreadyRegistered) {
 		c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
 		return
 	}
 
-	if err == filedomain.ErrProfilePhotoRequired || err == filedomain.ErrProfilePhotoNotAvailable {
+	if errors.Is(err, filedomain.ErrProfilePhotoRequired) || errors.Is(err, filedomain.ErrProfilePhotoNotAvailable) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	if errors.Is(err, category.ErrIDRequired) || errors.Is(err, category.ErrDoesNotExist) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusCreated, gin.H{"message": "cuenta registrada exitosamente"})
+	c.JSON(http.StatusCreated, providerSummaryResponseFromDomain(*createdProvider))
 }
 
 func (h *ProviderHandler) FilterProvidersByCategory(c *gin.Context) {
@@ -85,12 +92,12 @@ func (h *ProviderHandler) FilterProvidersByCategory(c *gin.Context) {
 	}
 
 	providers, err := h.providerService.FilterProvidersByCategoryID(c.Request.Context(), categoryID)
-	if err == category.ErrIDRequired {
+	if errors.Is(err, category.ErrIDRequired) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	if err == category.ErrDoesNotExist {
+	if errors.Is(err, category.ErrDoesNotExist) {
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 		return
 	}
@@ -102,16 +109,20 @@ func (h *ProviderHandler) FilterProvidersByCategory(c *gin.Context) {
 
 	response := make([]providerSummaryResponse, 0, len(providers))
 	for _, provider := range providers {
-		response = append(response, providerSummaryResponse{
-			ID:              provider.ID,
-			Name:            provider.Name,
-			Surname:         provider.Surname,
-			CategoryName:    provider.CategoryName,
-			ProfilePhotoURL: provider.ProfilePhotoURL,
-		})
+		response = append(response, providerSummaryResponseFromDomain(provider))
 	}
 
 	c.JSON(http.StatusOK, response)
+}
+
+func providerSummaryResponseFromDomain(provider providerreadmodel.ProviderSummary) providerSummaryResponse {
+	return providerSummaryResponse{
+		ID:              provider.ID,
+		Name:            provider.Name,
+		Surname:         provider.Surname,
+		CategoryName:    provider.CategoryName,
+		ProfilePhotoURL: provider.ProfilePhotoURL,
+	}
 }
 
 func categoryIDFromQuery(c *gin.Context) (int, error) {

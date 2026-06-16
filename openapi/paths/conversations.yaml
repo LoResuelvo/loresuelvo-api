@@ -26,6 +26,7 @@ get:
                   name: Juan
                   surname: Gómez
                   category_name: Plomería
+                  profile_photo_url: https://cdn.example/files/2026/06/provider_profile_photo/juan.jpg
                 last_message:
                   id: 1
                   sender_role: consumer

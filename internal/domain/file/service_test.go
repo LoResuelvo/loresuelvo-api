@@ -474,6 +474,42 @@ func TestValidateProviderProfilePhotoRejectsMissingFile(t *testing.T) {
 	assert.ErrorIs(t, err, filedomain.ErrProfilePhotoNotAvailable)
 }
 
+func TestResolvePublicURLReturnsConfirmedPublicFileURL(t *testing.T) {
+	repo := newFileRepositoryMock()
+	storage := newStorageMock()
+	service := newFileService(repo, storage)
+	upload, err := service.RequestUpload(context.Background(), filedomain.PresignRequest{
+		AuthID:       "auth0|provider",
+		OriginalName: "foto.jpg",
+		MimeType:     "image/jpeg",
+		SizeBytes:    1024,
+		Purpose:      filedomain.PurposeProviderProfilePhoto,
+	})
+	require.NoError(t, err)
+	_, err = service.ConfirmUpload(context.Background(), filedomain.ConfirmRequest{
+		AuthID:    "auth0|provider",
+		FileID:    upload.FileID,
+		Key:       upload.Key,
+		MimeType:  "image/jpeg",
+		SizeBytes: 1024,
+	})
+	require.NoError(t, err)
+
+	url, err := service.ResolvePublicURL(context.Background(), upload.FileID)
+
+	require.NoError(t, err)
+	assert.Equal(t, "https://cdn/public/"+upload.Key, url)
+}
+
+func TestResolvePublicURLReturnsEmptyURLForUnavailablePublicFile(t *testing.T) {
+	service := newFileService(newFileRepositoryMock(), newStorageMock())
+
+	url, err := service.ResolvePublicURL(context.Background(), "")
+
+	require.NoError(t, err)
+	assert.Empty(t, url)
+}
+
 func TestResolvePublicURLsReturnsConfirmedPublicFileURLsInBatch(t *testing.T) {
 	repo := newFileRepositoryMock()
 	storage := newStorageMock()

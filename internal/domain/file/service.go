@@ -123,6 +123,15 @@ func (s *Service) ValidateProviderProfilePhoto(ctx context.Context, authID, file
 	return nil
 }
 
+func (s *Service) ResolvePublicURL(ctx context.Context, fileID string) (string, error) {
+	urlsByID, err := s.ResolvePublicURLs(ctx, []string{fileID})
+	if err != nil {
+		return "", err
+	}
+
+	return urlsByID[fileID], nil
+}
+
 func (s *Service) ResolvePublicURLs(ctx context.Context, fileIDs []string) (map[string]string, error) {
 	uniqueFileIDs := uniqueNonEmptyFileIDs(fileIDs)
 	if len(uniqueFileIDs) == 0 {

@@ -14,14 +14,10 @@ import (
 type Service struct {
 	providerRepository Repository
 	categoryFinder     CategoryFinder
-	fileService        FileValidator
+	fileService        FileService
 }
 
-func NewService(repository Repository, categoryFinder CategoryFinder, fileService FileValidator) *Service {
-	if fileService == nil {
-		panic("provider file validator is required")
-	}
-
+func NewService(repository Repository, categoryFinder CategoryFinder, fileService FileService) *Service {
 	return &Service{
 		providerRepository: repository,
 		categoryFinder:     categoryFinder,
@@ -29,26 +25,42 @@ func NewService(repository Repository, categoryFinder CategoryFinder, fileServic
 	}
 }
 
-func (s *Service) RegisterProvider(ctx context.Context, authID, email, name, surname string, categoryID int, profilePhotoFileID string) error {
+func (s *Service) RegisterProvider(ctx context.Context, authID, email, name, surname string, categoryID int, profilePhotoFileID string) (*readmodel.ProviderSummary, error) {
 	if s.providerRepository.FindByEmail(email) {
-		return validator.ErrEmailAlreadyRegistered
+		return nil, validator.ErrEmailAlreadyRegistered
 	}
 
 	category, err := s.validateCategory(categoryID)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	if err := s.validateProfilePhoto(ctx, authID, profilePhotoFileID); err != nil {
-		return err
+		return nil, err
 	}
 
 	provider, err := NewProvider(authID, email, name, surname, category, profilePhotoFileID)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	return s.providerRepository.Save(*provider)
+	profilePhotoURL, err := s.fileService.ResolvePublicURL(ctx, profilePhotoFileID)
+	if err != nil {
+		return nil, fmt.Errorf("resolving provider profile photo url: %w", err)
+	}
+
+	providerID, err := s.providerRepository.Save(*provider)
+	if err != nil {
+		return nil, err
+	}
+
+	return &readmodel.ProviderSummary{
+		ID:              providerID,
+		Name:            provider.Name(),
+		Surname:         provider.Surname(),
+		CategoryName:    category.Name,
+		ProfilePhotoURL: profilePhotoURL,
+	}, nil
 }
 
 func (s *Service) FilterProvidersByCategoryID(ctx context.Context, categoryID int) ([]readmodel.ProviderSummary, error) {

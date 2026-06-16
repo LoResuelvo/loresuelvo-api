@@ -103,7 +103,8 @@ func savedProviderIDWithData(t *testing.T, testContext jobRequestRepositoryTestC
 	t.Helper()
 
 	providerToSave := validProviderWithData(t, testContext.categoryRepository, testContext.database, authID, email, name, surname, categoryName)
-	require.NoError(t, testContext.providerRepository.Save(*providerToSave))
+	_, err := testContext.providerRepository.Save(*providerToSave)
+	require.NoError(t, err)
 
 	providerID, err := testContext.providerRepository.FindIDByEmail(providerToSave.Email())
 	require.NoError(t, err)

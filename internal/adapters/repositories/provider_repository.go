@@ -21,33 +21,35 @@ func NewProviderRepository(db *sql.DB, repositoryUser *UserRepository) *Provider
 	}
 }
 
-func (repository *ProviderRepository) Save(providerToSave provider.Provider) error {
+func (repository *ProviderRepository) Save(providerToSave provider.Provider) (int, error) {
 	tx, err := repository.db.Begin()
 	if err != nil {
-		return fmt.Errorf("beginning provider transaction: %w", err)
+		return 0, fmt.Errorf("beginning provider transaction: %w", err)
 	}
 
 	userID, err := repository.repositoryUser.saveWithTx(tx, *providerToSave.User)
 	if err != nil {
-		return rollbackProviderTx(tx, fmt.Errorf("saving provider user: %w", err))
+		return 0, rollbackProviderTx(tx, fmt.Errorf("saving provider user: %w", err))
 	}
 
-	_, err = tx.Exec(
+	var providerID int
+	err = tx.QueryRow(
 		`INSERT INTO providers (user_id, category_id, profile_photo_file_id)
-		VALUES ($1, $2, $3)`,
+		VALUES ($1, $2, $3)
+		RETURNING id`,
 		userID,
 		providerToSave.Category.ID,
 		providerToSave.ProfilePhotoFileID,
-	)
+	).Scan(&providerID)
 	if err != nil {
-		return rollbackProviderTx(tx, fmt.Errorf("saving provider profile: %w", err))
+		return 0, rollbackProviderTx(tx, fmt.Errorf("saving provider profile: %w", err))
 	}
 
 	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("committing provider transaction: %w", err)
+		return 0, fmt.Errorf("committing provider transaction: %w", err)
 	}
 
-	return nil
+	return providerID, nil
 }
 
 func (repository *ProviderRepository) DeleteAll() error {

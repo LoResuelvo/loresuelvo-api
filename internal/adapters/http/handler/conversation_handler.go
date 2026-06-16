@@ -58,11 +58,12 @@ type conversationSummaryResponse struct {
 }
 
 type conversationCounterpartResponse struct {
-	ID           int    `json:"id"`
-	Role         string `json:"role"`
-	Name         string `json:"name"`
-	Surname      string `json:"surname"`
-	CategoryName string `json:"category_name,omitempty"`
+	ID              int    `json:"id"`
+	Role            string `json:"role"`
+	Name            string `json:"name"`
+	Surname         string `json:"surname"`
+	CategoryName    string `json:"category_name,omitempty"`
+	ProfilePhotoURL string `json:"profile_photo_url,omitempty"`
 }
 
 type conversationLastMessageResponse struct {
@@ -317,11 +318,12 @@ func conversationSummaryResponseFromDomain(summary readmodel.ConversationSummary
 
 func conversationCounterpartResponseFromDomain(counterpart readmodel.ConversationParticipant) conversationCounterpartResponse {
 	return conversationCounterpartResponse{
-		ID:           counterpart.ID,
-		Role:         counterpart.Role,
-		Name:         counterpart.Name,
-		Surname:      counterpart.Surname,
-		CategoryName: counterpart.CategoryName,
+		ID:              counterpart.ID,
+		Role:            counterpart.Role,
+		Name:            counterpart.Name,
+		Surname:         counterpart.Surname,
+		CategoryName:    counterpart.CategoryName,
+		ProfilePhotoURL: counterpart.ProfilePhotoURL,
 	}
 }
 

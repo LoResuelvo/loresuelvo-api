@@ -74,11 +74,7 @@ func (suite *testSuite) requestConsumerAccountRegistration(email, name, surname 
 }
 
 func (suite *testSuite) systemConfirmsRegistration() error {
-	if err := suite.registrationResponseShouldHaveStatusCode(http.StatusCreated); err != nil {
-		return err
-	}
-
-	return suite.registrationResponseShouldSay("cuenta registrada exitosamente")
+	return suite.registrationResponseShouldHaveStatusCode(http.StatusCreated)
 }
 
 func (suite *testSuite) systemReportsInvalidEmailFormat() error {

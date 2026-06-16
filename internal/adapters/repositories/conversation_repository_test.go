@@ -85,7 +85,8 @@ func savedProviderIDForConversation(t *testing.T, testContext conversationReposi
 	t.Helper()
 
 	providerToSave := validProviderWithData(t, testContext.categoryRepository, testContext.database, "auth0|conversation-provider", "conversation.provider@example.com", "Juan", "Gómez", "Plomería")
-	require.NoError(t, testContext.providerRepository.Save(*providerToSave))
+	_, err := testContext.providerRepository.Save(*providerToSave)
+	require.NoError(t, err)
 
 	providerID, err := testContext.providerRepository.FindIDByEmail(providerToSave.Email())
 	require.NoError(t, err)

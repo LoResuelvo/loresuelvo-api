@@ -113,11 +113,15 @@ post:
       content:
         application/json:
           schema:
-            $ref: '#/components/schemas/MessageResponse'
+            $ref: '#/components/schemas/ProviderSummary'
           examples:
             registered:
               value:
-                message: cuenta registrada exitosamente
+                id: 1
+                name: Juan
+                surname: Pérez
+                category_name: Plomería
+                profile_photo_url: https://cdn.example/files/2026/06/provider_profile_photo/juan.jpg
     '400':
       description: The request body is not valid JSON, cannot be bound to the expected
         payload, contains an invalid email format, omits category_id, or references

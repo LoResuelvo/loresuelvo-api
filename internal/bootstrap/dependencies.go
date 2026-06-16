@@ -81,6 +81,7 @@ func NewDependenciesWithChatbot(database *sql.DB, chatbot conversation.Chatbot) 
 		conversationReader,
 		messagePublisher,
 		chatbot,
+		fileService,
 	)
 	jobRequestService := jobrequest.NewService(
 		jobRequestRepository,

@@ -11,11 +11,13 @@ type ConversationSummary struct {
 }
 
 type ConversationParticipant struct {
-	ID           int
-	Role         string
-	Name         string
-	Surname      string
-	CategoryName string
+	ID                 int
+	Role               string
+	Name               string
+	Surname            string
+	CategoryName       string
+	ProfilePhotoFileID string
+	ProfilePhotoURL    string
 }
 
 type MessageSummary struct {

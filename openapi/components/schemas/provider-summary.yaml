@@ -1,5 +1,5 @@
 type: object
-description: Provider summary returned by GET /providers when filtering by category_id.
+description: Provider summary returned after provider registration and by GET /providers when filtering by category_id.
 required:
 - id
 - name
