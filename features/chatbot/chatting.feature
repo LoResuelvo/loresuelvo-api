@@ -1,4 +1,3 @@
-@wip
 Feature: Chatbot asistido por IA
     Como consumidor
     quiero enviar mensajes a un chatbot asistido por IA
