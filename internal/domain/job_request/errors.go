@@ -15,3 +15,5 @@ var ErrAlreadyExists = errors.New("Job request already exists")
 var ErrJobRequestNotFound = errors.New("Job request not found")
 
 var ErrOnlyAssignedProviderCanAcceptJobRequest = errors.New("Only the assigned provider can accept job requests")
+
+var ErrOnlyPendingJobRequestCanBeAccepted = errors.New("Only pending job requests can be accepted")

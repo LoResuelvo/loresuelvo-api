@@ -5,6 +5,7 @@ type JobRequestSummary struct {
 	ConversationID int
 	Title          string
 	Description    string
+	Status         string
 	Requester      JobRequestRequester
 }
 

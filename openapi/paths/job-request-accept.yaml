@@ -29,6 +29,7 @@ post:
                 conversation_id: 10
                 title: Reparación de fuga en la cocina
                 description: Hola Ana, necesito reparar una fuga de agua en la cocina. ¿Podrías ayudarme esta semana?
+                status: accepted
     '400':
       description: The job request id path parameter is not a positive integer.
       content:
@@ -69,12 +70,15 @@ post:
               value:
                 error: Conversation does not exist
     '409':
-      description: The linked conversation is no longer pending and cannot be accepted again.
+      description: The job request or linked conversation is no longer pending and cannot be accepted again.
       content:
         application/json:
           schema:
             $ref: '#/components/schemas/ErrorResponse'
           examples:
+            jobRequestNotPending:
+              value:
+                error: Only pending job requests can be accepted
             conversationNotPending:
               value:
                 error: Only pending conversations can be activated

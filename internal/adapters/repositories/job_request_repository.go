@@ -61,14 +61,15 @@ func (repository *JobRequestRepository) SaveWithConversation(jobRequest jobreque
 	var savedJobRequest jobrequest.JobRequest
 	err = tx.QueryRowContext(
 		ctx,
-		`INSERT INTO job_requests (consumer_id, provider_id, conversation_id, title, description, created_on, updated_on)
-		VALUES ($1, $2, $3, $4, $5, NOW(), NOW())
-		RETURNING id, consumer_id, provider_id, conversation_id, title, description`,
+		`INSERT INTO job_requests (consumer_id, provider_id, conversation_id, title, description, status, created_on, updated_on)
+		VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
+		RETURNING id, consumer_id, provider_id, conversation_id, title, description, status`,
 		jobRequest.ConsumerID,
 		jobRequest.ProviderID,
 		conversationID,
 		jobRequest.Title,
 		jobRequest.Description,
+		jobRequest.Status,
 	).Scan(
 		&savedJobRequest.ID,
 		&savedJobRequest.ConsumerID,
@@ -76,6 +77,7 @@ func (repository *JobRequestRepository) SaveWithConversation(jobRequest jobreque
 		&savedJobRequest.ConversationID,
 		&savedJobRequest.Title,
 		&savedJobRequest.Description,
+		&savedJobRequest.Status,
 	)
 	if err != nil {
 		return nil, rollbackJobRequestTx(tx, mapJobRequestInsertError(err))
@@ -88,10 +90,40 @@ func (repository *JobRequestRepository) SaveWithConversation(jobRequest jobreque
 	return &savedJobRequest, nil
 }
 
+func (repository *JobRequestRepository) ExistsBetweenWithAnyStatus(consumerID, providerID int, statuses []jobrequest.Status) (bool, error) {
+	if len(statuses) == 0 {
+		return false, nil
+	}
+
+	statusValues := make([]string, len(statuses))
+	for i, status := range statuses {
+		statusValues[i] = string(status)
+	}
+
+	var exists bool
+	err := repository.db.QueryRow(
+		`SELECT EXISTS (
+			SELECT 1
+			FROM job_requests
+			WHERE consumer_id = $1
+				AND provider_id = $2
+				AND status = ANY($3)
+		)`,
+		consumerID,
+		providerID,
+		statusValues,
+	).Scan(&exists)
+	if err != nil {
+		return false, fmt.Errorf("checking job request between consumer and provider with any status: %w", err)
+	}
+
+	return exists, nil
+}
+
 func (repository *JobRequestRepository) FindByConversationID(conversationID int) (*jobrequest.JobRequest, error) {
 	var foundJobRequest jobrequest.JobRequest
 	err := repository.db.QueryRow(
-		`SELECT id, consumer_id, provider_id, conversation_id, title, description
+		`SELECT id, consumer_id, provider_id, conversation_id, title, description, status
 		FROM job_requests
 		WHERE conversation_id = $1`,
 		conversationID,
@@ -102,6 +134,7 @@ func (repository *JobRequestRepository) FindByConversationID(conversationID int)
 		&foundJobRequest.ConversationID,
 		&foundJobRequest.Title,
 		&foundJobRequest.Description,
+		&foundJobRequest.Status,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("finding job request by conversation id: %w", err)
@@ -113,7 +146,7 @@ func (repository *JobRequestRepository) FindByConversationID(conversationID int)
 func (repository *JobRequestRepository) FindByID(id int) (*jobrequest.JobRequest, error) {
 	var foundJobRequest jobrequest.JobRequest
 	err := repository.db.QueryRow(
-		`SELECT id, consumer_id, provider_id, conversation_id, title, description
+		`SELECT id, consumer_id, provider_id, conversation_id, title, description, status
 		FROM job_requests
 		WHERE id = $1`,
 		id,
@@ -124,6 +157,7 @@ func (repository *JobRequestRepository) FindByID(id int) (*jobrequest.JobRequest
 		&foundJobRequest.ConversationID,
 		&foundJobRequest.Title,
 		&foundJobRequest.Description,
+		&foundJobRequest.Status,
 	)
 
 	if err != nil {
@@ -136,12 +170,37 @@ func (repository *JobRequestRepository) FindByID(id int) (*jobrequest.JobRequest
 	return &foundJobRequest, nil
 }
 
+func (repository *JobRequestRepository) SaveStatus(ctx context.Context, jobRequest jobrequest.JobRequest) error {
+	result, err := repository.db.ExecContext(
+		ctx,
+		`UPDATE job_requests
+		SET status = $2, updated_on = NOW()
+		WHERE id = $1`,
+		jobRequest.ID,
+		jobRequest.Status,
+	)
+	if err != nil {
+		return fmt.Errorf("saving job request status: %w", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("checking saved job request status: %w", err)
+	}
+	if rowsAffected == 0 {
+		return jobrequest.ErrJobRequestNotFound
+	}
+
+	return nil
+}
+
 func (repository *JobRequestRepository) FindByUserAuthID(userAuthID string) ([]readmodel.JobRequestSummary, error) {
 	rows, err := repository.db.Query(
 		`SELECT job_requests.id,
 			job_requests.conversation_id,
 			job_requests.title,
 			job_requests.description,
+			job_requests.status,
 			consumer_users.name,
 			consumer_users.surname
 		FROM job_requests
@@ -150,10 +209,10 @@ func (repository *JobRequestRepository) FindByUserAuthID(userAuthID string) ([]r
 		INNER JOIN users AS consumer_users ON consumer_users.id = consumers.user_id
 		INNER JOIN providers ON providers.id = job_requests.provider_id
 		INNER JOIN users AS provider_users ON provider_users.id = providers.user_id
-		WHERE conversations.status = $1
+		WHERE job_requests.status = $1
 			AND (consumer_users.auth_id = $2 OR provider_users.auth_id = $2)
 		ORDER BY job_requests.created_on DESC, job_requests.id DESC`,
-		conversation.StatusPending,
+		jobrequest.StatusPending,
 		userAuthID,
 	)
 	if err != nil {
@@ -171,6 +230,7 @@ func (repository *JobRequestRepository) FindByUserAuthID(userAuthID string) ([]r
 			&foundJobRequest.ConversationID,
 			&foundJobRequest.Title,
 			&foundJobRequest.Description,
+			&foundJobRequest.Status,
 			&foundJobRequest.Requester.Name,
 			&foundJobRequest.Requester.Surname,
 		); err != nil {

@@ -28,6 +28,7 @@ type jobRequestResponse struct {
 	ConversationID int    `json:"conversation_id"`
 	Title          string `json:"title"`
 	Description    string `json:"description"`
+	Status         string `json:"status"`
 }
 
 type jobRequestSummaryResponse struct {
@@ -35,6 +36,7 @@ type jobRequestSummaryResponse struct {
 	ConversationID int                         `json:"conversation_id"`
 	Title          string                      `json:"title"`
 	Description    string                      `json:"description"`
+	Status         string                      `json:"status"`
 	Requester      jobRequestRequesterResponse `json:"requester"`
 }
 
@@ -106,6 +108,7 @@ func (h *JobRequestHandler) GetJobRequests(c *gin.Context) {
 			ConversationID: jobRequest.ConversationID,
 			Title:          jobRequest.Title,
 			Description:    jobRequest.Description,
+			Status:         jobRequest.Status,
 			Requester: jobRequestRequesterResponse{
 				Name:    jobRequest.Requester.Name,
 				Surname: jobRequest.Requester.Surname,
@@ -138,6 +141,10 @@ func (h *JobRequestHandler) AcceptJobRequest(c *gin.Context) {
 		c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
 		return
 	}
+	if errors.Is(err, jobrequest.ErrOnlyPendingJobRequestCanBeAccepted) {
+		c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
+		return
+	}
 	if errors.Is(err, conversation.ErrOnlyPendingConversationCanBeActivated) {
 		c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
 		return
@@ -165,5 +172,6 @@ func jobRequestResponseFromDomain(createdJobRequest jobrequest.JobRequest) jobRe
 		ConversationID: createdJobRequest.ConversationID,
 		Title:          createdJobRequest.Title,
 		Description:    createdJobRequest.Description,
+		Status:         string(createdJobRequest.Status),
 	}
 }

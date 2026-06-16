@@ -1026,6 +1026,7 @@
                                                 "conversation_id": 10,
                                                 "title": "Reparación de fuga en la cocina",
                                                 "description": "Hola Ana, necesito reparar una fuga de agua en la cocina. ¿Podrías ayudarme esta semana?",
+                                                "status": "pending",
                                                 "requester": {
                                                     "name": "Ana",
                                                     "surname": "Pérez"
@@ -1117,7 +1118,8 @@
                                             "id": 1,
                                             "conversation_id": 10,
                                             "title": "Reparación de fuga en la cocina",
-                                            "description": "Hola Ana, necesito reparar una fuga de agua en la cocina. ¿Podrías ayudarme esta semana?"
+                                            "description": "Hola Ana, necesito reparar una fuga de agua en la cocina. ¿Podrías ayudarme esta semana?",
+                                            "status": "pending"
                                         }
                                     }
                                 }
@@ -1260,7 +1262,8 @@
                                             "id": 1,
                                             "conversation_id": 10,
                                             "title": "Reparación de fuga en la cocina",
-                                            "description": "Hola Ana, necesito reparar una fuga de agua en la cocina. ¿Podrías ayudarme esta semana?"
+                                            "description": "Hola Ana, necesito reparar una fuga de agua en la cocina. ¿Podrías ayudarme esta semana?",
+                                            "status": "accepted"
                                         }
                                     }
                                 }
@@ -1334,13 +1337,18 @@
                         }
                     },
                     "409": {
-                        "description": "The linked conversation is no longer pending and cannot be accepted again.",
+                        "description": "The job request or linked conversation is no longer pending and cannot be accepted again.",
                         "content": {
                             "application/json": {
                                 "schema": {
                                     "$ref": "#/components/schemas/ErrorResponse"
                                 },
                                 "examples": {
+                                    "jobRequestNotPending": {
+                                        "value": {
+                                            "error": "Only pending job requests can be accepted"
+                                        }
+                                    },
                                     "conversationNotPending": {
                                         "value": {
                                             "error": "Only pending conversations can be activated"
@@ -2092,7 +2100,8 @@
                     "id",
                     "conversation_id",
                     "title",
-                    "description"
+                    "description",
+                    "status"
                 ],
                 "properties": {
                     "id": {
@@ -2116,6 +2125,15 @@
                         "type": "string",
                         "description": "Optional job request description. Empty when omitted.",
                         "example": "Hola Ana, necesito reparar una fuga de agua en la cocina. ¿Podrías ayudarme esta semana?"
+                    },
+                    "status": {
+                        "type": "string",
+                        "description": "Current job request lifecycle status.",
+                        "enum": [
+                            "pending",
+                            "accepted"
+                        ],
+                        "example": "pending"
                     }
                 },
                 "additionalProperties": false
@@ -2128,6 +2146,7 @@
                     "conversation_id",
                     "title",
                     "description",
+                    "status",
                     "requester"
                 ],
                 "properties": {
@@ -2152,6 +2171,15 @@
                         "type": "string",
                         "description": "Optional job request description. Empty when omitted.",
                         "example": "Hola Ana, necesito reparar una fuga de agua en la cocina. ¿Podrías ayudarme esta semana?"
+                    },
+                    "status": {
+                        "type": "string",
+                        "description": "Current job request lifecycle status.",
+                        "enum": [
+                            "pending",
+                            "accepted"
+                        ],
+                        "example": "pending"
                     },
                     "requester": {
                         "$ref": "#/components/schemas/JobRequestRequester"

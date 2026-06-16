@@ -22,6 +22,11 @@ Scenario: No permitir aceptar solicitud a otro prestador
   When intento aceptar la solicitud de trabajo pendiente
   Then el sistema deniega la aceptación de la solicitud
 
+Scenario: No permitir aceptar solicitud ya aceptada
+  Given que existe una solicitud de trabajo pendiente aceptada
+  When intento aceptar nuevamente la solicitud de trabajo aceptada
+  Then el sistema rechaza aceptar una solicitud de trabajo ya aceptada
+
 Scenario: Consumidor puede superar el límite de mensajes luego de aceptación
   Given que existe una solicitud de trabajo pendiente aceptada
   And que estoy autenticado como consumidor "consumidor@example.com"

@@ -5,6 +5,7 @@ required:
 - conversation_id
 - title
 - description
+- status
 properties:
   id:
     type: integer
@@ -24,4 +25,11 @@ properties:
     type: string
     description: Optional job request description. Empty when omitted.
     example: Hola Ana, necesito reparar una fuga de agua en la cocina. ¿Podrías ayudarme esta semana?
+  status:
+    type: string
+    description: Current job request lifecycle status.
+    enum:
+    - pending
+    - accepted
+    example: pending
 additionalProperties: false

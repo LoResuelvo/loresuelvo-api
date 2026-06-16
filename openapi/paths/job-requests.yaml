@@ -22,6 +22,7 @@ get:
                 conversation_id: 10
                 title: Reparación de fuga en la cocina
                 description: Hola Ana, necesito reparar una fuga de agua en la cocina. ¿Podrías ayudarme esta semana?
+                status: pending
                 requester:
                   name: Ana
                   surname: Pérez
@@ -80,6 +81,7 @@ post:
                 conversation_id: 10
                 title: Reparación de fuga en la cocina
                 description: Hola Ana, necesito reparar una fuga de agua en la cocina. ¿Podrías ayudarme esta semana?
+                status: pending
     '400':
       description: The request body is invalid, provider_id is missing or zero, or title is empty after trimming.
       content:

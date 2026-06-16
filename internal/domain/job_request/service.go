@@ -34,12 +34,16 @@ func (s *Service) Create(consumerAuthID string, providerID int, title, descripti
 		return nil, err
 	}
 
+	jobRequest, err := New(consumerID, providerID, title, description)
+	if err != nil {
+		return nil, err
+	}
+
 	if err := s.ensureProviderExists(providerID); err != nil {
 		return nil, err
 	}
 
-	jobRequest, err := New(consumerID, providerID, title, description)
-	if err != nil {
+	if err := s.ensureNoOpenJobRequest(consumerID, providerID); err != nil {
 		return nil, err
 	}
 
@@ -66,8 +70,8 @@ func (s *Service) Accept(ctx context.Context, providerAuthID string, jobRequestI
 		return nil, ErrOnlyAssignedProviderCanAcceptJobRequest
 	}
 
-	if !jobRequest.CanBeAcceptedBy(providerID) {
-		return nil, ErrOnlyAssignedProviderCanAcceptJobRequest
+	if err := jobRequest.Accept(providerID); err != nil {
+		return nil, err
 	}
 
 	linkedConversation, err := s.conversationRepository.FindByID(ctx, jobRequest.ConversationID)
@@ -80,6 +84,10 @@ func (s *Service) Accept(ctx context.Context, providerAuthID string, jobRequestI
 	}
 
 	if err := s.conversationRepository.SaveStatus(ctx, linkedConversation); err != nil {
+		return nil, err
+	}
+
+	if err := s.repository.SaveStatus(ctx, *jobRequest); err != nil {
 		return nil, err
 	}
 
@@ -106,6 +114,18 @@ func (s *Service) ensureProviderExists(providerID int) error {
 	}
 	if !exists {
 		return ErrProviderDoesNotExist
+	}
+
+	return nil
+}
+
+func (s *Service) ensureNoOpenJobRequest(consumerID, providerID int) error {
+	exists, err := s.repository.ExistsBetweenWithAnyStatus(consumerID, providerID, OpenStatuses())
+	if err != nil {
+		return err
+	}
+	if exists {
+		return ErrAlreadyExists
 	}
 
 	return nil

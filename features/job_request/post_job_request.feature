@@ -34,7 +34,18 @@ Feature: Enviar solicitud de trabajo
             """
         Then el sistema muestra un mensaje de error indicando que el prestador no existe
 
-    Scenario: 39.5 - EST Enviar hasta 5 mensajes por el chat pendiente
+    Scenario: 39.5 - EST No permitir enviar otra solicitud si ya existe una solicitud abierta
+        Given envío una solicitud de trabajo al prestador "Ana Pérez" con el título "Reparación de fuga en la cocina" y la descripción:
+            """
+            Hola Ana, necesito reparar una fuga de agua en la cocina. ¿Podrías ayudarme esta semana?
+            """
+        When envío una solicitud de trabajo al prestador "Ana Pérez" con el título "Nuevo arreglo en la cocina" y la descripción:
+            """
+            También necesito revisar otra pérdida de agua.
+            """
+        Then el sistema muestra un mensaje de error indicando que ya existe una solicitud de trabajo abierta
+
+    Scenario: 39.6 - EST Enviar hasta 5 mensajes por el chat pendiente
         Given envío una solicitud de trabajo al prestador "Ana Pérez" con el título "Reparación de fuga en la cocina" y la descripción:
             """
             Hola Ana, necesito reparar una fuga de agua en la cocina. ¿Podrías ayudarme esta semana?
@@ -51,7 +62,7 @@ Feature: Enviar solicitud de trabajo
         Then el sistema muestra un mensaje de error indicando que se ha alcanzado el límite de mensajes permitidos en el chat pendiente
         And el sistema no registra el sexto mensaje en la conversación pendiente
 
-    Scenario: 39.6 - EST Escribir en chat sin aceptar solicitud de trabajo vinculada
+    Scenario: 39.7 - EST Escribir en chat sin aceptar solicitud de trabajo vinculada
         Given envío una solicitud de trabajo al prestador "Ana Pérez" con el título "Reparación de fuga en la cocina" y la descripción:
             """
             Hola Ana, necesito reparar una fuga de agua en la cocina. ¿Podrías ayudarme esta semana?

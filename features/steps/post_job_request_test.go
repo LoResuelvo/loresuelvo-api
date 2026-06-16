@@ -22,6 +22,7 @@ type jobRequestCreationResponse struct {
 	ConversationID int    `json:"conversation_id"`
 	Title          string `json:"title"`
 	Description    string `json:"description"`
+	Status         string `json:"status"`
 }
 
 func registerPostJobRequestSteps(sc *godog.ScenarioContext, suite *testSuite) {
@@ -32,6 +33,7 @@ func registerPostJobRequestSteps(sc *godog.ScenarioContext, suite *testSuite) {
 	sc.Step(`^el sistema registra la solicitud de trabajo con una descripción vacía$`, suite.systemRegistersJobRequestWithEmptyDescription)
 	sc.Step(`^el sistema muestra un mensaje de error indicando que el título es obligatorio$`, suite.systemReportsTitleIsRequired)
 	sc.Step(`^el sistema muestra un mensaje de error indicando que el prestador no existe$`, suite.systemReportsProviderDoesNotExist)
+	sc.Step(`^el sistema muestra un mensaje de error indicando que ya existe una solicitud de trabajo abierta$`, suite.systemReportsOpenJobRequestAlreadyExists)
 	sc.Step(`^envio al chat pendiente con el prestador "([^"]*)" los mensajes:$`, suite.sendMessagesToPendingChatWithProvider)
 	sc.Step(`^el sistema muestra un mensaje de error indicando que se ha alcanzado el límite de mensajes permitidos en el chat pendiente$`, suite.systemReportsPendingConversationMessageLimitReached)
 	sc.Step(`^el sistema no registra el sexto mensaje en la conversación pendiente$`, suite.systemDoesNotRegisterSixthPendingConversationMessage)
@@ -71,6 +73,9 @@ func (suite *testSuite) systemRegistersJobRequest() error {
 	if response.ConversationID == 0 {
 		return fmt.Errorf("expected linked conversation id, got body %s", string(suite.lastBody))
 	}
+	if response.Status != "pending" {
+		return fmt.Errorf("expected created job request status %q, got %q", "pending", response.Status)
+	}
 
 	suite.lastConversationID = response.ConversationID
 	return nil
@@ -94,6 +99,10 @@ func (suite *testSuite) systemRegistersJobRequestWithEmptyDescription() error {
 
 func (suite *testSuite) systemReportsTitleIsRequired() error {
 	return suite.conversationRequestShouldFailWithStatus(http.StatusBadRequest)
+}
+
+func (suite *testSuite) systemReportsOpenJobRequestAlreadyExists() error {
+	return suite.conversationRequestShouldFailWithStatus(http.StatusConflict)
 }
 
 func (suite *testSuite) sendMessagesToPendingChatWithProvider(providerFullName string, messages *godog.DocString) error {

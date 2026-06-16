@@ -151,6 +151,7 @@ func TestJobRequestRepositoryCanSaveRequestWithConversation(t *testing.T) {
 	assert.NotZero(t, savedJobRequest.ConversationID)
 	assert.Equal(t, requestToSave.Title, savedJobRequest.Title)
 	assert.Equal(t, requestToSave.Description, savedJobRequest.Description)
+	assert.Equal(t, jobrequest.StatusPending, savedJobRequest.Status)
 
 	foundConversation, err := testContext.conversationRepository.FindByID(context.Background(), savedJobRequest.ConversationID)
 	require.NoError(t, err)
@@ -175,6 +176,28 @@ func TestJobRequestRepositoryRejectsDuplicateRequestBetweenSameConsumerAndProvid
 	assert.Nil(t, duplicateJobRequest)
 }
 
+func TestJobRequestRepositoryCanDetectRequestBetweenConsumerAndProviderWithAnyStatus(t *testing.T) {
+	testContext := newJobRequestRepositoryTest(t)
+	consumerID, providerID := savedJobRequestParticipants(t, testContext)
+	_, err := testContext.jobRequestRepository.SaveWithConversation(validJobRequest(t, consumerID, providerID), conversationForJobRequest(t, consumerID, providerID))
+	require.NoError(t, err)
+
+	exists, err := testContext.jobRequestRepository.ExistsBetweenWithAnyStatus(consumerID, providerID, jobrequest.OpenStatuses())
+
+	require.NoError(t, err)
+	assert.True(t, exists)
+}
+
+func TestJobRequestRepositoryReturnsFalseWhenNoRequestExistsBetweenConsumerAndProviderWithAnyStatus(t *testing.T) {
+	testContext := newJobRequestRepositoryTest(t)
+	consumerID, providerID := savedJobRequestParticipants(t, testContext)
+
+	exists, err := testContext.jobRequestRepository.ExistsBetweenWithAnyStatus(consumerID, providerID, jobrequest.OpenStatuses())
+
+	require.NoError(t, err)
+	assert.False(t, exists)
+}
+
 func TestJobRequestRepositoryCanFindByConversationID(t *testing.T) {
 	testContext := newJobRequestRepositoryTest(t)
 	consumerID, providerID := savedJobRequestParticipants(t, testContext)
@@ -193,6 +216,7 @@ func TestJobRequestRepositoryCanFindByConversationID(t *testing.T) {
 	assert.Equal(t, savedJobRequest.ConversationID, foundJobRequest.ConversationID)
 	assert.Equal(t, requestToSave.Title, foundJobRequest.Title)
 	assert.Equal(t, requestToSave.Description, foundJobRequest.Description)
+	assert.Equal(t, jobrequest.StatusPending, foundJobRequest.Status)
 }
 
 func TestJobRequestRepositoryCanFindByID(t *testing.T) {
@@ -213,6 +237,7 @@ func TestJobRequestRepositoryCanFindByID(t *testing.T) {
 	assert.Equal(t, savedJobRequest.ConversationID, foundJobRequest.ConversationID)
 	assert.Equal(t, requestToSave.Title, foundJobRequest.Title)
 	assert.Equal(t, requestToSave.Description, foundJobRequest.Description)
+	assert.Equal(t, jobrequest.StatusPending, foundJobRequest.Status)
 }
 
 func TestJobRequestRepositoryFindByIDReturnsNotFoundIfRequestDoesNotExist(t *testing.T) {
@@ -245,6 +270,7 @@ func TestJobRequestRepositoryCanFindPendingRequestsByConsumerAuthID(t *testing.T
 	assert.Equal(t, savedJobRequest.ConversationID, foundJobRequests[0].ConversationID)
 	assert.Equal(t, "Ana", foundJobRequests[0].Requester.Name)
 	assert.Equal(t, "Perez", foundJobRequests[0].Requester.Surname)
+	assert.Equal(t, string(jobrequest.StatusPending), foundJobRequests[0].Status)
 }
 
 func TestJobRequestRepositoryCanFindPendingRequestsByProviderAuthID(t *testing.T) {
@@ -268,6 +294,7 @@ func TestJobRequestRepositoryCanFindPendingRequestsByProviderAuthID(t *testing.T
 	assert.Equal(t, savedJobRequest.ConversationID, foundJobRequests[0].ConversationID)
 	assert.Equal(t, "Ana", foundJobRequests[0].Requester.Name)
 	assert.Equal(t, "Perez", foundJobRequests[0].Requester.Surname)
+	assert.Equal(t, string(jobrequest.StatusPending), foundJobRequests[0].Status)
 }
 
 func TestJobRequestRepositoryFindByUserAuthIDReturnsOnlyPendingRequests(t *testing.T) {
@@ -277,13 +304,28 @@ func TestJobRequestRepositoryFindByUserAuthIDReturnsOnlyPendingRequests(t *testi
 	requestToSave := validJobRequest(t, consumerID, providerID)
 	savedJobRequest, err := testContext.jobRequestRepository.SaveWithConversation(requestToSave, conversationForJobRequest(t, consumerID, providerID))
 	require.NoError(t, err)
-	_, err = testContext.database.Exec(`UPDATE conversations SET status = 'active' WHERE id = $1`, savedJobRequest.ConversationID)
-	require.NoError(t, err)
+	savedJobRequest.Status = jobrequest.StatusAccepted
+	require.NoError(t, testContext.jobRequestRepository.SaveStatus(context.Background(), *savedJobRequest))
 
 	foundJobRequests, err := testContext.jobRequestRepository.FindByUserAuthID("auth0|job-request-active-consumer")
 
 	require.NoError(t, err)
 	assert.Empty(t, foundJobRequests)
+}
+
+func TestJobRequestRepositoryCanSaveStatus(t *testing.T) {
+	testContext := newJobRequestRepositoryTest(t)
+	consumerID, providerID := savedJobRequestParticipants(t, testContext)
+	savedJobRequest, err := testContext.jobRequestRepository.SaveWithConversation(validJobRequest(t, consumerID, providerID), conversationForJobRequest(t, consumerID, providerID))
+	require.NoError(t, err)
+	savedJobRequest.Status = jobrequest.StatusAccepted
+
+	err = testContext.jobRequestRepository.SaveStatus(context.Background(), *savedJobRequest)
+
+	require.NoError(t, err)
+	foundJobRequest, err := testContext.jobRequestRepository.FindByID(savedJobRequest.ID)
+	require.NoError(t, err)
+	assert.Equal(t, jobrequest.StatusAccepted, foundJobRequest.Status)
 }
 
 func TestJobRequestRepositoryCanDeleteAllRequests(t *testing.T) {

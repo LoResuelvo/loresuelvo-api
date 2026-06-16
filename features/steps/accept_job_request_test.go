@@ -14,10 +14,12 @@ const conversationStatusActive = "active"
 func registerAcceptJobRequestSteps(sc *godog.ScenarioContext, suite *testSuite) {
 	sc.Step(`^acepto la solicitud de trabajo pendiente$`, suite.acceptPendingJobRequest)
 	sc.Step(`^intento aceptar la solicitud de trabajo pendiente$`, suite.tryAcceptPendingJobRequest)
+	sc.Step(`^intento aceptar nuevamente la solicitud de trabajo aceptada$`, suite.tryAcceptPendingJobRequest)
 	sc.Step(`^la solicitud de trabajo queda aceptada$`, suite.systemAcceptsJobRequest)
 	sc.Step(`^la conversación vinculada queda activa$`, suite.linkedConversationIsActive)
 	sc.Step(`^el prestador puede enviar un mensaje en el chat vinculado$`, suite.providerCanSendMessageInLinkedChat)
 	sc.Step(`^el sistema deniega la aceptación de la solicitud$`, suite.systemDeniesJobRequestAcceptance)
+	sc.Step(`^el sistema rechaza aceptar una solicitud de trabajo ya aceptada$`, suite.systemRejectsAlreadyAcceptedJobRequest)
 	sc.Step(`^que existe una solicitud de trabajo pendiente aceptada$`, suite.thereIsAcceptedPendingJobRequest)
 	sc.Step(`^envío seis mensajes en el chat vinculado$`, suite.sendSixMessagesInLinkedChat)
 	sc.Step(`^el sistema registra los seis mensajes$`, suite.systemRegistersSixMessages)
@@ -62,7 +64,19 @@ func (suite *testSuite) requestAcceptPendingJobRequest() error {
 }
 
 func (suite *testSuite) systemAcceptsJobRequest() error {
-	return suite.lastResponseShouldHaveStatusCode(http.StatusOK)
+	if err := suite.lastResponseShouldHaveStatusCode(http.StatusOK); err != nil {
+		return err
+	}
+
+	response, err := suite.jobRequestCreationResponseFromLastBody()
+	if err != nil {
+		return err
+	}
+	if response.Status != "accepted" {
+		return fmt.Errorf("expected accepted job request status %q, got %q", "accepted", response.Status)
+	}
+
+	return nil
 }
 
 func (suite *testSuite) linkedConversationIsActive() error {
@@ -96,6 +110,10 @@ func (suite *testSuite) providerCanSendMessageInLinkedChat() error {
 
 func (suite *testSuite) systemDeniesJobRequestAcceptance() error {
 	return suite.conversationRequestShouldFailWithStatus(http.StatusForbidden)
+}
+
+func (suite *testSuite) systemRejectsAlreadyAcceptedJobRequest() error {
+	return suite.conversationRequestShouldFailWithStatus(http.StatusConflict)
 }
 
 func (suite *testSuite) thereIsAcceptedPendingJobRequest() error {

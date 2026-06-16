@@ -9,8 +9,10 @@ import (
 
 type Repository interface {
 	SaveWithConversation(jobRequest JobRequest, pendingConversation conversation.Conversation) (*JobRequest, error)
+	ExistsBetweenWithAnyStatus(consumerID, providerID int, statuses []Status) (bool, error)
 	FindByUserAuthID(userAuthID string) ([]readmodel.JobRequestSummary, error)
 	FindByID(id int) (*JobRequest, error)
+	SaveStatus(ctx context.Context, jobRequest JobRequest) error
 }
 
 type ConsumerRepository interface {
@@ -23,7 +25,6 @@ type ProviderRepository interface {
 }
 
 type ConversationRepository interface {
-	ExistsBetween(consumerID, providerID int) (bool, error)
 	FindByID(ctx context.Context, conversationID int) (conversation.Conversation, error)
 	SaveStatus(ctx context.Context, conversation conversation.Conversation) error
 }
