@@ -22,7 +22,7 @@ func TestNewPendingConversationCreatesPendingConversation(t *testing.T) {
 func TestNewPendingConversationRejectsMissingConsumerID(t *testing.T) {
 	pendingConversation, err := conversation.NewPendingConversation(0, 20)
 
-	assert.ErrorIs(t, err, conversation.ErrOnlyConsumerCanStartWorkRequest)
+	assert.ErrorIs(t, err, conversation.ErrConsumerRequired)
 	assert.Nil(t, pendingConversation)
 }
 

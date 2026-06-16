@@ -94,7 +94,6 @@ func (router *Router) registerJobRequestRoutes(engine *gin.Engine, authMiddlewar
 }
 
 func (router *Router) registerConversationRoutes(engine *gin.Engine, authMiddleware gin.HandlerFunc) {
-	engine.POST("/conversations", authMiddleware, router.conversationHandler.CreateConversation)
 	engine.GET("/conversations", authMiddleware, router.conversationHandler.ListConversations)
 	engine.GET("/conversations/:conversationID", authMiddleware, router.conversationHandler.GetConversation)
 	engine.POST("/conversations/:conversationID/messages", authMiddleware, router.conversationHandler.SendMessage)

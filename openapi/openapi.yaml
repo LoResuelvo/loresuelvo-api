@@ -106,8 +106,6 @@ components:
       $ref: ./components/schemas/confirm-file-request.yaml
     FileResponse:
       $ref: ./components/schemas/file-response.yaml
-    CreateConversationRequest:
-      $ref: ./components/schemas/create-conversation-request.yaml
     CreateJobRequestRequest:
       $ref: ./components/schemas/create-job-request-request.yaml
     JobRequest:

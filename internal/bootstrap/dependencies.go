@@ -78,7 +78,6 @@ func NewDependenciesWithChatbot(database *sql.DB, chatbot conversation.Chatbot) 
 		conversationRepository,
 		consumerRepository,
 		providerRepository,
-		providerRepository,
 		conversationReader,
 		messagePublisher,
 		chatbot,

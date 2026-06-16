@@ -8,7 +8,7 @@ type WorkConversation struct {
 
 func NewPendingConversation(consumerID, providerID int) (Conversation, error) {
 	if consumerID <= 0 {
-		return nil, ErrOnlyConsumerCanStartWorkRequest
+		return nil, ErrConsumerRequired
 	}
 
 	if providerID <= 0 {

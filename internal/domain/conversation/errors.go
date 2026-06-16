@@ -2,13 +2,11 @@ package conversation
 
 import "errors"
 
-var ErrProviderDoesNotExist = errors.New("Provider does not exist")
-
 var ErrProviderRequired = errors.New("Provider id is required")
 
 var ErrMessageRequired = errors.New("Message is required")
 
-var ErrOnlyConsumerCanStartWorkRequest = errors.New("Only consumers can start work requests")
+var ErrConsumerRequired = errors.New("Consumer id is required")
 
 var ErrAlreadyExists = errors.New("Conversation already exists")
 
@@ -27,5 +25,3 @@ var ErrOnlyConsumerCanMessageChatbot = errors.New("Only consumers can send messa
 var ErrChatbotResponseRequired = errors.New("Chatbot response is required")
 
 var ErrChatbotUnavailable = errors.New("Chatbot is unavailable")
-
-var ErrChatbotQuestionOutOfScope = errors.New("Chatbot only answers questions related to home problems")

@@ -7,7 +7,6 @@ import (
 )
 
 type Repository interface {
-	ExistsBetween(consumerID, providerID int) (bool, error)
 	SaveConversation(ctx context.Context, conversation Conversation) (Conversation, error)
 	FindByID(ctx context.Context, conversationID int) (Conversation, error)
 	AddMessage(ctx context.Context, conversationID int, message Message) (*Message, error)
@@ -17,10 +16,6 @@ type Repository interface {
 type ConsumerIDFinder interface {
 	FindIDByAuthID(authID string) (int, error)
 	FindAuthIDByID(id int) (string, error)
-}
-
-type ProviderExistenceChecker interface {
-	ExistsByID(id int) (bool, error)
 }
 
 type ProviderIDFinder interface {

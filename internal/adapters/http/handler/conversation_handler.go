@@ -18,22 +18,12 @@ type ConversationHandler struct {
 	conversationService *conversation.Service
 }
 
-type createConversationRequest struct {
-	ProviderID int    `json:"provider_id"`
-	Content    string `json:"content"`
-}
-
 type sendMessageRequest struct {
 	Content string `json:"content"`
 }
 
 type createChatbotConversationRequest struct {
 	Content string `json:"content"`
-}
-
-type conversationResponse struct {
-	ID     int    `json:"id"`
-	Status string `json:"status"`
 }
 
 type sentMessageResponse struct {
@@ -84,48 +74,6 @@ type conversationLastMessageResponse struct {
 
 func NewConversationHandler(conversationService *conversation.Service) *ConversationHandler {
 	return &ConversationHandler{conversationService: conversationService}
-}
-
-func (h *ConversationHandler) CreateConversation(c *gin.Context) {
-	auth0ID, ok := middleware.GetUserID(c)
-	if !ok || strings.TrimSpace(auth0ID) == "" {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "missing user id"})
-		return
-	}
-
-	var req createConversationRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	createdConversation, err := h.conversationService.StartWorkRequest(auth0ID, req.ProviderID, req.Content)
-	if errors.Is(err, conversation.ErrMessageRequired) || errors.Is(err, conversation.ErrProviderRequired) {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-	if errors.Is(err, conversation.ErrProviderDoesNotExist) {
-		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
-		return
-	}
-	if errors.Is(err, conversation.ErrOnlyConsumerCanStartWorkRequest) {
-		c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
-		return
-	}
-	if errors.Is(err, conversation.ErrAlreadyExists) {
-		c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
-		return
-	}
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-
-	c.Header("Location", fmt.Sprintf("/conversations/%d", createdConversation.Base().ID))
-	c.JSON(http.StatusCreated, conversationResponse{
-		ID:     createdConversation.Base().ID,
-		Status: createdConversation.Base().Status,
-	})
 }
 
 func (h *ConversationHandler) GetConversation(c *gin.Context) {
