@@ -18,6 +18,8 @@ func main() {
 	}
 	defer database.Close()
 
+	bootstrap.StartDevelopmentDataSeederFromEnv(context.Background(), database)
+
 	dependencies := bootstrap.NewDependencies(database)
 
 	auth0Validator, err := auth0.NewValidatorFromEnv()

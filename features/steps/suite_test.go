@@ -7,7 +7,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/auth0/testhelper"
+	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/auth0"
 	chatbotadapter "github.com/LoResuelvo/loresuelvo-api/internal/adapters/chatbot"
 	httpadapter "github.com/LoResuelvo/loresuelvo-api/internal/adapters/http"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/repositories"
@@ -31,7 +31,7 @@ type testSuite struct {
 	userRepository                     *repositories.UserRepository
 	fileRepository                     *repositories.FileRepository
 	auth0Validator                     *validator.Validator
-	tokenBuilder                       *testhelper.TokenBuilder
+	tokenBuilder                       *auth0.TokenBuilder
 	chatbot                            *chatbotadapter.FakeChatbot
 	lastStatus                         int
 	lastBody                           []byte
@@ -123,8 +123,8 @@ func newTestDb() *sql.DB {
 func newTestSuite(tb testing.TB, database *sql.DB) *testSuite {
 	chatbot := chatbotadapter.NewFakeChatbot()
 	dependencies := bootstrap.NewDependenciesWithChatbot(database, chatbot)
-	auth0Validator := testhelper.NewTestValidator(tb)
-	tokenBuilder := testhelper.NewTokenBuilder()
+	auth0Validator := auth0.NewFakeValidator()
+	tokenBuilder := auth0.NewTokenBuilder()
 
 	router := httpadapter.NewRouter(dependencies.CategoryHandler, dependencies.ConsumerHandler, dependencies.ProviderHandler, dependencies.ConversationHandler, dependencies.JobRequestHandler, dependencies.UserHandler, dependencies.FileHandler, dependencies.RealtimeHandler, auth0Validator)
 	engine, err := router.SetUp()

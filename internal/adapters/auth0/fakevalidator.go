@@ -1,20 +1,18 @@
-package testhelper
+package auth0
 
 import (
 	"context"
-	"testing"
 	"time"
 
-	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/auth0"
 	"github.com/auth0/go-jwt-middleware/v3/validator"
 	"github.com/lestrrat-go/jwx/v3/jwa"
 	"github.com/lestrrat-go/jwx/v3/jwt"
 )
 
-func NewTestValidator(tb testing.TB) *validator.Validator {
+func NewFakeValidator() *validator.Validator {
 	secret := []byte("test-secret-do-not-use-in-production")
 
-	v, err := validator.New(
+	v, _ := validator.New(
 		validator.WithKeyFunc(func(ctx context.Context) (any, error) {
 			return secret, nil
 		}),
@@ -22,12 +20,9 @@ func NewTestValidator(tb testing.TB) *validator.Validator {
 		validator.WithIssuer("test-issuer"),
 		validator.WithAudience("test-audience"),
 		validator.WithCustomClaims(func() validator.CustomClaims {
-			return &auth0.CustomClaims{}
+			return &CustomClaims{}
 		}),
 	)
-	if err != nil {
-		tb.Fatal("failed to build test validator:", err)
-	}
 
 	return v
 }

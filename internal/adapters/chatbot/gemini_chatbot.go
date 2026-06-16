@@ -38,7 +38,12 @@ func (chatbot *GeminiChatbot) AnswerHomeProblemQuestion(ctx context.Context, pro
 		return nil, fmt.Errorf("creating Gemini client: %w", err)
 	}
 
-	result, err := client.Models.GenerateContent(ctx, chatbot.model, genai.Text(chatbot.prompt(prompt, availableCategories)), nil)
+	result, err := client.Models.GenerateContent(
+		ctx,
+		chatbot.model,
+		genai.Text(chatbot.prompt(prompt, availableCategories)),
+		&genai.GenerateContentConfig{ResponseMIMEType: "application/json"},
+	)
 	if err != nil {
 		return nil, fmt.Errorf("generating chatbot response: %w", err)
 	}
