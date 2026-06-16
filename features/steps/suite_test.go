@@ -20,29 +20,30 @@ import (
 )
 
 type testSuite struct {
-	server                      *httptest.Server
-	database                    *sql.DB
-	categoryRepository          *repositories.CategoryRepository
-	consumerRepository          *repositories.ConsumerRepository
-	providerRepository          *repositories.ProviderRepository
-	conversationRepository      *repositories.ConversationRepository
-	messageRepository           *repositories.MessageRepository
-	jobRequestRepository        *repositories.JobRequestRepository
-	userRepository              *repositories.UserRepository
-	fileRepository              *repositories.FileRepository
-	auth0Validator              *validator.Validator
-	tokenBuilder                *testhelper.TokenBuilder
-	chatbot                     *chatbotadapter.FakeChatbot
-	lastStatus                  int
-	lastBody                    []byte
-	currentAuth0ID              string
-	lastConversationID          int
-	lastJobRequestID            int
-	lastWorkRequestProviderID   int
-	providerProfilePhotoFileID  string
-	realtimeConnections         map[string]*realtimeTestConnection
-	chatbotConversationIDs      []int
-	chatbotConversationStatuses []string
+	server                             *httptest.Server
+	database                           *sql.DB
+	categoryRepository                 *repositories.CategoryRepository
+	consumerRepository                 *repositories.ConsumerRepository
+	providerRepository                 *repositories.ProviderRepository
+	conversationRepository             *repositories.ConversationRepository
+	messageRepository                  *repositories.MessageRepository
+	jobRequestRepository               *repositories.JobRequestRepository
+	userRepository                     *repositories.UserRepository
+	fileRepository                     *repositories.FileRepository
+	auth0Validator                     *validator.Validator
+	tokenBuilder                       *testhelper.TokenBuilder
+	chatbot                            *chatbotadapter.FakeChatbot
+	lastStatus                         int
+	lastBody                           []byte
+	currentAuth0ID                     string
+	lastConversationID                 int
+	lastJobRequestID                   int
+	lastWorkRequestProviderID          int
+	providerProfilePhotoFileID         string
+	realtimeConnections                map[string]*realtimeTestConnection
+	chatbotConversationIDs             []int
+	chatbotConversationStatuses        []string
+	lastChatbotRecommendedCategoryName string
 
 	categoryIDsByName              map[string]int
 	lastProviderFilterCategoryName string
@@ -67,6 +68,7 @@ func (s *testSuite) registerAllSteps(sc *godog.ScenarioContext) {
 	registerAcceptJobRequestSteps(sc, s)
 	registerRealtimeMessageSteps(sc, s)
 	registerChatbotSteps(sc, s)
+	registerChatbotProviderRecommendationSteps(sc, s)
 }
 
 func (s *testSuite) cleanDatabase() error {
@@ -105,6 +107,7 @@ func (s *testSuite) cleanDatabase() error {
 	s.chatbot.Reset()
 	s.chatbotConversationIDs = nil
 	s.chatbotConversationStatuses = nil
+	s.lastChatbotRecommendedCategoryName = ""
 
 	return nil
 }
