@@ -19,6 +19,7 @@ type chatbotConversationRequest struct {
 
 type chatbotConversationResponse struct {
 	ID             int                           `json:"id"`
+	ConversationID int                           `json:"conversation_id"`
 	Status         string                        `json:"status"`
 	Title          string                        `json:"title"`
 	ResponseStatus string                        `json:"response_status"`
@@ -329,4 +330,12 @@ func (response chatbotConversationResponse) chatbotMessages() []conversationMess
 	}
 
 	return messages
+}
+
+func (response chatbotConversationResponse) conversationID() int {
+	if response.ConversationID != 0 {
+		return response.ConversationID
+	}
+
+	return response.ID
 }
