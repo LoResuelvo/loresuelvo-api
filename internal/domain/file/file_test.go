@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	clockadapter "github.com/LoResuelvo/loresuelvo-api/internal/adapters/clock"
 	filedomain "github.com/LoResuelvo/loresuelvo-api/internal/domain/file"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -181,7 +182,7 @@ func TestUploadPolicyRejectsUnsupportedMetadata(t *testing.T) {
 }
 
 func TestSystemClockReturnsUTCTime(t *testing.T) {
-	now := filedomain.SystemClock{}.Now()
+	now := clockadapter.SystemClock{}.Now()
 
 	assert.Equal(t, time.UTC, now.Location())
 	assert.False(t, now.IsZero())

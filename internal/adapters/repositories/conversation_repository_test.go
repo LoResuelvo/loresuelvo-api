@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"testing"
+	"time"
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/repositories"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/consumer"
@@ -262,7 +263,8 @@ func TestConversationRepositoryCanFindByID(t *testing.T) {
 	assert.Equal(t, consumerID, foundWorkConversation.ConsumerID)
 	assert.Equal(t, providerID, foundWorkConversation.ProviderID)
 	assert.Equal(t, conversation.StatusPending, foundConversation.Base().Status)
-	assert.Empty(t, foundConversation.Messages())
+	require.Len(t, foundConversation.Messages(), 1)
+	assert.Equal(t, messageToSave.Content, foundConversation.Messages()[0].Content)
 }
 
 func TestConversationRepositoryFindByIDReturnsNotFoundIfConversationDoesNotExist(t *testing.T) {
@@ -342,4 +344,119 @@ func TestConversationRepositoryAddMessageReturnsNotFoundForMissingConversation(t
 
 	assert.ErrorIs(t, err, conversation.ErrConversationDoesNotExist)
 	assert.Nil(t, savedMessage)
+}
+
+func savedChatbotConversationForRepository(t *testing.T, testContext conversationRepositoryTestContext) conversation.Conversation {
+	t.Helper()
+
+	consumerID := savedConsumerIDForConversation(t, testContext)
+	chatbotConversation, err := conversation.NewChatbotConversation(consumerID, "Pérdida de agua en la cocina")
+	require.NoError(t, err)
+
+	consumerMessage, err := conversation.NewConsumerMessage("Tengo una pérdida debajo de la pileta.")
+	require.NoError(t, err)
+	chatbotMessage, err := conversation.NewChatbotMessage("Revisá si el agua aparece cuando usás la bacha.")
+	require.NoError(t, err)
+	chatbotConversation.AddMessage(*consumerMessage)
+	chatbotConversation.AddMessage(*chatbotMessage)
+
+	savedConversation, err := testContext.conversationRepository.SaveConversation(context.Background(), chatbotConversation)
+	require.NoError(t, err)
+	return savedConversation
+}
+
+func TestConversationRepositoryCanUpdateChatbotContext(t *testing.T) {
+	testContext := newConversationRepositoryTest(t)
+	savedConversation := savedChatbotConversationForRepository(t, testContext)
+
+	savedChatbotConversation := savedConversation.(*conversation.ChatBotConversation)
+	require.NoError(t, savedChatbotConversation.UpdateContext(conversation.ChatbotConversationContext{Summary: "La consumidora reportó una pérdida bajo la pileta.", LastSummarizedMessageID: 2}))
+	updatedConversation, err := testContext.conversationRepository.UpdateConversation(context.Background(), savedChatbotConversation)
+
+	require.NoError(t, err)
+	require.NotNil(t, updatedConversation)
+	foundConversation, err := testContext.conversationRepository.FindByID(context.Background(), savedConversation.Base().ID)
+	require.NoError(t, err)
+	foundChatbotConversation := foundConversation.(*conversation.ChatBotConversation)
+	assert.Equal(t, "La consumidora reportó una pérdida bajo la pileta.", foundChatbotConversation.Context.Summary)
+	assert.Equal(t, 2, foundChatbotConversation.Context.LastSummarizedMessageID)
+	require.Len(t, foundChatbotConversation.Messages(), 2)
+	assert.Equal(t, conversation.SenderConsumer, foundChatbotConversation.Messages()[0].SenderRole)
+	assert.Equal(t, conversation.SenderChatbot, foundChatbotConversation.Messages()[1].SenderRole)
+}
+
+func TestConversationRepositoryCanUpdateConversationWithChatbotTurn(t *testing.T) {
+	testContext := newConversationRepositoryTest(t)
+	savedConversation := savedChatbotConversationForRepository(t, testContext)
+
+	consumerMessage, err := conversation.NewConsumerMessage("El agua sale cerca de la rosca del sifón.")
+	require.NoError(t, err)
+	chatbotMessage, err := conversation.NewChatbotMessage("Entonces revisá y ajustá la rosca del sifón.")
+	require.NoError(t, err)
+
+	savedChatbotConversation := savedConversation.(*conversation.ChatBotConversation)
+	require.NoError(t, savedChatbotConversation.UpdateContext(conversation.ChatbotConversationContext{Summary: "Resumen actualizado"}))
+	require.NoError(t, savedChatbotConversation.AddTurn(*consumerMessage, *chatbotMessage))
+	savedChatbotConversation.FinishProcessing()
+	updatedConversation, err := testContext.conversationRepository.UpdateConversation(context.Background(), savedChatbotConversation)
+
+	require.NoError(t, err)
+	foundConversation, err := testContext.conversationRepository.FindByID(context.Background(), updatedConversation.Base().ID)
+	require.NoError(t, err)
+	foundChatbotConversation := foundConversation.(*conversation.ChatBotConversation)
+	assert.Equal(t, "Resumen actualizado", foundChatbotConversation.Context.Summary)
+	require.Len(t, foundChatbotConversation.Messages(), 4)
+	assert.Equal(t, conversation.SenderConsumer, foundChatbotConversation.Messages()[2].SenderRole)
+	assert.Equal(t, conversation.SenderChatbot, foundChatbotConversation.Messages()[3].SenderRole)
+	assert.Zero(t, foundChatbotConversation.Context.LastSummarizedMessageID)
+}
+
+func TestConversationRepositoryPreventsConcurrentChatbotProcessing(t *testing.T) {
+	testContext := newConversationRepositoryTest(t)
+	savedConversation := savedChatbotConversationForRepository(t, testContext)
+	concurrentSnapshot, err := testContext.conversationRepository.FindByID(context.Background(), savedConversation.Base().ID)
+	require.NoError(t, err)
+	concurrentConversation := concurrentSnapshot.(*conversation.ChatBotConversation)
+	savedChatbotConversation := savedConversation.(*conversation.ChatBotConversation)
+
+	require.NoError(t, savedChatbotConversation.StartProcessing(time.Now().UTC()))
+	_, err = testContext.conversationRepository.UpdateConversation(context.Background(), savedChatbotConversation)
+	require.NoError(t, err)
+
+	require.NoError(t, concurrentConversation.StartProcessing(time.Now().UTC()))
+	_, err = testContext.conversationRepository.UpdateConversation(context.Background(), concurrentConversation)
+	assert.ErrorIs(t, err, conversation.ErrChatbotConversationAlreadyProcessing)
+
+	savedChatbotConversation.FinishProcessing()
+	_, err = testContext.conversationRepository.UpdateConversation(context.Background(), savedChatbotConversation)
+	require.NoError(t, err)
+	require.NoError(t, savedChatbotConversation.StartProcessing(time.Now().UTC()))
+	_, err = testContext.conversationRepository.UpdateConversation(context.Background(), savedChatbotConversation)
+	assert.NoError(t, err)
+}
+
+func TestConversationRepositoryAllowsContextUpdateWhileSameChatbotProcessingOwnsConversation(t *testing.T) {
+	testContext := newConversationRepositoryTest(t)
+	savedConversation := savedChatbotConversationForRepository(t, testContext)
+	savedChatbotConversation := savedConversation.(*conversation.ChatBotConversation)
+	startedOn := time.Now().UTC().Truncate(time.Microsecond)
+
+	require.NoError(t, savedChatbotConversation.StartProcessing(startedOn))
+	_, err := testContext.conversationRepository.UpdateConversation(context.Background(), savedChatbotConversation)
+	require.NoError(t, err)
+	require.NoError(t, savedChatbotConversation.UpdateContext(conversation.ChatbotConversationContext{
+		Summary:                 "Contexto actualizado durante el procesamiento",
+		LastSummarizedMessageID: 2,
+	}))
+
+	_, err = testContext.conversationRepository.UpdateConversation(context.Background(), savedChatbotConversation)
+
+	require.NoError(t, err)
+	foundConversation, err := testContext.conversationRepository.FindByID(context.Background(), savedConversation.Base().ID)
+	require.NoError(t, err)
+	foundChatbotConversation := foundConversation.(*conversation.ChatBotConversation)
+	assert.Equal(t, "Contexto actualizado durante el procesamiento", foundChatbotConversation.Context.Summary)
+	assert.Equal(t, 2, foundChatbotConversation.Context.LastSummarizedMessageID)
+	require.NotNil(t, foundChatbotConversation.ProcessingStartedAt())
+	assert.Equal(t, startedOn, *foundChatbotConversation.ProcessingStartedAt())
 }

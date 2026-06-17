@@ -10,6 +10,7 @@ import (
 type Repository interface {
 	SaveConversation(ctx context.Context, conversation Conversation) (Conversation, error)
 	FindByID(ctx context.Context, conversationID int) (Conversation, error)
+	UpdateConversation(ctx context.Context, conversation Conversation) (Conversation, error)
 	AddMessage(ctx context.Context, conversationID int, message Message) (*Message, error)
 	CountMessagesBySenderRole(ctx context.Context, conversationID int, senderRole string) (int, error)
 }

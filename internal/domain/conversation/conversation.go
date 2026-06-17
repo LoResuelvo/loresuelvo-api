@@ -54,6 +54,14 @@ func (conversation *BaseConversation) Messages() []Message {
 	return conversation.messages
 }
 
+func (conversation *BaseConversation) LastMessage() (Message, bool) {
+	if len(conversation.messages) == 0 {
+		return Message{}, false
+	}
+
+	return conversation.messages[len(conversation.messages)-1], true
+}
+
 func (conversation *BaseConversation) SetMessages(messages []Message) {
 	conversation.messages = messages
 }

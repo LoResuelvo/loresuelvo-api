@@ -215,6 +215,51 @@ func (h *ConversationHandler) CreateChatbotConversation(c *gin.Context) {
 	c.JSON(http.StatusCreated, chatbotConversationResponseFromDomain(*createdConversation))
 }
 
+func (h *ConversationHandler) ContinueChatbotConversation(c *gin.Context) {
+	auth0ID, ok := middleware.GetUserID(c)
+	if !ok || strings.TrimSpace(auth0ID) == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "missing user id"})
+		return
+	}
+
+	conversationID, err := conversationIDFromPath(c.Param("conversationID"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	var req sendMessageRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	turnResult, err := h.conversationService.ContinueChatbotConversation(c.Request.Context(), auth0ID, conversationID, req.Content)
+	if errors.Is(err, conversation.ErrMessageRequired) || errors.Is(err, conversation.ErrChatbotResponseRequired) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if errors.Is(err, conversation.ErrOnlyConsumerCanMessageChatbot) || errors.Is(err, conversation.ErrConversationAccessDenied) {
+		c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
+		return
+	}
+	if errors.Is(err, conversation.ErrConversationDoesNotExist) {
+		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		return
+	}
+	if errors.Is(err, conversation.ErrChatbotConversationAlreadyProcessing) {
+		c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
+		return
+	}
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.Header("Location", fmt.Sprintf("/chatbot/conversations/%d/messages", conversationID))
+	c.JSON(http.StatusCreated, chatbotConversationResponseFromDomain(*turnResult))
+}
+
 func conversationIDFromPath(value string) (int, error) {
 	conversationID, err := strconv.Atoi(value)
 	if err != nil || conversationID <= 0 {
@@ -236,6 +281,7 @@ func sentMessageResponseFromDomain(message conversation.Message) sentMessageResp
 
 type chatbotConversationResponse struct {
 	ID                   int                           `json:"id"`
+	ConversationID       int                           `json:"conversation_id,omitempty"`
 	Status               string                        `json:"status"`
 	Title                string                        `json:"title"`
 	ResponseStatus       string                        `json:"response_status"`
@@ -275,6 +321,7 @@ func chatbotConversationResponseFromDomain(result conversation.ChatbotConversati
 
 	return chatbotConversationResponse{
 		ID:                   result.Conversation.Base().ID,
+		ConversationID:       result.Conversation.Base().ID,
 		Status:               result.Conversation.Base().Status,
 		Title:                title,
 		ResponseStatus:       responseStatus,

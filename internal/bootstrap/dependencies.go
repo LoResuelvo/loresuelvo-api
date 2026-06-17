@@ -5,6 +5,7 @@ import (
 	"database/sql"
 
 	chatbotadapter "github.com/LoResuelvo/loresuelvo-api/internal/adapters/chatbot"
+	clockadapter "github.com/LoResuelvo/loresuelvo-api/internal/adapters/clock"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/realtime"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/repositories"
@@ -59,7 +60,7 @@ func NewDependenciesWithChatbot(database *sql.DB, chatbot conversation.Chatbot) 
 
 	storageConfig := storage.NewConfigFromEnv()
 	fileStorage := storage.NewStorageFromConfig(storageConfig)
-	fileService := filedomain.NewService(fileRepository, fileStorage, storageConfig.PublicBucket, storageConfig.PrivateBucket, filedomain.SystemClock{})
+	fileService := filedomain.NewService(fileRepository, fileStorage, storageConfig.PublicBucket, storageConfig.PrivateBucket, clockadapter.SystemClock{})
 
 	// Realtime infrastructure
 	hub := realtime.NewHub()
@@ -83,6 +84,7 @@ func NewDependenciesWithChatbot(database *sql.DB, chatbot conversation.Chatbot) 
 		chatbot,
 		categoryRepository,
 		fileService,
+		clockadapter.SystemClock{},
 	)
 	jobRequestService := jobrequest.NewService(
 		jobRequestRepository,

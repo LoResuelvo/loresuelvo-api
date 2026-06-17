@@ -100,12 +100,6 @@ func newFileService(repo *fileRepositoryMock, storage *storageMock) *filedomain.
 	return filedomain.NewService(repo, storage, "public", "private", fixedClock{})
 }
 
-func TestNewServiceRequiresClock(t *testing.T) {
-	assert.PanicsWithValue(t, "file clock is required", func() {
-		filedomain.NewService(newFileRepositoryMock(), newStorageMock(), "public", "private", nil)
-	})
-}
-
 func TestRequestUploadCreatesPendingProviderProfilePhoto(t *testing.T) {
 	repo := newFileRepositoryMock()
 	service := newFileService(repo, newStorageMock())

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	domainclock "github.com/LoResuelvo/loresuelvo-api/internal/domain/clock"
 	"github.com/google/uuid"
 )
 
@@ -12,16 +13,12 @@ type Service struct {
 	storage       Storage
 	publicBucket  string
 	privateBucket string
-	clock         Clock
+	clock         domainclock.Clock
 	idGenerator   func() string
 	policies      map[string]UploadPolicy
 }
 
-func NewService(repository Repository, storage Storage, publicBucket, privateBucket string, clock Clock) *Service {
-	if clock == nil {
-		panic("file clock is required")
-	}
-
+func NewService(repository Repository, storage Storage, publicBucket, privateBucket string, clock domainclock.Clock) *Service {
 	return &Service{
 		repository:    repository,
 		storage:       storage,

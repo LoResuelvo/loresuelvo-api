@@ -55,27 +55,3 @@ func (p *Publisher) PublishMessage(ctx context.Context, conv conversation.Conver
 
 	p.hub.BroadcastMessage(ctx, consumerAuthID, workConversation.ConsumerID, providerAuthID, workConversation.ProviderID, senderAuthID, message.SenderRole, event)
 }
-
-func (p *Publisher) PublishChatbotMessage(ctx context.Context, conv conversation.Conversation, message conversation.Message) {
-	chatbotConversation, ok := conv.(*conversation.ChatBotConversation)
-	if !ok {
-		slog.Warn("realtime publisher: expected chatbot conversation",
-			"conversationType", conv.ConversationType())
-		return
-	}
-
-	consumerAuthID, err := p.consumerRepo.FindAuthIDByID(chatbotConversation.ConsumerID)
-	if err != nil {
-		slog.Warn("realtime publisher: failed to find chatbot conversation consumer auth id",
-			"consumerID", chatbotConversation.ConsumerID, "error", err)
-		return
-	}
-
-	event, err := BuildMessageEvent(conv.Base().ID, message.ID, message.SenderRole, message.Content, message.CreatedOn)
-	if err != nil {
-		slog.Error("realtime publisher: failed to build chatbot event", "error", err)
-		return
-	}
-
-	p.hub.BroadcastToParticipant(ctx, consumerAuthID, conversation.SenderConsumer, chatbotConversation.ConsumerID, event)
-}

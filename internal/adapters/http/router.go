@@ -101,6 +101,7 @@ func (router *Router) registerConversationRoutes(engine *gin.Engine, authMiddlew
 
 func (router *Router) registerChatbotRoutes(engine *gin.Engine, authMiddleware gin.HandlerFunc) {
 	engine.POST("/chatbot/conversations", authMiddleware, router.conversationHandler.CreateChatbotConversation)
+	engine.POST("/chatbot/conversations/:conversationID/messages", authMiddleware, router.conversationHandler.ContinueChatbotConversation)
 }
 
 func (router *Router) registerAuthenticatedRoutes(engine *gin.Engine, authMiddleware gin.HandlerFunc) {

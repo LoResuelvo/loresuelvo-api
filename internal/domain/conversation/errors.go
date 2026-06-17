@@ -25,3 +25,9 @@ var ErrOnlyConsumerCanMessageChatbot = errors.New("Only consumers can send messa
 var ErrChatbotResponseRequired = errors.New("Chatbot response is required")
 
 var ErrChatbotUnavailable = errors.New("Chatbot is unavailable")
+
+var ErrChatbotConversationAlreadyProcessing = errors.New("Chatbot conversation is already processing another message")
+
+var ErrChatbotContextInvalid = errors.New("Chatbot context is invalid")
+
+var ErrInvalidChatbotTurn = errors.New("Chatbot turn is invalid")

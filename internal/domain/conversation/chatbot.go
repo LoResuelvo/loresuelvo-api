@@ -8,7 +8,14 @@ import (
 )
 
 type Chatbot interface {
-	AnswerHomeProblemQuestion(ctx context.Context, question string, availableCategories []category.Category) (*ChatbotResponse, error)
+	AnswerHomeProblemQuestion(ctx context.Context, question ChatbotHomeProblemQuestion, availableCategories []category.Category) (*ChatbotResponse, error)
+	SummarizeHomeProblemConversation(ctx context.Context, previousSummary string, messages []Message) (string, error)
+}
+
+type ChatbotHomeProblemQuestion struct {
+	UserMessage    string
+	ContextSummary string
+	RecentMessages []Message
 }
 
 type ChatbotResponseStatus string

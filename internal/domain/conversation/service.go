@@ -6,10 +6,17 @@ import (
 	"strings"
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/category"
+	domainclock "github.com/LoResuelvo/loresuelvo-api/internal/domain/clock"
 	readmodel "github.com/LoResuelvo/loresuelvo-api/internal/domain/conversation/read_model"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/provider"
 	providerreadmodel "github.com/LoResuelvo/loresuelvo-api/internal/domain/provider/read_model"
 )
+
+type chatbotAnswer struct {
+	response             *ChatbotResponse
+	message              *Message
+	recommendedProviders []providerreadmodel.ProviderSummary
+}
 
 type Service struct {
 	conversationRepository Repository
@@ -20,6 +27,7 @@ type Service struct {
 	chatbot                Chatbot
 	categoryRepository     RecommendationCategoryLister
 	fileService            FileURLResolver
+	clock                  domainclock.Clock
 }
 
 func NewService(
@@ -31,6 +39,7 @@ func NewService(
 	chatbot Chatbot,
 	categoryRepository RecommendationCategoryLister,
 	fileService FileURLResolver,
+	clock domainclock.Clock,
 ) *Service {
 	return &Service{
 		conversationRepository: conversationRepository,
@@ -41,6 +50,7 @@ func NewService(
 		chatbot:                chatbot,
 		categoryRepository:     categoryRepository,
 		fileService:            fileService,
+		clock:                  clock,
 	}
 }
 
@@ -120,9 +130,9 @@ func (s *Service) List(ctx context.Context, authID string) ([]readmodel.Conversa
 }
 
 func (s *Service) CreateChatbotConversation(ctx context.Context, authID string, content string) (*ChatbotConversationResult, error) {
-	consumerID, err := s.consumerRepository.FindIDByAuthID(authID)
+	consumerID, err := s.chatbotConsumerID(authID)
 	if err != nil {
-		return nil, ErrOnlyConsumerCanMessageChatbot
+		return nil, err
 	}
 
 	consumerMessage, err := NewConsumerMessage(content)
@@ -130,18 +140,112 @@ func (s *Service) CreateChatbotConversation(ctx context.Context, authID string, 
 		return nil, err
 	}
 
+	answer, err := s.answerChatbotQuestion(ctx, ChatbotHomeProblemQuestion{UserMessage: consumerMessage.Content})
+	if err != nil {
+		return nil, err
+	}
+
+	createdConversation, err := NewChatbotConversation(consumerID, answer.response.Title)
+	if err != nil {
+		return nil, err
+	}
+	chatbotConversation := createdConversation.(*ChatBotConversation)
+	chatbotConversation.AddMessage(*consumerMessage)
+	chatbotConversation.AddMessage(*answer.message)
+
+	savedConversation, err := s.conversationRepository.SaveConversation(ctx, chatbotConversation)
+	if err != nil {
+		return nil, err
+	}
+
+	return chatbotTurnResult(savedConversation, answer), nil
+}
+
+func (s *Service) ContinueChatbotConversation(ctx context.Context, authID string, conversationID int, content string) (*ChatbotConversationTurnResult, error) {
+	consumerID, err := s.chatbotConsumerID(authID)
+	if err != nil {
+		return nil, err
+	}
+
+	consumerMessage, err := NewConsumerMessage(content)
+	if err != nil {
+		return nil, err
+	}
+
+	chatbotConversation, err := s.findOwnedChatbotConversation(ctx, conversationID, consumerID)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := s.startChatbotProcessing(ctx, chatbotConversation); err != nil {
+		return nil, err
+	}
+	processingFinished := false
+	defer func() {
+		if !processingFinished {
+			s.finishChatbotProcessing(context.WithoutCancel(ctx), chatbotConversation)
+		}
+	}()
+
+	if err := s.refreshChatbotContextIfNeeded(ctx, chatbotConversation); err != nil {
+		return nil, err
+	}
+
+	question := chatbotHomeProblemQuestionFrom(chatbotConversation, consumerMessage.Content)
+	answer, err := s.answerChatbotQuestion(ctx, question)
+	if err != nil {
+		return nil, err
+	}
+
+	savedConversation, err := s.saveChatbotTurn(ctx, chatbotConversation, *consumerMessage, *answer.message)
+	if err != nil {
+		return nil, err
+	}
+	processingFinished = true
+
+	return chatbotTurnResult(savedConversation, answer), nil
+}
+
+func (s *Service) chatbotConsumerID(authID string) (int, error) {
+	consumerID, err := s.consumerRepository.FindIDByAuthID(authID)
+	if err != nil {
+		return 0, ErrOnlyConsumerCanMessageChatbot
+	}
+
+	return consumerID, nil
+}
+
+func (s *Service) findOwnedChatbotConversation(ctx context.Context, conversationID int, consumerID int) (*ChatBotConversation, error) {
+	foundConversation, err := s.conversationRepository.FindByID(ctx, conversationID)
+	if err != nil {
+		return nil, err
+	}
+
+	chatbotConversation, ok := foundConversation.(*ChatBotConversation)
+	if !ok {
+		return nil, ErrConversationDoesNotExist
+	}
+	if chatbotConversation.ConsumerID != consumerID {
+		return nil, ErrConversationAccessDenied
+	}
+
+	return chatbotConversation, nil
+}
+
+func (s *Service) answerChatbotQuestion(ctx context.Context, question ChatbotHomeProblemQuestion) (*chatbotAnswer, error) {
 	availableCategories, err := s.availableCategoriesForChatbot()
 	if err != nil {
 		return nil, err
 	}
 
-	chatbotResponse, err := s.chatbot.AnswerHomeProblemQuestion(ctx, consumerMessage.Content, availableCategories)
+	chatbotResponse, err := s.chatbot.AnswerHomeProblemQuestion(ctx, question, availableCategories)
 	if err != nil {
 		return nil, err
 	}
 	if chatbotResponse == nil {
 		return nil, ErrChatbotResponseRequired
 	}
+
 	chatbotMessage, err := NewChatbotMessage(chatbotResponse.Content)
 	if err != nil {
 		return nil, err
@@ -152,28 +256,84 @@ func (s *Service) CreateChatbotConversation(ctx context.Context, authID string, 
 		return nil, err
 	}
 
-	chatbotConversation, err := NewChatbotConversation(consumerID, chatbotResponse.Title)
-	if err != nil {
-		return nil, err
-	}
-
-	chatbotConversation.AddMessage(*consumerMessage)
-	chatbotConversation.AddMessage(*chatbotMessage)
-
-	savedConversation, err := s.conversationRepository.SaveConversation(ctx, chatbotConversation)
-	if err != nil {
-		return nil, err
-	}
-
-	s.messagePublisher.PublishChatbotMessage(ctx, savedConversation, *chatbotMessage)
-
-	return &ChatbotConversationResult{
-		Conversation:            savedConversation,
-		ResponseStatus:          chatbotResponse.Status,
-		RecommendedProviders:    recommendedProviders,
-		DiagnosisCompleted:      chatbotResponse.DiagnosisCompleted,
-		RecommendedCategoryName: strings.TrimSpace(chatbotResponse.RecommendedCategoryName),
+	return &chatbotAnswer{
+		response:             chatbotResponse,
+		message:              chatbotMessage,
+		recommendedProviders: recommendedProviders,
 	}, nil
+}
+
+func (s *Service) startChatbotProcessing(ctx context.Context, chatbotConversation *ChatBotConversation) error {
+	if err := chatbotConversation.StartProcessing(s.clock.Now()); err != nil {
+		return err
+	}
+
+	_, err := s.conversationRepository.UpdateConversation(ctx, chatbotConversation)
+	return err
+}
+
+func (s *Service) finishChatbotProcessing(ctx context.Context, chatbotConversation *ChatBotConversation) {
+	chatbotConversation.FinishProcessing()
+	_, _ = s.conversationRepository.UpdateConversation(ctx, chatbotConversation)
+}
+
+func (s *Service) refreshChatbotContextIfNeeded(ctx context.Context, chatbotConversation *ChatBotConversation) error {
+	if !chatbotConversation.ShouldSummarizeContext(ChatbotRecentMessageLimit) {
+		return nil
+	}
+
+	pendingMessages := chatbotConversation.MessagesPendingSummary()
+	contextSummary, err := s.summarizeChatbotContext(ctx, chatbotConversation.Context.Summary, pendingMessages)
+	if err != nil {
+		return err
+	}
+
+	lastPendingMessage := pendingMessages[len(pendingMessages)-1]
+	if err := chatbotConversation.UpdateContext(ChatbotConversationContext{
+		Summary:                 contextSummary,
+		LastSummarizedMessageID: lastPendingMessage.ID,
+	}); err != nil {
+		return err
+	}
+
+	_, err = s.conversationRepository.UpdateConversation(ctx, chatbotConversation)
+	return err
+}
+
+func chatbotHomeProblemQuestionFrom(chatbotConversation *ChatBotConversation, userMessage string) ChatbotHomeProblemQuestion {
+	return ChatbotHomeProblemQuestion{
+		UserMessage:    userMessage,
+		ContextSummary: chatbotConversation.Context.Summary,
+		RecentMessages: chatbotConversation.RecentMessages(ChatbotRecentMessageLimit),
+	}
+}
+
+func (s *Service) saveChatbotTurn(ctx context.Context, chatbotConversation *ChatBotConversation, consumerMessage Message, chatbotMessage Message) (Conversation, error) {
+	if err := chatbotConversation.AddTurn(consumerMessage, chatbotMessage); err != nil {
+		return nil, err
+	}
+	chatbotConversation.FinishProcessing()
+
+	return s.conversationRepository.UpdateConversation(ctx, chatbotConversation)
+}
+
+func (s *Service) summarizeChatbotContext(ctx context.Context, previousSummary string, messages []Message) (string, error) {
+	contextSummary, err := s.chatbot.SummarizeHomeProblemConversation(ctx, previousSummary, messages)
+	if err != nil {
+		return "", err
+	}
+
+	return strings.TrimSpace(contextSummary), nil
+}
+
+func chatbotTurnResult(conversation Conversation, answer *chatbotAnswer) *ChatbotConversationTurnResult {
+	return &ChatbotConversationTurnResult{
+		Conversation:            conversation,
+		ResponseStatus:          answer.response.Status,
+		RecommendedProviders:    answer.recommendedProviders,
+		DiagnosisCompleted:      answer.response.DiagnosisCompleted,
+		RecommendedCategoryName: strings.TrimSpace(answer.response.RecommendedCategoryName),
+	}
 }
 
 func (s *Service) authenticatedConsumerMatches(authID string, consumerID int) bool {

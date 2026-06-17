@@ -11,7 +11,6 @@ Feature: Continuar conversación con el chatbot asistido por IA
 
     Rule: El consumidor puede continuar una conversación existente con el chatbot asistido por IA
 
-    @wip
     Scenario: 11.2.1 - Continuar una conversación existente con el chatbot asistido por IA
         Given que estoy autenticado como consumidor "ana@example.com"
         And ya tengo una conversación activa con el chatbot sobre:
@@ -33,7 +32,6 @@ Feature: Continuar conversación con el chatbot asistido por IA
             """
         And el sistema no crea una nueva conversación con el chatbot asistido por IA
 
-    @wip
     Scenario: 11.2.2 - El chatbot recibe contexto de la conversación sin reenviar todo el historial
         Given que estoy autenticado como consumidor "ana@example.com"
         And ya tengo una conversación activa con el chatbot con muchos mensajes sobre una pérdida de agua en la cocina
@@ -48,7 +46,6 @@ Feature: Continuar conversación con el chatbot asistido por IA
         Then el sistema envía al chatbot el resumen de contexto de la conversación
         And el sistema envía al chatbot los mensajes recientes relevantes de la conversación
 
-    @wip
     Scenario: 11.2.3 - Solo el consumidor dueño puede continuar una conversación con el chatbot
         Given que existe un consumidor registrado con correo "maria@example.com", nombre "María" y apellido "López"
         And que el consumidor "ana@example.com" tiene una conversación activa con el chatbot
@@ -60,7 +57,6 @@ Feature: Continuar conversación con el chatbot asistido por IA
         Then el sistema me indica que no puedo acceder a esa conversación con el chatbot asistido por IA
         And el sistema no registra mi mensaje en esa conversación con el chatbot asistido por IA
 
-    @wip
     Scenario: 11.2.4 - Una conversación con el chatbot no acepta dos mensajes simultáneos
         Given que estoy autenticado como consumidor "ana@example.com"
         And ya tengo una conversación activa con el chatbot

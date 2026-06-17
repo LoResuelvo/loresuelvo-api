@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/conversation"
 	"github.com/cucumber/godog"
@@ -61,8 +62,27 @@ func (suite *testSuite) iHaveActiveChatbotConversationWithManyMessagesAboutKitch
 }
 
 func (suite *testSuite) thereIsChatbotConversationContextSummary(summary *godog.DocString) error {
+	if suite.lastConversationID == 0 {
+		return fmt.Errorf("expected existing chatbot conversation id")
+	}
+
 	suite.expectedChatbotContextSummary = normalizeDocString(summary)
-	return nil
+	foundConversation, err := suite.conversationRepository.FindByID(context.Background(), suite.lastConversationID)
+	if err != nil {
+		return err
+	}
+	chatbotConversation, ok := foundConversation.(*conversation.ChatBotConversation)
+	if !ok {
+		return fmt.Errorf("expected chatbot conversation fixture")
+	}
+	if err := chatbotConversation.UpdateContext(conversation.ChatbotConversationContext{
+		Summary:                 suite.expectedChatbotContextSummary,
+		LastSummarizedMessageID: chatbotConversation.Context.LastSummarizedMessageID,
+	}); err != nil {
+		return err
+	}
+	_, err = suite.conversationRepository.UpdateConversation(context.Background(), chatbotConversation)
+	return err
 }
 
 func (suite *testSuite) consumerHasActiveChatbotConversation(consumerEmail string) error {
@@ -74,7 +94,23 @@ func (suite *testSuite) consumerHasActiveChatbotConversation(consumerEmail strin
 }
 
 func (suite *testSuite) chatbotConversationIsProcessingPreviousResponse() error {
-	return nil
+	if suite.lastConversationID == 0 {
+		return fmt.Errorf("expected existing chatbot conversation id")
+	}
+
+	foundConversation, err := suite.conversationRepository.FindByID(context.Background(), suite.lastConversationID)
+	if err != nil {
+		return err
+	}
+	chatbotConversation, ok := foundConversation.(*conversation.ChatBotConversation)
+	if !ok {
+		return fmt.Errorf("expected chatbot conversation fixture")
+	}
+	if err := chatbotConversation.StartProcessing(time.Now().UTC()); err != nil {
+		return err
+	}
+	_, err = suite.conversationRepository.UpdateConversation(context.Background(), chatbotConversation)
+	return err
 }
 
 func (suite *testSuite) sendNewMessageToExistingChatbotConversation(message *godog.DocString) error {
@@ -126,8 +162,8 @@ func (suite *testSuite) systemSendsConversationContextSummaryToChatbot() error {
 	if strings.TrimSpace(suite.expectedChatbotContextSummary) == "" {
 		return fmt.Errorf("expected chatbot context summary fixture to be present")
 	}
-	if !strings.Contains(suite.chatbot.LastQuestion(), suite.expectedChatbotContextSummary) {
-		return fmt.Errorf("expected chatbot prompt to include context summary %q, got %q", suite.expectedChatbotContextSummary, suite.chatbot.LastQuestion())
+	if suite.chatbot.LastQuestion().ContextSummary != suite.expectedChatbotContextSummary {
+		return fmt.Errorf("expected chatbot question to include context summary %q, got %#v", suite.expectedChatbotContextSummary, suite.chatbot.LastQuestion())
 	}
 
 	return nil
@@ -137,11 +173,14 @@ func (suite *testSuite) systemSendsRecentRelevantMessagesToChatbot() error {
 	if strings.TrimSpace(suite.expectedRecentChatbotContextMessage) == "" {
 		return fmt.Errorf("expected recent chatbot context message fixture to be present")
 	}
-	if !strings.Contains(suite.chatbot.LastQuestion(), suite.expectedRecentChatbotContextMessage) {
-		return fmt.Errorf("expected chatbot prompt to include recent message %q, got %q", suite.expectedRecentChatbotContextMessage, suite.chatbot.LastQuestion())
+	question := suite.chatbot.LastQuestion()
+	for _, message := range question.RecentMessages {
+		if message.Content == suite.expectedRecentChatbotContextMessage {
+			return nil
+		}
 	}
 
-	return nil
+	return fmt.Errorf("expected chatbot question to include recent message %q, got %#v", suite.expectedRecentChatbotContextMessage, question)
 }
 
 func (suite *testSuite) systemReportsCannotAccessChatbotConversation() error {
@@ -169,6 +208,16 @@ func (suite *testSuite) systemDoesNotRegisterMyMessageInChatbotConversation() er
 	}
 	if strings.Contains(string(suite.lastBody), suite.lastAttemptedChatbotContinuationMessage) {
 		return fmt.Errorf("expected failed response not to include attempted message %q, got body %s", suite.lastAttemptedChatbotContinuationMessage, string(suite.lastBody))
+	}
+
+	foundConversation, err := suite.conversationRepository.FindByID(context.Background(), suite.lastConversationID)
+	if err != nil {
+		return err
+	}
+	for _, message := range foundConversation.Messages() {
+		if message.SenderRole == conversation.SenderConsumer && message.Content == suite.lastAttemptedChatbotContinuationMessage {
+			return fmt.Errorf("expected attempted chatbot continuation message %q not to be persisted", suite.lastAttemptedChatbotContinuationMessage)
+		}
 	}
 
 	return nil
