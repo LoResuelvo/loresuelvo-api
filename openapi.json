@@ -1145,6 +1145,172 @@
                 }
             }
         },
+        "/chatbot/conversations/{conversationId}/messages": {
+            "post": {
+                "tags": [
+                    "Conversations"
+                ],
+                "operationId": "continueChatbotConversation",
+                "summary": "Send a message to an existing AI-assisted chatbot conversation",
+                "description": "Adds a consumer message to an existing chatbot conversation, sends the persisted context summary plus recent relevant messages to the stateless chatbot, persists the chatbot response, and returns the messages created for this turn with recommended providers when applicable.",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "name": "conversationId",
+                        "in": "path",
+                        "required": true,
+                        "description": "Chatbot conversation identifier.",
+                        "schema": {
+                            "type": "integer",
+                            "format": "int32",
+                            "minimum": 1,
+                            "example": 1
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/SendMessageRequest"
+                            },
+                            "examples": {
+                                "followUp": {
+                                    "value": {
+                                        "content": "El agua aparece solamente cuando abro la canilla."
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Chatbot conversation turn created successfully.",
+                        "headers": {
+                            "Location": {
+                                "description": "Path of the chatbot conversation messages collection.",
+                                "schema": {
+                                    "type": "string",
+                                    "example": "/chatbot/conversations/1/messages"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ChatbotConversationResponse"
+                                },
+                                "examples": {
+                                    "continuedConversation": {
+                                        "value": {
+                                            "id": 1,
+                                            "conversation_id": 1,
+                                            "status": "active",
+                                            "title": "Pérdida de agua en la cocina",
+                                            "response_status": "answered",
+                                            "messages": [
+                                                {
+                                                    "id": 3,
+                                                    "sender_role": "consumer",
+                                                    "content": "El agua aparece solamente cuando abro la canilla.",
+                                                    "created_on": "2026-06-17T12:00:00Z"
+                                                },
+                                                {
+                                                    "id": 4,
+                                                    "sender_role": "chatbot",
+                                                    "content": "Si el agua aparece solo al usar la bacha, revisá primero el sifón y las conexiones flexibles.",
+                                                    "created_on": "2026-06-17T12:00:01Z"
+                                                }
+                                            ],
+                                            "response": {
+                                                "id": 4,
+                                                "sender_role": "chatbot",
+                                                "content": "Si el agua aparece solo al usar la bacha, revisá primero el sifón y las conexiones flexibles.",
+                                                "created_on": "2026-06-17T12:00:01Z"
+                                            },
+                                            "recommended_providers": []
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "The conversation id path parameter is invalid, the request body is invalid, or the message content is empty after trimming.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Authentication failed or the authenticated user id could not be obtained from the request context.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AuthErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "The authenticated user is not the consumer owner of this chatbot conversation.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "No chatbot conversation exists with the requested id.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "The chatbot conversation is already processing another message.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                },
+                                "examples": {
+                                    "processing": {
+                                        "value": {
+                                            "error": "Chatbot conversation is already processing another message"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Unexpected error while continuing the chatbot conversation.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/job-requests": {
             "get": {
                 "tags": [
@@ -2407,6 +2573,12 @@
                         "type": "integer",
                         "format": "int32",
                         "description": "Chatbot conversation identifier.",
+                        "example": 1
+                    },
+                    "conversation_id": {
+                        "type": "integer",
+                        "format": "int32",
+                        "description": "Chatbot conversation identifier. Present in chatbot turn responses.",
                         "example": 1
                     },
                     "status": {

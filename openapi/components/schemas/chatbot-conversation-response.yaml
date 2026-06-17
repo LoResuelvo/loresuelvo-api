@@ -13,6 +13,11 @@ properties:
     format: int32
     description: Chatbot conversation identifier.
     example: 1
+  conversation_id:
+    type: integer
+    format: int32
+    description: Chatbot conversation identifier. Present in chatbot turn responses.
+    example: 1
   status:
     type: string
     description: Conversation status.

@@ -48,6 +48,8 @@ paths:
     $ref: ./paths/conversations.yaml
   /chatbot/conversations:
     $ref: ./paths/chatbot-conversations.yaml
+  /chatbot/conversations/{conversationId}/messages:
+    $ref: ./paths/chatbot-conversation-messages.yaml
   /job-requests:
     $ref: ./paths/job-requests.yaml
   /job-requests/{jobRequestID}/accept:
