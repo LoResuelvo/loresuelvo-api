@@ -18,7 +18,7 @@ func main() {
 	}
 	defer database.Close()
 
-	bootstrap.StartDevelopmentDataSeederFromEnv(context.Background(), database)
+	bootstrap.StartDefaultDataSeederFromEnv(context.Background(), database)
 
 	dependencies := bootstrap.NewDependencies(database)
 

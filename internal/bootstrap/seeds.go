@@ -1,6 +1,7 @@
 package bootstrap
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
 	"errors"
@@ -11,11 +12,13 @@ import (
 	"time"
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/storage"
+	"gopkg.in/yaml.v3"
 )
 
 const (
-	developmentSeedRetryInterval = 2 * time.Second
-	developmentSeedMaxAttempts   = 60
+	seedRetryInterval = 2 * time.Second
+	seedMaxAttempts   = 60
+	defaultSeedsFile  = "seeds/default.yaml"
 
 	seedProviderRole                = "provider"
 	seedProviderProfilePhotoPurpose = "provider_profile_photo"
@@ -23,55 +26,55 @@ const (
 	seedPublicFileVisibility        = "public"
 )
 
-type developmentProviderSeed struct {
-	AuthID             string
-	Email              string
-	Name               string
-	Surname            string
-	CategoryName       string
-	ProfilePhotoFileID string
-	ProfilePhotoName   string
-	ProfilePhotoKey    string
+type seedData struct {
+	Categories []categorySeed `yaml:"categories"`
+	Providers  []providerSeed `yaml:"providers"`
 }
 
-var developmentProviderSeeds = []developmentProviderSeed{
-	{
-		AuthID:             "auth0|seed-provider-plumbing",
-		Email:              "juan.plomero.seed@example.com",
-		Name:               "Juan",
-		Surname:            "Gómez",
-		CategoryName:       "Plomería",
-		ProfilePhotoFileID: "11111111-1111-4111-8111-111111111111",
-		ProfilePhotoName:   "juan-plomero-seed.webp",
-		ProfilePhotoKey:    "seed/provider_profile_photo/juan-plomero-seed.webp",
-	},
-	{
-		AuthID:             "auth0|seed-provider-electricity",
-		Email:              "laura.electricista.seed@example.com",
-		Name:               "Laura",
-		Surname:            "Suárez",
-		CategoryName:       "Electricidad",
-		ProfilePhotoFileID: "22222222-2222-4222-8222-222222222222",
-		ProfilePhotoName:   "laura-electricista-seed.webp",
-		ProfilePhotoKey:    "seed/provider_profile_photo/laura-electricista-seed.webp",
-	},
+type categorySeed struct {
+	Name string `yaml:"name"`
 }
 
-func StartDevelopmentDataSeederFromEnv(ctx context.Context, database *sql.DB) {
-	if !developmentSeedsEnabledFromEnv() {
+type providerSeed struct {
+	AuthID             string `yaml:"auth_id"`
+	Email              string `yaml:"email"`
+	Name               string `yaml:"name"`
+	Surname            string `yaml:"surname"`
+	CategoryName       string `yaml:"category"`
+	ProfilePhotoFileID string `yaml:"profile_photo_file_id"`
+	ProfilePhotoName   string `yaml:"profile_photo_name"`
+	ProfilePhotoKey    string `yaml:"profile_photo_key"`
+}
+
+func StartDefaultDataSeederFromEnv(ctx context.Context, database *sql.DB) {
+	if !seedsEnabledFromEnv() {
+		return
+	}
+
+	data, found, err := loadSeedDataFromEnv()
+	if err != nil {
+		slog.Error("default seed data could not be loaded", "error", err)
+		return
+	}
+	if !found {
+		slog.Info("default seed data file was not found; skipping seeds", "file", seedsFileFromEnv())
+		return
+	}
+	if data.IsEmpty() {
+		slog.Info("default seed data is empty; skipping seeds", "file", seedsFileFromEnv())
 		return
 	}
 
 	go func() {
 		storageConfig := storage.NewConfigFromEnv()
-		for attempt := 1; attempt <= developmentSeedMaxAttempts; attempt++ {
-			if err := seedDevelopmentProviders(ctx, database, storageConfig.PublicBucket); err != nil {
+		for attempt := 1; attempt <= seedMaxAttempts; attempt++ {
+			if err := seedDefaultData(ctx, database, storageConfig.PublicBucket, data); err != nil {
 				slog.Warn(
-					"development provider seeds are not ready yet; will retry",
+					"default seeds are not ready yet; will retry",
 					"attempt",
 					attempt,
 					"max_attempts",
-					developmentSeedMaxAttempts,
+					seedMaxAttempts,
 					"error",
 					err,
 				)
@@ -79,61 +82,112 @@ func StartDevelopmentDataSeederFromEnv(ctx context.Context, database *sql.DB) {
 				select {
 				case <-ctx.Done():
 					return
-				case <-time.After(developmentSeedRetryInterval):
+				case <-time.After(seedRetryInterval):
 					continue
 				}
 			}
 
-			slog.Info("development provider seeds are ready", "providers", len(developmentProviderSeeds))
+			slog.Info("default seeds are ready", "categories", len(data.Categories), "providers", len(data.Providers))
 			return
 		}
 
-		slog.Error("development provider seeds could not be applied after retries", "max_attempts", developmentSeedMaxAttempts)
+		slog.Error("default seeds could not be applied after retries", "max_attempts", seedMaxAttempts)
 	}()
 }
 
-func SeedDevelopmentDataFromEnv(ctx context.Context, database *sql.DB) error {
-	if !developmentSeedsEnabledFromEnv() {
+func SeedDefaultDataFromEnv(ctx context.Context, database *sql.DB) error {
+	if !seedsEnabledFromEnv() {
+		return nil
+	}
+
+	data, found, err := loadSeedDataFromEnv()
+	if err != nil {
+		return err
+	}
+	if !found {
+		slog.Info("default seed data file was not found; skipping seeds", "file", seedsFileFromEnv())
+		return nil
+	}
+	if data.IsEmpty() {
+		slog.Info("default seed data is empty; skipping seeds", "file", seedsFileFromEnv())
 		return nil
 	}
 
 	storageConfig := storage.NewConfigFromEnv()
-	if err := seedDevelopmentProviders(ctx, database, storageConfig.PublicBucket); err != nil {
+	if err := seedDefaultData(ctx, database, storageConfig.PublicBucket, data); err != nil {
 		return err
 	}
 
-	slog.Info("development provider seeds are ready", "providers", len(developmentProviderSeeds))
+	slog.Info("default seeds are ready", "categories", len(data.Categories), "providers", len(data.Providers))
 	return nil
 }
 
-func developmentSeedsEnabledFromEnv() bool {
-	if strings.ToLower(strings.TrimSpace(os.Getenv("ENVIRONMENT"))) != "dev" {
-		return false
-	}
-
-	return !strings.EqualFold(strings.TrimSpace(os.Getenv("DEV_SEEDS_ENABLED")), "false")
+func seedsEnabledFromEnv() bool {
+	return strings.EqualFold(strings.TrimSpace(os.Getenv("SEEDS_ENABLED")), "true")
 }
 
-func seedDevelopmentProviders(ctx context.Context, database *sql.DB, publicBucket string) error {
-	tx, err := database.BeginTx(ctx, nil)
-	if err != nil {
-		return fmt.Errorf("beginning development seed transaction: %w", err)
+func seedsFileFromEnv() string {
+	path := strings.TrimSpace(os.Getenv("SEEDS_FILE"))
+	if path == "" {
+		return defaultSeedsFile
 	}
 
-	for _, seed := range developmentProviderSeeds {
-		if err := seedDevelopmentProvider(ctx, tx, publicBucket, seed); err != nil {
-			return rollbackDevelopmentSeedTx(tx, err)
+	return path
+}
+
+func loadSeedDataFromEnv() (seedData, bool, error) {
+	return loadSeedData(seedsFileFromEnv())
+}
+
+func loadSeedData(path string) (seedData, bool, error) {
+	content, err := os.ReadFile(path)
+	if errors.Is(err, os.ErrNotExist) {
+		return seedData{}, false, nil
+	}
+	if err != nil {
+		return seedData{}, false, fmt.Errorf("reading seed data file %q: %w", path, err)
+	}
+
+	var data seedData
+	decoder := yaml.NewDecoder(bytes.NewReader(content))
+	decoder.KnownFields(true)
+	if err := decoder.Decode(&data); err != nil {
+		return seedData{}, false, fmt.Errorf("parsing seed data file %q: %w", path, err)
+	}
+
+	return data, true, nil
+}
+
+func (data seedData) IsEmpty() bool {
+	return len(data.Categories) == 0 && len(data.Providers) == 0
+}
+
+func seedDefaultData(ctx context.Context, database *sql.DB, publicBucket string, data seedData) error {
+	tx, err := database.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("beginning seed transaction: %w", err)
+	}
+
+	for _, seed := range data.Categories {
+		if _, err := upsertSeedCategory(ctx, tx, seed.Name); err != nil {
+			return rollbackSeedTx(tx, err)
+		}
+	}
+
+	for _, seed := range data.Providers {
+		if err := seedDefaultProvider(ctx, tx, publicBucket, seed); err != nil {
+			return rollbackSeedTx(tx, err)
 		}
 	}
 
 	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("committing development seed transaction: %w", err)
+		return fmt.Errorf("committing seed transaction: %w", err)
 	}
 
 	return nil
 }
 
-func seedDevelopmentProvider(ctx context.Context, tx *sql.Tx, publicBucket string, seed developmentProviderSeed) error {
+func seedDefaultProvider(ctx context.Context, tx *sql.Tx, publicBucket string, seed providerSeed) error {
 	categoryID, err := upsertSeedCategory(ctx, tx, seed.CategoryName)
 	if err != nil {
 		return err
@@ -176,7 +230,7 @@ func upsertSeedCategory(ctx context.Context, tx *sql.Tx, categoryName string) (i
 	return categoryID, nil
 }
 
-func upsertSeedProviderProfilePhoto(ctx context.Context, tx *sql.Tx, publicBucket string, seed developmentProviderSeed) error {
+func upsertSeedProviderProfilePhoto(ctx context.Context, tx *sql.Tx, publicBucket string, seed providerSeed) error {
 	_, err := tx.ExecContext(
 		ctx,
 		`INSERT INTO files (id, key, bucket, original_name, mime_type, size_bytes, status, visibility, purpose, uploaded_by_auth_id, created_on, updated_on)
@@ -208,7 +262,7 @@ func upsertSeedProviderProfilePhoto(ctx context.Context, tx *sql.Tx, publicBucke
 	return nil
 }
 
-func upsertSeedProviderUser(ctx context.Context, tx *sql.Tx, seed developmentProviderSeed) (int, error) {
+func upsertSeedProviderUser(ctx context.Context, tx *sql.Tx, seed providerSeed) (int, error) {
 	var userID int
 	err := tx.QueryRowContext(
 		ctx,
@@ -276,9 +330,9 @@ func upsertSeedProvider(ctx context.Context, tx *sql.Tx, userID, categoryID int,
 	return nil
 }
 
-func rollbackDevelopmentSeedTx(tx *sql.Tx, originalErr error) error {
+func rollbackSeedTx(tx *sql.Tx, originalErr error) error {
 	if rollbackErr := tx.Rollback(); rollbackErr != nil {
-		return fmt.Errorf("%w; additionally could not rollback development seed transaction: %v", originalErr, rollbackErr)
+		return fmt.Errorf("%w; additionally could not rollback seed transaction: %v", originalErr, rollbackErr)
 	}
 
 	return originalErr
