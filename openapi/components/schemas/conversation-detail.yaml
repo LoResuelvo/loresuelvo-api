@@ -1,9 +1,9 @@
 type: object
-description: Conversation detail visible to one of its participants.
+description: Conversation detail visible to one of its participants. Type-specific data is returned under either `work` or `chatbot` according to `type`.
 required:
 - id
+- type
 - status
-- counterpart
 - messages
 - updated_on
 properties:
@@ -12,6 +12,13 @@ properties:
     format: int32
     description: Conversation identifier.
     example: 1
+  type:
+    type: string
+    description: Conversation type discriminator.
+    enum:
+    - work
+    - chatbot
+    example: chatbot
   status:
     type: string
     description: Current conversation status.
@@ -19,9 +26,62 @@ properties:
     - pending
     - active
     - rejected
-    example: pending
-  counterpart:
-    $ref: '#/components/schemas/ConversationCounterpart'
+    example: active
+  work:
+    type: object
+    description: Detail data for work conversations.
+    required:
+    - counterpart
+    properties:
+      counterpart:
+        $ref: '#/components/schemas/ConversationCounterpart'
+    additionalProperties: false
+  chatbot:
+    type: object
+    description: Detail data for chatbot conversations.
+    required:
+    - title
+    - response_status
+    - diagnosis_completed
+    - recommended_providers
+    properties:
+      title:
+        type: string
+        description: Chatbot-generated conversation title.
+        example: Pérdida de agua en la cocina
+      response_status:
+        type: string
+        description: Last semantic chatbot response status.
+        enum:
+        - answered
+        - out_of_scope
+        example: answered
+      diagnosis_completed:
+        type: boolean
+        description: Whether the chatbot concluded the diagnosis.
+        example: true
+      recommended_category:
+        type: object
+        nullable: true
+        description: Category recommended by the chatbot when diagnosis is complete.
+        required:
+        - id
+        - name
+        properties:
+          id:
+            type: integer
+            format: int32
+            example: 3
+          name:
+            type: string
+            example: Plomería
+        additionalProperties: false
+      recommended_providers:
+        type: array
+        description: Providers currently derived from the persisted recommended category.
+        items:
+          $ref: '#/components/schemas/ProviderSummary'
+    additionalProperties: false
   messages:
     type: array
     description: Messages in chronological order.
