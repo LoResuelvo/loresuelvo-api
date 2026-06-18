@@ -8,10 +8,10 @@ info:
     name: MIT
     url: https://opensource.org/license/mit
 servers:
-- url: /
-  description: Current API host
 - url: http://localhost:8080
   description: Local development server
+- url: /
+  description: Current API host
 tags:
 - name: Health
   description: Service availability endpoints.

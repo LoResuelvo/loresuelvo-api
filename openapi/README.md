@@ -39,13 +39,12 @@ This regenerates `openapi.json` and starts the `swagger-ui` compose service on:
 http://localhost:8081
 ```
 
-The OpenAPI `servers` section defaults to `/`, which makes hosted Swagger UI use
-the same API host that served the documentation, for example staging at
-`https://api-test.loresuelvo.com.ar`. For local development, select the
-`http://localhost:8080` server from Swagger UI's server dropdown. The API
-development container exposes `CORS_ALLOWED_ORIGINS=http://localhost:8081`, so
-local **Try it out** requests from Swagger UI are allowed. Stop the Swagger UI
-service with:
+The OpenAPI `servers` section defaults to `http://localhost:8080`, so local
+Swagger UI **Try it out** requests target the development API without selecting a
+server per operation. Hosted environments can still select `/ - Current API host`
+from Swagger UI's server dropdown. The API development container exposes
+`CORS_ALLOWED_ORIGINS=http://localhost:8081`, so local **Try it out** requests
+from Swagger UI are allowed. Stop the Swagger UI service with:
 
 ```sh
 make swagger-down
