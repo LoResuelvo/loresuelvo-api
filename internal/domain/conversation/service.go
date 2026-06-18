@@ -54,13 +54,19 @@ func (s *Service) GetByID(ctx context.Context, authID string, conversationID int
 		return nil, err
 	}
 
-	workConversation, ok := foundConversation.(*WorkConversation)
-	if !ok {
+	switch typedConversation := foundConversation.(type) {
+	case *WorkConversation:
+		return s.getWorkConversationDetail(ctx, authID, typedConversation)
+	case *ChatBotConversation:
+		return s.getChatbotConversationDetail(ctx, authID, typedConversation)
+	default:
 		return nil, ErrConversationAccessDenied
 	}
+}
 
+func (s *Service) getWorkConversationDetail(ctx context.Context, authID string, workConversation *WorkConversation) (*readmodel.ConversationDetail, error) {
 	if s.authenticatedConsumerMatches(authID, workConversation.ConsumerID) {
-		detail, err := s.conversationReader.FindDetailByIDForConsumer(ctx, conversationID)
+		detail, err := s.conversationReader.FindDetailByIDRoleAndType(ctx, workConversation.Base().ID, SenderConsumer, TypeWork)
 		if err != nil {
 			return nil, err
 		}
@@ -68,7 +74,7 @@ func (s *Service) GetByID(ctx context.Context, authID string, conversationID int
 	}
 
 	if s.authenticatedProviderMatches(authID, workConversation.ProviderID) {
-		detail, err := s.conversationReader.FindDetailByIDForProvider(ctx, conversationID)
+		detail, err := s.conversationReader.FindDetailByIDRoleAndType(ctx, workConversation.Base().ID, SenderProvider, TypeWork)
 		if err != nil {
 			return nil, err
 		}
@@ -76,6 +82,19 @@ func (s *Service) GetByID(ctx context.Context, authID string, conversationID int
 	}
 
 	return nil, ErrConversationAccessDenied
+}
+
+func (s *Service) getChatbotConversationDetail(ctx context.Context, authID string, chatbotConversation *ChatBotConversation) (*readmodel.ConversationDetail, error) {
+	if !s.authenticatedConsumerMatches(authID, chatbotConversation.ConsumerID) {
+		return nil, ErrConversationAccessDenied
+	}
+
+	detail, err := s.conversationReader.FindDetailByIDRoleAndType(ctx, chatbotConversation.Base().ID, SenderConsumer, TypeChatbot)
+	if err != nil {
+		return nil, err
+	}
+
+	return s.withRecommendedProviders(ctx, detail)
 }
 
 func (s *Service) SendMessage(ctx context.Context, authID string, conversationID int, content string) (*Message, error) {
@@ -153,6 +172,7 @@ func (s *Service) CreateChatbotConversation(ctx context.Context, authID string, 
 		return nil, err
 	}
 	chatbotConversation := createdConversation.(*ChatBotConversation)
+	chatbotConversation.ApplyResponse(*answer.response, answer.recommendedCategoryID)
 	chatbotConversation.AddMessage(*consumerMessage)
 	chatbotConversation.AddMessage(*answer.message)
 
@@ -200,7 +220,7 @@ func (s *Service) ContinueChatbotConversation(ctx context.Context, authID string
 		return nil, err
 	}
 
-	savedConversation, err := s.saveChatbotTurn(ctx, chatbotConversation, *consumerMessage, *answer.message)
+	savedConversation, err := s.saveChatbotTurn(ctx, chatbotConversation, *consumerMessage, *answer.message, answer)
 	if err != nil {
 		return nil, err
 	}
@@ -254,15 +274,21 @@ func (s *Service) answerChatbotQuestion(ctx context.Context, question ChatbotHom
 		return nil, err
 	}
 
-	recommendedProviders, err := s.recommendedProvidersForChatbotResponse(ctx, *chatbotResponse, availableCategories)
+	recommendedCategory, recommendedProviders, err := s.recommendationForChatbotResponse(ctx, *chatbotResponse, availableCategories)
 	if err != nil {
 		return nil, err
 	}
 
+	var recommendedCategoryID *int
+	if recommendedCategory != nil {
+		recommendedCategoryID = &recommendedCategory.ID
+	}
+
 	return &chatbotAnswer{
-		response:             chatbotResponse,
-		message:              chatbotMessage,
-		recommendedProviders: recommendedProviders,
+		response:              chatbotResponse,
+		message:               chatbotMessage,
+		recommendedCategoryID: recommendedCategoryID,
+		recommendedProviders:  recommendedProviders,
 	}, nil
 }
 
@@ -311,10 +337,11 @@ func chatbotHomeProblemQuestionFrom(chatbotConversation *ChatBotConversation, us
 	}
 }
 
-func (s *Service) saveChatbotTurn(ctx context.Context, chatbotConversation *ChatBotConversation, consumerMessage Message, chatbotMessage Message) (Conversation, error) {
+func (s *Service) saveChatbotTurn(ctx context.Context, chatbotConversation *ChatBotConversation, consumerMessage Message, chatbotMessage Message, answer *chatbotAnswer) (Conversation, error) {
 	if err := chatbotConversation.AddTurn(consumerMessage, chatbotMessage); err != nil {
 		return nil, err
 	}
+	chatbotConversation.ApplyResponse(*answer.response, answer.recommendedCategoryID)
 	chatbotConversation.FinishProcessing()
 
 	return s.conversationRepository.UpdateConversation(ctx, chatbotConversation)
@@ -409,41 +436,73 @@ func (s *Service) withCounterpartProfilePhotoURLs(ctx context.Context, summaries
 }
 
 func (s *Service) withCounterpartProfilePhotoURL(ctx context.Context, detail *readmodel.ConversationDetail) (*readmodel.ConversationDetail, error) {
-	profilePhotoURL, err := s.fileService.ResolvePublicURL(ctx, detail.Counterpart.ProfilePhotoFileID)
+	if detail.Work == nil {
+		return detail, nil
+	}
+
+	profilePhotoURL, err := s.fileService.ResolvePublicURL(ctx, detail.Work.Counterpart.ProfilePhotoFileID)
 	if err != nil {
 		return nil, fmt.Errorf("resolving conversation counterpart profile photo url: %w", err)
 	}
-	detail.Counterpart.ProfilePhotoURL = profilePhotoURL
+	detail.Work.Counterpart.ProfilePhotoURL = profilePhotoURL
 
 	return detail, nil
 }
 
 // TODO: Let the chatbot rank providers using richer provider attributes when recommendation criteria evolve.
-func (s *Service) recommendedProvidersForChatbotResponse(ctx context.Context, chatbotResponse ChatbotResponse, availableCategories []category.Category) ([]providerreadmodel.ProviderSummary, error) {
+func (s *Service) recommendationForChatbotResponse(ctx context.Context, chatbotResponse ChatbotResponse, availableCategories []category.Category) (*category.Category, []providerreadmodel.ProviderSummary, error) {
 	if !chatbotResponse.DiagnosisCompleted {
-		return nil, nil
+		return nil, nil, nil
 	}
 
-	categoryName := strings.TrimSpace(chatbotResponse.RecommendedCategoryName)
-	if categoryName == "" {
-		return []providerreadmodel.ProviderSummary{}, nil
-	}
-
-	recommendedCategory, err := category.New(categoryName)
-	if err != nil {
-		return []providerreadmodel.ProviderSummary{}, nil
-	}
-	matchedCategory := findCategoryByNormalizedName(availableCategories, recommendedCategory.NormalizedName)
+	matchedCategory := categoryForChatbotResponse(chatbotResponse, availableCategories)
 	if matchedCategory == nil {
-		return []providerreadmodel.ProviderSummary{}, nil
+		return nil, []providerreadmodel.ProviderSummary{}, nil
 	}
 
 	providers, err := s.providerRepository.FindByCategoryID(matchedCategory.ID)
 	if err != nil {
+		return nil, nil, err
+	}
+
+	summaries, err := s.providerSummariesWithProfilePhotoURLs(ctx, providers)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return matchedCategory, summaries, nil
+}
+
+func categoryForChatbotResponse(chatbotResponse ChatbotResponse, availableCategories []category.Category) *category.Category {
+	categoryName := strings.TrimSpace(chatbotResponse.RecommendedCategoryName)
+	if categoryName == "" {
+		return nil
+	}
+
+	recommendedCategory, err := category.New(categoryName)
+	if err != nil {
+		return nil
+	}
+
+	return findCategoryByNormalizedName(availableCategories, recommendedCategory.NormalizedName)
+}
+
+func (s *Service) withRecommendedProviders(ctx context.Context, detail *readmodel.ConversationDetail) (*readmodel.ConversationDetail, error) {
+	if detail.Chatbot == nil || !detail.Chatbot.DiagnosisCompleted || detail.Chatbot.RecommendedCategory == nil || detail.Chatbot.RecommendedCategory.ID == 0 {
+		return detail, nil
+	}
+
+	providers, err := s.providerRepository.FindByCategoryID(detail.Chatbot.RecommendedCategory.ID)
+	if err != nil {
 		return nil, err
 	}
 
-	return s.providerSummariesWithProfilePhotoURLs(ctx, providers)
+	detail.Chatbot.RecommendedProviders, err = s.providerSummariesWithProfilePhotoURLs(ctx, providers)
+	if err != nil {
+		return nil, err
+	}
+
+	return detail, nil
 }
 
 func (s *Service) providerSummariesWithProfilePhotoURLs(ctx context.Context, providers []provider.Provider) ([]providerreadmodel.ProviderSummary, error) {

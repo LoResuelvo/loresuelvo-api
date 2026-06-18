@@ -216,11 +216,11 @@ type conversationReaderMock struct {
 	consumerSummaries         []readmodel.ConversationSummary
 	providerSummaries         []readmodel.ConversationSummary
 	chatbotSummaries          []readmodel.ConversationSummary
-	consumerDetail            *readmodel.ConversationDetail
-	providerDetail            *readmodel.ConversationDetail
+	detail                    *readmodel.ConversationDetail
 	requestedParticipantID    int
 	requestedParticipantRole  string
 	requestedConversationType string
+	requestedConversationID   int
 	err                       error
 }
 
@@ -240,18 +240,14 @@ func (m *conversationReaderMock) FindSummariesByParticipantIDRoleAndType(ctx con
 	return m.consumerSummaries, nil
 }
 
-func (m *conversationReaderMock) FindDetailByIDForConsumer(ctx context.Context, conversationID int) (*readmodel.ConversationDetail, error) {
+func (m *conversationReaderMock) FindDetailByIDRoleAndType(ctx context.Context, conversationID int, participantRole string, conversationType string) (*readmodel.ConversationDetail, error) {
+	m.requestedConversationID = conversationID
+	m.requestedParticipantRole = participantRole
+	m.requestedConversationType = conversationType
 	if m.err != nil {
 		return nil, m.err
 	}
-	return m.consumerDetail, nil
-}
-
-func (m *conversationReaderMock) FindDetailByIDForProvider(ctx context.Context, conversationID int) (*readmodel.ConversationDetail, error) {
-	if m.err != nil {
-		return nil, m.err
-	}
-	return m.providerDetail, nil
+	return m.detail, nil
 }
 
 type fileURLResolverMock struct {
@@ -639,7 +635,7 @@ func TestGetByIDReturnsConversationDetailForParticipantConsumer(t *testing.T) {
 	repo := &conversationRepositoryMock{foundResult: conversationFixture()}
 	consumerIDFinder := &consumerIDFinderMock{consumerID: 10}
 	providerIDFinder := &providerIDFinderMock{err: errors.New("provider not found")}
-	conversationReader := &conversationReaderMock{consumerDetail: conversationDetailFixture(conversation.SenderProvider)}
+	conversationReader := &conversationReaderMock{detail: conversationDetailFixture(conversation.SenderProvider)}
 	fileURLResolver := &fileURLResolverMock{urlsByFileID: map[string]string{"provider-photo-file-id": "https://cdn/provider.jpg"}}
 
 	service := conversation.NewService(repo, consumerIDFinder, providerIDFinder, conversationReader, nil, &chatbotMock{}, nil, fileURLResolver, fixedClock{now: time.Now().UTC()})
@@ -650,9 +646,10 @@ func TestGetByIDReturnsConversationDetailForParticipantConsumer(t *testing.T) {
 	require.NotNil(t, foundConversation)
 	assert.True(t, repo.findByIDCalled)
 	assert.Equal(t, 1, foundConversation.ID)
-	assert.Equal(t, 20, foundConversation.Counterpart.ID)
-	assert.Equal(t, conversation.SenderProvider, foundConversation.Counterpart.Role)
-	assert.Equal(t, "https://cdn/provider.jpg", foundConversation.Counterpart.ProfilePhotoURL)
+	require.NotNil(t, foundConversation.Work)
+	assert.Equal(t, 20, foundConversation.Work.Counterpart.ID)
+	assert.Equal(t, conversation.SenderProvider, foundConversation.Work.Counterpart.Role)
+	assert.Equal(t, "https://cdn/provider.jpg", foundConversation.Work.Counterpart.ProfilePhotoURL)
 	assert.Equal(t, []string{"provider-photo-file-id"}, fileURLResolver.resolvedFileIDs)
 	assert.Len(t, foundConversation.Messages, 1)
 }
@@ -661,7 +658,7 @@ func TestGetByIDReturnsConversationDetailForParticipantProvider(t *testing.T) {
 	repo := &conversationRepositoryMock{foundResult: conversationFixture()}
 	consumerIDFinder := &consumerIDFinderMock{err: errors.New("consumer not found")}
 	providerIDFinder := &providerIDFinderMock{providerID: 20}
-	conversationReader := &conversationReaderMock{providerDetail: conversationDetailFixture(conversation.SenderConsumer)}
+	conversationReader := &conversationReaderMock{detail: conversationDetailFixture(conversation.SenderConsumer)}
 
 	service := conversation.NewService(repo, consumerIDFinder, providerIDFinder, conversationReader, nil, &chatbotMock{}, nil, &fileURLResolverMock{}, fixedClock{now: time.Now().UTC()})
 
@@ -670,8 +667,76 @@ func TestGetByIDReturnsConversationDetailForParticipantProvider(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, foundConversation)
 	assert.True(t, repo.findByIDCalled)
-	assert.Equal(t, 10, foundConversation.Counterpart.ID)
-	assert.Equal(t, conversation.SenderConsumer, foundConversation.Counterpart.Role)
+	require.NotNil(t, foundConversation.Work)
+	assert.Equal(t, 10, foundConversation.Work.Counterpart.ID)
+	assert.Equal(t, conversation.SenderConsumer, foundConversation.Work.Counterpart.Role)
+}
+
+func TestGetByIDReturnsChatbotConversationDetailForOwnerConsumer(t *testing.T) {
+	recommendedCategoryID := 3
+	repo := &conversationRepositoryMock{foundResult: &conversation.ChatBotConversation{
+		BaseConversation:      &conversation.BaseConversation{ID: 7, Type: conversation.TypeChatbot, Status: conversation.StatusActive},
+		ConsumerID:            10,
+		Title:                 "Pérdida de agua en la cocina",
+		ResponseStatus:        conversation.ChatbotResponseAnswered,
+		DiagnosisCompleted:    true,
+		RecommendedCategoryID: &recommendedCategoryID,
+	}}
+	consumerIDFinder := &consumerIDFinderMock{consumerID: 10}
+	plumbingCategory := &category.Category{ID: recommendedCategoryID, Name: "Plomería", NormalizedName: "plomería"}
+	recommendedProvider, err := provider.NewProvider("auth0|provider", "juan@example.com", "Juan", "Gómez", plumbingCategory, "provider-photo-file-id")
+	require.NoError(t, err)
+	recommendedProvider.ID = 20
+	providerFinder := &providerIDFinderMock{providers: []provider.Provider{*recommendedProvider}}
+	conversationReader := &conversationReaderMock{detail: &readmodel.ConversationDetail{
+		ID:     7,
+		Type:   conversation.TypeChatbot,
+		Status: conversation.StatusActive,
+		Chatbot: &readmodel.ChatbotConversationDetail{
+			Title:              "Pérdida de agua en la cocina",
+			ResponseStatus:     string(conversation.ChatbotResponseAnswered),
+			DiagnosisCompleted: true,
+			RecommendedCategory: &readmodel.RecommendedCategory{
+				ID:   recommendedCategoryID,
+				Name: "Plomería",
+			},
+		},
+		Messages: []readmodel.MessageDetail{{ID: 1, SenderRole: conversation.SenderConsumer, Content: "Pierde agua"}},
+	}}
+	fileURLResolver := &fileURLResolverMock{urlsByFileID: map[string]string{"provider-photo-file-id": "https://cdn/provider.jpg"}}
+	service := conversation.NewService(repo, consumerIDFinder, providerFinder, conversationReader, nil, &chatbotMock{}, nil, fileURLResolver, fixedClock{now: time.Now().UTC()})
+
+	foundConversation, err := service.GetByID(context.Background(), "auth0|consumer", 7)
+
+	require.NoError(t, err)
+	require.NotNil(t, foundConversation)
+	assert.True(t, repo.findByIDCalled)
+	assert.Equal(t, 7, conversationReader.requestedConversationID)
+	assert.Equal(t, conversation.SenderConsumer, conversationReader.requestedParticipantRole)
+	assert.Equal(t, conversation.TypeChatbot, conversationReader.requestedConversationType)
+	assert.True(t, providerFinder.findByCategoryIDCalled)
+	assert.Equal(t, recommendedCategoryID, providerFinder.requestedCategoryID)
+	require.NotNil(t, foundConversation.Chatbot)
+	require.Len(t, foundConversation.Chatbot.RecommendedProviders, 1)
+	assert.Equal(t, 20, foundConversation.Chatbot.RecommendedProviders[0].ID)
+	assert.Equal(t, "https://cdn/provider.jpg", foundConversation.Chatbot.RecommendedProviders[0].ProfilePhotoURL)
+}
+
+func TestGetByIDRejectsChatbotConversationForNonOwnerConsumer(t *testing.T) {
+	repo := &conversationRepositoryMock{foundResult: &conversation.ChatBotConversation{
+		BaseConversation: &conversation.BaseConversation{ID: 7, Type: conversation.TypeChatbot, Status: conversation.StatusActive},
+		ConsumerID:       10,
+	}}
+	consumerIDFinder := &consumerIDFinderMock{consumerID: 999}
+	conversationReader := &conversationReaderMock{}
+	service := conversation.NewService(repo, consumerIDFinder, &providerIDFinderMock{}, conversationReader, nil, &chatbotMock{}, nil, &fileURLResolverMock{}, fixedClock{now: time.Now().UTC()})
+
+	foundConversation, err := service.GetByID(context.Background(), "auth0|other-consumer", 7)
+
+	assert.ErrorIs(t, err, conversation.ErrConversationAccessDenied)
+	assert.Nil(t, foundConversation)
+	assert.True(t, repo.findByIDCalled)
+	assert.Zero(t, conversationReader.requestedConversationID)
 }
 
 func TestGetByIDRejectsAuthenticatedUserThatIsNotParticipant(t *testing.T) {
@@ -966,14 +1031,17 @@ func conversationDetailFixture(counterpartRole string) *readmodel.ConversationDe
 
 	return &readmodel.ConversationDetail{
 		ID:     1,
+		Type:   conversation.TypeWork,
 		Status: conversation.StatusPending,
-		Counterpart: readmodel.ConversationParticipant{
-			ID:                 counterpartID,
-			Role:               counterpartRole,
-			Name:               counterpartName,
-			Surname:            counterpartSurname,
-			CategoryName:       counterpartCategory,
-			ProfilePhotoFileID: profilePhotoFileID,
+		Work: &readmodel.WorkConversationDetail{
+			Counterpart: readmodel.ConversationParticipant{
+				ID:                 counterpartID,
+				Role:               counterpartRole,
+				Name:               counterpartName,
+				Surname:            counterpartSurname,
+				CategoryName:       counterpartCategory,
+				ProfilePhotoFileID: profilePhotoFileID,
+			},
 		},
 		UpdatedOn: now,
 		Messages: []readmodel.MessageDetail{

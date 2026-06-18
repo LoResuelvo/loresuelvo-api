@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/repositories"
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/category"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/conversation"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -94,17 +95,17 @@ func TestConversationReaderReturnsEmptySummaryLists(t *testing.T) {
 func TestConversationReaderFindsDetailForConsumer(t *testing.T) {
 	fixture := newSavedConversationReaderFixture(t)
 
-	detail, err := fixture.reader.FindDetailByIDForConsumer(context.Background(), fixture.savedConversation.Base().ID)
+	detail, err := fixture.reader.FindDetailByIDRoleAndType(context.Background(), fixture.savedConversation.Base().ID, conversation.SenderConsumer, conversation.TypeWork)
 
 	require.NoError(t, err)
 	require.NotNil(t, detail)
 	assert.Equal(t, fixture.savedConversation.Base().ID, detail.ID)
 	assert.Equal(t, conversation.StatusPending, detail.Status)
-	assert.Equal(t, fixture.providerID, detail.Counterpart.ID)
-	assert.Equal(t, conversation.SenderProvider, detail.Counterpart.Role)
-	assert.Equal(t, "Juan", detail.Counterpart.Name)
-	assert.Equal(t, "Gómez", detail.Counterpart.Surname)
-	assert.Equal(t, "Plomería", detail.Counterpart.CategoryName)
+	assert.Equal(t, fixture.providerID, detail.Work.Counterpart.ID)
+	assert.Equal(t, conversation.SenderProvider, detail.Work.Counterpart.Role)
+	assert.Equal(t, "Juan", detail.Work.Counterpart.Name)
+	assert.Equal(t, "Gómez", detail.Work.Counterpart.Surname)
+	assert.Equal(t, "Plomería", detail.Work.Counterpart.CategoryName)
 	require.Len(t, detail.Messages, 1)
 	assert.Equal(t, conversation.SenderConsumer, detail.Messages[0].SenderRole)
 	assert.Equal(t, fixture.initialMessage.Content, detail.Messages[0].Content)
@@ -115,17 +116,17 @@ func TestConversationReaderFindsDetailForConsumer(t *testing.T) {
 func TestConversationReaderFindsDetailForProvider(t *testing.T) {
 	fixture := newSavedConversationReaderFixture(t)
 
-	detail, err := fixture.reader.FindDetailByIDForProvider(context.Background(), fixture.savedConversation.Base().ID)
+	detail, err := fixture.reader.FindDetailByIDRoleAndType(context.Background(), fixture.savedConversation.Base().ID, conversation.SenderProvider, conversation.TypeWork)
 
 	require.NoError(t, err)
 	require.NotNil(t, detail)
 	assert.Equal(t, fixture.savedConversation.Base().ID, detail.ID)
 	assert.Equal(t, conversation.StatusPending, detail.Status)
-	assert.Equal(t, fixture.consumerID, detail.Counterpart.ID)
-	assert.Equal(t, conversation.SenderConsumer, detail.Counterpart.Role)
-	assert.Equal(t, "Ana", detail.Counterpart.Name)
-	assert.Equal(t, "Pérez", detail.Counterpart.Surname)
-	assert.Empty(t, detail.Counterpart.CategoryName)
+	assert.Equal(t, fixture.consumerID, detail.Work.Counterpart.ID)
+	assert.Equal(t, conversation.SenderConsumer, detail.Work.Counterpart.Role)
+	assert.Equal(t, "Ana", detail.Work.Counterpart.Name)
+	assert.Equal(t, "Pérez", detail.Work.Counterpart.Surname)
+	assert.Empty(t, detail.Work.Counterpart.CategoryName)
 	require.Len(t, detail.Messages, 1)
 	assert.Equal(t, conversation.SenderConsumer, detail.Messages[0].SenderRole)
 	assert.Equal(t, fixture.initialMessage.Content, detail.Messages[0].Content)
@@ -149,7 +150,7 @@ func TestConversationReaderReflectsSentMessageAsLatestAndDetailLastMessage(t *te
 	assert.Equal(t, sentMessage.Content, consumerSummaries[0].LastMessage.Content)
 	assert.Equal(t, sentMessage.CreatedOn, consumerSummaries[0].UpdatedOn)
 
-	detail, err := fixture.reader.FindDetailByIDForConsumer(context.Background(), fixture.savedConversation.Base().ID)
+	detail, err := fixture.reader.FindDetailByIDRoleAndType(context.Background(), fixture.savedConversation.Base().ID, conversation.SenderConsumer, conversation.TypeWork)
 	require.NoError(t, err)
 	require.Len(t, detail.Messages, 2)
 	assert.Equal(t, fixture.initialMessage.Content, detail.Messages[0].Content)
@@ -163,7 +164,7 @@ func TestConversationReaderReturnsNotFoundForMissingConversationDetail(t *testin
 	testContext := newConversationRepositoryTest(t)
 	reader := repositories.NewConversationReader(testContext.database)
 
-	detail, err := reader.FindDetailByIDForConsumer(context.Background(), 999)
+	detail, err := reader.FindDetailByIDRoleAndType(context.Background(), 999, conversation.SenderConsumer, conversation.TypeWork)
 
 	assert.ErrorIs(t, err, conversation.ErrConversationDoesNotExist)
 	assert.Nil(t, detail)
@@ -207,6 +208,53 @@ func TestConversationReaderFindsChatbotSummariesByConsumerIDAndType(t *testing.T
 	assert.Equal(t, conversation.SenderChatbot, summaries[0].LastMessage.SenderRole)
 	assert.Equal(t, chatbotMessage.Content, summaries[0].LastMessage.Content)
 	assert.NotZero(t, summaries[0].UpdatedOn)
+}
+
+func TestConversationReaderFindsChatbotDetailByIDRoleAndType(t *testing.T) {
+	testContext := newConversationRepositoryTest(t)
+	reader := repositories.NewConversationReader(testContext.database)
+	consumerID := savedConsumerIDForConversation(t, testContext)
+	plumbingCategory, err := category.New("Plomería")
+	require.NoError(t, err)
+	savedCategory, err := testContext.categoryRepository.Save(*plumbingCategory)
+	require.NoError(t, err)
+
+	chatbotConversation, err := conversation.NewChatbotConversation(consumerID, "Pérdida de agua en la cocina")
+	require.NoError(t, err)
+	typedChatbotConversation := chatbotConversation.(*conversation.ChatBotConversation)
+	typedChatbotConversation.ApplyResponse(conversation.ChatbotResponse{
+		Status:             conversation.ChatbotResponseAnswered,
+		DiagnosisCompleted: true,
+	}, &savedCategory.ID)
+	consumerMessage, err := conversation.NewConsumerMessage("Tengo una pérdida debajo de la pileta.")
+	require.NoError(t, err)
+	chatbotMessage, err := conversation.NewChatbotMessage("Revisá el sifón y las conexiones flexibles.")
+	require.NoError(t, err)
+	typedChatbotConversation.AddMessage(*consumerMessage)
+	typedChatbotConversation.AddMessage(*chatbotMessage)
+	savedConversation, err := testContext.conversationRepository.SaveConversation(context.Background(), typedChatbotConversation)
+	require.NoError(t, err)
+
+	detail, err := reader.FindDetailByIDRoleAndType(context.Background(), savedConversation.Base().ID, conversation.SenderConsumer, conversation.TypeChatbot)
+
+	require.NoError(t, err)
+	require.NotNil(t, detail)
+	assert.Equal(t, savedConversation.Base().ID, detail.ID)
+	assert.Equal(t, conversation.TypeChatbot, detail.Type)
+	assert.Equal(t, conversation.StatusActive, detail.Status)
+	require.NotNil(t, detail.Chatbot)
+	assert.Equal(t, "Pérdida de agua en la cocina", detail.Chatbot.Title)
+	assert.Equal(t, string(conversation.ChatbotResponseAnswered), detail.Chatbot.ResponseStatus)
+	assert.True(t, detail.Chatbot.DiagnosisCompleted)
+	require.NotNil(t, detail.Chatbot.RecommendedCategory)
+	assert.Equal(t, savedCategory.ID, detail.Chatbot.RecommendedCategory.ID)
+	assert.Equal(t, "Plomería", detail.Chatbot.RecommendedCategory.Name)
+	require.Len(t, detail.Messages, 2)
+	assert.Equal(t, conversation.SenderConsumer, detail.Messages[0].SenderRole)
+	assert.Equal(t, consumerMessage.Content, detail.Messages[0].Content)
+	assert.Equal(t, conversation.SenderChatbot, detail.Messages[1].SenderRole)
+	assert.Equal(t, chatbotMessage.Content, detail.Messages[1].Content)
+	assert.NotZero(t, detail.UpdatedOn)
 }
 
 func TestConversationReaderReturnsEmptyChatbotSummariesForDifferentType(t *testing.T) {

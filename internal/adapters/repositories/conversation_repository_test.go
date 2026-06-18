@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/repositories"
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/category"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/consumer"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/conversation"
 	"github.com/LoResuelvo/loresuelvo-api/internal/infrastructure/db"
@@ -391,6 +392,32 @@ func TestConversationRepositoryCanUpdateChatbotContext(t *testing.T) {
 	assert.Equal(t, conversation.SenderChatbot, foundChatbotConversation.Messages()[1].SenderRole)
 }
 
+func TestConversationRepositoryCanPersistChatbotSemanticResult(t *testing.T) {
+	testContext := newConversationRepositoryTest(t)
+	consumerID := savedConsumerIDForConversation(t, testContext)
+	plumbingCategory, err := category.New("Plomería")
+	require.NoError(t, err)
+	savedCategory, err := testContext.categoryRepository.Save(*plumbingCategory)
+	require.NoError(t, err)
+	chatbotConversation, err := conversation.NewChatbotConversation(consumerID, "Pérdida de agua en la cocina")
+	require.NoError(t, err)
+	chatbotConversation.(*conversation.ChatBotConversation).ApplyResponse(conversation.ChatbotResponse{
+		Status:             conversation.ChatbotResponseAnswered,
+		DiagnosisCompleted: true,
+	}, &savedCategory.ID)
+
+	savedConversation, err := testContext.conversationRepository.SaveConversation(context.Background(), chatbotConversation)
+
+	require.NoError(t, err)
+	foundConversation, err := testContext.conversationRepository.FindByID(context.Background(), savedConversation.Base().ID)
+	require.NoError(t, err)
+	foundChatbotConversation := foundConversation.(*conversation.ChatBotConversation)
+	assert.Equal(t, conversation.ChatbotResponseAnswered, foundChatbotConversation.ResponseStatus)
+	assert.True(t, foundChatbotConversation.DiagnosisCompleted)
+	require.NotNil(t, foundChatbotConversation.RecommendedCategoryID)
+	assert.Equal(t, savedCategory.ID, *foundChatbotConversation.RecommendedCategoryID)
+}
+
 func TestConversationRepositoryCanUpdateConversationWithChatbotTurn(t *testing.T) {
 	testContext := newConversationRepositoryTest(t)
 	savedConversation := savedChatbotConversationForRepository(t, testContext)
@@ -402,6 +429,14 @@ func TestConversationRepositoryCanUpdateConversationWithChatbotTurn(t *testing.T
 
 	savedChatbotConversation := savedConversation.(*conversation.ChatBotConversation)
 	require.NoError(t, savedChatbotConversation.UpdateContext(conversation.ChatbotConversationContext{Summary: "Resumen actualizado"}))
+	electricityCategory, err := category.New("Electricidad")
+	require.NoError(t, err)
+	savedCategory, err := testContext.categoryRepository.Save(*electricityCategory)
+	require.NoError(t, err)
+	savedChatbotConversation.ApplyResponse(conversation.ChatbotResponse{
+		Status:             conversation.ChatbotResponseAnswered,
+		DiagnosisCompleted: true,
+	}, &savedCategory.ID)
 	require.NoError(t, savedChatbotConversation.AddTurn(*consumerMessage, *chatbotMessage))
 	savedChatbotConversation.FinishProcessing()
 	updatedConversation, err := testContext.conversationRepository.UpdateConversation(context.Background(), savedChatbotConversation)
@@ -415,6 +450,9 @@ func TestConversationRepositoryCanUpdateConversationWithChatbotTurn(t *testing.T
 	assert.Equal(t, conversation.SenderConsumer, foundChatbotConversation.Messages()[2].SenderRole)
 	assert.Equal(t, conversation.SenderChatbot, foundChatbotConversation.Messages()[3].SenderRole)
 	assert.Zero(t, foundChatbotConversation.Context.LastSummarizedMessageID)
+	assert.True(t, foundChatbotConversation.DiagnosisCompleted)
+	require.NotNil(t, foundChatbotConversation.RecommendedCategoryID)
+	assert.Equal(t, savedCategory.ID, *foundChatbotConversation.RecommendedCategoryID)
 }
 
 func TestConversationRepositoryPreventsConcurrentChatbotProcessing(t *testing.T) {

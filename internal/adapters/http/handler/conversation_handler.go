@@ -35,11 +35,30 @@ type sentMessageResponse struct {
 }
 
 type conversationDetailResponse struct {
-	ID          int                             `json:"id"`
-	Status      string                          `json:"status"`
+	ID        int                           `json:"id"`
+	Type      string                        `json:"type"`
+	Status    string                        `json:"status"`
+	Work      *workConversationDetail       `json:"work,omitempty"`
+	Chatbot   *chatbotConversationDetail    `json:"chatbot,omitempty"`
+	Messages  []conversationMessageResponse `json:"messages"`
+	UpdatedOn time.Time                     `json:"updated_on"`
+}
+
+type workConversationDetail struct {
 	Counterpart conversationCounterpartResponse `json:"counterpart"`
-	Messages    []conversationMessageResponse   `json:"messages"`
-	UpdatedOn   time.Time                       `json:"updated_on"`
+}
+
+type chatbotConversationDetail struct {
+	Title                string                       `json:"title"`
+	ResponseStatus       string                       `json:"response_status"`
+	DiagnosisCompleted   bool                         `json:"diagnosis_completed"`
+	RecommendedCategory  *recommendedCategoryResponse `json:"recommended_category,omitempty"`
+	RecommendedProviders []providerSummaryResponse    `json:"recommended_providers"`
+}
+
+type recommendedCategoryResponse struct {
+	ID   int    `json:"id"`
+	Name string `json:"name"`
 }
 
 type conversationMessageResponse struct {
@@ -372,11 +391,50 @@ func conversationDetailResponseFromDomain(foundConversation readmodel.Conversati
 	}
 
 	return conversationDetailResponse{
-		ID:          foundConversation.ID,
-		Status:      foundConversation.Status,
-		Counterpart: conversationCounterpartResponseFromDomain(foundConversation.Counterpart),
-		Messages:    messages,
-		UpdatedOn:   foundConversation.UpdatedOn,
+		ID:        foundConversation.ID,
+		Type:      foundConversation.Type,
+		Status:    foundConversation.Status,
+		Work:      workConversationDetailResponseFromDomain(foundConversation.Work),
+		Chatbot:   chatbotConversationDetailResponseFromDomain(foundConversation.Chatbot),
+		Messages:  messages,
+		UpdatedOn: foundConversation.UpdatedOn,
+	}
+}
+
+func workConversationDetailResponseFromDomain(detail *readmodel.WorkConversationDetail) *workConversationDetail {
+	if detail == nil {
+		return nil
+	}
+
+	return &workConversationDetail{
+		Counterpart: conversationCounterpartResponseFromDomain(detail.Counterpart),
+	}
+}
+
+func chatbotConversationDetailResponseFromDomain(detail *readmodel.ChatbotConversationDetail) *chatbotConversationDetail {
+	if detail == nil {
+		return nil
+	}
+
+	recommendedProviders := make([]providerSummaryResponse, 0, len(detail.RecommendedProviders))
+	for _, recommendedProvider := range detail.RecommendedProviders {
+		recommendedProviders = append(recommendedProviders, providerSummaryResponseFromDomain(recommendedProvider))
+	}
+
+	var recommendedCategory *recommendedCategoryResponse
+	if detail.RecommendedCategory != nil {
+		recommendedCategory = &recommendedCategoryResponse{
+			ID:   detail.RecommendedCategory.ID,
+			Name: detail.RecommendedCategory.Name,
+		}
+	}
+
+	return &chatbotConversationDetail{
+		Title:                detail.Title,
+		ResponseStatus:       detail.ResponseStatus,
+		DiagnosisCompleted:   detail.DiagnosisCompleted,
+		RecommendedCategory:  recommendedCategory,
+		RecommendedProviders: recommendedProviders,
 	}
 }
 

@@ -35,9 +35,10 @@ type ChatbotResponse struct {
 }
 
 type chatbotAnswer struct {
-	response             *ChatbotResponse
-	message              *Message
-	recommendedProviders []providerreadmodel.ProviderSummary
+	response              *ChatbotResponse
+	message               *Message
+	recommendedCategoryID *int
+	recommendedProviders  []providerreadmodel.ProviderSummary
 }
 
 func ParseChatbotResponseStatus(value string) (ChatbotResponseStatus, error) {

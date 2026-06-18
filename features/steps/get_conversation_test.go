@@ -14,11 +14,16 @@ import (
 const nonExistingConversationID = 999999999
 
 type conversationDetailResponse struct {
-	ID          int                             `json:"id"`
-	Status      string                          `json:"status"`
+	ID        int                           `json:"id"`
+	Type      string                        `json:"type"`
+	Status    string                        `json:"status"`
+	Work      workConversationDetail        `json:"work"`
+	Messages  []conversationMessageResponse `json:"messages"`
+	UpdatedOn time.Time                     `json:"updated_on"`
+}
+
+type workConversationDetail struct {
 	Counterpart conversationCounterpartResponse `json:"counterpart"`
-	Messages    []conversationMessageResponse   `json:"messages"`
-	UpdatedOn   time.Time                       `json:"updated_on"`
 }
 
 type conversationMessageResponse struct {
@@ -142,13 +147,14 @@ func (suite *testSuite) systemShowsConversationBetweenConsumerAndProvider(consum
 	if response.ID != suite.lastConversationID {
 		return fmt.Errorf("expected conversation id %d, got %d", suite.lastConversationID, response.ID)
 	}
+	counterpart := response.Work.Counterpart
 	if suite.currentAuth0ID == auth0IDForConsumerEmail(consumerEmail) {
-		if response.Counterpart.ID != providerID || response.Counterpart.Role != participantRoleProvider {
-			return fmt.Errorf("expected provider counterpart id %d and role %q, got id %d and role %q", providerID, participantRoleProvider, response.Counterpart.ID, response.Counterpart.Role)
+		if counterpart.ID != providerID || counterpart.Role != participantRoleProvider {
+			return fmt.Errorf("expected provider counterpart id %d and role %q, got id %d and role %q", providerID, participantRoleProvider, counterpart.ID, counterpart.Role)
 		}
 	} else if suite.currentAuth0ID == auth0IDForProviderEmail(providerEmail) {
-		if response.Counterpart.ID != consumerID || response.Counterpart.Role != participantRoleConsumer {
-			return fmt.Errorf("expected consumer counterpart id %d and role %q, got id %d and role %q", consumerID, participantRoleConsumer, response.Counterpart.ID, response.Counterpart.Role)
+		if counterpart.ID != consumerID || counterpart.Role != participantRoleConsumer {
+			return fmt.Errorf("expected consumer counterpart id %d and role %q, got id %d and role %q", consumerID, participantRoleConsumer, counterpart.ID, counterpart.Role)
 		}
 	} else {
 		return fmt.Errorf("authenticated user is not one of the expected conversation participants")

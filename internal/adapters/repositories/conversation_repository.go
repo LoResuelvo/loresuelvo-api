@@ -247,16 +247,27 @@ func (repository *ConversationRepository) updateChatbotConversationWithTx(ctx co
 		return repository.startChatbotProcessingWithTx(ctx, tx, chatbotConversation, processingStartedOn.Time)
 	}
 
+	recommendedCategoryID := sql.NullInt64{}
+	if chatbotConversation.RecommendedCategoryID != nil {
+		recommendedCategoryID = sql.NullInt64{Int64: int64(*chatbotConversation.RecommendedCategoryID), Valid: true}
+	}
+
 	result, err := tx.ExecContext(
 		ctx,
 		`UPDATE chatbot_conversations
 		SET context_summary = $2,
 			last_summarized_message_id = $3,
-			processing_started_on = NULL
+			processing_started_on = NULL,
+			last_response_status = $4,
+			diagnosis_completed = $5,
+			recommended_category_id = $6
 		WHERE conversation_id = $1`,
 		chatbotConversation.Base().ID,
 		chatbotConversation.Context.Summary,
 		chatbotConversation.Context.LastSummarizedMessageID,
+		chatbotConversation.ResponseStatus,
+		chatbotConversation.DiagnosisCompleted,
+		recommendedCategoryID,
 	)
 	if err != nil {
 		return fmt.Errorf("updating chatbot conversation: %w", err)
@@ -365,10 +376,13 @@ func (repository *ConversationRepository) FindByID(ctx context.Context, conversa
 	var base conversation.BaseConversation
 	var consumerID int
 	var providerID int
-	var title string
-	var contextSummary string
-	var lastSummarizedMessageID int
+	var title sql.NullString
+	var contextSummary sql.NullString
+	var lastSummarizedMessageID sql.NullInt64
 	var processingStartedOn sql.NullTime
+	var lastResponseStatus sql.NullString
+	var diagnosisCompleted sql.NullBool
+	var recommendedCategoryID sql.NullInt64
 	var conversationType string
 	err := repository.db.QueryRowContext(
 		ctx,
@@ -376,10 +390,13 @@ func (repository *ConversationRepository) FindByID(ctx context.Context, conversa
 			c.id,
 			COALESCE(wc.consumer_id, cc.consumer_id),
 			COALESCE(wc.provider_id, 0),
-			COALESCE(cc.title, ''),
-			COALESCE(cc.context_summary, ''),
-			COALESCE(cc.last_summarized_message_id, 0),
+			cc.title,
+			cc.context_summary,
+			cc.last_summarized_message_id,
 			cc.processing_started_on,
+			cc.last_response_status,
+			cc.diagnosis_completed,
+			cc.recommended_category_id,
 			c.status,
 			c.updated_on,
 			c.type
@@ -396,6 +413,9 @@ func (repository *ConversationRepository) FindByID(ctx context.Context, conversa
 		&contextSummary,
 		&lastSummarizedMessageID,
 		&processingStartedOn,
+		&lastResponseStatus,
+		&diagnosisCompleted,
+		&recommendedCategoryID,
 		&base.Status,
 		&base.UpdatedOn,
 		&conversationType,
@@ -420,13 +440,20 @@ func (repository *ConversationRepository) FindByID(ctx context.Context, conversa
 		if processingStartedOn.Valid {
 			processingStartedAt = &processingStartedOn.Time
 		}
+		responseStatus, err := conversation.ParseChatbotResponseStatus(lastResponseStatus.String)
+		if err != nil {
+			return nil, err
+		}
 		return &conversation.ChatBotConversation{
-			BaseConversation: &base,
-			ConsumerID:       consumerID,
-			Title:            title,
+			BaseConversation:      &base,
+			ConsumerID:            consumerID,
+			Title:                 title.String,
+			ResponseStatus:        responseStatus,
+			DiagnosisCompleted:    diagnosisCompleted.Bool,
+			RecommendedCategoryID: optionalIntFromSQLNullInt64(recommendedCategoryID),
 			Context: conversation.ChatbotConversationContext{
-				Summary:                 contextSummary,
-				LastSummarizedMessageID: lastSummarizedMessageID,
+				Summary:                 contextSummary.String,
+				LastSummarizedMessageID: int(lastSummarizedMessageID.Int64),
 			},
 			ProcessingStartedOn: processingStartedAt,
 		}, nil
@@ -468,6 +495,15 @@ func (repository *ConversationRepository) findMessagesByConversationID(ctx conte
 	}
 
 	return messages, nil
+}
+
+func optionalIntFromSQLNullInt64(value sql.NullInt64) *int {
+	if !value.Valid {
+		return nil
+	}
+
+	converted := int(value.Int64)
+	return &converted
 }
 
 func (repository *ConversationRepository) SaveStatus(ctx context.Context, conversationToSave conversation.Conversation) error {
@@ -517,17 +553,34 @@ func (repository *ConversationRepository) saveChatbotConversationWithTx(ctx cont
 	if startedOn := conversationToSave.ProcessingStartedAt(); startedOn != nil {
 		processingStartedOn = sql.NullTime{Time: *startedOn, Valid: true}
 	}
+	recommendedCategoryID := sql.NullInt64{}
+	if conversationToSave.RecommendedCategoryID != nil {
+		recommendedCategoryID = sql.NullInt64{Int64: int64(*conversationToSave.RecommendedCategoryID), Valid: true}
+	}
 
 	_, err := tx.ExecContext(
 		ctx,
-		`INSERT INTO chatbot_conversations (conversation_id, consumer_id, title, context_summary, last_summarized_message_id, processing_started_on)
-		VALUES ($1, $2, $3, $4, $5, $6)`,
+		`INSERT INTO chatbot_conversations (
+			conversation_id,
+			consumer_id,
+			title,
+			context_summary,
+			last_summarized_message_id,
+			processing_started_on,
+			last_response_status,
+			diagnosis_completed,
+			recommended_category_id
+		)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
 		conversationToSave.Base().ID,
 		conversationToSave.ConsumerID,
 		conversationToSave.Title,
 		conversationToSave.Context.Summary,
 		conversationToSave.Context.LastSummarizedMessageID,
 		processingStartedOn,
+		conversationToSave.ResponseStatus,
+		conversationToSave.DiagnosisCompleted,
+		recommendedCategoryID,
 	)
 	if err != nil {
 		return mapConversationInsertError(err)

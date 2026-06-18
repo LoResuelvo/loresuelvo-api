@@ -27,10 +27,13 @@ const ChatbotProcessingStaleAfter = 5 * time.Minute
 
 type ChatBotConversation struct {
 	*BaseConversation
-	ConsumerID          int
-	Title               string
-	Context             ChatbotConversationContext
-	ProcessingStartedOn *time.Time
+	ConsumerID            int
+	Title                 string
+	ResponseStatus        ChatbotResponseStatus
+	DiagnosisCompleted    bool
+	RecommendedCategoryID *int
+	Context               ChatbotConversationContext
+	ProcessingStartedOn   *time.Time
 }
 
 func NewChatbotConversation(consumerID int, title string) (Conversation, error) {
@@ -46,9 +49,16 @@ func NewChatbotConversation(consumerID int, title string) (Conversation, error) 
 			Type:   TypeChatbot,
 			Status: StatusActive,
 		},
-		ConsumerID: consumerID,
-		Title:      trimmedTitle,
+		ConsumerID:     consumerID,
+		Title:          trimmedTitle,
+		ResponseStatus: ChatbotResponseAnswered,
 	}, nil
+}
+
+func (conversation *ChatBotConversation) ApplyResponse(response ChatbotResponse, recommendedCategoryID *int) {
+	conversation.ResponseStatus = response.Status
+	conversation.DiagnosisCompleted = response.DiagnosisCompleted
+	conversation.RecommendedCategoryID = copyOptionalInt(recommendedCategoryID)
 }
 
 func (conversation *ChatBotConversation) UpdateContext(context ChatbotConversationContext) error {
@@ -127,4 +137,13 @@ func (conversation *ChatBotConversation) canStartProcessing(now time.Time) bool 
 	}
 
 	return !conversation.ProcessingStartedOn.Add(ChatbotProcessingStaleAfter).After(now)
+}
+
+func copyOptionalInt(value *int) *int {
+	if value == nil {
+		return nil
+	}
+
+	copied := *value
+	return &copied
 }

@@ -1,4 +1,3 @@
-@wip
 Feature: Obtener detalle de conversación con el chatbot asistido por IA
     Como consumidor
     quiero consultar el detalle de una conversación existente con el chatbot asistido por IA

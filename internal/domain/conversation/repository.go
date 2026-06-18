@@ -32,6 +32,5 @@ type ProviderRepository interface {
 
 type Reader interface {
 	FindSummariesByParticipantIDRoleAndType(ctx context.Context, participantID int, participantRole string, conversationType string) ([]readmodel.ConversationSummary, error)
-	FindDetailByIDForConsumer(ctx context.Context, conversationID int) (*readmodel.ConversationDetail, error)
-	FindDetailByIDForProvider(ctx context.Context, conversationID int) (*readmodel.ConversationDetail, error)
+	FindDetailByIDRoleAndType(ctx context.Context, conversationID int, participantRole string, conversationType string) (*readmodel.ConversationDetail, error)
 }
