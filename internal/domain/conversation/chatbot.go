@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/category"
+	providerreadmodel "github.com/LoResuelvo/loresuelvo-api/internal/domain/provider/read_model"
 )
 
 type Chatbot interface {
@@ -31,6 +32,12 @@ type ChatbotResponse struct {
 	Content                 string
 	DiagnosisCompleted      bool
 	RecommendedCategoryName string
+}
+
+type chatbotAnswer struct {
+	response             *ChatbotResponse
+	message              *Message
+	recommendedProviders []providerreadmodel.ProviderSummary
 }
 
 func ParseChatbotResponseStatus(value string) (ChatbotResponseStatus, error) {

@@ -94,12 +94,13 @@ func (router *Router) registerJobRequestRoutes(engine *gin.Engine, authMiddlewar
 }
 
 func (router *Router) registerConversationRoutes(engine *gin.Engine, authMiddleware gin.HandlerFunc) {
-	engine.GET("/conversations", authMiddleware, router.conversationHandler.ListConversations)
+	engine.GET("/conversations", authMiddleware, router.conversationHandler.ListWorkConversations)
 	engine.GET("/conversations/:conversationID", authMiddleware, router.conversationHandler.GetConversation)
 	engine.POST("/conversations/:conversationID/messages", authMiddleware, router.conversationHandler.SendMessage)
 }
 
 func (router *Router) registerChatbotRoutes(engine *gin.Engine, authMiddleware gin.HandlerFunc) {
+	engine.GET("/chatbot/conversations", authMiddleware, router.conversationHandler.ListChatbotConversations)
 	engine.POST("/chatbot/conversations", authMiddleware, router.conversationHandler.CreateChatbotConversation)
 	engine.POST("/chatbot/conversations/:conversationID/messages", authMiddleware, router.conversationHandler.ContinueChatbotConversation)
 }

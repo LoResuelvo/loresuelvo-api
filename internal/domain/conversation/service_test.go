@@ -213,25 +213,31 @@ func (m *recommendationCategoryListerMock) ListAll() ([]category.Category, error
 }
 
 type conversationReaderMock struct {
-	consumerSummaries []readmodel.ConversationSummary
-	providerSummaries []readmodel.ConversationSummary
-	consumerDetail    *readmodel.ConversationDetail
-	providerDetail    *readmodel.ConversationDetail
-	err               error
+	consumerSummaries         []readmodel.ConversationSummary
+	providerSummaries         []readmodel.ConversationSummary
+	chatbotSummaries          []readmodel.ConversationSummary
+	consumerDetail            *readmodel.ConversationDetail
+	providerDetail            *readmodel.ConversationDetail
+	requestedParticipantID    int
+	requestedParticipantRole  string
+	requestedConversationType string
+	err                       error
 }
 
-func (m *conversationReaderMock) FindSummariesByConsumerID(ctx context.Context, consumerID int) ([]readmodel.ConversationSummary, error) {
+func (m *conversationReaderMock) FindSummariesByParticipantIDRoleAndType(ctx context.Context, participantID int, participantRole string, conversationType string) ([]readmodel.ConversationSummary, error) {
+	m.requestedParticipantID = participantID
+	m.requestedParticipantRole = participantRole
+	m.requestedConversationType = conversationType
 	if m.err != nil {
 		return nil, m.err
+	}
+	if conversationType == conversation.TypeChatbot {
+		return m.chatbotSummaries, nil
+	}
+	if participantRole == conversation.SenderProvider {
+		return m.providerSummaries, nil
 	}
 	return m.consumerSummaries, nil
-}
-
-func (m *conversationReaderMock) FindSummariesByProviderID(ctx context.Context, providerID int) ([]readmodel.ConversationSummary, error) {
-	if m.err != nil {
-		return nil, m.err
-	}
-	return m.providerSummaries, nil
 }
 
 func (m *conversationReaderMock) FindDetailByIDForConsumer(ctx context.Context, conversationID int) (*readmodel.ConversationDetail, error) {
@@ -853,15 +859,16 @@ func TestListReturnsConversationSummariesForConsumer(t *testing.T) {
 		consumerSummaries: []readmodel.ConversationSummary{
 			{
 				ID:     1,
+				Type:   conversation.TypeWork,
 				Status: conversation.StatusPending,
-				Counterpart: readmodel.ConversationParticipant{
+				Work: &readmodel.WorkConversationSummary{Counterpart: readmodel.ConversationParticipant{
 					ID:                 20,
 					Role:               conversation.SenderProvider,
 					Name:               "Juan",
 					Surname:            "Gómez",
 					CategoryName:       "Plomería",
 					ProfilePhotoFileID: "provider-photo-file-id",
-				},
+				}},
 				LastMessage: &readmodel.MessageSummary{ID: 1, SenderRole: conversation.SenderConsumer, Content: "Hola", CreatedOn: now},
 				UpdatedOn:   now,
 			},
@@ -871,18 +878,18 @@ func TestListReturnsConversationSummariesForConsumer(t *testing.T) {
 	fileURLResolver := &fileURLResolverMock{urlsByFileID: map[string]string{"provider-photo-file-id": "https://cdn/provider.jpg"}}
 	service := conversation.NewService(repo, consumerIDFinder, providerIDFinder, conversationReader, nil, &chatbotMock{}, nil, fileURLResolver, fixedClock{now: time.Now().UTC()})
 
-	summaries, err := service.List(context.Background(), "auth0|consumer")
+	summaries, err := service.ListWorkConversations(context.Background(), "auth0|consumer")
 
 	require.NoError(t, err)
 	require.Len(t, summaries, 1)
 	assert.Equal(t, 1, summaries[0].ID)
 	assert.Equal(t, conversation.StatusPending, summaries[0].Status)
-	assert.Equal(t, 20, summaries[0].Counterpart.ID)
-	assert.Equal(t, conversation.SenderProvider, summaries[0].Counterpart.Role)
-	assert.Equal(t, "Juan", summaries[0].Counterpart.Name)
-	assert.Equal(t, "Gómez", summaries[0].Counterpart.Surname)
-	assert.Equal(t, "Plomería", summaries[0].Counterpart.CategoryName)
-	assert.Equal(t, "https://cdn/provider.jpg", summaries[0].Counterpart.ProfilePhotoURL)
+	assert.Equal(t, 20, summaries[0].Work.Counterpart.ID)
+	assert.Equal(t, conversation.SenderProvider, summaries[0].Work.Counterpart.Role)
+	assert.Equal(t, "Juan", summaries[0].Work.Counterpart.Name)
+	assert.Equal(t, "Gómez", summaries[0].Work.Counterpart.Surname)
+	assert.Equal(t, "Plomería", summaries[0].Work.Counterpart.CategoryName)
+	assert.Equal(t, "https://cdn/provider.jpg", summaries[0].Work.Counterpart.ProfilePhotoURL)
 	assert.Equal(t, []string{"provider-photo-file-id"}, fileURLResolver.resolvedFileIDs)
 	require.NotNil(t, summaries[0].LastMessage)
 	assert.Equal(t, conversation.SenderConsumer, summaries[0].LastMessage.SenderRole)
@@ -898,13 +905,14 @@ func TestListReturnsConversationSummariesForProvider(t *testing.T) {
 		providerSummaries: []readmodel.ConversationSummary{
 			{
 				ID:     1,
+				Type:   conversation.TypeWork,
 				Status: conversation.StatusPending,
-				Counterpart: readmodel.ConversationParticipant{
+				Work: &readmodel.WorkConversationSummary{Counterpart: readmodel.ConversationParticipant{
 					ID:      10,
 					Role:    conversation.SenderConsumer,
 					Name:    "Ana",
 					Surname: "Pérez",
-				},
+				}},
 				LastMessage: &readmodel.MessageSummary{ID: 1, SenderRole: conversation.SenderConsumer, Content: "Hola", CreatedOn: now},
 				UpdatedOn:   now,
 			},
@@ -913,17 +921,17 @@ func TestListReturnsConversationSummariesForProvider(t *testing.T) {
 
 	service := conversation.NewService(repo, consumerIDFinder, providerIDFinder, conversationReader, nil, &chatbotMock{}, nil, &fileURLResolverMock{}, fixedClock{now: time.Now().UTC()})
 
-	summaries, err := service.List(context.Background(), "auth0|provider")
+	summaries, err := service.ListWorkConversations(context.Background(), "auth0|provider")
 
 	require.NoError(t, err)
 	require.Len(t, summaries, 1)
 	assert.Equal(t, 1, summaries[0].ID)
 	assert.Equal(t, conversation.StatusPending, summaries[0].Status)
-	assert.Equal(t, 10, summaries[0].Counterpart.ID)
-	assert.Equal(t, conversation.SenderConsumer, summaries[0].Counterpart.Role)
-	assert.Equal(t, "Ana", summaries[0].Counterpart.Name)
-	assert.Equal(t, "Pérez", summaries[0].Counterpart.Surname)
-	assert.Empty(t, summaries[0].Counterpart.CategoryName)
+	assert.Equal(t, 10, summaries[0].Work.Counterpart.ID)
+	assert.Equal(t, conversation.SenderConsumer, summaries[0].Work.Counterpart.Role)
+	assert.Equal(t, "Ana", summaries[0].Work.Counterpart.Name)
+	assert.Equal(t, "Pérez", summaries[0].Work.Counterpart.Surname)
+	assert.Empty(t, summaries[0].Work.Counterpart.CategoryName)
 	require.NotNil(t, summaries[0].LastMessage)
 	assert.Equal(t, conversation.SenderConsumer, summaries[0].LastMessage.SenderRole)
 }
@@ -935,7 +943,7 @@ func TestListRejectsAuthenticatedUserWithoutParticipantProfile(t *testing.T) {
 
 	service := conversation.NewService(repo, consumerIDFinder, providerIDFinder, &conversationReaderMock{}, &messagePublisherMock{}, &chatbotMock{}, nil, &fileURLResolverMock{}, fixedClock{now: time.Now().UTC()})
 
-	summaries, err := service.List(context.Background(), "auth0|unknown")
+	summaries, err := service.ListWorkConversations(context.Background(), "auth0|unknown")
 
 	assert.ErrorIs(t, err, conversation.ErrConversationAccessDenied)
 	assert.Nil(t, summaries)
@@ -1008,4 +1016,31 @@ func activeConversationFixture() conversation.Conversation {
 	fixture := conversationFixture()
 	fixture.Base().Status = "active"
 	return fixture
+}
+
+func TestServiceListsChatbotConversationsForConsumer(t *testing.T) {
+	reader := &conversationReaderMock{
+		chatbotSummaries: []readmodel.ConversationSummary{
+			{ID: 42, Type: conversation.TypeChatbot, Status: conversation.StatusActive, Chatbot: &readmodel.ChatbotConversationSummary{Title: "Pérdida de agua en la cocina"}},
+		},
+	}
+	service := conversation.NewService(&conversationRepositoryMock{}, &consumerIDFinderMock{consumerID: 10}, &providerIDFinderMock{}, reader, &messagePublisherMock{}, &chatbotMock{}, nil, &fileURLResolverMock{}, fixedClock{now: time.Now().UTC()})
+
+	summaries, err := service.ListChatbotConversations(context.Background(), "auth0|consumer")
+
+	require.NoError(t, err)
+	require.Len(t, summaries, 1)
+	assert.Equal(t, 42, summaries[0].ID)
+	assert.Equal(t, 10, reader.requestedParticipantID)
+	assert.Equal(t, conversation.SenderConsumer, reader.requestedParticipantRole)
+	assert.Equal(t, conversation.TypeChatbot, reader.requestedConversationType)
+}
+
+func TestServiceRejectsChatbotConversationListForNonConsumer(t *testing.T) {
+	service := conversation.NewService(&conversationRepositoryMock{}, &consumerIDFinderMock{err: errors.New("not found")}, &providerIDFinderMock{providerID: 99}, &conversationReaderMock{}, &messagePublisherMock{}, &chatbotMock{}, nil, &fileURLResolverMock{}, fixedClock{now: time.Now().UTC()})
+
+	summaries, err := service.ListChatbotConversations(context.Background(), "auth0|provider")
+
+	assert.ErrorIs(t, err, conversation.ErrOnlyConsumerCanListChatbotConversations)
+	assert.Nil(t, summaries)
 }

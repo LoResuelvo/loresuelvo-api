@@ -52,9 +52,18 @@ type conversationMessageResponse struct {
 type conversationSummaryResponse struct {
 	ID          int                              `json:"id"`
 	Status      string                           `json:"status"`
-	Counterpart conversationCounterpartResponse  `json:"counterpart"`
 	LastMessage *conversationLastMessageResponse `json:"last_message"`
 	UpdatedOn   time.Time                        `json:"updated_on"`
+}
+
+type workConversationSummaryResponse struct {
+	conversationSummaryResponse
+	Counterpart conversationCounterpartResponse `json:"counterpart"`
+}
+
+type chatbotConversationSummaryResponse struct {
+	conversationSummaryResponse
+	Title string `json:"title"`
 }
 
 type conversationCounterpartResponse struct {
@@ -164,14 +173,14 @@ func (h *ConversationHandler) SendMessage(c *gin.Context) {
 	c.JSON(http.StatusCreated, sentMessageResponseFromDomain(*sentMessage))
 }
 
-func (h *ConversationHandler) ListConversations(c *gin.Context) {
+func (h *ConversationHandler) ListWorkConversations(c *gin.Context) {
 	auth0ID, ok := middleware.GetUserID(c)
 	if !ok || strings.TrimSpace(auth0ID) == "" {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "missing user id"})
 		return
 	}
 
-	summaries, err := h.conversationService.List(c.Request.Context(), auth0ID)
+	summaries, err := h.conversationService.ListWorkConversations(c.Request.Context(), auth0ID)
 	if errors.Is(err, conversation.ErrConversationAccessDenied) {
 		c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
 		return
@@ -182,6 +191,26 @@ func (h *ConversationHandler) ListConversations(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, conversationSummaryResponsesFromDomain(summaries))
+}
+
+func (h *ConversationHandler) ListChatbotConversations(c *gin.Context) {
+	auth0ID, ok := middleware.GetUserID(c)
+	if !ok || strings.TrimSpace(auth0ID) == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "missing user id"})
+		return
+	}
+
+	summaries, err := h.conversationService.ListChatbotConversations(c.Request.Context(), auth0ID)
+	if errors.Is(err, conversation.ErrOnlyConsumerCanListChatbotConversations) {
+		c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
+		return
+	}
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, chatbotConversationSummaryResponsesFromDomain(summaries))
 }
 
 func (h *ConversationHandler) CreateChatbotConversation(c *gin.Context) {
@@ -351,8 +380,29 @@ func conversationDetailResponseFromDomain(foundConversation readmodel.Conversati
 	}
 }
 
-func conversationSummaryResponsesFromDomain(summaries []readmodel.ConversationSummary) []conversationSummaryResponse {
-	response := make([]conversationSummaryResponse, 0, len(summaries))
+func chatbotConversationSummaryResponsesFromDomain(summaries []readmodel.ConversationSummary) []chatbotConversationSummaryResponse {
+	response := make([]chatbotConversationSummaryResponse, 0, len(summaries))
+	for _, summary := range summaries {
+		response = append(response, chatbotConversationSummaryResponseFromDomain(summary))
+	}
+
+	return response
+}
+
+func chatbotConversationSummaryResponseFromDomain(summary readmodel.ConversationSummary) chatbotConversationSummaryResponse {
+	title := ""
+	if summary.Chatbot != nil {
+		title = summary.Chatbot.Title
+	}
+
+	return chatbotConversationSummaryResponse{
+		conversationSummaryResponse: baseConversationSummaryResponseFromDomain(summary),
+		Title:                       title,
+	}
+}
+
+func conversationSummaryResponsesFromDomain(summaries []readmodel.ConversationSummary) []workConversationSummaryResponse {
+	response := make([]workConversationSummaryResponse, 0, len(summaries))
 	for _, summary := range summaries {
 		response = append(response, conversationSummaryResponseFromDomain(summary))
 	}
@@ -360,11 +410,22 @@ func conversationSummaryResponsesFromDomain(summaries []readmodel.ConversationSu
 	return response
 }
 
-func conversationSummaryResponseFromDomain(summary readmodel.ConversationSummary) conversationSummaryResponse {
+func conversationSummaryResponseFromDomain(summary readmodel.ConversationSummary) workConversationSummaryResponse {
+	var counterpart readmodel.ConversationParticipant
+	if summary.Work != nil {
+		counterpart = summary.Work.Counterpart
+	}
+
+	return workConversationSummaryResponse{
+		conversationSummaryResponse: baseConversationSummaryResponseFromDomain(summary),
+		Counterpart:                 conversationCounterpartResponseFromDomain(counterpart),
+	}
+}
+
+func baseConversationSummaryResponseFromDomain(summary readmodel.ConversationSummary) conversationSummaryResponse {
 	return conversationSummaryResponse{
 		ID:          summary.ID,
 		Status:      summary.Status,
-		Counterpart: conversationCounterpartResponseFromDomain(summary.Counterpart),
 		LastMessage: conversationLastMessageResponseFromDomain(summary.LastMessage),
 		UpdatedOn:   summary.UpdatedOn,
 	}

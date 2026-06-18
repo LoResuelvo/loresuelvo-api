@@ -73,7 +73,13 @@ func newConversationRepositoryTest(t *testing.T) conversationRepositoryTestConte
 func savedConsumerIDForConversation(t *testing.T, testContext conversationRepositoryTestContext) int {
 	t.Helper()
 
-	consumerToSave, err := consumer.NewConsumer("auth0|conversation-consumer", "conversation.consumer@example.com", "Ana", "Pérez")
+	return savedConsumerIDForConversationWithData(t, testContext, "auth0|conversation-consumer", "conversation.consumer@example.com", "Ana", "Pérez")
+}
+
+func savedConsumerIDForConversationWithData(t *testing.T, testContext conversationRepositoryTestContext, authID, email, name, surname string) int {
+	t.Helper()
+
+	consumerToSave, err := consumer.NewConsumer(authID, email, name, surname)
 	require.NoError(t, err)
 	require.NoError(t, testContext.consumerRepository.Save(*consumerToSave))
 

@@ -5,6 +5,8 @@ import (
 	"time"
 )
 
+const ChatbotRecentMessageLimit = 10
+
 type ChatbotConversationContext struct {
 	Summary                 string
 	LastSummarizedMessageID int

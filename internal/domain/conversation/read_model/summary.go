@@ -4,10 +4,20 @@ import "time"
 
 type ConversationSummary struct {
 	ID          int
+	Type        string
 	Status      string
-	Counterpart ConversationParticipant
 	LastMessage *MessageSummary
 	UpdatedOn   time.Time
+	Work        *WorkConversationSummary
+	Chatbot     *ChatbotConversationSummary
+}
+
+type WorkConversationSummary struct {
+	Counterpart ConversationParticipant
+}
+
+type ChatbotConversationSummary struct {
+	Title string
 }
 
 type ConversationParticipant struct {

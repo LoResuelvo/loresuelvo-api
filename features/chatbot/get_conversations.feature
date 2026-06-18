@@ -1,4 +1,3 @@
-@wip
 Feature: Obtener conversaciones con el chatbot asistido por IA
     Como consumidor
     quiero ver mis conversaciones con el chatbot asistido por IA

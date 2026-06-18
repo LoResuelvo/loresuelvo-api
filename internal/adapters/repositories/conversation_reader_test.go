@@ -41,17 +41,17 @@ func newSavedConversationReaderFixture(t *testing.T) conversationReaderFixture {
 func TestConversationReaderFindsConsumerSummaries(t *testing.T) {
 	fixture := newSavedConversationReaderFixture(t)
 
-	summaries, err := fixture.reader.FindSummariesByConsumerID(context.Background(), fixture.consumerID)
+	summaries, err := fixture.reader.FindSummariesByParticipantIDRoleAndType(context.Background(), fixture.consumerID, conversation.SenderConsumer, conversation.TypeWork)
 
 	require.NoError(t, err)
 	require.Len(t, summaries, 1)
 	assert.Equal(t, fixture.savedConversation.Base().ID, summaries[0].ID)
 	assert.Equal(t, conversation.StatusPending, summaries[0].Status)
-	assert.Equal(t, fixture.providerID, summaries[0].Counterpart.ID)
-	assert.Equal(t, conversation.SenderProvider, summaries[0].Counterpart.Role)
-	assert.Equal(t, "Juan", summaries[0].Counterpart.Name)
-	assert.Equal(t, "Gómez", summaries[0].Counterpart.Surname)
-	assert.Equal(t, "Plomería", summaries[0].Counterpart.CategoryName)
+	assert.Equal(t, fixture.providerID, summaries[0].Work.Counterpart.ID)
+	assert.Equal(t, conversation.SenderProvider, summaries[0].Work.Counterpart.Role)
+	assert.Equal(t, "Juan", summaries[0].Work.Counterpart.Name)
+	assert.Equal(t, "Gómez", summaries[0].Work.Counterpart.Surname)
+	assert.Equal(t, "Plomería", summaries[0].Work.Counterpart.CategoryName)
 	require.NotNil(t, summaries[0].LastMessage)
 	assert.Equal(t, conversation.SenderConsumer, summaries[0].LastMessage.SenderRole)
 	assert.Equal(t, fixture.initialMessage.Content, summaries[0].LastMessage.Content)
@@ -61,17 +61,17 @@ func TestConversationReaderFindsConsumerSummaries(t *testing.T) {
 func TestConversationReaderFindsProviderSummaries(t *testing.T) {
 	fixture := newSavedConversationReaderFixture(t)
 
-	summaries, err := fixture.reader.FindSummariesByProviderID(context.Background(), fixture.providerID)
+	summaries, err := fixture.reader.FindSummariesByParticipantIDRoleAndType(context.Background(), fixture.providerID, conversation.SenderProvider, conversation.TypeWork)
 
 	require.NoError(t, err)
 	require.Len(t, summaries, 1)
 	assert.Equal(t, fixture.savedConversation.Base().ID, summaries[0].ID)
 	assert.Equal(t, conversation.StatusPending, summaries[0].Status)
-	assert.Equal(t, fixture.consumerID, summaries[0].Counterpart.ID)
-	assert.Equal(t, conversation.SenderConsumer, summaries[0].Counterpart.Role)
-	assert.Equal(t, "Ana", summaries[0].Counterpart.Name)
-	assert.Equal(t, "Pérez", summaries[0].Counterpart.Surname)
-	assert.Empty(t, summaries[0].Counterpart.CategoryName)
+	assert.Equal(t, fixture.consumerID, summaries[0].Work.Counterpart.ID)
+	assert.Equal(t, conversation.SenderConsumer, summaries[0].Work.Counterpart.Role)
+	assert.Equal(t, "Ana", summaries[0].Work.Counterpart.Name)
+	assert.Equal(t, "Pérez", summaries[0].Work.Counterpart.Surname)
+	assert.Empty(t, summaries[0].Work.Counterpart.CategoryName)
 	require.NotNil(t, summaries[0].LastMessage)
 	assert.Equal(t, conversation.SenderConsumer, summaries[0].LastMessage.SenderRole)
 	assert.Equal(t, fixture.initialMessage.Content, summaries[0].LastMessage.Content)
@@ -82,11 +82,11 @@ func TestConversationReaderReturnsEmptySummaryLists(t *testing.T) {
 	testContext := newConversationRepositoryTest(t)
 	reader := repositories.NewConversationReader(testContext.database)
 
-	consumerSummaries, err := reader.FindSummariesByConsumerID(context.Background(), 999)
+	consumerSummaries, err := reader.FindSummariesByParticipantIDRoleAndType(context.Background(), 999, conversation.SenderConsumer, conversation.TypeWork)
 	require.NoError(t, err)
 	assert.Empty(t, consumerSummaries)
 
-	providerSummaries, err := reader.FindSummariesByProviderID(context.Background(), 999)
+	providerSummaries, err := reader.FindSummariesByParticipantIDRoleAndType(context.Background(), 999, conversation.SenderProvider, conversation.TypeWork)
 	require.NoError(t, err)
 	assert.Empty(t, providerSummaries)
 }
@@ -140,7 +140,7 @@ func TestConversationReaderReflectsSentMessageAsLatestAndDetailLastMessage(t *te
 	sentMessage, err := fixture.conversationRepository.AddMessage(context.Background(), fixture.savedConversation.Base().ID, *providerMessage)
 	require.NoError(t, err)
 
-	consumerSummaries, err := fixture.reader.FindSummariesByConsumerID(context.Background(), fixture.consumerID)
+	consumerSummaries, err := fixture.reader.FindSummariesByParticipantIDRoleAndType(context.Background(), fixture.consumerID, conversation.SenderConsumer, conversation.TypeWork)
 	require.NoError(t, err)
 	require.Len(t, consumerSummaries, 1)
 	require.NotNil(t, consumerSummaries[0].LastMessage)
@@ -167,4 +167,62 @@ func TestConversationReaderReturnsNotFoundForMissingConversationDetail(t *testin
 
 	assert.ErrorIs(t, err, conversation.ErrConversationDoesNotExist)
 	assert.Nil(t, detail)
+}
+
+func TestConversationReaderFindsChatbotSummariesByConsumerIDAndType(t *testing.T) {
+	testContext := newConversationRepositoryTest(t)
+	reader := repositories.NewConversationReader(testContext.database)
+	consumerID, providerID := savedConversationParticipants(t, testContext)
+	otherConsumerID := savedConsumerIDForConversationWithData(t, testContext, "auth0|other-chatbot-consumer", "other.chatbot.consumer@example.com", "Diego", "Sosa")
+
+	chatbotConversation, err := conversation.NewChatbotConversation(consumerID, "Pérdida de agua en la cocina")
+	require.NoError(t, err)
+	consumerMessage, err := conversation.NewConsumerMessage("Tengo una pérdida debajo de la pileta.")
+	require.NoError(t, err)
+	chatbotMessage, err := conversation.NewChatbotMessage("Revisá el sifón y las conexiones flexibles.")
+	require.NoError(t, err)
+	chatbotConversation.AddMessage(*consumerMessage)
+	chatbotConversation.AddMessage(*chatbotMessage)
+	savedChatbotConversation, err := testContext.conversationRepository.SaveConversation(context.Background(), chatbotConversation)
+	require.NoError(t, err)
+
+	otherChatbotConversation, err := conversation.NewChatbotConversation(otherConsumerID, "Problema eléctrico")
+	require.NoError(t, err)
+	otherChatbotConversation.AddMessage(*consumerMessage)
+	_, err = testContext.conversationRepository.SaveConversation(context.Background(), otherChatbotConversation)
+	require.NoError(t, err)
+
+	workConversation, workMessage := pendingConversationWithMessage(t, consumerID, providerID)
+	_, err = testContext.conversationRepository.SaveWithMessage(workConversation, workMessage)
+	require.NoError(t, err)
+
+	summaries, err := reader.FindSummariesByParticipantIDRoleAndType(context.Background(), consumerID, conversation.SenderConsumer, conversation.TypeChatbot)
+
+	require.NoError(t, err)
+	require.Len(t, summaries, 1)
+	assert.Equal(t, savedChatbotConversation.Base().ID, summaries[0].ID)
+	assert.Equal(t, conversation.StatusActive, summaries[0].Status)
+	assert.Equal(t, "Pérdida de agua en la cocina", summaries[0].Chatbot.Title)
+	require.NotNil(t, summaries[0].LastMessage)
+	assert.Equal(t, conversation.SenderChatbot, summaries[0].LastMessage.SenderRole)
+	assert.Equal(t, chatbotMessage.Content, summaries[0].LastMessage.Content)
+	assert.NotZero(t, summaries[0].UpdatedOn)
+}
+
+func TestConversationReaderReturnsEmptyChatbotSummariesForDifferentType(t *testing.T) {
+	testContext := newConversationRepositoryTest(t)
+	reader := repositories.NewConversationReader(testContext.database)
+	consumerID := savedConsumerIDForConversation(t, testContext)
+	chatbotConversation, err := conversation.NewChatbotConversation(consumerID, "Pérdida de agua en la cocina")
+	require.NoError(t, err)
+	consumerMessage, err := conversation.NewConsumerMessage("Tengo una pérdida debajo de la pileta.")
+	require.NoError(t, err)
+	chatbotConversation.AddMessage(*consumerMessage)
+	_, err = testContext.conversationRepository.SaveConversation(context.Background(), chatbotConversation)
+	require.NoError(t, err)
+
+	summaries, err := reader.FindSummariesByParticipantIDRoleAndType(context.Background(), consumerID, conversation.SenderConsumer, conversation.TypeWork)
+
+	require.NoError(t, err)
+	assert.Empty(t, summaries)
 }

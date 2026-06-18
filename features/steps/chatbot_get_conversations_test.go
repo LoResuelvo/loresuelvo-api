@@ -12,7 +12,6 @@ import (
 
 type chatbotConversationSummaryResponse struct {
 	ID             int                                     `json:"id"`
-	ConversationID int                                     `json:"conversation_id"`
 	Status         string                                  `json:"status"`
 	Title          string                                  `json:"title"`
 	ResponseStatus string                                  `json:"response_status"`

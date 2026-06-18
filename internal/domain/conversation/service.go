@@ -12,12 +12,6 @@ import (
 	providerreadmodel "github.com/LoResuelvo/loresuelvo-api/internal/domain/provider/read_model"
 )
 
-type chatbotAnswer struct {
-	response             *ChatbotResponse
-	message              *Message
-	recommendedProviders []providerreadmodel.ProviderSummary
-}
-
 type Service struct {
 	conversationRepository Repository
 	consumerRepository     ConsumerIDFinder
@@ -109,9 +103,9 @@ func (s *Service) SendMessage(ctx context.Context, authID string, conversationID
 	return sentMessage, nil
 }
 
-func (s *Service) List(ctx context.Context, authID string) ([]readmodel.ConversationSummary, error) {
+func (s *Service) ListWorkConversations(ctx context.Context, authID string) ([]readmodel.ConversationSummary, error) {
 	if consumerID, err := s.consumerRepository.FindIDByAuthID(authID); err == nil {
-		summaries, err := s.conversationReader.FindSummariesByConsumerID(ctx, consumerID)
+		summaries, err := s.conversationReader.FindSummariesByParticipantIDRoleAndType(ctx, consumerID, SenderConsumer, TypeWork)
 		if err != nil {
 			return nil, err
 		}
@@ -119,7 +113,7 @@ func (s *Service) List(ctx context.Context, authID string) ([]readmodel.Conversa
 	}
 
 	if providerID, err := s.providerRepository.FindIDByAuthID(authID); err == nil {
-		summaries, err := s.conversationReader.FindSummariesByProviderID(ctx, providerID)
+		summaries, err := s.conversationReader.FindSummariesByParticipantIDRoleAndType(ctx, providerID, SenderProvider, TypeWork)
 		if err != nil {
 			return nil, err
 		}
@@ -127,6 +121,15 @@ func (s *Service) List(ctx context.Context, authID string) ([]readmodel.Conversa
 	}
 
 	return nil, ErrConversationAccessDenied
+}
+
+func (s *Service) ListChatbotConversations(ctx context.Context, authID string) ([]readmodel.ConversationSummary, error) {
+	consumerID, err := s.consumerRepository.FindIDByAuthID(authID)
+	if err != nil {
+		return nil, ErrOnlyConsumerCanListChatbotConversations
+	}
+
+	return s.conversationReader.FindSummariesByParticipantIDRoleAndType(ctx, consumerID, SenderConsumer, TypeChatbot)
 }
 
 func (s *Service) CreateChatbotConversation(ctx context.Context, authID string, content string) (*ChatbotConversationResult, error) {
@@ -386,14 +389,20 @@ func (s *Service) ensureMessageAllowedInCurrentConversationState(ctx context.Con
 func (s *Service) withCounterpartProfilePhotoURLs(ctx context.Context, summaries []readmodel.ConversationSummary) ([]readmodel.ConversationSummary, error) {
 	fileIDs := make([]string, 0, len(summaries))
 	for i := range summaries {
-		fileIDs = append(fileIDs, summaries[i].Counterpart.ProfilePhotoFileID)
+		if summaries[i].Work == nil {
+			continue
+		}
+		fileIDs = append(fileIDs, summaries[i].Work.Counterpart.ProfilePhotoFileID)
 	}
 	urlsByFileID, err := s.fileService.ResolvePublicURLs(ctx, fileIDs)
 	if err != nil {
 		return nil, fmt.Errorf("resolving conversation counterpart profile photo urls: %w", err)
 	}
 	for i := range summaries {
-		summaries[i].Counterpart.ProfilePhotoURL = urlsByFileID[summaries[i].Counterpart.ProfilePhotoFileID]
+		if summaries[i].Work == nil {
+			continue
+		}
+		summaries[i].Work.Counterpart.ProfilePhotoURL = urlsByFileID[summaries[i].Work.Counterpart.ProfilePhotoFileID]
 	}
 
 	return summaries, nil

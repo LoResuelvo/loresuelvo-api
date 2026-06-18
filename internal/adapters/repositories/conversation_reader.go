@@ -17,11 +17,34 @@ func NewConversationReader(db *sql.DB) *ConversationReader {
 	return &ConversationReader{db: db}
 }
 
-func (reader *ConversationReader) FindSummariesByConsumerID(ctx context.Context, consumerID int) ([]readmodel.ConversationSummary, error) {
+func (reader *ConversationReader) FindSummariesByParticipantIDRoleAndType(ctx context.Context, participantID int, participantRole string, conversationType string) ([]readmodel.ConversationSummary, error) {
+	switch conversationType {
+	case conversation.TypeWork:
+		return reader.findWorkSummariesByParticipantIDAndRole(ctx, participantID, participantRole, conversationType)
+	case conversation.TypeChatbot:
+		return reader.findChatbotSummariesByConsumerIDAndType(ctx, participantID, conversationType)
+	default:
+		return nil, fmt.Errorf("finding conversation summaries: unsupported conversation type %q", conversationType)
+	}
+}
+
+func (reader *ConversationReader) findWorkSummariesByParticipantIDAndRole(ctx context.Context, participantID int, participantRole string, conversationType string) ([]readmodel.ConversationSummary, error) {
+	switch participantRole {
+	case conversation.SenderConsumer:
+		return reader.findWorkSummariesByConsumerID(ctx, participantID, conversationType)
+	case conversation.SenderProvider:
+		return reader.findWorkSummariesByProviderID(ctx, participantID, conversationType)
+	default:
+		return nil, fmt.Errorf("finding work conversation summaries: unsupported participant role %q", participantRole)
+	}
+}
+
+func (reader *ConversationReader) findWorkSummariesByConsumerID(ctx context.Context, consumerID int, conversationType string) ([]readmodel.ConversationSummary, error) {
 	rows, err := reader.db.QueryContext(
 		ctx,
 		`SELECT
 			c.id,
+			c.type,
 			c.status,
 			p.id,
 			u.name,
@@ -46,22 +69,25 @@ func (reader *ConversationReader) FindSummariesByConsumerID(ctx context.Context,
 			LIMIT 1
 		) lm ON true
 		WHERE wc.consumer_id = $1
+			AND c.type = $2
 		ORDER BY c.updated_on DESC, c.id DESC`,
 		consumerID,
+		conversationType,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("finding consumer conversation summaries: %w", err)
+		return nil, fmt.Errorf("finding consumer work conversation summaries: %w", err)
 	}
 	defer func() { _ = rows.Close() }()
 
-	return scanConversationSummaries(rows, conversation.SenderProvider)
+	return scanWorkConversationSummaries(rows, conversation.SenderProvider)
 }
 
-func (reader *ConversationReader) FindSummariesByProviderID(ctx context.Context, providerID int) ([]readmodel.ConversationSummary, error) {
+func (reader *ConversationReader) findWorkSummariesByProviderID(ctx context.Context, providerID int, conversationType string) ([]readmodel.ConversationSummary, error) {
 	rows, err := reader.db.QueryContext(
 		ctx,
 		`SELECT
 			c.id,
+			c.type,
 			c.status,
 			consumer.id,
 			u.name,
@@ -85,15 +111,53 @@ func (reader *ConversationReader) FindSummariesByProviderID(ctx context.Context,
 			LIMIT 1
 		) lm ON true
 		WHERE wc.provider_id = $1
+			AND c.type = $2
 		ORDER BY c.updated_on DESC, c.id DESC`,
 		providerID,
+		conversationType,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("finding provider conversation summaries: %w", err)
+		return nil, fmt.Errorf("finding provider work conversation summaries: %w", err)
 	}
 	defer func() { _ = rows.Close() }()
 
-	return scanConversationSummaries(rows, conversation.SenderConsumer)
+	return scanWorkConversationSummaries(rows, conversation.SenderConsumer)
+}
+
+func (reader *ConversationReader) findChatbotSummariesByConsumerIDAndType(ctx context.Context, consumerID int, conversationType string) ([]readmodel.ConversationSummary, error) {
+	rows, err := reader.db.QueryContext(
+		ctx,
+		`SELECT
+			c.id,
+			c.type,
+			c.status,
+			cc.title,
+			lm.id,
+			lm.sender_role,
+			lm.content,
+			lm.created_on,
+			c.updated_on
+		FROM conversations c
+		INNER JOIN chatbot_conversations cc ON cc.conversation_id = c.id
+		LEFT JOIN LATERAL (
+			SELECT m.id, m.sender_role, m.content, m.created_on
+			FROM messages m
+			WHERE m.conversation_id = c.id
+			ORDER BY m.created_on DESC, m.id DESC
+			LIMIT 1
+		) lm ON true
+		WHERE cc.consumer_id = $1
+			AND c.type = $2
+		ORDER BY c.updated_on DESC, c.id DESC`,
+		consumerID,
+		conversationType,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("finding chatbot conversation summaries by consumer and type: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	return scanChatbotConversationSummaries(rows)
 }
 
 func (reader *ConversationReader) FindDetailByIDForConsumer(ctx context.Context, conversationID int) (*readmodel.ConversationDetail, error) {
@@ -163,10 +227,11 @@ func (reader *ConversationReader) FindDetailByIDForProvider(ctx context.Context,
 	return scanConversationDetail(rows, conversation.SenderConsumer)
 }
 
-func scanConversationSummaries(rows *sql.Rows, counterpartRole string) ([]readmodel.ConversationSummary, error) {
+func scanChatbotConversationSummaries(rows *sql.Rows) ([]readmodel.ConversationSummary, error) {
 	summaries := []readmodel.ConversationSummary{}
 	for rows.Next() {
 		var summary readmodel.ConversationSummary
+		var title string
 		var lastMessageID sql.NullInt64
 		var lastMessageSenderRole sql.NullString
 		var lastMessageContent sql.NullString
@@ -174,39 +239,82 @@ func scanConversationSummaries(rows *sql.Rows, counterpartRole string) ([]readmo
 
 		if err := rows.Scan(
 			&summary.ID,
+			&summary.Type,
 			&summary.Status,
-			&summary.Counterpart.ID,
-			&summary.Counterpart.Name,
-			&summary.Counterpart.Surname,
-			&summary.Counterpart.CategoryName,
-			&summary.Counterpart.ProfilePhotoFileID,
+			&title,
 			&lastMessageID,
 			&lastMessageSenderRole,
 			&lastMessageContent,
 			&lastMessageCreatedOn,
 			&summary.UpdatedOn,
 		); err != nil {
-			return nil, fmt.Errorf("scanning conversation summary: %w", err)
+			return nil, fmt.Errorf("scanning chatbot conversation summary: %w", err)
 		}
 
-		summary.Counterpart.Role = counterpartRole
-		if lastMessageID.Valid {
-			summary.LastMessage = &readmodel.MessageSummary{
-				ID:         int(lastMessageID.Int64),
-				SenderRole: lastMessageSenderRole.String,
-				Content:    lastMessageContent.String,
-				CreatedOn:  lastMessageCreatedOn.Time,
-			}
-		}
-
+		summary.Chatbot = &readmodel.ChatbotConversationSummary{Title: title}
+		setSummaryLastMessage(&summary, lastMessageID, lastMessageSenderRole, lastMessageContent, lastMessageCreatedOn)
 		summaries = append(summaries, summary)
 	}
 
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterating conversation summaries: %w", err)
+		return nil, fmt.Errorf("iterating chatbot conversation summaries: %w", err)
 	}
 
 	return summaries, nil
+}
+
+func scanWorkConversationSummaries(rows *sql.Rows, counterpartRole string) ([]readmodel.ConversationSummary, error) {
+	summaries := []readmodel.ConversationSummary{}
+	for rows.Next() {
+		var summary readmodel.ConversationSummary
+		var counterpart readmodel.ConversationParticipant
+		var lastMessageID sql.NullInt64
+		var lastMessageSenderRole sql.NullString
+		var lastMessageContent sql.NullString
+		var lastMessageCreatedOn sql.NullTime
+
+		if err := rows.Scan(
+			&summary.ID,
+			&summary.Type,
+			&summary.Status,
+			&counterpart.ID,
+			&counterpart.Name,
+			&counterpart.Surname,
+			&counterpart.CategoryName,
+			&counterpart.ProfilePhotoFileID,
+			&lastMessageID,
+			&lastMessageSenderRole,
+			&lastMessageContent,
+			&lastMessageCreatedOn,
+			&summary.UpdatedOn,
+		); err != nil {
+			return nil, fmt.Errorf("scanning work conversation summary: %w", err)
+		}
+
+		counterpart.Role = counterpartRole
+		summary.Work = &readmodel.WorkConversationSummary{Counterpart: counterpart}
+		setSummaryLastMessage(&summary, lastMessageID, lastMessageSenderRole, lastMessageContent, lastMessageCreatedOn)
+		summaries = append(summaries, summary)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterating work conversation summaries: %w", err)
+	}
+
+	return summaries, nil
+}
+
+func setSummaryLastMessage(summary *readmodel.ConversationSummary, id sql.NullInt64, senderRole sql.NullString, content sql.NullString, createdOn sql.NullTime) {
+	if !id.Valid {
+		return
+	}
+
+	summary.LastMessage = &readmodel.MessageSummary{
+		ID:         int(id.Int64),
+		SenderRole: senderRole.String,
+		Content:    content.String,
+		CreatedOn:  createdOn.Time,
+	}
 }
 
 func scanConversationDetail(rows *sql.Rows, counterpartRole string) (*readmodel.ConversationDetail, error) {
