@@ -1,3 +1,57 @@
+get:
+  tags:
+  - Conversations
+  operationId: listChatbotConversations
+  summary: List my AI-assisted chatbot conversations
+  description: Returns chatbot conversation summaries for the authenticated consumer. Provider work conversations are intentionally excluded; use GET /conversations for provider work conversations.
+  security:
+  - BearerAuth: []
+  responses:
+    '200':
+      description: Chatbot conversation summaries returned successfully. The array is empty when the authenticated consumer has no chatbot conversations.
+      content:
+        application/json:
+          schema:
+            type: array
+            items:
+              $ref: '#/components/schemas/ChatbotConversationSummary'
+          examples:
+            withConversations:
+              value:
+              - id: 1
+                status: active
+                title: Pérdida de agua en la cocina
+                last_message:
+                  id: 2
+                  sender_role: chatbot
+                  content: Revisá si el agua sale desde la rosca del sifón o desde la manguera flexible.
+                  created_on: '2026-06-18T12:00:00Z'
+                updated_on: '2026-06-18T12:00:00Z'
+            empty:
+              value: []
+    '401':
+      description: Authentication failed or the authenticated user id could not be obtained from the request context.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/AuthErrorResponse'
+    '403':
+      description: The authenticated user is not a consumer.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            onlyConsumer:
+              value:
+                error: Only consumers can list AI chatbot conversations
+    '500':
+      description: Unexpected error while listing chatbot conversations.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
 post:
   tags:
   - Conversations

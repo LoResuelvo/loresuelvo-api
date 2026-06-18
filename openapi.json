@@ -1000,6 +1000,92 @@
             }
         },
         "/chatbot/conversations": {
+            "get": {
+                "tags": [
+                    "Conversations"
+                ],
+                "operationId": "listChatbotConversations",
+                "summary": "List my AI-assisted chatbot conversations",
+                "description": "Returns chatbot conversation summaries for the authenticated consumer. Provider work conversations are intentionally excluded; use GET /conversations for provider work conversations.",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Chatbot conversation summaries returned successfully. The array is empty when the authenticated consumer has no chatbot conversations.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/ChatbotConversationSummary"
+                                    }
+                                },
+                                "examples": {
+                                    "withConversations": {
+                                        "value": [
+                                            {
+                                                "id": 1,
+                                                "status": "active",
+                                                "title": "Pérdida de agua en la cocina",
+                                                "last_message": {
+                                                    "id": 2,
+                                                    "sender_role": "chatbot",
+                                                    "content": "Revisá si el agua sale desde la rosca del sifón o desde la manguera flexible.",
+                                                    "created_on": "2026-06-18T12:00:00Z"
+                                                },
+                                                "updated_on": "2026-06-18T12:00:00Z"
+                                            }
+                                        ]
+                                    },
+                                    "empty": {
+                                        "value": []
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Authentication failed or the authenticated user id could not be obtained from the request context.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AuthErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "The authenticated user is not a consumer.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                },
+                                "examples": {
+                                    "onlyConsumer": {
+                                        "value": {
+                                            "error": "Only consumers can list AI chatbot conversations"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Unexpected error while listing chatbot conversations.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
             "post": {
                 "tags": [
                     "Conversations"
@@ -2623,6 +2709,48 @@
                 },
                 "additionalProperties": false
             },
+            "ChatbotConversationSummary": {
+                "type": "object",
+                "description": "Chatbot conversation summary returned by GET /chatbot/conversations for the authenticated consumer.",
+                "required": [
+                    "id",
+                    "status",
+                    "title",
+                    "last_message",
+                    "updated_on"
+                ],
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "format": "int32",
+                        "description": "Chatbot conversation identifier.",
+                        "example": 1
+                    },
+                    "status": {
+                        "type": "string",
+                        "description": "Conversation status.",
+                        "enum": [
+                            "active"
+                        ],
+                        "example": "active"
+                    },
+                    "title": {
+                        "type": "string",
+                        "description": "Short title generated by the chatbot for the conversation.",
+                        "example": "Pérdida de agua en la cocina"
+                    },
+                    "last_message": {
+                        "$ref": "#/components/schemas/ConversationLastMessage"
+                    },
+                    "updated_on": {
+                        "type": "string",
+                        "format": "date-time",
+                        "description": "Last time the chatbot conversation changed.",
+                        "example": "2026-06-18T12:00:00Z"
+                    }
+                },
+                "additionalProperties": false
+            },
             "SentMessage": {
                 "type": "object",
                 "description": "Message created in a conversation by one of its participants.",
@@ -2806,7 +2934,8 @@
                         "description": "Role of the participant that sent the message.",
                         "enum": [
                             "consumer",
-                            "provider"
+                            "provider",
+                            "chatbot"
                         ],
                         "example": "consumer"
                     },

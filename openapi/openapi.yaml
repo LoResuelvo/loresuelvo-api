@@ -124,6 +124,8 @@ components:
       $ref: ./components/schemas/create-chatbot-conversation-request.yaml
     ChatbotConversationResponse:
       $ref: ./components/schemas/chatbot-conversation-response.yaml
+    ChatbotConversationSummary:
+      $ref: ./components/schemas/chatbot-conversation-summary.yaml
     SentMessage:
       $ref: ./components/schemas/sent-message.yaml
     Conversation:

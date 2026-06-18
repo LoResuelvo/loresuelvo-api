@@ -17,6 +17,7 @@ properties:
     enum:
     - consumer
     - provider
+    - chatbot
     example: consumer
   content:
     type: string
