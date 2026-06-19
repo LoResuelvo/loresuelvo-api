@@ -40,14 +40,35 @@ jobs:
           username: ${{ secrets.DROPLET_USER }}
           key: ${{ secrets.DROPLET_STAGING_SSH_KEY }}
           script: |
-            set -e
+            set -euo pipefail
             cd ~/loresuelvo-api
             git fetch --tags --force
             git checkout ${{ github.ref_name }}
 
-            echo "DATABASE_URL=${{ secrets.DATABASE_URL_STAGING }}" > .env
-            echo "AUTH0_DOMAIN=${{ secrets.AUTH0_DOMAIN_STAGING }}" >> .env
-            echo "AUTH0_AUDIENCE=${{ secrets.AUTH0_AUDIENCE_STAGING }}" >> .env
+            cat > .env <<EOF
+            DATABASE_URL=${{ secrets.DATABASE_URL_STAGING }}
+            AUTH0_DOMAIN=${{ secrets.AUTH0_DOMAIN_STAGING }}
+            AUTH0_AUDIENCE=${{ secrets.AUTH0_AUDIENCE_STAGING }}
+            ENVIRONMENT=staging
+            CORS_ALLOWED_ORIGINS=${{ secrets.CORS_ALLOWED_ORIGINS_STAGING }}
+            STORAGE_PROVIDER=${{ secrets.STORAGE_PROVIDER }}
+            STORAGE_ENDPOINT=${{ secrets.STORAGE_ENDPOINT }}
+            STORAGE_REGION=${{ secrets.STORAGE_REGION }}
+            STORAGE_ACCESS_KEY_ID=${{ secrets.STORAGE_ACCESS_KEY_ID_STAGING }}
+            STORAGE_SECRET_ACCESS_KEY=${{ secrets.STORAGE_SECRET_ACCESS_KEY_STAGING }}
+            STORAGE_PUBLIC_BUCKET=${{ secrets.STORAGE_PUBLIC_BUCKET_STAGING }}
+            STORAGE_PRIVATE_BUCKET=${{ secrets.STORAGE_PRIVATE_BUCKET_STAGING }}
+            STORAGE_PUBLIC_BASE_URL=${{ secrets.STORAGE_PUBLIC_BASE_URL_STAGING }}
+            STORAGE_PRESIGN_EXPIRATION_SECONDS=${{ secrets.STORAGE_PRESIGN_EXPIRATION_SECONDS }}
+            CHATBOT_PROVIDER=${{ secrets.CHATBOT_PROVIDER }}
+            CHATBOT_API_KEY=${{ secrets.CHATBOT_API_KEY_STAGING }}
+            SEEDS_ENABLED=${{ secrets.SEEDS_ENABLED }}
+            EOF
+            chmod 600 .env
+            if grep -E '^[A-Z_]+=$' .env; then
+              echo "ERROR: empty values found in .env" >&2
+              exit 1
+            fi
 
             export IMAGE_TAG=${{ github.ref_name }}
             export GITHUB_REPOSITORY_OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
@@ -73,14 +94,35 @@ jobs:
           username: ${{ secrets.DROPLET_USER }}
           key: ${{ secrets.DROPLET_PROD_SSH_KEY }}
           script: |
-            set -e
+            set -euo pipefail
             cd ~/loresuelvo-api
             git fetch --tags --force
             git checkout ${{ github.ref_name }}
 
-            echo "DATABASE_URL=${{ secrets.DATABASE_URL_PROD }}" > .env
-            echo "AUTH0_DOMAIN=${{ secrets.AUTH0_DOMAIN_PROD }}" >> .env
-            echo "AUTH0_AUDIENCE=${{ secrets.AUTH0_AUDIENCE_PROD }}" >> .env
+            cat > .env <<EOF
+            DATABASE_URL=${{ secrets.DATABASE_URL_PROD }}
+            AUTH0_DOMAIN=${{ secrets.AUTH0_DOMAIN_PROD }}
+            AUTH0_AUDIENCE=${{ secrets.AUTH0_AUDIENCE_PROD }}
+            ENVIRONMENT=production
+            CORS_ALLOWED_ORIGINS=${{ secrets.CORS_ALLOWED_ORIGINS_PROD }}
+            STORAGE_PROVIDER=${{ secrets.STORAGE_PROVIDER }}
+            STORAGE_ENDPOINT=${{ secrets.STORAGE_ENDPOINT }}
+            STORAGE_REGION=${{ secrets.STORAGE_REGION }}
+            STORAGE_ACCESS_KEY_ID=${{ secrets.STORAGE_ACCESS_KEY_ID_PROD }}
+            STORAGE_SECRET_ACCESS_KEY=${{ secrets.STORAGE_SECRET_ACCESS_KEY_PROD }}
+            STORAGE_PUBLIC_BUCKET=${{ secrets.STORAGE_PUBLIC_BUCKET_PROD }}
+            STORAGE_PRIVATE_BUCKET=${{ secrets.STORAGE_PRIVATE_BUCKET_PROD }}
+            STORAGE_PUBLIC_BASE_URL=${{ secrets.STORAGE_PUBLIC_BASE_URL_PROD }}
+            STORAGE_PRESIGN_EXPIRATION_SECONDS=${{ secrets.STORAGE_PRESIGN_EXPIRATION_SECONDS }}
+            CHATBOT_PROVIDER=${{ secrets.CHATBOT_PROVIDER }}
+            CHATBOT_API_KEY=${{ secrets.CHATBOT_API_KEY_PROD }}
+            SEEDS_ENABLED=${{ secrets.SEEDS_ENABLED }}
+            EOF
+            chmod 600 .env
+            if grep -E '^[A-Z_]+=$' .env; then
+              echo "ERROR: empty values found in .env" >&2
+              exit 1
+            fi
 
             export IMAGE_TAG=${{ github.ref_name }}
             export GITHUB_REPOSITORY_OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
