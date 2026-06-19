@@ -172,7 +172,7 @@ func (s *Service) CreateChatbotConversation(ctx context.Context, authID string, 
 		return nil, err
 	}
 	chatbotConversation := createdConversation.(*ChatBotConversation)
-	chatbotConversation.ApplyResponse(*answer.response, answer.recommendedCategoryID)
+	chatbotConversation.ApplyResponse(*answer.response, recommendedCategoryID(answer.recommendedCategory))
 	chatbotConversation.AddMessage(*consumerMessage)
 	chatbotConversation.AddMessage(*answer.message)
 
@@ -279,17 +279,21 @@ func (s *Service) answerChatbotQuestion(ctx context.Context, question ChatbotHom
 		return nil, err
 	}
 
-	var recommendedCategoryID *int
-	if recommendedCategory != nil {
-		recommendedCategoryID = &recommendedCategory.ID
+	return &chatbotAnswer{
+		response:             chatbotResponse,
+		message:              chatbotMessage,
+		recommendedCategory:  recommendedCategory,
+		recommendedProviders: recommendedProviders,
+	}, nil
+}
+
+func recommendedCategoryID(recommendedCategory *category.Category) *int {
+	if recommendedCategory == nil {
+		return nil
 	}
 
-	return &chatbotAnswer{
-		response:              chatbotResponse,
-		message:               chatbotMessage,
-		recommendedCategoryID: recommendedCategoryID,
-		recommendedProviders:  recommendedProviders,
-	}, nil
+	categoryID := recommendedCategory.ID
+	return &categoryID
 }
 
 func (s *Service) startChatbotProcessing(ctx context.Context, chatbotConversation *ChatBotConversation) error {
@@ -341,7 +345,7 @@ func (s *Service) saveChatbotTurn(ctx context.Context, chatbotConversation *Chat
 	if err := chatbotConversation.AddTurn(consumerMessage, chatbotMessage); err != nil {
 		return nil, err
 	}
-	chatbotConversation.ApplyResponse(*answer.response, answer.recommendedCategoryID)
+	chatbotConversation.ApplyResponse(*answer.response, recommendedCategoryID(answer.recommendedCategory))
 	chatbotConversation.FinishProcessing()
 
 	return s.conversationRepository.UpdateConversation(ctx, chatbotConversation)
@@ -358,11 +362,11 @@ func (s *Service) summarizeChatbotContext(ctx context.Context, previousSummary s
 
 func chatbotTurnResult(conversation Conversation, answer *chatbotAnswer) *ChatbotConversationTurnResult {
 	return &ChatbotConversationTurnResult{
-		Conversation:            conversation,
-		ResponseStatus:          answer.response.Status,
-		RecommendedProviders:    answer.recommendedProviders,
-		DiagnosisCompleted:      answer.response.DiagnosisCompleted,
-		RecommendedCategoryName: strings.TrimSpace(answer.response.RecommendedCategoryName),
+		Conversation:         conversation,
+		ResponseStatus:       answer.response.Status,
+		RecommendedProviders: answer.recommendedProviders,
+		DiagnosisCompleted:   answer.response.DiagnosisCompleted,
+		RecommendedCategory:  answer.recommendedCategory,
 	}
 }
 

@@ -18,13 +18,14 @@ type chatbotConversationRequest struct {
 }
 
 type chatbotConversationResponse struct {
-	ID             int                           `json:"id"`
-	ConversationID int                           `json:"conversation_id"`
-	Status         string                        `json:"status"`
-	Title          string                        `json:"title"`
-	ResponseStatus string                        `json:"response_status"`
-	Messages       []conversationMessageResponse `json:"messages"`
-	Response       *conversationMessageResponse  `json:"response"`
+	ID                  int                           `json:"id"`
+	Status              string                        `json:"status"`
+	Title               string                        `json:"title"`
+	ResponseStatus      string                        `json:"response_status"`
+	DiagnosisCompleted  bool                          `json:"diagnosis_completed"`
+	RecommendedCategory recommendedCategoryDetail     `json:"recommended_category"`
+	Messages            []conversationMessageResponse `json:"messages"`
+	Response            *conversationMessageResponse  `json:"response"`
 }
 
 func registerChatbotSteps(sc *godog.ScenarioContext, suite *testSuite) {
@@ -333,9 +334,5 @@ func (response chatbotConversationResponse) chatbotMessages() []conversationMess
 }
 
 func (response chatbotConversationResponse) conversationID() int {
-	if response.ConversationID != 0 {
-		return response.ConversationID
-	}
-
 	return response.ID
 }

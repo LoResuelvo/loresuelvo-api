@@ -43,10 +43,10 @@ post:
             continuedConversation:
               value:
                 id: 1
-                conversation_id: 1
                 status: active
                 title: Pérdida de agua en la cocina
                 response_status: answered
+                diagnosis_completed: false
                 messages:
                 - id: 3
                   sender_role: consumer

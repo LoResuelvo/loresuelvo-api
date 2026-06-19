@@ -11,6 +11,7 @@ import (
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/middleware"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/conversation"
 	readmodel "github.com/LoResuelvo/loresuelvo-api/internal/domain/conversation/read_model"
+	providerreadmodel "github.com/LoResuelvo/loresuelvo-api/internal/domain/provider/read_model"
 	"github.com/gin-gonic/gin"
 )
 
@@ -328,14 +329,11 @@ func sentMessageResponseFromDomain(message conversation.Message) sentMessageResp
 }
 
 type chatbotConversationResponse struct {
-	ID                   int                           `json:"id"`
-	ConversationID       int                           `json:"conversation_id,omitempty"`
-	Status               string                        `json:"status"`
-	Title                string                        `json:"title"`
-	ResponseStatus       string                        `json:"response_status"`
-	Messages             []conversationMessageResponse `json:"messages"`
-	Response             *conversationMessageResponse  `json:"response,omitempty"`
-	RecommendedProviders []providerSummaryResponse     `json:"recommended_providers"`
+	ID     int    `json:"id"`
+	Status string `json:"status"`
+	chatbotConversationDetail
+	Messages []conversationMessageResponse `json:"messages"`
+	Response *conversationMessageResponse  `json:"response,omitempty"`
 }
 
 func chatbotConversationResponseFromDomain(result conversation.ChatbotConversationResult) chatbotConversationResponse {
@@ -356,26 +354,30 @@ func chatbotConversationResponseFromDomain(result conversation.ChatbotConversati
 	}
 
 	title := ""
-	responseStatus := ""
 	if chatbotConversation != nil {
 		title = chatbotConversation.Title
-		responseStatus = string(result.ResponseStatus)
 	}
 
-	recommendedProviders := make([]providerSummaryResponse, 0, len(result.RecommendedProviders))
-	for _, recommendedProvider := range result.RecommendedProviders {
-		recommendedProviders = append(recommendedProviders, providerSummaryResponseFromDomain(recommendedProvider))
+	var recommendedCategory *recommendedCategoryResponse
+	if result.RecommendedCategory != nil {
+		recommendedCategory = &recommendedCategoryResponse{
+			ID:   result.RecommendedCategory.ID,
+			Name: result.RecommendedCategory.Name,
+		}
 	}
 
 	return chatbotConversationResponse{
-		ID:                   result.Conversation.Base().ID,
-		ConversationID:       result.Conversation.Base().ID,
-		Status:               result.Conversation.Base().Status,
-		Title:                title,
-		ResponseStatus:       responseStatus,
-		Messages:             messages,
-		Response:             chatbotResponse,
-		RecommendedProviders: recommendedProviders,
+		ID:     result.Conversation.Base().ID,
+		Status: result.Conversation.Base().Status,
+		chatbotConversationDetail: chatbotConversationDetail{
+			Title:                title,
+			ResponseStatus:       string(result.ResponseStatus),
+			DiagnosisCompleted:   result.DiagnosisCompleted,
+			RecommendedCategory:  recommendedCategory,
+			RecommendedProviders: providerSummaryResponsesFromDomain(result.RecommendedProviders),
+		},
+		Messages: messages,
+		Response: chatbotResponse,
 	}
 }
 
@@ -416,11 +418,6 @@ func chatbotConversationDetailResponseFromDomain(detail *readmodel.ChatbotConver
 		return nil
 	}
 
-	recommendedProviders := make([]providerSummaryResponse, 0, len(detail.RecommendedProviders))
-	for _, recommendedProvider := range detail.RecommendedProviders {
-		recommendedProviders = append(recommendedProviders, providerSummaryResponseFromDomain(recommendedProvider))
-	}
-
 	var recommendedCategory *recommendedCategoryResponse
 	if detail.RecommendedCategory != nil {
 		recommendedCategory = &recommendedCategoryResponse{
@@ -434,8 +431,17 @@ func chatbotConversationDetailResponseFromDomain(detail *readmodel.ChatbotConver
 		ResponseStatus:       detail.ResponseStatus,
 		DiagnosisCompleted:   detail.DiagnosisCompleted,
 		RecommendedCategory:  recommendedCategory,
-		RecommendedProviders: recommendedProviders,
+		RecommendedProviders: providerSummaryResponsesFromDomain(detail.RecommendedProviders),
 	}
+}
+
+func providerSummaryResponsesFromDomain(providers []providerreadmodel.ProviderSummary) []providerSummaryResponse {
+	response := make([]providerSummaryResponse, 0, len(providers))
+	for _, foundProvider := range providers {
+		response = append(response, providerSummaryResponseFromDomain(foundProvider))
+	}
+
+	return response
 }
 
 func chatbotConversationSummaryResponsesFromDomain(summaries []readmodel.ConversationSummary) []chatbotConversationSummaryResponse {

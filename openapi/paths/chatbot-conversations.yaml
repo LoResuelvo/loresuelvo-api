@@ -90,6 +90,10 @@ post:
                 status: active
                 title: Diagnóstico concluido
                 response_status: answered
+                diagnosis_completed: true
+                recommended_category:
+                  id: 3
+                  name: Plomería
                 messages:
                 - id: 1
                   sender_role: consumer
