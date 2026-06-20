@@ -13,15 +13,17 @@ import (
 )
 
 type sendMessageRequest struct {
-	Content string `json:"content,omitempty"`
+	Content      string   `json:"content,omitempty"`
+	ImageFileIDs []string `json:"image_file_ids,omitempty"`
 }
 
 type sentMessageResponse struct {
-	ID             int       `json:"id"`
-	ConversationID int       `json:"conversation_id"`
-	SenderRole     string    `json:"sender_role"`
-	Content        string    `json:"content"`
-	CreatedOn      time.Time `json:"created_on"`
+	ID             int                    `json:"id"`
+	ConversationID int                    `json:"conversation_id"`
+	SenderRole     string                 `json:"sender_role"`
+	Content        string                 `json:"content"`
+	Images         []messageImageResponse `json:"images"`
+	CreatedOn      time.Time              `json:"created_on"`
 }
 
 func registerSendMessageSteps(sc *godog.ScenarioContext, suite *testSuite) {

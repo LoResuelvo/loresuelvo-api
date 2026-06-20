@@ -47,6 +47,9 @@ type testSuite struct {
 	expectedChatbotContextSummary           string
 	expectedRecentChatbotContextMessage     string
 	lastAttemptedChatbotContinuationMessage string
+	messageImagesByName                     map[string]messageImageFixture
+	lastSentMessageID                       int
+	lastAttemptedMessageImageNames          []string
 
 	categoryIDsByName              map[string]int
 	lastProviderFilterCategoryName string
@@ -70,6 +73,7 @@ func (s *testSuite) registerAllSteps(sc *godog.ScenarioContext) {
 	registerGetJobRequestSteps(sc, s)
 	registerAcceptJobRequestSteps(sc, s)
 	registerRealtimeMessageSteps(sc, s)
+	registerAttachMessageImagesSteps(sc, s)
 	registerChatbotSteps(sc, s)
 	registerChatbotContinuationSteps(sc, s)
 	registerChatbotGetConversationsSteps(sc, s)
@@ -117,6 +121,9 @@ func (s *testSuite) cleanDatabase() error {
 	s.expectedChatbotContextSummary = ""
 	s.expectedRecentChatbotContextMessage = ""
 	s.lastAttemptedChatbotContinuationMessage = ""
+	s.messageImagesByName = map[string]messageImageFixture{}
+	s.lastSentMessageID = 0
+	s.lastAttemptedMessageImageNames = nil
 
 	return nil
 }
@@ -163,6 +170,7 @@ func newTestSuite(tb testing.TB, database *sql.DB) *testSuite {
 		categoryIDsByName:          map[string]int{},
 		participantRolesByFullName: map[string]string{},
 		realtimeConnections:        map[string]*realtimeTestConnection{},
+		messageImagesByName:        map[string]messageImageFixture{},
 	}
 }
 

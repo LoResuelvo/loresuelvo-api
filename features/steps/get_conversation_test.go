@@ -27,10 +27,11 @@ type workConversationDetail struct {
 }
 
 type conversationMessageResponse struct {
-	ID         int       `json:"id"`
-	SenderRole string    `json:"sender_role"`
-	Content    string    `json:"content"`
-	CreatedOn  time.Time `json:"created_on"`
+	ID         int                    `json:"id"`
+	SenderRole string                 `json:"sender_role"`
+	Content    string                 `json:"content"`
+	Images     []messageImageResponse `json:"images"`
+	CreatedOn  time.Time              `json:"created_on"`
 }
 
 func registerGetConversationSteps(sc *godog.ScenarioContext, suite *testSuite) {
