@@ -110,6 +110,8 @@ components:
       $ref: ./components/schemas/confirm-file-request.yaml
     FileResponse:
       $ref: ./components/schemas/file-response.yaml
+    MessageImage:
+      $ref: ./components/schemas/message-image.yaml
     CreateJobRequestRequest:
       $ref: ./components/schemas/create-job-request-request.yaml
     JobRequest:

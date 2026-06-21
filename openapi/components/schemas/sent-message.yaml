@@ -5,6 +5,7 @@ required:
 - conversation_id
 - sender_role
 - content
+- images
 - created_on
 properties:
   id:
@@ -28,6 +29,10 @@ properties:
     type: string
     description: Message text.
     example: ¿El jueves por la mañana te queda cómodo para pasar a revisar el problema?
+  images:
+    type: array
+    items:
+      $ref: '#/components/schemas/MessageImage'
   created_on:
     type: string
     format: date-time

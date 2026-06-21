@@ -4,6 +4,7 @@ required:
 - id
 - sender_role
 - content
+- images
 - created_on
 properties:
   id:
@@ -23,6 +24,10 @@ properties:
     type: string
     description: Message text.
     example: Hola Juan, necesito reparar una pérdida de agua en la cocina. ¿Podrías ayudarme esta semana?
+  images:
+    type: array
+    items:
+      $ref: '#/components/schemas/MessageImage'
   created_on:
     type: string
     format: date-time

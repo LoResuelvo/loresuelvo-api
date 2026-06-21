@@ -1,0 +1,19 @@
+type: object
+description: Private image attached to a conversation message.
+required:
+- id
+- url
+- original_name
+properties:
+  id:
+    type: string
+    format: uuid
+    description: Confirmed file identifier.
+  url:
+    type: string
+    format: uri
+    description: Short-lived authorized download URL. Clients must treat it as opaque and temporary.
+  original_name:
+    type: string
+    description: Original image name supplied by the sender.
+additionalProperties: false

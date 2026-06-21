@@ -2451,7 +2451,6 @@
                 "type": "object",
                 "required": [
                     "id",
-                    "url",
                     "original_name"
                 ],
                 "properties": {
@@ -2464,13 +2463,39 @@
                     "url": {
                         "type": "string",
                         "format": "uri",
-                        "description": "Public URL for confirmed public files.",
+                        "description": "Public URL for confirmed public files. Omitted for private files.",
                         "example": "https://cdn.example/files/2026/06/provider_profile_photo/4af47f1b-97b6-4b32-baa0-b95d6077f919.jpg"
                     },
                     "original_name": {
                         "type": "string",
                         "description": "Original file name selected by the user.",
                         "example": "foto-perfil.jpg"
+                    }
+                },
+                "additionalProperties": false
+            },
+            "MessageImage": {
+                "type": "object",
+                "description": "Private image attached to a conversation message.",
+                "required": [
+                    "id",
+                    "url",
+                    "original_name"
+                ],
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "Confirmed file identifier."
+                    },
+                    "url": {
+                        "type": "string",
+                        "format": "uri",
+                        "description": "Short-lived authorized download URL. Clients must treat it as opaque and temporary."
+                    },
+                    "original_name": {
+                        "type": "string",
+                        "description": "Original image name supplied by the sender."
                     }
                 },
                 "additionalProperties": false
@@ -2619,15 +2644,34 @@
             },
             "SendMessageRequest": {
                 "type": "object",
-                "description": "Payload accepted by POST /conversations/{conversationId}/messages to append a text message. The sender is inferred from the authenticated JWT subject.",
-                "required": [
-                    "content"
+                "description": "Payload accepted by POST /conversations/{conversationId}/messages. The sender is inferred from the authenticated JWT subject. At least text or one image is required.",
+                "anyOf": [
+                    {
+                        "required": [
+                            "content"
+                        ]
+                    },
+                    {
+                        "required": [
+                            "image_file_ids"
+                        ]
+                    }
                 ],
                 "properties": {
                     "content": {
                         "type": "string",
-                        "description": "Message text. Must be non-empty after trimming.",
+                        "description": "Optional message text. Must be non-empty after trimming when no images are provided.",
                         "example": "¿El jueves por la mañana te queda cómodo para pasar a revisar el problema?"
+                    },
+                    "image_file_ids": {
+                        "type": "array",
+                        "description": "Confirmed private conversation-image files uploaded by the authenticated sender.",
+                        "maxItems": 5,
+                        "uniqueItems": true,
+                        "items": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
                     }
                 },
                 "additionalProperties": false
@@ -2799,6 +2843,7 @@
                     "conversation_id",
                     "sender_role",
                     "content",
+                    "images",
                     "created_on"
                 ],
                 "properties": {
@@ -2827,6 +2872,12 @@
                         "type": "string",
                         "description": "Message text.",
                         "example": "¿El jueves por la mañana te queda cómodo para pasar a revisar el problema?"
+                    },
+                    "images": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/MessageImage"
+                        }
                     },
                     "created_on": {
                         "type": "string",
@@ -3067,6 +3118,7 @@
                     "id",
                     "sender_role",
                     "content",
+                    "images",
                     "created_on"
                 ],
                 "properties": {
@@ -3090,6 +3142,12 @@
                         "type": "string",
                         "description": "Message text.",
                         "example": "Hola Juan, necesito reparar una pérdida de agua en la cocina. ¿Podrías ayudarme esta semana?"
+                    },
+                    "images": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/MessageImage"
+                        }
                     },
                     "created_on": {
                         "type": "string",

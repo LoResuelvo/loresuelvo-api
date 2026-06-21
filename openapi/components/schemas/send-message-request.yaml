@@ -1,10 +1,19 @@
 type: object
-description: Payload accepted by POST /conversations/{conversationId}/messages to append a text message. The sender is inferred from the authenticated JWT subject.
-required:
-- content
+description: Payload accepted by POST /conversations/{conversationId}/messages. The sender is inferred from the authenticated JWT subject. At least text or one image is required.
+anyOf:
+- required: [content]
+- required: [image_file_ids]
 properties:
   content:
     type: string
-    description: Message text. Must be non-empty after trimming.
+    description: Optional message text. Must be non-empty after trimming when no images are provided.
     example: ¿El jueves por la mañana te queda cómodo para pasar a revisar el problema?
+  image_file_ids:
+    type: array
+    description: Confirmed private conversation-image files uploaded by the authenticated sender.
+    maxItems: 5
+    uniqueItems: true
+    items:
+      type: string
+      format: uuid
 additionalProperties: false
