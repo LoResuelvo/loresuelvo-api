@@ -10,7 +10,7 @@ func validateUploadRequest(request PresignRequest, policy UploadPolicy) (*FileMe
 		return nil, err
 	}
 	if !policy.Allows(*metadata) {
-		return nil, ErrUnsupportedProfilePhoto
+		return nil, policy.InvalidMetadataError
 	}
 	return metadata, nil
 }

@@ -36,7 +36,7 @@ type confirmFileRequest struct {
 
 type fileResponse struct {
 	ID           string `json:"id"`
-	URL          string `json:"url"`
+	URL          string `json:"url,omitempty"`
 	OriginalName string `json:"original_name"`
 }
 
@@ -112,6 +112,14 @@ func (h *FileHandler) ConfirmUpload(c *gin.Context) {
 func handleFileError(c *gin.Context, err error) {
 	if errors.Is(err, filedomain.ErrUnsupportedProfilePhoto) || errors.Is(err, filedomain.ErrProfilePhotoNotAvailable) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": filedomain.ErrProfilePhotoNotAvailable.Error()})
+		return
+	}
+	if errors.Is(err, filedomain.ErrMessageImageNotAvailable) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	if errors.Is(err, filedomain.ErrFileNotAvailable) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 	if errors.Is(err, filedomain.ErrProfilePhotoRequired) ||

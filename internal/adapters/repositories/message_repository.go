@@ -9,11 +9,12 @@ import (
 )
 
 type MessageRepository struct {
-	db *sql.DB
+	db              *sql.DB
+	imageRepository *MessageImageRepository
 }
 
-func NewMessageRepository(db *sql.DB) *MessageRepository {
-	return &MessageRepository{db: db}
+func NewMessageRepository(db *sql.DB, imageRepository *MessageImageRepository) *MessageRepository {
+	return &MessageRepository{db: db, imageRepository: imageRepository}
 }
 
 func (repository *MessageRepository) ExistsInConversation(conversationID int, content string) (bool, error) {
@@ -78,5 +79,14 @@ func (repository *MessageRepository) saveWithTx(ctx context.Context, tx *sql.Tx,
 		return nil, fmt.Errorf("saving message: %w", err)
 	}
 
+	savedMessage.Images = append(savedMessage.Images, message.Images...)
+	if err := repository.imageRepository.saveWithTx(ctx, tx, savedMessage.ID, savedMessage.Images); err != nil {
+		return nil, err
+	}
+
 	return &savedMessage, nil
+}
+
+func (repository *MessageRepository) findImagesByConversationID(ctx context.Context, conversationID int) (map[int][]persistedMessageImage, error) {
+	return repository.imageRepository.findByConversationID(ctx, conversationID)
 }

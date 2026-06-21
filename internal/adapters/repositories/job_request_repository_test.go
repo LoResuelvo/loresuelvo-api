@@ -62,7 +62,7 @@ func newJobRequestRepositoryTest(t *testing.T) jobRequestRepositoryTestContext {
 	cleanJobRequestRepositoryTestDatabase(t, database)
 
 	userRepository := repositories.NewUserRepository(database)
-	messageRepository := repositories.NewMessageRepository(database)
+	messageRepository := repositories.NewMessageRepository(database, repositories.NewMessageImageRepository(database))
 
 	return jobRequestRepositoryTestContext{
 		database:               database,

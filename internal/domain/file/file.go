@@ -9,7 +9,8 @@ const (
 	VisibilityPublic  = "public"
 	VisibilityPrivate = "private"
 
-	PurposeProviderProfilePhoto = "provider_profile_photo"
+	PurposeProviderProfilePhoto     = "provider_profile_photo"
+	PurposeConversationMessageImage = "conversation_message_image"
 )
 
 type File struct {

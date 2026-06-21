@@ -6,6 +6,8 @@ var ErrProviderRequired = errors.New("Provider id is required")
 
 var ErrMessageRequired = errors.New("Message is required")
 
+var ErrMessageImageNotAvailable = errors.New("Message image is not available")
+
 var ErrConsumerRequired = errors.New("Consumer id is required")
 
 var ErrAlreadyExists = errors.New("Conversation already exists")

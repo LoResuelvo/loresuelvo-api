@@ -10,11 +10,12 @@ import (
 )
 
 type ConversationReader struct {
-	db *sql.DB
+	db                     *sql.DB
+	messageImageRepository *MessageImageRepository
 }
 
-func NewConversationReader(db *sql.DB) *ConversationReader {
-	return &ConversationReader{db: db}
+func NewConversationReader(db *sql.DB, messageImageRepository *MessageImageRepository) *ConversationReader {
+	return &ConversationReader{db: db, messageImageRepository: messageImageRepository}
 }
 
 func (reader *ConversationReader) FindSummariesByParticipantIDRoleAndType(ctx context.Context, participantID int, participantRole string, conversationType string) ([]readmodel.ConversationSummary, error) {
@@ -216,7 +217,12 @@ func (reader *ConversationReader) findWorkDetailForConsumer(ctx context.Context,
 	}
 	defer func() { _ = rows.Close() }()
 
-	return scanWorkConversationDetail(rows, conversation.SenderProvider)
+	detail, err := scanWorkConversationDetail(rows, conversation.SenderProvider)
+	_ = rows.Close()
+	if err != nil {
+		return nil, err
+	}
+	return reader.withMessageImages(ctx, detail)
 }
 
 func (reader *ConversationReader) findWorkDetailForProvider(ctx context.Context, conversationID int) (*readmodel.ConversationDetail, error) {
@@ -252,7 +258,12 @@ func (reader *ConversationReader) findWorkDetailForProvider(ctx context.Context,
 	}
 	defer func() { _ = rows.Close() }()
 
-	return scanWorkConversationDetail(rows, conversation.SenderConsumer)
+	detail, err := scanWorkConversationDetail(rows, conversation.SenderConsumer)
+	_ = rows.Close()
+	if err != nil {
+		return nil, err
+	}
+	return reader.withMessageImages(ctx, detail)
 }
 
 func (reader *ConversationReader) findChatbotDetailByID(ctx context.Context, conversationID int) (*readmodel.ConversationDetail, error) {
@@ -287,7 +298,21 @@ func (reader *ConversationReader) findChatbotDetailByID(ctx context.Context, con
 	}
 	defer func() { _ = rows.Close() }()
 
-	return scanChatbotConversationDetail(rows)
+	detail, err := scanChatbotConversationDetail(rows)
+	_ = rows.Close()
+	if err != nil {
+		return nil, err
+	}
+	return reader.withMessageImages(ctx, detail)
+}
+
+func (reader *ConversationReader) withMessageImages(ctx context.Context, detail *readmodel.ConversationDetail) (*readmodel.ConversationDetail, error) {
+	imagesByMessageID, err := reader.messageImageRepository.findByConversationID(ctx, detail.ID)
+	if err != nil {
+		return nil, err
+	}
+	attachImagesToMessageDetails(detail.Messages, imagesByMessageID)
+	return detail, nil
 }
 
 func scanChatbotConversationSummaries(rows *sql.Rows) ([]readmodel.ConversationSummary, error) {

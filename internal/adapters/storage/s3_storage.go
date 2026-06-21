@@ -62,6 +62,17 @@ func (storage *S3Storage) GenerateUploadURL(ctx context.Context, object filedoma
 	return &filedomain.UploadTarget{URL: result.URL, Headers: headers}, nil
 }
 
+func (storage *S3Storage) GenerateDownloadURL(ctx context.Context, object filedomain.ObjectToDownload) (string, error) {
+	result, err := storage.presignClient.PresignGetObject(ctx, &s3.GetObjectInput{
+		Bucket: aws.String(object.Bucket),
+		Key:    aws.String(object.Key),
+	}, storage.presignExpiresIn)
+	if err != nil {
+		return "", fmt.Errorf("presigning get object: %w", err)
+	}
+	return result.URL, nil
+}
+
 func (storage *S3Storage) ReadObjectMetadata(ctx context.Context, bucket, key string) (*filedomain.ObjectMetadata, error) {
 	result, err := storage.client.HeadObject(ctx, &s3.HeadObjectInput{
 		Bucket: aws.String(bucket),

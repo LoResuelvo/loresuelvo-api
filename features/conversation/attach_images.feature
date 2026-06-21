@@ -1,4 +1,3 @@
-@wip
 Feature: 50 Adjuntar imágenes en el chat con un prestador
     Como participante de un chat de trabajo
     quiero adjuntar imágenes a mis mensajes

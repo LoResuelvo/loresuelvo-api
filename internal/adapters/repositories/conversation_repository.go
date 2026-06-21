@@ -493,6 +493,11 @@ func (repository *ConversationRepository) findMessagesByConversationID(ctx conte
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("iterating conversation messages: %w", err)
 	}
+	imagesByMessageID, err := repository.messageRepository.findImagesByConversationID(ctx, conversationID)
+	if err != nil {
+		return nil, err
+	}
+	attachImagesToMessages(messages, imagesByMessageID)
 
 	return messages, nil
 }

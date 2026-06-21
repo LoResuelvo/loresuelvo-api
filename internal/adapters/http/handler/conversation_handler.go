@@ -11,6 +11,7 @@ import (
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/middleware"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/conversation"
 	readmodel "github.com/LoResuelvo/loresuelvo-api/internal/domain/conversation/read_model"
+	filedomain "github.com/LoResuelvo/loresuelvo-api/internal/domain/file"
 	providerreadmodel "github.com/LoResuelvo/loresuelvo-api/internal/domain/provider/read_model"
 	"github.com/gin-gonic/gin"
 )
@@ -20,19 +21,22 @@ type ConversationHandler struct {
 }
 
 type sendMessageRequest struct {
-	Content string `json:"content"`
+	Content      string   `json:"content"`
+	ImageFileIDs []string `json:"image_file_ids"`
 }
 
 type createChatbotConversationRequest struct {
 	Content string `json:"content"`
 }
 
+// TODO: hay que unificarlo con conversationMessageResponse
 type sentMessageResponse struct {
-	ID             int       `json:"id"`
-	ConversationID int       `json:"conversation_id"`
-	SenderRole     string    `json:"sender_role"`
-	Content        string    `json:"content"`
-	CreatedOn      time.Time `json:"created_on"`
+	ID             int                    `json:"id"`
+	ConversationID int                    `json:"conversation_id"`
+	SenderRole     string                 `json:"sender_role"`
+	Content        string                 `json:"content"`
+	Images         []messageImageResponse `json:"images"`
+	CreatedOn      time.Time              `json:"created_on"`
 }
 
 type conversationDetailResponse struct {
@@ -63,10 +67,17 @@ type recommendedCategoryResponse struct {
 }
 
 type conversationMessageResponse struct {
-	ID         int       `json:"id"`
-	SenderRole string    `json:"sender_role"`
-	Content    string    `json:"content"`
-	CreatedOn  time.Time `json:"created_on"`
+	ID         int                    `json:"id"`
+	SenderRole string                 `json:"sender_role"`
+	Content    string                 `json:"content"`
+	Images     []messageImageResponse `json:"images"`
+	CreatedOn  time.Time              `json:"created_on"`
+}
+
+type messageImageResponse struct {
+	ID           string `json:"id"`
+	URL          string `json:"url"`
+	OriginalName string `json:"original_name"`
 }
 
 type conversationSummaryResponse struct {
@@ -163,8 +174,8 @@ func (h *ConversationHandler) SendMessage(c *gin.Context) {
 		return
 	}
 
-	sentMessage, err := h.conversationService.SendMessage(c.Request.Context(), auth0ID, conversationID, req.Content)
-	if errors.Is(err, conversation.ErrMessageRequired) {
+	sentMessage, err := h.conversationService.SendMessage(c.Request.Context(), auth0ID, conversationID, req.Content, req.ImageFileIDs)
+	if errors.Is(err, conversation.ErrMessageRequired) || errors.Is(err, conversation.ErrMessageImageNotAvailable) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
@@ -324,6 +335,7 @@ func sentMessageResponseFromDomain(message conversation.Message) sentMessageResp
 		ConversationID: message.ConversationID,
 		SenderRole:     message.SenderRole,
 		Content:        message.Content,
+		Images:         messageImageResponsesFromDomain(message.Images),
 		CreatedOn:      message.CreatedOn,
 	}
 }
@@ -345,6 +357,7 @@ func chatbotConversationResponseFromDomain(result conversation.ChatbotConversati
 			ID:         message.ID,
 			SenderRole: message.SenderRole,
 			Content:    message.Content,
+			Images:     messageImageResponsesFromDomain(message.Images),
 			CreatedOn:  message.CreatedOn,
 		}
 		messages = append(messages, messageResponse)
@@ -388,6 +401,7 @@ func conversationDetailResponseFromDomain(foundConversation readmodel.Conversati
 			ID:         message.ID,
 			SenderRole: message.SenderRole,
 			Content:    message.Content,
+			Images:     messageImageResponsesFromDomain(message.Images),
 			CreatedOn:  message.CreatedOn,
 		})
 	}
@@ -401,6 +415,14 @@ func conversationDetailResponseFromDomain(foundConversation readmodel.Conversati
 		Messages:  messages,
 		UpdatedOn: foundConversation.UpdatedOn,
 	}
+}
+
+func messageImageResponsesFromDomain(images []filedomain.MessageImage) []messageImageResponse {
+	response := make([]messageImageResponse, 0, len(images))
+	for _, image := range images {
+		response = append(response, messageImageResponse{ID: image.FileID, URL: image.URL, OriginalName: image.OriginalName})
+	}
+	return response
 }
 
 func workConversationDetailResponseFromDomain(detail *readmodel.WorkConversationDetail) *workConversationDetail {

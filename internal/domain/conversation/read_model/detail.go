@@ -3,6 +3,7 @@ package readmodel
 import (
 	"time"
 
+	filedomain "github.com/LoResuelvo/loresuelvo-api/internal/domain/file"
 	providerreadmodel "github.com/LoResuelvo/loresuelvo-api/internal/domain/provider/read_model"
 )
 
@@ -37,5 +38,6 @@ type MessageDetail struct {
 	ID         int
 	SenderRole string
 	Content    string
+	Images     []filedomain.MessageImage
 	CreatedOn  time.Time
 }

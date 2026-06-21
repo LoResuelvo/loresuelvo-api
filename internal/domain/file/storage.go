@@ -4,8 +4,14 @@ import "context"
 
 type Storage interface {
 	GenerateUploadURL(ctx context.Context, object ObjectToUpload) (*UploadTarget, error)
+	GenerateDownloadURL(ctx context.Context, object ObjectToDownload) (string, error)
 	ReadObjectMetadata(ctx context.Context, bucket, key string) (*ObjectMetadata, error)
 	PublicURL(bucket, key string) string
+}
+
+type ObjectToDownload struct {
+	Bucket string
+	Key    string
 }
 
 type ObjectToUpload struct {

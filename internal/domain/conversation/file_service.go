@@ -1,8 +1,14 @@
 package conversation
 
-import "context"
+import (
+	"context"
 
-type FileURLResolver interface {
+	filedomain "github.com/LoResuelvo/loresuelvo-api/internal/domain/file"
+)
+
+type FileService interface {
 	ResolvePublicURL(ctx context.Context, fileID string) (string, error)
 	ResolvePublicURLs(ctx context.Context, fileIDs []string) (map[string]string, error)
+	PrepareMessageImages(ctx context.Context, authID string, fileIDs []string) ([]filedomain.MessageImage, error)
+	ResolveMessageImages(ctx context.Context, fileIDs []string) (map[string]filedomain.MessageImage, error)
 }

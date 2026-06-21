@@ -63,6 +63,10 @@ type storageMock struct {
 	readErr          error
 }
 
+func (storage *storageMock) GenerateDownloadURL(_ context.Context, object filedomain.ObjectToDownload) (string, error) {
+	return "https://download/" + object.Bucket + "/" + object.Key, nil
+}
+
 func newStorageMock() *storageMock {
 	return &storageMock{metadataByObject: map[string]filedomain.ObjectMetadata{}}
 }
@@ -120,6 +124,55 @@ func TestRequestUploadCreatesPendingProviderProfilePhoto(t *testing.T) {
 	assert.Equal(t, filedomain.StatusPending, createdFile.Status)
 	assert.Equal(t, filedomain.VisibilityPublic, createdFile.Visibility)
 	assert.Equal(t, "auth0|provider", createdFile.UploadedByAuthID)
+}
+
+func TestRequestUploadCreatesPrivateConversationMessageImage(t *testing.T) {
+	repo := newFileRepositoryMock()
+	service := newFileService(repo, newStorageMock())
+
+	result, err := service.RequestUpload(context.Background(), filedomain.PresignRequest{
+		AuthID: "auth0|consumer", OriginalName: "problem.webp", MimeType: "image/webp", SizeBytes: 1024, Purpose: filedomain.PurposeConversationMessageImage,
+	})
+
+	require.NoError(t, err)
+	createdFile := repo.files[result.FileID]
+	assert.Equal(t, filedomain.VisibilityPrivate, createdFile.Visibility)
+	assert.Contains(t, result.Key, "/conversation_message_image/")
+}
+
+func TestValidateAndResolveConversationMessageImage(t *testing.T) {
+	repo := newFileRepositoryMock()
+	storage := newStorageMock()
+	service := newFileService(repo, storage)
+	upload, err := service.RequestUpload(context.Background(), filedomain.PresignRequest{
+		AuthID: "auth0|consumer", OriginalName: "problem.jpg", MimeType: "image/jpeg", SizeBytes: 1024, Purpose: filedomain.PurposeConversationMessageImage,
+	})
+	require.NoError(t, err)
+	_, err = service.ConfirmUpload(context.Background(), filedomain.ConfirmRequest{AuthID: "auth0|consumer", FileID: upload.FileID, Key: upload.Key, MimeType: "image/jpeg", SizeBytes: 1024})
+	require.NoError(t, err)
+
+	validated, err := service.ValidateMessageImages(context.Background(), "auth0|consumer", []string{upload.FileID})
+	require.NoError(t, err)
+	require.Len(t, validated, 1)
+	resolved, err := service.ResolveMessageImages(context.Background(), []string{upload.FileID})
+	require.NoError(t, err)
+	assert.Equal(t, "problem.jpg", resolved[upload.FileID].OriginalName)
+	assert.Equal(t, "https://download/private/"+upload.Key, resolved[upload.FileID].URL)
+}
+
+func TestValidateConversationMessageImageRejectsWrongOwnerAndPurpose(t *testing.T) {
+	repo := newFileRepositoryMock()
+	storage := newStorageMock()
+	service := newFileService(repo, storage)
+	upload, err := service.RequestUpload(context.Background(), filedomain.PresignRequest{
+		AuthID: "auth0|provider", OriginalName: "profile.jpg", MimeType: "image/jpeg", SizeBytes: 1024, Purpose: filedomain.PurposeProviderProfilePhoto,
+	})
+	require.NoError(t, err)
+	_, err = service.ConfirmUpload(context.Background(), filedomain.ConfirmRequest{AuthID: "auth0|provider", FileID: upload.FileID, Key: upload.Key, MimeType: "image/jpeg", SizeBytes: 1024})
+	require.NoError(t, err)
+
+	_, err = service.ValidateMessageImages(context.Background(), "auth0|other", []string{upload.FileID})
+	assert.ErrorIs(t, err, filedomain.ErrMessageImageNotAvailable)
 }
 
 func TestRequestUploadRejectsMissingPurpose(t *testing.T) {
@@ -290,7 +343,7 @@ func TestConfirmUploadRejectsUnavailableFile(t *testing.T) {
 		SizeBytes: 1024,
 	})
 
-	assert.ErrorIs(t, err, filedomain.ErrProfilePhotoNotAvailable)
+	assert.ErrorIs(t, err, filedomain.ErrFileNotAvailable)
 }
 
 func TestConfirmUploadRejectsMismatchedRequestData(t *testing.T) {
@@ -314,7 +367,7 @@ func TestConfirmUploadRejectsMismatchedRequestData(t *testing.T) {
 		SizeBytes: 2048,
 	})
 
-	assert.ErrorIs(t, err, filedomain.ErrProfilePhotoNotAvailable)
+	assert.ErrorIs(t, err, filedomain.ErrFileNotAvailable)
 }
 
 func TestConfirmUploadRejectsMismatchedMetadataRequestData(t *testing.T) {
@@ -338,7 +391,7 @@ func TestConfirmUploadRejectsMismatchedMetadataRequestData(t *testing.T) {
 		SizeBytes: 2048,
 	})
 
-	assert.ErrorIs(t, err, filedomain.ErrProfilePhotoNotAvailable)
+	assert.ErrorIs(t, err, filedomain.ErrFileNotAvailable)
 }
 
 func TestConfirmUploadRejectsUnreadableObjectMetadata(t *testing.T) {
@@ -363,7 +416,7 @@ func TestConfirmUploadRejectsUnreadableObjectMetadata(t *testing.T) {
 		SizeBytes: 2048,
 	})
 
-	assert.ErrorIs(t, err, filedomain.ErrProfilePhotoNotAvailable)
+	assert.ErrorIs(t, err, filedomain.ErrFileNotAvailable)
 }
 
 func TestConfirmUploadRejectsMismatchedObjectMetadata(t *testing.T) {
@@ -388,7 +441,7 @@ func TestConfirmUploadRejectsMismatchedObjectMetadata(t *testing.T) {
 		SizeBytes: 2048,
 	})
 
-	assert.ErrorIs(t, err, filedomain.ErrProfilePhotoNotAvailable)
+	assert.ErrorIs(t, err, filedomain.ErrFileNotAvailable)
 }
 
 func TestConfirmUploadWrapsRepositorySaveError(t *testing.T) {

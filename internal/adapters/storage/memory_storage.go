@@ -51,6 +51,16 @@ func (storage *MemoryStorage) ReadObjectMetadata(_ context.Context, bucket, key 
 	return &metadata, nil
 }
 
+func (storage *MemoryStorage) GenerateDownloadURL(_ context.Context, object filedomain.ObjectToDownload) (string, error) {
+	storage.mu.RLock()
+	_, ok := storage.objects[objectIdentity(object.Bucket, object.Key)]
+	storage.mu.RUnlock()
+	if !ok {
+		return "", fmt.Errorf("object not found")
+	}
+	return fmt.Sprintf("%s/download/%s/%s", storage.publicBaseURL, object.Bucket, object.Key), nil
+}
+
 func (storage *MemoryStorage) PublicURL(bucket, key string) string {
 	return fmt.Sprintf("%s/%s/%s", storage.publicBaseURL, bucket, key)
 }

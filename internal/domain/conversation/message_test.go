@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/conversation"
+	filedomain "github.com/LoResuelvo/loresuelvo-api/internal/domain/file"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -50,4 +51,20 @@ func TestNewProviderMessageRejectsEmptyContent(t *testing.T) {
 
 	assert.ErrorIs(t, err, conversation.ErrMessageRequired)
 	assert.Nil(t, message)
+}
+
+func TestNewConsumerMessageWithImagesAllowsEmptyText(t *testing.T) {
+	message, err := conversation.NewConsumerMessage("   ", filedomain.MessageImage{FileID: "file-id", OriginalName: "problem.jpg"})
+
+	require.NoError(t, err)
+	assert.Empty(t, message.Content)
+	require.Len(t, message.Images, 1)
+	assert.Equal(t, "file-id", message.Images[0].FileID)
+}
+
+func TestNewConsumerMessageWithImagesRejectsDuplicateFiles(t *testing.T) {
+	message, err := conversation.NewConsumerMessage("Problem", filedomain.MessageImage{FileID: "file-id"}, filedomain.MessageImage{FileID: "file-id"})
+
+	assert.Nil(t, message)
+	assert.ErrorIs(t, err, conversation.ErrMessageImageNotAvailable)
 }

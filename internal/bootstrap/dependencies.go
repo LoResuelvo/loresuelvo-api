@@ -26,6 +26,7 @@ type Dependencies struct {
 	ProviderRepository     *repositories.ProviderRepository
 	ConversationRepository *repositories.ConversationRepository
 	MessageRepository      *repositories.MessageRepository
+	MessageImageRepository *repositories.MessageImageRepository
 	JobRequestRepository   *repositories.JobRequestRepository
 	ConversationReader     *repositories.ConversationReader
 	FileRepository         *repositories.FileRepository
@@ -52,10 +53,11 @@ func NewDependenciesWithChatbot(database *sql.DB, chatbot conversation.Chatbot) 
 	categoryRepository := repositories.NewCategoryRepository(database)
 	consumerRepository := repositories.NewConsumerRepository(database, userRepository)
 	providerRepository := repositories.NewProviderRepository(database, userRepository)
-	messageRepository := repositories.NewMessageRepository(database)
+	messageImageRepository := repositories.NewMessageImageRepository(database)
+	messageRepository := repositories.NewMessageRepository(database, messageImageRepository)
 	conversationRepository := repositories.NewConversationRepository(database, messageRepository)
 	jobRequestRepository := repositories.NewJobRequestRepository(database)
-	conversationReader := repositories.NewConversationReader(database)
+	conversationReader := repositories.NewConversationReader(database, messageImageRepository)
 	fileRepository := repositories.NewFileRepository(database)
 
 	storageConfig := storage.NewConfigFromEnv()
@@ -103,6 +105,7 @@ func NewDependenciesWithChatbot(database *sql.DB, chatbot conversation.Chatbot) 
 		ProviderRepository:     providerRepository,
 		ConversationRepository: conversationRepository,
 		MessageRepository:      messageRepository,
+		MessageImageRepository: messageImageRepository,
 		JobRequestRepository:   jobRequestRepository,
 		ConversationReader:     conversationReader,
 		FileRepository:         fileRepository,

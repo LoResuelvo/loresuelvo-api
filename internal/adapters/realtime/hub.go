@@ -205,15 +205,20 @@ func (h *Hub) deliverToAuthIDRoleAndProfile(authID, role string, profileID int, 
 }
 
 // BuildMessageEvent creates the JSON payload for a conversation.message.created event
-func BuildMessageEvent(conversationID int, messageID int, senderRole string, content string, createdOn time.Time) ([]byte, error) {
+func BuildMessageEvent(conversationID int, message conversation.Message) ([]byte, error) {
+	images := make([]realtimeMessageImage, 0, len(message.Images))
+	for _, image := range message.Images {
+		images = append(images, realtimeMessageImage{ID: image.FileID, URL: image.URL, OriginalName: image.OriginalName})
+	}
 	event := realtimeMessageEvent{
 		Type:           "conversation.message.created",
 		ConversationID: conversationID,
 		Message: realtimeEventMessage{
-			ID:         messageID,
-			SenderRole: senderRole,
-			Content:    content,
-			CreatedOn:  createdOn,
+			ID:         message.ID,
+			SenderRole: message.SenderRole,
+			Content:    message.Content,
+			Images:     images,
+			CreatedOn:  message.CreatedOn,
 		},
 	}
 	return json.Marshal(event)
@@ -226,8 +231,15 @@ type realtimeMessageEvent struct {
 }
 
 type realtimeEventMessage struct {
-	ID         int       `json:"id"`
-	SenderRole string    `json:"sender_role"`
-	Content    string    `json:"content"`
-	CreatedOn  time.Time `json:"created_on"`
+	ID         int                    `json:"id"`
+	SenderRole string                 `json:"sender_role"`
+	Content    string                 `json:"content"`
+	Images     []realtimeMessageImage `json:"images"`
+	CreatedOn  time.Time              `json:"created_on"`
+}
+
+type realtimeMessageImage struct {
+	ID           string `json:"id"`
+	URL          string `json:"url"`
+	OriginalName string `json:"original_name"`
 }

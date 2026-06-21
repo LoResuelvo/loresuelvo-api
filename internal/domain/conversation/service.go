@@ -2,12 +2,14 @@ package conversation
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/category"
 	domainclock "github.com/LoResuelvo/loresuelvo-api/internal/domain/clock"
 	readmodel "github.com/LoResuelvo/loresuelvo-api/internal/domain/conversation/read_model"
+	filedomain "github.com/LoResuelvo/loresuelvo-api/internal/domain/file"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/provider"
 	providerreadmodel "github.com/LoResuelvo/loresuelvo-api/internal/domain/provider/read_model"
 )
@@ -20,7 +22,7 @@ type Service struct {
 	messagePublisher       MessagePublisher
 	chatbot                Chatbot
 	categoryRepository     RecommendationCategoryLister
-	fileService            FileURLResolver
+	fileService            FileService
 	clock                  domainclock.Clock
 }
 
@@ -32,7 +34,7 @@ func NewService(
 	messagePublisher MessagePublisher,
 	chatbot Chatbot,
 	categoryRepository RecommendationCategoryLister,
-	fileService FileURLResolver,
+	fileService FileService,
 	clock domainclock.Clock,
 ) *Service {
 	return &Service{
@@ -70,7 +72,11 @@ func (s *Service) getWorkConversationDetail(ctx context.Context, authID string, 
 		if err != nil {
 			return nil, err
 		}
-		return s.withCounterpartProfilePhotoURL(ctx, detail)
+		detail, err = s.withCounterpartProfilePhotoURL(ctx, detail)
+		if err != nil {
+			return nil, err
+		}
+		return s.withMessageImageURLs(ctx, detail)
 	}
 
 	if s.authenticatedProviderMatches(authID, workConversation.ProviderID) {
@@ -78,7 +84,11 @@ func (s *Service) getWorkConversationDetail(ctx context.Context, authID string, 
 		if err != nil {
 			return nil, err
 		}
-		return s.withCounterpartProfilePhotoURL(ctx, detail)
+		detail, err = s.withCounterpartProfilePhotoURL(ctx, detail)
+		if err != nil {
+			return nil, err
+		}
+		return s.withMessageImageURLs(ctx, detail)
 	}
 
 	return nil, ErrConversationAccessDenied
@@ -94,16 +104,28 @@ func (s *Service) getChatbotConversationDetail(ctx context.Context, authID strin
 		return nil, err
 	}
 
-	return s.withRecommendedProviders(ctx, detail)
+	detail, err = s.withRecommendedProviders(ctx, detail)
+	if err != nil {
+		return nil, err
+	}
+	return s.withMessageImageURLs(ctx, detail)
 }
 
-func (s *Service) SendMessage(ctx context.Context, authID string, conversationID int, content string) (*Message, error) {
+func (s *Service) SendMessage(ctx context.Context, authID string, conversationID int, content string, imageFileIDs []string) (*Message, error) {
 	foundConversation, err := s.conversationRepository.FindByID(ctx, conversationID)
 	if err != nil {
 		return nil, err
 	}
 
-	message, err := s.newMessageForAuthenticatedParticipant(authID, foundConversation, content)
+	senderRole, err := s.senderRoleForAuthenticatedParticipant(authID, foundConversation)
+	if err != nil {
+		return nil, err
+	}
+	images, err := s.messageImagesForSender(ctx, authID, imageFileIDs)
+	if err != nil {
+		return nil, err
+	}
+	message, err := newParticipantMessage(senderRole, content, images)
 	if err != nil {
 		return nil, err
 	}
@@ -380,21 +402,71 @@ func (s *Service) authenticatedProviderMatches(authID string, providerID int) bo
 	return err == nil && authenticatedProviderID == providerID
 }
 
-func (s *Service) newMessageForAuthenticatedParticipant(authID string, foundConversation Conversation, content string) (*Message, error) {
+func (s *Service) senderRoleForAuthenticatedParticipant(authID string, foundConversation Conversation) (string, error) {
 	workConversation, ok := foundConversation.(*WorkConversation)
 	if !ok {
-		return nil, ErrConversationAccessDenied
+		return "", ErrConversationAccessDenied
 	}
 
 	if s.authenticatedConsumerMatches(authID, workConversation.ConsumerID) {
-		return NewConsumerMessage(content)
+		return SenderConsumer, nil
 	}
 
 	if s.authenticatedProviderMatches(authID, workConversation.ProviderID) {
-		return NewProviderMessage(content)
+		return SenderProvider, nil
 	}
 
-	return nil, ErrConversationAccessDenied
+	return "", ErrConversationAccessDenied
+}
+
+func newParticipantMessage(senderRole, content string, images []filedomain.MessageImage) (*Message, error) {
+	if senderRole == SenderConsumer {
+		return NewConsumerMessage(content, images...)
+	}
+	return NewProviderMessage(content, images...)
+}
+
+func (s *Service) messageImagesForSender(ctx context.Context, authID string, fileIDs []string) ([]filedomain.MessageImage, error) {
+	preparedFiles, err := s.fileService.PrepareMessageImages(ctx, authID, fileIDs)
+	if err != nil {
+		if errors.Is(err, filedomain.ErrMessageImageNotAvailable) {
+			return nil, ErrMessageImageNotAvailable
+		}
+		return nil, fmt.Errorf("preparing message images: %w", err)
+	}
+	images := make([]filedomain.MessageImage, 0, len(preparedFiles))
+	for _, file := range preparedFiles {
+		if file.URL == "" {
+			return nil, ErrMessageImageNotAvailable
+		}
+		images = append(images, file)
+	}
+	return images, nil
+}
+
+func (s *Service) withMessageImageURLs(ctx context.Context, detail *readmodel.ConversationDetail) (*readmodel.ConversationDetail, error) {
+	fileIDs := make([]string, 0)
+	for _, message := range detail.Messages {
+		for _, image := range message.Images {
+			fileIDs = append(fileIDs, image.FileID)
+		}
+	}
+	resolved, err := s.fileService.ResolveMessageImages(ctx, fileIDs)
+	if err != nil {
+		return nil, fmt.Errorf("resolving conversation message images: %w", err)
+	}
+	for messageIndex := range detail.Messages {
+		for imageIndex := range detail.Messages[messageIndex].Images {
+			image := &detail.Messages[messageIndex].Images[imageIndex]
+			file, ok := resolved[image.FileID]
+			if !ok || file.URL == "" {
+				return nil, ErrMessageImageNotAvailable
+			}
+			image.OriginalName = file.OriginalName
+			image.URL = file.URL
+		}
+	}
+	return detail, nil
 }
 
 func (s *Service) ensureMessageAllowedInCurrentConversationState(ctx context.Context, foundConversation Conversation, message Message) error {
