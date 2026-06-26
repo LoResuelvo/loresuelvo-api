@@ -1,11 +1,19 @@
 type: object
-description: Message sent by a consumer to start a chatbot-assisted home problem conversation.
-required:
-- content
+description: Payload accepted by POST /chatbot/conversations. At least text or one image is required.
+anyOf:
+- required: [content]
+- required: [image_file_ids]
 properties:
   content:
     type: string
-    description: Consumer question or description of the home problem.
-    minLength: 1
+    description: Optional consumer question or description of the home problem. Must be non-empty after trimming when no images are provided.
     example: Hay agua acumulada dentro del mueble bajo mesada cada vez que uso la pileta.
+  image_file_ids:
+    type: array
+    description: Confirmed private conversation-image files uploaded by the authenticated consumer for pre-diagnosis.
+    maxItems: 5
+    uniqueItems: true
+    items:
+      type: string
+      format: uuid
 additionalProperties: false

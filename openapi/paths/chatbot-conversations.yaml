@@ -57,7 +57,7 @@ post:
   - Conversations
   operationId: createChatbotConversation
   summary: Send a message to the AI-assisted chatbot
-  description: Creates a chatbot conversation for the authenticated consumer and returns the persisted consumer message, chatbot answer, and recommended providers in the same response when the chatbot concludes a pre-diagnosis and recommends an appropriate provider category.
+  description: Creates a chatbot conversation for the authenticated consumer and returns the persisted consumer message, chatbot answer, and recommended providers in the same response when the chatbot concludes a pre-diagnosis and recommends an appropriate provider category. The first consumer message may include text, confirmed private image file ids, or both.
   security:
   - BearerAuth: []
   requestBody:
@@ -70,6 +70,11 @@ post:
           plumbingProblem:
             value:
               content: Hay agua acumulada dentro del mueble bajo mesada cada vez que uso la pileta.
+          plumbingProblemWithImage:
+            value:
+              content: ¿Podés orientarme con esta pérdida debajo de la pileta?
+              image_file_ids:
+              - 550e8400-e29b-41d4-a716-446655440000
   responses:
     '201':
       description: Chatbot conversation created successfully.
