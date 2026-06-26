@@ -5,3 +5,9 @@ type MessageImage struct {
 	OriginalName string
 	URL          string
 }
+
+type MessageImageContent struct {
+	MessageImage
+	MimeType string
+	Data     []byte
+}

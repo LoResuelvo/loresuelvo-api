@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/category"
+	filedomain "github.com/LoResuelvo/loresuelvo-api/internal/domain/file"
 	providerreadmodel "github.com/LoResuelvo/loresuelvo-api/internal/domain/provider/read_model"
 )
 
@@ -17,6 +18,7 @@ type ChatbotHomeProblemQuestion struct {
 	UserMessage    string
 	ContextSummary string
 	RecentMessages []Message
+	Images         []filedomain.MessageImageContent
 }
 
 type ChatbotResponseStatus string

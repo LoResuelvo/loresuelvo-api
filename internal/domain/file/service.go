@@ -186,6 +186,37 @@ func (s *Service) PrepareMessageImages(ctx context.Context, authID string, fileI
 	return result, nil
 }
 
+func (s *Service) PrepareChatbotMessageImages(ctx context.Context, authID string, fileIDs []string) ([]MessageImageContent, error) {
+	files, err := s.validatedMessageImageFiles(ctx, authID, fileIDs)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]MessageImageContent, 0, len(files))
+	for _, file := range files {
+		resolved, err := s.resolveMessageImage(ctx, file)
+		if err != nil {
+			return nil, err
+		}
+		data, err := s.storage.ReadObject(ctx, ObjectToDownload{
+			Bucket:       file.Bucket,
+			Key:          file.Key,
+			MaxSizeBytes: conversationMessageImagePolicy.MaxSizeBytes,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("reading chatbot message image: %w", err)
+		}
+		if len(data) == 0 || len(data) != file.SizeBytes() || len(data) > conversationMessageImagePolicy.MaxSizeBytes {
+			return nil, ErrMessageImageNotAvailable
+		}
+		result = append(result, MessageImageContent{
+			MessageImage: resolved,
+			MimeType:     file.MimeType(),
+			Data:         data,
+		})
+	}
+	return result, nil
+}
+
 func (s *Service) validatedMessageImageFiles(ctx context.Context, authID string, fileIDs []string) ([]File, error) {
 	if len(fileIDs) == 0 {
 		return []File{}, nil

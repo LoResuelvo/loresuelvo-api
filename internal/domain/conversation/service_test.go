@@ -268,6 +268,21 @@ func (m *fileURLResolverMock) PrepareMessageImages(_ context.Context, _ string, 
 	return files, m.err
 }
 
+func (m *fileURLResolverMock) PrepareChatbotMessageImages(_ context.Context, _ string, fileIDs []string) ([]filedomain.MessageImageContent, error) {
+	if len(fileIDs) == 0 {
+		return []filedomain.MessageImageContent{}, nil
+	}
+	files := make([]filedomain.MessageImageContent, 0, len(fileIDs))
+	for _, fileID := range fileIDs {
+		files = append(files, filedomain.MessageImageContent{
+			MessageImage: filedomain.MessageImage{FileID: fileID, OriginalName: fileID + ".jpg", URL: "https://files/" + fileID},
+			MimeType:     "image/jpeg",
+			Data:         []byte("image-bytes-" + fileID),
+		})
+	}
+	return files, m.err
+}
+
 func (m *fileURLResolverMock) ResolveMessageImages(_ context.Context, fileIDs []string) (map[string]filedomain.MessageImage, error) {
 	if len(fileIDs) == 0 {
 		return map[string]filedomain.MessageImage{}, nil
@@ -397,6 +412,32 @@ func TestCreateChatbotConversationCreatesActiveConversationWithConsumerAndChatbo
 	assert.Equal(t, conversation.SenderChatbot, savedChatbotConversation.Messages()[1].SenderRole)
 	assert.Equal(t, "Cerrá la llave de paso y revisá el sifón.", savedChatbotConversation.Messages()[1].Content)
 	assert.False(t, publisher.publishCalled)
+}
+
+func TestCreateChatbotConversationAcceptsImageOnlyMessage(t *testing.T) {
+	repo := &conversationRepositoryMock{}
+	consumerIDFinder := &consumerIDFinderMock{consumerID: 10}
+	chatbot := &chatbotMock{response: &conversation.ChatbotResponse{
+		Status:  conversation.ChatbotResponseAnswered,
+		Title:   "Humedad en pared",
+		Content: "La imagen muestra humedad compatible con una filtración.",
+	}}
+	fileService := &fileURLResolverMock{}
+
+	service := conversation.NewService(repo, consumerIDFinder, &providerIDFinderMock{}, &conversationReaderMock{}, &messagePublisherMock{}, chatbot, &recommendationCategoryListerMock{}, fileService, fixedClock{now: time.Now().UTC()})
+
+	createdResult, err := service.CreateChatbotConversation(context.Background(), "auth0|consumer", "   ", []string{"image-file-id"})
+
+	require.NoError(t, err)
+	require.NotNil(t, createdResult)
+	assert.True(t, chatbot.called)
+	assert.Empty(t, chatbot.question.UserMessage)
+	require.Len(t, chatbot.question.Images, 1)
+	assert.Equal(t, "image-file-id", chatbot.question.Images[0].FileID)
+	savedChatbotConversation := repo.savedChatbot.(*conversation.ChatBotConversation)
+	require.Len(t, savedChatbotConversation.Messages(), 2)
+	assert.Empty(t, savedChatbotConversation.Messages()[0].Content)
+	assert.Equal(t, []filedomain.MessageImage{{FileID: "image-file-id", OriginalName: "image-file-id.jpg", URL: "https://files/image-file-id"}}, savedChatbotConversation.Messages()[0].Images)
 }
 
 func TestCreateChatbotConversationIncludesRecommendedProvidersWhenDiagnosisIsCompleted(t *testing.T) {
@@ -570,6 +611,32 @@ func TestContinueChatbotConversationAddsConsumerAndChatbotMessagesToExistingChat
 	assert.Equal(t, conversation.SenderChatbot, result.Conversation.Messages()[2].SenderRole)
 	assert.Equal(t, "Revisá el sifón.", result.Conversation.Messages()[2].Content)
 	assert.False(t, publisher.publishCalled)
+}
+
+func TestContinueChatbotConversationSendsCurrentTurnImagesToChatbot(t *testing.T) {
+	repo := &conversationRepositoryMock{
+		foundResult: &conversation.ChatBotConversation{
+			BaseConversation: &conversation.BaseConversation{ID: 7, Type: conversation.TypeChatbot, Status: conversation.StatusActive},
+			ConsumerID:       10,
+			Title:            "Pérdida de agua en la cocina",
+		},
+	}
+	consumerIDFinder := &consumerIDFinderMock{consumerID: 10}
+	chatbot := &chatbotMock{response: &conversation.ChatbotResponse{
+		Status:  conversation.ChatbotResponseAnswered,
+		Title:   "Pérdida de agua en la cocina",
+		Content: "Por la imagen, revisá la rosca del sifón.",
+	}}
+	service := conversation.NewService(repo, consumerIDFinder, &providerIDFinderMock{}, &conversationReaderMock{}, &messagePublisherMock{}, chatbot, &recommendationCategoryListerMock{}, &fileURLResolverMock{}, fixedClock{now: time.Now().UTC()})
+
+	result, err := service.ContinueChatbotConversation(context.Background(), "auth0|consumer", 7, "Saqué una foto", []string{"detail-image-id"})
+
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	require.Len(t, chatbot.question.Images, 1)
+	assert.Equal(t, "detail-image-id", chatbot.question.Images[0].FileID)
+	require.Len(t, result.Conversation.Messages(), 2)
+	assert.Equal(t, []filedomain.MessageImage{{FileID: "detail-image-id", OriginalName: "detail-image-id.jpg", URL: "https://files/detail-image-id"}}, result.Conversation.Messages()[0].Images)
 }
 
 func TestContinueChatbotConversationSummarizesPendingContextWhenRecentMessageLimitIsReached(t *testing.T) {

@@ -111,6 +111,9 @@ func (suite *testSuite) chatbotReceivesImageForPreDiagnosis(imageName string) er
 	if err := suite.assertChatbotWasCalled(); err != nil {
 		return err
 	}
+	if err := suite.assertLastChatbotQuestionImages([]string{imageName}); err != nil {
+		return err
+	}
 	response, err := suite.chatbotConversationResponseShouldHaveStatusCode(http.StatusCreated)
 	if err != nil {
 		return err
@@ -120,6 +123,9 @@ func (suite *testSuite) chatbotReceivesImageForPreDiagnosis(imageName string) er
 
 func (suite *testSuite) chatbotReceivesImagesForPreDiagnosis(firstName, secondName string) error {
 	if err := suite.assertChatbotWasCalled(); err != nil {
+		return err
+	}
+	if err := suite.assertLastChatbotQuestionImages([]string{firstName, secondName}); err != nil {
 		return err
 	}
 	response, err := suite.chatbotConversationResponseShouldHaveStatusCode(http.StatusCreated)
@@ -201,6 +207,30 @@ func (suite *testSuite) assertConversationDetailConsumerMessageImages(messages [
 func (suite *testSuite) assertChatbotWasCalled() error {
 	if suite.chatbot.RequestCount() == 0 {
 		return fmt.Errorf("expected chatbot to receive a pre-diagnosis request")
+	}
+	return nil
+}
+
+func (suite *testSuite) assertLastChatbotQuestionImages(expectedNames []string) error {
+	question := suite.chatbot.LastQuestion()
+	if len(question.Images) != len(expectedNames) {
+		return fmt.Errorf("expected chatbot question to include %d image(s), got %d", len(expectedNames), len(question.Images))
+	}
+	for _, expectedName := range expectedNames {
+		expectedImage, ok := suite.messageImagesByName[expectedName]
+		if !ok {
+			return fmt.Errorf("expected image fixture %q to exist", expectedName)
+		}
+		found := false
+		for _, image := range question.Images {
+			if image.FileID == expectedImage.FileID && image.OriginalName == expectedName && image.MimeType == expectedImage.MimeType && len(image.Data) == expectedImage.SizeBytes {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return fmt.Errorf("expected chatbot question images to include %q, got %#v", expectedName, question.Images)
+		}
 	}
 	return nil
 }

@@ -3,6 +3,7 @@ package storage
 import (
 	"context"
 	"fmt"
+	"io"
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -85,6 +86,31 @@ func (storage *S3Storage) ReadObjectMetadata(ctx context.Context, bucket, key st
 		MimeType:  aws.ToString(result.ContentType),
 		SizeBytes: int(aws.ToInt64(result.ContentLength)),
 	}, nil
+}
+
+func (storage *S3Storage) ReadObject(ctx context.Context, object filedomain.ObjectToDownload) ([]byte, error) {
+	result, err := storage.client.GetObject(ctx, &s3.GetObjectInput{
+		Bucket: aws.String(object.Bucket),
+		Key:    aws.String(object.Key),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("reading object: %w", err)
+	}
+	defer result.Body.Close()
+
+	reader := io.Reader(result.Body)
+	if object.MaxSizeBytes > 0 {
+		reader = io.LimitReader(result.Body, int64(object.MaxSizeBytes)+1)
+	}
+	data, err := io.ReadAll(reader)
+	if err != nil {
+		return nil, fmt.Errorf("reading object body: %w", err)
+	}
+	if object.MaxSizeBytes > 0 && len(data) > object.MaxSizeBytes {
+		return nil, fmt.Errorf("object exceeds maximum size")
+	}
+
+	return data, nil
 }
 
 func (storage *S3Storage) PublicURL(bucket, key string) string {

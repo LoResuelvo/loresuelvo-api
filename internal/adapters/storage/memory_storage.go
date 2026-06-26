@@ -11,8 +11,13 @@ import (
 
 type MemoryStorage struct {
 	publicBaseURL string
-	objects       map[string]filedomain.ObjectMetadata
+	objects       map[string]memoryObject
 	mu            sync.RWMutex
+}
+
+type memoryObject struct {
+	metadata filedomain.ObjectMetadata
+	data     []byte
 }
 
 func NewMemoryStorage(publicBaseURL string) *MemoryStorage {
@@ -21,15 +26,18 @@ func NewMemoryStorage(publicBaseURL string) *MemoryStorage {
 	}
 	return &MemoryStorage{
 		publicBaseURL: strings.TrimRight(publicBaseURL, "/"),
-		objects:       map[string]filedomain.ObjectMetadata{},
+		objects:       map[string]memoryObject{},
 	}
 }
 
 func (storage *MemoryStorage) GenerateUploadURL(_ context.Context, object filedomain.ObjectToUpload) (*filedomain.UploadTarget, error) {
 	storage.mu.Lock()
-	storage.objects[objectIdentity(object.Bucket, object.Key)] = filedomain.ObjectMetadata{
-		MimeType:  object.MimeType,
-		SizeBytes: object.SizeBytes,
+	storage.objects[objectIdentity(object.Bucket, object.Key)] = memoryObject{
+		metadata: filedomain.ObjectMetadata{
+			MimeType:  object.MimeType,
+			SizeBytes: object.SizeBytes,
+		},
+		data: make([]byte, object.SizeBytes),
 	}
 	storage.mu.Unlock()
 
@@ -43,12 +51,28 @@ func (storage *MemoryStorage) GenerateUploadURL(_ context.Context, object filedo
 
 func (storage *MemoryStorage) ReadObjectMetadata(_ context.Context, bucket, key string) (*filedomain.ObjectMetadata, error) {
 	storage.mu.RLock()
-	metadata, ok := storage.objects[objectIdentity(bucket, key)]
+	object, ok := storage.objects[objectIdentity(bucket, key)]
 	storage.mu.RUnlock()
 	if !ok {
 		return nil, fmt.Errorf("object metadata not found")
 	}
+	metadata := object.metadata
 	return &metadata, nil
+}
+
+func (storage *MemoryStorage) ReadObject(_ context.Context, object filedomain.ObjectToDownload) ([]byte, error) {
+	storage.mu.RLock()
+	storedObject, ok := storage.objects[objectIdentity(object.Bucket, object.Key)]
+	storage.mu.RUnlock()
+	if !ok {
+		return nil, fmt.Errorf("object not found")
+	}
+	if object.MaxSizeBytes > 0 && len(storedObject.data) > object.MaxSizeBytes {
+		return nil, fmt.Errorf("object exceeds maximum size")
+	}
+	data := make([]byte, len(storedObject.data))
+	copy(data, storedObject.data)
+	return data, nil
 }
 
 func (storage *MemoryStorage) GenerateDownloadURL(_ context.Context, object filedomain.ObjectToDownload) (string, error) {

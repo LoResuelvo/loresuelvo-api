@@ -6,12 +6,14 @@ type Storage interface {
 	GenerateUploadURL(ctx context.Context, object ObjectToUpload) (*UploadTarget, error)
 	GenerateDownloadURL(ctx context.Context, object ObjectToDownload) (string, error)
 	ReadObjectMetadata(ctx context.Context, bucket, key string) (*ObjectMetadata, error)
+	ReadObject(ctx context.Context, object ObjectToDownload) ([]byte, error)
 	PublicURL(bucket, key string) string
 }
 
 type ObjectToDownload struct {
-	Bucket string
-	Key    string
+	Bucket       string
+	Key          string
+	MaxSizeBytes int
 }
 
 type ObjectToUpload struct {

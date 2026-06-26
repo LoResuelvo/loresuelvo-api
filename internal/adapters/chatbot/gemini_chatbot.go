@@ -41,7 +41,7 @@ func (chatbot *GeminiChatbot) AnswerHomeProblemQuestion(ctx context.Context, que
 	result, err := client.Models.GenerateContent(
 		ctx,
 		chatbot.model,
-		genai.Text(chatbot.answerPrompt(question, availableCategories)),
+		chatbot.answerContent(question, availableCategories),
 		&genai.GenerateContentConfig{ResponseMIMEType: "application/json"},
 	)
 	if err != nil {
@@ -49,6 +49,14 @@ func (chatbot *GeminiChatbot) AnswerHomeProblemQuestion(ctx context.Context, que
 	}
 
 	return parseChatbotResponse(result.Text())
+}
+
+func (chatbot *GeminiChatbot) answerContent(question conversation.ChatbotHomeProblemQuestion, availableCategories []category.Category) []*genai.Content {
+	parts := []*genai.Part{genai.NewPartFromText(chatbot.answerPrompt(question, availableCategories))}
+	for _, image := range question.Images {
+		parts = append(parts, genai.NewPartFromBytes(image.Data, image.MimeType))
+	}
+	return []*genai.Content{genai.NewContentFromParts(parts, genai.RoleUser)}
 }
 
 func (chatbot *GeminiChatbot) SummarizeHomeProblemConversation(ctx context.Context, previousSummary string, messages []conversation.Message) (string, error) {
@@ -122,7 +130,17 @@ Mensajes nuevos:
 func chatbotQuestionPromptSection(question conversation.ChatbotHomeProblemQuestion) string {
 	var builder strings.Builder
 	builder.WriteString("Mensaje actual del consumidor:\n")
-	builder.WriteString(strings.TrimSpace(question.UserMessage))
+	if message := strings.TrimSpace(question.UserMessage); message != "" {
+		builder.WriteString(message)
+	} else {
+		builder.WriteString("Sin texto. Analizá las imágenes adjuntas del problema del hogar.")
+	}
+	if len(question.Images) > 0 {
+		builder.WriteString("\n\nImágenes adjuntas al mensaje actual:\n")
+		for index, image := range question.Images {
+			builder.WriteString(fmt.Sprintf("- Imagen %d: %s (%s)\n", index+1, strings.TrimSpace(image.OriginalName), strings.TrimSpace(image.MimeType)))
+		}
+	}
 	builder.WriteString("\n\nContexto conversacional disponible:\n")
 
 	if summary := strings.TrimSpace(question.ContextSummary); summary != "" {
@@ -155,13 +173,22 @@ func messagesForPrompt(messages []conversation.Message) string {
 	var builder strings.Builder
 	for _, message := range messages {
 		content := strings.TrimSpace(message.Content)
-		if content == "" {
+		imageCount := len(message.Images)
+		if content == "" && imageCount == 0 {
 			continue
 		}
 		builder.WriteString("- ")
 		builder.WriteString(message.SenderRole)
 		builder.WriteString(": ")
-		builder.WriteString(content)
+		if content != "" {
+			builder.WriteString(content)
+		}
+		if imageCount > 0 {
+			if content != "" {
+				builder.WriteString(" ")
+			}
+			builder.WriteString(fmt.Sprintf("[adjuntó %d imagen(es)]", imageCount))
+		}
 		builder.WriteString("\n")
 	}
 

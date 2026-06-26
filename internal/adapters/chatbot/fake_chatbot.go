@@ -7,6 +7,7 @@ import (
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/category"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/conversation"
+	filedomain "github.com/LoResuelvo/loresuelvo-api/internal/domain/file"
 )
 
 const (
@@ -163,7 +164,19 @@ func copyQuestion(question conversation.ChatbotHomeProblemQuestion) conversation
 		UserMessage:    question.UserMessage,
 		ContextSummary: question.ContextSummary,
 		RecentMessages: copyMessages(question.RecentMessages),
+		Images:         copyMessageImageContents(question.Images),
 	}
+}
+
+func copyMessageImageContents(images []filedomain.MessageImageContent) []filedomain.MessageImageContent {
+	copiedImages := make([]filedomain.MessageImageContent, len(images))
+	for index, image := range images {
+		copiedImages[index] = image
+		if image.Data != nil {
+			copiedImages[index].Data = append([]byte(nil), image.Data...)
+		}
+	}
+	return copiedImages
 }
 
 func copyMessages(messages []conversation.Message) []conversation.Message {

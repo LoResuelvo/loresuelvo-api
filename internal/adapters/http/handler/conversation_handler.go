@@ -26,7 +26,8 @@ type sendMessageRequest struct {
 }
 
 type createChatbotConversationRequest struct {
-	Content string `json:"content"`
+	Content      string   `json:"content"`
+	ImageFileIDs []string `json:"image_file_ids"`
 }
 
 // TODO: hay que unificarlo con conversationMessageResponse
@@ -257,8 +258,8 @@ func (h *ConversationHandler) CreateChatbotConversation(c *gin.Context) {
 		return
 	}
 
-	createdConversation, err := h.conversationService.CreateChatbotConversation(c.Request.Context(), auth0ID, req.Content)
-	if errors.Is(err, conversation.ErrMessageRequired) || errors.Is(err, conversation.ErrChatbotResponseRequired) {
+	createdConversation, err := h.conversationService.CreateChatbotConversation(c.Request.Context(), auth0ID, req.Content, req.ImageFileIDs)
+	if errors.Is(err, conversation.ErrMessageRequired) || errors.Is(err, conversation.ErrChatbotResponseRequired) || errors.Is(err, conversation.ErrMessageImageNotAvailable) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
@@ -294,8 +295,8 @@ func (h *ConversationHandler) ContinueChatbotConversation(c *gin.Context) {
 		return
 	}
 
-	turnResult, err := h.conversationService.ContinueChatbotConversation(c.Request.Context(), auth0ID, conversationID, req.Content)
-	if errors.Is(err, conversation.ErrMessageRequired) || errors.Is(err, conversation.ErrChatbotResponseRequired) {
+	turnResult, err := h.conversationService.ContinueChatbotConversation(c.Request.Context(), auth0ID, conversationID, req.Content, req.ImageFileIDs)
+	if errors.Is(err, conversation.ErrMessageRequired) || errors.Is(err, conversation.ErrChatbotResponseRequired) || errors.Is(err, conversation.ErrMessageImageNotAvailable) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}

@@ -61,6 +61,7 @@ type storageMock struct {
 	metadataByObject map[string]filedomain.ObjectMetadata
 	generateErr      error
 	readErr          error
+	objectReadErr    error
 }
 
 func (storage *storageMock) GenerateDownloadURL(_ context.Context, object filedomain.ObjectToDownload) (string, error) {
@@ -88,6 +89,21 @@ func (storage *storageMock) ReadObjectMetadata(_ context.Context, bucket, key st
 		return nil, assert.AnError
 	}
 	return &metadata, nil
+}
+
+func (storage *storageMock) ReadObject(_ context.Context, object filedomain.ObjectToDownload) ([]byte, error) {
+	if storage.objectReadErr != nil {
+		return nil, storage.objectReadErr
+	}
+	metadata, ok := storage.metadataByObject[object.Bucket+"/"+object.Key]
+	if !ok {
+		return nil, assert.AnError
+	}
+	data := make([]byte, metadata.SizeBytes)
+	if object.MaxSizeBytes > 0 && len(data) > object.MaxSizeBytes {
+		return nil, assert.AnError
+	}
+	return data, nil
 }
 
 func (storage *storageMock) PublicURL(bucket, key string) string {
@@ -158,6 +174,28 @@ func TestValidateAndResolveConversationMessageImage(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "problem.jpg", resolved[upload.FileID].OriginalName)
 	assert.Equal(t, "https://download/private/"+upload.Key, resolved[upload.FileID].URL)
+}
+
+func TestPrepareChatbotMessageImagesReturnsPrivateImageContent(t *testing.T) {
+	repo := newFileRepositoryMock()
+	storage := newStorageMock()
+	service := newFileService(repo, storage)
+	upload, err := service.RequestUpload(context.Background(), filedomain.PresignRequest{
+		AuthID: "auth0|consumer", OriginalName: "problem.jpg", MimeType: "image/jpeg", SizeBytes: 1024, Purpose: filedomain.PurposeConversationMessageImage,
+	})
+	require.NoError(t, err)
+	_, err = service.ConfirmUpload(context.Background(), filedomain.ConfirmRequest{AuthID: "auth0|consumer", FileID: upload.FileID, Key: upload.Key, MimeType: "image/jpeg", SizeBytes: 1024})
+	require.NoError(t, err)
+
+	prepared, err := service.PrepareChatbotMessageImages(context.Background(), "auth0|consumer", []string{upload.FileID})
+
+	require.NoError(t, err)
+	require.Len(t, prepared, 1)
+	assert.Equal(t, upload.FileID, prepared[0].FileID)
+	assert.Equal(t, "problem.jpg", prepared[0].OriginalName)
+	assert.Equal(t, "image/jpeg", prepared[0].MimeType)
+	assert.Len(t, prepared[0].Data, 1024)
+	assert.Equal(t, "https://download/private/"+upload.Key, prepared[0].URL)
 }
 
 func TestValidateConversationMessageImageRejectsWrongOwnerAndPurpose(t *testing.T) {

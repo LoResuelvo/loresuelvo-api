@@ -12,7 +12,6 @@ Feature: 12.1 Adjuntar imágenes para pre-diagnóstico
 
     Rule: El consumidor puede adjuntar imágenes al iniciar o continuar el pre-diagnóstico
 
-    @wip
     Scenario: 12.1.1 - Crear conversación con el chatbot adjuntando una imagen
         Given que estoy autenticado como consumidor "ana@example.com"
         And que cargué y confirmé la imagen "perdida-bajo-mesada.jpg"
@@ -32,7 +31,6 @@ Feature: 12.1 Adjuntar imágenes para pre-diagnóstico
             La imagen muestra una posible pérdida en una conexión bajo mesada. Cerrá la llave de paso y revisá si el goteo viene del sifón o de la manguera flexible.
             """
 
-    @wip
     Scenario: 12.1.2 - Continuar una conversación con el chatbot adjuntando una imagen
         Given que estoy autenticado como consumidor "ana@example.com"
         And ya tengo una conversación activa con el chatbot sobre:
@@ -56,7 +54,6 @@ Feature: 12.1 Adjuntar imágenes para pre-diagnóstico
             Por la imagen, la humedad parece concentrarse cerca del sifón. Secá la zona, ajustá la rosca con cuidado y contactá a un plomero si vuelve a gotear.
             """
 
-    @wip
     Scenario: 12.1.3 - Enviar al chatbot un mensaje compuesto solamente por imágenes
         Given que estoy autenticado como consumidor "ana@example.com"
         And que cargué y confirmé la imagen "humedad-pared.webp"
@@ -72,7 +69,6 @@ Feature: 12.1 Adjuntar imágenes para pre-diagnóstico
             Pre diagnóstico: la imagen muestra humedad compatible con filtración o pérdida cercana. Conviene revisar si hay caños, grifería o desagües detrás de esa pared.
             """
 
-    @wip
     Scenario: 12.1.4 - Adjuntar más de una imagen en un mensaje al chatbot
         Given que estoy autenticado como consumidor "ana@example.com"
         And que cargué y confirmé las imágenes: "vista-general-cocina.jpg", "detalle-conexion.jpg"
@@ -85,7 +81,6 @@ Feature: 12.1 Adjuntar imágenes para pre-diagnóstico
 
     Rule: Las imágenes del pre-diagnóstico quedan registradas y son privadas
 
-    @wip
     Scenario: 12.1.5 - Consultar una conversación con el chatbot que tiene imágenes adjuntas
         Given que el consumidor "ana@example.com" envió un mensaje al chatbot con la imagen "perdida-bajo-mesada.jpg"
         And que estoy autenticado como consumidor "ana@example.com"
@@ -93,7 +88,6 @@ Feature: 12.1 Adjuntar imágenes para pre-diagnóstico
         Then el detalle de la conversación con el chatbot incluye mi mensaje con la imagen "perdida-bajo-mesada.jpg"
         And el sistema permite al consumidor acceder a la imagen adjunta
 
-    @wip
     Scenario: 12.1.6 - Rechazar el acceso de otro consumidor a una imagen adjunta al chatbot
         Given que el consumidor "ana@example.com" envió un mensaje al chatbot con la imagen "perdida-bajo-mesada.jpg"
         And que estoy autenticado como consumidor "carla@example.com"
@@ -102,7 +96,6 @@ Feature: 12.1 Adjuntar imágenes para pre-diagnóstico
 
     Rule: Solo pueden adjuntarse imágenes disponibles y pertenecientes al consumidor
 
-    @wip
     Scenario: 12.1.7 - Rechazar una imagen del chatbot que todavía no fue confirmada
         Given que estoy autenticado como consumidor "ana@example.com"
         And que cargué pero no confirmé la imagen "carga-incompleta.jpg"
@@ -113,7 +106,6 @@ Feature: 12.1 Adjuntar imágenes para pre-diagnóstico
         Then el sistema rechaza el mensaje porque la imagen no está disponible
         And el sistema no crea una conversación con el chatbot asistido por IA
 
-    @wip
     Scenario: 12.1.8 - Rechazar una imagen del chatbot cargada por otro usuario
         Given que la consumidora "carla@example.com" cargó y confirmó la imagen "imagen-ajena.jpg"
         And que estoy autenticado como consumidor "ana@example.com"
@@ -124,7 +116,6 @@ Feature: 12.1 Adjuntar imágenes para pre-diagnóstico
         Then el sistema rechaza el mensaje porque la imagen no está disponible
         And el sistema no crea una conversación con el chatbot asistido por IA
 
-    @wip
     Scenario: 12.1.9 - Rechazar un archivo cargado para otra finalidad
         Given que estoy autenticado como consumidor "ana@example.com"
         And que cargué y confirmé la imagen "foto-de-perfil.jpg" como foto de perfil
@@ -137,7 +128,6 @@ Feature: 12.1 Adjuntar imágenes para pre-diagnóstico
 
     Rule: La cantidad máxima de imágenes que puede adjuntar un consumidor en un mensaje al chatbot asistido por IA es 5
 
-    @wip
     Scenario: 12.1.10 - Rechazar más imágenes que el máximo permitido
         Given que estoy autenticado como consumidor "ana@example.com"
         And que cargué y confirmé las imágenes: "img-1.jpg", "img-2.jpg", "img-3.jpg", "img-4.jpg", "img-5.jpg", "img-6.jpg"

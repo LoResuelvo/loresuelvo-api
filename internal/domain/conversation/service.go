@@ -173,18 +173,22 @@ func (s *Service) ListChatbotConversations(ctx context.Context, authID string) (
 	return s.conversationReader.FindSummariesByParticipantIDRoleAndType(ctx, consumerID, SenderConsumer, TypeChatbot)
 }
 
-func (s *Service) CreateChatbotConversation(ctx context.Context, authID string, content string) (*ChatbotConversationResult, error) {
+func (s *Service) CreateChatbotConversation(ctx context.Context, authID string, content string, imageFileIDs ...[]string) (*ChatbotConversationResult, error) {
 	consumerID, err := s.chatbotConsumerID(authID)
 	if err != nil {
 		return nil, err
 	}
 
-	consumerMessage, err := NewConsumerMessage(content)
+	messageImages, chatbotImages, err := s.chatbotImagesForSender(ctx, authID, optionalImageFileIDs(imageFileIDs))
+	if err != nil {
+		return nil, err
+	}
+	consumerMessage, err := NewConsumerMessage(content, messageImages...)
 	if err != nil {
 		return nil, err
 	}
 
-	answer, err := s.answerChatbotQuestion(ctx, ChatbotHomeProblemQuestion{UserMessage: consumerMessage.Content})
+	answer, err := s.answerChatbotQuestion(ctx, ChatbotHomeProblemQuestion{UserMessage: consumerMessage.Content, Images: chatbotImages})
 	if err != nil {
 		return nil, err
 	}
@@ -206,13 +210,17 @@ func (s *Service) CreateChatbotConversation(ctx context.Context, authID string, 
 	return chatbotTurnResult(savedConversation, answer), nil
 }
 
-func (s *Service) ContinueChatbotConversation(ctx context.Context, authID string, conversationID int, content string) (*ChatbotConversationTurnResult, error) {
+func (s *Service) ContinueChatbotConversation(ctx context.Context, authID string, conversationID int, content string, imageFileIDs ...[]string) (*ChatbotConversationTurnResult, error) {
 	consumerID, err := s.chatbotConsumerID(authID)
 	if err != nil {
 		return nil, err
 	}
 
-	consumerMessage, err := NewConsumerMessage(content)
+	messageImages, chatbotImages, err := s.chatbotImagesForSender(ctx, authID, optionalImageFileIDs(imageFileIDs))
+	if err != nil {
+		return nil, err
+	}
+	consumerMessage, err := NewConsumerMessage(content, messageImages...)
 	if err != nil {
 		return nil, err
 	}
@@ -236,7 +244,7 @@ func (s *Service) ContinueChatbotConversation(ctx context.Context, authID string
 		return nil, err
 	}
 
-	question := chatbotHomeProblemQuestionFrom(chatbotConversation, consumerMessage.Content)
+	question := chatbotHomeProblemQuestionFrom(chatbotConversation, consumerMessage.Content, chatbotImages)
 	answer, err := s.answerChatbotQuestion(ctx, question)
 	if err != nil {
 		return nil, err
@@ -355,11 +363,12 @@ func (s *Service) refreshChatbotContextIfNeeded(ctx context.Context, chatbotConv
 	return err
 }
 
-func chatbotHomeProblemQuestionFrom(chatbotConversation *ChatBotConversation, userMessage string) ChatbotHomeProblemQuestion {
+func chatbotHomeProblemQuestionFrom(chatbotConversation *ChatBotConversation, userMessage string, images []filedomain.MessageImageContent) ChatbotHomeProblemQuestion {
 	return ChatbotHomeProblemQuestion{
 		UserMessage:    userMessage,
 		ContextSummary: chatbotConversation.Context.Summary,
 		RecentMessages: chatbotConversation.RecentMessages(ChatbotRecentMessageLimit),
+		Images:         images,
 	}
 }
 
@@ -434,14 +443,32 @@ func (s *Service) messageImagesForSender(ctx context.Context, authID string, fil
 		}
 		return nil, fmt.Errorf("preparing message images: %w", err)
 	}
-	images := make([]filedomain.MessageImage, 0, len(preparedFiles))
-	for _, file := range preparedFiles {
-		if file.URL == "" {
-			return nil, ErrMessageImageNotAvailable
+	return preparedFiles, nil
+}
+
+func (s *Service) chatbotImagesForSender(ctx context.Context, authID string, fileIDs []string) ([]filedomain.MessageImage, []filedomain.MessageImageContent, error) {
+	preparedFiles, err := s.fileService.PrepareChatbotMessageImages(ctx, authID, fileIDs)
+	if err != nil {
+		if errors.Is(err, filedomain.ErrMessageImageNotAvailable) {
+			return nil, nil, ErrMessageImageNotAvailable
 		}
-		images = append(images, file)
+		return nil, nil, fmt.Errorf("preparing chatbot message images: %w", err)
 	}
-	return images, nil
+
+	messageImages := make([]filedomain.MessageImage, 0, len(preparedFiles))
+	chatbotImages := make([]filedomain.MessageImageContent, 0, len(preparedFiles))
+	for _, file := range preparedFiles {
+		messageImages = append(messageImages, file.MessageImage)
+		chatbotImages = append(chatbotImages, file)
+	}
+	return messageImages, chatbotImages, nil
+}
+
+func optionalImageFileIDs(imageFileIDs [][]string) []string {
+	if len(imageFileIDs) == 0 {
+		return nil
+	}
+	return imageFileIDs[0]
 }
 
 func (s *Service) withMessageImageURLs(ctx context.Context, detail *readmodel.ConversationDetail) (*readmodel.ConversationDetail, error) {
