@@ -76,6 +76,7 @@ func (s *testSuite) registerAllSteps(sc *godog.ScenarioContext) {
 	registerAttachMessageImagesSteps(sc, s)
 	registerChatbotSteps(sc, s)
 	registerChatbotContinuationSteps(sc, s)
+	registerChatbotAttachImagesSteps(sc, s)
 	registerChatbotGetConversationsSteps(sc, s)
 	registerChatbotGetConversationSteps(sc, s)
 	registerChatbotProviderRecommendationSteps(sc, s)

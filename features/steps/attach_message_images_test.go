@@ -33,6 +33,7 @@ type messageImageResponse struct {
 func registerAttachMessageImagesSteps(sc *godog.ScenarioContext, suite *testSuite) {
 	sc.Step(`^que cargué y confirmé la imagen "([^"]*)"$`, suite.uploadAndConfirmMessageImage)
 	sc.Step(`^que cargué y confirmé las imágenes: "([^"]*)", "([^"]*)"$`, suite.uploadAndConfirmTwoMessageImages)
+	sc.Step(`^que cargué y confirmé las imágenes: "([^"]*)", "([^"]*)", "([^"]*)", "([^"]*)", "([^"]*)", "([^"]*)"$`, suite.uploadAndConfirmSixMessageImages)
 	sc.Step(`^que cargué pero no confirmé la imagen "([^"]*)"$`, suite.uploadPendingMessageImage)
 	sc.Step(`^que la consumidora "([^"]*)" cargó y confirmó la imagen "([^"]*)"$`, suite.consumerUploadedAndConfirmedMessageImage)
 	sc.Step(`^que cargué y confirmé la imagen "([^"]*)" como foto de perfil$`, suite.uploadAndConfirmProfilePhotoImage)
@@ -63,10 +64,20 @@ func (suite *testSuite) uploadAndConfirmMessageImage(name string) error {
 }
 
 func (suite *testSuite) uploadAndConfirmTwoMessageImages(firstName, secondName string) error {
-	if err := suite.uploadAndConfirmMessageImage(firstName); err != nil {
-		return err
+	return suite.uploadAndConfirmMessageImages(firstName, secondName)
+}
+
+func (suite *testSuite) uploadAndConfirmSixMessageImages(firstName, secondName, thirdName, fourthName, fifthName, sixthName string) error {
+	return suite.uploadAndConfirmMessageImages(firstName, secondName, thirdName, fourthName, fifthName, sixthName)
+}
+
+func (suite *testSuite) uploadAndConfirmMessageImages(names ...string) error {
+	for _, name := range names {
+		if err := suite.uploadAndConfirmMessageImage(name); err != nil {
+			return err
+		}
 	}
-	return suite.uploadAndConfirmMessageImage(secondName)
+	return nil
 }
 
 func (suite *testSuite) uploadPendingMessageImage(name string) error {

@@ -14,7 +14,8 @@ import (
 const participantRoleChatbot = "chatbot"
 
 type chatbotConversationRequest struct {
-	Content string `json:"content"`
+	Content      string   `json:"content"`
+	ImageFileIDs []string `json:"image_file_ids,omitempty"`
 }
 
 type chatbotConversationResponse struct {
