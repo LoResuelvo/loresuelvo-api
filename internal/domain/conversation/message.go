@@ -39,6 +39,19 @@ func newMessage(senderRole, content string, images []filedomain.MessageImage) (*
 	if trimmedContent == "" && len(images) == 0 {
 		return nil, ErrMessageRequired
 	}
+	messageImages, err := ensureMessageImages(images)
+	if err != nil {
+		return nil, err
+	}
+
+	return &Message{
+		SenderRole: senderRole,
+		Content:    trimmedContent,
+		Images:     messageImages,
+	}, nil
+}
+
+func ensureMessageImages(images []filedomain.MessageImage) ([]filedomain.MessageImage, error) {
 	seen := make(map[string]struct{}, len(images))
 	messageImages := make([]filedomain.MessageImage, len(images))
 	for index, image := range images {
@@ -52,10 +65,5 @@ func newMessage(senderRole, content string, images []filedomain.MessageImage) (*
 		seen[image.FileID] = struct{}{}
 		messageImages[index] = image
 	}
-
-	return &Message{
-		SenderRole: senderRole,
-		Content:    trimmedContent,
-		Images:     messageImages,
-	}, nil
+	return messageImages, nil
 }
