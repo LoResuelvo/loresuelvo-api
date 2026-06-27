@@ -50,6 +50,14 @@ type testSuite struct {
 	messageImagesByName                     map[string]messageImageFixture
 	lastSentMessageID                       int
 	lastAttemptedMessageImageNames          []string
+	aiJobRequestsByProvider                 map[string]jobRequestCreationResponse
+	aiSourceChatbotConversationID           int
+	aiExpectedAssessmentID                  int
+	aiExpectedJobRequestTitle               string
+	aiExpectedJobRequestDescription         string
+	aiJobRequestCountBeforeContact          int
+	aiWorkConversationIDsBeforeContact      map[int]int
+	aiAttemptedProviderIDs                  []int
 
 	categoryIDsByName              map[string]int
 	lastProviderFilterCategoryName string
@@ -80,6 +88,7 @@ func (s *testSuite) registerAllSteps(sc *godog.ScenarioContext) {
 	registerChatbotGetConversationsSteps(sc, s)
 	registerChatbotGetConversationSteps(sc, s)
 	registerChatbotProviderRecommendationSteps(sc, s)
+	registerAIJobRequestSteps(sc, s)
 }
 
 func (s *testSuite) cleanDatabase() error {
@@ -125,6 +134,14 @@ func (s *testSuite) cleanDatabase() error {
 	s.messageImagesByName = map[string]messageImageFixture{}
 	s.lastSentMessageID = 0
 	s.lastAttemptedMessageImageNames = nil
+	s.aiJobRequestsByProvider = map[string]jobRequestCreationResponse{}
+	s.aiSourceChatbotConversationID = 0
+	s.aiExpectedAssessmentID = 0
+	s.aiExpectedJobRequestTitle = ""
+	s.aiExpectedJobRequestDescription = ""
+	s.aiJobRequestCountBeforeContact = 0
+	s.aiWorkConversationIDsBeforeContact = map[int]int{}
+	s.aiAttemptedProviderIDs = nil
 
 	return nil
 }
@@ -168,10 +185,12 @@ func newTestSuite(tb testing.TB, database *sql.DB) *testSuite {
 		tokenBuilder:           tokenBuilder,
 		chatbot:                chatbot,
 
-		categoryIDsByName:          map[string]int{},
-		participantRolesByFullName: map[string]string{},
-		realtimeConnections:        map[string]*realtimeTestConnection{},
-		messageImagesByName:        map[string]messageImageFixture{},
+		categoryIDsByName:                  map[string]int{},
+		participantRolesByFullName:         map[string]string{},
+		realtimeConnections:                map[string]*realtimeTestConnection{},
+		messageImagesByName:                map[string]messageImageFixture{},
+		aiJobRequestsByProvider:            map[string]jobRequestCreationResponse{},
+		aiWorkConversationIDsBeforeContact: map[int]int{},
 	}
 }
 
