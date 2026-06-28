@@ -27,7 +27,9 @@ services:
       - app-network
 
   seed-assets:
-    image: amazon/aws-cli:2
+    # One-shot S3-compatible client used to upload seed profile photos to the
+    # real bucket configured through STORAGE_*; it does not run local storage.
+    image: public.ecr.aws/aws-cli/aws-cli:latest
     profiles:
       - tools
     env_file:
