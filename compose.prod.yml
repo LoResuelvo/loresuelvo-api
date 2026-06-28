@@ -26,6 +26,23 @@ services:
     networks:
       - app-network
 
+  seed-assets:
+    image: amazon/aws-cli:2
+    profiles:
+      - tools
+    env_file:
+      - .env
+    working_dir: /work
+    volumes:
+      - ./seeds:/work/seeds:ro
+      - ./scripts/upload_seed_assets.sh:/work/scripts/upload_seed_assets.sh:ro
+    environment:
+      SEED_ASSETS_DIR: /work/seeds/assets
+      SEED_ASSET_MANIFEST: /work/seeds/providers-100-assets.tsv
+    entrypoint: ["/bin/sh", "/work/scripts/upload_seed_assets.sh"]
+    networks:
+      - app-network
+
   nginx:
     image: nginx:alpine
     container_name: nginx-proxy

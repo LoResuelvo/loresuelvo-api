@@ -1,4 +1,4 @@
-.PHONY: up down clean build bash lint test openapi swagger swagger-down spec gherkin test-all-once migrate-up migrate-down migrate-test-up migrate-test-down storage storage-console storage-reset
+.PHONY: up down clean build bash lint test openapi swagger swagger-down spec gherkin test-all-once migrate-up migrate-down migrate-test-up migrate-test-down storage storage-console storage-reset seed-assets-local
 
 # Nombre del servicio del compose
 SERVICE = api-dev
@@ -19,6 +19,10 @@ storage-reset:
 	docker compose rm -sfv minio minio-init
 	docker volume rm loresuelvo-api_minio-data || true
 	docker compose up -d minio minio-init
+
+seed-assets-local:
+	docker compose up -d minio minio-init
+	docker compose run --rm --entrypoint /bin/sh minio-init /minio-init/upload-seed-assets.sh
 
 down:
 	docker compose down
