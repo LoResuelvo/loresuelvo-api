@@ -27,13 +27,12 @@ const ChatbotProcessingStaleAfter = 5 * time.Minute
 
 type ChatBotConversation struct {
 	*BaseConversation
-	ConsumerID            int
-	Title                 string
-	ResponseStatus        ChatbotResponseStatus
-	DiagnosisCompleted    bool
-	RecommendedCategoryID *int
-	Context               ChatbotConversationContext
-	ProcessingStartedOn   *time.Time
+	ConsumerID          int
+	Title               string
+	LastResponseStatus  ChatbotResponseStatus
+	CurrentAssessment   *ProblemAssessment
+	Context             ChatbotConversationContext
+	ProcessingStartedOn *time.Time
 }
 
 func NewChatbotConversation(consumerID int, title string) (Conversation, error) {
@@ -49,16 +48,41 @@ func NewChatbotConversation(consumerID int, title string) (Conversation, error) 
 			Type:   TypeChatbot,
 			Status: StatusActive,
 		},
-		ConsumerID:     consumerID,
-		Title:          trimmedTitle,
-		ResponseStatus: ChatbotResponseAnswered,
+		ConsumerID:         consumerID,
+		Title:              trimmedTitle,
+		LastResponseStatus: ChatbotResponseAnswered,
 	}, nil
 }
 
-func (conversation *ChatBotConversation) ApplyResponse(response ChatbotResponse, recommendedCategoryID *int) {
-	conversation.ResponseStatus = response.Status
-	conversation.DiagnosisCompleted = response.DiagnosisCompleted
-	conversation.RecommendedCategoryID = copyOptionalInt(recommendedCategoryID)
+func (conversation *ChatBotConversation) ApplyResponse(response ChatbotResponse, problemCategoryID *int) error {
+	conversation.LastResponseStatus = response.Status
+	if response.Assessment.Action == ChatbotAssessmentUnchanged {
+		if conversation.CurrentAssessment == nil && response.Status != ChatbotResponseOutOfScope {
+			return ErrProblemAssessmentInvalid
+		}
+		return nil
+	}
+	if response.Assessment.Action != ChatbotAssessmentReplace {
+		return ErrProblemAssessmentInvalid
+	}
+
+	version := 1
+	if conversation.CurrentAssessment != nil {
+		version = conversation.CurrentAssessment.Version + 1
+	}
+	assessment, err := NewProblemAssessment(
+		conversation.Base().ID,
+		version,
+		response.Assessment.Outcome,
+		problemCategoryID,
+		response.Assessment.ProblemTitle,
+		response.Assessment.ProblemDescription,
+	)
+	if err != nil {
+		return err
+	}
+	conversation.CurrentAssessment = assessment
+	return nil
 }
 
 func (conversation *ChatBotConversation) UpdateContext(context ChatbotConversationContext) error {

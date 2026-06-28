@@ -1,7 +1,9 @@
 package repositories
 
 import (
+	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/category"
@@ -73,6 +75,18 @@ func (repository *ProviderRepository) ExistsByID(id int) (bool, error) {
 	return exists, nil
 }
 
+func (repository *ProviderRepository) FindByID(ctx context.Context, providerID int) (*provider.Provider, error) {
+	row := repository.db.QueryRowContext(ctx, providerSelectSQL+` WHERE providers.id = $1`, providerID)
+	foundProvider, err := scanProvider(row)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, provider.ErrDoesNotExist
+	}
+	if err != nil {
+		return nil, fmt.Errorf("finding provider by id: %w", err)
+	}
+	return foundProvider, nil
+}
+
 func (repository *ProviderRepository) FindIDByAuthID(authID string) (int, error) {
 	var providerID int
 	err := repository.db.QueryRow(
@@ -123,20 +137,7 @@ func (repository *ProviderRepository) FindIDByEmail(email string) (int, error) {
 
 func (repository *ProviderRepository) FindByCategoryID(categoryID int) ([]provider.Provider, error) {
 	rows, err := repository.db.Query(
-		`SELECT providers.id,
-			users.auth_id,
-			users.email,
-			users.name,
-			users.surname,
-			users.role,
-			categories.id,
-			categories.name,
-			categories.normalized_name,
-			COALESCE(providers.profile_photo_file_id::text, '')
-		FROM providers
-		INNER JOIN users ON users.id = providers.user_id
-		INNER JOIN categories ON categories.id = providers.category_id
-		WHERE providers.category_id = $1
+		providerSelectSQL+` WHERE providers.category_id = $1
 		ORDER BY users.name ASC, users.surname ASC`,
 		categoryID,
 	)
@@ -149,31 +150,11 @@ func (repository *ProviderRepository) FindByCategoryID(categoryID int) ([]provid
 
 	providers := []provider.Provider{}
 	for rows.Next() {
-		var providerID int
-		var providerCategory category.Category
-		var providerUser user.User
-		var providerProfilePhotoFileID string
-		if err := rows.Scan(
-			&providerID,
-			&providerUser.AuthID,
-			&providerUser.Email,
-			&providerUser.Name,
-			&providerUser.Surname,
-			&providerUser.Role,
-			&providerCategory.ID,
-			&providerCategory.Name,
-			&providerCategory.NormalizedName,
-			&providerProfilePhotoFileID,
-		); err != nil {
+		foundProvider, err := scanProvider(rows)
+		if err != nil {
 			return nil, err
 		}
-
-		providers = append(providers, provider.Provider{
-			ID:                 providerID,
-			User:               &providerUser,
-			Category:           &providerCategory,
-			ProfilePhotoFileID: providerProfilePhotoFileID,
-		})
+		providers = append(providers, *foundProvider)
 	}
 
 	if err := rows.Err(); err != nil {
@@ -181,6 +162,47 @@ func (repository *ProviderRepository) FindByCategoryID(categoryID int) ([]provid
 	}
 
 	return providers, nil
+}
+
+const providerSelectSQL = `SELECT providers.id,
+	users.auth_id,
+	users.email,
+	users.name,
+	users.surname,
+	users.role,
+	categories.id,
+	categories.name,
+	categories.normalized_name,
+	COALESCE(providers.profile_photo_file_id::text, '')
+FROM providers
+INNER JOIN users ON users.id = providers.user_id
+INNER JOIN categories ON categories.id = providers.category_id`
+
+type providerScanner interface {
+	Scan(dest ...any) error
+}
+
+func scanProvider(scanner providerScanner) (*provider.Provider, error) {
+	var foundProvider provider.Provider
+	var providerCategory category.Category
+	var providerUser user.User
+	if err := scanner.Scan(
+		&foundProvider.ID,
+		&providerUser.AuthID,
+		&providerUser.Email,
+		&providerUser.Name,
+		&providerUser.Surname,
+		&providerUser.Role,
+		&providerCategory.ID,
+		&providerCategory.Name,
+		&providerCategory.NormalizedName,
+		&foundProvider.ProfilePhotoFileID,
+	); err != nil {
+		return nil, err
+	}
+	foundProvider.User = &providerUser
+	foundProvider.Category = &providerCategory
+	return &foundProvider, nil
 }
 
 func rollbackProviderTx(tx *sql.Tx, originalErr error) error {

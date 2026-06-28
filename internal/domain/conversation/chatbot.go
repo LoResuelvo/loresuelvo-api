@@ -15,10 +15,11 @@ type Chatbot interface {
 }
 
 type ChatbotHomeProblemQuestion struct {
-	UserMessage    string
-	ContextSummary string
-	RecentMessages []Message
-	Images         []filedomain.MessageImageContent
+	UserMessage       string
+	ContextSummary    string
+	RecentMessages    []Message
+	Images            []filedomain.MessageImageContent
+	IsNewConversation bool
 }
 
 type ChatbotResponseStatus string
@@ -29,18 +30,41 @@ const (
 )
 
 type ChatbotResponse struct {
-	Status                  ChatbotResponseStatus
-	Title                   string
-	Content                 string
-	DiagnosisCompleted      bool
-	RecommendedCategoryName string
+	Status     ChatbotResponseStatus
+	Title      string
+	Content    string
+	Assessment ChatbotAssessmentResponse
+}
+
+type ChatbotAssessmentAction string
+
+const (
+	ChatbotAssessmentUnchanged ChatbotAssessmentAction = "unchanged"
+	ChatbotAssessmentReplace   ChatbotAssessmentAction = "replace"
+)
+
+type ChatbotAssessmentResponse struct {
+	Action              ChatbotAssessmentAction
+	Outcome             ProblemAssessmentOutcome
+	ProblemTitle        string
+	ProblemDescription  string
+	ProblemCategoryName string
 }
 
 type chatbotAnswer struct {
 	response             *ChatbotResponse
 	message              *Message
-	recommendedCategory  *category.Category
+	problemCategory      *category.Category
 	recommendedProviders []providerreadmodel.ProviderSummary
+}
+
+func ParseChatbotAssessmentAction(value string) (ChatbotAssessmentAction, error) {
+	switch action := ChatbotAssessmentAction(strings.ToLower(strings.TrimSpace(value))); action {
+	case ChatbotAssessmentUnchanged, ChatbotAssessmentReplace:
+		return action, nil
+	default:
+		return "", ErrChatbotResponseRequired
+	}
 }
 
 func ParseChatbotResponseStatus(value string) (ChatbotResponseStatus, error) {

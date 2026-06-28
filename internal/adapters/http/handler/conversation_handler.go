@@ -55,14 +55,18 @@ type workConversationDetail struct {
 }
 
 type chatbotConversationDetail struct {
-	Title                string                       `json:"title"`
-	ResponseStatus       string                       `json:"response_status"`
-	DiagnosisCompleted   bool                         `json:"diagnosis_completed"`
-	RecommendedCategory  *recommendedCategoryResponse `json:"recommended_category,omitempty"`
-	RecommendedProviders []providerSummaryResponse    `json:"recommended_providers"`
+	Title                string                     `json:"title"`
+	ResponseStatus       string                     `json:"response_status"`
+	Assessment           *problemAssessmentResponse `json:"assessment,omitempty"`
+	RecommendedProviders []providerSummaryResponse  `json:"recommended_providers"`
 }
 
-type recommendedCategoryResponse struct {
+type problemAssessmentResponse struct {
+	Outcome         string                   `json:"outcome"`
+	ProblemCategory *problemCategoryResponse `json:"problem_category,omitempty"`
+}
+
+type problemCategoryResponse struct {
 	ID   int    `json:"id"`
 	Name string `json:"name"`
 }
@@ -372,22 +376,20 @@ func chatbotConversationResponseFromDomain(result conversation.ChatbotConversati
 		title = chatbotConversation.Title
 	}
 
-	var recommendedCategory *recommendedCategoryResponse
-	if result.RecommendedCategory != nil {
-		recommendedCategory = &recommendedCategoryResponse{
-			ID:   result.RecommendedCategory.ID,
-			Name: result.RecommendedCategory.Name,
+	var problemCategory *problemCategoryResponse
+	if result.ProblemCategory != nil {
+		problemCategory = &problemCategoryResponse{
+			ID:   result.ProblemCategory.ID,
+			Name: result.ProblemCategory.Name,
 		}
 	}
-
 	return chatbotConversationResponse{
 		ID:     result.Conversation.Base().ID,
 		Status: result.Conversation.Base().Status,
 		chatbotConversationDetail: chatbotConversationDetail{
 			Title:                title,
 			ResponseStatus:       string(result.ResponseStatus),
-			DiagnosisCompleted:   result.DiagnosisCompleted,
-			RecommendedCategory:  recommendedCategory,
+			Assessment:           assessmentResponse(result.Assessment != nil, assessmentOutcome(result.Assessment), problemCategory),
 			RecommendedProviders: providerSummaryResponsesFromDomain(result.RecommendedProviders),
 		},
 		Messages: messages,
@@ -441,21 +443,41 @@ func chatbotConversationDetailResponseFromDomain(detail *readmodel.ChatbotConver
 		return nil
 	}
 
-	var recommendedCategory *recommendedCategoryResponse
-	if detail.RecommendedCategory != nil {
-		recommendedCategory = &recommendedCategoryResponse{
-			ID:   detail.RecommendedCategory.ID,
-			Name: detail.RecommendedCategory.Name,
+	var problemCategory *problemCategoryResponse
+	if detail.Assessment != nil && detail.Assessment.ProblemCategory != nil {
+		problemCategory = &problemCategoryResponse{
+			ID:   detail.Assessment.ProblemCategory.ID,
+			Name: detail.Assessment.ProblemCategory.Name,
 		}
 	}
 
 	return &chatbotConversationDetail{
 		Title:                detail.Title,
 		ResponseStatus:       detail.ResponseStatus,
-		DiagnosisCompleted:   detail.DiagnosisCompleted,
-		RecommendedCategory:  recommendedCategory,
+		Assessment:           assessmentResponse(detail.Assessment != nil, readModelAssessmentOutcome(detail.Assessment), problemCategory),
 		RecommendedProviders: providerSummaryResponsesFromDomain(detail.RecommendedProviders),
 	}
+}
+
+func assessmentOutcome(assessment *conversation.ProblemAssessment) string {
+	if assessment == nil {
+		return ""
+	}
+	return string(assessment.Outcome)
+}
+
+func readModelAssessmentOutcome(assessment *readmodel.ProblemAssessmentDetail) string {
+	if assessment == nil {
+		return ""
+	}
+	return assessment.Outcome
+}
+
+func assessmentResponse(present bool, outcome string, category *problemCategoryResponse) *problemAssessmentResponse {
+	if !present {
+		return nil
+	}
+	return &problemAssessmentResponse{Outcome: outcome, ProblemCategory: category}
 }
 
 func providerSummaryResponsesFromDomain(providers []providerreadmodel.ProviderSummary) []providerSummaryResponse {

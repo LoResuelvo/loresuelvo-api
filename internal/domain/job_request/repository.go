@@ -5,6 +5,7 @@ import (
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/conversation"
 	readmodel "github.com/LoResuelvo/loresuelvo-api/internal/domain/job_request/read_model"
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/provider"
 )
 
 type Repository interface {
@@ -22,6 +23,7 @@ type ConsumerRepository interface {
 type ProviderRepository interface {
 	ExistsByID(id int) (bool, error)
 	FindIDByAuthID(authID string) (int, error)
+	FindByID(ctx context.Context, id int) (*provider.Provider, error)
 }
 
 type ConversationRepository interface {

@@ -222,10 +222,13 @@ func TestConversationReaderFindsChatbotDetailByIDRoleAndType(t *testing.T) {
 	chatbotConversation, err := conversation.NewChatbotConversation(consumerID, "Pérdida de agua en la cocina")
 	require.NoError(t, err)
 	typedChatbotConversation := chatbotConversation.(*conversation.ChatBotConversation)
-	typedChatbotConversation.ApplyResponse(conversation.ChatbotResponse{
-		Status:             conversation.ChatbotResponseAnswered,
-		DiagnosisCompleted: true,
-	}, &savedCategory.ID)
+	require.NoError(t, typedChatbotConversation.ApplyResponse(conversation.ChatbotResponse{
+		Status: conversation.ChatbotResponseAnswered,
+		Assessment: conversation.ChatbotAssessmentResponse{
+			Action: conversation.ChatbotAssessmentReplace, Outcome: conversation.AssessmentProfessionalRequired,
+			ProblemTitle: "Pérdida debajo de la pileta", ProblemDescription: "Tengo una pérdida debajo de la pileta.",
+		},
+	}, &savedCategory.ID))
 	consumerMessage, err := conversation.NewConsumerMessage("Tengo una pérdida debajo de la pileta.")
 	require.NoError(t, err)
 	chatbotMessage, err := conversation.NewChatbotMessage("Revisá el sifón y las conexiones flexibles.")
@@ -245,10 +248,11 @@ func TestConversationReaderFindsChatbotDetailByIDRoleAndType(t *testing.T) {
 	require.NotNil(t, detail.Chatbot)
 	assert.Equal(t, "Pérdida de agua en la cocina", detail.Chatbot.Title)
 	assert.Equal(t, string(conversation.ChatbotResponseAnswered), detail.Chatbot.ResponseStatus)
-	assert.True(t, detail.Chatbot.DiagnosisCompleted)
-	require.NotNil(t, detail.Chatbot.RecommendedCategory)
-	assert.Equal(t, savedCategory.ID, detail.Chatbot.RecommendedCategory.ID)
-	assert.Equal(t, "Plomería", detail.Chatbot.RecommendedCategory.Name)
+	require.NotNil(t, detail.Chatbot.Assessment)
+	assert.Equal(t, string(conversation.AssessmentProfessionalRequired), detail.Chatbot.Assessment.Outcome)
+	require.NotNil(t, detail.Chatbot.Assessment.ProblemCategory)
+	assert.Equal(t, savedCategory.ID, detail.Chatbot.Assessment.ProblemCategory.ID)
+	assert.Equal(t, "Plomería", detail.Chatbot.Assessment.ProblemCategory.Name)
 	require.Len(t, detail.Messages, 2)
 	assert.Equal(t, conversation.SenderConsumer, detail.Messages[0].SenderRole)
 	assert.Equal(t, consumerMessage.Content, detail.Messages[0].Content)

@@ -360,6 +360,12 @@ func (m *chatbotMock) AnswerHomeProblemQuestion(ctx context.Context, question co
 	if m.err != nil {
 		return nil, m.err
 	}
+	if m.response != nil && m.response.Assessment.Action == "" {
+		m.response.Assessment = conversation.ChatbotAssessmentResponse{
+			Action:  conversation.ChatbotAssessmentReplace,
+			Outcome: conversation.AssessmentCollectingInformation,
+		}
+	}
 	return m.response, nil
 }
 
@@ -451,11 +457,13 @@ func TestCreateChatbotConversationIncludesRecommendedProvidersWhenDiagnosisIsCom
 	providerFinder := &providerIDFinderMock{providers: []provider.Provider{*recommendedProvider}}
 	fileURLResolver := &fileURLResolverMock{urlsByFileID: map[string]string{"provider-photo-file-id": "https://cdn/provider.jpg"}}
 	chatbot := &chatbotMock{response: &conversation.ChatbotResponse{
-		Status:                  conversation.ChatbotResponseAnswered,
-		Title:                   "Pérdida de agua en la cocina",
-		Content:                 "Contactá a un plomero.",
-		DiagnosisCompleted:      true,
-		RecommendedCategoryName: "Plomería",
+		Status:  conversation.ChatbotResponseAnswered,
+		Title:   "Pérdida de agua en la cocina",
+		Content: "Contactá a un plomero.",
+		Assessment: conversation.ChatbotAssessmentResponse{
+			Action: conversation.ChatbotAssessmentReplace, Outcome: conversation.AssessmentProfessionalRequired,
+			ProblemTitle: "Pérdida de agua", ProblemDescription: "Pierde agua la bacha.", ProblemCategoryName: "Plomería",
+		},
 	}}
 
 	service := conversation.NewService(repo, consumerIDFinder, providerFinder, &conversationReaderMock{}, &messagePublisherMock{}, chatbot, categoryLister, fileURLResolver, fixedClock{now: time.Now().UTC()})
@@ -464,10 +472,11 @@ func TestCreateChatbotConversationIncludesRecommendedProvidersWhenDiagnosisIsCom
 
 	require.NoError(t, err)
 	require.NotNil(t, createdResult)
-	assert.True(t, createdResult.DiagnosisCompleted)
-	require.NotNil(t, createdResult.RecommendedCategory)
-	assert.Equal(t, 3, createdResult.RecommendedCategory.ID)
-	assert.Equal(t, "Plomería", createdResult.RecommendedCategory.Name)
+	require.NotNil(t, createdResult.Assessment)
+	assert.Equal(t, conversation.AssessmentProfessionalRequired, createdResult.Assessment.Outcome)
+	require.NotNil(t, createdResult.ProblemCategory)
+	assert.Equal(t, 3, createdResult.ProblemCategory.ID)
+	assert.Equal(t, "Plomería", createdResult.ProblemCategory.Name)
 	assert.True(t, categoryLister.called)
 	assert.Equal(t, []string{"Plomería"}, categoryNames(chatbot.availableCategories))
 	assert.True(t, providerFinder.findByCategoryIDCalled)
@@ -487,11 +496,12 @@ func TestCreateChatbotConversationDoesNotRecommendProvidersBeforeDiagnosisIsComp
 	categoryLister := &recommendationCategoryListerMock{categories: []category.Category{{ID: 3, Name: "Plomería", NormalizedName: "plomería"}}}
 	providerFinder := &providerIDFinderMock{}
 	chatbot := &chatbotMock{response: &conversation.ChatbotResponse{
-		Status:                  conversation.ChatbotResponseAnswered,
-		Title:                   "Consulta de humedad",
-		Content:                 "Necesito más información.",
-		DiagnosisCompleted:      false,
-		RecommendedCategoryName: "Plomería",
+		Status:  conversation.ChatbotResponseAnswered,
+		Title:   "Consulta de humedad",
+		Content: "Necesito más información.",
+		Assessment: conversation.ChatbotAssessmentResponse{
+			Action: conversation.ChatbotAssessmentReplace, Outcome: conversation.AssessmentCollectingInformation,
+		},
 	}}
 
 	service := conversation.NewService(repo, consumerIDFinder, providerFinder, &conversationReaderMock{}, &messagePublisherMock{}, chatbot, categoryLister, &fileURLResolverMock{}, fixedClock{now: time.Now().UTC()})
@@ -500,8 +510,9 @@ func TestCreateChatbotConversationDoesNotRecommendProvidersBeforeDiagnosisIsComp
 
 	require.NoError(t, err)
 	require.NotNil(t, createdResult)
-	assert.False(t, createdResult.DiagnosisCompleted)
-	assert.Nil(t, createdResult.RecommendedCategory)
+	require.NotNil(t, createdResult.Assessment)
+	assert.Equal(t, conversation.AssessmentCollectingInformation, createdResult.Assessment.Outcome)
+	assert.Nil(t, createdResult.ProblemCategory)
 	assert.Empty(t, createdResult.RecommendedProviders)
 	assert.False(t, providerFinder.findByCategoryIDCalled)
 	assert.True(t, categoryLister.called)
@@ -771,12 +782,14 @@ func TestGetByIDReturnsConversationDetailForParticipantProvider(t *testing.T) {
 func TestGetByIDReturnsChatbotConversationDetailForOwnerConsumer(t *testing.T) {
 	recommendedCategoryID := 3
 	repo := &conversationRepositoryMock{foundResult: &conversation.ChatBotConversation{
-		BaseConversation:      &conversation.BaseConversation{ID: 7, Type: conversation.TypeChatbot, Status: conversation.StatusActive},
-		ConsumerID:            10,
-		Title:                 "Pérdida de agua en la cocina",
-		ResponseStatus:        conversation.ChatbotResponseAnswered,
-		DiagnosisCompleted:    true,
-		RecommendedCategoryID: &recommendedCategoryID,
+		BaseConversation:   &conversation.BaseConversation{ID: 7, Type: conversation.TypeChatbot, Status: conversation.StatusActive},
+		ConsumerID:         10,
+		Title:              "Pérdida de agua en la cocina",
+		LastResponseStatus: conversation.ChatbotResponseAnswered,
+		CurrentAssessment: &conversation.ProblemAssessment{
+			ID: 1, Version: 1, Outcome: conversation.AssessmentProfessionalRequired,
+			ProblemCategoryID: &recommendedCategoryID, ProblemTitle: "Pérdida", ProblemDescription: "Pierde agua", BasedOnMessageID: 1,
+		},
 	}}
 	consumerIDFinder := &consumerIDFinderMock{consumerID: 10}
 	plumbingCategory := &category.Category{ID: recommendedCategoryID, Name: "Plomería", NormalizedName: "plomería"}
@@ -789,12 +802,11 @@ func TestGetByIDReturnsChatbotConversationDetailForOwnerConsumer(t *testing.T) {
 		Type:   conversation.TypeChatbot,
 		Status: conversation.StatusActive,
 		Chatbot: &readmodel.ChatbotConversationDetail{
-			Title:              "Pérdida de agua en la cocina",
-			ResponseStatus:     string(conversation.ChatbotResponseAnswered),
-			DiagnosisCompleted: true,
-			RecommendedCategory: &readmodel.RecommendedCategory{
-				ID:   recommendedCategoryID,
-				Name: "Plomería",
+			Title:          "Pérdida de agua en la cocina",
+			ResponseStatus: string(conversation.ChatbotResponseAnswered),
+			Assessment: &readmodel.ProblemAssessmentDetail{
+				Outcome:         string(conversation.AssessmentProfessionalRequired),
+				ProblemCategory: &readmodel.ProblemCategory{ID: recommendedCategoryID, Name: "Plomería"},
 			},
 		},
 		Messages: []readmodel.MessageDetail{{ID: 1, SenderRole: conversation.SenderConsumer, Content: "Pierde agua"}},

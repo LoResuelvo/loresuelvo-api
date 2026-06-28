@@ -9,9 +9,8 @@ import (
 )
 
 type chatbotProviderRecommendationsResponse struct {
-	DiagnosisCompleted   bool                      `json:"diagnosis_completed"`
-	RecommendedCategory  recommendedCategoryDetail `json:"recommended_category"`
-	RecommendedProviders []providerSummaryResponse `json:"recommended_providers"`
+	Assessment           *chatbotAssessmentResponse `json:"assessment"`
+	RecommendedProviders []providerSummaryResponse  `json:"recommended_providers"`
 }
 
 func registerChatbotProviderRecommendationSteps(sc *godog.ScenarioContext, suite *testSuite) {
@@ -97,11 +96,11 @@ func (suite *testSuite) recommendedProvidersFromLastChatbotResponse() ([]provide
 		return nil, fmt.Errorf("expected chatbot response to include recommended_providers, got body %s", string(suite.lastBody))
 	}
 	if suite.lastChatbotRecommendedCategoryName != "" {
-		if !response.DiagnosisCompleted {
-			return nil, fmt.Errorf("expected chatbot response to indicate a completed diagnosis, got body %s", string(suite.lastBody))
+		if response.Assessment == nil || response.Assessment.Outcome != "professional_required" {
+			return nil, fmt.Errorf("expected chatbot response to require a professional, got body %s", string(suite.lastBody))
 		}
-		if response.RecommendedCategory.ID == 0 || !sameNormalizedName(response.RecommendedCategory.Name, suite.lastChatbotRecommendedCategoryName) {
-			return nil, fmt.Errorf("expected chatbot response category %q with a valid id, got %+v with body %s", suite.lastChatbotRecommendedCategoryName, response.RecommendedCategory, string(suite.lastBody))
+		if response.Assessment.ProblemCategory.ID == 0 || !sameNormalizedName(response.Assessment.ProblemCategory.Name, suite.lastChatbotRecommendedCategoryName) {
+			return nil, fmt.Errorf("expected chatbot response category %q with a valid id, got %+v with body %s", suite.lastChatbotRecommendedCategoryName, response.Assessment.ProblemCategory, string(suite.lastBody))
 		}
 	}
 

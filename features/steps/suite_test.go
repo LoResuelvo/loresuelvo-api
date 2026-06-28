@@ -94,16 +94,16 @@ func (s *testSuite) registerAllSteps(sc *godog.ScenarioContext) {
 func (s *testSuite) cleanDatabase() error {
 	s.closeRealtimeConnections()
 
-	if err := s.messageRepository.DeleteAll(); err != nil {
-		return fmt.Errorf("could not clean messages: %w", err)
-	}
-
 	if err := s.jobRequestRepository.DeleteAll(); err != nil {
 		return fmt.Errorf("could not clean job requests: %w", err)
 	}
 
 	if err := s.conversationRepository.DeleteAll(); err != nil {
 		return fmt.Errorf("could not clean conversations: %w", err)
+	}
+
+	if err := s.messageRepository.DeleteAll(); err != nil {
+		return fmt.Errorf("could not clean messages: %w", err)
 	}
 
 	if err := s.userRepository.DeleteAll(); err != nil {

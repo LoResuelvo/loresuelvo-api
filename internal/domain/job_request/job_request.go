@@ -1,6 +1,10 @@
 package jobrequest
 
-import "strings"
+import (
+	"strings"
+
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/conversation"
+)
 
 type Status string
 
@@ -14,13 +18,30 @@ func OpenStatuses() []Status {
 }
 
 type JobRequest struct {
-	ID             int
-	ConsumerID     int
-	ProviderID     int
-	ConversationID int
-	Title          string
-	Description    string
-	Status         Status
+	ID                 int
+	ConsumerID         int
+	ProviderID         int
+	ConversationID     int
+	Title              string
+	Description        string
+	Status             Status
+	SourceAssessmentID *int
+}
+
+func NewFromAssessment(consumerID, providerID int, assessment conversation.ProblemAssessment) (*JobRequest, error) {
+	if !assessment.RequiresProfessional() {
+		return nil, ErrAssessmentNotContactable
+	}
+	jobRequest, err := New(consumerID, providerID, assessment.ProblemTitle, assessment.ProblemDescription)
+	if err != nil {
+		return nil, err
+	}
+	assessmentID := assessment.ID
+	if assessmentID <= 0 {
+		return nil, ErrAssessmentNotContactable
+	}
+	jobRequest.SourceAssessmentID = &assessmentID
+	return jobRequest, nil
 }
 
 func New(consumerID, providerID int, title, description string) (*JobRequest, error) {

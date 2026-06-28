@@ -8,8 +8,8 @@ import (
 type ChatbotConversationTurnResult struct {
 	Conversation         Conversation
 	ResponseStatus       ChatbotResponseStatus
-	DiagnosisCompleted   bool
-	RecommendedCategory  *category.Category
+	Assessment           *ProblemAssessment
+	ProblemCategory      *category.Category
 	RecommendedProviders []providerreadmodel.ProviderSummary
 }
 

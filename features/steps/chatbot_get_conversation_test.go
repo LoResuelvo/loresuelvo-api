@@ -19,11 +19,10 @@ type chatbotConversationDetailResponse struct {
 }
 
 type chatbotConversationDetail struct {
-	Title                string                    `json:"title"`
-	ResponseStatus       string                    `json:"response_status"`
-	DiagnosisCompleted   bool                      `json:"diagnosis_completed"`
-	RecommendedCategory  recommendedCategoryDetail `json:"recommended_category"`
-	RecommendedProviders []providerSummaryResponse `json:"recommended_providers"`
+	Title                string                     `json:"title"`
+	ResponseStatus       string                     `json:"response_status"`
+	Assessment           *chatbotAssessmentResponse `json:"assessment"`
+	RecommendedProviders []providerSummaryResponse  `json:"recommended_providers"`
 }
 
 type recommendedCategoryDetail struct {
@@ -123,8 +122,8 @@ func (suite *testSuite) systemShowsChatbotDiagnosisCompleted() error {
 	if err != nil {
 		return err
 	}
-	if !response.Chatbot.DiagnosisCompleted {
-		return fmt.Errorf("expected chatbot diagnosis to be completed, got body %s", string(suite.lastBody))
+	if response.Chatbot.Assessment == nil || response.Chatbot.Assessment.Outcome == "collecting_information" {
+		return fmt.Errorf("expected chatbot assessment to be completed, got body %s", string(suite.lastBody))
 	}
 
 	return nil
@@ -135,8 +134,8 @@ func (suite *testSuite) systemShowsRecommendedCategoryInChatbotConversationDetai
 	if err != nil {
 		return err
 	}
-	if !sameNormalizedName(response.Chatbot.RecommendedCategory.Name, categoryName) {
-		return fmt.Errorf("expected recommended category %q, got %q with body %s", categoryName, response.Chatbot.RecommendedCategory.Name, string(suite.lastBody))
+	if response.Chatbot.Assessment == nil || !sameNormalizedName(response.Chatbot.Assessment.ProblemCategory.Name, categoryName) {
+		return fmt.Errorf("expected problem category %q, got body %s", categoryName, string(suite.lastBody))
 	}
 
 	return nil

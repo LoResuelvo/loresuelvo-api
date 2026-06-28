@@ -18,10 +18,14 @@ func TestChatbotConversationResponseReusesChatbotDetailPayload(t *testing.T) {
 		Title:            "Pérdida de agua en la cocina",
 	}
 	result := conversation.ChatbotConversationResult{
-		Conversation:        chatbotConversation,
-		ResponseStatus:      conversation.ChatbotResponseAnswered,
-		DiagnosisCompleted:  true,
-		RecommendedCategory: recommendedCategory,
+		Conversation:    chatbotConversation,
+		ResponseStatus:  conversation.ChatbotResponseAnswered,
+		ProblemCategory: recommendedCategory,
+		Assessment: &conversation.ProblemAssessment{
+			ID: 1, Version: 1, Outcome: conversation.AssessmentProfessionalRequired,
+			ProblemCategoryID: &recommendedCategory.ID, ProblemTitle: "Pérdida",
+			ProblemDescription: "Pierde agua.", BasedOnMessageID: 2,
+		},
 		RecommendedProviders: []providerreadmodel.ProviderSummary{{
 			ID:           20,
 			Name:         "Juan",
@@ -34,16 +38,18 @@ func TestChatbotConversationResponseReusesChatbotDetailPayload(t *testing.T) {
 
 	assert.Equal(t, "Pérdida de agua en la cocina", response.Title)
 	assert.Equal(t, string(conversation.ChatbotResponseAnswered), response.ResponseStatus)
-	assert.True(t, response.DiagnosisCompleted)
-	require.NotNil(t, response.RecommendedCategory)
-	assert.Equal(t, 3, response.RecommendedCategory.ID)
-	assert.Equal(t, "Plomería", response.RecommendedCategory.Name)
+	require.NotNil(t, response.Assessment)
+	assert.Equal(t, string(conversation.AssessmentProfessionalRequired), response.Assessment.Outcome)
+	require.NotNil(t, response.Assessment.ProblemCategory)
+	assert.Equal(t, 3, response.Assessment.ProblemCategory.ID)
+	assert.Equal(t, "Plomería", response.Assessment.ProblemCategory.Name)
 	require.Len(t, response.RecommendedProviders, 1)
 
 	body, err := json.Marshal(response)
 	require.NoError(t, err)
 	var fields map[string]json.RawMessage
 	require.NoError(t, json.Unmarshal(body, &fields))
-	assert.Contains(t, fields, "recommended_category")
-	assert.NotContains(t, fields, "recommended_category_name")
+	assert.Contains(t, fields, "assessment")
+	assert.NotContains(t, fields, "diagnosis_completed")
+	assert.NotContains(t, fields, "recommended_category")
 }

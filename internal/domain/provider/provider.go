@@ -46,3 +46,7 @@ func (p Provider) Name() string {
 func (p Provider) Surname() string {
 	return p.User.Surname
 }
+
+func (p Provider) HasCategory(categoryID int) bool {
+	return categoryID > 0 && p.Category != nil && p.Category.ID == categoryID
+}

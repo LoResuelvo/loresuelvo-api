@@ -35,3 +35,5 @@ var ErrChatbotContextInvalid = errors.New("Chatbot context is invalid")
 var ErrInvalidChatbotTurn = errors.New("Chatbot turn is invalid")
 
 var ErrOnlyConsumerCanListChatbotConversations = errors.New("Only consumers can list AI chatbot conversations")
+
+var ErrProblemAssessmentInvalid = errors.New("Problem assessment is invalid")

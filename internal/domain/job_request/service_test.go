@@ -5,9 +5,11 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/category"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/conversation"
 	jobrequest "github.com/LoResuelvo/loresuelvo-api/internal/domain/job_request"
 	readmodel "github.com/LoResuelvo/loresuelvo-api/internal/domain/job_request/read_model"
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/provider"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -90,8 +92,88 @@ func (m *consumerRepo) FindIDByAuthID(authID string) (int, error) {
 
 type providerRepo struct {
 	exists     bool
+	categoryID int
 	providerID int
 	err        error
+}
+
+func (m *providerRepo) FindByID(ctx context.Context, providerID int) (*provider.Provider, error) {
+	if m.err != nil {
+		return nil, m.err
+	}
+	if !m.exists {
+		return nil, provider.ErrDoesNotExist
+	}
+	return &provider.Provider{ID: providerID, Category: &category.Category{ID: m.categoryID}}, nil
+}
+
+func TestCreateFromChatbotAssessmentCopiesCurrentAssessment(t *testing.T) {
+	categoryID := 3
+	assessment := &conversation.ProblemAssessment{
+		ID: 9, ChatbotConversationID: 7, Version: 2,
+		Outcome: conversation.AssessmentProfessionalRequired, ProblemCategoryID: &categoryID,
+		ProblemTitle: "Pérdida en el sifón", ProblemDescription: "La pérdida continúa después de ajustar la conexión.", BasedOnMessageID: 20,
+	}
+	repo := &jobRequestRepositoryMock{}
+	service := jobrequest.NewService(
+		repo,
+		&consumerRepo{consumerID: 10},
+		&providerRepo{exists: true, categoryID: categoryID},
+		&conversationRepo{foundConversation: &conversation.ChatBotConversation{
+			BaseConversation: &conversation.BaseConversation{ID: 7, Type: conversation.TypeChatbot},
+			ConsumerID:       10, CurrentAssessment: assessment,
+		}},
+	)
+
+	created, err := service.CreateFromChatbotAssessment(context.Background(), "auth0|consumer", 7, 20)
+
+	require.NoError(t, err)
+	require.NotNil(t, created)
+	require.Len(t, repo.savedJobRequest, 1)
+	assert.Equal(t, assessment.ProblemTitle, repo.savedJobRequest[0].Title)
+	assert.Equal(t, assessment.ProblemDescription, repo.savedJobRequest[0].Description)
+	require.NotNil(t, repo.savedJobRequest[0].SourceAssessmentID)
+	assert.Equal(t, assessment.ID, *repo.savedJobRequest[0].SourceAssessmentID)
+}
+
+func TestCreateFromChatbotAssessmentRejectsSelfServiceOutcome(t *testing.T) {
+	categoryID := 3
+	service := jobrequest.NewService(
+		&jobRequestRepositoryMock{},
+		&consumerRepo{consumerID: 10},
+		&providerRepo{exists: true},
+		&conversationRepo{foundConversation: &conversation.ChatBotConversation{
+			BaseConversation: &conversation.BaseConversation{ID: 7, Type: conversation.TypeChatbot},
+			ConsumerID:       10,
+			CurrentAssessment: &conversation.ProblemAssessment{
+				ID: 9, Version: 1, Outcome: conversation.AssessmentSelfService,
+				ProblemCategoryID: &categoryID, ProblemTitle: "Problema simple",
+				ProblemDescription: "Puede resolverse sin prestador.", BasedOnMessageID: 2,
+			},
+		}},
+	)
+
+	created, err := service.CreateFromChatbotAssessment(context.Background(), "auth0|consumer", 7, 20)
+
+	assert.ErrorIs(t, err, jobrequest.ErrAssessmentNotContactable)
+	assert.Nil(t, created)
+}
+
+func TestCreateFromChatbotAssessmentRejectsDifferentOwner(t *testing.T) {
+	service := jobrequest.NewService(
+		&jobRequestRepositoryMock{},
+		&consumerRepo{consumerID: 11},
+		&providerRepo{exists: true},
+		&conversationRepo{foundConversation: &conversation.ChatBotConversation{
+			BaseConversation: &conversation.BaseConversation{ID: 7, Type: conversation.TypeChatbot},
+			ConsumerID:       10,
+		}},
+	)
+
+	created, err := service.CreateFromChatbotAssessment(context.Background(), "auth0|other", 7, 20)
+
+	assert.ErrorIs(t, err, jobrequest.ErrChatbotConversationAccessDenied)
+	assert.Nil(t, created)
 }
 
 func (m *providerRepo) ExistsByID(id int) (bool, error) {

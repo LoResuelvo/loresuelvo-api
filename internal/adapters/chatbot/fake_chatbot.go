@@ -80,11 +80,33 @@ func (chatbot *FakeChatbot) SetConcludedDiagnosisResponse(title, content, recomm
 	defer chatbot.mu.Unlock()
 
 	chatbot.response = conversation.ChatbotResponse{
-		Status:                  conversation.ChatbotResponseAnswered,
-		Title:                   title,
-		Content:                 content,
-		DiagnosisCompleted:      true,
-		RecommendedCategoryName: recommendedCategoryName,
+		Status:  conversation.ChatbotResponseAnswered,
+		Title:   title,
+		Content: content,
+		Assessment: conversation.ChatbotAssessmentResponse{
+			Action:              conversation.ChatbotAssessmentReplace,
+			Outcome:             conversation.AssessmentProfessionalRequired,
+			ProblemTitle:        title,
+			ProblemDescription:  content,
+			ProblemCategoryName: recommendedCategoryName,
+		},
+	}
+}
+
+func (chatbot *FakeChatbot) SetSelfServiceResponse(title, content, categoryName string) {
+	chatbot.mu.Lock()
+	defer chatbot.mu.Unlock()
+	chatbot.response = conversation.ChatbotResponse{
+		Status:  conversation.ChatbotResponseAnswered,
+		Title:   title,
+		Content: content,
+		Assessment: conversation.ChatbotAssessmentResponse{
+			Action:              conversation.ChatbotAssessmentReplace,
+			Outcome:             conversation.AssessmentSelfService,
+			ProblemTitle:        title,
+			ProblemDescription:  content,
+			ProblemCategoryName: categoryName,
+		},
 	}
 }
 
@@ -96,6 +118,13 @@ func (chatbot *FakeChatbot) SetResponseWithStatus(status conversation.ChatbotRes
 		Status:  status,
 		Title:   title,
 		Content: content,
+		Assessment: conversation.ChatbotAssessmentResponse{
+			Action:  conversation.ChatbotAssessmentReplace,
+			Outcome: conversation.AssessmentCollectingInformation,
+		},
+	}
+	if status == conversation.ChatbotResponseOutOfScope {
+		chatbot.response.Assessment = conversation.ChatbotAssessmentResponse{Action: conversation.ChatbotAssessmentUnchanged}
 	}
 }
 
@@ -107,6 +136,10 @@ func (chatbot *FakeChatbot) Reset() {
 		Status:  conversation.ChatbotResponseAnswered,
 		Title:   defaultChatbotTitle,
 		Content: defaultChatbotContent,
+		Assessment: conversation.ChatbotAssessmentResponse{
+			Action:  conversation.ChatbotAssessmentReplace,
+			Outcome: conversation.AssessmentCollectingInformation,
+		},
 	}
 	chatbot.summary = ""
 	chatbot.requestCount = 0
@@ -161,10 +194,11 @@ func (chatbot *FakeChatbot) LastAvailableCategories() []category.Category {
 
 func copyQuestion(question conversation.ChatbotHomeProblemQuestion) conversation.ChatbotHomeProblemQuestion {
 	return conversation.ChatbotHomeProblemQuestion{
-		UserMessage:    question.UserMessage,
-		ContextSummary: question.ContextSummary,
-		RecentMessages: copyMessages(question.RecentMessages),
-		Images:         copyMessageImageContents(question.Images),
+		UserMessage:       question.UserMessage,
+		ContextSummary:    question.ContextSummary,
+		RecentMessages:    copyMessages(question.RecentMessages),
+		Images:            copyMessageImageContents(question.Images),
+		IsNewConversation: question.IsNewConversation,
 	}
 }
 

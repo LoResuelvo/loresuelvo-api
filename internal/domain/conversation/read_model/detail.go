@@ -24,12 +24,16 @@ type WorkConversationDetail struct {
 type ChatbotConversationDetail struct {
 	Title                string
 	ResponseStatus       string
-	DiagnosisCompleted   bool
-	RecommendedCategory  *RecommendedCategory
+	Assessment           *ProblemAssessmentDetail
 	RecommendedProviders []providerreadmodel.ProviderSummary
 }
 
-type RecommendedCategory struct {
+type ProblemAssessmentDetail struct {
+	Outcome         string
+	ProblemCategory *ProblemCategory
+}
+
+type ProblemCategory struct {
 	ID   int
 	Name string
 }

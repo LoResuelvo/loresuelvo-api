@@ -15,7 +15,6 @@ Feature: 51 Enviar solicitud de conversación de trabajo a Prestadores, con IA
 
     Rule: Solo una evaluación vigente que requiere un profesional permite contactar prestadores
 
-    @wip
     Scenario: 51.1 - Enviar una solicitud a un prestador recomendado usando la evaluación del chatbot
         Given que estoy autenticado como consumidor "ana@example.com"
         And que tengo una conversación con el chatbot cuya evaluación vigente requiere un profesional del rubro "Plomería" con el título "Pérdida debajo de la pileta" y la descripción:
@@ -32,7 +31,6 @@ Feature: 51 Enviar solicitud de conversación de trabajo a Prestadores, con IA
         And la solicitud queda vinculada con la evaluación vigente de la conversación con el chatbot
         And el sistema crea una conversación de trabajo pendiente entre "Ana Pérez" y "Juan Gómez"
 
-    @wip
     Scenario: 51.2 - No permitir contactar prestadores cuando el problema puede ser resuelto por el consumidor
         Given que estoy autenticado como consumidor "ana@example.com"
         And que tengo una conversación con el chatbot cuya evaluación vigente clasifica el problema en el rubro "Plomería" y determina que puede resolverse sin un profesional
@@ -41,7 +39,6 @@ Feature: 51 Enviar solicitud de conversación de trabajo a Prestadores, con IA
         And el sistema no registra una solicitud de trabajo
         And el sistema no crea una conversación de trabajo pendiente
 
-    @wip
     Scenario: 51.3 - No permitir contactar prestadores mientras falta información para evaluar el problema
         Given que estoy autenticado como consumidor "ana@example.com"
         And que tengo una conversación con el chatbot cuya evaluación vigente todavía requiere más información
@@ -50,7 +47,6 @@ Feature: 51 Enviar solicitud de conversación de trabajo a Prestadores, con IA
         And el sistema no registra una solicitud de trabajo
         And el sistema no crea una conversación de trabajo pendiente
 
-    @wip
     Scenario: 51.4 - Una respuesta posterior fuera de alcance no invalida una evaluación profesional vigente
         Given que estoy autenticado como consumidor "ana@example.com"
         And que tengo una conversación con el chatbot cuya evaluación vigente requiere un profesional del rubro "Plomería" con el título "Pérdida debajo de la pileta" y la descripción:
@@ -64,7 +60,6 @@ Feature: 51 Enviar solicitud de conversación de trabajo a Prestadores, con IA
 
     Rule: El prestador contactado debe corresponder al rubro de la evaluación vigente
 
-    @wip
     Scenario: 51.5 - Rechazar un prestador de un rubro diferente al evaluado
         Given que estoy autenticado como consumidor "ana@example.com"
         And que tengo una conversación con el chatbot cuya evaluación vigente requiere un profesional del rubro "Plomería"
@@ -73,7 +68,6 @@ Feature: 51 Enviar solicitud de conversación de trabajo a Prestadores, con IA
         And el sistema no registra una solicitud de trabajo para "Laura Suárez"
         And el sistema no crea una conversación de trabajo pendiente con "Laura Suárez"
 
-    @wip
     Scenario: 51.6 - Enviar solicitudes a varios prestadores recomendados desde la misma evaluación
         Given que estoy autenticado como consumidor "ana@example.com"
         And que tengo una conversación con el chatbot cuya evaluación vigente requiere un profesional del rubro "Plomería" con el título "Pérdida debajo de la pileta" y la descripción:
@@ -88,7 +82,6 @@ Feature: 51 Enviar solicitud de conversación de trabajo a Prestadores, con IA
 
     Rule: La solicitud utiliza una copia trazable de la evaluación seleccionada
 
-    @wip
     Scenario: 51.7 - Utilizar la revisión vigente de la evaluación al contactar al prestador
         Given que estoy autenticado como consumidor "ana@example.com"
         And que mi conversación con el chatbot tenía una evaluación que permitía resolver el problema sin un profesional
@@ -104,7 +97,6 @@ Feature: 51 Enviar solicitud de conversación de trabajo a Prestadores, con IA
             La pérdida reapareció después de ajustar el sifón y ahora se produce incluso sin utilizar la pileta.
             """
 
-    @wip
     Scenario: 51.8 - Conservar en la solicitud el contenido enviado aunque la evaluación evolucione posteriormente
         Given que estoy autenticado como consumidor "ana@example.com"
         And que envié al prestador "Juan Gómez" una solicitud desde una evaluación con el título "Pérdida en el sifón" y la descripción:
@@ -125,7 +117,6 @@ Feature: 51 Enviar solicitud de conversación de trabajo a Prestadores, con IA
 
     Rule: Solo el consumidor dueño de la conversación puede generar solicitudes desde su evaluación
 
-    @wip
     Scenario: 51.9 - Rechazar el contacto desde la conversación con el chatbot de otro consumidor
         Given que el consumidor "ana@example.com" tiene una conversación con el chatbot cuya evaluación vigente requiere un profesional del rubro "Plomería"
         And que estoy autenticado como consumidor "carla@example.com"
@@ -136,7 +127,6 @@ Feature: 51 Enviar solicitud de conversación de trabajo a Prestadores, con IA
 
     Rule: No puede existir más de una solicitud abierta entre el consumidor y el mismo prestador
 
-    @wip
     Scenario: 51.10 - No duplicar una solicitud abierta para el mismo prestador
         Given que estoy autenticado como consumidor "ana@example.com"
         And que tengo una conversación con el chatbot cuya evaluación vigente requiere un profesional del rubro "Plomería"

@@ -260,3 +260,27 @@ func TestProviderRepositoryCanFindIDByAuthID(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotZero(t, providerID)
 }
+
+func TestProviderRepositoryCanFindByID(t *testing.T) {
+	testContext := newProviderRepositoryTest(t)
+	providerToSave := validProvider(t, testContext)
+	providerID, err := testContext.providerRepository.Save(*providerToSave)
+	require.NoError(t, err)
+
+	foundProvider, err := testContext.providerRepository.FindByID(context.Background(), providerID)
+
+	require.NoError(t, err)
+	assert.Equal(t, providerID, foundProvider.ID)
+	assert.Equal(t, providerToSave.Name(), foundProvider.Name())
+	require.NotNil(t, foundProvider.Category)
+	assert.Equal(t, providerToSave.Category.ID, foundProvider.Category.ID)
+}
+
+func TestProviderRepositoryFindByIDReturnsNotFound(t *testing.T) {
+	testContext := newProviderRepositoryTest(t)
+
+	foundProvider, err := testContext.providerRepository.FindByID(context.Background(), 999999)
+
+	assert.ErrorIs(t, err, provider.ErrDoesNotExist)
+	assert.Nil(t, foundProvider)
+}

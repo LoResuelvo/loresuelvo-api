@@ -275,7 +275,7 @@ func (reader *ConversationReader) findChatbotDetailByID(ctx context.Context, con
 			c.status,
 			cc.title,
 			cc.last_response_status,
-			cc.diagnosis_completed,
+			COALESCE(pa.outcome, ''),
 			COALESCE(cat.id, 0),
 			COALESCE(cat.name, ''),
 			m.id,
@@ -285,7 +285,8 @@ func (reader *ConversationReader) findChatbotDetailByID(ctx context.Context, con
 			c.updated_on
 		FROM conversations c
 		INNER JOIN chatbot_conversations cc ON cc.conversation_id = c.id
-		LEFT JOIN categories cat ON cat.id = cc.recommended_category_id
+		LEFT JOIN problem_assessments pa ON pa.id = cc.current_assessment_id
+		LEFT JOIN categories cat ON cat.id = pa.problem_category_id
 		LEFT JOIN messages m ON m.conversation_id = c.id
 		WHERE c.id = $1
 			AND c.type = $2
@@ -467,7 +468,8 @@ func scanChatbotConversationDetail(rows *sql.Rows) (*readmodel.ConversationDetai
 	for rows.Next() {
 		var rowDetail readmodel.ConversationDetail
 		var chatbotDetail readmodel.ChatbotConversationDetail
-		var recommendedCategory readmodel.RecommendedCategory
+		var assessment readmodel.ProblemAssessmentDetail
+		var problemCategory readmodel.ProblemCategory
 		var messageID sql.NullInt64
 		var messageSenderRole sql.NullString
 		var messageContent sql.NullString
@@ -479,9 +481,9 @@ func scanChatbotConversationDetail(rows *sql.Rows) (*readmodel.ConversationDetai
 			&rowDetail.Status,
 			&chatbotDetail.Title,
 			&chatbotDetail.ResponseStatus,
-			&chatbotDetail.DiagnosisCompleted,
-			&recommendedCategory.ID,
-			&recommendedCategory.Name,
+			&assessment.Outcome,
+			&problemCategory.ID,
+			&problemCategory.Name,
 			&messageID,
 			&messageSenderRole,
 			&messageContent,
@@ -492,8 +494,11 @@ func scanChatbotConversationDetail(rows *sql.Rows) (*readmodel.ConversationDetai
 		}
 
 		if detail == nil {
-			if recommendedCategory.ID > 0 {
-				chatbotDetail.RecommendedCategory = &recommendedCategory
+			if assessment.Outcome != "" {
+				if problemCategory.ID > 0 {
+					assessment.ProblemCategory = &problemCategory
+				}
+				chatbotDetail.Assessment = &assessment
 			}
 			rowDetail.Chatbot = &chatbotDetail
 			rowDetail.Messages = []readmodel.MessageDetail{}

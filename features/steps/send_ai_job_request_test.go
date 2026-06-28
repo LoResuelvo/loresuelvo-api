@@ -73,7 +73,7 @@ func (suite *testSuite) iHaveChatbotConversationWithSelfServiceAssessment(catego
 
 	suite.aiExpectedJobRequestTitle = "Problema simple de " + categoryName
 	suite.aiExpectedJobRequestDescription = "La evaluación determina que el consumidor puede resolver el problema sin un profesional."
-	suite.chatbot.SetResponse(suite.aiExpectedJobRequestTitle, suite.aiExpectedJobRequestDescription)
+	suite.chatbot.SetSelfServiceResponse(suite.aiExpectedJobRequestTitle, suite.aiExpectedJobRequestDescription, categoryName)
 
 	if err := suite.createAndRememberChatbotConversation("Necesito orientación para resolver un problema simple de mi hogar."); err != nil {
 		return err
@@ -659,6 +659,12 @@ func exportedIntField(value any, fieldName string) (int, error) {
 		return 0, fmt.Errorf("expected struct with field %s", fieldName)
 	}
 	field := reflected.FieldByName(fieldName)
+	if field.IsValid() && field.Kind() == reflect.Pointer {
+		if field.IsNil() {
+			return 0, fmt.Errorf("expected non-nil integer field %s", fieldName)
+		}
+		field = field.Elem()
+	}
 	if !field.IsValid() || !field.CanInt() {
 		return 0, fmt.Errorf("expected integer field %s", fieldName)
 	}

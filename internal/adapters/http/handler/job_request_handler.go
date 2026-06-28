@@ -23,6 +23,10 @@ type createJobRequestRequest struct {
 	Description string `json:"description"`
 }
 
+type createJobRequestFromChatbotRequest struct {
+	ProviderID int `json:"provider_id"`
+}
+
 type jobRequestResponse struct {
 	ID             int    `json:"id"`
 	ConversationID int    `json:"conversation_id"`
@@ -86,6 +90,42 @@ func (h *JobRequestHandler) CreateJobRequest(c *gin.Context) {
 
 	c.Header("Location", fmt.Sprintf("/job-requests/%d", createdJobRequest.ID))
 	c.JSON(http.StatusCreated, jobRequestResponseFromDomain(*createdJobRequest))
+}
+
+func (h *JobRequestHandler) CreateFromChatbotAssessment(c *gin.Context) {
+	auth0ID, ok := middleware.GetUserID(c)
+	if !ok || strings.TrimSpace(auth0ID) == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "missing user id"})
+		return
+	}
+	conversationID, err := conversationIDFromPath(c.Param("conversationID"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	var request createJobRequestFromChatbotRequest
+	if err := c.ShouldBindJSON(&request); err != nil || request.ProviderID <= 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": jobrequest.ErrProviderRequired.Error()})
+		return
+	}
+
+	created, err := h.jobRequestService.CreateFromChatbotAssessment(c.Request.Context(), auth0ID, conversationID, request.ProviderID)
+	switch {
+	case errors.Is(err, conversation.ErrConversationDoesNotExist), errors.Is(err, jobrequest.ErrProviderDoesNotExist):
+		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+	case errors.Is(err, jobrequest.ErrOnlyConsumerCanCreateJobRequest), errors.Is(err, jobrequest.ErrChatbotConversationAccessDenied):
+		c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
+	case errors.Is(err, jobrequest.ErrAssessmentNotContactable),
+		errors.Is(err, jobrequest.ErrAssessmentNeedsMoreInformation),
+		errors.Is(err, jobrequest.ErrProviderCategoryMismatch),
+		errors.Is(err, jobrequest.ErrAlreadyExists):
+		c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
+	case err != nil:
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+	default:
+		c.Header("Location", fmt.Sprintf("/job-requests/%d", created.ID))
+		c.JSON(http.StatusCreated, jobRequestResponseFromDomain(*created))
+	}
 }
 
 func (h *JobRequestHandler) GetJobRequests(c *gin.Context) {

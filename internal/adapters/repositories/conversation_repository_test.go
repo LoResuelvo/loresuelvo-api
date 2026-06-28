@@ -27,11 +27,14 @@ type conversationRepositoryTestContext struct {
 func cleanConversationRepositoryTestDatabase(t *testing.T, database *sql.DB) {
 	t.Helper()
 
-	_, err := database.Exec("DELETE FROM messages")
-	require.NoError(t, err, "could not clean messages")
+	_, err := database.Exec("DELETE FROM job_requests")
+	require.NoError(t, err, "could not clean job requests")
 
 	_, err = database.Exec("DELETE FROM conversations")
 	require.NoError(t, err, "could not clean conversations")
+
+	_, err = database.Exec("DELETE FROM messages")
+	require.NoError(t, err, "could not clean messages")
 
 	_, err = database.Exec("DELETE FROM providers")
 	require.NoError(t, err, "could not clean providers")
@@ -401,10 +404,21 @@ func TestConversationRepositoryCanPersistChatbotSemanticResult(t *testing.T) {
 	require.NoError(t, err)
 	chatbotConversation, err := conversation.NewChatbotConversation(consumerID, "Pérdida de agua en la cocina")
 	require.NoError(t, err)
-	chatbotConversation.(*conversation.ChatBotConversation).ApplyResponse(conversation.ChatbotResponse{
-		Status:             conversation.ChatbotResponseAnswered,
-		DiagnosisCompleted: true,
-	}, &savedCategory.ID)
+	typedConversation := chatbotConversation.(*conversation.ChatBotConversation)
+	consumerMessage, err := conversation.NewConsumerMessage("Pierde agua debajo de la pileta.")
+	require.NoError(t, err)
+	chatbotMessage, err := conversation.NewChatbotMessage("La pérdida requiere un plomero.")
+	require.NoError(t, err)
+	require.NoError(t, typedConversation.AddTurn(*consumerMessage, *chatbotMessage))
+	require.NoError(t, typedConversation.ApplyResponse(conversation.ChatbotResponse{
+		Status: conversation.ChatbotResponseAnswered,
+		Assessment: conversation.ChatbotAssessmentResponse{
+			Action:             conversation.ChatbotAssessmentReplace,
+			Outcome:            conversation.AssessmentProfessionalRequired,
+			ProblemTitle:       "Pérdida debajo de la pileta",
+			ProblemDescription: "Pierde agua debajo de la pileta.",
+		},
+	}, &savedCategory.ID))
 
 	savedConversation, err := testContext.conversationRepository.SaveConversation(context.Background(), chatbotConversation)
 
@@ -412,10 +426,11 @@ func TestConversationRepositoryCanPersistChatbotSemanticResult(t *testing.T) {
 	foundConversation, err := testContext.conversationRepository.FindByID(context.Background(), savedConversation.Base().ID)
 	require.NoError(t, err)
 	foundChatbotConversation := foundConversation.(*conversation.ChatBotConversation)
-	assert.Equal(t, conversation.ChatbotResponseAnswered, foundChatbotConversation.ResponseStatus)
-	assert.True(t, foundChatbotConversation.DiagnosisCompleted)
-	require.NotNil(t, foundChatbotConversation.RecommendedCategoryID)
-	assert.Equal(t, savedCategory.ID, *foundChatbotConversation.RecommendedCategoryID)
+	assert.Equal(t, conversation.ChatbotResponseAnswered, foundChatbotConversation.LastResponseStatus)
+	require.NotNil(t, foundChatbotConversation.CurrentAssessment)
+	assert.Equal(t, conversation.AssessmentProfessionalRequired, foundChatbotConversation.CurrentAssessment.Outcome)
+	require.NotNil(t, foundChatbotConversation.CurrentAssessment.ProblemCategoryID)
+	assert.Equal(t, savedCategory.ID, *foundChatbotConversation.CurrentAssessment.ProblemCategoryID)
 }
 
 func TestConversationRepositoryCanUpdateConversationWithChatbotTurn(t *testing.T) {
@@ -433,10 +448,15 @@ func TestConversationRepositoryCanUpdateConversationWithChatbotTurn(t *testing.T
 	require.NoError(t, err)
 	savedCategory, err := testContext.categoryRepository.Save(*electricityCategory)
 	require.NoError(t, err)
-	savedChatbotConversation.ApplyResponse(conversation.ChatbotResponse{
-		Status:             conversation.ChatbotResponseAnswered,
-		DiagnosisCompleted: true,
-	}, &savedCategory.ID)
+	require.NoError(t, savedChatbotConversation.ApplyResponse(conversation.ChatbotResponse{
+		Status: conversation.ChatbotResponseAnswered,
+		Assessment: conversation.ChatbotAssessmentResponse{
+			Action:             conversation.ChatbotAssessmentReplace,
+			Outcome:            conversation.AssessmentProfessionalRequired,
+			ProblemTitle:       "Problema eléctrico",
+			ProblemDescription: "El problema requiere un electricista.",
+		},
+	}, &savedCategory.ID))
 	require.NoError(t, savedChatbotConversation.AddTurn(*consumerMessage, *chatbotMessage))
 	savedChatbotConversation.FinishProcessing()
 	updatedConversation, err := testContext.conversationRepository.UpdateConversation(context.Background(), savedChatbotConversation)
@@ -450,9 +470,10 @@ func TestConversationRepositoryCanUpdateConversationWithChatbotTurn(t *testing.T
 	assert.Equal(t, conversation.SenderConsumer, foundChatbotConversation.Messages()[2].SenderRole)
 	assert.Equal(t, conversation.SenderChatbot, foundChatbotConversation.Messages()[3].SenderRole)
 	assert.Zero(t, foundChatbotConversation.Context.LastSummarizedMessageID)
-	assert.True(t, foundChatbotConversation.DiagnosisCompleted)
-	require.NotNil(t, foundChatbotConversation.RecommendedCategoryID)
-	assert.Equal(t, savedCategory.ID, *foundChatbotConversation.RecommendedCategoryID)
+	require.NotNil(t, foundChatbotConversation.CurrentAssessment)
+	assert.Equal(t, conversation.AssessmentProfessionalRequired, foundChatbotConversation.CurrentAssessment.Outcome)
+	require.NotNil(t, foundChatbotConversation.CurrentAssessment.ProblemCategoryID)
+	assert.Equal(t, savedCategory.ID, *foundChatbotConversation.CurrentAssessment.ProblemCategoryID)
 }
 
 func TestConversationRepositoryPreventsConcurrentChatbotProcessing(t *testing.T) {

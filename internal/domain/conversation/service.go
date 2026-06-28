@@ -188,7 +188,7 @@ func (s *Service) CreateChatbotConversation(ctx context.Context, authID string, 
 		return nil, err
 	}
 
-	answer, err := s.answerChatbotQuestion(ctx, ChatbotHomeProblemQuestion{UserMessage: consumerMessage.Content, Images: chatbotImages})
+	answer, err := s.answerChatbotQuestion(ctx, ChatbotHomeProblemQuestion{UserMessage: consumerMessage.Content, Images: chatbotImages, IsNewConversation: true})
 	if err != nil {
 		return nil, err
 	}
@@ -198,7 +198,9 @@ func (s *Service) CreateChatbotConversation(ctx context.Context, authID string, 
 		return nil, err
 	}
 	chatbotConversation := createdConversation.(*ChatBotConversation)
-	chatbotConversation.ApplyResponse(*answer.response, recommendedCategoryID(answer.recommendedCategory))
+	if err := chatbotConversation.ApplyResponse(*answer.response, problemCategoryID(answer.problemCategory)); err != nil {
+		return nil, err
+	}
 	chatbotConversation.AddMessage(*consumerMessage)
 	chatbotConversation.AddMessage(*answer.message)
 
@@ -249,6 +251,12 @@ func (s *Service) ContinueChatbotConversation(ctx context.Context, authID string
 	if err != nil {
 		return nil, err
 	}
+	if answer.response.Assessment.Action == ChatbotAssessmentUnchanged {
+		answer.problemCategory, answer.recommendedProviders, err = s.recommendationForCurrentAssessment(ctx, chatbotConversation)
+		if err != nil {
+			return nil, err
+		}
+	}
 
 	savedConversation, err := s.saveChatbotTurn(ctx, chatbotConversation, *consumerMessage, *answer.message, answer)
 	if err != nil {
@@ -257,6 +265,33 @@ func (s *Service) ContinueChatbotConversation(ctx context.Context, authID string
 	processingFinished = true
 
 	return chatbotTurnResult(savedConversation, answer), nil
+}
+
+func (s *Service) recommendationForCurrentAssessment(ctx context.Context, chatbotConversation *ChatBotConversation) (*category.Category, []providerreadmodel.ProviderSummary, error) {
+	assessment := chatbotConversation.CurrentAssessment
+	if assessment == nil || assessment.ProblemCategoryID == nil {
+		return nil, nil, nil
+	}
+	categories, err := s.availableCategoriesForChatbot()
+	if err != nil {
+		return nil, nil, err
+	}
+	var matched *category.Category
+	for i := range categories {
+		if categories[i].ID == *assessment.ProblemCategoryID {
+			matched = &categories[i]
+			break
+		}
+	}
+	if matched == nil || !assessment.RequiresProfessional() {
+		return matched, nil, nil
+	}
+	providers, err := s.providerRepository.FindByCategoryID(matched.ID)
+	if err != nil {
+		return nil, nil, err
+	}
+	summaries, err := s.providerSummariesWithProfilePhotoURLs(ctx, providers)
+	return matched, summaries, err
 }
 
 func (s *Service) chatbotConsumerID(authID string) (int, error) {
@@ -298,13 +333,12 @@ func (s *Service) answerChatbotQuestion(ctx context.Context, question ChatbotHom
 	if chatbotResponse == nil {
 		return nil, ErrChatbotResponseRequired
 	}
-
 	chatbotMessage, err := NewChatbotMessage(chatbotResponse.Content)
 	if err != nil {
 		return nil, err
 	}
 
-	recommendedCategory, recommendedProviders, err := s.recommendationForChatbotResponse(ctx, *chatbotResponse, availableCategories)
+	problemCategory, recommendedProviders, err := s.assessmentResult(ctx, *chatbotResponse, availableCategories)
 	if err != nil {
 		return nil, err
 	}
@@ -312,17 +346,17 @@ func (s *Service) answerChatbotQuestion(ctx context.Context, question ChatbotHom
 	return &chatbotAnswer{
 		response:             chatbotResponse,
 		message:              chatbotMessage,
-		recommendedCategory:  recommendedCategory,
+		problemCategory:      problemCategory,
 		recommendedProviders: recommendedProviders,
 	}, nil
 }
 
-func recommendedCategoryID(recommendedCategory *category.Category) *int {
-	if recommendedCategory == nil {
+func problemCategoryID(problemCategory *category.Category) *int {
+	if problemCategory == nil {
 		return nil
 	}
 
-	categoryID := recommendedCategory.ID
+	categoryID := problemCategory.ID
 	return &categoryID
 }
 
@@ -376,7 +410,9 @@ func (s *Service) saveChatbotTurn(ctx context.Context, chatbotConversation *Chat
 	if err := chatbotConversation.AddTurn(consumerMessage, chatbotMessage); err != nil {
 		return nil, err
 	}
-	chatbotConversation.ApplyResponse(*answer.response, recommendedCategoryID(answer.recommendedCategory))
+	if err := chatbotConversation.ApplyResponse(*answer.response, problemCategoryID(answer.problemCategory)); err != nil {
+		return nil, err
+	}
 	chatbotConversation.FinishProcessing()
 
 	return s.conversationRepository.UpdateConversation(ctx, chatbotConversation)
@@ -396,9 +432,19 @@ func chatbotTurnResult(conversation Conversation, answer *chatbotAnswer) *Chatbo
 		Conversation:         conversation,
 		ResponseStatus:       answer.response.Status,
 		RecommendedProviders: answer.recommendedProviders,
-		DiagnosisCompleted:   answer.response.DiagnosisCompleted,
-		RecommendedCategory:  answer.recommendedCategory,
+		Assessment:           copyCurrentAssessment(conversation),
+		ProblemCategory:      answer.problemCategory,
 	}
+}
+
+func copyCurrentAssessment(foundConversation Conversation) *ProblemAssessment {
+	chatbotConversation, ok := foundConversation.(*ChatBotConversation)
+	if !ok || chatbotConversation.CurrentAssessment == nil {
+		return nil
+	}
+	assessment := *chatbotConversation.CurrentAssessment
+	assessment.ProblemCategoryID = copyOptionalInt(assessment.ProblemCategoryID)
+	return &assessment
 }
 
 func (s *Service) authenticatedConsumerMatches(authID string, consumerID int) bool {
@@ -553,14 +599,20 @@ func (s *Service) withCounterpartProfilePhotoURL(ctx context.Context, detail *re
 }
 
 // TODO: Let the chatbot rank providers using richer provider attributes when recommendation criteria evolve.
-func (s *Service) recommendationForChatbotResponse(ctx context.Context, chatbotResponse ChatbotResponse, availableCategories []category.Category) (*category.Category, []providerreadmodel.ProviderSummary, error) {
-	if !chatbotResponse.DiagnosisCompleted {
+func (s *Service) assessmentResult(ctx context.Context, chatbotResponse ChatbotResponse, availableCategories []category.Category) (*category.Category, []providerreadmodel.ProviderSummary, error) {
+	if chatbotResponse.Assessment.Action == ChatbotAssessmentUnchanged {
 		return nil, nil, nil
 	}
 
 	matchedCategory := categoryForChatbotResponse(chatbotResponse, availableCategories)
-	if matchedCategory == nil {
-		return nil, []providerreadmodel.ProviderSummary{}, nil
+	if strings.TrimSpace(chatbotResponse.Assessment.ProblemCategoryName) != "" && matchedCategory == nil {
+		return nil, nil, ErrProblemAssessmentInvalid
+	}
+	if chatbotResponse.Assessment.Outcome == AssessmentProfessionalRequired && matchedCategory == nil {
+		return nil, nil, ErrProblemAssessmentInvalid
+	}
+	if chatbotResponse.Assessment.Outcome != AssessmentProfessionalRequired {
+		return matchedCategory, nil, nil
 	}
 
 	providers, err := s.providerRepository.FindByCategoryID(matchedCategory.ID)
@@ -577,7 +629,7 @@ func (s *Service) recommendationForChatbotResponse(ctx context.Context, chatbotR
 }
 
 func categoryForChatbotResponse(chatbotResponse ChatbotResponse, availableCategories []category.Category) *category.Category {
-	categoryName := strings.TrimSpace(chatbotResponse.RecommendedCategoryName)
+	categoryName := strings.TrimSpace(chatbotResponse.Assessment.ProblemCategoryName)
 	if categoryName == "" {
 		return nil
 	}
@@ -591,11 +643,11 @@ func categoryForChatbotResponse(chatbotResponse ChatbotResponse, availableCatego
 }
 
 func (s *Service) withRecommendedProviders(ctx context.Context, detail *readmodel.ConversationDetail) (*readmodel.ConversationDetail, error) {
-	if detail.Chatbot == nil || !detail.Chatbot.DiagnosisCompleted || detail.Chatbot.RecommendedCategory == nil || detail.Chatbot.RecommendedCategory.ID == 0 {
+	if detail.Chatbot == nil || detail.Chatbot.Assessment == nil || detail.Chatbot.Assessment.Outcome != string(AssessmentProfessionalRequired) || detail.Chatbot.Assessment.ProblemCategory == nil {
 		return detail, nil
 	}
 
-	providers, err := s.providerRepository.FindByCategoryID(detail.Chatbot.RecommendedCategory.ID)
+	providers, err := s.providerRepository.FindByCategoryID(detail.Chatbot.Assessment.ProblemCategory.ID)
 	if err != nil {
 		return nil, err
 	}
