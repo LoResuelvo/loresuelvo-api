@@ -1,0 +1,9 @@
+type: object
+required:
+- provider_id
+properties:
+  provider_id:
+    type: integer
+    format: int32
+    minimum: 1
+additionalProperties: false

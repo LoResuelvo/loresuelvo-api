@@ -51,7 +51,8 @@ post:
                 status: active
                 title: Pérdida de agua en la cocina
                 response_status: answered
-                diagnosis_completed: false
+                assessment:
+                  outcome: collecting_information
                 messages:
                 - id: 3
                   sender_role: consumer

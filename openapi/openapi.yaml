@@ -50,6 +50,8 @@ paths:
     $ref: ./paths/chatbot-conversations.yaml
   /chatbot/conversations/{conversationId}/messages:
     $ref: ./paths/chatbot-conversation-messages.yaml
+  /chatbot/conversations/{conversationId}/job-requests:
+    $ref: ./paths/chatbot-conversation-job-requests.yaml
   /job-requests:
     $ref: ./paths/job-requests.yaml
   /job-requests/{jobRequestID}/accept:
@@ -128,6 +130,10 @@ components:
       $ref: ./components/schemas/chatbot-conversation-response.yaml
     ChatbotConversationDetail:
       $ref: ./components/schemas/chatbot-conversation-detail.yaml
+    ProblemAssessment:
+      $ref: ./components/schemas/problem-assessment.yaml
+    CreateAIJobRequestRequest:
+      $ref: ./components/schemas/create-ai-job-request-request.yaml
     ChatbotConversationSummary:
       $ref: ./components/schemas/chatbot-conversation-summary.yaml
     SentMessage:

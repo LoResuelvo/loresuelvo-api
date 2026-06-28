@@ -1,0 +1,69 @@
+parameters:
+- name: conversationId
+  in: path
+  required: true
+  schema:
+    type: integer
+    format: int32
+    minimum: 1
+post:
+  tags:
+  - JobRequests
+  operationId: createJobRequestFromChatbotAssessment
+  summary: Contact a provider from a chatbot assessment
+  description: Creates a pending job request and work conversation using an immutable copy of the authenticated consumer's current professional assessment.
+  security:
+  - BearerAuth: []
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/CreateAIJobRequestRequest'
+  responses:
+    '201':
+      description: Job request and pending work conversation created.
+      headers:
+        Location:
+          schema:
+            type: string
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/JobRequest'
+    '400':
+      description: Invalid conversation id, body, or provider id.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    '401':
+      description: Authentication failed.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/AuthErrorResponse'
+    '403':
+      description: The caller is not the consumer who owns the chatbot conversation.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    '404':
+      description: The chatbot conversation or provider does not exist.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    '409':
+      description: Assessment state, category mismatch, or duplicate request conflict.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    '500':
+      description: Unexpected error.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'

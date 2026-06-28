@@ -1,0 +1,25 @@
+type: object
+description: Frontend projection of the current structured home-problem assessment.
+required:
+- outcome
+properties:
+  outcome:
+    type: string
+    enum:
+    - collecting_information
+    - self_service
+    - professional_required
+  problem_category:
+    type: object
+    nullable: true
+    required:
+    - id
+    - name
+    properties:
+      id:
+        type: integer
+        format: int32
+      name:
+        type: string
+    additionalProperties: false
+additionalProperties: false

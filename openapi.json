@@ -1147,10 +1147,12 @@
                                             "status": "active",
                                             "title": "Diagnóstico concluido",
                                             "response_status": "answered",
-                                            "diagnosis_completed": true,
-                                            "recommended_category": {
-                                                "id": 3,
-                                                "name": "Plomería"
+                                            "assessment": {
+                                                "outcome": "professional_required",
+                                                "problem_category": {
+                                                    "id": 3,
+                                                    "name": "Plomería"
+                                                }
                                             },
                                             "messages": [
                                                 {
@@ -1320,7 +1322,9 @@
                                             "status": "active",
                                             "title": "Pérdida de agua en la cocina",
                                             "response_status": "answered",
-                                            "diagnosis_completed": false,
+                                            "assessment": {
+                                                "outcome": "collecting_information"
+                                            },
                                             "messages": [
                                                 {
                                                     "id": 3,
@@ -1407,6 +1411,122 @@
                     },
                     "500": {
                         "description": "Unexpected error while continuing the chatbot conversation.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/chatbot/conversations/{conversationId}/job-requests": {
+            "parameters": [
+                {
+                    "name": "conversationId",
+                    "in": "path",
+                    "required": true,
+                    "schema": {
+                        "type": "integer",
+                        "format": "int32",
+                        "minimum": 1
+                    }
+                }
+            ],
+            "post": {
+                "tags": [
+                    "JobRequests"
+                ],
+                "operationId": "createJobRequestFromChatbotAssessment",
+                "summary": "Contact a provider from a chatbot assessment",
+                "description": "Creates a pending job request and work conversation using an immutable copy of the authenticated consumer's current professional assessment.",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CreateAIJobRequestRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Job request and pending work conversation created.",
+                        "headers": {
+                            "Location": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/JobRequest"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid conversation id, body, or provider id.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Authentication failed.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AuthErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "The caller is not the consumer who owns the chatbot conversation.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "The chatbot conversation or provider does not exist.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Assessment state, category mismatch, or duplicate request conflict.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Unexpected error.",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -2774,7 +2894,6 @@
                 "required": [
                     "title",
                     "response_status",
-                    "diagnosis_completed",
                     "recommended_providers"
                 ],
                 "properties": {
@@ -2792,31 +2911,8 @@
                         ],
                         "example": "answered"
                     },
-                    "diagnosis_completed": {
-                        "type": "boolean",
-                        "description": "Whether the chatbot concluded the diagnosis.",
-                        "example": true
-                    },
-                    "recommended_category": {
-                        "type": "object",
-                        "nullable": true,
-                        "description": "Category recommended by the chatbot when diagnosis is complete.",
-                        "required": [
-                            "id",
-                            "name"
-                        ],
-                        "properties": {
-                            "id": {
-                                "type": "integer",
-                                "format": "int32",
-                                "example": 3
-                            },
-                            "name": {
-                                "type": "string",
-                                "example": "Plomería"
-                            }
-                        },
-                        "additionalProperties": false
+                    "assessment": {
+                        "$ref": "#/components/schemas/ProblemAssessment"
                     },
                     "recommended_providers": {
                         "type": "array",
@@ -2826,6 +2922,56 @@
                         }
                     }
                 }
+            },
+            "ProblemAssessment": {
+                "type": "object",
+                "description": "Frontend projection of the current structured home-problem assessment.",
+                "required": [
+                    "outcome"
+                ],
+                "properties": {
+                    "outcome": {
+                        "type": "string",
+                        "enum": [
+                            "collecting_information",
+                            "self_service",
+                            "professional_required"
+                        ]
+                    },
+                    "problem_category": {
+                        "type": "object",
+                        "nullable": true,
+                        "required": [
+                            "id",
+                            "name"
+                        ],
+                        "properties": {
+                            "id": {
+                                "type": "integer",
+                                "format": "int32"
+                            },
+                            "name": {
+                                "type": "string"
+                            }
+                        },
+                        "additionalProperties": false
+                    }
+                },
+                "additionalProperties": false
+            },
+            "CreateAIJobRequestRequest": {
+                "type": "object",
+                "required": [
+                    "provider_id"
+                ],
+                "properties": {
+                    "provider_id": {
+                        "type": "integer",
+                        "format": "int32",
+                        "minimum": 1
+                    }
+                },
+                "additionalProperties": false
             },
             "ChatbotConversationSummary": {
                 "type": "object",
