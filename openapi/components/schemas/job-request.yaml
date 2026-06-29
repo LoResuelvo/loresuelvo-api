@@ -6,6 +6,7 @@ required:
 - title
 - description
 - status
+- images
 properties:
   id:
     type: integer
@@ -32,4 +33,10 @@ properties:
     - pending
     - accepted
     example: pending
+  images:
+    type: array
+    description: Images attached to the job request with short-lived authorized URLs. Empty when no image was attached.
+    maxItems: 3
+    items:
+      $ref: '#/components/schemas/MessageImage'
 additionalProperties: false

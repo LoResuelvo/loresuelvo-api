@@ -1574,7 +1574,14 @@
                                                 "requester": {
                                                     "name": "Ana",
                                                     "surname": "Pérez"
-                                                }
+                                                },
+                                                "images": [
+                                                    {
+                                                        "id": "4af47f1b-97b6-4b32-baa0-b95d6077f919",
+                                                        "url": "https://cdn.example/private/job-request-image.jpg?signature=temporary",
+                                                        "original_name": "perdida-bajo-mesada.jpg"
+                                                    }
+                                                ]
                                             }
                                         ]
                                     },
@@ -1632,7 +1639,10 @@
                                     "value": {
                                         "provider_id": 1,
                                         "title": "Reparación de fuga en la cocina",
-                                        "description": "Hola Ana, necesito reparar una fuga de agua en la cocina. ¿Podrías ayudarme esta semana?"
+                                        "description": "Hola Ana, necesito reparar una fuga de agua en la cocina. ¿Podrías ayudarme esta semana?",
+                                        "image_file_ids": [
+                                            "4af47f1b-97b6-4b32-baa0-b95d6077f919"
+                                        ]
                                     }
                                 }
                             }
@@ -1663,7 +1673,14 @@
                                             "conversation_id": 10,
                                             "title": "Reparación de fuga en la cocina",
                                             "description": "Hola Ana, necesito reparar una fuga de agua en la cocina. ¿Podrías ayudarme esta semana?",
-                                            "status": "pending"
+                                            "status": "pending",
+                                            "images": [
+                                                {
+                                                    "id": "4af47f1b-97b6-4b32-baa0-b95d6077f919",
+                                                    "url": "https://cdn.example/private/job-request-image.jpg?signature=temporary",
+                                                    "original_name": "perdida-bajo-mesada.jpg"
+                                                }
+                                            ]
                                         }
                                     }
                                 }
@@ -1671,7 +1688,7 @@
                         }
                     },
                     "400": {
-                        "description": "The request body is invalid, provider_id is missing or zero, or title is empty after trimming.",
+                        "description": "The request body is invalid, provider_id is missing or zero, title is empty after trimming, or the attached images are invalid.",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -2659,6 +2676,19 @@
                         "type": "string",
                         "description": "Optional job request description.",
                         "example": "Hola Ana, necesito reparar una fuga de agua en la cocina. ¿Podrías ayudarme esta semana?"
+                    },
+                    "image_file_ids": {
+                        "type": "array",
+                        "description": "Optional confirmed private image file identifiers attached by the authenticated consumer. At most 3 images are accepted.",
+                        "maxItems": 3,
+                        "items": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "example": [
+                            "4af47f1b-97b6-4b32-baa0-b95d6077f919",
+                            "a80c8658-f409-4f64-a8f0-b8e181c75e32"
+                        ]
                     }
                 },
                 "additionalProperties": false
@@ -2671,7 +2701,8 @@
                     "conversation_id",
                     "title",
                     "description",
-                    "status"
+                    "status",
+                    "images"
                 ],
                 "properties": {
                     "id": {
@@ -2704,6 +2735,14 @@
                             "accepted"
                         ],
                         "example": "pending"
+                    },
+                    "images": {
+                        "type": "array",
+                        "description": "Images attached to the job request with short-lived authorized URLs. Empty when no image was attached.",
+                        "maxItems": 3,
+                        "items": {
+                            "$ref": "#/components/schemas/MessageImage"
+                        }
                     }
                 },
                 "additionalProperties": false
@@ -2717,7 +2756,8 @@
                     "title",
                     "description",
                     "status",
-                    "requester"
+                    "requester",
+                    "images"
                 ],
                 "properties": {
                     "id": {
@@ -2753,6 +2793,14 @@
                     },
                     "requester": {
                         "$ref": "#/components/schemas/JobRequestRequester"
+                    },
+                    "images": {
+                        "type": "array",
+                        "description": "Images attached to the job request with short-lived authorized URLs. Empty when no image was attached.",
+                        "maxItems": 3,
+                        "items": {
+                            "$ref": "#/components/schemas/MessageImage"
+                        }
                     }
                 },
                 "additionalProperties": false

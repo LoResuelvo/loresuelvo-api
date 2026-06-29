@@ -7,6 +7,7 @@ required:
 - description
 - status
 - requester
+- images
 properties:
   id:
     type: integer
@@ -35,4 +36,10 @@ properties:
     example: pending
   requester:
     $ref: '#/components/schemas/JobRequestRequester'
+  images:
+    type: array
+    description: Images attached to the job request with short-lived authorized URLs. Empty when no image was attached.
+    maxItems: 3
+    items:
+      $ref: '#/components/schemas/MessageImage'
 additionalProperties: false

@@ -17,4 +17,14 @@ properties:
     type: string
     description: Optional job request description.
     example: Hola Ana, necesito reparar una fuga de agua en la cocina. ¿Podrías ayudarme esta semana?
+  image_file_ids:
+    type: array
+    description: Optional confirmed private image file identifiers attached by the authenticated consumer. At most 3 images are accepted.
+    maxItems: 3
+    items:
+      type: string
+      format: uuid
+    example:
+    - 4af47f1b-97b6-4b32-baa0-b95d6077f919
+    - a80c8658-f409-4f64-a8f0-b8e181c75e32
 additionalProperties: false

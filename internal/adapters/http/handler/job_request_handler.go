@@ -18,9 +18,10 @@ type JobRequestHandler struct {
 }
 
 type createJobRequestRequest struct {
-	ProviderID  int    `json:"provider_id"`
-	Title       string `json:"title"`
-	Description string `json:"description"`
+	ProviderID   int      `json:"provider_id"`
+	Title        string   `json:"title"`
+	Description  string   `json:"description"`
+	ImageFileIDs []string `json:"image_file_ids"`
 }
 
 type createJobRequestFromChatbotRequest struct {
@@ -28,11 +29,12 @@ type createJobRequestFromChatbotRequest struct {
 }
 
 type jobRequestResponse struct {
-	ID             int    `json:"id"`
-	ConversationID int    `json:"conversation_id"`
-	Title          string `json:"title"`
-	Description    string `json:"description"`
-	Status         string `json:"status"`
+	ID             int                    `json:"id"`
+	ConversationID int                    `json:"conversation_id"`
+	Title          string                 `json:"title"`
+	Description    string                 `json:"description"`
+	Status         string                 `json:"status"`
+	Images         []messageImageResponse `json:"images"`
 }
 
 type jobRequestSummaryResponse struct {
@@ -42,6 +44,7 @@ type jobRequestSummaryResponse struct {
 	Description    string                      `json:"description"`
 	Status         string                      `json:"status"`
 	Requester      jobRequestRequesterResponse `json:"requester"`
+	Images         []messageImageResponse      `json:"images"`
 }
 
 type jobRequestRequesterResponse struct {
@@ -153,6 +156,7 @@ func (h *JobRequestHandler) GetJobRequests(c *gin.Context) {
 				Name:    jobRequest.Requester.Name,
 				Surname: jobRequest.Requester.Surname,
 			},
+			Images: []messageImageResponse{},
 		}
 	}
 
@@ -213,5 +217,6 @@ func jobRequestResponseFromDomain(createdJobRequest jobrequest.JobRequest) jobRe
 		Title:          createdJobRequest.Title,
 		Description:    createdJobRequest.Description,
 		Status:         string(createdJobRequest.Status),
+		Images:         []messageImageResponse{},
 	}
 }
