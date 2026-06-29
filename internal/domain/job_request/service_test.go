@@ -235,7 +235,7 @@ func TestCreateJobRequestSavesRequestWithPendingConversation(t *testing.T) {
 		&conversationRepo{},
 	)
 
-	createdRequest, err := service.Create("auth0|consumer", 20, "  Reparación de fuga  ", "  Necesito ayuda esta semana  ")
+	createdRequest, err := service.Create("auth0|consumer", 20, "  Reparación de fuga  ", "  Necesito ayuda esta semana  ", []string{})
 
 	firstSavedRequest := repo.savedJobRequest[0]
 	require.NoError(t, err)
@@ -265,7 +265,7 @@ func TestCreateJobRequestAllowsEmptyDescription(t *testing.T) {
 		&conversationRepo{},
 	)
 
-	createdRequest, err := service.Create("auth0|consumer", 20, "Reparación de fuga", "   ")
+	createdRequest, err := service.Create("auth0|consumer", 20, "Reparación de fuga", "   ", []string{})
 
 	require.NoError(t, err)
 	require.NotNil(t, createdRequest)
@@ -281,7 +281,7 @@ func TestCreateJobRequestRejectsMissingTitle(t *testing.T) {
 		&conversationRepo{},
 	)
 
-	createdRequest, err := service.Create("auth0|consumer", 20, "   ", "Necesito ayuda")
+	createdRequest, err := service.Create("auth0|consumer", 20, "   ", "Necesito ayuda", []string{})
 
 	assert.ErrorIs(t, err, jobrequest.ErrTitleRequired)
 	assert.Nil(t, createdRequest)
@@ -297,7 +297,7 @@ func TestCreateJobRequestRejectsNonConsumer(t *testing.T) {
 		&conversationRepo{},
 	)
 
-	createdRequest, err := service.Create("auth0|provider", 20, "Reparación de fuga", "")
+	createdRequest, err := service.Create("auth0|provider", 20, "Reparación de fuga", "", []string{})
 
 	assert.ErrorIs(t, err, jobrequest.ErrOnlyConsumerCanCreateJobRequest)
 	assert.Nil(t, createdRequest)
@@ -313,7 +313,7 @@ func TestCreateJobRequestRejectsNonExistingProvider(t *testing.T) {
 		&conversationRepo{},
 	)
 
-	createdRequest, err := service.Create("auth0|consumer", 20, "Reparación de fuga", "")
+	createdRequest, err := service.Create("auth0|consumer", 20, "Reparación de fuga", "", []string{})
 
 	assert.ErrorIs(t, err, jobrequest.ErrProviderDoesNotExist)
 	assert.Nil(t, createdRequest)
@@ -329,7 +329,7 @@ func TestCreateJobRequestRejectsExistingOpenRequestBetweenConsumerAndProvider(t 
 		&conversationRepo{},
 	)
 
-	createdRequest, err := service.Create("auth0|consumer", 20, "Reparación de fuga", "")
+	createdRequest, err := service.Create("auth0|consumer", 20, "Reparación de fuga", "", []string{})
 
 	assert.ErrorIs(t, err, jobrequest.ErrAlreadyExists)
 	assert.Nil(t, createdRequest)
@@ -347,7 +347,7 @@ func TestCreateJobRequestPropagatesOpenRequestLookupError(t *testing.T) {
 		&conversationRepo{},
 	)
 
-	createdRequest, err := service.Create("auth0|consumer", 20, "Reparación de fuga", "")
+	createdRequest, err := service.Create("auth0|consumer", 20, "Reparación de fuga", "", []string{})
 
 	assert.ErrorContains(t, err, "lookup failed")
 	assert.Nil(t, createdRequest)

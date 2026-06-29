@@ -69,7 +69,7 @@ func (h *JobRequestHandler) CreateJobRequest(c *gin.Context) {
 		return
 	}
 
-	createdJobRequest, err := h.jobRequestService.Create(auth0ID, req.ProviderID, req.Title, req.Description)
+	createdJobRequest, err := h.jobRequestService.Create(auth0ID, req.ProviderID, req.Title, req.Description, req.ImageFileIDs)
 	if errors.Is(err, jobrequest.ErrTitleRequired) || errors.Is(err, jobrequest.ErrProviderRequired) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return

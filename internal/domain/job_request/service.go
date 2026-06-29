@@ -30,13 +30,8 @@ func NewService(
 	}
 }
 
-func (s *Service) Create(consumerAuthID string, providerID int, title, description string) (*JobRequest, error) {
+func (s *Service) Create(consumerAuthID string, providerID int, title, description string, images []string) (*JobRequest, error) {
 	consumerID, err := s.consumerIDForJobRequest(consumerAuthID)
-	if err != nil {
-		return nil, err
-	}
-
-	jobRequest, err := New(consumerID, providerID, title, description)
 	if err != nil {
 		return nil, err
 	}
@@ -50,6 +45,11 @@ func (s *Service) Create(consumerAuthID string, providerID int, title, descripti
 	}
 
 	pendingConversation, err := conversation.NewPendingConversation(consumerID, providerID)
+	if err != nil {
+		return nil, err
+	}
+
+	jobRequest, err := New(consumerID, providerID, title, description)
 	if err != nil {
 		return nil, err
 	}
