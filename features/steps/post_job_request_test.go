@@ -12,17 +12,19 @@ import (
 )
 
 type jobRequestCreationRequest struct {
-	ProviderID  int    `json:"provider_id"`
-	Title       string `json:"title,omitempty"`
-	Description string `json:"description,omitempty"`
+	ProviderID   int      `json:"provider_id"`
+	Title        string   `json:"title,omitempty"`
+	Description  string   `json:"description,omitempty"`
+	ImageFileIDs []string `json:"image_file_ids,omitempty"`
 }
 
 type jobRequestCreationResponse struct {
-	ID             int    `json:"id"`
-	ConversationID int    `json:"conversation_id"`
-	Title          string `json:"title"`
-	Description    string `json:"description"`
-	Status         string `json:"status"`
+	ID             int                    `json:"id"`
+	ConversationID int                    `json:"conversation_id"`
+	Title          string                 `json:"title"`
+	Description    string                 `json:"description"`
+	Status         string                 `json:"status"`
+	Images         []messageImageResponse `json:"images"`
 }
 
 func registerPostJobRequestSteps(sc *godog.ScenarioContext, suite *testSuite) {
@@ -155,8 +157,9 @@ func (suite *testSuite) systemReportsProviderCannotMessagePendingConversation() 
 }
 
 type jobRequestPayload struct {
-	title       string
-	description string
+	title        string
+	description  string
+	imageFileIDs []string
 }
 
 func (suite *testSuite) requestJobRequestToProviderFullName(providerFullName string, payload jobRequestPayload) error {
@@ -167,9 +170,10 @@ func (suite *testSuite) requestJobRequestToProviderFullName(providerFullName str
 
 	suite.lastWorkRequestProviderID = providerID
 	request := jobRequestCreationRequest{
-		ProviderID:  providerID,
-		Title:       payload.title,
-		Description: payload.description,
+		ProviderID:   providerID,
+		Title:        payload.title,
+		Description:  payload.description,
+		ImageFileIDs: payload.imageFileIDs,
 	}
 
 	return suite.requestJobRequest(request)

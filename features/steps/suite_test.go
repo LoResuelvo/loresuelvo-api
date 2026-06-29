@@ -79,6 +79,7 @@ func (s *testSuite) registerAllSteps(sc *godog.ScenarioContext) {
 	registerSendMessageSteps(sc, s)
 	registerPostJobRequestSteps(sc, s)
 	registerGetJobRequestSteps(sc, s)
+	registerJobRequestImagesSteps(sc, s)
 	registerAcceptJobRequestSteps(sc, s)
 	registerRealtimeMessageSteps(sc, s)
 	registerAttachMessageImagesSteps(sc, s)
