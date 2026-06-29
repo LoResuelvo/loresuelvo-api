@@ -47,6 +47,7 @@ func (suite *testSuite) uploadAndConfirmJobRequestImages(names ...string) error 
 			return err
 		}
 	}
+	suite.lastAttemptedMessageImageNames = append([]string(nil), names...)
 	return nil
 }
 
@@ -100,11 +101,11 @@ func (suite *testSuite) sendJobRequestToProviderWithImage(providerFullName, titl
 }
 
 func (suite *testSuite) sendJobRequestToProviderWithUploadedImages(providerFullName, title string, description *godog.DocString) error {
-	return suite.requestJobRequestToProviderWithImages(providerFullName, title, normalizeDocString(description), suite.allRememberedMessageImageNames())
+	return suite.requestJobRequestToProviderWithImages(providerFullName, title, normalizeDocString(description), suite.lastAttemptedMessageImageNames)
 }
 
 func (suite *testSuite) trySendJobRequestToProviderWithUploadedImages(providerFullName, title string, description *godog.DocString) error {
-	return suite.requestJobRequestToProviderWithImages(providerFullName, title, normalizeDocString(description), suite.allRememberedMessageImageNames())
+	return suite.requestJobRequestToProviderWithImages(providerFullName, title, normalizeDocString(description), suite.lastAttemptedMessageImageNames)
 }
 
 func (suite *testSuite) requestJobRequestToProviderWithImages(providerFullName, title, description string, imageNames []string) error {

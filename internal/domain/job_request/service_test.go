@@ -7,6 +7,7 @@ import (
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/category"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/conversation"
+	filedomain "github.com/LoResuelvo/loresuelvo-api/internal/domain/file"
 	jobrequest "github.com/LoResuelvo/loresuelvo-api/internal/domain/job_request"
 	readmodel "github.com/LoResuelvo/loresuelvo-api/internal/domain/job_request/read_model"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/provider"
@@ -123,6 +124,7 @@ func TestCreateFromChatbotAssessmentCopiesCurrentAssessment(t *testing.T) {
 			BaseConversation: &conversation.BaseConversation{ID: 7, Type: conversation.TypeChatbot},
 			ConsumerID:       10, CurrentAssessment: assessment,
 		}},
+		fileServiceForJobRequestTest(),
 	)
 
 	created, err := service.CreateFromChatbotAssessment(context.Background(), "auth0|consumer", 7, 20)
@@ -151,6 +153,7 @@ func TestCreateFromChatbotAssessmentRejectsSelfServiceOutcome(t *testing.T) {
 				ProblemDescription: "Puede resolverse sin prestador.", BasedOnMessageID: 2,
 			},
 		}},
+		fileServiceForJobRequestTest(),
 	)
 
 	created, err := service.CreateFromChatbotAssessment(context.Background(), "auth0|consumer", 7, 20)
@@ -168,6 +171,7 @@ func TestCreateFromChatbotAssessmentRejectsDifferentOwner(t *testing.T) {
 			BaseConversation: &conversation.BaseConversation{ID: 7, Type: conversation.TypeChatbot},
 			ConsumerID:       10,
 		}},
+		fileServiceForJobRequestTest(),
 	)
 
 	created, err := service.CreateFromChatbotAssessment(context.Background(), "auth0|other", 7, 20)
@@ -226,6 +230,35 @@ func (m *conversationRepo) SaveStatus(ctx context.Context, conversation conversa
 	return nil
 }
 
+type jobRequestImageValidatorMock struct {
+	called  bool
+	authID  string
+	fileIDs []string
+	images  []filedomain.Image
+	err     error
+}
+
+func (m *jobRequestImageValidatorMock) PrepareJobRequestImages(_ context.Context, authID string, fileIDs []string) ([]filedomain.Image, error) {
+	m.called = true
+	m.authID = authID
+	m.fileIDs = append([]string(nil), fileIDs...)
+	if m.err != nil {
+		return nil, m.err
+	}
+	return m.images, nil
+}
+
+func (m *jobRequestImageValidatorMock) ResolveJobRequestImages(_ context.Context, images []filedomain.Image) ([]filedomain.Image, error) {
+	if m.err != nil {
+		return nil, m.err
+	}
+	return images, nil
+}
+
+func fileServiceForJobRequestTest() jobrequest.FileService {
+	return &jobRequestImageValidatorMock{}
+}
+
 func TestCreateJobRequestSavesRequestWithPendingConversation(t *testing.T) {
 	repo := &jobRequestRepositoryMock{}
 	service := jobrequest.NewService(
@@ -233,9 +266,10 @@ func TestCreateJobRequestSavesRequestWithPendingConversation(t *testing.T) {
 		&consumerRepo{consumerID: 10},
 		&providerRepo{exists: true},
 		&conversationRepo{},
+		fileServiceForJobRequestTest(),
 	)
 
-	createdRequest, err := service.Create("auth0|consumer", 20, "  Reparación de fuga  ", "  Necesito ayuda esta semana  ", []string{})
+	createdRequest, err := service.Create(context.Background(), "auth0|consumer", 20, "  Reparación de fuga  ", "  Necesito ayuda esta semana  ", []string{})
 
 	firstSavedRequest := repo.savedJobRequest[0]
 	require.NoError(t, err)
@@ -256,6 +290,30 @@ func TestCreateJobRequestSavesRequestWithPendingConversation(t *testing.T) {
 	assert.Equal(t, 2, createdRequest.ConversationID)
 }
 
+func TestCreateJobRequestValidatesImagesWithFileService(t *testing.T) {
+	repo := &jobRequestRepositoryMock{}
+	imageValidator := &jobRequestImageValidatorMock{
+		images: []filedomain.Image{{FileID: "file-1", OriginalName: "problema.jpg", URL: "https://files/file-1"}},
+	}
+	service := jobrequest.NewService(
+		repo,
+		&consumerRepo{consumerID: 10},
+		&providerRepo{exists: true},
+		&conversationRepo{},
+		imageValidator,
+	)
+
+	createdRequest, err := service.Create(context.Background(), "auth0|consumer", 20, "Reparación de fuga", "Necesito ayuda", []string{"file-1"})
+
+	require.NoError(t, err)
+	require.NotNil(t, createdRequest)
+	assert.True(t, imageValidator.called)
+	assert.Equal(t, "auth0|consumer", imageValidator.authID)
+	assert.Equal(t, []string{"file-1"}, imageValidator.fileIDs)
+	require.Len(t, repo.savedJobRequest, 1)
+	assert.Equal(t, []jobrequest.Image{{FileID: "file-1", OriginalName: "problema.jpg", URL: "https://files/file-1"}}, repo.savedJobRequest[0].Images)
+}
+
 func TestCreateJobRequestAllowsEmptyDescription(t *testing.T) {
 	repo := &jobRequestRepositoryMock{}
 	service := jobrequest.NewService(
@@ -263,9 +321,10 @@ func TestCreateJobRequestAllowsEmptyDescription(t *testing.T) {
 		&consumerRepo{consumerID: 10},
 		&providerRepo{exists: true},
 		&conversationRepo{},
+		fileServiceForJobRequestTest(),
 	)
 
-	createdRequest, err := service.Create("auth0|consumer", 20, "Reparación de fuga", "   ", []string{})
+	createdRequest, err := service.Create(context.Background(), "auth0|consumer", 20, "Reparación de fuga", "   ", []string{})
 
 	require.NoError(t, err)
 	require.NotNil(t, createdRequest)
@@ -279,9 +338,10 @@ func TestCreateJobRequestRejectsMissingTitle(t *testing.T) {
 		&consumerRepo{consumerID: 10},
 		&providerRepo{exists: true},
 		&conversationRepo{},
+		fileServiceForJobRequestTest(),
 	)
 
-	createdRequest, err := service.Create("auth0|consumer", 20, "   ", "Necesito ayuda", []string{})
+	createdRequest, err := service.Create(context.Background(), "auth0|consumer", 20, "   ", "Necesito ayuda", []string{})
 
 	assert.ErrorIs(t, err, jobrequest.ErrTitleRequired)
 	assert.Nil(t, createdRequest)
@@ -295,9 +355,10 @@ func TestCreateJobRequestRejectsNonConsumer(t *testing.T) {
 		&consumerRepo{err: errors.New("consumer not found")},
 		&providerRepo{exists: true},
 		&conversationRepo{},
+		fileServiceForJobRequestTest(),
 	)
 
-	createdRequest, err := service.Create("auth0|provider", 20, "Reparación de fuga", "", []string{})
+	createdRequest, err := service.Create(context.Background(), "auth0|provider", 20, "Reparación de fuga", "", []string{})
 
 	assert.ErrorIs(t, err, jobrequest.ErrOnlyConsumerCanCreateJobRequest)
 	assert.Nil(t, createdRequest)
@@ -311,9 +372,10 @@ func TestCreateJobRequestRejectsNonExistingProvider(t *testing.T) {
 		&consumerRepo{consumerID: 10},
 		&providerRepo{exists: false},
 		&conversationRepo{},
+		fileServiceForJobRequestTest(),
 	)
 
-	createdRequest, err := service.Create("auth0|consumer", 20, "Reparación de fuga", "", []string{})
+	createdRequest, err := service.Create(context.Background(), "auth0|consumer", 20, "Reparación de fuga", "", []string{})
 
 	assert.ErrorIs(t, err, jobrequest.ErrProviderDoesNotExist)
 	assert.Nil(t, createdRequest)
@@ -327,9 +389,10 @@ func TestCreateJobRequestRejectsExistingOpenRequestBetweenConsumerAndProvider(t 
 		&consumerRepo{consumerID: 10},
 		&providerRepo{exists: true},
 		&conversationRepo{},
+		fileServiceForJobRequestTest(),
 	)
 
-	createdRequest, err := service.Create("auth0|consumer", 20, "Reparación de fuga", "", []string{})
+	createdRequest, err := service.Create(context.Background(), "auth0|consumer", 20, "Reparación de fuga", "", []string{})
 
 	assert.ErrorIs(t, err, jobrequest.ErrAlreadyExists)
 	assert.Nil(t, createdRequest)
@@ -345,9 +408,10 @@ func TestCreateJobRequestPropagatesOpenRequestLookupError(t *testing.T) {
 		&consumerRepo{consumerID: 10},
 		&providerRepo{exists: true},
 		&conversationRepo{},
+		fileServiceForJobRequestTest(),
 	)
 
-	createdRequest, err := service.Create("auth0|consumer", 20, "Reparación de fuga", "", []string{})
+	createdRequest, err := service.Create(context.Background(), "auth0|consumer", 20, "Reparación de fuga", "", []string{})
 
 	assert.ErrorContains(t, err, "lookup failed")
 	assert.Nil(t, createdRequest)
@@ -362,9 +426,10 @@ func TestShouldGetNoJobRequests(t *testing.T) {
 		&consumerRepo{consumerID: 10},
 		&providerRepo{exists: true},
 		&conversationRepo{},
+		fileServiceForJobRequestTest(),
 	)
 
-	jobRequests, err := service.GetJobRequests("auth0|consumer")
+	jobRequests, err := service.GetJobRequests(context.Background(), "auth0|consumer")
 
 	require.NoError(t, err)
 	assert.Empty(t, jobRequests)
@@ -377,6 +442,7 @@ func TestSHouldGetListOfJobRequests(t *testing.T) {
 		&consumerRepo{consumerID: 10},
 		&providerRepo{exists: true},
 		&conversationRepo{},
+		fileServiceForJobRequestTest(),
 	)
 
 	repo.foundJobRequests = []readmodel.JobRequestSummary{
@@ -385,7 +451,7 @@ func TestSHouldGetListOfJobRequests(t *testing.T) {
 	}
 	expectedJobRequests := repo.foundJobRequests
 
-	jobRequests, err := service.GetJobRequests("auth0|consumer")
+	jobRequests, err := service.GetJobRequests(context.Background(), "auth0|consumer")
 
 	require.NoError(t, err)
 	assert.Equal(t, expectedJobRequests, jobRequests)
@@ -419,6 +485,7 @@ func TestAcceptJobRequestActivatesLinkedConversationForAssignedProvider(t *testi
 		&consumerRepo{},
 		&providerRepo{providerID: 20},
 		conversationRepo,
+		fileServiceForJobRequestTest(),
 	)
 
 	acceptedJobRequest, err := service.Accept(context.Background(), "auth0|provider", 1)
@@ -452,6 +519,7 @@ func TestAcceptJobRequestRejectsProviderThatIsNotAssigned(t *testing.T) {
 		&consumerRepo{},
 		&providerRepo{providerID: 99},
 		conversationRepo,
+		fileServiceForJobRequestTest(),
 	)
 
 	acceptedJobRequest, err := service.Accept(context.Background(), "auth0|other-provider", 1)
@@ -472,6 +540,7 @@ func TestAcceptJobRequestReturnsNotFoundWhenRequestDoesNotExist(t *testing.T) {
 		&consumerRepo{},
 		&providerRepo{providerID: 20},
 		conversationRepo,
+		fileServiceForJobRequestTest(),
 	)
 
 	acceptedJobRequest, err := service.Accept(context.Background(), "auth0|provider", 999)
@@ -501,6 +570,7 @@ func TestAcceptJobRequestRejectsAlreadyAcceptedRequest(t *testing.T) {
 		&consumerRepo{},
 		&providerRepo{providerID: 20},
 		conversationRepo,
+		fileServiceForJobRequestTest(),
 	)
 
 	acceptedJobRequest, err := service.Accept(context.Background(), "auth0|provider", 1)

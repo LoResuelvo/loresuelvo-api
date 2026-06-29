@@ -25,3 +25,5 @@ var ErrAssessmentNeedsMoreInformation = errors.New("Current problem assessment n
 var ErrProviderCategoryMismatch = errors.New("Provider category does not match the current problem assessment")
 
 var ErrChatbotConversationAccessDenied = errors.New("Cannot create a job request from this chatbot conversation")
+
+var ErrJobRequestImageNotAvailable = errors.New("Job request image is not available")

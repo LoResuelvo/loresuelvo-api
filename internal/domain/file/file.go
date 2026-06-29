@@ -11,6 +11,7 @@ const (
 
 	PurposeProviderProfilePhoto     = "provider_profile_photo"
 	PurposeConversationMessageImage = "conversation_message_image"
+	PurposeJobRequestImage          = "job_request_image"
 )
 
 type File struct {

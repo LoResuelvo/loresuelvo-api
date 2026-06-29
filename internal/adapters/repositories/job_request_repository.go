@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/conversation"
 	jobrequest "github.com/LoResuelvo/loresuelvo-api/internal/domain/job_request"
@@ -84,6 +85,11 @@ func (repository *JobRequestRepository) SaveWithConversation(jobRequest jobreque
 	if err != nil {
 		return nil, rollbackJobRequestTx(tx, mapJobRequestInsertError(err))
 	}
+	savedJobRequest.Images = append([]jobrequest.Image(nil), jobRequest.Images...)
+
+	if err := saveJobRequestImagesWithTx(ctx, tx, savedJobRequest.ID, savedJobRequest.Images); err != nil {
+		return nil, rollbackJobRequestTx(tx, err)
+	}
 
 	if err := tx.Commit(); err != nil {
 		return nil, fmt.Errorf("committing job request transaction: %w", err)
@@ -142,6 +148,11 @@ func (repository *JobRequestRepository) FindByConversationID(conversationID int)
 	if err != nil {
 		return nil, fmt.Errorf("finding job request by conversation id: %w", err)
 	}
+	imagesByJobRequestID, err := repository.findImagesByJobRequestIDs([]int{foundJobRequest.ID})
+	if err != nil {
+		return nil, err
+	}
+	foundJobRequest.Images = domainImagesFromReadModel(imagesByJobRequestID[foundJobRequest.ID])
 
 	return &foundJobRequest, nil
 }
@@ -170,6 +181,11 @@ func (repository *JobRequestRepository) FindByID(id int) (*jobrequest.JobRequest
 		}
 		return nil, fmt.Errorf("finding job request by id: %w", err)
 	}
+	imagesByJobRequestID, err := repository.findImagesByJobRequestIDs([]int{foundJobRequest.ID})
+	if err != nil {
+		return nil, err
+	}
+	foundJobRequest.Images = domainImagesFromReadModel(imagesByJobRequestID[foundJobRequest.ID])
 
 	return &foundJobRequest, nil
 }
@@ -248,7 +264,104 @@ func (repository *JobRequestRepository) FindByUserAuthID(userAuthID string) ([]r
 		return nil, fmt.Errorf("iterating job requests by user auth id: %w", err)
 	}
 
+	jobRequestIDs := make([]int, 0, len(jobRequests))
+	for _, jobRequest := range jobRequests {
+		jobRequestIDs = append(jobRequestIDs, jobRequest.ID)
+	}
+	imagesByJobRequestID, err := repository.findImagesByJobRequestIDs(jobRequestIDs)
+	if err != nil {
+		return nil, err
+	}
+	for index := range jobRequests {
+		jobRequests[index].Images = imagesByJobRequestID[jobRequests[index].ID]
+	}
+
 	return jobRequests, nil
+}
+
+func saveJobRequestImagesWithTx(ctx context.Context, tx *sql.Tx, jobRequestID int, images []jobrequest.Image) error {
+	for position, image := range images {
+		_, err := tx.ExecContext(
+			ctx,
+			`INSERT INTO job_request_images (job_request_id, file_id, position)
+			VALUES ($1, $2, $3)`,
+			jobRequestID,
+			image.FileID,
+			position,
+		)
+		if err != nil {
+			var pgErr *pgconn.PgError
+			if errors.As(err, &pgErr) && pgErr.Code == uniqueViolationCode {
+				return jobrequest.ErrJobRequestImageNotAvailable
+			}
+			return fmt.Errorf("saving job request image: %w", err)
+		}
+	}
+
+	return nil
+}
+
+func (repository *JobRequestRepository) findImagesByJobRequestIDs(jobRequestIDs []int) (map[int][]readmodel.JobRequestImage, error) {
+	imagesByJobRequestID := make(map[int][]readmodel.JobRequestImage, len(jobRequestIDs))
+	if len(jobRequestIDs) == 0 {
+		return imagesByJobRequestID, nil
+	}
+
+	args := make([]any, len(jobRequestIDs))
+	placeholders := make([]string, len(jobRequestIDs))
+	for index, jobRequestID := range jobRequestIDs {
+		args[index] = jobRequestID
+		placeholders[index] = fmt.Sprintf("$%d", index+1)
+	}
+
+	rows, err := repository.db.Query(
+		fmt.Sprintf(
+			`SELECT job_request_images.job_request_id,
+				job_request_images.file_id::text,
+				files.original_name
+			FROM job_request_images
+			INNER JOIN files ON files.id = job_request_images.file_id
+			WHERE job_request_images.job_request_id IN (%s)
+			ORDER BY job_request_images.job_request_id, job_request_images.position`,
+			strings.Join(placeholders, ", "),
+		),
+		args...,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("finding job request images: %w", err)
+	}
+	defer func() {
+		_ = rows.Close()
+	}()
+
+	for rows.Next() {
+		var jobRequestID int
+		var image readmodel.JobRequestImage
+		if err := rows.Scan(&jobRequestID, &image.FileID, &image.OriginalName); err != nil {
+			return nil, fmt.Errorf("scanning job request image: %w", err)
+		}
+		imagesByJobRequestID[jobRequestID] = append(imagesByJobRequestID[jobRequestID], image)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterating job request images: %w", err)
+	}
+
+	return imagesByJobRequestID, nil
+}
+
+func domainImagesFromReadModel(images []readmodel.JobRequestImage) []jobrequest.Image {
+	if len(images) == 0 {
+		return []jobrequest.Image{}
+	}
+	result := make([]jobrequest.Image, 0, len(images))
+	for _, image := range images {
+		result = append(result, jobrequest.Image{
+			FileID:       image.FileID,
+			OriginalName: image.OriginalName,
+			URL:          image.URL,
+		})
+	}
+	return result
 }
 
 func (repository *JobRequestRepository) DeleteAll() error {

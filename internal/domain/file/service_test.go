@@ -342,6 +342,34 @@ func TestRequestUploadRejectsOversizedProfilePhoto(t *testing.T) {
 	assert.ErrorIs(t, err, filedomain.ErrUnsupportedProfilePhoto)
 }
 
+func TestRequestUploadRejectsOversizedJobRequestImage(t *testing.T) {
+	service := newFileService(newFileRepositoryMock(), newStorageMock())
+
+	_, err := service.RequestUpload(context.Background(), filedomain.PresignRequest{
+		AuthID:       "auth0|consumer",
+		OriginalName: "problema.jpg",
+		MimeType:     "image/jpeg",
+		SizeBytes:    5*1024*1024 + 1,
+		Purpose:      filedomain.PurposeJobRequestImage,
+	})
+
+	assert.ErrorIs(t, err, filedomain.ErrJobRequestImageNotAvailable)
+}
+
+func TestRequestUploadRejectsInvalidJobRequestImageMimeType(t *testing.T) {
+	service := newFileService(newFileRepositoryMock(), newStorageMock())
+
+	_, err := service.RequestUpload(context.Background(), filedomain.PresignRequest{
+		AuthID:       "auth0|consumer",
+		OriginalName: "problema.gif",
+		MimeType:     "image/gif",
+		SizeBytes:    1024,
+		Purpose:      filedomain.PurposeJobRequestImage,
+	})
+
+	assert.ErrorIs(t, err, filedomain.ErrJobRequestImageNotAvailable)
+}
+
 func TestConfirmUploadMarksFileAsConfirmed(t *testing.T) {
 	repo := newFileRepositoryMock()
 	storage := newStorageMock()

@@ -7,9 +7,16 @@ type JobRequestSummary struct {
 	Description    string
 	Status         string
 	Requester      JobRequestRequester
+	Images         []JobRequestImage
 }
 
 type JobRequestRequester struct {
 	Name    string
 	Surname string
+}
+
+type JobRequestImage struct {
+	FileID       string
+	OriginalName string
+	URL          string
 }

@@ -3,7 +3,9 @@ package file
 const (
 	maxProviderProfilePhotoBytes     = 5 * 1024 * 1024
 	maxConversationMessageImageBytes = 5 * 1024 * 1024
+	maxJobRequestImageBytes          = 5 * 1024 * 1024
 	MaxConversationMessageImages     = 5
+	MaxJobRequestImages              = 3
 )
 
 type UploadPolicy struct {
@@ -46,9 +48,22 @@ var conversationMessageImagePolicy = UploadPolicy{
 	InvalidMetadataError: ErrMessageImageNotAvailable,
 }
 
+var jobRequestImagePolicy = UploadPolicy{
+	Purpose:      PurposeJobRequestImage,
+	Visibility:   VisibilityPrivate,
+	MaxSizeBytes: maxJobRequestImageBytes,
+	AllowedMimeTypes: map[string]struct{}{
+		"image/jpeg": {},
+		"image/png":  {},
+		"image/webp": {},
+	},
+	InvalidMetadataError: ErrJobRequestImageNotAvailable,
+}
+
 func defaultUploadPolicies() map[string]UploadPolicy {
 	return map[string]UploadPolicy{
 		PurposeProviderProfilePhoto:     providerProfilePhotoPolicy,
 		PurposeConversationMessageImage: conversationMessageImagePolicy,
+		PurposeJobRequestImage:          jobRequestImagePolicy,
 	}
 }

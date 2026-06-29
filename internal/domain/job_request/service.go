@@ -3,8 +3,10 @@ package jobrequest
 import (
 	"context"
 	"errors"
+	"fmt"
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/conversation"
+	filedomain "github.com/LoResuelvo/loresuelvo-api/internal/domain/file"
 	readmodel "github.com/LoResuelvo/loresuelvo-api/internal/domain/job_request/read_model"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/provider"
 )
@@ -14,6 +16,7 @@ type Service struct {
 	consumerRepository     ConsumerRepository
 	providerRepository     ProviderRepository
 	conversationRepository ConversationRepository
+	fileService            FileService
 }
 
 func NewService(
@@ -21,16 +24,18 @@ func NewService(
 	consumerRepository ConsumerRepository,
 	providerRepository ProviderRepository,
 	conversationRepository ConversationRepository,
+	fileService FileService,
 ) *Service {
 	return &Service{
 		repository:             repository,
 		consumerRepository:     consumerRepository,
 		providerRepository:     providerRepository,
 		conversationRepository: conversationRepository,
+		fileService:            fileService,
 	}
 }
 
-func (s *Service) Create(consumerAuthID string, providerID int, title, description string, images []string) (*JobRequest, error) {
+func (s *Service) Create(ctx context.Context, consumerAuthID string, providerID int, title, description string, imageFileIDs []string) (*JobRequest, error) {
 	consumerID, err := s.consumerIDForJobRequest(consumerAuthID)
 	if err != nil {
 		return nil, err
@@ -48,13 +53,31 @@ func (s *Service) Create(consumerAuthID string, providerID int, title, descripti
 	if err != nil {
 		return nil, err
 	}
+	images, err := s.jobRequestImages(ctx, consumerAuthID, imageFileIDs)
+	if err != nil {
+		return nil, err
+	}
 
-	jobRequest, err := New(consumerID, providerID, title, description)
+	jobRequest, err := New(consumerID, providerID, title, description, images)
 	if err != nil {
 		return nil, err
 	}
 
 	return s.repository.SaveWithConversation(*jobRequest, pendingConversation)
+}
+
+func (s *Service) jobRequestImages(ctx context.Context, consumerAuthID string, imageFileIDs []string) ([]Image, error) {
+	if len(imageFileIDs) == 0 {
+		return []Image{}, nil
+	}
+	images, err := s.fileService.PrepareJobRequestImages(ctx, consumerAuthID, imageFileIDs)
+	if errors.Is(err, filedomain.ErrJobRequestImageNotAvailable) {
+		return nil, ErrJobRequestImageNotAvailable
+	}
+	if err != nil {
+		return nil, fmt.Errorf("validating job request images: %w", err)
+	}
+	return jobRequestImagesFromFileImages(images), nil
 }
 
 func (s *Service) CreateFromChatbotAssessment(ctx context.Context, consumerAuthID string, chatbotConversationID, providerID int) (*JobRequest, error) {
@@ -101,8 +124,22 @@ func (s *Service) CreateFromChatbotAssessment(ctx context.Context, consumerAuthI
 	return s.repository.SaveWithConversation(*jobRequest, pendingConversation)
 }
 
-func (s *Service) GetJobRequests(userAuthID string) ([]readmodel.JobRequestSummary, error) {
-	return s.repository.FindByUserAuthID(userAuthID)
+func (s *Service) GetJobRequests(ctx context.Context, userAuthID string) ([]readmodel.JobRequestSummary, error) {
+	jobRequests, err := s.repository.FindByUserAuthID(userAuthID)
+	if err != nil {
+		return nil, err
+	}
+	for index := range jobRequests {
+		resolvedImages, err := s.fileService.ResolveJobRequestImages(ctx, fileImagesFromReadModelImages(jobRequests[index].Images))
+		if errors.Is(err, filedomain.ErrJobRequestImageNotAvailable) {
+			return nil, ErrJobRequestImageNotAvailable
+		}
+		if err != nil {
+			return nil, fmt.Errorf("resolving job request images: %w", err)
+		}
+		jobRequests[index].Images = readModelImagesFromFileImages(resolvedImages)
+	}
+	return jobRequests, nil
 }
 
 func (s *Service) Accept(ctx context.Context, providerAuthID string, jobRequestID int) (*JobRequest, error) {

@@ -31,7 +31,6 @@ Feature: Obtencion de solicitudes de trabajo
         And que existe una solicitud de trabajo pendiente para el prestador "prestador@example.com"
         When obtengo mis solicitudes de trabajo pendientes
         Then el sistema me muestra una lista con 1 solicitudes pendientes
-    @wip
     Scenario: 40.5 - OBT Prestador obtiene solicitud pendiente con imágenes
         Given existe un prestador registrado con correo "prestador@example.com", nombre "Prestador", apellido "Ejemplo" y rubro "Plomería"
         And que existe una solicitud de trabajo pendiente para el prestador "prestador@example.com" con la imagen "perdida-bajo-mesada.jpg"

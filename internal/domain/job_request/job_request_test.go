@@ -17,10 +17,22 @@ func TestCheckIfAJobRequestCanBeActivated(t *testing.T) {
 }
 
 func TestNewJobRequestStartsPending(t *testing.T) {
-	jobRequest, err := jobrequest.New(10, 20, "Reparación", "Necesito ayuda")
+	jobRequest, err := jobrequest.New(10, 20, "Reparación", "Necesito ayuda", []jobrequest.Image{})
 
 	assert.NoError(t, err)
 	assert.Equal(t, jobrequest.StatusPending, jobRequest.Status)
+}
+
+func TestNewJobRequestRejectsMoreThanThreeImages(t *testing.T) {
+	jobRequest, err := jobrequest.New(10, 20, "Reparación", "Necesito ayuda", []jobrequest.Image{
+		{FileID: "file-1"},
+		{FileID: "file-2"},
+		{FileID: "file-3"},
+		{FileID: "file-4"},
+	})
+
+	assert.ErrorIs(t, err, jobrequest.ErrJobRequestImageNotAvailable)
+	assert.Nil(t, jobRequest)
 }
 
 func TestAcceptPendingJobRequest(t *testing.T) {

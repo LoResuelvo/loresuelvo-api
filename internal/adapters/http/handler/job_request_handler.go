@@ -10,6 +10,7 @@ import (
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/middleware"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/conversation"
 	jobrequest "github.com/LoResuelvo/loresuelvo-api/internal/domain/job_request"
+	readmodel "github.com/LoResuelvo/loresuelvo-api/internal/domain/job_request/read_model"
 	"github.com/gin-gonic/gin"
 )
 
@@ -69,8 +70,8 @@ func (h *JobRequestHandler) CreateJobRequest(c *gin.Context) {
 		return
 	}
 
-	createdJobRequest, err := h.jobRequestService.Create(auth0ID, req.ProviderID, req.Title, req.Description, req.ImageFileIDs)
-	if errors.Is(err, jobrequest.ErrTitleRequired) || errors.Is(err, jobrequest.ErrProviderRequired) {
+	createdJobRequest, err := h.jobRequestService.Create(c.Request.Context(), auth0ID, req.ProviderID, req.Title, req.Description, req.ImageFileIDs)
+	if errors.Is(err, jobrequest.ErrTitleRequired) || errors.Is(err, jobrequest.ErrProviderRequired) || errors.Is(err, jobrequest.ErrJobRequestImageNotAvailable) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
@@ -138,7 +139,7 @@ func (h *JobRequestHandler) GetJobRequests(c *gin.Context) {
 		return
 	}
 
-	jobRequests, err := h.jobRequestService.GetJobRequests(auth0ID)
+	jobRequests, err := h.jobRequestService.GetJobRequests(c.Request.Context(), auth0ID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -156,7 +157,7 @@ func (h *JobRequestHandler) GetJobRequests(c *gin.Context) {
 				Name:    jobRequest.Requester.Name,
 				Surname: jobRequest.Requester.Surname,
 			},
-			Images: []messageImageResponse{},
+			Images: jobRequestImageResponsesFromReadModel(jobRequest.Images),
 		}
 	}
 
@@ -217,6 +218,30 @@ func jobRequestResponseFromDomain(createdJobRequest jobrequest.JobRequest) jobRe
 		Title:          createdJobRequest.Title,
 		Description:    createdJobRequest.Description,
 		Status:         string(createdJobRequest.Status),
-		Images:         []messageImageResponse{},
+		Images:         jobRequestImageResponsesFromDomain(createdJobRequest.Images),
 	}
+}
+
+func jobRequestImageResponsesFromDomain(images []jobrequest.Image) []messageImageResponse {
+	response := make([]messageImageResponse, 0, len(images))
+	for _, image := range images {
+		response = append(response, messageImageResponse{
+			ID:           image.FileID,
+			URL:          image.URL,
+			OriginalName: image.OriginalName,
+		})
+	}
+	return response
+}
+
+func jobRequestImageResponsesFromReadModel(images []readmodel.JobRequestImage) []messageImageResponse {
+	response := make([]messageImageResponse, 0, len(images))
+	for _, image := range images {
+		response = append(response, messageImageResponse{
+			ID:           image.FileID,
+			URL:          image.URL,
+			OriginalName: image.OriginalName,
+		})
+	}
+	return response
 }

@@ -69,7 +69,6 @@ Feature: Enviar solicitud de trabajo
             """
         When el prestador "Ana Pérez" intenta enviar un mensaje en el chat pendiente con el consumidor "Diego" sin aceptar la solicitud de trabajo vinculada
         Then el sistema muestra un mensaje de error indicando que no se puede enviar mensajes en el chat pendiente sin aceptar la solicitud de trabajo vinculada
-    @wip
     Scenario: 39.8 - EST Enviar solicitud de trabajo con una imagen adjunta
         Given que cargué y confirmé la imagen de solicitud de trabajo "perdida-bajo-mesada.jpg"
         When envío una solicitud de trabajo al prestador "Ana Pérez" con el título "Reparación de fuga en la cocina" y la imagen cargada "perdida-bajo-mesada.jpg":
@@ -77,7 +76,6 @@ Feature: Enviar solicitud de trabajo
             Hola Ana, necesito reparar una fuga de agua en la cocina. Te adjunto una imagen del problema.
             """
         Then el sistema registra la solicitud de trabajo con la imagen "perdida-bajo-mesada.jpg"
-    @wip
     Scenario: 39.9 - EST Enviar solicitud de trabajo con múltiples imágenes adjuntas
         Given que cargué y confirmé las imágenes de solicitud de trabajo: "perdida-bajo-mesada.jpg", "detalle-sifon.webp", "humedad-pared.png"
         When envío una solicitud de trabajo al prestador "Ana Pérez" con el título "Reparación de fuga en la cocina" y las imágenes cargadas:
@@ -85,7 +83,6 @@ Feature: Enviar solicitud de trabajo
             Hola Ana, necesito reparar una fuga de agua en la cocina. Te adjunto varias imágenes del problema.
             """
         Then el sistema registra la solicitud de trabajo con las imágenes adjuntas
-    @wip
     Scenario: 39.10 - EST Rechazar solicitud de trabajo con más de 3 imágenes
         Given que cargué y confirmé las imágenes de solicitud de trabajo: "perdida-bajo-mesada.jpg", "detalle-sifon.webp", "humedad-pared.png", "caño-roto.jpg"
         When intento enviar una solicitud de trabajo al prestador "Ana Pérez" con el título "Reparación de fuga en la cocina" y las imágenes cargadas:

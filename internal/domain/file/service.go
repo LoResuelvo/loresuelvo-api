@@ -170,6 +170,22 @@ func (s *Service) ValidateMessageImages(ctx context.Context, authID string, file
 	return result, nil
 }
 
+func (s *Service) PrepareJobRequestImages(ctx context.Context, authID string, fileIDs []string) ([]Image, error) {
+	files, err := s.validatedJobRequestImageFiles(ctx, authID, fileIDs)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]Image, 0, len(files))
+	for _, file := range files {
+		resolved, err := s.resolveImage(ctx, file)
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, resolved)
+	}
+	return result, nil
+}
+
 func (s *Service) PrepareMessageImages(ctx context.Context, authID string, fileIDs []string) ([]MessageImage, error) {
 	files, err := s.validatedMessageImageFiles(ctx, authID, fileIDs)
 	if err != nil {
@@ -255,6 +271,44 @@ func (s *Service) validatedMessageImageFiles(ctx context.Context, authID string,
 	return result, nil
 }
 
+func (s *Service) validatedJobRequestImageFiles(ctx context.Context, authID string, fileIDs []string) ([]File, error) {
+	if len(fileIDs) == 0 {
+		return []File{}, nil
+	}
+	if len(fileIDs) > MaxJobRequestImages {
+		return nil, ErrJobRequestImageNotAvailable
+	}
+	uniqueFileIDs := uniqueNonEmptyFileIDs(fileIDs)
+	if len(uniqueFileIDs) != len(fileIDs) {
+		return nil, ErrJobRequestImageNotAvailable
+	}
+
+	files, err := s.repository.FindByIDs(ctx, uniqueFileIDs)
+	if err != nil {
+		return nil, fmt.Errorf("finding job request images for validation: %w", err)
+	}
+	if len(files) != len(uniqueFileIDs) {
+		return nil, ErrJobRequestImageNotAvailable
+	}
+	filesByID := make(map[string]File, len(files))
+	for _, file := range files {
+		if !isValidJobRequestImageFor(file, authID) {
+			return nil, ErrJobRequestImageNotAvailable
+		}
+		filesByID[file.ID] = file
+	}
+
+	result := make([]File, 0, len(fileIDs))
+	for _, fileID := range fileIDs {
+		file, ok := filesByID[fileID]
+		if !ok {
+			return nil, ErrJobRequestImageNotAvailable
+		}
+		result = append(result, file)
+	}
+	return result, nil
+}
+
 func (s *Service) ResolveMessageImages(ctx context.Context, fileIDs []string) (map[string]MessageImage, error) {
 	uniqueFileIDs := uniqueNonEmptyFileIDs(fileIDs)
 	if len(uniqueFileIDs) == 0 {
@@ -270,7 +324,7 @@ func (s *Service) ResolveMessageImages(ctx context.Context, fileIDs []string) (m
 		if !isAvailableConversationMessageImage(file) {
 			continue
 		}
-		resolved, err := s.resolveMessageImage(ctx, file)
+		resolved, err := s.resolveImage(ctx, file)
 		if err != nil {
 			return nil, err
 		}
@@ -280,11 +334,58 @@ func (s *Service) ResolveMessageImages(ctx context.Context, fileIDs []string) (m
 }
 
 func (s *Service) resolveMessageImage(ctx context.Context, file File) (MessageImage, error) {
+	return s.resolveImage(ctx, file)
+}
+
+func (s *Service) ResolveJobRequestImages(ctx context.Context, images []Image) ([]Image, error) {
+	fileIDs := make([]string, 0, len(images))
+	for _, image := range images {
+		fileIDs = append(fileIDs, image.FileID)
+	}
+	uniqueFileIDs := uniqueNonEmptyFileIDs(fileIDs)
+	if len(uniqueFileIDs) != len(fileIDs) {
+		return nil, ErrJobRequestImageNotAvailable
+	}
+	if len(uniqueFileIDs) == 0 {
+		return []Image{}, nil
+	}
+
+	files, err := s.repository.FindByIDs(ctx, uniqueFileIDs)
+	if err != nil {
+		return nil, fmt.Errorf("finding job request images: %w", err)
+	}
+	if len(files) != len(uniqueFileIDs) {
+		return nil, ErrJobRequestImageNotAvailable
+	}
+	filesByID := make(map[string]File, len(files))
+	for _, file := range files {
+		if !isAvailableJobRequestImage(file) {
+			return nil, ErrJobRequestImageNotAvailable
+		}
+		filesByID[file.ID] = file
+	}
+
+	result := make([]Image, 0, len(images))
+	for _, image := range images {
+		file, ok := filesByID[image.FileID]
+		if !ok {
+			return nil, ErrJobRequestImageNotAvailable
+		}
+		resolved, err := s.resolveImage(ctx, file)
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, resolved)
+	}
+	return result, nil
+}
+
+func (s *Service) resolveImage(ctx context.Context, file File) (Image, error) {
 	url, err := s.storage.GenerateDownloadURL(ctx, ObjectToDownload{Bucket: file.Bucket, Key: file.Key})
 	if err != nil {
-		return MessageImage{}, fmt.Errorf("generating message image download url: %w", err)
+		return Image{}, fmt.Errorf("generating image download url: %w", err)
 	}
-	return MessageImage{FileID: file.ID, OriginalName: file.OriginalName(), URL: url}, nil
+	return Image{FileID: file.ID, OriginalName: file.OriginalName(), URL: url}, nil
 }
 
 func (s *Service) policyFor(purpose string) (UploadPolicy, error) {
@@ -342,4 +443,15 @@ func isAvailableConversationMessageImage(file File) bool {
 		!file.IsPublic() &&
 		file.HasPurpose(PurposeConversationMessageImage) &&
 		conversationMessageImagePolicy.Allows(file.Metadata())
+}
+
+func isValidJobRequestImageFor(file File, authID string) bool {
+	return isAvailableJobRequestImage(file) && file.WasUploadedBy(authID)
+}
+
+func isAvailableJobRequestImage(file File) bool {
+	return file.IsConfirmed() &&
+		!file.IsPublic() &&
+		file.HasPurpose(PurposeJobRequestImage) &&
+		jobRequestImagePolicy.Allows(file.Metadata())
 }

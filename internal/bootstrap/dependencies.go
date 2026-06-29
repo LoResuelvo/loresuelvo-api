@@ -93,6 +93,7 @@ func NewDependenciesWithChatbot(database *sql.DB, chatbot conversation.Chatbot) 
 		consumerRepository,
 		providerRepository,
 		conversationRepository,
+		fileService,
 	)
 	userService := user.NewService(userRepository)
 

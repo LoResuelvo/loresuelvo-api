@@ -1,10 +1,12 @@
 package file
 
-type MessageImage struct {
+type Image struct {
 	FileID       string
 	OriginalName string
 	URL          string
 }
+
+type MessageImage = Image
 
 type MessageImageContent struct {
 	MessageImage

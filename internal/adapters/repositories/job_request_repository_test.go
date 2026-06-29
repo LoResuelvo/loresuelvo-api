@@ -130,16 +130,35 @@ func conversationForJobRequest(t *testing.T, consumerID, providerID int) convers
 func validJobRequest(t *testing.T, consumerID, providerID int) jobrequest.JobRequest {
 	t.Helper()
 
-	requestToSave, err := jobrequest.New(consumerID, providerID, "Reparacion de fuga", "Necesito ayuda esta semana")
+	requestToSave, err := jobrequest.New(consumerID, providerID, "Reparacion de fuga", "Necesito ayuda esta semana", nil)
 	require.NoError(t, err)
 
 	return *requestToSave
+}
+
+func savedJobRequestImage(t *testing.T, testContext jobRequestRepositoryTestContext, fileID, originalName, uploaderAuthID string) jobrequest.Image {
+	t.Helper()
+
+	_, err := testContext.database.Exec(
+		`INSERT INTO files (id, key, bucket, original_name, mime_type, size_bytes, status, visibility, purpose, uploaded_by_auth_id, created_on, updated_on)
+		VALUES ($1, $2, 'private', $3, 'image/jpeg', 1024, 'confirmed', 'private', 'job_request_image', $4, NOW(), NOW())`,
+		fileID,
+		"files/2026/06/job_request_image/"+fileID+"/"+originalName,
+		originalName,
+		uploaderAuthID,
+	)
+	require.NoError(t, err)
+
+	return jobrequest.Image{FileID: fileID, OriginalName: originalName}
 }
 
 func TestJobRequestRepositoryCanSaveRequestWithConversation(t *testing.T) {
 	testContext := newJobRequestRepositoryTest(t)
 	consumerID, providerID := savedJobRequestParticipants(t, testContext)
 	requestToSave := validJobRequest(t, consumerID, providerID)
+	requestToSave.Images = []jobrequest.Image{
+		savedJobRequestImage(t, testContext, "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", "perdida-bajo-mesada.jpg", "auth0|job-request-consumer"),
+	}
 	pendingConversation := conversationForJobRequest(t, consumerID, providerID)
 
 	savedJobRequest, err := testContext.jobRequestRepository.SaveWithConversation(requestToSave, pendingConversation)
@@ -153,6 +172,7 @@ func TestJobRequestRepositoryCanSaveRequestWithConversation(t *testing.T) {
 	assert.Equal(t, requestToSave.Title, savedJobRequest.Title)
 	assert.Equal(t, requestToSave.Description, savedJobRequest.Description)
 	assert.Equal(t, jobrequest.StatusPending, savedJobRequest.Status)
+	assert.Equal(t, requestToSave.Images, savedJobRequest.Images)
 
 	foundConversation, err := testContext.conversationRepository.FindByID(context.Background(), savedJobRequest.ConversationID)
 	require.NoError(t, err)
@@ -160,6 +180,10 @@ func TestJobRequestRepositoryCanSaveRequestWithConversation(t *testing.T) {
 	assert.Equal(t, consumerID, foundWorkConversation.ConsumerID)
 	assert.Equal(t, providerID, foundWorkConversation.ProviderID)
 	assert.Equal(t, conversation.StatusPending, foundWorkConversation.Base().Status)
+
+	foundJobRequest, err := testContext.jobRequestRepository.FindByConversationID(savedJobRequest.ConversationID)
+	require.NoError(t, err)
+	assert.Equal(t, requestToSave.Images, foundJobRequest.Images)
 }
 
 func TestJobRequestRepositoryRejectsDuplicateRequestBetweenSameConsumerAndProvider(t *testing.T) {
