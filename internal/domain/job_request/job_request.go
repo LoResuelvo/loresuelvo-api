@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/conversation"
+	filedomain "github.com/LoResuelvo/loresuelvo-api/internal/domain/file"
 )
 
 type Status string
@@ -28,14 +29,14 @@ type JobRequest struct {
 	Description        string
 	Status             Status
 	SourceAssessmentID *int
-	Images             []Image
+	Images             []filedomain.MessageImage
 }
 
 func NewFromAssessment(consumerID, providerID int, assessment conversation.ProblemAssessment) (*JobRequest, error) {
 	if !assessment.RequiresProfessional() {
 		return nil, ErrAssessmentNotContactable
 	}
-	jobRequest, err := New(consumerID, providerID, assessment.ProblemTitle, assessment.ProblemDescription, nil)
+	jobRequest, err := New(consumerID, providerID, assessment.ProblemTitle, assessment.ProblemDescription, []filedomain.MessageImage{})
 	if err != nil {
 		return nil, err
 	}
@@ -47,7 +48,7 @@ func NewFromAssessment(consumerID, providerID int, assessment conversation.Probl
 	return jobRequest, nil
 }
 
-func New(consumerID, providerID int, title, description string, images []Image) (*JobRequest, error) {
+func New(consumerID, providerID int, title, description string, images []filedomain.MessageImage) (*JobRequest, error) {
 	if consumerID <= 0 {
 		return nil, ErrOnlyConsumerCanCreateJobRequest
 	}
@@ -69,7 +70,7 @@ func New(consumerID, providerID int, title, description string, images []Image) 
 		Title:       trimmedTitle,
 		Description: strings.TrimSpace(description),
 		Status:      StatusPending,
-		Images:      append([]Image(nil), images...),
+		Images:      images,
 	}, nil
 }
 

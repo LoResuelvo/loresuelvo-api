@@ -8,6 +8,7 @@ import (
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/repositories"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/consumer"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/conversation"
+	filedomain "github.com/LoResuelvo/loresuelvo-api/internal/domain/file"
 	jobrequest "github.com/LoResuelvo/loresuelvo-api/internal/domain/job_request"
 	"github.com/LoResuelvo/loresuelvo-api/internal/infrastructure/db"
 	"github.com/stretchr/testify/assert"
@@ -136,7 +137,7 @@ func validJobRequest(t *testing.T, consumerID, providerID int) jobrequest.JobReq
 	return *requestToSave
 }
 
-func savedJobRequestImage(t *testing.T, testContext jobRequestRepositoryTestContext, fileID, originalName, uploaderAuthID string) jobrequest.Image {
+func savedJobRequestImage(t *testing.T, testContext jobRequestRepositoryTestContext, fileID, originalName, uploaderAuthID string) filedomain.MessageImage {
 	t.Helper()
 
 	_, err := testContext.database.Exec(
@@ -149,14 +150,14 @@ func savedJobRequestImage(t *testing.T, testContext jobRequestRepositoryTestCont
 	)
 	require.NoError(t, err)
 
-	return jobrequest.Image{FileID: fileID, OriginalName: originalName}
+	return filedomain.MessageImage{FileID: fileID, OriginalName: originalName}
 }
 
 func TestJobRequestRepositoryCanSaveRequestWithConversation(t *testing.T) {
 	testContext := newJobRequestRepositoryTest(t)
 	consumerID, providerID := savedJobRequestParticipants(t, testContext)
 	requestToSave := validJobRequest(t, consumerID, providerID)
-	requestToSave.Images = []jobrequest.Image{
+	requestToSave.Images = []filedomain.MessageImage{
 		savedJobRequestImage(t, testContext, "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", "perdida-bajo-mesada.jpg", "auth0|job-request-consumer"),
 	}
 	pendingConversation := conversationForJobRequest(t, consumerID, providerID)

@@ -311,7 +311,7 @@ func TestCreateJobRequestValidatesImagesWithFileService(t *testing.T) {
 	assert.Equal(t, "auth0|consumer", imageValidator.authID)
 	assert.Equal(t, []string{"file-1"}, imageValidator.fileIDs)
 	require.Len(t, repo.savedJobRequest, 1)
-	assert.Equal(t, []jobrequest.Image{{FileID: "file-1", OriginalName: "problema.jpg", URL: "https://files/file-1"}}, repo.savedJobRequest[0].Images)
+	assert.Equal(t, []filedomain.MessageImage{{FileID: "file-1", OriginalName: "problema.jpg", URL: "https://files/file-1"}}, repo.savedJobRequest[0].Images)
 }
 
 func TestCreateJobRequestAllowsEmptyDescription(t *testing.T) {

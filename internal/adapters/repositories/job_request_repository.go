@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/conversation"
+	filedomain "github.com/LoResuelvo/loresuelvo-api/internal/domain/file"
 	jobrequest "github.com/LoResuelvo/loresuelvo-api/internal/domain/job_request"
 	readmodel "github.com/LoResuelvo/loresuelvo-api/internal/domain/job_request/read_model"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -85,7 +86,7 @@ func (repository *JobRequestRepository) SaveWithConversation(jobRequest jobreque
 	if err != nil {
 		return nil, rollbackJobRequestTx(tx, mapJobRequestInsertError(err))
 	}
-	savedJobRequest.Images = append([]jobrequest.Image(nil), jobRequest.Images...)
+	savedJobRequest.Images = append([]filedomain.MessageImage(nil), jobRequest.Images...)
 
 	if err := saveJobRequestImagesWithTx(ctx, tx, savedJobRequest.ID, savedJobRequest.Images); err != nil {
 		return nil, rollbackJobRequestTx(tx, err)
@@ -279,7 +280,7 @@ func (repository *JobRequestRepository) FindByUserAuthID(userAuthID string) ([]r
 	return jobRequests, nil
 }
 
-func saveJobRequestImagesWithTx(ctx context.Context, tx *sql.Tx, jobRequestID int, images []jobrequest.Image) error {
+func saveJobRequestImagesWithTx(ctx context.Context, tx *sql.Tx, jobRequestID int, images []filedomain.MessageImage) error {
 	for position, image := range images {
 		_, err := tx.ExecContext(
 			ctx,
@@ -349,13 +350,13 @@ func (repository *JobRequestRepository) findImagesByJobRequestIDs(jobRequestIDs 
 	return imagesByJobRequestID, nil
 }
 
-func domainImagesFromReadModel(images []readmodel.JobRequestImage) []jobrequest.Image {
+func domainImagesFromReadModel(images []readmodel.JobRequestImage) []filedomain.MessageImage {
 	if len(images) == 0 {
-		return []jobrequest.Image{}
+		return []filedomain.MessageImage{}
 	}
-	result := make([]jobrequest.Image, 0, len(images))
+	result := make([]filedomain.MessageImage, 0, len(images))
 	for _, image := range images {
-		result = append(result, jobrequest.Image{
+		result = append(result, filedomain.MessageImage{
 			FileID:       image.FileID,
 			OriginalName: image.OriginalName,
 			URL:          image.URL,

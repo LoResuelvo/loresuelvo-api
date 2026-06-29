@@ -3,6 +3,7 @@ package jobrequest_test
 import (
 	"testing"
 
+	filedomain "github.com/LoResuelvo/loresuelvo-api/internal/domain/file"
 	jobrequest "github.com/LoResuelvo/loresuelvo-api/internal/domain/job_request"
 	"github.com/stretchr/testify/assert"
 )
@@ -17,14 +18,14 @@ func TestCheckIfAJobRequestCanBeActivated(t *testing.T) {
 }
 
 func TestNewJobRequestStartsPending(t *testing.T) {
-	jobRequest, err := jobrequest.New(10, 20, "Reparación", "Necesito ayuda", []jobrequest.Image{})
+	jobRequest, err := jobrequest.New(10, 20, "Reparación", "Necesito ayuda", []filedomain.MessageImage{})
 
 	assert.NoError(t, err)
 	assert.Equal(t, jobrequest.StatusPending, jobRequest.Status)
 }
 
 func TestNewJobRequestRejectsMoreThanThreeImages(t *testing.T) {
-	jobRequest, err := jobrequest.New(10, 20, "Reparación", "Necesito ayuda", []jobrequest.Image{
+	jobRequest, err := jobrequest.New(10, 20, "Reparación", "Necesito ayuda", []filedomain.MessageImage{
 		{FileID: "file-1"},
 		{FileID: "file-2"},
 		{FileID: "file-3"},

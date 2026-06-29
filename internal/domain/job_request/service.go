@@ -66,9 +66,9 @@ func (s *Service) Create(ctx context.Context, consumerAuthID string, providerID 
 	return s.repository.SaveWithConversation(*jobRequest, pendingConversation)
 }
 
-func (s *Service) jobRequestImages(ctx context.Context, consumerAuthID string, imageFileIDs []string) ([]Image, error) {
+func (s *Service) jobRequestImages(ctx context.Context, consumerAuthID string, imageFileIDs []string) ([]filedomain.MessageImage, error) {
 	if len(imageFileIDs) == 0 {
-		return []Image{}, nil
+		return []filedomain.MessageImage{}, nil
 	}
 	images, err := s.fileService.PrepareJobRequestImages(ctx, consumerAuthID, imageFileIDs)
 	if errors.Is(err, filedomain.ErrJobRequestImageNotAvailable) {
@@ -77,7 +77,7 @@ func (s *Service) jobRequestImages(ctx context.Context, consumerAuthID string, i
 	if err != nil {
 		return nil, fmt.Errorf("validating job request images: %w", err)
 	}
-	return jobRequestImagesFromFileImages(images), nil
+	return images, nil
 }
 
 func (s *Service) CreateFromChatbotAssessment(ctx context.Context, consumerAuthID string, chatbotConversationID, providerID int) (*JobRequest, error) {

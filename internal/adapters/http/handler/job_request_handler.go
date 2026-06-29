@@ -9,6 +9,7 @@ import (
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/middleware"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/conversation"
+	filedomain "github.com/LoResuelvo/loresuelvo-api/internal/domain/file"
 	jobrequest "github.com/LoResuelvo/loresuelvo-api/internal/domain/job_request"
 	readmodel "github.com/LoResuelvo/loresuelvo-api/internal/domain/job_request/read_model"
 	"github.com/gin-gonic/gin"
@@ -222,7 +223,7 @@ func jobRequestResponseFromDomain(createdJobRequest jobrequest.JobRequest) jobRe
 	}
 }
 
-func jobRequestImageResponsesFromDomain(images []jobrequest.Image) []messageImageResponse {
+func jobRequestImageResponsesFromDomain(images []filedomain.MessageImage) []messageImageResponse {
 	response := make([]messageImageResponse, 0, len(images))
 	for _, image := range images {
 		response = append(response, messageImageResponse{
