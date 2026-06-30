@@ -62,6 +62,7 @@ jobs:
             STORAGE_PRESIGN_EXPIRATION_SECONDS=${{ secrets.STORAGE_PRESIGN_EXPIRATION_SECONDS }}
             CHATBOT_PROVIDER=${{ secrets.CHATBOT_PROVIDER }}
             CHATBOT_API_KEY=${{ secrets.CHATBOT_API_KEY_STAGING }}
+            CHATBOT_MODEL=${{ secrets.CHATBOT_MODEL }}
             SEEDS_ENABLED=${{ secrets.SEEDS_ENABLED }}
             SEEDS_FILE=seeds/providers-100.yaml
             EOF
@@ -118,6 +119,7 @@ jobs:
             STORAGE_PRESIGN_EXPIRATION_SECONDS=${{ secrets.STORAGE_PRESIGN_EXPIRATION_SECONDS }}
             CHATBOT_PROVIDER=${{ secrets.CHATBOT_PROVIDER }}
             CHATBOT_API_KEY=${{ secrets.CHATBOT_API_KEY_PROD }}
+            CHATBOT_MODEL=${{ secrets.CHATBOT_MODEL }}
             SEEDS_ENABLED=${{ secrets.SEEDS_ENABLED }}
             SEEDS_FILE=seeds/providers-100.yaml
             EOF
