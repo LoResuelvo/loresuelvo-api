@@ -58,6 +58,12 @@ type testSuite struct {
 	aiJobRequestCountBeforeContact          int
 	aiWorkConversationIDsBeforeContact      map[int]int
 	aiAttemptedProviderIDs                  []int
+	expectedChatbotImageDescriptions        map[string]string
+	expectedAssessmentImageNames            []string
+	previousAssessmentID                    int
+	previousAssessmentImages                []any
+	consumerMessageCountBeforeAttempt       int
+	chatbotMessageCountBeforeAttempt        int
 
 	categoryIDsByName              map[string]int
 	lastProviderFilterCategoryName string
@@ -86,10 +92,12 @@ func (s *testSuite) registerAllSteps(sc *godog.ScenarioContext) {
 	registerChatbotSteps(sc, s)
 	registerChatbotContinuationSteps(sc, s)
 	registerChatbotAttachImagesSteps(sc, s)
+	registerChatbotImageContextSteps(sc, s)
 	registerChatbotGetConversationsSteps(sc, s)
 	registerChatbotGetConversationSteps(sc, s)
 	registerChatbotProviderRecommendationSteps(sc, s)
 	registerAIJobRequestSteps(sc, s)
+	registerAIJobRequestImageSteps(sc, s)
 }
 
 func (s *testSuite) cleanDatabase() error {
@@ -143,6 +151,12 @@ func (s *testSuite) cleanDatabase() error {
 	s.aiJobRequestCountBeforeContact = 0
 	s.aiWorkConversationIDsBeforeContact = map[int]int{}
 	s.aiAttemptedProviderIDs = nil
+	s.expectedChatbotImageDescriptions = map[string]string{}
+	s.expectedAssessmentImageNames = nil
+	s.previousAssessmentID = 0
+	s.previousAssessmentImages = nil
+	s.consumerMessageCountBeforeAttempt = 0
+	s.chatbotMessageCountBeforeAttempt = 0
 
 	return nil
 }
@@ -192,6 +206,7 @@ func newTestSuite(tb testing.TB, database *sql.DB) *testSuite {
 		messageImagesByName:                map[string]messageImageFixture{},
 		aiJobRequestsByProvider:            map[string]jobRequestCreationResponse{},
 		aiWorkConversationIDsBeforeContact: map[int]int{},
+		expectedChatbotImageDescriptions:   map[string]string{},
 	}
 }
 
