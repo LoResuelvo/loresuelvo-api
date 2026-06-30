@@ -192,13 +192,20 @@ func (s *Service) CreateChatbotConversation(ctx context.Context, authID string, 
 	if err != nil {
 		return nil, err
 	}
+	if err := applyChatbotImageDescriptions(consumerMessage, answer.response.ImageDescriptions); err != nil {
+		return nil, err
+	}
+	selectedImages, err := selectedAssessmentImages(answer.response.Assessment, consumerMessage.Images)
+	if err != nil {
+		return nil, err
+	}
 
 	createdConversation, err := NewChatbotConversation(consumerID, answer.response.Title)
 	if err != nil {
 		return nil, err
 	}
 	chatbotConversation := createdConversation.(*ChatBotConversation)
-	if err := chatbotConversation.ApplyResponse(*answer.response, problemCategoryID(answer.problemCategory)); err != nil {
+	if err := chatbotConversation.ApplyResponse(*answer.response, problemCategoryID(answer.problemCategory), selectedImages...); err != nil {
 		return nil, err
 	}
 	chatbotConversation.AddMessage(*consumerMessage)
@@ -251,6 +258,14 @@ func (s *Service) ContinueChatbotConversation(ctx context.Context, authID string
 	if err != nil {
 		return nil, err
 	}
+	if err := applyChatbotImageDescriptions(consumerMessage, answer.response.ImageDescriptions); err != nil {
+		return nil, err
+	}
+	availableImages := append(chatbotConversationImageEvidence(chatbotConversation), consumerMessage.Images...)
+	selectedImages, err := selectedAssessmentImages(answer.response.Assessment, availableImages)
+	if err != nil {
+		return nil, err
+	}
 	if answer.response.Assessment.Action == ChatbotAssessmentUnchanged {
 		answer.problemCategory, answer.recommendedProviders, err = s.recommendationForCurrentAssessment(ctx, chatbotConversation)
 		if err != nil {
@@ -258,7 +273,7 @@ func (s *Service) ContinueChatbotConversation(ctx context.Context, authID string
 		}
 	}
 
-	savedConversation, err := s.saveChatbotTurn(ctx, chatbotConversation, *consumerMessage, *answer.message, answer)
+	savedConversation, err := s.saveChatbotTurn(ctx, chatbotConversation, *consumerMessage, *answer.message, answer, selectedImages)
 	if err != nil {
 		return nil, err
 	}
@@ -406,16 +421,85 @@ func chatbotHomeProblemQuestionFrom(chatbotConversation *ChatBotConversation, us
 	}
 }
 
-func (s *Service) saveChatbotTurn(ctx context.Context, chatbotConversation *ChatBotConversation, consumerMessage Message, chatbotMessage Message, answer *chatbotAnswer) (Conversation, error) {
+func (s *Service) saveChatbotTurn(ctx context.Context, chatbotConversation *ChatBotConversation, consumerMessage Message, chatbotMessage Message, answer *chatbotAnswer, selectedImages []filedomain.MessageImage) (Conversation, error) {
 	if err := chatbotConversation.AddTurn(consumerMessage, chatbotMessage); err != nil {
 		return nil, err
 	}
-	if err := chatbotConversation.ApplyResponse(*answer.response, problemCategoryID(answer.problemCategory)); err != nil {
+	if err := chatbotConversation.ApplyResponse(*answer.response, problemCategoryID(answer.problemCategory), selectedImages...); err != nil {
 		return nil, err
 	}
 	chatbotConversation.FinishProcessing()
 
 	return s.conversationRepository.UpdateConversation(ctx, chatbotConversation)
+}
+
+func applyChatbotImageDescriptions(message *Message, descriptions []ChatbotImageDescription) error {
+	if len(message.Images) != len(descriptions) {
+		return ErrChatbotResponseRequired
+	}
+	byRef := make(map[string]string, len(descriptions))
+	for _, description := range descriptions {
+		ref := strings.TrimSpace(description.ImageRef)
+		text := strings.TrimSpace(description.Description)
+		if ref == "" || text == "" {
+			return ErrChatbotResponseRequired
+		}
+		if _, exists := byRef[ref]; exists {
+			return ErrChatbotResponseRequired
+		}
+		byRef[ref] = text
+	}
+	for index := range message.Images {
+		description, exists := byRef[ChatbotImageRef(message.Images[index].FileID)]
+		if !exists {
+			return ErrChatbotResponseRequired
+		}
+		message.Images[index].Description = description
+	}
+	return nil
+}
+
+func selectedAssessmentImages(assessment ChatbotAssessmentResponse, available []filedomain.MessageImage) ([]filedomain.MessageImage, error) {
+	if assessment.Action == ChatbotAssessmentUnchanged {
+		if len(assessment.SelectedImageRefs) != 0 {
+			return nil, ErrProblemAssessmentInvalid
+		}
+		return nil, nil
+	}
+	if len(assessment.SelectedImageRefs) > MaxProblemAssessmentImages {
+		return nil, ErrProblemAssessmentInvalid
+	}
+	byRef := make(map[string]filedomain.MessageImage, len(available))
+	for _, image := range available {
+		if strings.TrimSpace(image.Description) != "" {
+			byRef[ChatbotImageRef(image.FileID)] = image
+		}
+	}
+	selected := make([]filedomain.MessageImage, 0, len(assessment.SelectedImageRefs))
+	seen := make(map[string]struct{}, len(assessment.SelectedImageRefs))
+	for _, rawRef := range assessment.SelectedImageRefs {
+		ref := strings.TrimSpace(rawRef)
+		if _, duplicate := seen[ref]; duplicate {
+			return nil, ErrProblemAssessmentInvalid
+		}
+		image, exists := byRef[ref]
+		if !exists {
+			return nil, ErrProblemAssessmentInvalid
+		}
+		seen[ref] = struct{}{}
+		selected = append(selected, image)
+	}
+	return selected, nil
+}
+
+func chatbotConversationImageEvidence(chatbotConversation *ChatBotConversation) []filedomain.MessageImage {
+	var images []filedomain.MessageImage
+	for _, message := range chatbotConversation.Messages() {
+		if message.SenderRole == SenderConsumer {
+			images = append(images, message.Images...)
+		}
+	}
+	return images
 }
 
 func (s *Service) summarizeChatbotContext(ctx context.Context, previousSummary string, messages []Message) (string, error) {

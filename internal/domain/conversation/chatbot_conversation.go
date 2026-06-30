@@ -3,6 +3,8 @@ package conversation
 import (
 	"strings"
 	"time"
+
+	filedomain "github.com/LoResuelvo/loresuelvo-api/internal/domain/file"
 )
 
 const ChatbotRecentMessageLimit = 10
@@ -54,7 +56,7 @@ func NewChatbotConversation(consumerID int, title string) (Conversation, error) 
 	}, nil
 }
 
-func (conversation *ChatBotConversation) ApplyResponse(response ChatbotResponse, problemCategoryID *int) error {
+func (conversation *ChatBotConversation) ApplyResponse(response ChatbotResponse, problemCategoryID *int, selectedImages ...filedomain.MessageImage) error {
 	conversation.LastResponseStatus = response.Status
 	if response.Assessment.Action == ChatbotAssessmentUnchanged {
 		if conversation.CurrentAssessment == nil && response.Status != ChatbotResponseOutOfScope {
@@ -77,6 +79,7 @@ func (conversation *ChatBotConversation) ApplyResponse(response ChatbotResponse,
 		problemCategoryID,
 		response.Assessment.ProblemTitle,
 		response.Assessment.ProblemDescription,
+		selectedImages...,
 	)
 	if err != nil {
 		return err

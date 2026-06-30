@@ -26,6 +26,9 @@ type FakeChatbot struct {
 	lastSummaryMessages     []conversation.Message
 	lastPreviousSummary     string
 	lastAvailableCategories []category.Category
+	imageDescriptions       map[string]string
+	selectedImageNames      []string
+	descriptionMode         string
 }
 
 func NewFakeChatbot() *FakeChatbot {
@@ -42,8 +45,43 @@ func (chatbot *FakeChatbot) AnswerHomeProblemQuestion(ctx context.Context, quest
 	chatbot.lastQuestion = copyQuestion(question)
 	chatbot.lastAvailableCategories = availableCategories
 	response := chatbot.response
+	response.ImageDescriptions = make([]conversation.ChatbotImageDescription, 0, len(question.Images))
+	for index, image := range question.Images {
+		if chatbot.descriptionMode == "omit_after_first" && index > 0 {
+			continue
+		}
+		ref := conversation.ChatbotImageRef(image.FileID)
+		if chatbot.descriptionMode == "unknown_ref" {
+			ref = conversation.ChatbotImageRef("00000000-0000-0000-0000-000000000000")
+		}
+		description := chatbot.imageDescriptions[image.OriginalName]
+		if strings.TrimSpace(description) == "" {
+			description = "Se observa evidencia visual relevante del problema en " + image.OriginalName + "."
+		}
+		response.ImageDescriptions = append(response.ImageDescriptions, conversation.ChatbotImageDescription{ImageRef: ref, Description: description})
+	}
+	if response.Assessment.Action == conversation.ChatbotAssessmentReplace {
+		for _, selectedName := range chatbot.selectedImageNames {
+			for _, image := range chatbotQuestionImages(question) {
+				if image.OriginalName == selectedName {
+					response.Assessment.SelectedImageRefs = append(response.Assessment.SelectedImageRefs, conversation.ChatbotImageRef(image.FileID))
+					break
+				}
+			}
+		}
+	}
 
 	return &response, nil
+}
+
+func chatbotQuestionImages(question conversation.ChatbotHomeProblemQuestion) []filedomain.MessageImageContent {
+	result := append([]filedomain.MessageImageContent(nil), question.Images...)
+	for _, message := range question.RecentMessages {
+		for _, image := range message.Images {
+			result = append(result, filedomain.MessageImageContent{MessageImage: image})
+		}
+	}
+	return result
 }
 
 func (chatbot *FakeChatbot) SummarizeHomeProblemConversation(ctx context.Context, previousSummary string, messages []conversation.Message) (string, error) {
@@ -69,6 +107,24 @@ func (chatbot *FakeChatbot) SetSummary(summary string) {
 	defer chatbot.mu.Unlock()
 
 	chatbot.summary = strings.TrimSpace(summary)
+}
+
+func (chatbot *FakeChatbot) SetImageDescription(originalName, description string) {
+	chatbot.mu.Lock()
+	defer chatbot.mu.Unlock()
+	chatbot.imageDescriptions[originalName] = strings.TrimSpace(description)
+}
+
+func (chatbot *FakeChatbot) SetSelectedImageNames(names ...string) {
+	chatbot.mu.Lock()
+	defer chatbot.mu.Unlock()
+	chatbot.selectedImageNames = append([]string(nil), names...)
+}
+
+func (chatbot *FakeChatbot) SetImageDescriptionMode(mode string) {
+	chatbot.mu.Lock()
+	defer chatbot.mu.Unlock()
+	chatbot.descriptionMode = mode
 }
 
 func (chatbot *FakeChatbot) SetOutOfScopeResponse(title, content string) {
@@ -148,6 +204,9 @@ func (chatbot *FakeChatbot) Reset() {
 	chatbot.lastSummaryMessages = nil
 	chatbot.lastPreviousSummary = ""
 	chatbot.lastAvailableCategories = nil
+	chatbot.imageDescriptions = map[string]string{}
+	chatbot.selectedImageNames = nil
+	chatbot.descriptionMode = ""
 }
 
 func (chatbot *FakeChatbot) RequestCount() int {
@@ -226,7 +285,7 @@ func fallbackSummary(previousSummary string, messages []conversation.Message) st
 	}
 	for _, message := range messages {
 		content := strings.TrimSpace(message.Content)
-		if content == "" {
+		if content == "" && len(message.Images) == 0 {
 			continue
 		}
 		if builder.Len() > 0 {
@@ -235,6 +294,13 @@ func fallbackSummary(previousSummary string, messages []conversation.Message) st
 		builder.WriteString(message.SenderRole)
 		builder.WriteString(": ")
 		builder.WriteString(content)
+		for _, image := range message.Images {
+			builder.WriteString(" [")
+			builder.WriteString(conversation.ChatbotImageRef(image.FileID))
+			builder.WriteString(": ")
+			builder.WriteString(strings.TrimSpace(image.Description))
+			builder.WriteString("]")
+		}
 	}
 
 	return strings.TrimSpace(builder.String())

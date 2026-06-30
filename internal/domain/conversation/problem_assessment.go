@@ -1,6 +1,12 @@
 package conversation
 
-import "strings"
+import (
+	"strings"
+
+	filedomain "github.com/LoResuelvo/loresuelvo-api/internal/domain/file"
+)
+
+const MaxProblemAssessmentImages = 3
 
 type ProblemAssessmentOutcome string
 
@@ -19,6 +25,7 @@ type ProblemAssessment struct {
 	ProblemTitle          string
 	ProblemDescription    string
 	BasedOnMessageID      int
+	Images                []filedomain.MessageImage
 }
 
 func NewProblemAssessment(
@@ -28,6 +35,7 @@ func NewProblemAssessment(
 	problemCategoryID *int,
 	title string,
 	description string,
+	images ...filedomain.MessageImage,
 ) (*ProblemAssessment, error) {
 	assessment := &ProblemAssessment{
 		ChatbotConversationID: chatbotConversationID,
@@ -36,6 +44,7 @@ func NewProblemAssessment(
 		ProblemCategoryID:     copyOptionalInt(problemCategoryID),
 		ProblemTitle:          strings.TrimSpace(title),
 		ProblemDescription:    strings.TrimSpace(description),
+		Images:                append([]filedomain.MessageImage(nil), images...),
 	}
 	if err := assessment.Validate(); err != nil {
 		return nil, err
@@ -49,6 +58,21 @@ func (assessment ProblemAssessment) Validate() error {
 	}
 	if assessment.ProblemCategoryID != nil && *assessment.ProblemCategoryID <= 0 {
 		return ErrProblemAssessmentInvalid
+	}
+	if len(assessment.Images) > MaxProblemAssessmentImages {
+		return ErrProblemAssessmentInvalid
+	}
+	seenImages := make(map[string]struct{}, len(assessment.Images))
+	for index := range assessment.Images {
+		assessment.Images[index].FileID = strings.TrimSpace(assessment.Images[index].FileID)
+		assessment.Images[index].Description = strings.TrimSpace(assessment.Images[index].Description)
+		if assessment.Images[index].FileID == "" || assessment.Images[index].Description == "" {
+			return ErrProblemAssessmentInvalid
+		}
+		if _, exists := seenImages[assessment.Images[index].FileID]; exists {
+			return ErrProblemAssessmentInvalid
+		}
+		seenImages[assessment.Images[index].FileID] = struct{}{}
 	}
 
 	switch assessment.Outcome {

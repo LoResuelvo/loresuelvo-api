@@ -30,10 +30,16 @@ const (
 )
 
 type ChatbotResponse struct {
-	Status     ChatbotResponseStatus
-	Title      string
-	Content    string
-	Assessment ChatbotAssessmentResponse
+	Status            ChatbotResponseStatus
+	Title             string
+	Content           string
+	ImageDescriptions []ChatbotImageDescription
+	Assessment        ChatbotAssessmentResponse
+}
+
+type ChatbotImageDescription struct {
+	ImageRef    string
+	Description string
 }
 
 type ChatbotAssessmentAction string
@@ -49,6 +55,11 @@ type ChatbotAssessmentResponse struct {
 	ProblemTitle        string
 	ProblemDescription  string
 	ProblemCategoryName string
+	SelectedImageRefs   []string
+}
+
+func ChatbotImageRef(fileID string) string {
+	return "image:" + strings.TrimSpace(fileID)
 }
 
 type chatbotAnswer struct {

@@ -366,6 +366,13 @@ func (m *chatbotMock) AnswerHomeProblemQuestion(ctx context.Context, question co
 			Outcome: conversation.AssessmentCollectingInformation,
 		}
 	}
+	if m.response != nil && len(question.Images) > 0 && len(m.response.ImageDescriptions) == 0 {
+		for _, image := range question.Images {
+			m.response.ImageDescriptions = append(m.response.ImageDescriptions, conversation.ChatbotImageDescription{
+				ImageRef: conversation.ChatbotImageRef(image.FileID), Description: "Descripción de prueba",
+			})
+		}
+	}
 	return m.response, nil
 }
 
@@ -443,7 +450,7 @@ func TestCreateChatbotConversationAcceptsImageOnlyMessage(t *testing.T) {
 	savedChatbotConversation := repo.savedChatbot.(*conversation.ChatBotConversation)
 	require.Len(t, savedChatbotConversation.Messages(), 2)
 	assert.Empty(t, savedChatbotConversation.Messages()[0].Content)
-	assert.Equal(t, []filedomain.MessageImage{{FileID: "image-file-id", OriginalName: "image-file-id.jpg", URL: "https://files/image-file-id"}}, savedChatbotConversation.Messages()[0].Images)
+	assert.Equal(t, []filedomain.MessageImage{{FileID: "image-file-id", OriginalName: "image-file-id.jpg", URL: "https://files/image-file-id", Description: "Descripción de prueba"}}, savedChatbotConversation.Messages()[0].Images)
 }
 
 func TestCreateChatbotConversationIncludesRecommendedProvidersWhenDiagnosisIsCompleted(t *testing.T) {
@@ -647,7 +654,7 @@ func TestContinueChatbotConversationSendsCurrentTurnImagesToChatbot(t *testing.T
 	require.Len(t, chatbot.question.Images, 1)
 	assert.Equal(t, "detail-image-id", chatbot.question.Images[0].FileID)
 	require.Len(t, result.Conversation.Messages(), 2)
-	assert.Equal(t, []filedomain.MessageImage{{FileID: "detail-image-id", OriginalName: "detail-image-id.jpg", URL: "https://files/detail-image-id"}}, result.Conversation.Messages()[0].Images)
+	assert.Equal(t, []filedomain.MessageImage{{FileID: "detail-image-id", OriginalName: "detail-image-id.jpg", URL: "https://files/detail-image-id", Description: "Descripción de prueba"}}, result.Conversation.Messages()[0].Images)
 }
 
 func TestContinueChatbotConversationSummarizesPendingContextWhenRecentMessageLimitIsReached(t *testing.T) {

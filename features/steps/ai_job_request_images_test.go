@@ -3,9 +3,10 @@ package steps_test
 import (
 	"context"
 	"fmt"
-	"reflect"
 	"strings"
 
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/conversation"
+	filedomain "github.com/LoResuelvo/loresuelvo-api/internal/domain/file"
 	"github.com/cucumber/godog"
 )
 
@@ -59,12 +60,26 @@ func (suite *testSuite) currentProfessionalAssessmentSelectedImages(firstName, s
 }
 
 func (suite *testSuite) currentProfessionalAssessmentSelectedImage(imageName string) error {
+	if suite.lastConversationID == 0 {
+		if err := suite.sendImagesToChatbot(imageName); err != nil {
+			return err
+		}
+	}
 	return suite.prepareProfessionalAssessmentWithSelectedImages([]string{imageName})
 }
 
 func (suite *testSuite) prepareProfessionalAssessmentWithSelectedImages(imageNames []string) error {
 	suite.expectedAssessmentImageNames = append([]string(nil), imageNames...)
-	if err := suite.prepareProfessionalAssessment("Plomería", "Pérdida de agua", "Hay evidencia de una pérdida que requiere intervención profesional."); err != nil {
+	suite.chatbot.SetSelectedImageNames(imageNames...)
+	suite.chatbot.SetConcludedDiagnosisResponse("Pérdida de agua", "Hay evidencia de una pérdida que requiere intervención profesional.", "Plomería")
+	if err := suite.requestContinueChatbotConversation(
+		suite.lastConversationID,
+		chatbotConversationRequest{Content: "La evidencia confirma que necesito ayuda profesional."},
+	); err != nil {
+		return err
+	}
+	suite.aiSourceChatbotConversationID = suite.lastConversationID
+	if err := suite.rememberCurrentAssessmentIDIfAvailable(); err != nil {
 		return err
 	}
 	return suite.assertCurrentAssessmentImages(imageNames)
@@ -106,10 +121,15 @@ func (suite *testSuite) iSentImageWhileAssessmentNeededMoreInformation(imageName
 	if err := suite.requestCreateChatbotConversationWithImages("Adjunto una imagen mientras completo la información.", []string{imageName}); err != nil {
 		return err
 	}
-	return suite.rememberCreatedChatbotConversation()
+	if err := suite.rememberCreatedChatbotConversation(); err != nil {
+		return err
+	}
+	suite.aiSourceChatbotConversationID = suite.lastConversationID
+	return nil
 }
 
 func (suite *testSuite) newInformationProducesProfessionalAssessmentForCategory(categoryName string) error {
+	suite.chatbot.SetSelectedImageNames(suite.allRememberedMessageImageNames()...)
 	suite.chatbot.SetConcludedDiagnosisResponse("Humedad en pared", "La humedad requiere revisión profesional.", categoryName)
 	if err := suite.requestContinueChatbotConversation(
 		suite.lastConversationID,
@@ -137,10 +157,17 @@ func (suite *testSuite) assessmentContentDidNotChange() error {
 
 func (suite *testSuite) chatbotReplacesAssessmentImageSelection(imageName string) error {
 	suite.expectedAssessmentImageNames = []string{imageName}
+	if _, exists := suite.messageImagesByName[imageName]; !exists {
+		if err := suite.uploadAndConfirmMessageImage(imageName); err != nil {
+			return err
+		}
+	}
 	suite.chatbot.SetConcludedDiagnosisResponse("Pérdida de agua", "Hay evidencia de una pérdida que requiere intervención profesional.", "Plomería")
-	if err := suite.requestContinueChatbotConversation(
+	suite.chatbot.SetSelectedImageNames(imageName)
+	if err := suite.requestContinueChatbotConversationWithImages(
 		suite.lastConversationID,
-		chatbotConversationRequest{Content: "La nueva imagen muestra mejor el mismo problema."},
+		"La nueva imagen muestra mejor el mismo problema.",
+		[]string{imageName},
 	); err != nil {
 		return err
 	}
@@ -173,64 +200,26 @@ func (suite *testSuite) assertCurrentAssessmentImages(expectedNames []string) er
 	return assertDomainImageNames(images, expectedNames)
 }
 
-func (suite *testSuite) currentAssessmentImages() ([]any, error) {
+func (suite *testSuite) currentAssessmentImages() ([]filedomain.MessageImage, error) {
 	foundConversation, err := suite.conversationRepository.FindByID(context.Background(), suite.lastConversationID)
 	if err != nil {
 		return nil, err
 	}
-	images, err := nestedExportedSliceField(foundConversation, "CurrentAssessment", "Images")
-	if err != nil {
-		return nil, err
+	chatbotConversation, ok := foundConversation.(*conversation.ChatBotConversation)
+	if !ok || chatbotConversation.CurrentAssessment == nil {
+		return nil, fmt.Errorf("expected chatbot conversation with current assessment")
 	}
-	return images, nil
+	return append([]filedomain.MessageImage(nil), chatbotConversation.CurrentAssessment.Images...), nil
 }
 
-func (suite *testSuite) assertMessageImagesFromDomain(images any, expectedNames []string) error {
-	reflected := reflect.ValueOf(images)
-	values := make([]any, reflected.Len())
-	for index := 0; index < reflected.Len(); index++ {
-		values[index] = reflected.Index(index).Interface()
-	}
-	return assertDomainImageNames(values, expectedNames)
+func (suite *testSuite) assertMessageImagesFromDomain(images []filedomain.MessageImage, expectedNames []string) error {
+	return assertDomainImageNames(images, expectedNames)
 }
 
-func nestedExportedSliceField(value any, parentFieldName, childFieldName string) ([]any, error) {
-	reflected := reflect.ValueOf(value)
-	if reflected.Kind() == reflect.Pointer {
-		if reflected.IsNil() {
-			return nil, fmt.Errorf("expected non-nil value with field %s", parentFieldName)
-		}
-		reflected = reflected.Elem()
-	}
-	parent := reflected.FieldByName(parentFieldName)
-	if !parent.IsValid() {
-		return nil, fmt.Errorf("expected field %s", parentFieldName)
-	}
-	if parent.Kind() == reflect.Pointer {
-		if parent.IsNil() {
-			return nil, fmt.Errorf("expected non-nil field %s", parentFieldName)
-		}
-		parent = parent.Elem()
-	}
-	child := parent.FieldByName(childFieldName)
-	if !child.IsValid() || child.Kind() != reflect.Slice {
-		return nil, fmt.Errorf("expected slice field %s.%s", parentFieldName, childFieldName)
-	}
-	result := make([]any, child.Len())
-	for index := 0; index < child.Len(); index++ {
-		result[index] = child.Index(index).Interface()
-	}
-	return result, nil
-}
-
-func assertDomainImageNames(images []any, expectedNames []string) error {
+func assertDomainImageNames(images []filedomain.MessageImage, expectedNames []string) error {
 	actualNames := make([]string, 0, len(images))
 	for _, image := range images {
-		name, err := exportedStringField(image, "OriginalName")
-		if err != nil {
-			return err
-		}
-		actualNames = append(actualNames, name)
+		actualNames = append(actualNames, strings.TrimSpace(image.OriginalName))
 	}
 	if strings.Join(actualNames, "\x00") != strings.Join(expectedNames, "\x00") {
 		return fmt.Errorf("expected image names %v, got %v", expectedNames, actualNames)

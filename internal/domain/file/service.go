@@ -359,7 +359,7 @@ func (s *Service) ResolveJobRequestImages(ctx context.Context, images []Image) (
 	}
 	filesByID := make(map[string]File, len(files))
 	for _, file := range files {
-		if !isAvailableJobRequestImage(file) {
+		if !isAvailableJobRequestImage(file) && !isAvailableConversationMessageImage(file) {
 			return nil, ErrJobRequestImageNotAvailable
 		}
 		filesByID[file.ID] = file
@@ -449,6 +449,7 @@ func isValidJobRequestImageFor(file File, authID string) bool {
 	return isAvailableJobRequestImage(file) && file.WasUploadedBy(authID)
 }
 
+// TODO: No repetir código.
 func isAvailableJobRequestImage(file File) bool {
 	return file.IsConfirmed() &&
 		!file.IsPublic() &&

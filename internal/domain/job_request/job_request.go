@@ -29,14 +29,14 @@ type JobRequest struct {
 	Description        string
 	Status             Status
 	SourceAssessmentID *int
-	Images             []filedomain.MessageImage
+	Images             []filedomain.Image
 }
 
 func NewFromAssessment(consumerID, providerID int, assessment conversation.ProblemAssessment) (*JobRequest, error) {
 	if !assessment.RequiresProfessional() {
 		return nil, ErrAssessmentNotContactable
 	}
-	jobRequest, err := New(consumerID, providerID, assessment.ProblemTitle, assessment.ProblemDescription, []filedomain.MessageImage{})
+	jobRequest, err := New(consumerID, providerID, assessment.ProblemTitle, assessment.ProblemDescription, assessment.Images)
 	if err != nil {
 		return nil, err
 	}
@@ -48,7 +48,7 @@ func NewFromAssessment(consumerID, providerID int, assessment conversation.Probl
 	return jobRequest, nil
 }
 
-func New(consumerID, providerID int, title, description string, images []filedomain.MessageImage) (*JobRequest, error) {
+func New(consumerID, providerID int, title, description string, images []filedomain.Image) (*JobRequest, error) {
 	if consumerID <= 0 {
 		return nil, ErrOnlyConsumerCanCreateJobRequest
 	}
@@ -70,7 +70,7 @@ func New(consumerID, providerID int, title, description string, images []filedom
 		Title:       trimmedTitle,
 		Description: strings.TrimSpace(description),
 		Status:      StatusPending,
-		Images:      images,
+		Images:      append([]filedomain.Image(nil), images...),
 	}, nil
 }
 

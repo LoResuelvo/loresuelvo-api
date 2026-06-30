@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/conversation"
+	filedomain "github.com/LoResuelvo/loresuelvo-api/internal/domain/file"
 	"github.com/jackc/pgx/v5/pgconn"
 )
 
@@ -483,6 +484,10 @@ func (repository *ConversationRepository) FindByID(ctx context.Context, conversa
 				ProblemDescription:    assessmentDescription.String,
 				BasedOnMessageID:      int(assessmentBasedOnMessageID.Int64),
 			}
+			chatbotConversation.CurrentAssessment.Images, err = repository.findAssessmentImages(ctx, chatbotConversation.CurrentAssessment.ID)
+			if err != nil {
+				return nil, err
+			}
 		}
 		return chatbotConversation, nil
 	case conversation.TypeWork:
@@ -641,7 +646,7 @@ func (repository *ConversationRepository) saveCurrentAssessmentWithTx(ctx contex
 	if assessment.ProblemCategoryID != nil {
 		categoryID = sql.NullInt64{Int64: int64(*assessment.ProblemCategoryID), Valid: true}
 	}
-	return tx.QueryRowContext(ctx,
+	if err := tx.QueryRowContext(ctx,
 		`INSERT INTO problem_assessments (
 			chatbot_conversation_id, version, outcome, problem_category_id,
 			problem_title, problem_description, based_on_message_id
@@ -654,7 +659,48 @@ func (repository *ConversationRepository) saveCurrentAssessmentWithTx(ctx contex
 		assessment.ProblemTitle,
 		assessment.ProblemDescription,
 		assessment.BasedOnMessageID,
-	).Scan(&assessment.ID)
+	).Scan(&assessment.ID); err != nil {
+		return err
+	}
+	for position, image := range assessment.Images {
+		if _, err := tx.ExecContext(ctx,
+			`INSERT INTO problem_assessment_images (problem_assessment_id, file_id, position)
+			 VALUES ($1, $2, $3)`,
+			assessment.ID, image.FileID, position,
+		); err != nil {
+			return fmt.Errorf("saving problem assessment image: %w", err)
+		}
+	}
+	return nil
+}
+
+func (repository *ConversationRepository) findAssessmentImages(ctx context.Context, assessmentID int) ([]filedomain.MessageImage, error) {
+	rows, err := repository.db.QueryContext(ctx,
+		`SELECT pai.file_id::text, f.original_name, mi.description
+		 FROM problem_assessment_images pai
+		 INNER JOIN files f ON f.id = pai.file_id
+		 INNER JOIN message_images mi ON mi.file_id = pai.file_id
+		 WHERE pai.problem_assessment_id = $1
+		 ORDER BY pai.position`,
+		assessmentID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("finding problem assessment images: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	images := []filedomain.MessageImage{}
+	for rows.Next() {
+		var image filedomain.MessageImage
+		if err := rows.Scan(&image.FileID, &image.OriginalName, &image.Description); err != nil {
+			return nil, fmt.Errorf("scanning problem assessment image: %w", err)
+		}
+		images = append(images, image)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterating problem assessment images: %w", err)
+	}
+	return images, nil
 }
 
 func optionalAssessmentID(assessment *conversation.ProblemAssessment) any {

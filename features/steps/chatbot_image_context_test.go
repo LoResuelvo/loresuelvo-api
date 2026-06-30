@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"reflect"
 	"strings"
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/conversation"
@@ -35,6 +34,7 @@ func registerChatbotImageContextSteps(sc *godog.ScenarioContext, suite *testSuit
 }
 
 func (suite *testSuite) iSentImageToChatbot(imageName string) error {
+	suite.chatbot.SetImageDescription(imageName, chatbotImageFixtureDescription(imageName))
 	if err := suite.uploadAndConfirmMessageImage(imageName); err != nil {
 		return err
 	}
@@ -42,6 +42,19 @@ func (suite *testSuite) iSentImageToChatbot(imageName string) error {
 		return err
 	}
 	return suite.rememberCreatedChatbotConversation()
+}
+
+func chatbotImageFixtureDescription(imageName string) string {
+	switch imageName {
+	case "perdida-bajo-mesada.jpg":
+		return "Se observa agua acumulada debajo del sifón y humedad alrededor de su conexión."
+	case "humedad-pared.webp":
+		return "Se observa una mancha de humedad ascendente junto al zócalo."
+	case "vista-general-cocina.jpg":
+		return "Se observa agua debajo de la pileta y humedad en la base del mueble."
+	default:
+		return "Se observa evidencia visual relevante del problema."
+	}
 }
 
 func (suite *testSuite) chatbotDescribedImageAs(imageName string, description *godog.DocString) error {
@@ -73,12 +86,8 @@ func (suite *testSuite) chatbotReceivesHistoricalImageDescription(imageName stri
 	for _, message := range suite.chatbot.LastQuestion().RecentMessages {
 		for _, image := range message.Images {
 			if image.OriginalName == imageName {
-				description, err := exportedStringField(image, "Description")
-				if err != nil {
-					return err
-				}
-				if description != expected {
-					return fmt.Errorf("expected historical image %q description %q, got %q", imageName, expected, description)
+				if image.Description != expected {
+					return fmt.Errorf("expected historical image %q description %q, got %q", imageName, expected, image.Description)
 				}
 				return nil
 			}
@@ -142,6 +151,7 @@ func (suite *testSuite) chatbotReceivesNewImageBytes(imageName string) error {
 
 func (suite *testSuite) chatbotWillDescribeOnlyImage(imageName string) error {
 	suite.lastAttemptedMessageImageNames = []string{imageName}
+	suite.chatbot.SetImageDescriptionMode("omit_after_first")
 	return nil
 }
 
@@ -157,6 +167,7 @@ func (suite *testSuite) trySendBothImagesInNewChatbotMessage() error {
 }
 
 func (suite *testSuite) chatbotWillDescribeUnknownImageReference() error {
+	suite.chatbot.SetImageDescriptionMode("unknown_ref")
 	return nil
 }
 
@@ -172,8 +183,8 @@ func (suite *testSuite) trySendRememberedImageInNewChatbotMessage() error {
 }
 
 func (suite *testSuite) systemRejectsInvalidChatbotResponse() error {
-	if suite.lastStatus != http.StatusInternalServerError {
-		return fmt.Errorf("expected invalid chatbot response to return status %d, got %d with body %s", http.StatusInternalServerError, suite.lastStatus, string(suite.lastBody))
+	if suite.lastStatus != http.StatusBadRequest {
+		return fmt.Errorf("expected invalid chatbot response to return status %d, got %d with body %s", http.StatusBadRequest, suite.lastStatus, string(suite.lastBody))
 	}
 	return suite.lastResponseShouldHaveError()
 }
@@ -238,27 +249,9 @@ func (suite *testSuite) persistedImageDescription(imageName string) (string, err
 	for _, message := range foundConversation.Messages() {
 		for _, image := range message.Images {
 			if image.OriginalName == imageName {
-				return exportedStringField(image, "Description")
+				return strings.TrimSpace(image.Description), nil
 			}
 		}
 	}
 	return "", fmt.Errorf("expected persisted image %q in chatbot conversation", imageName)
-}
-
-func exportedStringField(value any, fieldName string) (string, error) {
-	reflected := reflect.ValueOf(value)
-	if reflected.Kind() == reflect.Pointer {
-		if reflected.IsNil() {
-			return "", fmt.Errorf("expected non-nil value with field %s", fieldName)
-		}
-		reflected = reflected.Elem()
-	}
-	if reflected.Kind() != reflect.Struct {
-		return "", fmt.Errorf("expected struct with field %s", fieldName)
-	}
-	field := reflected.FieldByName(fieldName)
-	if !field.IsValid() || field.Kind() != reflect.String {
-		return "", fmt.Errorf("expected string field %s", fieldName)
-	}
-	return strings.TrimSpace(field.String()), nil
 }

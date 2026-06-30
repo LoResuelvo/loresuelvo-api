@@ -12,6 +12,7 @@ import (
 	httpadapter "github.com/LoResuelvo/loresuelvo-api/internal/adapters/http"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/repositories"
 	"github.com/LoResuelvo/loresuelvo-api/internal/bootstrap"
+	filedomain "github.com/LoResuelvo/loresuelvo-api/internal/domain/file"
 	"github.com/LoResuelvo/loresuelvo-api/internal/infrastructure/db"
 	"github.com/auth0/go-jwt-middleware/v3/validator"
 	"github.com/cucumber/godog"
@@ -61,7 +62,7 @@ type testSuite struct {
 	expectedChatbotImageDescriptions        map[string]string
 	expectedAssessmentImageNames            []string
 	previousAssessmentID                    int
-	previousAssessmentImages                []any
+	previousAssessmentImages                []filedomain.MessageImage
 	consumerMessageCountBeforeAttempt       int
 	chatbotMessageCountBeforeAttempt        int
 

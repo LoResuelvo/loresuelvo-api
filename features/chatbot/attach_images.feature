@@ -140,7 +140,6 @@ Feature: 12.1 Adjuntar imágenes para pre-diagnóstico
 
     Rule: Cada imagen se analiza una sola vez y su descripción se reutiliza como contexto
 
-    @wip
     Scenario: 12.1.11 - Reutilizar la descripción de una imagen en una consulta posterior
         Given que estoy autenticado como consumidor "ana@example.com"
         And que envié al chatbot la imagen "perdida-bajo-mesada.jpg"
@@ -155,7 +154,6 @@ Feature: 12.1 Adjuntar imágenes para pre-diagnóstico
         Then el chatbot recibe como contexto la descripción de la imagen "perdida-bajo-mesada.jpg"
         And el chatbot no vuelve a recibir el contenido binario de la imagen "perdida-bajo-mesada.jpg"
 
-    @wip
     Scenario: 12.1.12 - Conservar la evidencia visual al compactar el contexto de la conversación
         Given que estoy autenticado como consumidor "ana@example.com"
         And que envié al chatbot la imagen "humedad-pared.webp"
@@ -169,7 +167,6 @@ Feature: 12.1 Adjuntar imágenes para pre-diagnóstico
         And el chatbot puede relacionar la consulta posterior con esa evidencia visual
         And el chatbot no vuelve a recibir el contenido binario de la imagen "humedad-pared.webp"
 
-    @wip
     Scenario: 12.1.13 - Enviar como binario solo las imágenes nuevas de un turno posterior
         Given que estoy autenticado como consumidor "ana@example.com"
         And que envié al chatbot la imagen "vista-general-cocina.jpg"
@@ -188,7 +185,6 @@ Feature: 12.1 Adjuntar imágenes para pre-diagnóstico
 
     Rule: El turno solo se registra si el análisis visual es completo y consistente
 
-    @wip
     Scenario: 12.1.14 - Rechazar una respuesta que omite la descripción de una imagen nueva
         Given que estoy autenticado como consumidor "ana@example.com"
         And ya tengo una conversación activa con el chatbot sobre:
@@ -202,7 +198,6 @@ Feature: 12.1 Adjuntar imágenes para pre-diagnóstico
         And el sistema no registra el mensaje con las imágenes
         And el sistema no registra la respuesta del chatbot
 
-    @wip
     Scenario: 12.1.15 - Rechazar descripciones asociadas a imágenes que no pertenecen al turno
         Given que estoy autenticado como consumidor "ana@example.com"
         And ya tengo una conversación activa con el chatbot sobre:

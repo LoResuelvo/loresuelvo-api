@@ -138,7 +138,6 @@ Feature: 51 Enviar solicitud de conversación de trabajo a Prestadores, con IA
 
     Rule: La evaluación selecciona las imágenes adecuadas para la solicitud de trabajo
 
-    @wip
     Scenario: 51.11 - Adjuntar a la solicitud las imágenes seleccionadas por la evaluación vigente
         Given que estoy autenticado como consumidor "ana@example.com"
         And que envié al chatbot las imágenes "vista-general-cocina.jpg" y "detalle-conexion.jpg"
@@ -148,7 +147,6 @@ Feature: 51 Enviar solicitud de conversación de trabajo a Prestadores, con IA
         And la solicitud contiene las imágenes "vista-general-cocina.jpg" y "detalle-conexion.jpg"
         And la solicitud queda vinculada con la evaluación que seleccionó esas imágenes
 
-    @wip
     Scenario: 51.12 - Excluir de la solicitud las imágenes que no son relevantes para la evaluación vigente
         Given que estoy autenticado como consumidor "ana@example.com"
         And que envié al chatbot las imágenes "perdida-bajo-mesada.jpg", "tablero-electrico.jpg" y "detalle-sifon.jpg"
@@ -159,7 +157,6 @@ Feature: 51 Enviar solicitud de conversación de trabajo a Prestadores, con IA
 
     Rule: La selección de imágenes es versionada y trazable
 
-    @wip
     Scenario: 51.13 - Incorporar evidencia visual anterior al completar una evaluación profesional
         Given que estoy autenticado como consumidor "ana@example.com"
         And que envié la imagen "humedad-pared.webp" mientras la evaluación todavía requería más información
@@ -169,7 +166,6 @@ Feature: 51 Enviar solicitud de conversación de trabajo a Prestadores, con IA
         Then la solicitud contiene la imagen "humedad-pared.webp"
         And la solicitud queda vinculada con la evaluación profesional vigente
 
-    @wip
     Scenario: 51.14 - Crear una nueva revisión cuando cambia solamente la selección de imágenes
         Given que estoy autenticado como consumidor "ana@example.com"
         And que la evaluación profesional vigente seleccionó la imagen "vista-general-cocina.jpg"
