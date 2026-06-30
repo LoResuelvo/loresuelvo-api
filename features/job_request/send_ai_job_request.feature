@@ -135,3 +135,46 @@ Feature: 51 Enviar solicitud de conversación de trabajo a Prestadores, con IA
         Then el sistema indica que ya existe una solicitud de trabajo abierta con ese prestador
         And el sistema no registra otra solicitud de trabajo para "Juan Gómez"
         And el sistema no crea otra conversación de trabajo pendiente con "Juan Gómez"
+
+    Rule: La evaluación selecciona las imágenes adecuadas para la solicitud de trabajo
+
+    @wip
+    Scenario: 51.11 - Adjuntar a la solicitud las imágenes seleccionadas por la evaluación vigente
+        Given que estoy autenticado como consumidor "ana@example.com"
+        And que envié al chatbot las imágenes "vista-general-cocina.jpg" y "detalle-conexion.jpg"
+        And que la evaluación profesional vigente seleccionó ambas imágenes como evidencia del problema
+        When elijo contactar al prestador recomendado "Juan Gómez" desde esa conversación con el chatbot
+        Then el sistema registra una solicitud de trabajo pendiente para el prestador "Juan Gómez"
+        And la solicitud contiene las imágenes "vista-general-cocina.jpg" y "detalle-conexion.jpg"
+        And la solicitud queda vinculada con la evaluación que seleccionó esas imágenes
+
+    @wip
+    Scenario: 51.12 - Excluir de la solicitud las imágenes que no son relevantes para la evaluación vigente
+        Given que estoy autenticado como consumidor "ana@example.com"
+        And que envié al chatbot las imágenes "perdida-bajo-mesada.jpg", "tablero-electrico.jpg" y "detalle-sifon.jpg"
+        And que la evaluación profesional vigente seleccionó "perdida-bajo-mesada.jpg" y "detalle-sifon.jpg" como evidencia del problema de plomería
+        When elijo contactar al prestador recomendado "Juan Gómez" desde esa conversación con el chatbot
+        Then la solicitud contiene las imágenes "perdida-bajo-mesada.jpg" y "detalle-sifon.jpg"
+        And la solicitud no contiene la imagen "tablero-electrico.jpg"
+
+    Rule: La selección de imágenes es versionada y trazable
+
+    @wip
+    Scenario: 51.13 - Incorporar evidencia visual anterior al completar una evaluación profesional
+        Given que estoy autenticado como consumidor "ana@example.com"
+        And que envié la imagen "humedad-pared.webp" mientras la evaluación todavía requería más información
+        And que después de aportar nueva información la evaluación vigente requiere un profesional del rubro "Plomería"
+        And que la evaluación vigente seleccionó la imagen histórica "humedad-pared.webp"
+        When elijo contactar al prestador recomendado "Juan Gómez" desde esa conversación con el chatbot
+        Then la solicitud contiene la imagen "humedad-pared.webp"
+        And la solicitud queda vinculada con la evaluación profesional vigente
+
+    @wip
+    Scenario: 51.14 - Crear una nueva revisión cuando cambia solamente la selección de imágenes
+        Given que estoy autenticado como consumidor "ana@example.com"
+        And que la evaluación profesional vigente seleccionó la imagen "vista-general-cocina.jpg"
+        And que el título, la descripción, el resultado y el rubro evaluados no cambiaron
+        When el chatbot reemplaza la selección por la imagen "detalle-conexion.jpg"
+        Then el sistema registra una nueva revisión de la evaluación
+        And la nueva evaluación selecciona solamente la imagen "detalle-conexion.jpg"
+        And la evaluación anterior conserva la imagen "vista-general-cocina.jpg"

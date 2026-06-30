@@ -137,3 +137,81 @@ Feature: 12.1 Adjuntar imágenes para pre-diagnóstico
             """
         Then el sistema rechaza el mensaje porque la imagen no está disponible
         And el sistema no crea una conversación con el chatbot asistido por IA
+
+    Rule: Cada imagen se analiza una sola vez y su descripción se reutiliza como contexto
+
+    @wip
+    Scenario: 12.1.11 - Reutilizar la descripción de una imagen en una consulta posterior
+        Given que estoy autenticado como consumidor "ana@example.com"
+        And que envié al chatbot la imagen "perdida-bajo-mesada.jpg"
+        And que el chatbot describió la imagen "perdida-bajo-mesada.jpg" como:
+            """
+            Se observa agua acumulada debajo del sifón y humedad alrededor de su conexión.
+            """
+        When envío un nuevo mensaje sin imágenes en esa conversación:
+            """
+            ¿Esa humedad podría explicar que el mueble vuelva a mojarse?
+            """
+        Then el chatbot recibe como contexto la descripción de la imagen "perdida-bajo-mesada.jpg"
+        And el chatbot no vuelve a recibir el contenido binario de la imagen "perdida-bajo-mesada.jpg"
+
+    @wip
+    Scenario: 12.1.12 - Conservar la evidencia visual al compactar el contexto de la conversación
+        Given que estoy autenticado como consumidor "ana@example.com"
+        And que envié al chatbot la imagen "humedad-pared.webp"
+        And que el chatbot describió la imagen "humedad-pared.webp" como:
+            """
+            Se observa una mancha de humedad ascendente junto al zócalo.
+            """
+        And que continué la conversación hasta que fue necesario resumir su contexto
+        When envío una consulta posterior sobre la mancha de humedad
+        Then el resumen acumulado conserva la descripción de la imagen "humedad-pared.webp"
+        And el chatbot puede relacionar la consulta posterior con esa evidencia visual
+        And el chatbot no vuelve a recibir el contenido binario de la imagen "humedad-pared.webp"
+
+    @wip
+    Scenario: 12.1.13 - Enviar como binario solo las imágenes nuevas de un turno posterior
+        Given que estoy autenticado como consumidor "ana@example.com"
+        And que envié al chatbot la imagen "vista-general-cocina.jpg"
+        And que el chatbot describió la imagen "vista-general-cocina.jpg" como:
+            """
+            Se observa agua debajo de la pileta y humedad en la base del mueble.
+            """
+        And que cargué y confirmé la imagen "detalle-conexion.jpg"
+        When envío un nuevo mensaje con la imagen cargada "detalle-conexion.jpg":
+            """
+            Ahora saqué una foto más cercana de la conexión.
+            """
+        Then el chatbot recibe el contenido binario de la imagen nueva "detalle-conexion.jpg"
+        And el chatbot recibe como texto la descripción histórica de la imagen "vista-general-cocina.jpg"
+        And el chatbot no vuelve a recibir el contenido binario de la imagen "vista-general-cocina.jpg"
+
+    Rule: El turno solo se registra si el análisis visual es completo y consistente
+
+    @wip
+    Scenario: 12.1.14 - Rechazar una respuesta que omite la descripción de una imagen nueva
+        Given que estoy autenticado como consumidor "ana@example.com"
+        And ya tengo una conversación activa con el chatbot sobre:
+            """
+            Tengo una pérdida debajo de la pileta.
+            """
+        And que cargué y confirmé las imágenes: "vista-general-cocina.jpg", "detalle-conexion.jpg"
+        And que el chatbot devolverá una descripción solamente para "vista-general-cocina.jpg"
+        When intento enviar ambas imágenes en un nuevo mensaje al chatbot
+        Then el sistema rechaza la consulta por una respuesta inválida del chatbot
+        And el sistema no registra el mensaje con las imágenes
+        And el sistema no registra la respuesta del chatbot
+
+    @wip
+    Scenario: 12.1.15 - Rechazar descripciones asociadas a imágenes que no pertenecen al turno
+        Given que estoy autenticado como consumidor "ana@example.com"
+        And ya tengo una conversación activa con el chatbot sobre:
+            """
+            Tengo una pérdida debajo de la pileta.
+            """
+        And que cargué y confirmé la imagen "detalle-conexion.jpg"
+        And que el chatbot devolverá una descripción para una referencia de imagen desconocida
+        When intento enviar la imagen en un nuevo mensaje al chatbot
+        Then el sistema rechaza la consulta por una respuesta inválida del chatbot
+        And el sistema no registra el mensaje con la imagen
+        And el sistema no registra la respuesta del chatbot
