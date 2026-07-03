@@ -1,10 +1,9 @@
-package handler
+package user_handler
 
 import (
 	"net/http"
-	"strings"
 
-	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/middleware"
+	httphandler "github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/user"
 	"github.com/gin-gonic/gin"
 )
@@ -18,20 +17,14 @@ func NewUserHandler(userService *user.Service) *UserHandler {
 }
 
 func (h *UserHandler) GetCurrentUser(c *gin.Context) {
-	auth0ID, ok := middleware.GetUserID(c)
-	if !ok || strings.TrimSpace(auth0ID) == "" {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "missing user id"})
+	auth0ID, ok := httphandler.GetAuthenticatedUserID(c)
+	if !ok {
 		return
 	}
 
 	currentUser, err := h.userService.GetCurrentUser(auth0ID)
-	if err == user.ErrNotFound {
-		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
-		return
-	}
-
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		handleGetCurrentUserError(c, err)
 		return
 	}
 

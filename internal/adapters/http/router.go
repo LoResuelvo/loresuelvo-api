@@ -4,7 +4,13 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler"
+	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/category_handler"
+	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/consumer_handler"
+	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/conversation_handler"
+	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/file_handler"
+	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/job_request_handler"
+	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/provider_handler"
+	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/user_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/middleware"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/realtime"
 	"github.com/auth0/go-jwt-middleware/v3/validator"
@@ -12,18 +18,18 @@ import (
 )
 
 type Router struct {
-	categoryHandler     *handler.CategoryHandler
-	consumerHandler     *handler.ConsumerHandler
-	providerHandler     *handler.ProviderHandler
-	conversationHandler *handler.ConversationHandler
-	jobRequestHandler   *handler.JobRequestHandler
-	userHandler         *handler.UserHandler
-	fileHandler         *handler.FileHandler
+	categoryHandler     *category_handler.CategoryHandler
+	consumerHandler     *consumer_handler.ConsumerHandler
+	providerHandler     *provider_handler.ProviderHandler
+	conversationHandler *conversation_handler.ConversationHandler
+	jobRequestHandler   *job_request_handler.JobRequestHandler
+	userHandler         *user_handler.UserHandler
+	fileHandler         *file_handler.FileHandler
 	realtimeHandler     *realtime.Handler
 	auth0Validator      *validator.Validator
 }
 
-func NewRouter(categoryHandler *handler.CategoryHandler, consumerHandler *handler.ConsumerHandler, providerHandler *handler.ProviderHandler, conversationHandler *handler.ConversationHandler, jobRequestHandler *handler.JobRequestHandler, userHandler *handler.UserHandler, fileHandler *handler.FileHandler, realtimeHandler *realtime.Handler, auth0Validator *validator.Validator) *Router {
+func NewRouter(categoryHandler *category_handler.CategoryHandler, consumerHandler *consumer_handler.ConsumerHandler, providerHandler *provider_handler.ProviderHandler, conversationHandler *conversation_handler.ConversationHandler, jobRequestHandler *job_request_handler.JobRequestHandler, userHandler *user_handler.UserHandler, fileHandler *file_handler.FileHandler, realtimeHandler *realtime.Handler, auth0Validator *validator.Validator) *Router {
 	router := &Router{
 		categoryHandler:     categoryHandler,
 		consumerHandler:     consumerHandler,

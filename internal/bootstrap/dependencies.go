@@ -6,7 +6,13 @@ import (
 
 	chatbotadapter "github.com/LoResuelvo/loresuelvo-api/internal/adapters/chatbot"
 	clockadapter "github.com/LoResuelvo/loresuelvo-api/internal/adapters/clock"
-	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler"
+	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/category_handler"
+	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/consumer_handler"
+	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/conversation_handler"
+	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/file_handler"
+	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/job_request_handler"
+	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/provider_handler"
+	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/user_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/realtime"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/repositories"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/storage"
@@ -31,13 +37,13 @@ type Dependencies struct {
 	ConversationReader     *repositories.ConversationReader
 	FileRepository         *repositories.FileRepository
 
-	CategoryHandler     *handler.CategoryHandler
-	ConsumerHandler     *handler.ConsumerHandler
-	ProviderHandler     *handler.ProviderHandler
-	ConversationHandler *handler.ConversationHandler
-	JobRequestHandler   *handler.JobRequestHandler
-	UserHandler         *handler.UserHandler
-	FileHandler         *handler.FileHandler
+	CategoryHandler     *category_handler.CategoryHandler
+	ConsumerHandler     *consumer_handler.ConsumerHandler
+	ProviderHandler     *provider_handler.ProviderHandler
+	ConversationHandler *conversation_handler.ConversationHandler
+	JobRequestHandler   *job_request_handler.JobRequestHandler
+	UserHandler         *user_handler.UserHandler
+	FileHandler         *file_handler.FileHandler
 
 	Hub              *realtime.Hub
 	RealtimeHandler  *realtime.Handler
@@ -110,13 +116,13 @@ func NewDependenciesWithChatbot(database *sql.DB, chatbot conversation.Chatbot) 
 		JobRequestRepository:   jobRequestRepository,
 		ConversationReader:     conversationReader,
 		FileRepository:         fileRepository,
-		CategoryHandler:        handler.NewCategoryHandler(categoryService),
-		ConsumerHandler:        handler.NewConsumerHandler(consumerService),
-		ProviderHandler:        handler.NewProviderHandler(providerService),
-		ConversationHandler:    handler.NewConversationHandler(conversationService),
-		JobRequestHandler:      handler.NewJobRequestHandler(jobRequestService),
-		UserHandler:            handler.NewUserHandler(userService),
-		FileHandler:            handler.NewFileHandler(fileService),
+		CategoryHandler:        category_handler.NewCategoryHandler(categoryService),
+		ConsumerHandler:        consumer_handler.NewConsumerHandler(consumerService),
+		ProviderHandler:        provider_handler.NewProviderHandler(providerService),
+		ConversationHandler:    conversation_handler.NewConversationHandler(conversationService),
+		JobRequestHandler:      job_request_handler.NewJobRequestHandler(jobRequestService),
+		UserHandler:            user_handler.NewUserHandler(userService),
+		FileHandler:            file_handler.NewFileHandler(fileService),
 		Hub:                    hub,
 		RealtimeHandler:        realtimeHandler,
 		MessagePublisher:       messagePublisher,

@@ -1,0 +1,7 @@
+package consumer_handler
+
+type registerConsumerRequest struct {
+	Email   string `json:"email"`
+	Name    string `json:"name"`
+	Surname string `json:"surname"`
+}
