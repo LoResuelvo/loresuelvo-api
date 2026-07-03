@@ -8,7 +8,7 @@ git fetch --tags --force
 # - git tag -l "v*.*.*": Lista solo los tags con formato v1.2.3
 # - sort -V: Ordena versiones de forma lógica (ej: v1.10.0 es mayor que v1.2.0)
 # - tail -n1: Se queda con la última (la más alta)
-LATEST_TAG=$(git tag -l "v*.*.*" | sort -V | tail -n1)
+LATEST_TAG=$(git tag -l | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -n1 || true)
 
 if [ -z "$LATEST_TAG" ]; then
     LATEST_TAG="v0.0.0"
