@@ -28,7 +28,7 @@ echo "New tag will be: $NEW_TAG"
 # Pregunta final para estar seguros
 read -p "Create and push tag $NEW_TAG ? (y/n): " -n 1 -r
 echo ""
-if [[ ! $REPLY =~ ^[Ss]$ ]]; then
+if [[ ! $REPLY =~ ^[Yy]$ ]]; then
     exit 1
 fi
 
