@@ -52,7 +52,7 @@ func (suite *testSuite) sendImagesToChatbot(names ...string) error {
 }
 
 func (suite *testSuite) currentProfessionalAssessmentSelectedBothImages() error {
-	return suite.prepareProfessionalAssessmentWithSelectedImages(suite.allRememberedMessageImageNames())
+	return suite.prepareProfessionalAssessmentWithSelectedImages(suite.lastAttemptedMessageImageNames)
 }
 
 func (suite *testSuite) currentProfessionalAssessmentSelectedImages(firstName, secondName string) error {
