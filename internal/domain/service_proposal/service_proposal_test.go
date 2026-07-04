@@ -57,3 +57,16 @@ func TestConversationMustBeAccepted(t *testing.T) {
 	assert.Error(t, err)
 	assert.Nil(t, serviceProposal)
 }
+
+func TestShouldCreateAsPending(t *testing.T) {
+	clock := new(MockClock)
+	clock.On("Now").Return(time.Now())
+
+	serviceProposal, err := serviceproposal.NewServiceProposal(
+		validProvider, validConsumer, validConversation, validServiceAmount,
+		validServiceScheduledOn, validServiceDescription, clock)
+
+	assert.NoError(t, err)
+	assert.NotNil(t, serviceProposal)
+	assert.Equal(t, serviceproposal.StatusPending, serviceProposal.Status)
+}

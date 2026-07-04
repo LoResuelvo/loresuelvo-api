@@ -9,12 +9,22 @@ import (
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/provider"
 )
 
+type Status string
+
+const (
+	StatusPending  Status = "pending"
+	StatusAccepted Status = "accepted"
+	StatusRejected Status = "rejected"
+)
+
 type ServiceProposal struct {
-	provider    *provider.Provider
-	consumer    *consumer.Consumer
-	amount      int64
-	scheduledOn time.Time
-	description string
+	Provider    *provider.Provider
+	Consumer    *consumer.Consumer
+	Converation conversation.Conversation
+	Amount      int64
+	ScheduledOn time.Time
+	Description string
+	Status      Status
 }
 
 func NewServiceProposal(provider *provider.Provider, consumer *consumer.Consumer, conversation conversation.Conversation, amount int64, scheduledOn time.Time, description string, clock clock.Clock) (*ServiceProposal, error) {
@@ -27,11 +37,12 @@ func NewServiceProposal(provider *provider.Provider, consumer *consumer.Consumer
 	}
 
 	return &ServiceProposal{
-		provider:    provider,
-		consumer:    consumer,
-		amount:      amount,
-		scheduledOn: scheduledOn,
-		description: description,
+		Provider:    provider,
+		Consumer:    consumer,
+		Amount:      amount,
+		ScheduledOn: scheduledOn,
+		Description: description,
+		Status:      StatusPending,
 	}, nil
 }
 
