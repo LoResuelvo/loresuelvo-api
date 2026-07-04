@@ -6,6 +6,7 @@ import (
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/consumer"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/conversation"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/provider"
+	serviceproposal "github.com/LoResuelvo/loresuelvo-api/internal/domain/service_proposal"
 	"github.com/stretchr/testify/mock"
 )
 
@@ -68,4 +69,18 @@ func (m *MockConversationRepository) FindBetween(providerID int, consumerID int)
 	}
 
 	return args.Get(0).(conversation.Conversation), args.Error(1)
+}
+
+type MockServiceProposalRepository struct {
+	mock.Mock
+}
+
+func (m *MockServiceProposalRepository) Save(serviceProposal *serviceproposal.ServiceProposal) (*serviceproposal.ServiceProposal, error) {
+	args := m.Called(serviceProposal)
+
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+
+	return args.Get(0).(*serviceproposal.ServiceProposal), args.Error(1)
 }

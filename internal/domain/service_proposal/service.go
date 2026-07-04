@@ -10,14 +10,16 @@ import (
 )
 
 type Service struct {
+	repository             ServiceProposalRepository
 	providerRepository     ProviderRepository
 	consumerRepository     ConsumerRepository
 	conversationRepository ConversationRepository
 	clock                  clock.Clock
 }
 
-func NewService(providerRepo ProviderRepository, consumerRepo ConsumerRepository, conversationRepo ConversationRepository, clock clock.Clock) *Service {
+func NewService(serviceRepo ServiceProposalRepository, providerRepo ProviderRepository, consumerRepo ConsumerRepository, conversationRepo ConversationRepository, clock clock.Clock) *Service {
 	return &Service{
+		repository:             serviceRepo,
 		providerRepository:     providerRepo,
 		consumerRepository:     consumerRepo,
 		conversationRepository: conversationRepo,
@@ -31,7 +33,12 @@ func (s *Service) CreateServiceProposal(auth0ID string, consumerID int, amount i
 		return nil, err
 	}
 
-	return NewServiceProposal(provider, consumer, conversation, amount, scheduledOn, description, s.clock)
+	serviceProposal, err := NewServiceProposal(provider, consumer, conversation, amount, scheduledOn, description, s.clock)
+	if err != nil {
+		return nil, err
+	}
+
+	return s.repository.Save(serviceProposal)
 }
 
 func (s *Service) getParticipants(providerAuth0ID string, consumerID int) (*provider.Provider, *consumer.Consumer, conversation.Conversation, error) {

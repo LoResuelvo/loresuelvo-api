@@ -30,16 +30,16 @@ func (h *ServiceProposalHandler) CreateServiceProposal(c *gin.Context) {
 		return
 	}
 
-	scheduelOnUTC := req.ScheduledOn.UTC()
-	amounsInCents, err := httphandler.ParseAmountToCents(req.Amount)
+	scheduledOnUTC := req.ScheduledOn.UTC()
+	amountInCents, err := httphandler.ParseAmountToCents(req.Amount)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	serviceproposal, err := h.serviceProposalService.CreateServiceProposal(auth0ID, req.ConsumerID, amounsInCents, scheduelOnUTC, req.Description)
+	serviceproposal, err := h.serviceProposalService.CreateServiceProposal(auth0ID, req.ConsumerID, amountInCents, scheduledOnUTC, req.Description)
 	if err != nil {
-		// handleServiceProposalError(c, err)
+		handleCreateServiceProposalError(c, err)
 		return
 	}
-	c.JSON(http.StatusCreated, serviceproposal)
+	c.JSON(http.StatusCreated, serviceProposalCreationResponseFromDomain(serviceproposal))
 }

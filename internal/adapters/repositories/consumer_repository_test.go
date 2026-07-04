@@ -100,3 +100,24 @@ func TestConsumerRepositoryCanFindIDByAuthID(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotZero(t, consumerID)
 }
+
+func TestConsumerRepositoryCanFindByID(t *testing.T) {
+	repo := newConsumerRepositoryTest(t)
+	consumerToSave := validConsumer()
+
+	err := repo.Save(consumerToSave)
+	require.NoError(t, err, "saving consumer should not return an error")
+	consumerID, err := repo.FindIDByEmail(consumerToSave.User.Email)
+	require.NoError(t, err)
+
+	foundConsumer, err := repo.FindByID(consumerID)
+
+	require.NoError(t, err)
+	assert.Equal(t, consumerID, foundConsumer.ID)
+	require.NotNil(t, foundConsumer.User)
+	assert.Equal(t, consumerToSave.User.AuthID, foundConsumer.User.AuthID)
+	assert.Equal(t, consumerToSave.User.Email, foundConsumer.User.Email)
+	assert.Equal(t, consumerToSave.User.Name, foundConsumer.User.Name)
+	assert.Equal(t, consumerToSave.User.Surname, foundConsumer.User.Surname)
+	assert.Equal(t, consumerToSave.User.Role, foundConsumer.User.Role)
+}

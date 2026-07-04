@@ -261,6 +261,28 @@ func TestProviderRepositoryCanFindIDByAuthID(t *testing.T) {
 	assert.NotZero(t, providerID)
 }
 
+func TestProviderRepositoryCanFindByAuthID(t *testing.T) {
+	testContext := newProviderRepositoryTest(t)
+	repo := testContext.providerRepository
+	providerToSave := validProvider(t, testContext)
+
+	providerID, err := repo.Save(*providerToSave)
+	require.NoError(t, err, "saving provider should not return an error")
+
+	foundProvider, err := repo.FindByAuthID(providerToSave.AuthID())
+
+	require.NoError(t, err)
+	assert.Equal(t, providerID, foundProvider.ID)
+	assert.Equal(t, providerToSave.AuthID(), foundProvider.AuthID())
+	assert.Equal(t, providerToSave.Email(), foundProvider.Email())
+	assert.Equal(t, providerToSave.Name(), foundProvider.Name())
+	assert.Equal(t, providerToSave.Surname(), foundProvider.Surname())
+	require.NotNil(t, foundProvider.Category)
+	assert.Equal(t, providerToSave.Category.ID, foundProvider.Category.ID)
+	assert.Equal(t, providerToSave.Category.Name, foundProvider.Category.Name)
+	assert.Equal(t, providerToSave.ProfilePhotoFileID, foundProvider.ProfilePhotoFileID)
+}
+
 func TestProviderRepositoryCanFindByID(t *testing.T) {
 	testContext := newProviderRepositoryTest(t)
 	providerToSave := validProvider(t, testContext)

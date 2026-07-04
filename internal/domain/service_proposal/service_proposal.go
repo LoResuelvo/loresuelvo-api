@@ -18,13 +18,13 @@ const (
 )
 
 type ServiceProposal struct {
-	Provider    *provider.Provider
-	Consumer    *consumer.Consumer
-	Converation conversation.Conversation
-	Amount      int64
-	ScheduledOn time.Time
-	Description string
-	Status      Status
+	Provider     *provider.Provider
+	Consumer     *consumer.Consumer
+	Conversation conversation.Conversation
+	Amount       int64
+	ScheduledOn  time.Time
+	Description  string
+	Status       Status
 }
 
 func NewServiceProposal(provider *provider.Provider, consumer *consumer.Consumer, conversation conversation.Conversation, amount int64, scheduledOn time.Time, description string, clock clock.Clock) (*ServiceProposal, error) {
@@ -37,12 +37,13 @@ func NewServiceProposal(provider *provider.Provider, consumer *consumer.Consumer
 	}
 
 	return &ServiceProposal{
-		Provider:    provider,
-		Consumer:    consumer,
-		Amount:      amount,
-		ScheduledOn: scheduledOn,
-		Description: description,
-		Status:      StatusPending,
+		Provider:     provider,
+		Consumer:     consumer,
+		Conversation: conversation,
+		Amount:       amount,
+		ScheduledOn:  scheduledOn,
+		Description:  description,
+		Status:       StatusPending,
 	}, nil
 }
 

@@ -8,12 +8,14 @@ import (
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/provider"
 	serviceproposal "github.com/LoResuelvo/loresuelvo-api/internal/domain/service_proposal"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 )
 
 func TestCreateServiceProposal(t *testing.T) {
 	providerRepo := new(MockProviderRepository)
 	consumerRepo := new(MockConsumerRepository)
 	conversationRepo := new(MockConversationRepository)
+	serviceRepo := new(MockServiceProposalRepository)
 	clock := new(MockClock)
 
 	providerRepo.
@@ -28,11 +30,15 @@ func TestCreateServiceProposal(t *testing.T) {
 		On("FindBetween", validProviderID, validConsumerID).
 		Return(validConversation, nil)
 
+	serviceRepo.
+		On("Save", mock.AnythingOfType("*serviceproposal.ServiceProposal")).
+		Return(&serviceproposal.ServiceProposal{}, nil)
+
 	clock.
 		On("Now").
 		Return(time.Now())
 
-	service := serviceproposal.NewService(providerRepo, consumerRepo, conversationRepo, clock)
+	service := serviceproposal.NewService(serviceRepo, providerRepo, consumerRepo, conversationRepo, clock)
 
 	serviceProposal, err := service.CreateServiceProposal(
 		validProviderAuth0ID, validConsumerID, validServiceAmount,
@@ -46,6 +52,7 @@ func TestCreateServiceProposalWithNoConversation(t *testing.T) {
 	providerRepo := new(MockProviderRepository)
 	consumerRepo := new(MockConsumerRepository)
 	conversationRepo := new(MockConversationRepository)
+	serviceRepo := new(MockServiceProposalRepository)
 	clock := new(MockClock)
 
 	providerRepo.
@@ -60,7 +67,11 @@ func TestCreateServiceProposalWithNoConversation(t *testing.T) {
 		On("FindBetween", validProviderID, validConsumerID).
 		Return(nil, serviceproposal.ErrConversationRequired)
 
-	service := serviceproposal.NewService(providerRepo, consumerRepo, conversationRepo, clock)
+	serviceRepo.
+		On("Save", mock.AnythingOfType("*serviceproposal.ServiceProposal")).
+		Return(&serviceproposal.ServiceProposal{}, nil)
+
+	service := serviceproposal.NewService(serviceRepo, providerRepo, consumerRepo, conversationRepo, clock)
 
 	serviceProposal, err := service.CreateServiceProposal(
 		validProviderAuth0ID, validConsumerID, validServiceAmount,
@@ -68,4 +79,41 @@ func TestCreateServiceProposalWithNoConversation(t *testing.T) {
 
 	assert.Error(t, err)
 	assert.Nil(t, serviceProposal)
+}
+
+func TestCreateProposalShouldPersist(t *testing.T) {
+	providerRepo := new(MockProviderRepository)
+	consumerRepo := new(MockConsumerRepository)
+	conversationRepo := new(MockConversationRepository)
+	serviceRepo := new(MockServiceProposalRepository)
+	clock := new(MockClock)
+
+	providerRepo.
+		On("FindByAuthID", validProviderAuth0ID).
+		Return(&provider.Provider{ID: validProviderID}, nil)
+
+	consumerRepo.
+		On("FindByID", validConsumerID).
+		Return(&consumer.Consumer{ID: validConsumerID}, nil)
+
+	conversationRepo.
+		On("FindBetween", validProviderID, validConsumerID).
+		Return(validConversation, nil)
+
+	serviceRepo.
+		On("Save", mock.AnythingOfType("*serviceproposal.ServiceProposal")).
+		Return(&serviceproposal.ServiceProposal{}, nil).
+		Once()
+
+	clock.
+		On("Now").
+		Return(time.Now())
+
+	service := serviceproposal.NewService(serviceRepo, providerRepo, consumerRepo, conversationRepo, clock)
+
+	_, _ = service.CreateServiceProposal(
+		validProviderAuth0ID, validConsumerID, validServiceAmount,
+		validServiceScheduledOn, validServiceDescription)
+
+	serviceRepo.AssertExpectations(t)
 }

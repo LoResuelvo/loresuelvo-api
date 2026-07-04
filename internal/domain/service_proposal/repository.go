@@ -11,6 +11,7 @@ type ConversationRepository interface {
 }
 
 type ServiceProposalRepository interface {
+	Save(serviceProposal *ServiceProposal) (*ServiceProposal, error)
 }
 
 type ProviderRepository interface {

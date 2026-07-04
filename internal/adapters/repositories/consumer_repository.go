@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/consumer"
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/user"
 )
 
 type ConsumerRepository struct {
@@ -99,7 +100,33 @@ func (repository *ConsumerRepository) FindIDByEmail(email string) (int, error) {
 }
 
 func (repository *ConsumerRepository) FindByID(consumerID int) (*consumer.Consumer, error) {
-	return nil, nil
+	var foundConsumer consumer.Consumer
+	var consumerUser user.User
+	err := repository.db.QueryRow(
+		`SELECT consumers.id,
+			users.auth_id,
+			users.email,
+			users.name,
+			users.surname,
+			users.role
+		FROM consumers
+		INNER JOIN users ON users.id = consumers.user_id
+		WHERE consumers.id = $1`,
+		consumerID,
+	).Scan(
+		&foundConsumer.ID,
+		&consumerUser.AuthID,
+		&consumerUser.Email,
+		&consumerUser.Name,
+		&consumerUser.Surname,
+		&consumerUser.Role,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("finding consumer by id: %w", err)
+	}
+
+	foundConsumer.User = &consumerUser
+	return &foundConsumer, nil
 }
 
 func (repository *ConsumerRepository) DeleteAll() error {

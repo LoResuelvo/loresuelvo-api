@@ -91,6 +91,7 @@ func NewDependenciesWithChatbot(database *sql.DB, chatbot conversation.Chatbot) 
 	jobRequestRepository := repositories.NewJobRequestRepository(database)
 	conversationReader := repositories.NewConversationReader(database, messageImageRepository)
 	fileRepository := repositories.NewFileRepository(database)
+	serviceProposalRepository := repositories.NewServiceProposalRepository(database)
 
 	storageConfig := storage.NewConfigFromEnv()
 	fileStorage := storage.NewStorageFromConfig(storageConfig)
@@ -128,7 +129,9 @@ func NewDependenciesWithChatbot(database *sql.DB, chatbot conversation.Chatbot) 
 		fileService,
 	)
 	userService := user.NewService(userRepository)
-	servicePorposalService := serviceproposal.NewService(providerRepository, consumerRepository, conversationRepository, clockadapter)
+	servicePorposalService := serviceproposal.NewService(
+		serviceProposalRepository, providerRepository, consumerRepository,
+		conversationRepository, clockadapter)
 	_ = cancel // TODO: wire shutdown signal to cancel context
 
 	return &Dependencies{

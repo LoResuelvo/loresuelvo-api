@@ -88,7 +88,16 @@ func (repository *ProviderRepository) FindByID(ctx context.Context, providerID i
 }
 
 func (repository *ProviderRepository) FindByAuthID(authID string) (*provider.Provider, error) {
-	return nil, nil
+	row := repository.db.QueryRow(providerSelectSQL+` WHERE users.auth_id = $1`, authID)
+	foundProvider, err := scanProvider(row)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, provider.ErrDoesNotExist
+	}
+	if err != nil {
+		return nil, fmt.Errorf("finding provider by auth id: %w", err)
+	}
+
+	return foundProvider, nil
 }
 
 func (repository *ProviderRepository) FindIDByAuthID(authID string) (int, error) {
