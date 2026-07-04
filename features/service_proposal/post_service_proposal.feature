@@ -1,3 +1,4 @@
+@wip
 Feature: Crear propuesta de servicio
     Como prestador
     quiero crear una propuesta de servicio
