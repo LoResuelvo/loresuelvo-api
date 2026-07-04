@@ -6,12 +6,14 @@ import (
 
 	chatbotadapter "github.com/LoResuelvo/loresuelvo-api/internal/adapters/chatbot"
 	clockadapter "github.com/LoResuelvo/loresuelvo-api/internal/adapters/clock"
+	httpadapter "github.com/LoResuelvo/loresuelvo-api/internal/adapters/http"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/category_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/consumer_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/conversation_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/file_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/job_request_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/provider_handler"
+	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/service_proposal_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/test_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/user_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/realtime"
@@ -24,6 +26,7 @@ import (
 	jobrequest "github.com/LoResuelvo/loresuelvo-api/internal/domain/job_request"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/provider"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/user"
+	"github.com/auth0/go-jwt-middleware/v3/validator"
 )
 
 type Dependencies struct {
@@ -38,20 +41,37 @@ type Dependencies struct {
 	ConversationReader     *repositories.ConversationReader
 	FileRepository         *repositories.FileRepository
 
-	CategoryHandler     *category_handler.CategoryHandler
-	ConsumerHandler     *consumer_handler.ConsumerHandler
-	ProviderHandler     *provider_handler.ProviderHandler
-	ConversationHandler *conversation_handler.ConversationHandler
-	JobRequestHandler   *job_request_handler.JobRequestHandler
-	UserHandler         *user_handler.UserHandler
-	FileHandler         *file_handler.FileHandler
-	TestHandler         *test_handler.TestHandler
+	CategoryHandler        *category_handler.CategoryHandler
+	ConsumerHandler        *consumer_handler.ConsumerHandler
+	ProviderHandler        *provider_handler.ProviderHandler
+	ConversationHandler    *conversation_handler.ConversationHandler
+	JobRequestHandler      *job_request_handler.JobRequestHandler
+	UserHandler            *user_handler.UserHandler
+	FileHandler            *file_handler.FileHandler
+	ServiceProposalHandler *service_proposal_handler.ServiceProposalHandler
+	TestHandler            *test_handler.TestHandler
 
 	Hub              *realtime.Hub
 	RealtimeHandler  *realtime.Handler
 	MessagePublisher conversation.MessagePublisher
 
 	Clock *clockadapter.SystemClock
+}
+
+func (dependencies *Dependencies) RouterConfig(auth0Validator *validator.Validator) httpadapter.RouterConfig {
+	return httpadapter.RouterConfig{
+		CategoryHandler:        dependencies.CategoryHandler,
+		ConsumerHandler:        dependencies.ConsumerHandler,
+		ProviderHandler:        dependencies.ProviderHandler,
+		ConversationHandler:    dependencies.ConversationHandler,
+		JobRequestHandler:      dependencies.JobRequestHandler,
+		UserHandler:            dependencies.UserHandler,
+		FileHandler:            dependencies.FileHandler,
+		ServiceProposalHandler: dependencies.ServiceProposalHandler,
+		TestHandler:            dependencies.TestHandler,
+		RealtimeHandler:        dependencies.RealtimeHandler,
+		Auth0Validator:         auth0Validator,
+	}
 }
 
 func NewDependencies(database *sql.DB) *Dependencies {
@@ -130,6 +150,7 @@ func NewDependenciesWithChatbot(database *sql.DB, chatbot conversation.Chatbot) 
 		JobRequestHandler:      job_request_handler.NewJobRequestHandler(jobRequestService),
 		UserHandler:            user_handler.NewUserHandler(userService),
 		FileHandler:            file_handler.NewFileHandler(fileService),
+		ServiceProposalHandler: service_proposal_handler.NewServiceProposalHandler(),
 		TestHandler:            testHandler,
 		Hub:                    hub,
 		RealtimeHandler:        realtimeHandler,

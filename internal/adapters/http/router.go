@@ -10,6 +10,7 @@ import (
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/file_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/job_request_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/provider_handler"
+	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/service_proposal_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/test_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/user_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/middleware"
@@ -18,31 +19,47 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-type Router struct {
-	categoryHandler     *category_handler.CategoryHandler
-	consumerHandler     *consumer_handler.ConsumerHandler
-	providerHandler     *provider_handler.ProviderHandler
-	conversationHandler *conversation_handler.ConversationHandler
-	jobRequestHandler   *job_request_handler.JobRequestHandler
-	userHandler         *user_handler.UserHandler
-	fileHandler         *file_handler.FileHandler
-	testHandler         *test_handler.TestHandler
-	realtimeHandler     *realtime.Handler
-	auth0Validator      *validator.Validator
+type RouterConfig struct {
+	CategoryHandler        *category_handler.CategoryHandler
+	ConsumerHandler        *consumer_handler.ConsumerHandler
+	ProviderHandler        *provider_handler.ProviderHandler
+	ConversationHandler    *conversation_handler.ConversationHandler
+	JobRequestHandler      *job_request_handler.JobRequestHandler
+	UserHandler            *user_handler.UserHandler
+	FileHandler            *file_handler.FileHandler
+	ServiceProposalHandler *service_proposal_handler.ServiceProposalHandler
+	TestHandler            *test_handler.TestHandler
+	RealtimeHandler        *realtime.Handler
+	Auth0Validator         *validator.Validator
 }
 
-func NewRouter(categoryHandler *category_handler.CategoryHandler, consumerHandler *consumer_handler.ConsumerHandler, providerHandler *provider_handler.ProviderHandler, conversationHandler *conversation_handler.ConversationHandler, jobRequestHandler *job_request_handler.JobRequestHandler, userHandler *user_handler.UserHandler, fileHandler *file_handler.FileHandler, testHandler *test_handler.TestHandler, realtimeHandler *realtime.Handler, auth0Validator *validator.Validator) *Router {
+type Router struct {
+	categoryHandler        *category_handler.CategoryHandler
+	consumerHandler        *consumer_handler.ConsumerHandler
+	providerHandler        *provider_handler.ProviderHandler
+	conversationHandler    *conversation_handler.ConversationHandler
+	jobRequestHandler      *job_request_handler.JobRequestHandler
+	userHandler            *user_handler.UserHandler
+	fileHandler            *file_handler.FileHandler
+	serviceProposalHandler *service_proposal_handler.ServiceProposalHandler
+	testHandler            *test_handler.TestHandler
+	realtimeHandler        *realtime.Handler
+	auth0Validator         *validator.Validator
+}
+
+func NewRouter(config RouterConfig) *Router {
 	router := &Router{
-		categoryHandler:     categoryHandler,
-		consumerHandler:     consumerHandler,
-		providerHandler:     providerHandler,
-		conversationHandler: conversationHandler,
-		jobRequestHandler:   jobRequestHandler,
-		userHandler:         userHandler,
-		fileHandler:         fileHandler,
-		testHandler:         testHandler,
-		realtimeHandler:     realtimeHandler,
-		auth0Validator:      auth0Validator,
+		categoryHandler:        config.CategoryHandler,
+		consumerHandler:        config.ConsumerHandler,
+		providerHandler:        config.ProviderHandler,
+		conversationHandler:    config.ConversationHandler,
+		jobRequestHandler:      config.JobRequestHandler,
+		userHandler:            config.UserHandler,
+		fileHandler:            config.FileHandler,
+		serviceProposalHandler: config.ServiceProposalHandler,
+		testHandler:            config.TestHandler,
+		realtimeHandler:        config.RealtimeHandler,
+		auth0Validator:         config.Auth0Validator,
 	}
 
 	return router
@@ -69,6 +86,7 @@ func (router *Router) SetUp() (*gin.Engine, error) {
 	router.registerJobRequestRoutes(engine, authMiddleware)
 	router.registerConversationRoutes(engine, authMiddleware)
 	router.registerChatbotRoutes(engine, authMiddleware)
+	router.registerServiceProposalRoutes(engine, authMiddleware)
 	router.registerAuthenticatedRoutes(engine, authMiddleware)
 	router.registerFileRoutes(engine, authMiddleware)
 	router.registerRealtimeRoutes(engine, authMiddleware)
@@ -114,6 +132,10 @@ func (router *Router) registerChatbotRoutes(engine *gin.Engine, authMiddleware g
 	engine.POST("/chatbot/conversations", authMiddleware, router.conversationHandler.CreateChatbotConversation)
 	engine.POST("/chatbot/conversations/:conversationID/messages", authMiddleware, router.conversationHandler.ContinueChatbotConversation)
 	engine.POST("/chatbot/conversations/:conversationID/job-requests", authMiddleware, router.jobRequestHandler.CreateFromChatbotAssessment)
+}
+
+func (router *Router) registerServiceProposalRoutes(engine *gin.Engine, authMiddleware gin.HandlerFunc) {
+	engine.POST("/service-proposals", authMiddleware, router.serviceProposalHandler.CreateServiceProposal)
 }
 
 func (router *Router) registerAuthenticatedRoutes(engine *gin.Engine, authMiddleware gin.HandlerFunc) {
