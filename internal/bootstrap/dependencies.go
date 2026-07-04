@@ -12,6 +12,7 @@ import (
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/file_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/job_request_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/provider_handler"
+	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/test_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/user_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/realtime"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/repositories"
@@ -44,10 +45,13 @@ type Dependencies struct {
 	JobRequestHandler   *job_request_handler.JobRequestHandler
 	UserHandler         *user_handler.UserHandler
 	FileHandler         *file_handler.FileHandler
+	TestHandler         *test_handler.TestHandler
 
 	Hub              *realtime.Hub
 	RealtimeHandler  *realtime.Handler
 	MessagePublisher conversation.MessagePublisher
+
+	Clock *clockadapter.SystemClock
 }
 
 func NewDependencies(database *sql.DB) *Dependencies {
@@ -55,6 +59,7 @@ func NewDependencies(database *sql.DB) *Dependencies {
 }
 
 func NewDependenciesWithChatbot(database *sql.DB, chatbot conversation.Chatbot) *Dependencies {
+	clockadapter := clockadapter.NewSystemClock()
 	userRepository := repositories.NewUserRepository(database)
 	categoryRepository := repositories.NewCategoryRepository(database)
 	consumerRepository := repositories.NewConsumerRepository(database, userRepository)
@@ -68,7 +73,7 @@ func NewDependenciesWithChatbot(database *sql.DB, chatbot conversation.Chatbot) 
 
 	storageConfig := storage.NewConfigFromEnv()
 	fileStorage := storage.NewStorageFromConfig(storageConfig)
-	fileService := filedomain.NewService(fileRepository, fileStorage, storageConfig.PublicBucket, storageConfig.PrivateBucket, clockadapter.SystemClock{})
+	fileService := filedomain.NewService(fileRepository, fileStorage, storageConfig.PublicBucket, storageConfig.PrivateBucket, clockadapter)
 
 	// Realtime infrastructure
 	hub := realtime.NewHub()
@@ -92,7 +97,7 @@ func NewDependenciesWithChatbot(database *sql.DB, chatbot conversation.Chatbot) 
 		chatbot,
 		categoryRepository,
 		fileService,
-		clockadapter.SystemClock{},
+		clockadapter,
 	)
 	jobRequestService := jobrequest.NewService(
 		jobRequestRepository,
@@ -102,6 +107,8 @@ func NewDependenciesWithChatbot(database *sql.DB, chatbot conversation.Chatbot) 
 		fileService,
 	)
 	userService := user.NewService(userRepository)
+
+	testHandler := test_handler.NewTestHandler(clockadapter)
 
 	_ = cancel // TODO: wire shutdown signal to cancel context
 
@@ -123,8 +130,10 @@ func NewDependenciesWithChatbot(database *sql.DB, chatbot conversation.Chatbot) 
 		JobRequestHandler:      job_request_handler.NewJobRequestHandler(jobRequestService),
 		UserHandler:            user_handler.NewUserHandler(userService),
 		FileHandler:            file_handler.NewFileHandler(fileService),
+		TestHandler:            testHandler,
 		Hub:                    hub,
 		RealtimeHandler:        realtimeHandler,
 		MessagePublisher:       messagePublisher,
+		Clock:                  clockadapter,
 	}
 }

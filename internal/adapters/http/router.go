@@ -10,6 +10,7 @@ import (
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/file_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/job_request_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/provider_handler"
+	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/test_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/user_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/middleware"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/realtime"
@@ -25,11 +26,12 @@ type Router struct {
 	jobRequestHandler   *job_request_handler.JobRequestHandler
 	userHandler         *user_handler.UserHandler
 	fileHandler         *file_handler.FileHandler
+	testHandler         *test_handler.TestHandler
 	realtimeHandler     *realtime.Handler
 	auth0Validator      *validator.Validator
 }
 
-func NewRouter(categoryHandler *category_handler.CategoryHandler, consumerHandler *consumer_handler.ConsumerHandler, providerHandler *provider_handler.ProviderHandler, conversationHandler *conversation_handler.ConversationHandler, jobRequestHandler *job_request_handler.JobRequestHandler, userHandler *user_handler.UserHandler, fileHandler *file_handler.FileHandler, realtimeHandler *realtime.Handler, auth0Validator *validator.Validator) *Router {
+func NewRouter(categoryHandler *category_handler.CategoryHandler, consumerHandler *consumer_handler.ConsumerHandler, providerHandler *provider_handler.ProviderHandler, conversationHandler *conversation_handler.ConversationHandler, jobRequestHandler *job_request_handler.JobRequestHandler, userHandler *user_handler.UserHandler, fileHandler *file_handler.FileHandler, testHandler *test_handler.TestHandler, realtimeHandler *realtime.Handler, auth0Validator *validator.Validator) *Router {
 	router := &Router{
 		categoryHandler:     categoryHandler,
 		consumerHandler:     consumerHandler,
@@ -38,6 +40,7 @@ func NewRouter(categoryHandler *category_handler.CategoryHandler, consumerHandle
 		jobRequestHandler:   jobRequestHandler,
 		userHandler:         userHandler,
 		fileHandler:         fileHandler,
+		testHandler:         testHandler,
 		realtimeHandler:     realtimeHandler,
 		auth0Validator:      auth0Validator,
 	}
@@ -69,6 +72,7 @@ func (router *Router) SetUp() (*gin.Engine, error) {
 	router.registerAuthenticatedRoutes(engine, authMiddleware)
 	router.registerFileRoutes(engine, authMiddleware)
 	router.registerRealtimeRoutes(engine, authMiddleware)
+	router.registerTestRoutes(engine)
 
 	return engine, nil
 }
@@ -124,4 +128,9 @@ func (router *Router) registerFileRoutes(engine *gin.Engine, authMiddleware gin.
 func (router *Router) registerRealtimeRoutes(engine *gin.Engine, authMiddleware gin.HandlerFunc) {
 	engine.POST("/ws-tickets", authMiddleware, router.realtimeHandler.IssueTicket)
 	engine.GET("/ws", router.realtimeHandler.Handle)
+}
+
+func (router *Router) registerTestRoutes(engine *gin.Engine) {
+	engine.POST("/test/clock", router.testHandler.SetTime)
+	engine.POST("/test/clear", router.testHandler.ClearTestData)
 }

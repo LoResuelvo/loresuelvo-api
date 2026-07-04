@@ -182,7 +182,7 @@ func TestUploadPolicyRejectsUnsupportedMetadata(t *testing.T) {
 }
 
 func TestSystemClockReturnsUTCTime(t *testing.T) {
-	now := clockadapter.SystemClock{}.Now()
+	now := clockadapter.NewSystemClock().Now()
 
 	assert.Equal(t, time.UTC, now.Location())
 	assert.False(t, now.IsZero())

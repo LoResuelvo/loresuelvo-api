@@ -9,6 +9,7 @@ import (
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/auth0"
 	chatbotadapter "github.com/LoResuelvo/loresuelvo-api/internal/adapters/chatbot"
+	clockadapter "github.com/LoResuelvo/loresuelvo-api/internal/adapters/clock"
 	httpadapter "github.com/LoResuelvo/loresuelvo-api/internal/adapters/http"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/repositories"
 	"github.com/LoResuelvo/loresuelvo-api/internal/bootstrap"
@@ -21,19 +22,21 @@ import (
 )
 
 type testSuite struct {
-	server                                  *httptest.Server
-	database                                *sql.DB
-	categoryRepository                      *repositories.CategoryRepository
-	consumerRepository                      *repositories.ConsumerRepository
-	providerRepository                      *repositories.ProviderRepository
-	conversationRepository                  *repositories.ConversationRepository
-	messageRepository                       *repositories.MessageRepository
-	jobRequestRepository                    *repositories.JobRequestRepository
-	userRepository                          *repositories.UserRepository
-	fileRepository                          *repositories.FileRepository
-	auth0Validator                          *validator.Validator
-	tokenBuilder                            *auth0.TokenBuilder
-	chatbot                                 *chatbotadapter.FakeChatbot
+	server                 *httptest.Server
+	database               *sql.DB
+	categoryRepository     *repositories.CategoryRepository
+	consumerRepository     *repositories.ConsumerRepository
+	providerRepository     *repositories.ProviderRepository
+	conversationRepository *repositories.ConversationRepository
+	messageRepository      *repositories.MessageRepository
+	jobRequestRepository   *repositories.JobRequestRepository
+	userRepository         *repositories.UserRepository
+	fileRepository         *repositories.FileRepository
+	auth0Validator         *validator.Validator
+	tokenBuilder           *auth0.TokenBuilder
+	chatbot                *chatbotadapter.FakeChatbot
+	clock                  *clockadapter.SystemClock
+
 	lastStatus                              int
 	lastBody                                []byte
 	currentAuth0ID                          string
@@ -102,7 +105,7 @@ func (s *testSuite) registerAllSteps(sc *godog.ScenarioContext) {
 	registerAIJobRequestImageSteps(sc, s)
 }
 
-func (s *testSuite) cleanDatabase() error {
+func (s *testSuite) cleanup() error {
 	s.closeRealtimeConnections()
 
 	if err := s.jobRequestRepository.DeleteAll(); err != nil {
@@ -128,6 +131,8 @@ func (s *testSuite) cleanDatabase() error {
 	if err := s.categoryRepository.DeleteAll(); err != nil {
 		return fmt.Errorf("could not clean categories: %w", err)
 	}
+
+	s.clock.Reset()
 
 	s.categoryIDsByName = map[string]int{}
 	s.participantRolesByFullName = map[string]string{}
@@ -159,7 +164,6 @@ func (s *testSuite) cleanDatabase() error {
 	s.previousAssessmentImages = nil
 	s.consumerMessageCountBeforeAttempt = 0
 	s.chatbotMessageCountBeforeAttempt = 0
-
 	return nil
 }
 
@@ -177,7 +181,7 @@ func newTestSuite(tb testing.TB, database *sql.DB) *testSuite {
 	auth0Validator := auth0.NewFakeValidator()
 	tokenBuilder := auth0.NewTokenBuilder()
 
-	router := httpadapter.NewRouter(dependencies.CategoryHandler, dependencies.ConsumerHandler, dependencies.ProviderHandler, dependencies.ConversationHandler, dependencies.JobRequestHandler, dependencies.UserHandler, dependencies.FileHandler, dependencies.RealtimeHandler, auth0Validator)
+	router := httpadapter.NewRouter(dependencies.CategoryHandler, dependencies.ConsumerHandler, dependencies.ProviderHandler, dependencies.ConversationHandler, dependencies.JobRequestHandler, dependencies.UserHandler, dependencies.FileHandler, dependencies.TestHandler, dependencies.RealtimeHandler, auth0Validator)
 	engine, err := router.SetUp()
 	require.NoError(tb, err, "could not initialize router")
 
@@ -201,6 +205,7 @@ func newTestSuite(tb testing.TB, database *sql.DB) *testSuite {
 		auth0Validator:         auth0Validator,
 		tokenBuilder:           tokenBuilder,
 		chatbot:                chatbot,
+		clock:                  dependencies.Clock,
 
 		categoryIDsByName:                  map[string]int{},
 		participantRolesByFullName:         map[string]string{},
@@ -216,8 +221,8 @@ func ScenarioInitializer(sc *godog.ScenarioContext, t *testing.T, database *sql.
 	testSuite := newTestSuite(t, database)
 	testSuite.registerAllSteps(sc)
 	sc.Before(func(ctx context.Context, sc *godog.Scenario) (context.Context, error) {
-		if err := testSuite.cleanDatabase(); err != nil {
-			return ctx, fmt.Errorf("could not clean test database: %w", err)
+		if err := testSuite.cleanup(); err != nil {
+			return ctx, fmt.Errorf("could not clean test status: %w", err)
 		}
 		return ctx, nil
 	})
