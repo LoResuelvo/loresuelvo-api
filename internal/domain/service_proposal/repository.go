@@ -7,7 +7,7 @@ import (
 )
 
 type ConversationRepository interface {
-	FindBetween(providerID int, consumerID int) (conversation.Conversation, error)
+	FindBetween(consumerID int, providerID int) (conversation.Conversation, error)
 }
 
 type ServiceProposalRepository interface {

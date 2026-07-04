@@ -18,6 +18,7 @@ const (
 )
 
 type ServiceProposal struct {
+	ID           int
 	Provider     *provider.Provider
 	Consumer     *consumer.Consumer
 	Conversation conversation.Conversation

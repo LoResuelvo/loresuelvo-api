@@ -4,6 +4,7 @@ import serviceproposal "github.com/LoResuelvo/loresuelvo-api/internal/domain/ser
 
 func serviceProposalCreationResponseFromDomain(proposal *serviceproposal.ServiceProposal) serviceProposalCreationResponse {
 	response := serviceProposalCreationResponse{
+		ID:          proposal.ID,
 		AmountCents: proposal.Amount,
 		ScheduledOn: proposal.ScheduledOn,
 		Description: proposal.Description,

@@ -27,7 +27,7 @@ func TestCreateServiceProposal(t *testing.T) {
 		Return(&consumer.Consumer{ID: validConsumerID}, nil)
 
 	conversationRepo.
-		On("FindBetween", validProviderID, validConsumerID).
+		On("FindBetween", validConsumerID, validProviderID).
 		Return(validConversation, nil)
 
 	serviceRepo.
@@ -64,7 +64,7 @@ func TestCreateServiceProposalWithNoConversation(t *testing.T) {
 		Return(nil, serviceproposal.ErrConsumerRequired)
 
 	conversationRepo.
-		On("FindBetween", validProviderID, validConsumerID).
+		On("FindBetween", validConsumerID, validProviderID).
 		Return(nil, serviceproposal.ErrConversationRequired)
 
 	serviceRepo.
@@ -97,7 +97,7 @@ func TestCreateProposalShouldPersist(t *testing.T) {
 		Return(&consumer.Consumer{ID: validConsumerID}, nil)
 
 	conversationRepo.
-		On("FindBetween", validProviderID, validConsumerID).
+		On("FindBetween", validConsumerID, validProviderID).
 		Return(validConversation, nil)
 
 	serviceRepo.

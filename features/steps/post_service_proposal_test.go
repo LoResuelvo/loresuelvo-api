@@ -2,6 +2,7 @@ package steps_test
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -9,6 +10,9 @@ import (
 	"strings"
 	"time"
 
+	httphandler "github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler"
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/conversation"
+	serviceproposal "github.com/LoResuelvo/loresuelvo-api/internal/domain/service_proposal"
 	"github.com/cucumber/godog"
 )
 
@@ -24,8 +28,7 @@ type serviceProposalCreationResponse struct {
 	ConversationID int       `json:"conversation_id"`
 	ConsumerID     int       `json:"consumer_id"`
 	ProviderID     int       `json:"provider_id"`
-	Amount         string    `json:"amount"`
-	AmountCents    int       `json:"amount_cents"`
+	AmountCents    int64     `json:"amount_cents"`
 	ScheduledOn    time.Time `json:"scheduled_on"`
 	Description    string    `json:"description"`
 	Status         string    `json:"status"`
@@ -95,23 +98,45 @@ func (suite *testSuite) systemRegistersServiceProposal() error {
 	if response.ID == 0 {
 		return fmt.Errorf("expected created service proposal id, got body %s", string(suite.lastBody))
 	}
-	if response.ConversationID == 0 {
-		return fmt.Errorf("expected service proposal conversation_id, got body %s", string(suite.lastBody))
+
+	expectedConversation, err := suite.conversationRepository.FindByID(context.Background(), suite.lastConversationID)
+	if err != nil {
+		return fmt.Errorf("could not find expected service proposal conversation: %w", err)
 	}
-	if response.ConsumerID == 0 {
-		return fmt.Errorf("expected service proposal consumer_id, got body %s", string(suite.lastBody))
+	expectedWorkConversation, ok := expectedConversation.(*conversation.WorkConversation)
+	if !ok {
+		return fmt.Errorf("expected work conversation fixture, got %T", expectedConversation)
 	}
-	if response.ProviderID == 0 {
-		return fmt.Errorf("expected service proposal provider_id, got body %s", string(suite.lastBody))
+	if response.ConversationID != suite.lastConversationID {
+		return fmt.Errorf("expected service proposal conversation_id %d, got %d", suite.lastConversationID, response.ConversationID)
 	}
-	if strings.TrimSpace(response.Amount) == "" && response.AmountCents == 0 {
-		return fmt.Errorf("expected service proposal amount or amount_cents, got body %s", string(suite.lastBody))
+	if response.ConsumerID != expectedWorkConversation.ConsumerID {
+		return fmt.Errorf("expected service proposal consumer_id %d, got %d", expectedWorkConversation.ConsumerID, response.ConsumerID)
 	}
-	if response.ScheduledOn.IsZero() {
-		return fmt.Errorf("expected service proposal scheduled_on, got body %s", string(suite.lastBody))
+	if response.ProviderID != expectedWorkConversation.ProviderID {
+		return fmt.Errorf("expected service proposal provider_id %d, got %d", expectedWorkConversation.ProviderID, response.ProviderID)
 	}
-	if strings.TrimSpace(response.Description) == "" {
-		return fmt.Errorf("expected service proposal description, got body %s", string(suite.lastBody))
+
+	expectedAmountCents, err := httphandler.ParseAmountToCents(suite.lastServiceProposalRequest.Amount)
+	if err != nil {
+		return fmt.Errorf("could not parse expected service proposal amount: %w", err)
+	}
+	if response.AmountCents != expectedAmountCents {
+		return fmt.Errorf("expected service proposal amount_cents %d, got %d", expectedAmountCents, response.AmountCents)
+	}
+
+	expectedScheduledOn, err := time.Parse(time.RFC3339, suite.lastServiceProposalRequest.ScheduledOn)
+	if err != nil {
+		return fmt.Errorf("could not parse expected service proposal scheduled_on: %w", err)
+	}
+	if !response.ScheduledOn.Equal(expectedScheduledOn.UTC()) {
+		return fmt.Errorf("expected service proposal scheduled_on %s, got %s", expectedScheduledOn.UTC().Format(time.RFC3339), response.ScheduledOn.Format(time.RFC3339))
+	}
+	if response.Description != suite.lastServiceProposalRequest.Description {
+		return fmt.Errorf("expected service proposal description %q, got %q", suite.lastServiceProposalRequest.Description, response.Description)
+	}
+	if response.Status != string(serviceproposal.StatusPending) {
+		return fmt.Errorf("expected service proposal status %q, got %q", serviceproposal.StatusPending, response.Status)
 	}
 
 	return nil
@@ -191,6 +216,10 @@ func (suite *testSuite) requestServiceProposalToConsumer(consumerEmail string, p
 }
 
 func (suite *testSuite) requestServiceProposal(payload any) error {
+	if request, ok := payload.(serviceProposalCreationRequest); ok {
+		suite.lastServiceProposalRequest = request
+	}
+
 	body, err := json.Marshal(payload)
 	if err != nil {
 		return err

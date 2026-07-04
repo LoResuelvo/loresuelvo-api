@@ -10,7 +10,6 @@ Feature: Crear propuesta de servicio
         And que existe un consumidor registrado con correo "carla@example.com", nombre "Carla" y apellido "Gómez"
         And existe un prestador registrado con correo "juan.plomero@example.com", nombre "Juan", apellido "Gómez" y rubro "Plomería"
     
-    @wip
     Scenario: 53.1-PSP El prestador crear una propuesta de servicio exitosa
         Given que existe un chat activo entre el consumidor "ana@example.com" y el prestador "juan.plomero@example.com" con el mensaje inicial:
             """
@@ -41,7 +40,6 @@ Feature: Crear propuesta de servicio
 
     Rule: El monto de la propuesta debe ser mayor a cero
 
-    @wip
     Scenario: 53.3-PSP El prestador crear una propuesta de servicio con monto inválido
         Given que existe un chat activo entre el consumidor "ana@example.com" y el prestador "juan.plomero@example.com" con el mensaje inicial:
             """
@@ -54,7 +52,6 @@ Feature: Crear propuesta de servicio
             """
         Then el sistema rechaza la propuesta de servicio porque el monto es inválido
     
-    @wip
     Scenario: 53.4-PSP El prestador crear una propuesta de servicio a un consumidor de otro chat
         Given existe un prestador registrado con correo "pedro.plomero@example.com", nombre "Pedro", apellido "Dib" y rubro "Plomería"
         And que existe un chat activo entre el consumidor "carla@example.com" y el prestador "pedro.plomero@example.com" con el mensaje inicial:
@@ -68,7 +65,6 @@ Feature: Crear propuesta de servicio
             """
         Then el sistema rechaza la propuesta de servicio porque no existe un chat activo con ese consumidor
 
-    @wip
     Scenario: 53.5-PSP El prestador crear una propuesta de servicio a un consumidor con el que no tiene conversación
         Given que estoy autenticado como prestador "juan.plomero@example.com"
         When intento enviar una propuesta de servicio al consumidor "ana@example.com" por "15000.50" para la fecha y hora "2026-07-05T09:30:00-03:00" con la descripción:
@@ -77,7 +73,6 @@ Feature: Crear propuesta de servicio
             """
         Then el sistema rechaza la propuesta de servicio porque no existe un chat activo con ese consumidor
 
-    @wip
     Scenario: 53.6-PSP El prestador crear una propuesta de servicio a un consumidor con conversacion pendiente
         Given que existe una conversación pendiente entre el consumidor "ana@example.com" y el prestador "juan.plomero@example.com" con el mensaje inicial:
             """
@@ -92,7 +87,6 @@ Feature: Crear propuesta de servicio
 
     Rule: La fecha y hora de la propuesta debe ser futura
     
-    @wip
     Scenario: 53.7-PSP El prestador crear una propuesta de servicio con fecha y hora pasada
         Given que existe un chat activo entre el consumidor "ana@example.com" y el prestador "juan.plomero@example.com" con el mensaje inicial:
             """
@@ -105,7 +99,6 @@ Feature: Crear propuesta de servicio
             """
         Then el sistema rechaza la propuesta de servicio porque la fecha y hora debe ser futura
     
-    @wip
     Scenario: 53.8-PSP El prestador crear una propuesta de servicio con falta de parametros
         Given que existe un chat activo entre el consumidor "ana@example.com" y el prestador "juan.plomero@example.com" con el mensaje inicial:
             """

@@ -68,6 +68,7 @@ type testSuite struct {
 	previousAssessmentImages                []filedomain.MessageImage
 	consumerMessageCountBeforeAttempt       int
 	chatbotMessageCountBeforeAttempt        int
+	lastServiceProposalRequest              serviceProposalCreationRequest
 
 	categoryIDsByName              map[string]int
 	lastProviderFilterCategoryName string
@@ -164,6 +165,7 @@ func (s *testSuite) cleanup() error {
 	s.previousAssessmentImages = nil
 	s.consumerMessageCountBeforeAttempt = 0
 	s.chatbotMessageCountBeforeAttempt = 0
+	s.lastServiceProposalRequest = serviceProposalCreationRequest{}
 	return nil
 }
 

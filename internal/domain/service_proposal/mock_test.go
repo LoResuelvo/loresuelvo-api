@@ -61,8 +61,8 @@ type MockConversationRepository struct {
 	mock.Mock
 }
 
-func (m *MockConversationRepository) FindBetween(providerID int, consumerID int) (conversation.Conversation, error) {
-	args := m.Called(providerID, consumerID)
+func (m *MockConversationRepository) FindBetween(consumerID int, providerID int) (conversation.Conversation, error) {
+	args := m.Called(consumerID, providerID)
 
 	if args.Get(0) == nil {
 		return nil, args.Error(1)

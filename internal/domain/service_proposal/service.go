@@ -52,7 +52,7 @@ func (s *Service) getParticipants(providerAuth0ID string, consumerID int) (*prov
 		return nil, nil, nil, ErrConsumerRequired
 	}
 
-	conversation, err := s.conversationRepository.FindBetween(provider.ID, consumer.ID)
+	conversation, err := s.conversationRepository.FindBetween(consumer.ID, provider.ID)
 	if err != nil {
 		return nil, nil, nil, ErrConversationRequired
 	}
