@@ -15,6 +15,7 @@ const (
 type Conversation interface {
 	ConversationType() string
 	Base() *BaseConversation
+	IsActive() bool
 	Activate() error
 	AddMessage(message Message)
 	Messages() []Message
@@ -64,4 +65,8 @@ func (conversation *BaseConversation) LastMessage() (Message, bool) {
 
 func (conversation *BaseConversation) SetMessages(messages []Message) {
 	conversation.messages = messages
+}
+
+func (conversation *BaseConversation) IsActive() bool {
+	return conversation.Status == StatusActive
 }

@@ -3,41 +3,52 @@ package serviceproposal
 import (
 	"time"
 
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/clock"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/consumer"
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/conversation"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/provider"
 )
 
 type Service struct {
-	providerRepository ProviderRepository
-	consumerRepository ConsumerRepository
+	providerRepository     ProviderRepository
+	consumerRepository     ConsumerRepository
+	conversationRepository ConversationRepository
+	clock                  clock.Clock
 }
 
-func NewService(providerRepo ProviderRepository, consumerRepo ConsumerRepository) *Service {
+func NewService(providerRepo ProviderRepository, consumerRepo ConsumerRepository, conversationRepo ConversationRepository, clock clock.Clock) *Service {
 	return &Service{
-		providerRepository: providerRepo,
-		consumerRepository: consumerRepo,
+		providerRepository:     providerRepo,
+		consumerRepository:     consumerRepo,
+		conversationRepository: conversationRepo,
+		clock:                  clock,
 	}
 }
 
 func (s *Service) CreateServiceProposal(auth0ID string, consumerID int, amount int64, scheduledOn time.Time, description string) (*ServiceProposal, error) {
-	provider, consumer, err := s.getParticipants(auth0ID, consumerID)
+	provider, consumer, conversation, err := s.getParticipants(auth0ID, consumerID)
 	if err != nil {
 		return nil, err
 	}
 
-	return NewServiceProposal(provider, consumer, amount, scheduledOn, description)
+	return NewServiceProposal(provider, consumer, conversation, amount, scheduledOn, description, s.clock)
 }
 
-func (s *Service) getParticipants(providerAuth0ID string, consumerID int) (*provider.Provider, *consumer.Consumer, error) {
+func (s *Service) getParticipants(providerAuth0ID string, consumerID int) (*provider.Provider, *consumer.Consumer, conversation.Conversation, error) {
 	provider, err := s.providerRepository.FindByAuthID(providerAuth0ID)
 	if err != nil {
-		return nil, nil, ErrProviderRequired
+		return nil, nil, nil, ErrProviderRequired
 	}
 
 	consumer, err := s.consumerRepository.FindByID(consumerID)
 	if err != nil {
-		return nil, nil, ErrConsumerRequired
+		return nil, nil, nil, ErrConsumerRequired
 	}
 
-	return provider, consumer, nil
+	conversation, err := s.conversationRepository.FindBetween(provider.ID, consumer.ID)
+	if err != nil {
+		return nil, nil, nil, ErrConversationRequired
+	}
+
+	return provider, consumer, conversation, nil
 }

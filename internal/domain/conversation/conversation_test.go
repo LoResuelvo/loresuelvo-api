@@ -215,3 +215,13 @@ func TestConversationLastMessageReturnsFalseWhenEmpty(t *testing.T) {
 	assert.False(t, ok)
 	assert.Empty(t, foundMessage)
 }
+
+func TestBaseConversationIsActiveReturnsTrueForActiveConversation(t *testing.T) {
+	conv := conversation.BaseConversation{Status: conversation.StatusActive}
+	assert.True(t, conv.IsActive())
+}
+
+func TestBaseConversationIsActiveReturnsFalseForInactiveConversation(t *testing.T) {
+	conv := conversation.BaseConversation{Status: conversation.StatusPending}
+	assert.False(t, conv.IsActive())
+}
