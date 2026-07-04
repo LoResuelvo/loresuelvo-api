@@ -98,6 +98,10 @@ func (repository *ConsumerRepository) FindIDByEmail(email string) (int, error) {
 	return consumerID, nil
 }
 
+func (repository *ConsumerRepository) FindByID(consumerID int) (*consumer.Consumer, error) {
+	return nil, nil
+}
+
 func (repository *ConsumerRepository) DeleteAll() error {
 	return repository.repositoryUser.DeleteAllOf("consumer")
 }

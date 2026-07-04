@@ -87,6 +87,10 @@ func (repository *ProviderRepository) FindByID(ctx context.Context, providerID i
 	return foundProvider, nil
 }
 
+func (repository *ProviderRepository) FindByAuthID(authID string) (*provider.Provider, error) {
+	return nil, nil
+}
+
 func (repository *ProviderRepository) FindIDByAuthID(authID string) (int, error) {
 	var providerID int
 	err := repository.db.QueryRow(

@@ -36,10 +36,10 @@ func (h *ServiceProposalHandler) CreateServiceProposal(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-
-	if err := h.serviceProposalService.CreateServiceProposal(auth0ID, req.ConsumerID, amounsInCents, scheduelOnUTC, req.Description); err != nil {
+	serviceproposal, err := h.serviceProposalService.CreateServiceProposal(auth0ID, req.ConsumerID, amounsInCents, scheduelOnUTC, req.Description)
+	if err != nil {
 		// handleServiceProposalError(c, err)
+		return
 	}
-
-	// c.JSON(http.StatusCreated, gin.H{"message": "Service proposal created successfully"})
+	c.JSON(http.StatusCreated, serviceproposal)
 }
