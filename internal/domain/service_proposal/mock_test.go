@@ -1,9 +1,19 @@
 package serviceproposal_test
 
 import (
+	"time"
+
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/consumer"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/provider"
 	"github.com/stretchr/testify/mock"
+)
+
+var (
+	validConsumerID               = 1
+	validProviderAuth0ID          = "provider-auth0-id"
+	validServiceDescription       = "Service description"
+	validServiceAmount      int64 = 1000
+	validServiceScheduledOn       = time.Now()
 )
 
 type MockProviderRepository struct {

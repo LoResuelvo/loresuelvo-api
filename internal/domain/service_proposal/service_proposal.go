@@ -16,6 +16,10 @@ type ServiceProposal struct {
 }
 
 func NewServiceProposal(provider *provider.Provider, consumer *consumer.Consumer, amount int64, scheduledOn time.Time, description string) (*ServiceProposal, error) {
+	if err := checkAmount(amount); err != nil {
+		return nil, err
+	}
+
 	return &ServiceProposal{
 		provider:    provider,
 		consumer:    consumer,
@@ -23,4 +27,12 @@ func NewServiceProposal(provider *provider.Provider, consumer *consumer.Consumer
 		scheduledOn: scheduledOn,
 		description: description,
 	}, nil
+}
+
+func checkAmount(amount int64) error {
+	if amount <= 0 {
+		return ErrInvalidAmount
+	}
+
+	return nil
 }
