@@ -25,6 +25,7 @@ import (
 	filedomain "github.com/LoResuelvo/loresuelvo-api/internal/domain/file"
 	jobrequest "github.com/LoResuelvo/loresuelvo-api/internal/domain/job_request"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/provider"
+	serviceproposal "github.com/LoResuelvo/loresuelvo-api/internal/domain/service_proposal"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/user"
 	"github.com/auth0/go-jwt-middleware/v3/validator"
 )
@@ -127,9 +128,7 @@ func NewDependenciesWithChatbot(database *sql.DB, chatbot conversation.Chatbot) 
 		fileService,
 	)
 	userService := user.NewService(userRepository)
-
-	testHandler := test_handler.NewTestHandler(clockadapter)
-
+	servicePorposalService := serviceproposal.NewService()
 	_ = cancel // TODO: wire shutdown signal to cancel context
 
 	return &Dependencies{
@@ -150,8 +149,8 @@ func NewDependenciesWithChatbot(database *sql.DB, chatbot conversation.Chatbot) 
 		JobRequestHandler:      job_request_handler.NewJobRequestHandler(jobRequestService),
 		UserHandler:            user_handler.NewUserHandler(userService),
 		FileHandler:            file_handler.NewFileHandler(fileService),
-		ServiceProposalHandler: service_proposal_handler.NewServiceProposalHandler(),
-		TestHandler:            testHandler,
+		ServiceProposalHandler: service_proposal_handler.NewServiceProposalHandler(servicePorposalService),
+		TestHandler:            test_handler.NewTestHandler(clockadapter),
 		Hub:                    hub,
 		RealtimeHandler:        realtimeHandler,
 		MessagePublisher:       messagePublisher,
