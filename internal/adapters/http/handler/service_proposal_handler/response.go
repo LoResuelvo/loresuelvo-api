@@ -30,5 +30,5 @@ type serviceProposalCounterpartResponse struct {
 	Name            string `json:"name"`
 	Surname         string `json:"surname"`
 	CategoryName    string `json:"category_name,omitempty"`
-	ProfilePhotoURL string `json:"profile_photo_url"`
+	ProfilePhotoURL string `json:"profile_photo_url,omitempty"`
 }

@@ -12,6 +12,7 @@ import (
 	httphandler "github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/repositories"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/consumer"
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/conversation"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/provider"
 	serviceproposal "github.com/LoResuelvo/loresuelvo-api/internal/domain/service_proposal"
 	"github.com/cucumber/godog"
@@ -44,6 +45,12 @@ type serviceProposalCounterpartResponse struct {
 	ProfilePhotoURL string `json:"profile_photo_url"`
 }
 
+type serviceProposalFixtureParticipants struct {
+	provider     *provider.Provider
+	consumer     *consumer.Consumer
+	conversation conversation.Conversation
+}
+
 func registerGetServiceProposalsSteps(sc *godog.ScenarioContext, suite *testSuite) {
 	sc.Step(`^que existe una propuesta de servicio pendiente de "([^"]*)" para "([^"]*)" por "([^"]*)" para la fecha y hora "([^"]*)" con la descripción:$`, suite.thereIsPendingServiceProposalWithDetails)
 	sc.Step(`^que existe una propuesta de servicio pendiente de "([^"]*)" para "([^"]*)"$`, suite.thereIsPendingServiceProposal)
@@ -55,7 +62,7 @@ func registerGetServiceProposalsSteps(sc *godog.ScenarioContext, suite *testSuit
 	sc.Step(`^el sistema muestra la propuesta de servicio pendiente por "([^"]*)" para la fecha y hora "([^"]*)"$`, suite.systemShowsPendingServiceProposal)
 	sc.Step(`^la propuesta incluye la descripción:$`, suite.serviceProposalIncludesDescription)
 	sc.Step(`^la contraparte de la propuesta es el prestador "([^"]*)" con rubro "([^"]*)" y su foto de perfil$`, suite.serviceProposalCounterpartIsProvider)
-	sc.Step(`^la contraparte de la propuesta es la consumidora "([^"]*)" con su foto de perfil$`, suite.serviceProposalCounterpartIsConsumer)
+	sc.Step(`^la contraparte de la propuesta es la consumidora "([^"]*)"$`, suite.serviceProposalCounterpartIsConsumer)
 	sc.Step(`^la contraparte no incluye un rubro$`, suite.serviceProposalCounterpartDoesNotIncludeCategory)
 	sc.Step(`^la propuesta incluye el identificador de la conversación con el prestador$`, suite.serviceProposalIncludesConversationID)
 	sc.Step(`^la propuesta incluye el identificador de la conversación con la consumidora$`, suite.serviceProposalIncludesConversationID)
@@ -102,6 +109,11 @@ func (suite *testSuite) thereAreServiceProposalsWithStatuses(providerEmail, cons
 		return fmt.Errorf("expected a table with at least one service proposal status")
 	}
 
+	participants, err := suite.prepareServiceProposalFixtureParticipants(providerEmail, consumerEmail)
+	if err != nil {
+		return err
+	}
+
 	for _, row := range table.Rows[1:] {
 		if len(row.Cells) != 1 {
 			return fmt.Errorf("expected exactly one status per table row")
@@ -112,9 +124,8 @@ func (suite *testSuite) thereAreServiceProposalsWithStatuses(providerEmail, cons
 			return fmt.Errorf("unsupported service proposal status %q", status)
 		}
 
-		if err := suite.createServiceProposalFixture(
-			providerEmail,
-			consumerEmail,
+		if err := suite.saveServiceProposalFixture(
+			participants,
 			status,
 			defaultServiceProposalAmount,
 			defaultServiceProposalScheduledOn,
@@ -149,42 +160,66 @@ func (suite *testSuite) createServiceProposalFixture(
 	scheduledOn time.Time,
 	description string,
 ) error {
+	participants, err := suite.prepareServiceProposalFixtureParticipants(providerEmail, consumerEmail)
+	if err != nil {
+		return err
+	}
+
+	return suite.saveServiceProposalFixture(participants, status, amountCents, scheduledOn, description)
+}
+
+func (suite *testSuite) prepareServiceProposalFixtureParticipants(providerEmail, consumerEmail string) (serviceProposalFixtureParticipants, error) {
 	if err := suite.thereIsActiveChatBetweenConsumerAndProviderWithInitialMessage(
 		consumerEmail,
 		providerEmail,
 		&godog.DocString{Content: "Conversación preparada para una propuesta de servicio."},
 	); err != nil {
-		return err
+		return serviceProposalFixtureParticipants{}, err
 	}
 
 	foundProvider, err := suite.userRepository.FindByAuthID(auth0IDForProviderEmail(providerEmail))
 	if err != nil {
-		return fmt.Errorf("finding service proposal provider fixture: %w", err)
+		return serviceProposalFixtureParticipants{}, fmt.Errorf("finding service proposal provider fixture: %w", err)
 	}
 	proposalProvider, ok := foundProvider.(*provider.Provider)
 	if !ok {
-		return fmt.Errorf("expected provider fixture for %q, got %T", providerEmail, foundProvider)
+		return serviceProposalFixtureParticipants{}, fmt.Errorf("expected provider fixture for %q, got %T", providerEmail, foundProvider)
 	}
 
 	foundConsumer, err := suite.userRepository.FindByAuthID(auth0IDForConsumerEmail(consumerEmail))
 	if err != nil {
-		return fmt.Errorf("finding service proposal consumer fixture: %w", err)
+		return serviceProposalFixtureParticipants{}, fmt.Errorf("finding service proposal consumer fixture: %w", err)
 	}
 	proposalConsumer, ok := foundConsumer.(*consumer.Consumer)
 	if !ok {
-		return fmt.Errorf("expected consumer fixture for %q, got %T", consumerEmail, foundConsumer)
+		return serviceProposalFixtureParticipants{}, fmt.Errorf("expected consumer fixture for %q, got %T", consumerEmail, foundConsumer)
 	}
 
 	proposalConversation, err := suite.conversationRepository.FindByID(context.Background(), suite.lastConversationID)
 	if err != nil {
-		return fmt.Errorf("finding service proposal conversation fixture: %w", err)
+		return serviceProposalFixtureParticipants{}, fmt.Errorf("finding service proposal conversation fixture: %w", err)
 	}
 
+	suite.serviceProposalConversationIDs[serviceProposalParticipantsKey(consumerEmail, providerEmail)] = suite.lastConversationID
+	return serviceProposalFixtureParticipants{
+		provider:     proposalProvider,
+		consumer:     proposalConsumer,
+		conversation: proposalConversation,
+	}, nil
+}
+
+func (suite *testSuite) saveServiceProposalFixture(
+	participants serviceProposalFixtureParticipants,
+	status serviceproposal.Status,
+	amountCents int64,
+	scheduledOn time.Time,
+	description string,
+) error {
 	repository := repositories.NewServiceProposalRepository(suite.database)
-	_, err = repository.Save(&serviceproposal.ServiceProposal{
-		Provider:     proposalProvider,
-		Consumer:     proposalConsumer,
-		Conversation: proposalConversation,
+	_, err := repository.Save(&serviceproposal.ServiceProposal{
+		Provider:     participants.provider,
+		Consumer:     participants.consumer,
+		Conversation: participants.conversation,
 		Amount:       amountCents,
 		ScheduledOn:  scheduledOn,
 		Description:  description,
@@ -194,7 +229,6 @@ func (suite *testSuite) createServiceProposalFixture(
 		return fmt.Errorf("saving service proposal fixture: %w", err)
 	}
 
-	suite.serviceProposalConversationIDs[serviceProposalParticipantsKey(consumerEmail, providerEmail)] = suite.lastConversationID
 	return nil
 }
 
@@ -301,9 +335,6 @@ func (suite *testSuite) serviceProposalCounterpartIsConsumer(fullName string) er
 	}
 	if !serviceProposalCounterpartMatches(proposal.Counterpart, participantRoleConsumer, fullName) {
 		return fmt.Errorf("expected consumer counterpart %q, got body %s", fullName, string(suite.lastBody))
-	}
-	if strings.TrimSpace(proposal.Counterpart.ProfilePhotoURL) == "" {
-		return fmt.Errorf("expected consumer counterpart to include profile_photo_url, got body %s", string(suite.lastBody))
 	}
 	return nil
 }

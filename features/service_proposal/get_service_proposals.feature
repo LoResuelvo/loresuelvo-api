@@ -46,7 +46,7 @@ Feature: Obtener propuestas de servicio
                 """
                 Reparación de pérdida de agua en cocina con materiales incluidos.
                 """
-            And la contraparte de la propuesta es la consumidora "Ana Pérez" con su foto de perfil
+            And la contraparte de la propuesta es la consumidora "Ana Pérez"
             And la contraparte no incluye un rubro
             And la propuesta incluye el identificador de la conversación con la consumidora
 
