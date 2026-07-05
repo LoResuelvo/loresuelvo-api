@@ -66,15 +66,16 @@ func (r *ServiceProposalRepository) Save(serviceProposal *serviceproposal.Servic
 	return &saved, nil
 }
 
-func (r *ServiceProposalRepository) FindByUserID(userID int) ([]*serviceproposal.ServiceProposal, error) {
+func (r *ServiceProposalRepository) FindByUserID(ctx context.Context, userID int) ([]*serviceproposal.ServiceProposal, error) {
 	rows, err := r.db.QueryContext(
-		context.Background(),
+		ctx,
 		`SELECT
 			sp.id,
 			sp.amount_cents,
 			sp.scheduled_on,
 			sp.description,
 			sp.status,
+			sp.created_on,
 			sp.conversation_id,
 			c.type,
 			c.status,
@@ -124,6 +125,7 @@ func (r *ServiceProposalRepository) FindByUserID(userID int) ([]*serviceproposal
 			&proposal.ScheduledOn,
 			&proposal.Description,
 			&proposal.Status,
+			&proposal.CreatedOn,
 			&baseConversation.ID,
 			&baseConversation.Type,
 			&baseConversation.Status,

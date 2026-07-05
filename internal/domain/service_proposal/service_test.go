@@ -4,13 +4,16 @@ import (
 	"testing"
 	"time"
 
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/category"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/consumer"
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/conversation"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/notification"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/provider"
 	serviceproposal "github.com/LoResuelvo/loresuelvo-api/internal/domain/service_proposal"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/user"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 )
 
 type serviceProposalTestEnv struct {
@@ -21,6 +24,7 @@ type serviceProposalTestEnv struct {
 	notificationRepo *MockNotificationRepository
 	clock            *MockClock
 	userRepo         *MockUserRepository
+	fileURLResolver  *MockFileURLResolver
 }
 
 func setupServiceProposalTest() *serviceProposalTestEnv {
@@ -30,6 +34,10 @@ func setupServiceProposalTest() *serviceProposalTestEnv {
 	serviceRepo := new(MockServiceProposalRepository)
 	notificationRepo := new(MockNotificationRepository)
 	clock := new(MockClock)
+	fileURLResolver := new(MockFileURLResolver)
+	fileURLResolver.
+		On("ResolvePublicURLs", mock.Anything, mock.Anything).
+		Return(map[string]string{}, nil)
 
 	userRepo := &MockUserRepository{
 		provider: providerRepo,
@@ -62,7 +70,7 @@ func setupServiceProposalTest() *serviceProposalTestEnv {
 		Return(&serviceproposal.ServiceProposal{}, nil)
 
 	serviceRepo.
-		On("FindByUserID", validProviderID).
+		On("FindByUserID", mock.Anything, validProviderID).
 		Return([]*serviceproposal.ServiceProposal{}, nil)
 
 	notificationRepo.
@@ -81,6 +89,7 @@ func setupServiceProposalTest() *serviceProposalTestEnv {
 		notificationRepo: notificationRepo,
 		clock:            clock,
 		userRepo:         userRepo,
+		fileURLResolver:  fileURLResolver,
 	}
 }
 
@@ -90,6 +99,7 @@ func (env *serviceProposalTestEnv) newService() *serviceproposal.Service {
 		env.userRepo,
 		env.conversationRepo,
 		env.notificationRepo,
+		env.fileURLResolver,
 		env.clock,
 	)
 }
@@ -187,12 +197,14 @@ func TestGetServiceProposalsWithoutServiceProposals(t *testing.T) {
 		Return(&provider.Provider{BaseUser: &user.BaseUser{ID: validProviderID}}, nil)
 
 	serviceRepo.
-		On("FindByUserID", validProviderID).
+		On("FindByUserID", mock.Anything, validProviderID).
 		Return([]*serviceproposal.ServiceProposal{}, nil)
 
-	service := serviceproposal.NewService(serviceRepo, userRepo, conversationRepo, notificationRepo, clock)
+	fileURLResolver := new(MockFileURLResolver)
+	fileURLResolver.On("ResolvePublicURLs", mock.Anything, mock.Anything).Return(map[string]string{}, nil)
+	service := serviceproposal.NewService(serviceRepo, userRepo, conversationRepo, notificationRepo, fileURLResolver, clock)
 
-	serviceProposals, err := service.GetServiceProposals(validProviderAuth0ID)
+	serviceProposals, err := service.GetServiceProposals(t.Context(), validProviderAuth0ID)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, serviceProposals)
@@ -204,12 +216,20 @@ func TestConsumerGetsPendingServiceProposal(t *testing.T) {
 	expectedProposal := &serviceproposal.ServiceProposal{
 		ID:          1,
 		Provider:    &provider.Provider{BaseUser: &user.BaseUser{ID: validProviderID}},
-		Consumer:    &consumer.Consumer{BaseUser: &user.BaseUser{ID: validConsumerID}},
+		Consumer:    &consumer.Consumer{BaseUser: &user.BaseUser{ID: validConsumerID, Role: consumer.Role}},
 		Amount:      validServiceAmount,
 		ScheduledOn: validServiceScheduledOn,
 		Description: validServiceDescription,
 		Status:      serviceproposal.StatusPending,
+		CreatedOn:   time.Now(),
+		Conversation: &conversation.WorkConversation{
+			BaseConversation: &conversation.BaseConversation{ID: 10},
+		},
 	}
+	expectedProposal.Provider.BaseUser.Name = "Juan"
+	expectedProposal.Provider.BaseUser.Surname = "Gomez"
+	expectedProposal.Provider.Category = &category.Category{Name: "Plomeria"}
+	expectedProposal.Provider.ProfilePhotoFileID = "provider-photo"
 
 	resetMocks(&env.userRepo.Mock, &env.serviceRepo.Mock)
 	env.userRepo.
@@ -217,14 +237,24 @@ func TestConsumerGetsPendingServiceProposal(t *testing.T) {
 		Return(expectedProposal.Consumer, nil).
 		Once()
 	env.serviceRepo.
-		On("FindByUserID", validConsumerID).
+		On("FindByUserID", mock.Anything, validConsumerID).
 		Return([]*serviceproposal.ServiceProposal{expectedProposal}, nil).
 		Once()
+	resetMocks(&env.fileURLResolver.Mock)
+	env.fileURLResolver.
+		On("ResolvePublicURLs", mock.Anything, []string{"provider-photo"}).
+		Return(map[string]string{"provider-photo": "https://cdn/provider.jpg"}, nil).
+		Once()
 
-	proposals, err := env.newService().GetServiceProposals(validConsumerAuth0ID)
+	proposals, err := env.newService().GetServiceProposals(t.Context(), validConsumerAuth0ID)
 
-	assert.NoError(t, err)
-	assert.Equal(t, []*serviceproposal.ServiceProposal{expectedProposal}, proposals)
+	require.NoError(t, err)
+	require.Len(t, proposals, 1)
+	assert.Equal(t, expectedProposal.ID, proposals[0].ID)
+	assert.Equal(t, "Juan", proposals[0].Counterpart.Name)
+	assert.Equal(t, "Gomez", proposals[0].Counterpart.Surname)
+	assert.Equal(t, "Plomeria", proposals[0].Counterpart.CategoryName)
+	assert.Equal(t, "https://cdn/provider.jpg", proposals[0].Counterpart.ProfilePhotoURL)
 	env.userRepo.AssertExpectations(t)
 	env.serviceRepo.AssertExpectations(t)
 }

@@ -1,6 +1,9 @@
 package service_proposal_handler
 
-import serviceproposal "github.com/LoResuelvo/loresuelvo-api/internal/domain/service_proposal"
+import (
+	serviceproposal "github.com/LoResuelvo/loresuelvo-api/internal/domain/service_proposal"
+	readmodel "github.com/LoResuelvo/loresuelvo-api/internal/domain/service_proposal/read_model"
+)
 
 func serviceProposalCreationResponseFromDomain(proposal *serviceproposal.ServiceProposal) serviceProposalCreationResponse {
 	response := serviceProposalCreationResponse{
@@ -22,4 +25,28 @@ func serviceProposalCreationResponseFromDomain(proposal *serviceproposal.Service
 	}
 
 	return response
+}
+
+func serviceProposalSummaryResponsesFromDomain(summaries []readmodel.ServiceProposalSummary) []serviceProposalSummaryResponse {
+	responses := make([]serviceProposalSummaryResponse, 0, len(summaries))
+	for _, summary := range summaries {
+		responses = append(responses, serviceProposalSummaryResponse{
+			ID:             summary.ID,
+			ConversationID: summary.ConversationID,
+			AmountCents:    summary.Amount,
+			ScheduledOn:    summary.ScheduledOn,
+			Description:    summary.Description,
+			Status:         summary.Status,
+			CreatedOn:      summary.CreatedOn,
+			Counterpart: serviceProposalCounterpartResponse{
+				ID:              summary.Counterpart.ID,
+				Role:            summary.Counterpart.Role,
+				Name:            summary.Counterpart.Name,
+				Surname:         summary.Counterpart.Surname,
+				CategoryName:    summary.Counterpart.CategoryName,
+				ProfilePhotoURL: summary.Counterpart.ProfilePhotoURL,
+			},
+		})
+	}
+	return responses
 }

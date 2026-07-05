@@ -125,7 +125,7 @@ func NewDependenciesWithChatbot(database *sql.DB, chatbot conversation.Chatbot) 
 	)
 	userService := user.NewService(userRepository)
 	servicePorposalService := serviceproposal.NewService(
-		serviceProposalRepository, userRepository, conversationRepository, notificationRepository, clockadapter)
+		serviceProposalRepository, userRepository, conversationRepository, notificationRepository, fileService, clockadapter)
 	_ = cancel // TODO: wire shutdown signal to cancel context
 
 	return &Dependencies{

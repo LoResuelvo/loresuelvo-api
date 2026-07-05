@@ -50,7 +50,11 @@ func (h *ServiceProposalHandler) GetServiceProposals(c *gin.Context) {
 		return
 	}
 
-	serviceProposals, _ := h.serviceProposalService.GetServiceProposals(auth0ID)
+	serviceProposals, err := h.serviceProposalService.GetServiceProposals(c.Request.Context(), auth0ID)
+	if err != nil {
+		httphandler.RespondError(c, http.StatusInternalServerError, "Could not get service proposals")
+		return
+	}
 
-	c.JSON(http.StatusOK, serviceProposals)
+	c.JSON(http.StatusOK, serviceProposalSummaryResponsesFromDomain(serviceProposals))
 }

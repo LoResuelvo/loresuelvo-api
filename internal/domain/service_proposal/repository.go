@@ -1,6 +1,8 @@
 package serviceproposal
 
 import (
+	"context"
+
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/consumer"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/conversation"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/notification"
@@ -14,7 +16,7 @@ type ConversationRepository interface {
 
 type ServiceProposalRepository interface {
 	Save(serviceProposal *ServiceProposal) (*ServiceProposal, error)
-	FindByUserID(userID int) ([]*ServiceProposal, error)
+	FindByUserID(ctx context.Context, userID int) ([]*ServiceProposal, error)
 }
 
 type UserRepository interface {
@@ -25,4 +27,8 @@ type UserRepository interface {
 
 type NotificationRepository interface {
 	Save(notification *notification.Notification) (*notification.Notification, error)
+}
+
+type FileURLResolver interface {
+	ResolvePublicURLs(ctx context.Context, fileIDs []string) (map[string]string, error)
 }

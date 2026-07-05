@@ -171,7 +171,7 @@ func TestServiceProposalRepositoryFindsPendingProposalForConsumer(t *testing.T) 
 	expected, err = testContext.serviceProposalRepository.Save(expected)
 	require.NoError(t, err)
 
-	found, err := testContext.serviceProposalRepository.FindByUserID(consumerID)
+	found, err := testContext.serviceProposalRepository.FindByUserID(context.Background(), consumerID)
 
 	require.NoError(t, err)
 	require.Len(t, found, 1)

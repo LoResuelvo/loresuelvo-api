@@ -1,6 +1,7 @@
 package serviceproposal_test
 
 import (
+	"context"
 	"time"
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/consumer"
@@ -86,6 +87,15 @@ type MockClock struct {
 	mock.Mock
 }
 
+type MockFileURLResolver struct {
+	mock.Mock
+}
+
+func (m *MockFileURLResolver) ResolvePublicURLs(ctx context.Context, fileIDs []string) (map[string]string, error) {
+	args := m.Called(ctx, fileIDs)
+	return args.Get(0).(map[string]string), args.Error(1)
+}
+
 func (m *MockClock) Now() time.Time {
 	args := m.Called()
 	return args.Get(0).(time.Time)
@@ -119,8 +129,8 @@ func (m *MockServiceProposalRepository) Save(serviceProposal *serviceproposal.Se
 	return args.Get(0).(*serviceproposal.ServiceProposal), args.Error(1)
 }
 
-func (m *MockServiceProposalRepository) FindByUserID(userID int) ([]*serviceproposal.ServiceProposal, error) {
-	args := m.Called(userID)
+func (m *MockServiceProposalRepository) FindByUserID(ctx context.Context, userID int) ([]*serviceproposal.ServiceProposal, error) {
+	args := m.Called(ctx, userID)
 
 	if args.Get(0) == nil {
 		return nil, args.Error(1)

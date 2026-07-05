@@ -27,6 +27,7 @@ type ServiceProposal struct {
 	ScheduledOn  time.Time
 	Description  string
 	Status       Status
+	CreatedOn    time.Time
 }
 
 func NewServiceProposal(provider *provider.Provider, consumer *consumer.Consumer, conversation conversation.Conversation, amount int64, scheduledOn time.Time, description string, clock clock.Clock) (*ServiceProposal, error) {
