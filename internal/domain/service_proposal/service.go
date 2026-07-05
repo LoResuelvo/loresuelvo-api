@@ -8,6 +8,7 @@ import (
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/clock"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/consumer"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/conversation"
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/notification"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/provider"
 	readmodel "github.com/LoResuelvo/loresuelvo-api/internal/domain/service_proposal/read_model"
 )
@@ -17,22 +18,24 @@ type Service struct {
 	userRepository         UserRepository
 	conversationRepository ConversationRepository
 	notificationRepository NotificationRepository
+	notificator            notification.Notificator
 	fileURLResolver        FileURLResolver
 	clock                  clock.Clock
 }
 
-func NewService(serviceRepo ServiceProposalRepository, userRepo UserRepository, conversationRepo ConversationRepository, notificationRepo NotificationRepository, fileURLResolver FileURLResolver, clock clock.Clock) *Service {
+func NewService(serviceRepo ServiceProposalRepository, userRepo UserRepository, conversationRepo ConversationRepository, notificationRepo NotificationRepository, notificator notification.Notificator, fileURLResolver FileURLResolver, clock clock.Clock) *Service {
 	return &Service{
 		repository:             serviceRepo,
 		userRepository:         userRepo,
 		conversationRepository: conversationRepo,
 		notificationRepository: notificationRepo,
+		notificator:            notificator,
 		fileURLResolver:        fileURLResolver,
 		clock:                  clock,
 	}
 }
 
-func (s *Service) CreateServiceProposal(auth0ID string, consumerID int, amount int64, scheduledOn time.Time, description string) (*ServiceProposal, error) {
+func (s *Service) CreateServiceProposal(ctx context.Context, auth0ID string, consumerID int, amount int64, scheduledOn time.Time, description string) (*ServiceProposal, error) {
 	provider, consumer, conversation, err := s.getParticipants(auth0ID, consumerID)
 	if err != nil {
 		return nil, err
@@ -43,14 +46,24 @@ func (s *Service) CreateServiceProposal(auth0ID string, consumerID int, amount i
 		return nil, err
 	}
 
-	notification := serviceProposal.CreateNotification(s.clock)
-
-	_, err = s.notificationRepository.Save(notification)
+	savedProposal, err := s.repository.Save(serviceProposal)
 	if err != nil {
 		return nil, err
 	}
 
-	return s.repository.Save(serviceProposal)
+	notification := savedProposal.CreateNotification(s.clock)
+	savedNotification, err := s.notificationRepository.Save(ctx, notification)
+	if err != nil {
+		return nil, err
+	}
+
+	if s.notificator != nil {
+		if err := s.notificator.Notify(ctx, savedNotification); err != nil {
+			return nil, err
+		}
+	}
+
+	return savedProposal, nil
 }
 
 func (s *Service) GetServiceProposals(ctx context.Context, auth0ID string) ([]readmodel.ServiceProposalSummary, error) {

@@ -36,7 +36,7 @@ func (h *ServiceProposalHandler) CreateServiceProposal(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	serviceproposal, err := h.serviceProposalService.CreateServiceProposal(auth0ID, req.ConsumerID, amountInCents, scheduledOnUTC, req.Description)
+	serviceproposal, err := h.serviceProposalService.CreateServiceProposal(c.Request.Context(), auth0ID, req.ConsumerID, amountInCents, scheduledOnUTC, req.Description)
 	if err != nil {
 		handleCreateServiceProposalError(c, err)
 		return

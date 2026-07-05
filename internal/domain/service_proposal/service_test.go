@@ -22,6 +22,7 @@ type serviceProposalTestEnv struct {
 	conversationRepo *MockConversationRepository
 	serviceRepo      *MockServiceProposalRepository
 	notificationRepo *MockNotificationRepository
+	notificator      *MockNotificator
 	clock            *MockClock
 	userRepo         *MockUserRepository
 	fileURLResolver  *MockFileURLResolver
@@ -33,6 +34,7 @@ func setupServiceProposalTest() *serviceProposalTestEnv {
 	conversationRepo := new(MockConversationRepository)
 	serviceRepo := new(MockServiceProposalRepository)
 	notificationRepo := new(MockNotificationRepository)
+	notificator := new(MockNotificator)
 	clock := new(MockClock)
 	fileURLResolver := new(MockFileURLResolver)
 	fileURLResolver.
@@ -65,17 +67,22 @@ func setupServiceProposalTest() *serviceProposalTestEnv {
 		On("FindBetween", validConsumerID, validProviderID).
 		Return(validConversation, nil)
 
+	savedProposal := validSavedServiceProposal()
 	serviceRepo.
 		On("Save", mock.AnythingOfType("*serviceproposal.ServiceProposal")).
-		Return(&serviceproposal.ServiceProposal{}, nil)
+		Return(savedProposal, nil)
 
 	serviceRepo.
 		On("FindByUserID", mock.Anything, validProviderID).
 		Return([]*serviceproposal.ServiceProposal{}, nil)
 
 	notificationRepo.
-		On("Save", mock.AnythingOfType("*notification.Notification")).
+		On("Save", mock.Anything, mock.AnythingOfType("*notification.Notification")).
 		Return(&notification.Notification{ID: 1}, nil)
+
+	notificator.
+		On("Notify", mock.Anything, mock.AnythingOfType("*notification.Notification")).
+		Return(nil)
 
 	clock.
 		On("Now").
@@ -87,9 +94,23 @@ func setupServiceProposalTest() *serviceProposalTestEnv {
 		conversationRepo: conversationRepo,
 		serviceRepo:      serviceRepo,
 		notificationRepo: notificationRepo,
+		notificator:      notificator,
 		clock:            clock,
 		userRepo:         userRepo,
 		fileURLResolver:  fileURLResolver,
+	}
+}
+
+func validSavedServiceProposal() *serviceproposal.ServiceProposal {
+	return &serviceproposal.ServiceProposal{
+		ID:           77,
+		Provider:     &provider.Provider{BaseUser: &user.BaseUser{ID: validProviderID}},
+		Consumer:     &consumer.Consumer{BaseUser: &user.BaseUser{ID: validConsumerID}},
+		Conversation: validConversation,
+		Amount:       validServiceAmount,
+		ScheduledOn:  validServiceScheduledOn,
+		Description:  validServiceDescription,
+		Status:       serviceproposal.StatusPending,
 	}
 }
 
@@ -99,6 +120,7 @@ func (env *serviceProposalTestEnv) newService() *serviceproposal.Service {
 		env.userRepo,
 		env.conversationRepo,
 		env.notificationRepo,
+		env.notificator,
 		env.fileURLResolver,
 		env.clock,
 	)
@@ -109,6 +131,7 @@ func TestCreateServiceProposal(t *testing.T) {
 	service := env.newService()
 
 	serviceProposal, err := service.CreateServiceProposal(
+		t.Context(),
 		validProviderAuth0ID,
 		validConsumerID,
 		validServiceAmount,
@@ -125,12 +148,13 @@ func TestCreateProposalShouldPersist(t *testing.T) {
 	resetMocks(&env.serviceRepo.Mock)
 	env.serviceRepo.
 		On("Save", mock.AnythingOfType("*serviceproposal.ServiceProposal")).
-		Return(&serviceproposal.ServiceProposal{}, nil).
+		Return(validSavedServiceProposal(), nil).
 		Once()
 
 	service := env.newService()
 
 	_, err := service.CreateServiceProposal(
+		t.Context(),
 		validProviderAuth0ID,
 		validConsumerID,
 		validServiceAmount,
@@ -153,6 +177,7 @@ func TestCreateServiceProposalWithNoConversation(t *testing.T) {
 	service := env.newService()
 
 	serviceProposal, err := service.CreateServiceProposal(
+		t.Context(),
 		validProviderAuth0ID,
 		validConsumerID,
 		validServiceAmount,
@@ -170,17 +195,66 @@ func TestCreationOfProposalShouldCreateNotification(t *testing.T) {
 	env := setupServiceProposalTest()
 	resetMocks(&env.notificationRepo.Mock)
 	env.notificationRepo.
-		On("Save", mock.AnythingOfType("*notification.Notification")).
+		On("Save", mock.Anything, mock.MatchedBy(func(notif *notification.Notification) bool {
+			return notif != nil &&
+				notif.UserID == validConsumerID &&
+				notif.Type == notification.TypeServiceProposalReceived &&
+				notif.ResourceType == notification.ResourceServiceProposal &&
+				notif.ResourceID == validSavedServiceProposal().ID
+		})).
 		Return(&notification.Notification{ID: 1}, nil).
 		Once()
 
 	service := env.newService()
 
 	_, _ = service.CreateServiceProposal(
+		t.Context(),
 		validProviderAuth0ID, validConsumerID, validServiceAmount,
 		validServiceScheduledOn, validServiceDescription)
 
 	env.notificationRepo.AssertExpectations(t)
+}
+
+func TestCreationOfProposalShouldNotifyAfterSavingNotification(t *testing.T) {
+	env := setupServiceProposalTest()
+	savedNotification := &notification.Notification{ID: 1, UserID: validConsumerID, ResourceID: validSavedServiceProposal().ID}
+	resetMocks(&env.notificationRepo.Mock, &env.notificator.Mock)
+	env.notificationRepo.
+		On("Save", mock.Anything, mock.AnythingOfType("*notification.Notification")).
+		Return(savedNotification, nil).
+		Once()
+	env.notificator.
+		On("Notify", mock.Anything, savedNotification).
+		Return(nil).
+		Once()
+
+	_, err := env.newService().CreateServiceProposal(
+		t.Context(),
+		validProviderAuth0ID, validConsumerID, validServiceAmount,
+		validServiceScheduledOn, validServiceDescription)
+
+	require.NoError(t, err)
+	env.notificationRepo.AssertExpectations(t)
+	env.notificator.AssertExpectations(t)
+}
+
+func TestCreationOfProposalShouldNotNotifyWhenNotificationCannotBeSaved(t *testing.T) {
+	env := setupServiceProposalTest()
+	resetMocks(&env.notificationRepo.Mock, &env.notificator.Mock)
+	env.notificationRepo.
+		On("Save", mock.Anything, mock.AnythingOfType("*notification.Notification")).
+		Return(nil, assert.AnError).
+		Once()
+
+	createdProposal, err := env.newService().CreateServiceProposal(
+		t.Context(),
+		validProviderAuth0ID, validConsumerID, validServiceAmount,
+		validServiceScheduledOn, validServiceDescription)
+
+	require.ErrorIs(t, err, assert.AnError)
+	assert.Nil(t, createdProposal)
+	env.notificationRepo.AssertExpectations(t)
+	env.notificator.AssertNotCalled(t, "Notify", mock.Anything, mock.Anything)
 }
 
 func TestGetServiceProposalsWithoutServiceProposals(t *testing.T) {
@@ -202,7 +276,7 @@ func TestGetServiceProposalsWithoutServiceProposals(t *testing.T) {
 
 	fileURLResolver := new(MockFileURLResolver)
 	fileURLResolver.On("ResolvePublicURLs", mock.Anything, mock.Anything).Return(map[string]string{}, nil)
-	service := serviceproposal.NewService(serviceRepo, userRepo, conversationRepo, notificationRepo, fileURLResolver, clock)
+	service := serviceproposal.NewService(serviceRepo, userRepo, conversationRepo, notificationRepo, nil, fileURLResolver, clock)
 
 	serviceProposals, err := service.GetServiceProposals(t.Context(), validProviderAuth0ID)
 

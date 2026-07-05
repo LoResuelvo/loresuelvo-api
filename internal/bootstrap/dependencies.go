@@ -16,6 +16,7 @@ import (
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/service_proposal_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/test_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/user_handler"
+	notificationadapter "github.com/LoResuelvo/loresuelvo-api/internal/adapters/notification"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/realtime"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/repositories"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/storage"
@@ -39,6 +40,7 @@ type Dependencies struct {
 	JobRequestRepository   *repositories.JobRequestRepository
 	ConversationReader     *repositories.ConversationReader
 	FileRepository         *repositories.FileRepository
+	NotificationRepository *repositories.NotificationRepository
 
 	CategoryHandler        *category_handler.CategoryHandler
 	ConsumerHandler        *consumer_handler.ConsumerHandler
@@ -102,6 +104,8 @@ func NewDependenciesWithChatbot(database *sql.DB, chatbot conversation.Chatbot) 
 	ticketStore := realtime.NewTicketStore()
 
 	messagePublisher := realtime.NewPublisher(hub, userRepository)
+	realtimeNotificationNotificator := realtime.NewNotificationNotificator(hub, userRepository)
+	notificator := notificationadapter.NewCompositeNotificator(realtimeNotificationNotificator)
 	realtimeHandler := realtime.NewHandler(hub, userRepository, ticketStore)
 
 	categoryService := category.NewService(categoryRepository)
@@ -125,7 +129,7 @@ func NewDependenciesWithChatbot(database *sql.DB, chatbot conversation.Chatbot) 
 	)
 	userService := user.NewService(userRepository)
 	servicePorposalService := serviceproposal.NewService(
-		serviceProposalRepository, userRepository, conversationRepository, notificationRepository, fileService, clockadapter)
+		serviceProposalRepository, userRepository, conversationRepository, notificationRepository, notificator, fileService, clockadapter)
 	_ = cancel // TODO: wire shutdown signal to cancel context
 
 	return &Dependencies{
@@ -137,6 +141,7 @@ func NewDependenciesWithChatbot(database *sql.DB, chatbot conversation.Chatbot) 
 		JobRequestRepository:   jobRequestRepository,
 		ConversationReader:     conversationReader,
 		FileRepository:         fileRepository,
+		NotificationRepository: notificationRepository,
 		CategoryHandler:        category_handler.NewCategoryHandler(categoryService),
 		ConsumerHandler:        consumer_handler.NewConsumerHandler(consumerService),
 		ProviderHandler:        provider_handler.NewProviderHandler(providerService),

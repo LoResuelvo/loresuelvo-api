@@ -143,12 +143,21 @@ type MockNotificationRepository struct {
 	mock.Mock
 }
 
-func (m *MockNotificationRepository) Save(notif *notification.Notification) (*notification.Notification, error) {
-	args := m.Called(notif)
+func (m *MockNotificationRepository) Save(ctx context.Context, notif *notification.Notification) (*notification.Notification, error) {
+	args := m.Called(ctx, notif)
 
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
 
 	return args.Get(0).(*notification.Notification), args.Error(1)
+}
+
+type MockNotificator struct {
+	mock.Mock
+}
+
+func (m *MockNotificator) Notify(ctx context.Context, notif *notification.Notification) error {
+	args := m.Called(ctx, notif)
+	return args.Error(0)
 }

@@ -26,7 +26,7 @@ type UserRepository interface {
 }
 
 type NotificationRepository interface {
-	Save(notification *notification.Notification) (*notification.Notification, error)
+	Save(ctx context.Context, notification *notification.Notification) (*notification.Notification, error)
 }
 
 type FileURLResolver interface {
