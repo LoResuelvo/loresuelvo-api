@@ -1,28 +1,30 @@
 package realtime
 
 import (
-	"errors"
 	"net/http"
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/middleware"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/conversation"
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/user"
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
 )
 
-type Handler struct {
-	hub              *Hub
-	consumerIDFinder conversation.ConsumerIDFinder
-	providerIDFinder conversation.ProviderIDFinder
-	ticketStore      *TicketStore
+type authenticatedUserFinder interface {
+	FindByAuthID(authID string) (user.User, error)
 }
 
-func NewHandler(hub *Hub, consumerIDFinder conversation.ConsumerIDFinder, providerIDFinder conversation.ProviderIDFinder, ticketStore *TicketStore) *Handler {
+type Handler struct {
+	hub         *Hub
+	userFinder  authenticatedUserFinder
+	ticketStore *TicketStore
+}
+
+func NewHandler(hub *Hub, userFinder authenticatedUserFinder, ticketStore *TicketStore) *Handler {
 	return &Handler{
-		hub:              hub,
-		consumerIDFinder: consumerIDFinder,
-		providerIDFinder: providerIDFinder,
-		ticketStore:      ticketStore,
+		hub:         hub,
+		userFinder:  userFinder,
+		ticketStore: ticketStore,
 	}
 }
 
@@ -88,12 +90,9 @@ func (h *Handler) upgrade(w http.ResponseWriter, r *http.Request) (*websocket.Co
 }
 
 func (h *Handler) resolveParticipantForRole(auth0ID, role string) (profileID int, err error) {
-	switch role {
-	case conversation.SenderConsumer:
-		return h.consumerIDFinder.FindIDByAuthID(auth0ID)
-	case conversation.SenderProvider:
-		return h.providerIDFinder.FindIDByAuthID(auth0ID)
-	default:
-		return 0, errors.New("unsupported participant role")
+	foundUser, err := h.userFinder.FindByAuthID(auth0ID)
+	if err != nil || foundUser.Base().Role != role {
+		return 0, conversation.ErrConversationAccessDenied
 	}
+	return foundUser.Base().ID, nil
 }

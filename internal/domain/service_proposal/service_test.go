@@ -7,6 +7,7 @@ import (
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/consumer"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/provider"
 	serviceproposal "github.com/LoResuelvo/loresuelvo-api/internal/domain/service_proposal"
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/user"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -20,11 +21,11 @@ func TestCreateServiceProposal(t *testing.T) {
 
 	providerRepo.
 		On("FindByAuthID", validProviderAuth0ID).
-		Return(&provider.Provider{ID: validProviderID}, nil)
+		Return(&provider.Provider{BaseUser: &user.BaseUser{ID: validProviderID}}, nil)
 
 	consumerRepo.
 		On("FindByID", validConsumerID).
-		Return(&consumer.Consumer{ID: validConsumerID}, nil)
+		Return(&consumer.Consumer{BaseUser: &user.BaseUser{ID: validConsumerID}}, nil)
 
 	conversationRepo.
 		On("FindBetween", validConsumerID, validProviderID).
@@ -38,7 +39,7 @@ func TestCreateServiceProposal(t *testing.T) {
 		On("Now").
 		Return(time.Now())
 
-	service := serviceproposal.NewService(serviceRepo, providerRepo, consumerRepo, conversationRepo, clock)
+	service := serviceproposal.NewService(serviceRepo, &MockUserRepository{provider: providerRepo, consumer: consumerRepo}, conversationRepo, clock)
 
 	serviceProposal, err := service.CreateServiceProposal(
 		validProviderAuth0ID, validConsumerID, validServiceAmount,
@@ -71,7 +72,7 @@ func TestCreateServiceProposalWithNoConversation(t *testing.T) {
 		On("Save", mock.AnythingOfType("*serviceproposal.ServiceProposal")).
 		Return(&serviceproposal.ServiceProposal{}, nil)
 
-	service := serviceproposal.NewService(serviceRepo, providerRepo, consumerRepo, conversationRepo, clock)
+	service := serviceproposal.NewService(serviceRepo, &MockUserRepository{provider: providerRepo, consumer: consumerRepo}, conversationRepo, clock)
 
 	serviceProposal, err := service.CreateServiceProposal(
 		validProviderAuth0ID, validConsumerID, validServiceAmount,
@@ -90,11 +91,11 @@ func TestCreateProposalShouldPersist(t *testing.T) {
 
 	providerRepo.
 		On("FindByAuthID", validProviderAuth0ID).
-		Return(&provider.Provider{ID: validProviderID}, nil)
+		Return(&provider.Provider{BaseUser: &user.BaseUser{ID: validProviderID}}, nil)
 
 	consumerRepo.
 		On("FindByID", validConsumerID).
-		Return(&consumer.Consumer{ID: validConsumerID}, nil)
+		Return(&consumer.Consumer{BaseUser: &user.BaseUser{ID: validConsumerID}}, nil)
 
 	conversationRepo.
 		On("FindBetween", validConsumerID, validProviderID).
@@ -109,7 +110,7 @@ func TestCreateProposalShouldPersist(t *testing.T) {
 		On("Now").
 		Return(time.Now())
 
-	service := serviceproposal.NewService(serviceRepo, providerRepo, consumerRepo, conversationRepo, clock)
+	service := serviceproposal.NewService(serviceRepo, &MockUserRepository{provider: providerRepo, consumer: consumerRepo}, conversationRepo, clock)
 
 	_, _ = service.CreateServiceProposal(
 		validProviderAuth0ID, validConsumerID, validServiceAmount,

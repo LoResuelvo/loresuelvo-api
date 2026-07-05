@@ -16,14 +16,10 @@ type Repository interface {
 	SaveStatus(ctx context.Context, jobRequest JobRequest) error
 }
 
-type ConsumerRepository interface {
+type UserRepository interface {
 	FindIDByAuthID(authID string) (int, error)
-}
-
-type ProviderRepository interface {
-	ExistsByID(id int) (bool, error)
-	FindIDByAuthID(authID string) (int, error)
-	FindByID(ctx context.Context, id int) (*provider.Provider, error)
+	ExistsProviderByID(id int) (bool, error)
+	FindProviderByID(ctx context.Context, id int) (*provider.Provider, error)
 }
 
 type ConversationRepository interface {

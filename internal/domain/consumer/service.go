@@ -1,24 +1,29 @@
 package consumer
 
-import "github.com/LoResuelvo/loresuelvo-api/internal/domain/validator"
+import (
+	"context"
+
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/validator"
+)
 
 type Service struct {
-	consumerRepository Repository
+	userRepository UserRepository
 }
 
-func NewService(consumerRepository Repository) *Service {
+func NewService(userRepository UserRepository) *Service {
 	return &Service{
-		consumerRepository: consumerRepository,
+		userRepository: userRepository,
 	}
 }
 
-func (cm *Service) RegisterConsumer(auth0ID string, email string, name string, surname string) error {
-	if cm.consumerRepository.FindByEmail(email) {
+func (cm *Service) RegisterConsumer(ctx context.Context, auth0ID string, email string, name string, surname string) error {
+	if cm.userRepository.FindByEmail(email) {
 		return validator.ErrEmailAlreadyRegistered
 	}
 	consumer, err := NewConsumer(auth0ID, email, name, surname)
 	if err != nil {
 		return err
 	}
-	return cm.consumerRepository.Save(*consumer)
+	_, err = cm.userRepository.Save(ctx, consumer)
+	return err
 }

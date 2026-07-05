@@ -2,17 +2,18 @@ package consumer
 
 import "github.com/LoResuelvo/loresuelvo-api/internal/domain/user"
 
+const Role = "consumer"
+
 type Consumer struct {
-	ID   int
-	User *user.User
+	*user.BaseUser
 }
 
 func NewConsumer(auth0ID string, email string, name string, surname string) (*Consumer, error) {
-	user, err := user.New(auth0ID, name, surname, email, "consumer")
+	baseUser, err := user.New(auth0ID, name, surname, email, Role)
 	if err != nil {
 		return nil, err
 	}
 	return &Consumer{
-		User: user,
+		BaseUser: baseUser,
 	}, nil
 }

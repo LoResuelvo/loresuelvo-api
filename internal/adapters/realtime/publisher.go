@@ -4,23 +4,24 @@ import (
 	"context"
 	"log/slog"
 
-	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/repositories"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/conversation"
 )
 
+type userAuthIDFinder interface {
+	FindAuthIDByID(id int) (string, error)
+}
+
 // Publisher broadcasts message events to connected clients.
 type Publisher struct {
-	hub          *Hub
-	consumerRepo *repositories.ConsumerRepository
-	providerRepo *repositories.ProviderRepository
+	hub            *Hub
+	userRepository userAuthIDFinder
 }
 
 // NewPublisher creates a new realtime Publisher.
-func NewPublisher(hub *Hub, consumerRepo *repositories.ConsumerRepository, providerRepo *repositories.ProviderRepository) *Publisher {
+func NewPublisher(hub *Hub, userRepository userAuthIDFinder) *Publisher {
 	return &Publisher{
-		hub:          hub,
-		consumerRepo: consumerRepo,
-		providerRepo: providerRepo,
+		hub:            hub,
+		userRepository: userRepository,
 	}
 }
 
@@ -33,14 +34,14 @@ func (p *Publisher) PublishMessage(ctx context.Context, conv conversation.Conver
 		return
 	}
 
-	consumerAuthID, err := p.consumerRepo.FindAuthIDByID(workConversation.ConsumerID)
+	consumerAuthID, err := p.userRepository.FindAuthIDByID(workConversation.ConsumerID)
 	if err != nil {
 		slog.Warn("realtime publisher: failed to find consumer auth id",
 			"consumerID", workConversation.ConsumerID, "error", err)
 		return
 	}
 
-	providerAuthID, err := p.providerRepo.FindAuthIDByID(workConversation.ProviderID)
+	providerAuthID, err := p.userRepository.FindAuthIDByID(workConversation.ProviderID)
 	if err != nil {
 		slog.Warn("realtime publisher: failed to find provider auth id",
 			"providerID", workConversation.ProviderID, "error", err)

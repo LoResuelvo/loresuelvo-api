@@ -551,7 +551,7 @@ func (suite *testSuite) workConversationIDWithCurrentConsumer(providerID int) (i
 	if strings.TrimSpace(suite.currentAuth0ID) == "" {
 		return 0, nil
 	}
-	consumerID, err := suite.consumerRepository.FindIDByAuthID(suite.currentAuth0ID)
+	consumerID, err := suite.userRepository.FindIDByAuthID(suite.currentAuth0ID)
 	if err != nil {
 		return 0, nil
 	}
@@ -570,7 +570,7 @@ func (suite *testSuite) workConversationIDWithCurrentConsumer(providerID int) (i
 }
 
 func (suite *testSuite) assertPendingWorkConversationCreated(providerID int) error {
-	consumerID, err := suite.consumerRepository.FindIDByAuthID(suite.currentAuth0ID)
+	consumerID, err := suite.userRepository.FindIDByAuthID(suite.currentAuth0ID)
 	if err != nil {
 		return err
 	}

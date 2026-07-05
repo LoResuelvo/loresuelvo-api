@@ -8,8 +8,7 @@ import (
 const Role = "provider"
 
 type Provider struct {
-	ID                 int
-	User               *user.User
+	*user.BaseUser
 	Category           *category.Category
 	ProfilePhotoFileID string
 }
@@ -25,26 +24,26 @@ func NewProvider(auth0ID string, email string, name string, surname string, prov
 	}
 
 	return &Provider{
-		User:               providerUser,
+		BaseUser:           providerUser,
 		Category:           providerCategory,
 		ProfilePhotoFileID: profilePhotoFileID,
 	}, nil
 }
 
 func (p Provider) AuthID() string {
-	return p.User.AuthID
+	return p.BaseUser.AuthID
 }
 
 func (p Provider) Email() string {
-	return p.User.Email
+	return p.BaseUser.Email
 }
 
 func (p Provider) Name() string {
-	return p.User.Name
+	return p.BaseUser.Name
 }
 
 func (p Provider) Surname() string {
-	return p.User.Surname
+	return p.BaseUser.Surname
 }
 
 func (p Provider) HasCategory(categoryID int) bool {

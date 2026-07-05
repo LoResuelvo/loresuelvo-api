@@ -78,7 +78,7 @@ func (suite *testSuite) trySendServiceProposalToConsumerForDateTimeWithDescripti
 }
 
 func (suite *testSuite) trySendServiceProposalToConsumerWithMissingParameters(consumerEmail string) error {
-	consumerID, err := suite.consumerRepository.FindIDByEmail(consumerEmail)
+	consumerID, err := suite.userRepository.FindIDByEmail(consumerEmail)
 	if err != nil {
 		return err
 	}
@@ -202,7 +202,7 @@ type serviceProposalPayload struct {
 }
 
 func (suite *testSuite) requestServiceProposalToConsumer(consumerEmail string, payload serviceProposalPayload) error {
-	consumerID, err := suite.consumerRepository.FindIDByEmail(consumerEmail)
+	consumerID, err := suite.userRepository.FindIDByEmail(consumerEmail)
 	if err != nil {
 		return err
 	}

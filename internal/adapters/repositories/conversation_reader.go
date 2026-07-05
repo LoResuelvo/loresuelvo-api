@@ -7,11 +7,17 @@ import (
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/conversation"
 	readmodel "github.com/LoResuelvo/loresuelvo-api/internal/domain/conversation/read_model"
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/user"
 )
 
 type ConversationReader struct {
 	db                     *sql.DB
 	messageImageRepository *MessageImageRepository
+}
+
+func (reader *ConversationReader) FindSummariesByUserAndType(ctx context.Context, foundUser user.User, conversationType string) ([]readmodel.ConversationSummary, error) {
+	base := foundUser.Base()
+	return reader.FindSummariesByParticipantIDRoleAndType(ctx, base.ID, base.Role, conversationType)
 }
 
 func NewConversationReader(db *sql.DB, messageImageRepository *MessageImageRepository) *ConversationReader {
@@ -47,7 +53,7 @@ func (reader *ConversationReader) findWorkSummariesByConsumerID(ctx context.Cont
 			c.id,
 			c.type,
 			c.status,
-			p.id,
+			p.user_id,
 			u.name,
 			u.surname,
 			COALESCE(cat.name, ''),
@@ -59,7 +65,7 @@ func (reader *ConversationReader) findWorkSummariesByConsumerID(ctx context.Cont
 			c.updated_on
 		FROM conversations c
 		INNER JOIN work_conversations wc ON wc.conversation_id = c.id
-		INNER JOIN providers p ON p.id = wc.provider_id
+		INNER JOIN providers p ON p.user_id = wc.provider_id
 		INNER JOIN users u ON u.id = p.user_id
 		LEFT JOIN categories cat ON cat.id = p.category_id
 		LEFT JOIN LATERAL (
@@ -90,7 +96,7 @@ func (reader *ConversationReader) findWorkSummariesByProviderID(ctx context.Cont
 			c.id,
 			c.type,
 			c.status,
-			consumer.id,
+			consumer.user_id,
 			u.name,
 			u.surname,
 			'',
@@ -102,7 +108,7 @@ func (reader *ConversationReader) findWorkSummariesByProviderID(ctx context.Cont
 			c.updated_on
 		FROM conversations c
 		INNER JOIN work_conversations wc ON wc.conversation_id = c.id
-		INNER JOIN consumers consumer ON consumer.id = wc.consumer_id
+		INNER JOIN consumers consumer ON consumer.user_id = wc.consumer_id
 		INNER JOIN users u ON u.id = consumer.user_id
 		LEFT JOIN LATERAL (
 			SELECT m.id, m.sender_role, m.content, m.created_on
@@ -190,7 +196,7 @@ func (reader *ConversationReader) findWorkDetailForConsumer(ctx context.Context,
 			c.id,
 			c.type,
 			c.status,
-			p.id,
+			p.user_id,
 			u.name,
 			u.surname,
 			COALESCE(cat.name, ''),
@@ -202,7 +208,7 @@ func (reader *ConversationReader) findWorkDetailForConsumer(ctx context.Context,
 			c.updated_on
 		FROM conversations c
 		INNER JOIN work_conversations wc ON wc.conversation_id = c.id
-		INNER JOIN providers p ON p.id = wc.provider_id
+		INNER JOIN providers p ON p.user_id = wc.provider_id
 		INNER JOIN users u ON u.id = p.user_id
 		LEFT JOIN categories cat ON cat.id = p.category_id
 		LEFT JOIN messages m ON m.conversation_id = c.id
@@ -232,7 +238,7 @@ func (reader *ConversationReader) findWorkDetailForProvider(ctx context.Context,
 			c.id,
 			c.type,
 			c.status,
-			consumer.id,
+			consumer.user_id,
 			u.name,
 			u.surname,
 			'',
@@ -244,7 +250,7 @@ func (reader *ConversationReader) findWorkDetailForProvider(ctx context.Context,
 			c.updated_on
 		FROM conversations c
 		INNER JOIN work_conversations wc ON wc.conversation_id = c.id
-		INNER JOIN consumers consumer ON consumer.id = wc.consumer_id
+		INNER JOIN consumers consumer ON consumer.user_id = wc.consumer_id
 		INNER JOIN users u ON u.id = consumer.user_id
 		LEFT JOIN messages m ON m.conversation_id = c.id
 		WHERE c.id = $1

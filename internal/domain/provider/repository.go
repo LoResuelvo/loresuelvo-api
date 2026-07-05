@@ -1,11 +1,16 @@
 package provider
 
-import "github.com/LoResuelvo/loresuelvo-api/internal/domain/category"
+import (
+	"context"
 
-type Repository interface {
-	Save(provider Provider) (int, error)
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/category"
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/user"
+)
+
+type UserRepository interface {
+	Save(ctx context.Context, user user.User) (user.User, error)
 	FindByEmail(email string) bool
-	FindByCategoryID(categoryID int) ([]Provider, error)
+	FindProvidersByCategoryID(categoryID int) ([]Provider, error)
 }
 
 type CategoryFinder interface {

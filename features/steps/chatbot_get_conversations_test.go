@@ -98,7 +98,7 @@ func (suite *testSuite) consumerHasChatbotConversationTitled(consumerEmail, titl
 	suite.currentAuth0ID = auth0IDForConsumerEmail(consumerEmail)
 	defer func() { suite.currentAuth0ID = previousAuth0ID }()
 
-	if _, err := suite.consumerRepository.FindIDByEmail(consumerEmail); err != nil {
+	if _, err := suite.userRepository.FindIDByEmail(consumerEmail); err != nil {
 		return err
 	}
 

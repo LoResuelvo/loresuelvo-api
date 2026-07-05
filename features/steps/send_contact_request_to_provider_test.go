@@ -43,7 +43,7 @@ func (suite *testSuite) thereIsRegisteredConsumerWithEmailNameAndSurname(email, 
 }
 
 func (suite *testSuite) thereIsNoConversationBetweenConsumerAndProvider(consumerEmail, providerEmail string) error {
-	consumerID, err := suite.consumerRepository.FindIDByEmail(consumerEmail)
+	consumerID, err := suite.userRepository.FindIDByEmail(consumerEmail)
 	if err != nil {
 		return err
 	}
@@ -104,7 +104,7 @@ func (suite *testSuite) lastResponseShouldHaveError() error {
 }
 
 func (suite *testSuite) providerIDByEmail(email string) (int, error) {
-	return suite.providerRepository.FindIDByEmail(email)
+	return suite.userRepository.FindIDByEmail(email)
 }
 
 func normalizeDocString(docString *godog.DocString) string {

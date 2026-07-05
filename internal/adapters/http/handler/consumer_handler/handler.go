@@ -33,7 +33,7 @@ func (h *ConsumerHandler) RegisterConsumer(c *gin.Context) {
 
 	req = normalizeRegisterConsumerRequest(req)
 
-	err := h.consumerService.RegisterConsumer(auth0ID, req.Email, req.Name, req.Surname)
+	err := h.consumerService.RegisterConsumer(c.Request.Context(), auth0ID, req.Email, req.Name, req.Surname)
 	if err != nil {
 		handleRegisterConsumerError(c, err)
 		return

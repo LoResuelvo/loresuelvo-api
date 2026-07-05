@@ -320,7 +320,7 @@ func (suite *testSuite) imageRemainsAssociatedWithSentMessage() error {
 }
 
 func (suite *testSuite) requestActiveChatWithConsumer(consumerEmail string) error {
-	if _, err := suite.consumerRepository.FindIDByEmail(consumerEmail); err != nil {
+	if _, err := suite.userRepository.FindIDByEmail(consumerEmail); err != nil {
 		return err
 	}
 	return suite.requestConversationByID(suite.lastConversationID)

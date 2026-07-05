@@ -179,6 +179,7 @@ func (suite *testSuite) requestJobRequestToProviderFullName(providerFullName str
 	return suite.requestJobRequest(request)
 }
 
+// No hacer consultas SQL en los steps, usar Repositorios
 func (suite *testSuite) providerIDByFullName(fullName string) (int, error) {
 	parts := strings.Fields(fullName)
 	if len(parts) < 2 {
@@ -187,7 +188,7 @@ func (suite *testSuite) providerIDByFullName(fullName string) (int, error) {
 
 	var providerID int
 	err := suite.database.QueryRow(
-		`SELECT providers.id
+		`SELECT providers.user_id
 		FROM providers
 		INNER JOIN users ON users.id = providers.user_id
 		WHERE users.name = $1 AND users.surname = $2`,

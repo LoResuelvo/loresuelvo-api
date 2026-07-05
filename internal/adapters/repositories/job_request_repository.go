@@ -226,9 +226,9 @@ func (repository *JobRequestRepository) FindByUserAuthID(userAuthID string) ([]r
 			consumer_users.surname
 		FROM job_requests
 		INNER JOIN conversations ON conversations.id = job_requests.conversation_id
-		INNER JOIN consumers ON consumers.id = job_requests.consumer_id
+		INNER JOIN consumers ON consumers.user_id = job_requests.consumer_id
 		INNER JOIN users AS consumer_users ON consumer_users.id = consumers.user_id
-		INNER JOIN providers ON providers.id = job_requests.provider_id
+		INNER JOIN providers ON providers.user_id = job_requests.provider_id
 		INNER JOIN users AS provider_users ON provider_users.id = providers.user_id
 		WHERE job_requests.status = $1
 			AND (consumer_users.auth_id = $2 OR provider_users.auth_id = $2)

@@ -14,10 +14,7 @@ type ServiceProposalRepository interface {
 	Save(serviceProposal *ServiceProposal) (*ServiceProposal, error)
 }
 
-type ProviderRepository interface {
-	FindByAuthID(auth0ID string) (*provider.Provider, error)
-}
-
-type ConsumerRepository interface {
-	FindByID(consumerID int) (*consumer.Consumer, error)
+type UserRepository interface {
+	FindProviderByAuthID(auth0ID string) (*provider.Provider, error)
+	FindConsumerByID(consumerID int) (*consumer.Consumer, error)
 }

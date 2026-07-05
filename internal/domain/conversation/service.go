@@ -12,12 +12,12 @@ import (
 	filedomain "github.com/LoResuelvo/loresuelvo-api/internal/domain/file"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/provider"
 	providerreadmodel "github.com/LoResuelvo/loresuelvo-api/internal/domain/provider/read_model"
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/user"
 )
 
 type Service struct {
 	conversationRepository Repository
-	consumerRepository     ConsumerIDFinder
-	providerRepository     ProviderRepository
+	userRepository         UserRepository
 	conversationReader     Reader
 	messagePublisher       MessagePublisher
 	chatbot                Chatbot
@@ -28,8 +28,7 @@ type Service struct {
 
 func NewService(
 	conversationRepository Repository,
-	consumerRepository ConsumerIDFinder,
-	providerRepository ProviderRepository,
+	userRepository UserRepository,
 	conversationReader Reader,
 	messagePublisher MessagePublisher,
 	chatbot Chatbot,
@@ -39,8 +38,7 @@ func NewService(
 ) *Service {
 	return &Service{
 		conversationRepository: conversationRepository,
-		consumerRepository:     consumerRepository,
-		providerRepository:     providerRepository,
+		userRepository:         userRepository,
 		conversationReader:     conversationReader,
 		messagePublisher:       messagePublisher,
 		chatbot:                chatbot,
@@ -66,6 +64,7 @@ func (s *Service) GetByID(ctx context.Context, authID string, conversationID int
 	}
 }
 
+// TODO: No duplicar código, adaptador se encarga de resolver según el tipo de Usuario
 func (s *Service) getWorkConversationDetail(ctx context.Context, authID string, workConversation *WorkConversation) (*readmodel.ConversationDetail, error) {
 	if s.authenticatedConsumerMatches(authID, workConversation.ConsumerID) {
 		detail, err := s.conversationReader.FindDetailByIDRoleAndType(ctx, workConversation.Base().ID, SenderConsumer, TypeWork)
@@ -134,6 +133,7 @@ func (s *Service) SendMessage(ctx context.Context, authID string, conversationID
 	}
 	foundConversation.AddMessage(*message)
 
+	// TODO: El repo Conversation debe tratar únicamente con Conversation, por lo tanto, métodos como AddMessage no deberían existir.
 	sentMessage, err := s.conversationRepository.AddMessage(ctx, conversationID, *message)
 	if err != nil {
 		return nil, err
@@ -145,16 +145,8 @@ func (s *Service) SendMessage(ctx context.Context, authID string, conversationID
 }
 
 func (s *Service) ListWorkConversations(ctx context.Context, authID string) ([]readmodel.ConversationSummary, error) {
-	if consumerID, err := s.consumerRepository.FindIDByAuthID(authID); err == nil {
-		summaries, err := s.conversationReader.FindSummariesByParticipantIDRoleAndType(ctx, consumerID, SenderConsumer, TypeWork)
-		if err != nil {
-			return nil, err
-		}
-		return s.withCounterpartProfilePhotoURLs(ctx, summaries)
-	}
-
-	if providerID, err := s.providerRepository.FindIDByAuthID(authID); err == nil {
-		summaries, err := s.conversationReader.FindSummariesByParticipantIDRoleAndType(ctx, providerID, SenderProvider, TypeWork)
+	if user, err := s.userRepository.FindByAuthID(authID); err == nil {
+		summaries, err := s.conversationReader.FindSummariesByUserAndType(ctx, user, TypeWork)
 		if err != nil {
 			return nil, err
 		}
@@ -165,14 +157,15 @@ func (s *Service) ListWorkConversations(ctx context.Context, authID string) ([]r
 }
 
 func (s *Service) ListChatbotConversations(ctx context.Context, authID string) ([]readmodel.ConversationSummary, error) {
-	consumerID, err := s.consumerRepository.FindIDByAuthID(authID)
-	if err != nil {
+	user, err := s.userRepository.FindByAuthID(authID)
+	if err != nil || user.Base().Role != SenderConsumer {
 		return nil, ErrOnlyConsumerCanListChatbotConversations
 	}
 
-	return s.conversationReader.FindSummariesByParticipantIDRoleAndType(ctx, consumerID, SenderConsumer, TypeChatbot)
+	return s.conversationReader.FindSummariesByUserAndType(ctx, user, TypeChatbot)
 }
 
+// TODO: recibir obligatoriamente una lista de strings para evitar el patrón optionalImageFIleIDs
 func (s *Service) CreateChatbotConversation(ctx context.Context, authID string, content string, imageFileIDs ...[]string) (*ChatbotConversationResult, error) {
 	consumerID, err := s.chatbotConsumerID(authID)
 	if err != nil {
@@ -301,7 +294,7 @@ func (s *Service) recommendationForCurrentAssessment(ctx context.Context, chatbo
 	if matched == nil || !assessment.RequiresProfessional() {
 		return matched, nil, nil
 	}
-	providers, err := s.providerRepository.FindByCategoryID(matched.ID)
+	providers, err := s.userRepository.FindProvidersByCategoryID(matched.ID)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -310,12 +303,12 @@ func (s *Service) recommendationForCurrentAssessment(ctx context.Context, chatbo
 }
 
 func (s *Service) chatbotConsumerID(authID string) (int, error) {
-	consumerID, err := s.consumerRepository.FindIDByAuthID(authID)
-	if err != nil {
+	foundUser, err := s.userRepository.FindByAuthID(authID)
+	if err != nil || foundUser.Base().Role != SenderConsumer {
 		return 0, ErrOnlyConsumerCanMessageChatbot
 	}
 
-	return consumerID, nil
+	return foundUser.Base().ID, nil
 }
 
 func (s *Service) findOwnedChatbotConversation(ctx context.Context, conversationID int, consumerID int) (*ChatBotConversation, error) {
@@ -532,13 +525,28 @@ func copyCurrentAssessment(foundConversation Conversation) *ProblemAssessment {
 }
 
 func (s *Service) authenticatedConsumerMatches(authID string, consumerID int) bool {
-	authenticatedConsumerID, err := s.consumerRepository.FindIDByAuthID(authID)
-	return err == nil && authenticatedConsumerID == consumerID
+	authenticatedUser, err := s.userRepository.FindByAuthID(authID)
+	return err == nil && authenticatedUser.Base().Role == SenderConsumer && authenticatedUser.Base().ID == consumerID
+}
+
+func (s *Service) authenticatedUserForConversation(authID string, conversation *WorkConversation) (user.User, error) {
+	authenticatedUser, err := s.userRepository.FindByAuthID(authID)
+	if err != nil {
+		return nil, ErrConversationAccessDenied
+	}
+	base := authenticatedUser.Base()
+	if (base.Role == SenderConsumer && base.ID != conversation.ConsumerID) ||
+		(base.Role == SenderProvider && base.ID != conversation.ProviderID) ||
+		(base.Role != SenderConsumer && base.Role != SenderProvider) {
+		return nil, ErrConversationAccessDenied
+	}
+
+	return authenticatedUser, nil
 }
 
 func (s *Service) authenticatedProviderMatches(authID string, providerID int) bool {
-	authenticatedProviderID, err := s.providerRepository.FindIDByAuthID(authID)
-	return err == nil && authenticatedProviderID == providerID
+	authenticatedUser, err := s.userRepository.FindByAuthID(authID)
+	return err == nil && authenticatedUser.Base().Role == SenderProvider && authenticatedUser.Base().ID == providerID
 }
 
 func (s *Service) senderRoleForAuthenticatedParticipant(authID string, foundConversation Conversation) (string, error) {
@@ -547,15 +555,12 @@ func (s *Service) senderRoleForAuthenticatedParticipant(authID string, foundConv
 		return "", ErrConversationAccessDenied
 	}
 
-	if s.authenticatedConsumerMatches(authID, workConversation.ConsumerID) {
-		return SenderConsumer, nil
+	authenticatedUser, err := s.authenticatedUserForConversation(authID, workConversation)
+	if err != nil {
+		return "", err
 	}
 
-	if s.authenticatedProviderMatches(authID, workConversation.ProviderID) {
-		return SenderProvider, nil
-	}
-
-	return "", ErrConversationAccessDenied
+	return authenticatedUser.Base().Role, nil
 }
 
 func newParticipantMessage(senderRole, content string, images []filedomain.MessageImage) (*Message, error) {
@@ -576,6 +581,7 @@ func (s *Service) messageImagesForSender(ctx context.Context, authID string, fil
 	return preparedFiles, nil
 }
 
+// TODO: Jamás deberíamos devolver fmt.Errorf, siempre errores específicos de dominio
 func (s *Service) chatbotImagesForSender(ctx context.Context, authID string, fileIDs []string) ([]filedomain.MessageImage, []filedomain.MessageImageContent, error) {
 	preparedFiles, err := s.fileService.PrepareChatbotMessageImages(ctx, authID, fileIDs)
 	if err != nil {
@@ -699,7 +705,7 @@ func (s *Service) assessmentResult(ctx context.Context, chatbotResponse ChatbotR
 		return matchedCategory, nil, nil
 	}
 
-	providers, err := s.providerRepository.FindByCategoryID(matchedCategory.ID)
+	providers, err := s.userRepository.FindProvidersByCategoryID(matchedCategory.ID)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -731,7 +737,7 @@ func (s *Service) withRecommendedProviders(ctx context.Context, detail *readmode
 		return detail, nil
 	}
 
-	providers, err := s.providerRepository.FindByCategoryID(detail.Chatbot.Assessment.ProblemCategory.ID)
+	providers, err := s.userRepository.FindProvidersByCategoryID(detail.Chatbot.Assessment.ProblemCategory.ID)
 	if err != nil {
 		return nil, err
 	}

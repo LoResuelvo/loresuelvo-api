@@ -13,6 +13,7 @@ import (
 	readmodel "github.com/LoResuelvo/loresuelvo-api/internal/domain/conversation/read_model"
 	filedomain "github.com/LoResuelvo/loresuelvo-api/internal/domain/file"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/provider"
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/user"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -179,6 +180,45 @@ type providerIDFinderMock struct {
 	findByCategoryIDErr    error
 }
 
+type userRepositoryMock struct {
+	consumer *consumerIDFinderMock
+	provider *providerIDFinderMock
+}
+
+func newUserRepositoryMock(consumer *consumerIDFinderMock, provider *providerIDFinderMock) *userRepositoryMock {
+	return &userRepositoryMock{consumer: consumer, provider: provider}
+}
+
+func (m *userRepositoryMock) FindByAuthID(authID string) (user.User, error) {
+	if m.consumer != nil {
+		if id, err := m.consumer.FindIDByAuthID(authID); err == nil {
+			return &user.BaseUser{ID: id, AuthID: authID, Role: conversation.SenderConsumer}, nil
+		}
+	}
+	if m.provider != nil {
+		id, err := m.provider.FindIDByAuthID(authID)
+		if err == nil {
+			return &user.BaseUser{ID: id, AuthID: authID, Role: conversation.SenderProvider}, nil
+		}
+		return nil, err
+	}
+	return nil, errors.New("user not found")
+}
+
+func (m *userRepositoryMock) FindIDByAuthID(authID string) (int, error) {
+	found, err := m.FindByAuthID(authID)
+	if err != nil {
+		return 0, err
+	}
+	return found.Base().ID, nil
+}
+
+func (m *userRepositoryMock) FindAuthIDByID(id int) (string, error) { return "", nil }
+
+func (m *userRepositoryMock) FindProvidersByCategoryID(categoryID int) ([]provider.Provider, error) {
+	return m.provider.FindProvidersByCategoryID(categoryID)
+}
+
 func (m *providerIDFinderMock) FindIDByAuthID(authID string) (int, error) {
 	if m.err != nil {
 		return 0, m.err
@@ -190,7 +230,7 @@ func (m *providerIDFinderMock) FindAuthIDByID(id int) (string, error) {
 	return "", nil
 }
 
-func (m *providerIDFinderMock) FindByCategoryID(categoryID int) ([]provider.Provider, error) {
+func (m *providerIDFinderMock) FindProvidersByCategoryID(categoryID int) ([]provider.Provider, error) {
 	m.findByCategoryIDCalled = true
 	m.requestedCategoryID = categoryID
 	if m.findByCategoryIDErr != nil {
@@ -239,6 +279,10 @@ func (m *conversationReaderMock) FindSummariesByParticipantIDRoleAndType(ctx con
 		return m.providerSummaries, nil
 	}
 	return m.consumerSummaries, nil
+}
+
+func (m *conversationReaderMock) FindSummariesByUserAndType(ctx context.Context, foundUser user.User, conversationType string) ([]readmodel.ConversationSummary, error) {
+	return m.FindSummariesByParticipantIDRoleAndType(ctx, foundUser.Base().ID, foundUser.Base().Role, conversationType)
 }
 
 func (m *conversationReaderMock) FindDetailByIDRoleAndType(ctx context.Context, conversationID int, participantRole string, conversationType string) (*readmodel.ConversationDetail, error) {
@@ -400,7 +444,7 @@ func TestCreateChatbotConversationCreatesActiveConversationWithConsumerAndChatbo
 	}}
 	publisher := &messagePublisherMock{}
 
-	service := conversation.NewService(repo, consumerIDFinder, &providerIDFinderMock{}, &conversationReaderMock{}, publisher, chatbot, &recommendationCategoryListerMock{}, &fileURLResolverMock{}, fixedClock{now: time.Now().UTC()})
+	service := conversation.NewService(repo, newUserRepositoryMock(consumerIDFinder, &providerIDFinderMock{}), &conversationReaderMock{}, publisher, chatbot, &recommendationCategoryListerMock{}, &fileURLResolverMock{}, fixedClock{now: time.Now().UTC()})
 
 	createdResult, err := service.CreateChatbotConversation(context.Background(), "auth0|consumer", "  Tengo una pérdida de agua en la cocina  ")
 
@@ -437,7 +481,7 @@ func TestCreateChatbotConversationAcceptsImageOnlyMessage(t *testing.T) {
 	}}
 	fileService := &fileURLResolverMock{}
 
-	service := conversation.NewService(repo, consumerIDFinder, &providerIDFinderMock{}, &conversationReaderMock{}, &messagePublisherMock{}, chatbot, &recommendationCategoryListerMock{}, fileService, fixedClock{now: time.Now().UTC()})
+	service := conversation.NewService(repo, newUserRepositoryMock(consumerIDFinder, &providerIDFinderMock{}), &conversationReaderMock{}, &messagePublisherMock{}, chatbot, &recommendationCategoryListerMock{}, fileService, fixedClock{now: time.Now().UTC()})
 
 	createdResult, err := service.CreateChatbotConversation(context.Background(), "auth0|consumer", "   ", []string{"image-file-id"})
 
@@ -473,7 +517,7 @@ func TestCreateChatbotConversationIncludesRecommendedProvidersWhenDiagnosisIsCom
 		},
 	}}
 
-	service := conversation.NewService(repo, consumerIDFinder, providerFinder, &conversationReaderMock{}, &messagePublisherMock{}, chatbot, categoryLister, fileURLResolver, fixedClock{now: time.Now().UTC()})
+	service := conversation.NewService(repo, newUserRepositoryMock(consumerIDFinder, providerFinder), &conversationReaderMock{}, &messagePublisherMock{}, chatbot, categoryLister, fileURLResolver, fixedClock{now: time.Now().UTC()})
 
 	createdResult, err := service.CreateChatbotConversation(context.Background(), "auth0|consumer", "Pierde agua la bacha")
 
@@ -511,7 +555,7 @@ func TestCreateChatbotConversationDoesNotRecommendProvidersBeforeDiagnosisIsComp
 		},
 	}}
 
-	service := conversation.NewService(repo, consumerIDFinder, providerFinder, &conversationReaderMock{}, &messagePublisherMock{}, chatbot, categoryLister, &fileURLResolverMock{}, fixedClock{now: time.Now().UTC()})
+	service := conversation.NewService(repo, newUserRepositoryMock(consumerIDFinder, providerFinder), &conversationReaderMock{}, &messagePublisherMock{}, chatbot, categoryLister, &fileURLResolverMock{}, fixedClock{now: time.Now().UTC()})
 
 	createdResult, err := service.CreateChatbotConversation(context.Background(), "auth0|consumer", "Tengo humedad")
 
@@ -531,7 +575,7 @@ func TestCreateChatbotConversationRejectsNonConsumerUser(t *testing.T) {
 	consumerIDFinder := &consumerIDFinderMock{err: errors.New("consumer not found")}
 	chatbot := &chatbotMock{response: &conversation.ChatbotResponse{Status: conversation.ChatbotResponseAnswered, Title: "Consulta", Content: "Respuesta"}}
 
-	service := conversation.NewService(repo, consumerIDFinder, &providerIDFinderMock{}, &conversationReaderMock{}, &messagePublisherMock{}, chatbot, nil, &fileURLResolverMock{}, fixedClock{now: time.Now().UTC()})
+	service := conversation.NewService(repo, newUserRepositoryMock(consumerIDFinder, &providerIDFinderMock{}), &conversationReaderMock{}, &messagePublisherMock{}, chatbot, nil, &fileURLResolverMock{}, fixedClock{now: time.Now().UTC()})
 
 	createdResult, err := service.CreateChatbotConversation(context.Background(), "auth0|provider", "Tengo una pérdida de agua")
 
@@ -546,7 +590,7 @@ func TestCreateChatbotConversationRejectsEmptyMessage(t *testing.T) {
 	consumerIDFinder := &consumerIDFinderMock{consumerID: 10}
 	chatbot := &chatbotMock{response: &conversation.ChatbotResponse{Status: conversation.ChatbotResponseAnswered, Title: "Consulta", Content: "Respuesta"}}
 
-	service := conversation.NewService(repo, consumerIDFinder, &providerIDFinderMock{}, &conversationReaderMock{}, &messagePublisherMock{}, chatbot, nil, &fileURLResolverMock{}, fixedClock{now: time.Now().UTC()})
+	service := conversation.NewService(repo, newUserRepositoryMock(consumerIDFinder, &providerIDFinderMock{}), &conversationReaderMock{}, &messagePublisherMock{}, chatbot, nil, &fileURLResolverMock{}, fixedClock{now: time.Now().UTC()})
 
 	createdResult, err := service.CreateChatbotConversation(context.Background(), "auth0|consumer", "   ")
 
@@ -561,7 +605,7 @@ func TestCreateChatbotConversationSendsQuestionToChatbotWithoutKeywordPreFilter(
 	consumerIDFinder := &consumerIDFinderMock{consumerID: 10}
 	chatbot := &chatbotMock{response: &conversation.ChatbotResponse{Status: conversation.ChatbotResponseOutOfScope, Title: "Consulta fuera de alcance", Content: "Solo puedo responder consultas sobre problemas del hogar."}}
 
-	service := conversation.NewService(repo, consumerIDFinder, &providerIDFinderMock{}, &conversationReaderMock{}, &messagePublisherMock{}, chatbot, &recommendationCategoryListerMock{}, &fileURLResolverMock{}, fixedClock{now: time.Now().UTC()})
+	service := conversation.NewService(repo, newUserRepositoryMock(consumerIDFinder, &providerIDFinderMock{}), &conversationReaderMock{}, &messagePublisherMock{}, chatbot, &recommendationCategoryListerMock{}, &fileURLResolverMock{}, fixedClock{now: time.Now().UTC()})
 
 	createdResult, err := service.CreateChatbotConversation(context.Background(), "auth0|consumer", "¿Qué equipo ganó el último partido de fútbol?")
 
@@ -578,7 +622,7 @@ func TestCreateChatbotConversationReturnsChatbotErrors(t *testing.T) {
 	consumerIDFinder := &consumerIDFinderMock{consumerID: 10}
 	chatbot := &chatbotMock{err: errors.New("chatbot unavailable")}
 
-	service := conversation.NewService(repo, consumerIDFinder, &providerIDFinderMock{}, &conversationReaderMock{}, &messagePublisherMock{}, chatbot, &recommendationCategoryListerMock{}, &fileURLResolverMock{}, fixedClock{now: time.Now().UTC()})
+	service := conversation.NewService(repo, newUserRepositoryMock(consumerIDFinder, &providerIDFinderMock{}), &conversationReaderMock{}, &messagePublisherMock{}, chatbot, &recommendationCategoryListerMock{}, &fileURLResolverMock{}, fixedClock{now: time.Now().UTC()})
 
 	createdResult, err := service.CreateChatbotConversation(context.Background(), "auth0|consumer", "Tengo una pérdida de agua")
 
@@ -608,7 +652,7 @@ func TestContinueChatbotConversationAddsConsumerAndChatbotMessagesToExistingChat
 		Content: "Revisá el sifón.",
 	}}
 	publisher := &messagePublisherMock{}
-	service := conversation.NewService(repo, consumerIDFinder, &providerIDFinderMock{}, &conversationReaderMock{}, publisher, chatbot, &recommendationCategoryListerMock{}, &fileURLResolverMock{}, fixedClock{now: time.Now().UTC()})
+	service := conversation.NewService(repo, newUserRepositoryMock(consumerIDFinder, &providerIDFinderMock{}), &conversationReaderMock{}, publisher, chatbot, &recommendationCategoryListerMock{}, &fileURLResolverMock{}, fixedClock{now: time.Now().UTC()})
 
 	result, err := service.ContinueChatbotConversation(context.Background(), "auth0|consumer", 7, "  Parece salir de la rosca del sifón.  ")
 
@@ -645,7 +689,7 @@ func TestContinueChatbotConversationSendsCurrentTurnImagesToChatbot(t *testing.T
 		Title:   "Pérdida de agua en la cocina",
 		Content: "Por la imagen, revisá la rosca del sifón.",
 	}}
-	service := conversation.NewService(repo, consumerIDFinder, &providerIDFinderMock{}, &conversationReaderMock{}, &messagePublisherMock{}, chatbot, &recommendationCategoryListerMock{}, &fileURLResolverMock{}, fixedClock{now: time.Now().UTC()})
+	service := conversation.NewService(repo, newUserRepositoryMock(consumerIDFinder, &providerIDFinderMock{}), &conversationReaderMock{}, &messagePublisherMock{}, chatbot, &recommendationCategoryListerMock{}, &fileURLResolverMock{}, fixedClock{now: time.Now().UTC()})
 
 	result, err := service.ContinueChatbotConversation(context.Background(), "auth0|consumer", 7, "Saqué una foto", []string{"detail-image-id"})
 
@@ -684,7 +728,7 @@ func TestContinueChatbotConversationSummarizesPendingContextWhenRecentMessageLim
 		},
 		summary: "Resumen compactado",
 	}
-	service := conversation.NewService(repo, &consumerIDFinderMock{consumerID: 10}, &providerIDFinderMock{}, &conversationReaderMock{}, &messagePublisherMock{}, chatbot, &recommendationCategoryListerMock{}, &fileURLResolverMock{}, fixedClock{now: time.Now().UTC()})
+	service := conversation.NewService(repo, newUserRepositoryMock(&consumerIDFinderMock{consumerID: 10}, &providerIDFinderMock{}), &conversationReaderMock{}, &messagePublisherMock{}, chatbot, &recommendationCategoryListerMock{}, &fileURLResolverMock{}, fixedClock{now: time.Now().UTC()})
 
 	result, err := service.ContinueChatbotConversation(context.Background(), "auth0|consumer", 7, "Nueva información")
 
@@ -710,7 +754,7 @@ func TestContinueChatbotConversationRejectsAnotherConsumer(t *testing.T) {
 		ConsumerID:       10,
 		Title:            "Pérdida de agua",
 	}}
-	service := conversation.NewService(repo, &consumerIDFinderMock{consumerID: 99}, &providerIDFinderMock{}, &conversationReaderMock{}, &messagePublisherMock{}, &chatbotMock{}, &recommendationCategoryListerMock{}, &fileURLResolverMock{}, fixedClock{now: time.Now().UTC()})
+	service := conversation.NewService(repo, newUserRepositoryMock(&consumerIDFinderMock{consumerID: 99}, &providerIDFinderMock{}), &conversationReaderMock{}, &messagePublisherMock{}, &chatbotMock{}, &recommendationCategoryListerMock{}, &fileURLResolverMock{}, fixedClock{now: time.Now().UTC()})
 
 	result, err := service.ContinueChatbotConversation(context.Background(), "auth0|other", 7, "Hola")
 
@@ -731,7 +775,7 @@ func TestContinueChatbotConversationReturnsProcessingConflict(t *testing.T) {
 	}
 	chatbot := &chatbotMock{}
 	now := time.Date(2026, time.June, 17, 12, 0, 0, 0, time.UTC)
-	service := conversation.NewService(repo, &consumerIDFinderMock{consumerID: 10}, &providerIDFinderMock{}, &conversationReaderMock{}, &messagePublisherMock{}, chatbot, &recommendationCategoryListerMock{}, &fileURLResolverMock{}, fixedClock{now: now})
+	service := conversation.NewService(repo, newUserRepositoryMock(&consumerIDFinderMock{consumerID: 10}, &providerIDFinderMock{}), &conversationReaderMock{}, &messagePublisherMock{}, chatbot, &recommendationCategoryListerMock{}, &fileURLResolverMock{}, fixedClock{now: now})
 
 	result, err := service.ContinueChatbotConversation(context.Background(), "auth0|consumer", 7, "Hola")
 
@@ -752,7 +796,7 @@ func TestGetByIDReturnsConversationDetailForParticipantConsumer(t *testing.T) {
 	conversationReader := &conversationReaderMock{detail: conversationDetailFixture(conversation.SenderProvider)}
 	fileURLResolver := &fileURLResolverMock{urlsByFileID: map[string]string{"provider-photo-file-id": "https://cdn/provider.jpg"}}
 
-	service := conversation.NewService(repo, consumerIDFinder, providerIDFinder, conversationReader, nil, &chatbotMock{}, nil, fileURLResolver, fixedClock{now: time.Now().UTC()})
+	service := conversation.NewService(repo, newUserRepositoryMock(consumerIDFinder, providerIDFinder), conversationReader, nil, &chatbotMock{}, nil, fileURLResolver, fixedClock{now: time.Now().UTC()})
 
 	foundConversation, err := service.GetByID(context.Background(), "auth0|consumer", 1)
 
@@ -774,7 +818,7 @@ func TestGetByIDReturnsConversationDetailForParticipantProvider(t *testing.T) {
 	providerIDFinder := &providerIDFinderMock{providerID: 20}
 	conversationReader := &conversationReaderMock{detail: conversationDetailFixture(conversation.SenderConsumer)}
 
-	service := conversation.NewService(repo, consumerIDFinder, providerIDFinder, conversationReader, nil, &chatbotMock{}, nil, &fileURLResolverMock{}, fixedClock{now: time.Now().UTC()})
+	service := conversation.NewService(repo, newUserRepositoryMock(consumerIDFinder, providerIDFinder), conversationReader, nil, &chatbotMock{}, nil, &fileURLResolverMock{}, fixedClock{now: time.Now().UTC()})
 
 	foundConversation, err := service.GetByID(context.Background(), "auth0|provider", 1)
 
@@ -819,7 +863,7 @@ func TestGetByIDReturnsChatbotConversationDetailForOwnerConsumer(t *testing.T) {
 		Messages: []readmodel.MessageDetail{{ID: 1, SenderRole: conversation.SenderConsumer, Content: "Pierde agua"}},
 	}}
 	fileURLResolver := &fileURLResolverMock{urlsByFileID: map[string]string{"provider-photo-file-id": "https://cdn/provider.jpg"}}
-	service := conversation.NewService(repo, consumerIDFinder, providerFinder, conversationReader, nil, &chatbotMock{}, nil, fileURLResolver, fixedClock{now: time.Now().UTC()})
+	service := conversation.NewService(repo, newUserRepositoryMock(consumerIDFinder, providerFinder), conversationReader, nil, &chatbotMock{}, nil, fileURLResolver, fixedClock{now: time.Now().UTC()})
 
 	foundConversation, err := service.GetByID(context.Background(), "auth0|consumer", 7)
 
@@ -844,7 +888,7 @@ func TestGetByIDRejectsChatbotConversationForNonOwnerConsumer(t *testing.T) {
 	}}
 	consumerIDFinder := &consumerIDFinderMock{consumerID: 999}
 	conversationReader := &conversationReaderMock{}
-	service := conversation.NewService(repo, consumerIDFinder, &providerIDFinderMock{}, conversationReader, nil, &chatbotMock{}, nil, &fileURLResolverMock{}, fixedClock{now: time.Now().UTC()})
+	service := conversation.NewService(repo, newUserRepositoryMock(consumerIDFinder, &providerIDFinderMock{}), conversationReader, nil, &chatbotMock{}, nil, &fileURLResolverMock{}, fixedClock{now: time.Now().UTC()})
 
 	foundConversation, err := service.GetByID(context.Background(), "auth0|other-consumer", 7)
 
@@ -859,7 +903,7 @@ func TestGetByIDRejectsAuthenticatedUserThatIsNotParticipant(t *testing.T) {
 	consumerIDFinder := &consumerIDFinderMock{consumerID: 999}
 	providerIDFinder := &providerIDFinderMock{providerID: 888}
 
-	service := conversation.NewService(repo, consumerIDFinder, providerIDFinder, &conversationReaderMock{}, &messagePublisherMock{}, &chatbotMock{}, nil, &fileURLResolverMock{}, fixedClock{now: time.Now().UTC()})
+	service := conversation.NewService(repo, newUserRepositoryMock(consumerIDFinder, providerIDFinder), &conversationReaderMock{}, &messagePublisherMock{}, &chatbotMock{}, nil, &fileURLResolverMock{}, fixedClock{now: time.Now().UTC()})
 
 	foundConversation, err := service.GetByID(context.Background(), "auth0|other", 1)
 
@@ -873,7 +917,7 @@ func TestGetByIDReturnsNotFoundWhenConversationDoesNotExist(t *testing.T) {
 	consumerIDFinder := &consumerIDFinderMock{consumerID: 10}
 	providerIDFinder := &providerIDFinderMock{providerID: 20}
 
-	service := conversation.NewService(repo, consumerIDFinder, providerIDFinder, &conversationReaderMock{}, &messagePublisherMock{}, &chatbotMock{}, nil, &fileURLResolverMock{}, fixedClock{now: time.Now().UTC()})
+	service := conversation.NewService(repo, newUserRepositoryMock(consumerIDFinder, providerIDFinder), &conversationReaderMock{}, &messagePublisherMock{}, &chatbotMock{}, nil, &fileURLResolverMock{}, fixedClock{now: time.Now().UTC()})
 
 	foundConversation, err := service.GetByID(context.Background(), "auth0|consumer", 999)
 
@@ -887,7 +931,7 @@ func TestSendMessageAddsConsumerMessageForParticipantConsumer(t *testing.T) {
 	consumerIDFinder := &consumerIDFinderMock{consumerID: 10}
 	providerIDFinder := &providerIDFinderMock{err: errors.New("provider not found")}
 
-	service := conversation.NewService(repo, consumerIDFinder, providerIDFinder, &conversationReaderMock{}, &messagePublisherMock{}, &chatbotMock{}, nil, &fileURLResolverMock{}, fixedClock{now: time.Now().UTC()})
+	service := conversation.NewService(repo, newUserRepositoryMock(consumerIDFinder, providerIDFinder), &conversationReaderMock{}, &messagePublisherMock{}, &chatbotMock{}, nil, &fileURLResolverMock{}, fixedClock{now: time.Now().UTC()})
 
 	sentMessage, err := service.SendMessage(context.Background(), "auth0|consumer", 1, "  ¿El jueves te queda cómodo?  ", nil)
 
@@ -904,7 +948,7 @@ func TestSendMessageAddsResolvedPrivateImages(t *testing.T) {
 	repo := &conversationRepositoryMock{foundResult: activeConversationFixture()}
 	publisher := &messagePublisherMock{}
 	fileService := &fileURLResolverMock{}
-	service := conversation.NewService(repo, &consumerIDFinderMock{consumerID: 10}, &providerIDFinderMock{}, &conversationReaderMock{}, publisher, &chatbotMock{}, nil, fileService, fixedClock{now: time.Now().UTC()})
+	service := conversation.NewService(repo, newUserRepositoryMock(&consumerIDFinderMock{consumerID: 10}, &providerIDFinderMock{}), &conversationReaderMock{}, publisher, &chatbotMock{}, nil, fileService, fixedClock{now: time.Now().UTC()})
 
 	sentMessage, err := service.SendMessage(context.Background(), "auth0|consumer", 1, "", []string{"image-file-id"})
 
@@ -919,7 +963,7 @@ func TestSendMessageAddsResolvedPrivateImages(t *testing.T) {
 func TestSendMessageRejectsUnavailableImageBeforePersistence(t *testing.T) {
 	repo := &conversationRepositoryMock{foundResult: activeConversationFixture()}
 	fileService := &fileURLResolverMock{err: filedomain.ErrMessageImageNotAvailable}
-	service := conversation.NewService(repo, &consumerIDFinderMock{consumerID: 10}, &providerIDFinderMock{}, &conversationReaderMock{}, &messagePublisherMock{}, &chatbotMock{}, nil, fileService, fixedClock{now: time.Now().UTC()})
+	service := conversation.NewService(repo, newUserRepositoryMock(&consumerIDFinderMock{consumerID: 10}, &providerIDFinderMock{}), &conversationReaderMock{}, &messagePublisherMock{}, &chatbotMock{}, nil, fileService, fixedClock{now: time.Now().UTC()})
 
 	sentMessage, err := service.SendMessage(context.Background(), "auth0|consumer", 1, "Problem", []string{"image-file-id"})
 
@@ -933,7 +977,7 @@ func TestSendMessageAddsProviderMessageForParticipantProvider(t *testing.T) {
 	consumerIDFinder := &consumerIDFinderMock{err: errors.New("consumer not found")}
 	providerIDFinder := &providerIDFinderMock{providerID: 20}
 
-	service := conversation.NewService(repo, consumerIDFinder, providerIDFinder, &conversationReaderMock{}, &messagePublisherMock{}, &chatbotMock{}, nil, &fileURLResolverMock{}, fixedClock{now: time.Now().UTC()})
+	service := conversation.NewService(repo, newUserRepositoryMock(consumerIDFinder, providerIDFinder), &conversationReaderMock{}, &messagePublisherMock{}, &chatbotMock{}, nil, &fileURLResolverMock{}, fixedClock{now: time.Now().UTC()})
 
 	sentMessage, err := service.SendMessage(context.Background(), "auth0|provider", 1, "Sí, puedo pasar el jueves a las 10", nil)
 
@@ -951,7 +995,7 @@ func TestSendMessageRejectsProviderMessageInPendingConversation(t *testing.T) {
 	consumerIDFinder := &consumerIDFinderMock{err: errors.New("consumer not found")}
 	providerIDFinder := &providerIDFinderMock{providerID: 20}
 
-	service := conversation.NewService(repo, consumerIDFinder, providerIDFinder, &conversationReaderMock{}, &messagePublisherMock{}, &chatbotMock{}, nil, &fileURLResolverMock{}, fixedClock{now: time.Now().UTC()})
+	service := conversation.NewService(repo, newUserRepositoryMock(consumerIDFinder, providerIDFinder), &conversationReaderMock{}, &messagePublisherMock{}, &chatbotMock{}, nil, &fileURLResolverMock{}, fixedClock{now: time.Now().UTC()})
 
 	sentMessage, err := service.SendMessage(context.Background(), "auth0|provider", 1, "Sí, puedo pasar el jueves a las 10", nil)
 
@@ -969,7 +1013,7 @@ func TestSendMessageRejectsConsumerMessageWhenPendingLimitWasReached(t *testing.
 	consumerIDFinder := &consumerIDFinderMock{consumerID: 10}
 	providerIDFinder := &providerIDFinderMock{err: errors.New("provider not found")}
 
-	service := conversation.NewService(repo, consumerIDFinder, providerIDFinder, &conversationReaderMock{}, &messagePublisherMock{}, &chatbotMock{}, nil, &fileURLResolverMock{}, fixedClock{now: time.Now().UTC()})
+	service := conversation.NewService(repo, newUserRepositoryMock(consumerIDFinder, providerIDFinder), &conversationReaderMock{}, &messagePublisherMock{}, &chatbotMock{}, nil, &fileURLResolverMock{}, fixedClock{now: time.Now().UTC()})
 
 	sentMessage, err := service.SendMessage(context.Background(), "auth0|consumer", 1, "Otro detalle", nil)
 
@@ -984,7 +1028,7 @@ func TestSendMessageRejectsAuthenticatedUserThatIsNotParticipant(t *testing.T) {
 	consumerIDFinder := &consumerIDFinderMock{consumerID: 999}
 	providerIDFinder := &providerIDFinderMock{providerID: 888}
 
-	service := conversation.NewService(repo, consumerIDFinder, providerIDFinder, &conversationReaderMock{}, &messagePublisherMock{}, &chatbotMock{}, nil, &fileURLResolverMock{}, fixedClock{now: time.Now().UTC()})
+	service := conversation.NewService(repo, newUserRepositoryMock(consumerIDFinder, providerIDFinder), &conversationReaderMock{}, &messagePublisherMock{}, &chatbotMock{}, nil, &fileURLResolverMock{}, fixedClock{now: time.Now().UTC()})
 
 	sentMessage, err := service.SendMessage(context.Background(), "auth0|other", 1, "Hola", nil)
 
@@ -999,7 +1043,7 @@ func TestSendMessageReturnsNotFoundWhenConversationDoesNotExist(t *testing.T) {
 	consumerIDFinder := &consumerIDFinderMock{consumerID: 10}
 	providerIDFinder := &providerIDFinderMock{providerID: 20}
 
-	service := conversation.NewService(repo, consumerIDFinder, providerIDFinder, &conversationReaderMock{}, &messagePublisherMock{}, &chatbotMock{}, nil, &fileURLResolverMock{}, fixedClock{now: time.Now().UTC()})
+	service := conversation.NewService(repo, newUserRepositoryMock(consumerIDFinder, providerIDFinder), &conversationReaderMock{}, &messagePublisherMock{}, &chatbotMock{}, nil, &fileURLResolverMock{}, fixedClock{now: time.Now().UTC()})
 
 	sentMessage, err := service.SendMessage(context.Background(), "auth0|consumer", 999, "Hola", nil)
 
@@ -1015,7 +1059,7 @@ func TestSendMessageRejectsEmptyContent(t *testing.T) {
 	providerIDFinder := &providerIDFinderMock{err: errors.New("provider not found")}
 	publisher := &messagePublisherMock{}
 
-	service := conversation.NewService(repo, consumerIDFinder, providerIDFinder, &conversationReaderMock{}, publisher, &chatbotMock{}, nil, &fileURLResolverMock{}, fixedClock{now: time.Now().UTC()})
+	service := conversation.NewService(repo, newUserRepositoryMock(consumerIDFinder, providerIDFinder), &conversationReaderMock{}, publisher, &chatbotMock{}, nil, &fileURLResolverMock{}, fixedClock{now: time.Now().UTC()})
 
 	sentMessage, err := service.SendMessage(context.Background(), "auth0|consumer", 1, "   ", nil)
 
@@ -1032,7 +1076,7 @@ func TestSendMessagePublishesMessageAfterSuccessfulPersistence(t *testing.T) {
 	providerIDFinder := &providerIDFinderMock{err: errors.New("provider not found")}
 	publisher := &messagePublisherMock{}
 
-	service := conversation.NewService(repo, consumerIDFinder, providerIDFinder, &conversationReaderMock{}, publisher, &chatbotMock{}, nil, &fileURLResolverMock{}, fixedClock{now: time.Now().UTC()})
+	service := conversation.NewService(repo, newUserRepositoryMock(consumerIDFinder, providerIDFinder), &conversationReaderMock{}, publisher, &chatbotMock{}, nil, &fileURLResolverMock{}, fixedClock{now: time.Now().UTC()})
 
 	sentMessage, err := service.SendMessage(context.Background(), "auth0|consumer", 1, "Hola proveedor", nil)
 
@@ -1049,7 +1093,7 @@ func TestSendMessageDoesNotPublishWhenPersistFails(t *testing.T) {
 	providerIDFinder := &providerIDFinderMock{err: errors.New("provider not found")}
 	publisher := &messagePublisherMock{}
 
-	service := conversation.NewService(repo, consumerIDFinder, providerIDFinder, &conversationReaderMock{}, publisher, &chatbotMock{}, nil, &fileURLResolverMock{}, fixedClock{now: time.Now().UTC()})
+	service := conversation.NewService(repo, newUserRepositoryMock(consumerIDFinder, providerIDFinder), &conversationReaderMock{}, publisher, &chatbotMock{}, nil, &fileURLResolverMock{}, fixedClock{now: time.Now().UTC()})
 
 	sentMessage, err := service.SendMessage(context.Background(), "auth0|consumer", 1, "Hola", nil)
 
@@ -1084,7 +1128,7 @@ func TestListReturnsConversationSummariesForConsumer(t *testing.T) {
 	}
 
 	fileURLResolver := &fileURLResolverMock{urlsByFileID: map[string]string{"provider-photo-file-id": "https://cdn/provider.jpg"}}
-	service := conversation.NewService(repo, consumerIDFinder, providerIDFinder, conversationReader, nil, &chatbotMock{}, nil, fileURLResolver, fixedClock{now: time.Now().UTC()})
+	service := conversation.NewService(repo, newUserRepositoryMock(consumerIDFinder, providerIDFinder), conversationReader, nil, &chatbotMock{}, nil, fileURLResolver, fixedClock{now: time.Now().UTC()})
 
 	summaries, err := service.ListWorkConversations(context.Background(), "auth0|consumer")
 
@@ -1127,7 +1171,7 @@ func TestListReturnsConversationSummariesForProvider(t *testing.T) {
 		},
 	}
 
-	service := conversation.NewService(repo, consumerIDFinder, providerIDFinder, conversationReader, nil, &chatbotMock{}, nil, &fileURLResolverMock{}, fixedClock{now: time.Now().UTC()})
+	service := conversation.NewService(repo, newUserRepositoryMock(consumerIDFinder, providerIDFinder), conversationReader, nil, &chatbotMock{}, nil, &fileURLResolverMock{}, fixedClock{now: time.Now().UTC()})
 
 	summaries, err := service.ListWorkConversations(context.Background(), "auth0|provider")
 
@@ -1149,7 +1193,7 @@ func TestListRejectsAuthenticatedUserWithoutParticipantProfile(t *testing.T) {
 	consumerIDFinder := &consumerIDFinderMock{err: errors.New("consumer not found")}
 	providerIDFinder := &providerIDFinderMock{err: errors.New("provider not found")}
 
-	service := conversation.NewService(repo, consumerIDFinder, providerIDFinder, &conversationReaderMock{}, &messagePublisherMock{}, &chatbotMock{}, nil, &fileURLResolverMock{}, fixedClock{now: time.Now().UTC()})
+	service := conversation.NewService(repo, newUserRepositoryMock(consumerIDFinder, providerIDFinder), &conversationReaderMock{}, &messagePublisherMock{}, &chatbotMock{}, nil, &fileURLResolverMock{}, fixedClock{now: time.Now().UTC()})
 
 	summaries, err := service.ListWorkConversations(context.Background(), "auth0|unknown")
 
@@ -1235,7 +1279,7 @@ func TestServiceListsChatbotConversationsForConsumer(t *testing.T) {
 			{ID: 42, Type: conversation.TypeChatbot, Status: conversation.StatusActive, Chatbot: &readmodel.ChatbotConversationSummary{Title: "Pérdida de agua en la cocina"}},
 		},
 	}
-	service := conversation.NewService(&conversationRepositoryMock{}, &consumerIDFinderMock{consumerID: 10}, &providerIDFinderMock{}, reader, &messagePublisherMock{}, &chatbotMock{}, nil, &fileURLResolverMock{}, fixedClock{now: time.Now().UTC()})
+	service := conversation.NewService(&conversationRepositoryMock{}, newUserRepositoryMock(&consumerIDFinderMock{consumerID: 10}, &providerIDFinderMock{}), reader, &messagePublisherMock{}, &chatbotMock{}, nil, &fileURLResolverMock{}, fixedClock{now: time.Now().UTC()})
 
 	summaries, err := service.ListChatbotConversations(context.Background(), "auth0|consumer")
 
@@ -1248,7 +1292,7 @@ func TestServiceListsChatbotConversationsForConsumer(t *testing.T) {
 }
 
 func TestServiceRejectsChatbotConversationListForNonConsumer(t *testing.T) {
-	service := conversation.NewService(&conversationRepositoryMock{}, &consumerIDFinderMock{err: errors.New("not found")}, &providerIDFinderMock{providerID: 99}, &conversationReaderMock{}, &messagePublisherMock{}, &chatbotMock{}, nil, &fileURLResolverMock{}, fixedClock{now: time.Now().UTC()})
+	service := conversation.NewService(&conversationRepositoryMock{}, newUserRepositoryMock(&consumerIDFinderMock{err: errors.New("not found")}, &providerIDFinderMock{providerID: 99}), &conversationReaderMock{}, &messagePublisherMock{}, &chatbotMock{}, nil, &fileURLResolverMock{}, fixedClock{now: time.Now().UTC()})
 
 	summaries, err := service.ListChatbotConversations(context.Background(), "auth0|provider")
 

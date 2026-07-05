@@ -38,6 +38,19 @@ type MockConsumerRepository struct {
 	mock.Mock
 }
 
+type MockUserRepository struct {
+	provider *MockProviderRepository
+	consumer *MockConsumerRepository
+}
+
+func (m *MockUserRepository) FindProviderByAuthID(auth0ID string) (*provider.Provider, error) {
+	return m.provider.FindByAuthID(auth0ID)
+}
+
+func (m *MockUserRepository) FindConsumerByID(id int) (*consumer.Consumer, error) {
+	return m.consumer.FindByID(id)
+}
+
 func (m *MockConsumerRepository) FindByID(id int) (*consumer.Consumer, error) {
 	args := m.Called(id)
 

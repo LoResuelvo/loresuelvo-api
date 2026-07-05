@@ -1,9 +1,11 @@
 package consumer_test
 
 import (
+	"context"
 	"testing"
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/consumer"
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/user"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/validator"
 	"github.com/stretchr/testify/assert"
 )
@@ -15,10 +17,10 @@ type consumerRepositoryMock struct {
 	findByEmailCalled  bool
 }
 
-func (repository *consumerRepositoryMock) Save(consumer consumer.Consumer) error {
-	repository.savedConsumer = consumer
+func (repository *consumerRepositoryMock) Save(_ context.Context, userToSave user.User) (user.User, error) {
+	repository.savedConsumer = *userToSave.(*consumer.Consumer)
 	repository.saveCalled = true
-	return nil
+	return userToSave, nil
 }
 
 func (repository *consumerRepositoryMock) FindByEmail(email string) bool {
@@ -31,6 +33,7 @@ func TestRegisterConsumerWithValidData(t *testing.T) {
 	consumerManager := consumer.NewService(repository)
 
 	err := consumerManager.RegisterConsumer(
+		context.Background(),
 		"auth0|ana",
 		"ana@example.com",
 		"Ana",
@@ -38,8 +41,8 @@ func TestRegisterConsumerWithValidData(t *testing.T) {
 	)
 
 	assert.NoError(t, err)
-	assert.Equal(t, "auth0|ana", repository.savedConsumer.User.AuthID)
-	assert.Equal(t, "ana@example.com", repository.savedConsumer.User.Email)
+	assert.Equal(t, "auth0|ana", repository.savedConsumer.BaseUser.AuthID)
+	assert.Equal(t, "ana@example.com", repository.savedConsumer.BaseUser.Email)
 }
 
 func TestRegisterConsumerWithEmailWithoutArroba(t *testing.T) {
@@ -47,6 +50,7 @@ func TestRegisterConsumerWithEmailWithoutArroba(t *testing.T) {
 	consumerManager := consumer.NewService(repository)
 
 	err := consumerManager.RegisterConsumer(
+		context.Background(),
 		"auth0|ana",
 		"anaexample.com",
 		"Ana",
@@ -62,6 +66,7 @@ func TestRegisterConsumerWithEmailWithoutDomain(t *testing.T) {
 	consumerManager := consumer.NewService(repository)
 
 	err := consumerManager.RegisterConsumer(
+		context.Background(),
 		"auth0|ana",
 		"ana@",
 		"Ana",
@@ -77,6 +82,7 @@ func TestRegisterConsumerWithEmailWithoutName(t *testing.T) {
 	consumerManager := consumer.NewService(repository)
 
 	err := consumerManager.RegisterConsumer(
+		context.Background(),
 		"auth0|ana",
 		"@example.com",
 		"Ana",
@@ -92,6 +98,7 @@ func TestRegisterConsumerWithAlreadyRegisteredEmail(t *testing.T) {
 	consumerManager := consumer.NewService(repository)
 
 	err := consumerManager.RegisterConsumer(
+		context.Background(),
 		"auth0|ana",
 		"ana@example.com",
 		"Ana",

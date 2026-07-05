@@ -25,8 +25,6 @@ type testSuite struct {
 	server                 *httptest.Server
 	database               *sql.DB
 	categoryRepository     *repositories.CategoryRepository
-	consumerRepository     *repositories.ConsumerRepository
-	providerRepository     *repositories.ProviderRepository
 	conversationRepository *repositories.ConversationRepository
 	messageRepository      *repositories.MessageRepository
 	jobRequestRepository   *repositories.JobRequestRepository
@@ -197,8 +195,6 @@ func newTestSuite(tb testing.TB, database *sql.DB) *testSuite {
 		server:                 server,
 		database:               database,
 		categoryRepository:     dependencies.CategoryRepository,
-		consumerRepository:     dependencies.ConsumerRepository,
-		providerRepository:     dependencies.ProviderRepository,
 		conversationRepository: dependencies.ConversationRepository,
 		messageRepository:      dependencies.MessageRepository,
 		jobRequestRepository:   dependencies.JobRequestRepository,

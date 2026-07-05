@@ -57,7 +57,7 @@ func (suite *testSuite) createPendingConversationBetweenConsumerAndProvider(cons
 		return err
 	}
 
-	consumerID, err := suite.consumerRepository.FindIDByEmail(consumerEmail)
+	consumerID, err := suite.userRepository.FindIDByEmail(consumerEmail)
 	if err != nil {
 		return err
 	}
@@ -135,7 +135,7 @@ func (suite *testSuite) systemShowsConversationBetweenConsumerAndProvider(consum
 		return err
 	}
 
-	consumerID, err := suite.consumerRepository.FindIDByEmail(consumerEmail)
+	consumerID, err := suite.userRepository.FindIDByEmail(consumerEmail)
 	if err != nil {
 		return err
 	}
@@ -214,7 +214,7 @@ func (suite *testSuite) conversationDetailResponseFromLastBody() (conversationDe
 }
 
 func (suite *testSuite) senderRoleForEmail(email string) (string, error) {
-	if _, err := suite.consumerRepository.FindIDByEmail(email); err == nil {
+	if _, err := suite.userRepository.FindIDByEmail(email); err == nil {
 		return participantRoleConsumer, nil
 	}
 

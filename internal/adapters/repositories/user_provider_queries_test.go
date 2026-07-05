@@ -33,7 +33,7 @@ func cleanProviderRepositoryTestDatabase(t *testing.T, database *sql.DB) {
 }
 
 type providerRepositoryTestContext struct {
-	providerRepository *repositories.ProviderRepository
+	providerRepository *repositories.UserRepository
 	categoryRepository *repositories.CategoryRepository
 	database           *sql.DB
 }
@@ -55,7 +55,7 @@ func newProviderRepositoryTest(t *testing.T) providerRepositoryTestContext {
 
 	userRepository := repositories.NewUserRepository(database)
 	return providerRepositoryTestContext{
-		providerRepository: repositories.NewProviderRepository(database, userRepository),
+		providerRepository: userRepository,
 		categoryRepository: repositories.NewCategoryRepository(database),
 		database:           database,
 	}
@@ -65,6 +65,10 @@ func validProvider(t *testing.T, testContext providerRepositoryTestContext) *pro
 	t.Helper()
 
 	return validProviderWithData(t, testContext.categoryRepository, testContext.database, "auth0|josue", "josugod@gmail.com", "Josue", "el pro", "Plomería")
+}
+
+func providerUser(value *provider.Provider) *provider.Provider {
+	return value
 }
 
 func validProviderWithData(t *testing.T, categoryRepository *repositories.CategoryRepository, database *sql.DB, authID, email, name, surname, categoryName string) *provider.Provider {
@@ -114,7 +118,7 @@ func savedCategoryForProvider(t *testing.T, categoryRepository *repositories.Cat
 
 	savedCategory, err := categoryRepository.Save(*categoryToSave)
 	require.NoError(t, err, "could not prepare provider category")
-	require.NotNil(t, savedCategory, "provider category should exist")
+	require.NotNil(t, &savedCategory, "provider category should exist")
 	return savedCategory
 }
 
@@ -123,7 +127,7 @@ func TestProviderRepositoryCanSaveAProvider(t *testing.T) {
 	repo := testContext.providerRepository
 	provider := validProvider(t, testContext)
 
-	_, err := repo.Save(*provider)
+	_, err := repo.Save(context.Background(), providerUser(provider))
 
 	assert.NoError(t, err)
 	exists := repo.FindByEmail(provider.Email())
@@ -135,7 +139,7 @@ func TestProviderRepositoryCanDeleteAllProviders(t *testing.T) {
 	repo := testContext.providerRepository
 	provider := validProvider(t, testContext)
 
-	_, _ = repo.Save(*provider)
+	_, _ = repo.Save(context.Background(), providerUser(provider))
 
 	err := repo.DeleteAll()
 
@@ -149,7 +153,7 @@ func TestProviderRepositoryCanFindByEmail(t *testing.T) {
 	repo := testContext.providerRepository
 	provider := validProvider(t, testContext)
 
-	_, _ = repo.Save(*provider)
+	_, _ = repo.Save(context.Background(), providerUser(provider))
 
 	assert.True(t, repo.FindByEmail(provider.Email()), "Provider should be found by email")
 }
@@ -166,7 +170,7 @@ func TestProviderRepositoryCanFindIDByEmail(t *testing.T) {
 	repo := testContext.providerRepository
 	provider := validProvider(t, testContext)
 
-	_, err := repo.Save(*provider)
+	_, err := repo.Save(context.Background(), providerUser(provider))
 	require.NoError(t, err, "saving provider should not return an error")
 
 	providerID, err := repo.FindIDByEmail(provider.Email())
@@ -180,13 +184,13 @@ func TestProviderRepositoryCanCheckExistenceByID(t *testing.T) {
 	repo := testContext.providerRepository
 	provider := validProvider(t, testContext)
 
-	_, err := repo.Save(*provider)
+	_, err := repo.Save(context.Background(), providerUser(provider))
 	require.NoError(t, err, "saving provider should not return an error")
 
 	providerID, err := repo.FindIDByEmail(provider.Email())
 	require.NoError(t, err)
 
-	exists, err := repo.ExistsByID(providerID)
+	exists, err := repo.ExistsProviderByID(providerID)
 
 	require.NoError(t, err)
 	assert.True(t, exists)
@@ -196,7 +200,7 @@ func TestProviderRepositoryExistsByIDReturnsFalseIfProviderDoesNotExist(t *testi
 	testContext := newProviderRepositoryTest(t)
 	repo := testContext.providerRepository
 
-	exists, err := repo.ExistsByID(999999999)
+	exists, err := repo.ExistsProviderByID(999999999)
 
 	require.NoError(t, err)
 	assert.False(t, exists)
@@ -209,14 +213,14 @@ func TestProviderRepositoryCanFindProvidersByCategoryID(t *testing.T) {
 	anotherPlumbingProvider := validProviderWithData(t, testContext.categoryRepository, testContext.database, "auth0|pedro", "pedro.plomero@example.com", "Pedro", "Dib", "Plomería")
 	electricProvider := validProviderWithData(t, testContext.categoryRepository, testContext.database, "auth0|laura", "laura.electricista@example.com", "Laura", "Gómez", "Electricidad")
 
-	_, err := repo.Save(*plumbingProvider)
+	_, err := repo.Save(context.Background(), providerUser(plumbingProvider))
 	require.NoError(t, err)
-	_, err = repo.Save(*anotherPlumbingProvider)
+	_, err = repo.Save(context.Background(), providerUser(anotherPlumbingProvider))
 	require.NoError(t, err)
-	_, err = repo.Save(*electricProvider)
+	_, err = repo.Save(context.Background(), providerUser(electricProvider))
 	require.NoError(t, err)
 
-	providers, err := repo.FindByCategoryID(plumbingProvider.Category.ID)
+	providers, err := repo.FindProvidersByCategoryID(plumbingProvider.Category.ID)
 
 	require.NoError(t, err)
 	assert.Len(t, providers, 2)
@@ -241,7 +245,7 @@ func TestProviderRepositoryFindByCategoryIDReturnsEmptyListIfNoProvidersExistFor
 	repo := testContext.providerRepository
 	emptyCategory := savedCategoryForProvider(t, testContext.categoryRepository, "Gasista")
 
-	providers, err := repo.FindByCategoryID(emptyCategory.ID)
+	providers, err := repo.FindProvidersByCategoryID(emptyCategory.ID)
 
 	require.NoError(t, err)
 	assert.Empty(t, providers)
@@ -252,7 +256,7 @@ func TestProviderRepositoryCanFindIDByAuthID(t *testing.T) {
 	repo := testContext.providerRepository
 	provider := validProvider(t, testContext)
 
-	_, err := repo.Save(*provider)
+	_, err := repo.Save(context.Background(), providerUser(provider))
 	require.NoError(t, err, "saving provider should not return an error")
 
 	providerID, err := repo.FindIDByAuthID(provider.AuthID())
@@ -266,10 +270,11 @@ func TestProviderRepositoryCanFindByAuthID(t *testing.T) {
 	repo := testContext.providerRepository
 	providerToSave := validProvider(t, testContext)
 
-	providerID, err := repo.Save(*providerToSave)
+	savedUser, err := repo.Save(context.Background(), providerUser(providerToSave))
+	providerID := savedUser.Base().ID
 	require.NoError(t, err, "saving provider should not return an error")
 
-	foundProvider, err := repo.FindByAuthID(providerToSave.AuthID())
+	foundProvider, err := repo.FindProviderByAuthID(providerToSave.AuthID())
 
 	require.NoError(t, err)
 	assert.Equal(t, providerID, foundProvider.ID)
@@ -286,10 +291,11 @@ func TestProviderRepositoryCanFindByAuthID(t *testing.T) {
 func TestProviderRepositoryCanFindByID(t *testing.T) {
 	testContext := newProviderRepositoryTest(t)
 	providerToSave := validProvider(t, testContext)
-	providerID, err := testContext.providerRepository.Save(*providerToSave)
+	savedUser, err := testContext.providerRepository.Save(context.Background(), providerUser(providerToSave))
+	providerID := savedUser.Base().ID
 	require.NoError(t, err)
 
-	foundProvider, err := testContext.providerRepository.FindByID(context.Background(), providerID)
+	foundProvider, err := testContext.providerRepository.FindProviderByID(context.Background(), providerID)
 
 	require.NoError(t, err)
 	assert.Equal(t, providerID, foundProvider.ID)
@@ -301,7 +307,7 @@ func TestProviderRepositoryCanFindByID(t *testing.T) {
 func TestProviderRepositoryFindByIDReturnsNotFound(t *testing.T) {
 	testContext := newProviderRepositoryTest(t)
 
-	foundProvider, err := testContext.providerRepository.FindByID(context.Background(), 999999)
+	foundProvider, err := testContext.providerRepository.FindProviderByID(context.Background(), 999999)
 
 	assert.ErrorIs(t, err, provider.ErrDoesNotExist)
 	assert.Nil(t, foundProvider)

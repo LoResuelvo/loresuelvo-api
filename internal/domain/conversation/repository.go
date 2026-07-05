@@ -3,6 +3,8 @@ package conversation
 import (
 	"context"
 
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/user"
+
 	readmodel "github.com/LoResuelvo/loresuelvo-api/internal/domain/conversation/read_model"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/provider"
 )
@@ -15,22 +17,12 @@ type Repository interface {
 	CountMessagesBySenderRole(ctx context.Context, conversationID int, senderRole string) (int, error)
 }
 
-type ConsumerIDFinder interface {
-	FindIDByAuthID(authID string) (int, error)
-	FindAuthIDByID(id int) (string, error)
-}
-
-type ProviderIDFinder interface {
-	FindIDByAuthID(authID string) (int, error)
-	FindAuthIDByID(id int) (string, error)
-}
-
-type ProviderRepository interface {
-	ProviderIDFinder
-	FindByCategoryID(categoryID int) ([]provider.Provider, error)
+type UserRepository interface {
+	FindByAuthID(authID string) (user.User, error)
+	FindProvidersByCategoryID(categoryID int) ([]provider.Provider, error)
 }
 
 type Reader interface {
-	FindSummariesByParticipantIDRoleAndType(ctx context.Context, participantID int, participantRole string, conversationType string) ([]readmodel.ConversationSummary, error)
+	FindSummariesByUserAndType(ctx context.Context, user user.User, conversationType string) ([]readmodel.ConversationSummary, error)
 	FindDetailByIDRoleAndType(ctx context.Context, conversationID int, participantRole string, conversationType string) (*readmodel.ConversationDetail, error)
 }

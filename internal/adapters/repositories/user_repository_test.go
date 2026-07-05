@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/repositories"
-	"github.com/LoResuelvo/loresuelvo-api/internal/domain/user"
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/consumer"
 	"github.com/LoResuelvo/loresuelvo-api/internal/infrastructure/db"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -27,8 +27,8 @@ func newUserRepositoryTest(t *testing.T) *repositories.UserRepository {
 	return repositories.NewUserRepository(database)
 }
 
-func validUser() *user.User {
-	user, _ := user.New("auth0|josue", "Josue", "el pro", "josugod@gmail.com", "user")
+func validUser() *consumer.Consumer {
+	user, _ := consumer.NewConsumer("auth0|josue", "josugod@gmail.com", "Josue", "el pro")
 	return user
 }
 
@@ -36,7 +36,7 @@ func TestUserRepositoryCanSaveAUser(t *testing.T) {
 	repo := newUserRepositoryTest(t)
 	user := validUser()
 
-	err := repo.Save(*user)
+	_, err := repo.Save(context.Background(), user)
 
 	assert.NoError(t, err)
 	exists := repo.FindByEmail(user.Email)
@@ -46,7 +46,7 @@ func TestUserRepositoryCanSaveAUser(t *testing.T) {
 func TestUserRepositoryCanDeleteAllUsers(t *testing.T) {
 	repo := newUserRepositoryTest(t)
 
-	_ = repo.Save(*validUser())
+	_, _ = repo.Save(context.Background(), validUser())
 
 	err := repo.DeleteAll()
 
@@ -59,7 +59,7 @@ func TestUserRepositoryCanFindByEmail(t *testing.T) {
 	repo := newUserRepositoryTest(t)
 	user := validUser()
 
-	_ = repo.Save(*user)
+	_, _ = repo.Save(context.Background(), user)
 
 	assert.True(t, repo.FindByEmail(user.Email), "User should be found by email")
 }

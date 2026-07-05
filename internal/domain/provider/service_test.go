@@ -8,6 +8,7 @@ import (
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/category"
 	filedomain "github.com/LoResuelvo/loresuelvo-api/internal/domain/file"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/provider"
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/user"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/validator"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -85,16 +86,19 @@ func (finder *categoryFinderMock) FindByID(id int) *category.Category {
 	return nil
 }
 
-func (repository *providerRepositoryMock) Save(provider provider.Provider) (int, error) {
-	repository.savedProvider = provider
+func (repository *providerRepositoryMock) Save(_ context.Context, userToSave user.User) (user.User, error) {
+	providerToSave := userToSave.(*provider.Provider)
+	repository.savedProvider = *providerToSave
 	repository.saveCalled = true
 	if repository.saveErr != nil {
-		return 0, repository.saveErr
+		return nil, repository.saveErr
 	}
 	if repository.saveID != 0 {
-		return repository.saveID, nil
+		providerToSave.ID = repository.saveID
+		return providerToSave, nil
 	}
-	return 1, nil
+	providerToSave.ID = 1
+	return providerToSave, nil
 }
 
 func (repository *providerRepositoryMock) FindByEmail(email string) bool {
@@ -102,7 +106,7 @@ func (repository *providerRepositoryMock) FindByEmail(email string) bool {
 	return repository.existsByEmailValue
 }
 
-func (repository *providerRepositoryMock) FindByCategoryID(categoryID int) ([]provider.Provider, error) {
+func (repository *providerRepositoryMock) FindProvidersByCategoryID(categoryID int) ([]provider.Provider, error) {
 	repository.findByCategoryIDCalled = true
 	repository.requestedCategoryID = categoryID
 	if repository.findByCategoryIDErr != nil {
@@ -155,7 +159,7 @@ func TestNewProviderExposesUserFieldsThroughAccessors(t *testing.T) {
 	assert.Equal(t, "ana@example.com", createdProvider.Email())
 	assert.Equal(t, "Ana", createdProvider.Name())
 	assert.Equal(t, "Perez", createdProvider.Surname())
-	assert.Equal(t, provider.Role, createdProvider.User.Role)
+	assert.Equal(t, provider.Role, createdProvider.BaseUser.Role)
 }
 
 func TestRegisterProviderWithEmailWithoutArroba(t *testing.T) {

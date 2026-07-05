@@ -12,21 +12,21 @@ import (
 )
 
 type Service struct {
-	providerRepository Repository
-	categoryFinder     CategoryFinder
-	fileService        FileService
+	userRepository UserRepository
+	categoryFinder CategoryFinder
+	fileService    FileService
 }
 
-func NewService(repository Repository, categoryFinder CategoryFinder, fileService FileService) *Service {
+func NewService(repository UserRepository, categoryFinder CategoryFinder, fileService FileService) *Service {
 	return &Service{
-		providerRepository: repository,
-		categoryFinder:     categoryFinder,
-		fileService:        fileService,
+		userRepository: repository,
+		categoryFinder: categoryFinder,
+		fileService:    fileService,
 	}
 }
 
 func (s *Service) RegisterProvider(ctx context.Context, authID, email, name, surname string, categoryID int, profilePhotoFileID string) (*readmodel.ProviderSummary, error) {
-	if s.providerRepository.FindByEmail(email) {
+	if s.userRepository.FindByEmail(email) {
 		return nil, validator.ErrEmailAlreadyRegistered
 	}
 
@@ -49,13 +49,13 @@ func (s *Service) RegisterProvider(ctx context.Context, authID, email, name, sur
 		return nil, fmt.Errorf("resolving provider profile photo url: %w", err)
 	}
 
-	providerID, err := s.providerRepository.Save(*provider)
+	savedUser, err := s.userRepository.Save(ctx, provider)
 	if err != nil {
 		return nil, err
 	}
 
 	return &readmodel.ProviderSummary{
-		ID:              providerID,
+		ID:              savedUser.Base().ID,
 		Name:            provider.Name(),
 		Surname:         provider.Surname(),
 		CategoryName:    category.Name,
@@ -68,7 +68,7 @@ func (s *Service) FilterProvidersByCategoryID(ctx context.Context, categoryID in
 		return nil, err
 	}
 
-	providers, err := s.providerRepository.FindByCategoryID(categoryID)
+	providers, err := s.userRepository.FindProvidersByCategoryID(categoryID)
 	if err != nil {
 		return nil, err
 	}

@@ -12,6 +12,7 @@ import (
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/conversation"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/provider"
 	serviceproposal "github.com/LoResuelvo/loresuelvo-api/internal/domain/service_proposal"
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/user"
 	"github.com/LoResuelvo/loresuelvo-api/internal/infrastructure/db"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -19,8 +20,7 @@ import (
 
 type serviceProposalRepositoryTestContext struct {
 	database                  *sql.DB
-	consumerRepository        *repositories.ConsumerRepository
-	providerRepository        *repositories.ProviderRepository
+	userRepository            *repositories.UserRepository
 	categoryRepository        *repositories.CategoryRepository
 	conversationRepository    *repositories.ConversationRepository
 	serviceProposalRepository *repositories.ServiceProposalRepository
@@ -44,8 +44,7 @@ func newServiceProposalRepositoryTest(t *testing.T) serviceProposalRepositoryTes
 
 	return serviceProposalRepositoryTestContext{
 		database:                  database,
-		consumerRepository:        repositories.NewConsumerRepository(database, userRepository),
-		providerRepository:        repositories.NewProviderRepository(database, userRepository),
+		userRepository:            userRepository,
 		categoryRepository:        repositories.NewCategoryRepository(database),
 		conversationRepository:    repositories.NewConversationRepository(database, messageRepository),
 		serviceProposalRepository: repositories.NewServiceProposalRepository(database),
@@ -77,11 +76,11 @@ func cleanServiceProposalRepositoryTestDatabase(t *testing.T, database *sql.DB) 
 func TestServiceProposalRepositoryCanSave(t *testing.T) {
 	testContext := newServiceProposalRepositoryTest(t)
 	consumerID := savedConsumerIDWithData(t, jobRequestRepositoryTestContext{
-		consumerRepository: testContext.consumerRepository,
+		userRepository: testContext.userRepository,
 	}, "auth0|service-proposal-consumer", "service.proposal.consumer@example.com", "Ana", "Perez")
 	providerID := savedProviderIDWithData(t, jobRequestRepositoryTestContext{
 		database:           testContext.database,
-		providerRepository: testContext.providerRepository,
+		userRepository:     testContext.userRepository,
 		categoryRepository: testContext.categoryRepository,
 	}, "auth0|service-proposal-provider", "service.proposal.provider@example.com", "Juan", "Gomez", "Plomeria")
 	activeConversation, err := conversation.NewPendingConversation(consumerID, providerID)
@@ -91,8 +90,8 @@ func TestServiceProposalRepositoryCanSave(t *testing.T) {
 	require.NoError(t, err)
 	scheduledOn := time.Now().Add(24 * time.Hour).UTC().Truncate(time.Microsecond)
 	proposalToSave, err := serviceproposal.NewServiceProposal(
-		&provider.Provider{ID: providerID},
-		&consumer.Consumer{ID: consumerID},
+		&provider.Provider{BaseUser: &user.BaseUser{ID: providerID}},
+		&consumer.Consumer{BaseUser: &user.BaseUser{ID: consumerID}},
 		activeConversation,
 		1500050,
 		scheduledOn,

@@ -11,17 +11,15 @@ import (
 
 type Service struct {
 	repository             ServiceProposalRepository
-	providerRepository     ProviderRepository
-	consumerRepository     ConsumerRepository
+	userRepository         UserRepository
 	conversationRepository ConversationRepository
 	clock                  clock.Clock
 }
 
-func NewService(serviceRepo ServiceProposalRepository, providerRepo ProviderRepository, consumerRepo ConsumerRepository, conversationRepo ConversationRepository, clock clock.Clock) *Service {
+func NewService(serviceRepo ServiceProposalRepository, userRepo UserRepository, conversationRepo ConversationRepository, clock clock.Clock) *Service {
 	return &Service{
 		repository:             serviceRepo,
-		providerRepository:     providerRepo,
-		consumerRepository:     consumerRepo,
+		userRepository:         userRepo,
 		conversationRepository: conversationRepo,
 		clock:                  clock,
 	}
@@ -42,17 +40,17 @@ func (s *Service) CreateServiceProposal(auth0ID string, consumerID int, amount i
 }
 
 func (s *Service) getParticipants(providerAuth0ID string, consumerID int) (*provider.Provider, *consumer.Consumer, conversation.Conversation, error) {
-	provider, err := s.providerRepository.FindByAuthID(providerAuth0ID)
+	provider, err := s.userRepository.FindProviderByAuthID(providerAuth0ID)
 	if err != nil {
 		return nil, nil, nil, ErrProviderRequired
 	}
 
-	consumer, err := s.consumerRepository.FindByID(consumerID)
+	consumer, err := s.userRepository.FindConsumerByID(consumerID)
 	if err != nil {
 		return nil, nil, nil, ErrConsumerRequired
 	}
 
-	conversation, err := s.conversationRepository.FindBetween(consumer.ID, provider.ID)
+	conversation, err := s.conversationRepository.FindBetween(consumer.Base().ID, provider.Base().ID)
 	if err != nil {
 		return nil, nil, nil, ErrConversationRequired
 	}

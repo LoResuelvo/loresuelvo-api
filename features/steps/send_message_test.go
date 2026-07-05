@@ -212,11 +212,9 @@ func (suite *testSuite) sentMessageResponseFromLastBody() (sentMessageResponse, 
 }
 
 func (suite *testSuite) currentAuthenticatedParticipantRole() (string, error) {
-	if _, err := suite.consumerRepository.FindIDByAuthID(suite.currentAuth0ID); err == nil {
-		return participantRoleConsumer, nil
-	}
-	if _, err := suite.providerRepository.FindIDByAuthID(suite.currentAuth0ID); err == nil {
-		return participantRoleProvider, nil
+	foundUser, err := suite.userRepository.FindByAuthID(suite.currentAuth0ID)
+	if err == nil {
+		return foundUser.Base().Role, nil
 	}
 
 	return "", fmt.Errorf("authenticated user is not a registered conversation participant")

@@ -13,23 +13,20 @@ import (
 
 type Service struct {
 	repository             Repository
-	consumerRepository     ConsumerRepository
-	providerRepository     ProviderRepository
+	userRepository         UserRepository
 	conversationRepository ConversationRepository
 	fileService            FileService
 }
 
 func NewService(
 	repository Repository,
-	consumerRepository ConsumerRepository,
-	providerRepository ProviderRepository,
+	userRepository UserRepository,
 	conversationRepository ConversationRepository,
 	fileService FileService,
 ) *Service {
 	return &Service{
 		repository:             repository,
-		consumerRepository:     consumerRepository,
-		providerRepository:     providerRepository,
+		userRepository:         userRepository,
 		conversationRepository: conversationRepository,
 		fileService:            fileService,
 	}
@@ -100,7 +97,7 @@ func (s *Service) CreateFromChatbotAssessment(ctx context.Context, consumerAuthI
 	if !assessment.RequiresProfessional() || assessment.ProblemCategoryID == nil {
 		return nil, ErrAssessmentNotContactable
 	}
-	foundProvider, err := s.providerRepository.FindByID(ctx, providerID)
+	foundProvider, err := s.userRepository.FindProviderByID(ctx, providerID)
 	if err != nil {
 		if errors.Is(err, provider.ErrDoesNotExist) {
 			return nil, ErrProviderDoesNotExist
@@ -148,7 +145,7 @@ func (s *Service) Accept(ctx context.Context, providerAuthID string, jobRequestI
 		return nil, err
 	}
 
-	providerID, err := s.providerRepository.FindIDByAuthID(providerAuthID)
+	providerID, err := s.userRepository.FindIDByAuthID(providerAuthID)
 	if err != nil {
 		return nil, ErrOnlyAssignedProviderCanAcceptJobRequest
 	}
@@ -178,7 +175,7 @@ func (s *Service) Accept(ctx context.Context, providerAuthID string, jobRequestI
 }
 
 func (s *Service) consumerIDForJobRequest(consumerAuthID string) (int, error) {
-	consumerID, err := s.consumerRepository.FindIDByAuthID(consumerAuthID)
+	consumerID, err := s.userRepository.FindIDByAuthID(consumerAuthID)
 	if err != nil {
 		return 0, ErrOnlyConsumerCanCreateJobRequest
 	}
@@ -191,7 +188,7 @@ func (s *Service) ensureProviderExists(providerID int) error {
 		return ErrProviderRequired
 	}
 
-	exists, err := s.providerRepository.ExistsByID(providerID)
+	exists, err := s.userRepository.ExistsProviderByID(providerID)
 	if err != nil {
 		return err
 	}

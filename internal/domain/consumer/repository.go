@@ -1,10 +1,12 @@
 package consumer
 
-type Repository interface {
-	Save(consumer Consumer) error
-	FindByEmail(email string) bool
-}
+import (
+	"context"
 
-type ConsumerIDFinder interface {
-	FindIDByAuthID(authID string) (int, error)
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/user"
+)
+
+type UserRepository interface {
+	Save(ctx context.Context, user user.User) (user.User, error)
+	FindByEmail(email string) bool
 }

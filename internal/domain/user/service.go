@@ -8,7 +8,7 @@ func NewService(repository Repository) *Service {
 	return &Service{repository: repository}
 }
 
-func (s *Service) GetCurrentUser(authID string) (*User, error) {
+func (s *Service) GetCurrentUser(authID string) (User, error) {
 	user, err := s.repository.FindByAuthID(authID)
 	if err != nil {
 		return nil, ErrNotFound

@@ -1,7 +1,9 @@
 package user
 
+import "context"
+
 type Repository interface {
-	Save(user User) error
+	Save(ctx context.Context, user User) (User, error)
 	FindByEmail(email string) bool
-	FindByAuthID(id string) (*User, error)
+	FindByAuthID(id string) (User, error)
 }

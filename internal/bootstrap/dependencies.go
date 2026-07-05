@@ -33,8 +33,6 @@ import (
 type Dependencies struct {
 	UserRepository         *repositories.UserRepository
 	CategoryRepository     *repositories.CategoryRepository
-	ConsumerRepository     *repositories.ConsumerRepository
-	ProviderRepository     *repositories.ProviderRepository
 	ConversationRepository *repositories.ConversationRepository
 	MessageRepository      *repositories.MessageRepository
 	MessageImageRepository *repositories.MessageImageRepository
@@ -83,8 +81,6 @@ func NewDependenciesWithChatbot(database *sql.DB, chatbot conversation.Chatbot) 
 	clockadapter := clockadapter.NewSystemClock()
 	userRepository := repositories.NewUserRepository(database)
 	categoryRepository := repositories.NewCategoryRepository(database)
-	consumerRepository := repositories.NewConsumerRepository(database, userRepository)
-	providerRepository := repositories.NewProviderRepository(database, userRepository)
 	messageImageRepository := repositories.NewMessageImageRepository(database)
 	messageRepository := repositories.NewMessageRepository(database, messageImageRepository)
 	conversationRepository := repositories.NewConversationRepository(database, messageRepository)
@@ -104,16 +100,15 @@ func NewDependenciesWithChatbot(database *sql.DB, chatbot conversation.Chatbot) 
 
 	ticketStore := realtime.NewTicketStore()
 
-	messagePublisher := realtime.NewPublisher(hub, consumerRepository, providerRepository)
-	realtimeHandler := realtime.NewHandler(hub, consumerRepository, providerRepository, ticketStore)
+	messagePublisher := realtime.NewPublisher(hub, userRepository)
+	realtimeHandler := realtime.NewHandler(hub, userRepository, ticketStore)
 
 	categoryService := category.NewService(categoryRepository)
-	providerService := provider.NewService(providerRepository, categoryRepository, fileService)
-	consumerService := consumer.NewService(consumerRepository)
+	providerService := provider.NewService(userRepository, categoryRepository, fileService)
+	consumerService := consumer.NewService(userRepository)
 	conversationService := conversation.NewService(
 		conversationRepository,
-		consumerRepository,
-		providerRepository,
+		userRepository,
 		conversationReader,
 		messagePublisher,
 		chatbot,
@@ -123,22 +118,18 @@ func NewDependenciesWithChatbot(database *sql.DB, chatbot conversation.Chatbot) 
 	)
 	jobRequestService := jobrequest.NewService(
 		jobRequestRepository,
-		consumerRepository,
-		providerRepository,
+		userRepository,
 		conversationRepository,
 		fileService,
 	)
 	userService := user.NewService(userRepository)
 	servicePorposalService := serviceproposal.NewService(
-		serviceProposalRepository, providerRepository, consumerRepository,
-		conversationRepository, clockadapter)
+		serviceProposalRepository, userRepository, conversationRepository, clockadapter)
 	_ = cancel // TODO: wire shutdown signal to cancel context
 
 	return &Dependencies{
 		UserRepository:         userRepository,
 		CategoryRepository:     categoryRepository,
-		ConsumerRepository:     consumerRepository,
-		ProviderRepository:     providerRepository,
 		ConversationRepository: conversationRepository,
 		MessageRepository:      messageRepository,
 		MessageImageRepository: messageImageRepository,

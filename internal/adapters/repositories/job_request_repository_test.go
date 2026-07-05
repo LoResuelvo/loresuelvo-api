@@ -17,8 +17,7 @@ import (
 
 type jobRequestRepositoryTestContext struct {
 	database               *sql.DB
-	consumerRepository     *repositories.ConsumerRepository
-	providerRepository     *repositories.ProviderRepository
+	userRepository         *repositories.UserRepository
 	categoryRepository     *repositories.CategoryRepository
 	conversationRepository *repositories.ConversationRepository
 	jobRequestRepository   *repositories.JobRequestRepository
@@ -67,8 +66,7 @@ func newJobRequestRepositoryTest(t *testing.T) jobRequestRepositoryTestContext {
 
 	return jobRequestRepositoryTestContext{
 		database:               database,
-		consumerRepository:     repositories.NewConsumerRepository(database, userRepository),
-		providerRepository:     repositories.NewProviderRepository(database, userRepository),
+		userRepository:         userRepository,
 		categoryRepository:     repositories.NewCategoryRepository(database),
 		conversationRepository: repositories.NewConversationRepository(database, messageRepository),
 		jobRequestRepository:   repositories.NewJobRequestRepository(database),
@@ -86,9 +84,10 @@ func savedConsumerIDWithData(t *testing.T, testContext jobRequestRepositoryTestC
 
 	consumerToSave, err := consumer.NewConsumer(authID, email, name, surname)
 	require.NoError(t, err)
-	require.NoError(t, testContext.consumerRepository.Save(*consumerToSave))
+	_, err = testContext.userRepository.Save(context.Background(), consumerToSave)
+	require.NoError(t, err)
 
-	consumerID, err := testContext.consumerRepository.FindIDByEmail(consumerToSave.User.Email)
+	consumerID, err := testContext.userRepository.FindIDByEmail(consumerToSave.BaseUser.Email)
 	require.NoError(t, err)
 
 	return consumerID
@@ -104,10 +103,10 @@ func savedProviderIDWithData(t *testing.T, testContext jobRequestRepositoryTestC
 	t.Helper()
 
 	providerToSave := validProviderWithData(t, testContext.categoryRepository, testContext.database, authID, email, name, surname, categoryName)
-	_, err := testContext.providerRepository.Save(*providerToSave)
+	_, err := testContext.userRepository.Save(context.Background(), providerUser(providerToSave))
 	require.NoError(t, err)
 
-	providerID, err := testContext.providerRepository.FindIDByEmail(providerToSave.Email())
+	providerID, err := testContext.userRepository.FindIDByEmail(providerToSave.Email())
 	require.NoError(t, err)
 
 	return providerID

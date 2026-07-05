@@ -65,7 +65,7 @@ func (suite *testSuite) chatbotIsAvailable() error {
 }
 
 func (suite *testSuite) thereIsNoChatbotConversationForConsumer(consumerEmail string) error {
-	if _, err := suite.consumerRepository.FindIDByEmail(consumerEmail); err != nil {
+	if _, err := suite.userRepository.FindIDByEmail(consumerEmail); err != nil {
 		return err
 	}
 
@@ -116,7 +116,7 @@ func (suite *testSuite) startNewChatbotConversationWithMessage(message *godog.Do
 }
 
 func (suite *testSuite) systemCreatesChatbotConversationForConsumer(consumerEmail string) error {
-	if _, err := suite.consumerRepository.FindIDByEmail(consumerEmail); err != nil {
+	if _, err := suite.userRepository.FindIDByEmail(consumerEmail); err != nil {
 		return err
 	}
 
