@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"strings"
 	"time"
 
 	httphandler "github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler"
@@ -40,12 +39,13 @@ type realtimeNotificationEvent struct {
 }
 
 type realtimeNotificationData struct {
-	ID        int            `json:"id"`
-	Type      string         `json:"type"`
-	Title     string         `json:"title"`
-	Body      string         `json:"body"`
-	Metadata  map[string]any `json:"metadata"`
-	CreatedOn time.Time      `json:"created_on"`
+	ID           int        `json:"id"`
+	UserID       int        `json:"user_id"`
+	Type         string     `json:"type"`
+	ResourceType string     `json:"resource_type"`
+	ResourceID   int        `json:"resource_id"`
+	ReadAt       *time.Time `json:"read_at"`
+	CreatedAt    time.Time  `json:"created_at"`
 }
 
 func registerPostServiceProposalSteps(sc *godog.ScenarioContext, suite *testSuite) {
@@ -160,20 +160,31 @@ func (suite *testSuite) consumerReceivesRealtimeServiceProposalNotification(emai
 	if notification.ID == 0 {
 		return fmt.Errorf("expected realtime notification id to be present")
 	}
-	if notification.Type != "service_proposal.created" {
-		return fmt.Errorf("expected notification type %q, got %q", "service_proposal.created", notification.Type)
+	if notification.Type != "service_proposal_received" {
+		return fmt.Errorf("expected notification type %q, got %q", "service_proposal_received", notification.Type)
 	}
-	if strings.TrimSpace(notification.Title) == "" {
-		return fmt.Errorf("expected realtime notification title to be present")
+	if notification.ResourceType != "service_proposal" {
+		return fmt.Errorf("expected notification resource_type %q, got %q", "service_proposal", notification.ResourceType)
 	}
-	if strings.TrimSpace(notification.Body) == "" {
-		return fmt.Errorf("expected realtime notification body to be present")
+	consumerID, err := suite.userRepository.FindIDByEmail(email)
+	if err != nil {
+		return fmt.Errorf("finding expected notification user: %w", err)
 	}
-	if notification.CreatedOn.IsZero() {
-		return fmt.Errorf("expected realtime notification created_on to be present")
+	if notification.UserID != consumerID {
+		return fmt.Errorf("expected notification user_id %d, got %d", consumerID, notification.UserID)
 	}
-	if err := assertServiceProposalNotificationMetadata(notification.Metadata); err != nil {
+	response, err := suite.serviceProposalCreationResponseFromLastBody()
+	if err != nil {
 		return err
+	}
+	if notification.ResourceID != response.ID {
+		return fmt.Errorf("expected notification resource_id %d, got %d", response.ID, notification.ResourceID)
+	}
+	if notification.ReadAt != nil {
+		return fmt.Errorf("expected unread realtime notification, got read_at %s", notification.ReadAt.Format(time.RFC3339))
+	}
+	if notification.CreatedAt.IsZero() {
+		return fmt.Errorf("expected realtime notification created_at to be present")
 	}
 
 	return nil
@@ -309,20 +320,4 @@ func (connection *realtimeTestConnection) readNotificationEvent(timeout time.Dur
 
 	_ = connection.conn.SetReadDeadline(time.Time{})
 	return event, nil
-}
-
-func assertServiceProposalNotificationMetadata(metadata map[string]any) error {
-	if len(metadata) == 0 {
-		return fmt.Errorf("expected realtime notification metadata to be present")
-	}
-
-	requiredKeys := []string{"service_proposal_id", "consumer_id", "provider_id", "conversation_id", "amount_cents", "scheduled_on"}
-	for _, key := range requiredKeys {
-		value, ok := metadata[key]
-		if !ok || value == nil {
-			return fmt.Errorf("expected realtime notification metadata %q to be present", key)
-		}
-	}
-
-	return nil
 }

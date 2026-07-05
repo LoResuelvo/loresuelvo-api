@@ -30,6 +30,7 @@ type testSuite struct {
 	jobRequestRepository   *repositories.JobRequestRepository
 	userRepository         *repositories.UserRepository
 	fileRepository         *repositories.FileRepository
+	notificationRepository *repositories.NotificationRepository
 	auth0Validator         *validator.Validator
 	tokenBuilder           *auth0.TokenBuilder
 	chatbot                *chatbotadapter.FakeChatbot
@@ -111,6 +112,10 @@ func (s *testSuite) cleanup() error {
 
 	if err := s.jobRequestRepository.DeleteAll(); err != nil {
 		return fmt.Errorf("could not clean job requests: %w", err)
+	}
+
+	if err := s.notificationRepository.DeleteAll(); err != nil {
+		return fmt.Errorf("could not clean notifications: %w", err)
 	}
 
 	if err := s.conversationRepository.DeleteAll(); err != nil {
@@ -203,6 +208,7 @@ func newTestSuite(tb testing.TB, database *sql.DB) *testSuite {
 		jobRequestRepository:   dependencies.JobRequestRepository,
 		userRepository:         dependencies.UserRepository,
 		fileRepository:         dependencies.FileRepository,
+		notificationRepository: dependencies.NotificationRepository,
 		auth0Validator:         auth0Validator,
 		tokenBuilder:           tokenBuilder,
 		chatbot:                chatbot,
