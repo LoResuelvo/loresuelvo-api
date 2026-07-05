@@ -1,7 +1,9 @@
 package repositories
 
 import (
+	"context"
 	"database/sql"
+	"fmt"
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/notification"
 )
@@ -16,10 +18,43 @@ func NewNotificationRepository(db *sql.DB) *NotificationRepository {
 	}
 }
 
-func (repository *NotificationRepository) Save(notification *notification.Notification) (*notification.Notification, error) {
-	// Implement the logic to save the notification to the database
-	// For example, you can use an INSERT statement to insert the notification into a notifications table
-	// After saving, you can return the saved notification and any error that occurred during the process
+func (repository *NotificationRepository) Save(ctx context.Context, notification *notification.Notification) (*notification.Notification, error) {
+	if notification == nil {
+		return nil, fmt.Errorf("saving notification: notification is required")
+	}
 
-	return notification, nil // Replace with actual implementation
+	saved := *notification
+	err := repository.db.QueryRowContext(
+		ctx,
+		`INSERT INTO notifications (
+			user_id,
+			type,
+			resource_type,
+			resource_id,
+			read_at,
+			created_at,
+			updated_on
+		)
+		VALUES ($1, $2, $3, $4, $5, $6, NOW())
+		RETURNING id, created_at`,
+		notification.UserID,
+		notification.Type,
+		notification.ResourceType,
+		notification.ResourceID,
+		notification.ReadAt,
+		notification.CreatedAt,
+	).Scan(&saved.ID, &saved.CreatedAt)
+	if err != nil {
+		return nil, fmt.Errorf("saving notification: %w", err)
+	}
+
+	return &saved, nil
+}
+
+func (repository *NotificationRepository) DeleteAll() error {
+	_, err := repository.db.Exec("DELETE FROM notifications")
+	if err != nil {
+		return fmt.Errorf("deleting all notifications: %w", err)
+	}
+	return nil
 }
