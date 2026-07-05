@@ -18,7 +18,6 @@ Feature: Obtener propuestas de servicio
             When consulto mis propuestas de servicio
             Then el sistema muestra un listado de propuestas de servicio vacío
         
-        @wip
         Scenario: 54.2-GSP Consumidor obtiene una propuesta recibida
             Given que existe una propuesta de servicio pendiente de "juan.plomero@example.com" para "ana@example.com" por "15000.50" para la fecha y hora "2026-07-05T09:30:00-03:00" con la descripción:
                 """
