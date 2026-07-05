@@ -49,6 +49,10 @@
             "description": "Job request creation endpoints."
         },
         {
+            "name": "ServiceProposals",
+            "description": "Service proposal endpoints."
+        },
+        {
             "name": "Users",
             "description": "Authenticated user session endpoints."
         },
@@ -1932,6 +1936,54 @@
                 }
             }
         },
+        "/service-proposals": {
+            "get": {
+                "summary": "List the authenticated user's service proposals",
+                "tags": [
+                    "ServiceProposals"
+                ],
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Service proposals involving the authenticated user",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/ServiceProposalSummary"
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AuthErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Service proposals could not be retrieved",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/conversations/{conversationId}": {
             "get": {
                 "tags": [
@@ -3534,6 +3586,91 @@
                     }
                 },
                 "additionalProperties": false
+            },
+            "ServiceProposalSummary": {
+                "type": "object",
+                "required": [
+                    "id",
+                    "conversation_id",
+                    "amount_cents",
+                    "scheduled_on",
+                    "description",
+                    "status",
+                    "created_on",
+                    "counterpart"
+                ],
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "minimum": 1
+                    },
+                    "conversation_id": {
+                        "type": "integer",
+                        "minimum": 1
+                    },
+                    "amount_cents": {
+                        "type": "integer",
+                        "format": "int64",
+                        "minimum": 1
+                    },
+                    "scheduled_on": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "description": {
+                        "type": "string"
+                    },
+                    "status": {
+                        "type": "string",
+                        "enum": [
+                            "pending",
+                            "accepted",
+                            "rejected"
+                        ]
+                    },
+                    "created_on": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "counterpart": {
+                        "$ref": "#/components/schemas/ServiceProposalCounterpart"
+                    }
+                }
+            },
+            "ServiceProposalCounterpart": {
+                "type": "object",
+                "required": [
+                    "id",
+                    "role",
+                    "name",
+                    "surname"
+                ],
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "minimum": 1
+                    },
+                    "role": {
+                        "type": "string",
+                        "enum": [
+                            "consumer",
+                            "provider"
+                        ]
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "surname": {
+                        "type": "string"
+                    },
+                    "category_name": {
+                        "type": "string"
+                    },
+                    "profile_photo_url": {
+                        "type": "string",
+                        "format": "uri"
+                    }
+                }
             }
         }
     }

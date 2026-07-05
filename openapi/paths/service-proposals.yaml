@@ -1,0 +1,27 @@
+get:
+  summary: List the authenticated user's service proposals
+  tags:
+    - ServiceProposals
+  security:
+    - BearerAuth: []
+  responses:
+    '200':
+      description: Service proposals involving the authenticated user
+      content:
+        application/json:
+          schema:
+            type: array
+            items:
+              $ref: '#/components/schemas/ServiceProposalSummary'
+    '401':
+      description: Missing or invalid authentication
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/AuthErrorResponse'
+    '500':
+      description: Service proposals could not be retrieved
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'

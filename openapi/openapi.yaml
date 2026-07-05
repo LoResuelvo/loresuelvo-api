@@ -27,6 +27,8 @@ tags:
   description: Provider work request conversation endpoints.
 - name: JobRequests
   description: Job request creation endpoints.
+- name: ServiceProposals
+  description: Service proposal endpoints.
 - name: Users
   description: Authenticated user session endpoints.
 - name: Realtime
@@ -56,6 +58,8 @@ paths:
     $ref: ./paths/job-requests.yaml
   /job-requests/{jobRequestID}/accept:
     $ref: ./paths/job-request-accept.yaml
+  /service-proposals:
+    $ref: ./paths/service-proposals.yaml
   /conversations/{conversationId}:
     $ref: ./paths/conversation-by-id.yaml
   /conversations/{conversationId}/messages:
@@ -164,3 +168,7 @@ components:
       $ref: ./components/schemas/category.yaml
     CategoryListItem:
       $ref: ./components/schemas/category-list-item.yaml
+    ServiceProposalSummary:
+      $ref: ./components/schemas/service-proposal-summary.yaml
+    ServiceProposalCounterpart:
+      $ref: ./components/schemas/service-proposal-counterpart.yaml

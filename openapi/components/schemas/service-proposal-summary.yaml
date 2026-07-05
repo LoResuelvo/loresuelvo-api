@@ -1,0 +1,37 @@
+type: object
+required:
+  - id
+  - conversation_id
+  - amount_cents
+  - scheduled_on
+  - description
+  - status
+  - created_on
+  - counterpart
+properties:
+  id:
+    type: integer
+    minimum: 1
+  conversation_id:
+    type: integer
+    minimum: 1
+  amount_cents:
+    type: integer
+    format: int64
+    minimum: 1
+  scheduled_on:
+    type: string
+    format: date-time
+  description:
+    type: string
+  status:
+    type: string
+    enum:
+      - pending
+      - accepted
+      - rejected
+  created_on:
+    type: string
+    format: date-time
+  counterpart:
+    $ref: '#/components/schemas/ServiceProposalCounterpart'

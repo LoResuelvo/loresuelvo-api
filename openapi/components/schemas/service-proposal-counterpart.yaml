@@ -1,0 +1,24 @@
+type: object
+required:
+  - id
+  - role
+  - name
+  - surname
+properties:
+  id:
+    type: integer
+    minimum: 1
+  role:
+    type: string
+    enum:
+      - consumer
+      - provider
+  name:
+    type: string
+  surname:
+    type: string
+  category_name:
+    type: string
+  profile_photo_url:
+    type: string
+    format: uri
