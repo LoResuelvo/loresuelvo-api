@@ -66,19 +66,55 @@ paths:
     $ref: ./paths/conversation-messages.yaml
   /me:
     $ref: ./paths/users.yaml
+  /ws-tickets:
+    post:
+      summary: Issue a WebSocket ticket
+      description: |
+        Issues a short-lived one-time ticket used to establish a realtime WebSocket connection.
+        Call this endpoint with the same Bearer JWT used for regular HTTP endpoints, then
+        pass the returned ticket to `/ws?ticket={ticket}&role={consumer|provider}`.
+      tags:
+        - Realtime
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: WebSocket ticket issued successfully.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - ticket
+                properties:
+                  ticket:
+                    type: string
+                    example: 9f0b8f6b2f7d4edc9a5b2a8e3d0d6a1c
+                additionalProperties: false
+        '401':
+          description: Authentication failed or the authenticated user id could not be obtained from the request context.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthErrorResponse'
+        '500':
+          description: The ticket could not be issued.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
   /ws:
     get:
-      summary: WebSocket for real-time messages
+      summary: WebSocket for realtime events
       description: |
-        Establishes a WebSocket connection for real-time message delivery.
-        Authentication is handled by the Gin middleware chain — the JWT token
-        must be provided in the `Authorization` header, identical to HTTP endpoints.
+        Establishes a WebSocket connection for realtime event delivery.
+        The client must first request a ticket with `POST /ws-tickets`, then open
+        `/ws?ticket={ticket}&role={consumer|provider}`. The ticket is one-time use.
 
-        Once connected, the client receives push events for message activity
-        in conversations where they participate. No query parameters are needed;
-        conversation filtering happens at publish time based on the sender's context.
+        Once connected, the client receives push events for activity relevant to
+        the authenticated user and selected role.
 
-        **Event format:**
+        **Conversation message event:**
         ```json
         {
           "type": "conversation.message.created",
@@ -91,13 +127,47 @@ paths:
           }
         }
         ```
+
+        **Notification created event:**
+        ```json
+        {
+          "type": "notification.created",
+          "notification": {
+            "id": 15,
+            "user_id": 1,
+            "type": "service_proposal_received",
+            "resource_type": "service_proposal",
+            "resource_id": 10,
+            "read_at": null,
+            "created_at": "2026-07-04T13:00:00Z"
+          }
+        }
+        ```
       tags:
         - Realtime
+      parameters:
+        - name: ticket
+          in: query
+          required: true
+          description: One-time ticket issued by POST /ws-tickets.
+          schema:
+            type: string
+        - name: role
+          in: query
+          required: true
+          description: Role profile to bind to this realtime connection.
+          schema:
+            type: string
+            enum:
+              - consumer
+              - provider
       responses:
         '101':
           description: Switching Protocols — WebSocket connection upgraded successfully
+        '400':
+          description: Missing or invalid role query parameter.
         '401':
-          description: Unauthorized — Missing or invalid JWT token
+          description: Missing, invalid, or expired WebSocket ticket.
 components:
   securitySchemes:
     $ref: ./components/security-schemes.yaml
@@ -128,6 +198,10 @@ components:
       $ref: ./components/schemas/job-request-requester.yaml
     SendMessageRequest:
       $ref: ./components/schemas/send-message-request.yaml
+    CreateServiceProposalRequest:
+      $ref: ./components/schemas/create-service-proposal-request.yaml
+    ServiceProposal:
+      $ref: ./components/schemas/service-proposal.yaml
     CreateChatbotConversationRequest:
       $ref: ./components/schemas/create-chatbot-conversation-request.yaml
     ChatbotConversationResponse:
@@ -172,3 +246,7 @@ components:
       $ref: ./components/schemas/service-proposal-summary.yaml
     ServiceProposalCounterpart:
       $ref: ./components/schemas/service-proposal-counterpart.yaml
+    RealtimeNotification:
+      $ref: ./components/schemas/realtime-notification.yaml
+    RealtimeNotificationCreatedEvent:
+      $ref: ./components/schemas/realtime-notification-created-event.yaml

@@ -1,0 +1,13 @@
+type: object
+description: Event emitted when a notification is created for the connected user.
+required:
+  - type
+  - notification
+properties:
+  type:
+    type: string
+    const: notification.created
+    example: notification.created
+  notification:
+    $ref: '#/components/schemas/RealtimeNotification'
+additionalProperties: false

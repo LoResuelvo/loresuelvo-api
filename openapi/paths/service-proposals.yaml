@@ -25,3 +25,103 @@ get:
         application/json:
           schema:
             $ref: '#/components/schemas/ErrorResponse'
+post:
+  tags:
+    - ServiceProposals
+  operationId: createServiceProposal
+  summary: Create a service proposal
+  description: |
+    Creates a pending service proposal from the authenticated provider to a consumer.
+    The provider and consumer must already have an active work conversation.
+
+    After the proposal is persisted, the API stores a notification for the consumer
+    and publishes it through the realtime WebSocket channel when the consumer is connected.
+  security:
+    - BearerAuth: []
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/CreateServiceProposalRequest'
+        examples:
+          validProposal:
+            summary: Valid service proposal
+            value:
+              consumer_id: 1
+              amount: '15000.50'
+              scheduled_on: '2026-07-05T12:30:00Z'
+              description: Reparación de pérdida de agua en cocina con materiales incluidos.
+  responses:
+    '201':
+      description: Service proposal created successfully.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ServiceProposal'
+          examples:
+            created:
+              value:
+                id: 10
+                conversation_id: 25
+                consumer_id: 1
+                provider_id: 2
+                amount_cents: 1500050
+                scheduled_on: '2026-07-05T12:30:00Z'
+                description: Reparación de pérdida de agua en cocina con materiales incluidos.
+                status: pending
+    '400':
+      description: The request body is invalid, required fields are missing, the amount is invalid, or scheduled_on is not in the future.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            invalidAmount:
+              value:
+                error: Amount must be greater than zero
+            invalidScheduledOn:
+              value:
+                error: Scheduled date must be in the future
+    '401':
+      description: Authentication failed or the authenticated user id could not be obtained from the request context.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/AuthErrorResponse'
+    '403':
+      description: The authenticated user is not a provider and cannot create a service proposal.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            onlyProvider:
+              value:
+                error: Provider is required
+    '404':
+      description: No consumer exists with the requested id.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            consumerNotFound:
+              value:
+                error: Consumer is required
+    '409':
+      description: The provider and consumer do not have an active work conversation.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            activeConversationRequired:
+              value:
+                error: Provider and consumer must have an active conversation before creating a service proposal
+    '500':
+      description: Unexpected error while creating the service proposal or storing its notification.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'

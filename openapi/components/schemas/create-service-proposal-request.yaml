@@ -1,0 +1,30 @@
+type: object
+description: Payload accepted by POST /service-proposals. The provider is inferred from the authenticated JWT subject.
+required:
+  - consumer_id
+  - amount
+  - scheduled_on
+  - description
+properties:
+  consumer_id:
+    type: integer
+    format: int32
+    minimum: 1
+    description: Consumer user id that will receive the proposal.
+    example: 1
+  amount:
+    type: string
+    description: Decimal amount in Argentine pesos. The API converts it to cents in the response.
+    pattern: '^[0-9]+(\.[0-9]{1,2})?$'
+    example: '15000.50'
+  scheduled_on:
+    type: string
+    format: date-time
+    description: Proposed service date and time. Must be in the future.
+    example: '2026-07-05T12:30:00Z'
+  description:
+    type: string
+    minLength: 1
+    description: Human-readable description of the proposed service.
+    example: Reparación de pérdida de agua en cocina con materiales incluidos.
+additionalProperties: false

@@ -1,0 +1,53 @@
+type: object
+description: Service proposal created by a provider for a consumer.
+required:
+  - id
+  - conversation_id
+  - consumer_id
+  - provider_id
+  - amount_cents
+  - scheduled_on
+  - description
+  - status
+properties:
+  id:
+    type: integer
+    format: int32
+    minimum: 1
+    example: 10
+  conversation_id:
+    type: integer
+    format: int32
+    minimum: 1
+    example: 25
+  consumer_id:
+    type: integer
+    format: int32
+    minimum: 1
+    example: 1
+  provider_id:
+    type: integer
+    format: int32
+    minimum: 1
+    example: 2
+  amount_cents:
+    type: integer
+    format: int64
+    minimum: 1
+    description: Proposal amount expressed in cents.
+    example: 1500050
+  scheduled_on:
+    type: string
+    format: date-time
+    example: '2026-07-05T12:30:00Z'
+  description:
+    type: string
+    example: Reparación de pérdida de agua en cocina con materiales incluidos.
+  status:
+    type: string
+    enum:
+      - pending
+      - accepted
+      - rejected
+    example: pending
+additionalProperties: false
