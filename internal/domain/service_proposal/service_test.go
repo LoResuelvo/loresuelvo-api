@@ -163,3 +163,28 @@ func TestCreationOfProposalShouldCreateNotification(t *testing.T) {
 
 	env.notificationRepo.AssertExpectations(t)
 }
+
+func TestGetServiceProposalsWithoutServiceProposals(t *testing.T) {
+	providerRepo := new(MockProviderRepository)
+	consumerRepo := new(MockConsumerRepository)
+	conversationRepo := new(MockConversationRepository)
+	serviceRepo := new(MockServiceProposalRepository)
+	notificationRepo := new(MockNotificationRepository)
+	clock := new(MockClock)
+
+	providerRepo.
+		On("FindByAuthID", validProviderAuth0ID).
+		Return(&provider.Provider{BaseUser: &user.BaseUser{ID: validProviderID}}, nil)
+
+	serviceRepo.
+		On("FindByUserID", validProviderID).
+		Return([]*serviceproposal.ServiceProposal{}, nil)
+
+	service := serviceproposal.NewService(serviceRepo, &MockUserRepository{provider: providerRepo, consumer: consumerRepo}, conversationRepo, notificationRepo, clock)
+
+	serviceProposals, err := service.GetServiceProposals(validProviderAuth0ID)
+
+	assert.NoError(t, err)
+	assert.NotNil(t, serviceProposals)
+	assert.Empty(t, serviceProposals)
+}

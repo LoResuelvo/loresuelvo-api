@@ -43,3 +43,14 @@ func (h *ServiceProposalHandler) CreateServiceProposal(c *gin.Context) {
 	}
 	c.JSON(http.StatusCreated, serviceProposalCreationResponseFromDomain(serviceproposal))
 }
+
+func (h *ServiceProposalHandler) GetServiceProposals(c *gin.Context) {
+	auth0ID, ok := httphandler.GetAuthenticatedUserID(c)
+	if !ok {
+		return
+	}
+
+	serviceProposals, _ := h.serviceProposalService.GetServiceProposals(auth0ID)
+
+	c.JSON(http.StatusOK, serviceProposals)
+}

@@ -136,6 +136,7 @@ func (router *Router) registerChatbotRoutes(engine *gin.Engine, authMiddleware g
 
 func (router *Router) registerServiceProposalRoutes(engine *gin.Engine, authMiddleware gin.HandlerFunc) {
 	engine.POST("/service-proposals", authMiddleware, router.serviceProposalHandler.CreateServiceProposal)
+	engine.GET("/service-proposals", authMiddleware, router.serviceProposalHandler.GetServiceProposals)
 }
 
 func (router *Router) registerAuthenticatedRoutes(engine *gin.Engine, authMiddleware gin.HandlerFunc) {
