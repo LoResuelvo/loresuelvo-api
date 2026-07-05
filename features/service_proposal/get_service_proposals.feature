@@ -33,7 +33,6 @@ Feature: Obtener propuestas de servicio
             And la contraparte de la propuesta es el prestador "Juan Gómez" con rubro "Plomería" y su foto de perfil
             And la propuesta incluye el identificador de la conversación con el prestador
         
-        @wip
         Scenario: 54.3-GSP Prestador obtiene una propuesta enviada
             Given que existe una propuesta de servicio pendiente de "juan.plomero@example.com" para "ana@example.com" por "15000.50" para la fecha y hora "2026-07-05T09:30:00-03:00" con la descripción:
                 """
@@ -52,7 +51,6 @@ Feature: Obtener propuestas de servicio
 
     Rule: El listado permite distinguir el estado de cada propuesta
         
-        @wip
         Scenario: 54.4-GSP Usuario obtiene propuestas con distintos estados
             Given que existen propuestas de servicio de "juan.plomero@example.com" para "ana@example.com" con los estados:
                 | estado   |
@@ -66,7 +64,6 @@ Feature: Obtener propuestas de servicio
 
     Rule: El listado solo incluye propuestas propias y muestra primero las más recientes
         
-        @wip
         Scenario: 54.5-GSP Usuario obtiene solamente las propuestas en las que participa
             Given que existe una propuesta de servicio pendiente de "juan.plomero@example.com" para "ana@example.com"
             And que existe una propuesta de servicio pendiente de "pedro.plomero@example.com" para "carla@example.com"
@@ -74,7 +71,6 @@ Feature: Obtener propuestas de servicio
             When consulto mis propuestas de servicio
             Then el sistema muestra solamente la propuesta entre "ana@example.com" y "juan.plomero@example.com"
         
-        @wip
         Scenario: 54.6-GSP Usuario obtiene primero las propuestas más recientes
             Given que existen varias propuestas de servicio para "ana@example.com" creadas en distintos momentos
             And que estoy autenticado como consumidor "ana@example.com"
@@ -83,7 +79,6 @@ Feature: Obtener propuestas de servicio
 
     Rule: Solo usuarios autenticados pueden listar propuestas de servicio
         
-        @wip
         Scenario: 54.7-GSP Rechazar listado sin sesión válida
             Given que no tengo una sesión válida
             When intento consultar mis propuestas de servicio
