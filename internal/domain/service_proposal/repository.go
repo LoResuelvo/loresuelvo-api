@@ -3,6 +3,7 @@ package serviceproposal
 import (
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/consumer"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/conversation"
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/notification"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/provider"
 )
 
@@ -17,4 +18,8 @@ type ServiceProposalRepository interface {
 type UserRepository interface {
 	FindProviderByAuthID(auth0ID string) (*provider.Provider, error)
 	FindConsumerByID(consumerID int) (*consumer.Consumer, error)
+}
+
+type NotificationRepository interface {
+	Save(notification *notification.Notification) (*notification.Notification, error)
 }

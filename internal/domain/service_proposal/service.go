@@ -13,14 +13,16 @@ type Service struct {
 	repository             ServiceProposalRepository
 	userRepository         UserRepository
 	conversationRepository ConversationRepository
+	notificationRepository NotificationRepository
 	clock                  clock.Clock
 }
 
-func NewService(serviceRepo ServiceProposalRepository, userRepo UserRepository, conversationRepo ConversationRepository, clock clock.Clock) *Service {
+func NewService(serviceRepo ServiceProposalRepository, userRepo UserRepository, conversationRepo ConversationRepository, notificationRepo NotificationRepository, clock clock.Clock) *Service {
 	return &Service{
 		repository:             serviceRepo,
 		userRepository:         userRepo,
 		conversationRepository: conversationRepo,
+		notificationRepository: notificationRepo,
 		clock:                  clock,
 	}
 }
@@ -32,6 +34,13 @@ func (s *Service) CreateServiceProposal(auth0ID string, consumerID int, amount i
 	}
 
 	serviceProposal, err := NewServiceProposal(provider, consumer, conversation, amount, scheduledOn, description, s.clock)
+	if err != nil {
+		return nil, err
+	}
+
+	notification := serviceProposal.CreateNotification(s.clock)
+
+	_, err = s.notificationRepository.Save(notification)
 	if err != nil {
 		return nil, err
 	}

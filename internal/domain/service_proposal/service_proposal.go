@@ -6,6 +6,7 @@ import (
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/clock"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/consumer"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/conversation"
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/notification"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/provider"
 )
 
@@ -46,6 +47,16 @@ func NewServiceProposal(provider *provider.Provider, consumer *consumer.Consumer
 		Description:  description,
 		Status:       StatusPending,
 	}, nil
+}
+
+func (sp *ServiceProposal) CreateNotification(clock clock.Clock) *notification.Notification {
+	return notification.NewNotification(
+		sp.Consumer.ID,
+		notification.TypeServiceProposalReceived,
+		notification.ResourceServiceProposal,
+		sp.ID,
+		clock,
+	)
 }
 
 func validateParameters(amount int64, scheduledOn time.Time, clock clock.Clock) error {

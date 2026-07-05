@@ -5,6 +5,7 @@ import (
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/consumer"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/conversation"
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/notification"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/provider"
 	serviceproposal "github.com/LoResuelvo/loresuelvo-api/internal/domain/service_proposal"
 	"github.com/stretchr/testify/mock"
@@ -19,6 +20,13 @@ var (
 	validServiceScheduledOn       = time.Now().Add(time.Hour)
 	validConversation             = &conversation.WorkConversation{BaseConversation: &conversation.BaseConversation{Status: conversation.StatusActive}}
 )
+
+func resetMocks(mocks ...*mock.Mock) {
+	for _, m := range mocks {
+		m.ExpectedCalls = nil
+		m.Calls = nil
+	}
+}
 
 type MockProviderRepository struct {
 	mock.Mock
@@ -96,4 +104,18 @@ func (m *MockServiceProposalRepository) Save(serviceProposal *serviceproposal.Se
 	}
 
 	return args.Get(0).(*serviceproposal.ServiceProposal), args.Error(1)
+}
+
+type MockNotificationRepository struct {
+	mock.Mock
+}
+
+func (m *MockNotificationRepository) Save(notif *notification.Notification) (*notification.Notification, error) {
+	args := m.Called(notif)
+
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+
+	return args.Get(0).(*notification.Notification), args.Error(1)
 }
