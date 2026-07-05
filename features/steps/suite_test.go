@@ -67,6 +67,7 @@ type testSuite struct {
 	consumerMessageCountBeforeAttempt       int
 	chatbotMessageCountBeforeAttempt        int
 	lastServiceProposalRequest              serviceProposalCreationRequest
+	serviceProposalConversationIDs          map[string]int
 
 	categoryIDsByName              map[string]int
 	lastProviderFilterCategoryName string
@@ -88,6 +89,7 @@ func (s *testSuite) registerAllSteps(sc *godog.ScenarioContext) {
 	registerSendMessageSteps(sc, s)
 	registerPostJobRequestSteps(sc, s)
 	registerPostServiceProposalSteps(sc, s)
+	registerGetServiceProposalsSteps(sc, s)
 	registerGetJobRequestSteps(sc, s)
 	registerJobRequestImagesSteps(sc, s)
 	registerAcceptJobRequestSteps(sc, s)
@@ -164,6 +166,7 @@ func (s *testSuite) cleanup() error {
 	s.consumerMessageCountBeforeAttempt = 0
 	s.chatbotMessageCountBeforeAttempt = 0
 	s.lastServiceProposalRequest = serviceProposalCreationRequest{}
+	s.serviceProposalConversationIDs = map[string]int{}
 	return nil
 }
 
@@ -212,6 +215,7 @@ func newTestSuite(tb testing.TB, database *sql.DB) *testSuite {
 		aiJobRequestsByProvider:            map[string]jobRequestCreationResponse{},
 		aiWorkConversationIDsBeforeContact: map[int]int{},
 		expectedChatbotImageDescriptions:   map[string]string{},
+		serviceProposalConversationIDs:     map[string]int{},
 	}
 }
 
