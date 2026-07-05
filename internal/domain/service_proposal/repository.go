@@ -5,6 +5,7 @@ import (
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/conversation"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/notification"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/provider"
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/user"
 )
 
 type ConversationRepository interface {
@@ -13,11 +14,13 @@ type ConversationRepository interface {
 
 type ServiceProposalRepository interface {
 	Save(serviceProposal *ServiceProposal) (*ServiceProposal, error)
+	FindByUserID(userID int) ([]*ServiceProposal, error)
 }
 
 type UserRepository interface {
 	FindProviderByAuthID(auth0ID string) (*provider.Provider, error)
 	FindConsumerByID(consumerID int) (*consumer.Consumer, error)
+	FindByAuthID(auth0ID string) (user.User, error)
 }
 
 type NotificationRepository interface {

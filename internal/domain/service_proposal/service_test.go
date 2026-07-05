@@ -35,6 +35,11 @@ func setupServiceProposalTest() *serviceProposalTestEnv {
 		provider: providerRepo,
 		consumer: consumerRepo,
 	}
+	userRepo.
+		On("FindByAuthID", validProviderAuth0ID).
+		Return(&provider.Provider{
+			BaseUser: &user.BaseUser{ID: validProviderID},
+		}, nil)
 
 	providerRepo.
 		On("FindByAuthID", validProviderAuth0ID).
@@ -55,6 +60,10 @@ func setupServiceProposalTest() *serviceProposalTestEnv {
 	serviceRepo.
 		On("Save", mock.AnythingOfType("*serviceproposal.ServiceProposal")).
 		Return(&serviceproposal.ServiceProposal{}, nil)
+
+	serviceRepo.
+		On("FindByUserID", validProviderID).
+		Return([]*serviceproposal.ServiceProposal{}, nil)
 
 	notificationRepo.
 		On("Save", mock.AnythingOfType("*notification.Notification")).
@@ -172,7 +181,8 @@ func TestGetServiceProposalsWithoutServiceProposals(t *testing.T) {
 	notificationRepo := new(MockNotificationRepository)
 	clock := new(MockClock)
 
-	providerRepo.
+	userRepo := &MockUserRepository{provider: providerRepo, consumer: consumerRepo}
+	userRepo.
 		On("FindByAuthID", validProviderAuth0ID).
 		Return(&provider.Provider{BaseUser: &user.BaseUser{ID: validProviderID}}, nil)
 
@@ -180,11 +190,41 @@ func TestGetServiceProposalsWithoutServiceProposals(t *testing.T) {
 		On("FindByUserID", validProviderID).
 		Return([]*serviceproposal.ServiceProposal{}, nil)
 
-	service := serviceproposal.NewService(serviceRepo, &MockUserRepository{provider: providerRepo, consumer: consumerRepo}, conversationRepo, notificationRepo, clock)
+	service := serviceproposal.NewService(serviceRepo, userRepo, conversationRepo, notificationRepo, clock)
 
 	serviceProposals, err := service.GetServiceProposals(validProviderAuth0ID)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, serviceProposals)
 	assert.Empty(t, serviceProposals)
+}
+
+func TestConsumerGetsPendingServiceProposal(t *testing.T) {
+	env := setupServiceProposalTest()
+	expectedProposal := &serviceproposal.ServiceProposal{
+		ID:          1,
+		Provider:    &provider.Provider{BaseUser: &user.BaseUser{ID: validProviderID}},
+		Consumer:    &consumer.Consumer{BaseUser: &user.BaseUser{ID: validConsumerID}},
+		Amount:      validServiceAmount,
+		ScheduledOn: validServiceScheduledOn,
+		Description: validServiceDescription,
+		Status:      serviceproposal.StatusPending,
+	}
+
+	resetMocks(&env.userRepo.Mock, &env.serviceRepo.Mock)
+	env.userRepo.
+		On("FindByAuthID", validConsumerAuth0ID).
+		Return(expectedProposal.Consumer, nil).
+		Once()
+	env.serviceRepo.
+		On("FindByUserID", validConsumerID).
+		Return([]*serviceproposal.ServiceProposal{expectedProposal}, nil).
+		Once()
+
+	proposals, err := env.newService().GetServiceProposals(validConsumerAuth0ID)
+
+	assert.NoError(t, err)
+	assert.Equal(t, []*serviceproposal.ServiceProposal{expectedProposal}, proposals)
+	env.userRepo.AssertExpectations(t)
+	env.serviceRepo.AssertExpectations(t)
 }

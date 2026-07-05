@@ -5,7 +5,12 @@ import (
 	"database/sql"
 	"fmt"
 
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/category"
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/consumer"
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/conversation"
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/provider"
 	serviceproposal "github.com/LoResuelvo/loresuelvo-api/internal/domain/service_proposal"
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/user"
 )
 
 type ServiceProposalRepository struct {
@@ -59,4 +64,106 @@ func (r *ServiceProposalRepository) Save(serviceProposal *serviceproposal.Servic
 	}
 
 	return &saved, nil
+}
+
+func (r *ServiceProposalRepository) FindByUserID(userID int) ([]*serviceproposal.ServiceProposal, error) {
+	rows, err := r.db.QueryContext(
+		context.Background(),
+		`SELECT
+			sp.id,
+			sp.amount_cents,
+			sp.scheduled_on,
+			sp.description,
+			sp.status,
+			sp.conversation_id,
+			c.type,
+			c.status,
+			consumer_user.id,
+			consumer_user.auth_id,
+			consumer_user.email,
+			consumer_user.name,
+			consumer_user.surname,
+			provider_user.id,
+			provider_user.auth_id,
+			provider_user.email,
+			provider_user.name,
+			provider_user.surname,
+			cat.id,
+			cat.name,
+			cat.normalized_name,
+			p.profile_photo_file_id
+		FROM service_proposals sp
+		INNER JOIN conversations c ON c.id = sp.conversation_id
+		INNER JOIN users consumer_user ON consumer_user.id = sp.consumer_id
+		INNER JOIN providers p ON p.user_id = sp.provider_id
+		INNER JOIN users provider_user ON provider_user.id = p.user_id
+		INNER JOIN categories cat ON cat.id = p.category_id
+		WHERE sp.consumer_id = $1 OR sp.provider_id = $1
+		ORDER BY sp.created_on DESC, sp.id DESC`,
+		userID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("finding service proposals by user id: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	proposals := make([]*serviceproposal.ServiceProposal, 0)
+	for rows.Next() {
+		var (
+			proposal           serviceproposal.ServiceProposal
+			baseConversation   conversation.BaseConversation
+			consumerUser       user.BaseUser
+			providerUser       user.BaseUser
+			providerCategory   category.Category
+			profilePhotoFileID string
+		)
+
+		err := rows.Scan(
+			&proposal.ID,
+			&proposal.Amount,
+			&proposal.ScheduledOn,
+			&proposal.Description,
+			&proposal.Status,
+			&baseConversation.ID,
+			&baseConversation.Type,
+			&baseConversation.Status,
+			&consumerUser.ID,
+			&consumerUser.AuthID,
+			&consumerUser.Email,
+			&consumerUser.Name,
+			&consumerUser.Surname,
+			&providerUser.ID,
+			&providerUser.AuthID,
+			&providerUser.Email,
+			&providerUser.Name,
+			&providerUser.Surname,
+			&providerCategory.ID,
+			&providerCategory.Name,
+			&providerCategory.NormalizedName,
+			&profilePhotoFileID,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("scanning service proposal by user id: %w", err)
+		}
+
+		consumerUser.Role = consumer.Role
+		providerUser.Role = provider.Role
+		proposal.Consumer = &consumer.Consumer{BaseUser: &consumerUser}
+		proposal.Provider = &provider.Provider{
+			BaseUser:           &providerUser,
+			Category:           &providerCategory,
+			ProfilePhotoFileID: profilePhotoFileID,
+		}
+		proposal.Conversation = &conversation.WorkConversation{
+			BaseConversation: &baseConversation,
+			ConsumerID:       consumerUser.ID,
+			ProviderID:       providerUser.ID,
+		}
+		proposals = append(proposals, &proposal)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterating service proposals by user id: %w", err)
+	}
+
+	return proposals, nil
 }

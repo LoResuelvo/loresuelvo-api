@@ -141,3 +141,49 @@ func TestServiceProposalRepositoryCanSave(t *testing.T) {
 	assert.Equal(t, proposalToSave.Description, storedDescription)
 	assert.Equal(t, proposalToSave.Status, storedStatus)
 }
+
+func TestServiceProposalRepositoryFindsPendingProposalForConsumer(t *testing.T) {
+	testContext := newServiceProposalRepositoryTest(t)
+	consumerID := savedConsumerIDWithData(t, jobRequestRepositoryTestContext{
+		userRepository: testContext.userRepository,
+	}, "auth0|proposal-list-consumer", "proposal.list.consumer@example.com", "Ana", "Perez")
+	providerID := savedProviderIDWithData(t, jobRequestRepositoryTestContext{
+		database:           testContext.database,
+		userRepository:     testContext.userRepository,
+		categoryRepository: testContext.categoryRepository,
+	}, "auth0|proposal-list-provider", "proposal.list.provider@example.com", "Juan", "Gomez", "Plomeria")
+	activeConversation, err := conversation.NewPendingConversation(consumerID, providerID)
+	require.NoError(t, err)
+	require.NoError(t, activeConversation.Activate())
+	activeConversation, err = testContext.conversationRepository.SaveConversation(context.Background(), activeConversation)
+	require.NoError(t, err)
+
+	expected, err := serviceproposal.NewServiceProposal(
+		&provider.Provider{BaseUser: &user.BaseUser{ID: providerID}},
+		&consumer.Consumer{BaseUser: &user.BaseUser{ID: consumerID}},
+		activeConversation,
+		1500050,
+		time.Now().Add(24*time.Hour).UTC().Truncate(time.Microsecond),
+		"Reparacion de perdida de agua en cocina con materiales incluidos.",
+		clockadapter.NewSystemClock(),
+	)
+	require.NoError(t, err)
+	expected, err = testContext.serviceProposalRepository.Save(expected)
+	require.NoError(t, err)
+
+	found, err := testContext.serviceProposalRepository.FindByUserID(consumerID)
+
+	require.NoError(t, err)
+	require.Len(t, found, 1)
+	assert.Equal(t, expected.ID, found[0].ID)
+	assert.Equal(t, consumerID, found[0].Consumer.ID)
+	assert.Equal(t, providerID, found[0].Provider.ID)
+	assert.Equal(t, "Juan", found[0].Provider.Base().Name)
+	assert.Equal(t, "Gomez", found[0].Provider.Base().Surname)
+	assert.Equal(t, "Plomeria", found[0].Provider.Category.Name)
+	assert.Equal(t, activeConversation.Base().ID, found[0].Conversation.Base().ID)
+	assert.Equal(t, serviceproposal.StatusPending, found[0].Status)
+	assert.Equal(t, expected.Amount, found[0].Amount)
+	assert.Equal(t, expected.ScheduledOn, found[0].ScheduledOn.UTC())
+	assert.Equal(t, expected.Description, found[0].Description)
+}

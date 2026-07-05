@@ -8,12 +8,14 @@ import (
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/notification"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/provider"
 	serviceproposal "github.com/LoResuelvo/loresuelvo-api/internal/domain/service_proposal"
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/user"
 	"github.com/stretchr/testify/mock"
 )
 
 var (
 	validConsumerID               = 1
 	validProviderID               = 1
+	validConsumerAuth0ID          = "consumer-auth0-id"
 	validProviderAuth0ID          = "provider-auth0-id"
 	validServiceDescription       = "Service description"
 	validServiceAmount      int64 = 1000
@@ -47,6 +49,7 @@ type MockConsumerRepository struct {
 }
 
 type MockUserRepository struct {
+	mock.Mock
 	provider *MockProviderRepository
 	consumer *MockConsumerRepository
 }
@@ -57,6 +60,16 @@ func (m *MockUserRepository) FindProviderByAuthID(auth0ID string) (*provider.Pro
 
 func (m *MockUserRepository) FindConsumerByID(id int) (*consumer.Consumer, error) {
 	return m.consumer.FindByID(id)
+}
+
+func (m *MockUserRepository) FindByAuthID(auth0ID string) (user.User, error) {
+	args := m.Called(auth0ID)
+
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+
+	return args.Get(0).(user.User), args.Error(1)
 }
 
 func (m *MockConsumerRepository) FindByID(id int) (*consumer.Consumer, error) {
@@ -104,6 +117,16 @@ func (m *MockServiceProposalRepository) Save(serviceProposal *serviceproposal.Se
 	}
 
 	return args.Get(0).(*serviceproposal.ServiceProposal), args.Error(1)
+}
+
+func (m *MockServiceProposalRepository) FindByUserID(userID int) ([]*serviceproposal.ServiceProposal, error) {
+	args := m.Called(userID)
+
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+
+	return args.Get(0).([]*serviceproposal.ServiceProposal), args.Error(1)
 }
 
 type MockNotificationRepository struct {

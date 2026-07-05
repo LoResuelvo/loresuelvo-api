@@ -49,7 +49,12 @@ func (s *Service) CreateServiceProposal(auth0ID string, consumerID int, amount i
 }
 
 func (s *Service) GetServiceProposals(auth0ID string) ([]*ServiceProposal, error) {
-	return []*ServiceProposal{}, nil
+	foundUser, err := s.userRepository.FindByAuthID(auth0ID)
+	if err != nil {
+		return nil, err
+	}
+
+	return s.repository.FindByUserID(foundUser.Base().ID)
 }
 
 func (s *Service) getParticipants(providerAuth0ID string, consumerID int) (*provider.Provider, *consumer.Consumer, conversation.Conversation, error) {
