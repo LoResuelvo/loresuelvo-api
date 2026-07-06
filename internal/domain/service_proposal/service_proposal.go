@@ -8,6 +8,7 @@ import (
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/conversation"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/notification"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/provider"
+	workorder "github.com/LoResuelvo/loresuelvo-api/internal/domain/work_order"
 )
 
 type Status string
@@ -58,6 +59,21 @@ func (sp *ServiceProposal) CreateNotification(clock clock.Clock) *notification.N
 		sp.ID,
 		clock,
 	)
+}
+
+func (sp *ServiceProposal) Accept(consumerID int, acceptedOn time.Time) (*workorder.WorkOrder, error) {
+	if sp.Consumer == nil || sp.Consumer.ID != consumerID {
+		return nil, ErrOnlyRecipientCanAccept
+	}
+	if sp.Status != StatusPending {
+		return nil, ErrOnlyPendingCanBeAccepted
+	}
+	if !sp.ScheduledOn.After(acceptedOn) {
+		return nil, ErrServiceProposalExpired
+	}
+
+	sp.Status = StatusAccepted
+	return workorder.New(sp.ID, sp.Consumer.ID, sp.Provider.ID, acceptedOn), nil
 }
 
 func validateParameters(amount int64, scheduledOn time.Time, clock clock.Clock) error {

@@ -3,6 +3,7 @@ package repositories
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/category"
@@ -11,14 +12,19 @@ import (
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/provider"
 	serviceproposal "github.com/LoResuelvo/loresuelvo-api/internal/domain/service_proposal"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/user"
+	workorder "github.com/LoResuelvo/loresuelvo-api/internal/domain/work_order"
 )
 
 type ServiceProposalRepository struct {
-	db *sql.DB
+	db                  *sql.DB
+	workOrderRepository *WorkOrderRepository
 }
 
-func NewServiceProposalRepository(db *sql.DB) *ServiceProposalRepository {
-	return &ServiceProposalRepository{db: db}
+func NewServiceProposalRepository(db *sql.DB, workOrderRepository *WorkOrderRepository) *ServiceProposalRepository {
+	return &ServiceProposalRepository{
+		db:                  db,
+		workOrderRepository: workOrderRepository,
+	}
 }
 
 func (r *ServiceProposalRepository) Save(serviceProposal *serviceproposal.ServiceProposal) (*serviceproposal.ServiceProposal, error) {
@@ -64,6 +70,99 @@ func (r *ServiceProposalRepository) Save(serviceProposal *serviceproposal.Servic
 	}
 
 	return &saved, nil
+}
+
+func (r *ServiceProposalRepository) FindByID(ctx context.Context, id int) (*serviceproposal.ServiceProposal, error) {
+	var (
+		proposal   serviceproposal.ServiceProposal
+		consumerID int
+		providerID int
+	)
+	err := r.db.QueryRowContext(
+		ctx,
+		`SELECT
+			sp.id,
+			sp.amount_cents,
+			sp.scheduled_on,
+			sp.description,
+			sp.status,
+			sp.created_on,
+			sp.consumer_id,
+			sp.provider_id
+		FROM service_proposals sp
+		WHERE sp.id = $1`,
+		id,
+	).Scan(
+		&proposal.ID,
+		&proposal.Amount,
+		&proposal.ScheduledOn,
+		&proposal.Description,
+		&proposal.Status,
+		&proposal.CreatedOn,
+		&consumerID,
+		&providerID,
+	)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, serviceproposal.ErrDoesNotExist
+		}
+		return nil, fmt.Errorf("finding service proposal by id: %w", err)
+	}
+
+	proposal.Consumer = &consumer.Consumer{BaseUser: &user.BaseUser{ID: consumerID, Role: consumer.Role}}
+	proposal.Provider = &provider.Provider{BaseUser: &user.BaseUser{ID: providerID, Role: provider.Role}}
+	return &proposal, nil
+}
+
+func (r *ServiceProposalRepository) SaveWithWorkOrder(
+	ctx context.Context,
+	proposal *serviceproposal.ServiceProposal,
+	order *workorder.WorkOrder,
+) (*workorder.WorkOrder, error) {
+	if proposal == nil {
+		return nil, fmt.Errorf("saving accepted service proposal: service proposal is required")
+	}
+
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, fmt.Errorf("beginning service proposal acceptance transaction: %w", err)
+	}
+
+	result, err := tx.ExecContext(
+		ctx,
+		`UPDATE service_proposals
+		SET status = $1, updated_on = NOW()
+		WHERE id = $2 AND status = $3`,
+		proposal.Status,
+		proposal.ID,
+		serviceproposal.StatusPending,
+	)
+	if err != nil {
+		return nil, rollbackServiceProposalAcceptance(tx, fmt.Errorf("updating accepted service proposal: %w", err))
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return nil, rollbackServiceProposalAcceptance(tx, fmt.Errorf("checking accepted service proposal update: %w", err))
+	}
+	if affected != 1 {
+		return nil, rollbackServiceProposalAcceptance(tx, serviceproposal.ErrOnlyPendingCanBeAccepted)
+	}
+
+	savedOrder, err := r.workOrderRepository.saveWithTx(ctx, tx, order)
+	if err != nil {
+		return nil, rollbackServiceProposalAcceptance(tx, err)
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, fmt.Errorf("committing service proposal acceptance: %w", err)
+	}
+	return savedOrder, nil
+}
+
+func rollbackServiceProposalAcceptance(tx *sql.Tx, cause error) error {
+	if rollbackErr := tx.Rollback(); rollbackErr != nil {
+		return fmt.Errorf("%w: rolling back service proposal acceptance: %v", cause, rollbackErr)
+	}
+	return cause
 }
 
 func (r *ServiceProposalRepository) FindByUserID(ctx context.Context, userID int) ([]*serviceproposal.ServiceProposal, error) {

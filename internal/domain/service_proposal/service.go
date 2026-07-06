@@ -11,6 +11,7 @@ import (
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/notification"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/provider"
 	readmodel "github.com/LoResuelvo/loresuelvo-api/internal/domain/service_proposal/read_model"
+	workorder "github.com/LoResuelvo/loresuelvo-api/internal/domain/work_order"
 )
 
 type Service struct {
@@ -98,6 +99,29 @@ func (s *Service) GetServiceProposals(ctx context.Context, auth0ID string) ([]re
 		summaries[index].Counterpart.ProfilePhotoURL = urlsByFileID[summaries[index].Counterpart.ProfilePhotoFileID]
 	}
 	return summaries, nil
+}
+
+func (s *Service) Accept(ctx context.Context, auth0ID string, proposalID int) (*ServiceProposal, *workorder.WorkOrder, error) {
+	foundUser, err := s.userRepository.FindByAuthID(auth0ID)
+	if err != nil {
+		return nil, nil, ErrOnlyRecipientCanAccept
+	}
+
+	proposal, err := s.repository.FindByID(ctx, proposalID)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	order, err := proposal.Accept(foundUser.Base().ID, s.clock.Now())
+	if err != nil {
+		return nil, nil, err
+	}
+
+	savedOrder, err := s.repository.SaveWithWorkOrder(ctx, proposal, order)
+	if err != nil {
+		return nil, nil, err
+	}
+	return proposal, savedOrder, nil
 }
 
 func serviceProposalSummaryFor(proposal *ServiceProposal, viewerRole string) (readmodel.ServiceProposalSummary, error) {

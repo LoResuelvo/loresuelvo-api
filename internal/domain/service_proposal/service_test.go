@@ -11,6 +11,7 @@ import (
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/provider"
 	serviceproposal "github.com/LoResuelvo/loresuelvo-api/internal/domain/service_proposal"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/user"
+	workorder "github.com/LoResuelvo/loresuelvo-api/internal/domain/work_order"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -141,6 +142,46 @@ func TestCreateServiceProposal(t *testing.T) {
 
 	assert.NoError(t, err)
 	assert.NotNil(t, serviceProposal)
+}
+
+func TestAcceptServiceProposalCreatesScheduledWorkOrder(t *testing.T) {
+	env := setupServiceProposalTest()
+	now := time.Date(2026, time.July, 4, 13, 0, 0, 0, time.UTC)
+	proposal := validSavedServiceProposal()
+	proposal.ScheduledOn = now.Add(time.Hour)
+	consumerUser := &consumer.Consumer{BaseUser: &user.BaseUser{ID: validConsumerID, Role: consumer.Role}}
+	savedOrder := &workorder.WorkOrder{
+		ID:                9,
+		ServiceProposalID: proposal.ID,
+		ConsumerID:        validConsumerID,
+		ProviderID:        validProviderID,
+		Status:            workorder.StatusScheduled,
+		AcceptedOn:        now,
+	}
+
+	resetMocks(&env.userRepo.Mock, &env.serviceRepo.Mock, &env.clock.Mock)
+	env.userRepo.On("FindByAuthID", validConsumerAuth0ID).Return(consumerUser, nil).Once()
+	env.serviceRepo.On("FindByID", mock.Anything, proposal.ID).Return(proposal, nil).Once()
+	env.clock.On("Now").Return(now).Once()
+	env.serviceRepo.
+		On("SaveWithWorkOrder", mock.Anything, proposal, mock.MatchedBy(func(order *workorder.WorkOrder) bool {
+			return order.ServiceProposalID == proposal.ID &&
+				order.ConsumerID == validConsumerID &&
+				order.ProviderID == validProviderID &&
+				order.Status == workorder.StatusScheduled &&
+				order.AcceptedOn.Equal(now)
+		})).
+		Return(savedOrder, nil).
+		Once()
+
+	acceptedProposal, createdOrder, err := env.newService().Accept(t.Context(), validConsumerAuth0ID, proposal.ID)
+
+	require.NoError(t, err)
+	assert.Equal(t, serviceproposal.StatusAccepted, acceptedProposal.Status)
+	assert.Equal(t, savedOrder, createdOrder)
+	env.userRepo.AssertExpectations(t)
+	env.serviceRepo.AssertExpectations(t)
+	env.clock.AssertExpectations(t)
 }
 
 func TestCreateProposalShouldPersist(t *testing.T) {

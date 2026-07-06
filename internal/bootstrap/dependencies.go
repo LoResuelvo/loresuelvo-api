@@ -41,6 +41,7 @@ type Dependencies struct {
 	ConversationReader     *repositories.ConversationReader
 	FileRepository         *repositories.FileRepository
 	NotificationRepository *repositories.NotificationRepository
+	WorkOrderRepository    *repositories.WorkOrderRepository
 
 	CategoryHandler        *category_handler.CategoryHandler
 	ConsumerHandler        *consumer_handler.ConsumerHandler
@@ -89,7 +90,8 @@ func NewDependenciesWithChatbot(database *sql.DB, chatbot conversation.Chatbot) 
 	jobRequestRepository := repositories.NewJobRequestRepository(database)
 	conversationReader := repositories.NewConversationReader(database, messageImageRepository)
 	fileRepository := repositories.NewFileRepository(database)
-	serviceProposalRepository := repositories.NewServiceProposalRepository(database)
+	workOrderRepository := repositories.NewWorkOrderRepository(database)
+	serviceProposalRepository := repositories.NewServiceProposalRepository(database, workOrderRepository)
 	notificationRepository := repositories.NewNotificationRepository(database)
 
 	storageConfig := storage.NewConfigFromEnv()
@@ -142,6 +144,7 @@ func NewDependenciesWithChatbot(database *sql.DB, chatbot conversation.Chatbot) 
 		ConversationReader:     conversationReader,
 		FileRepository:         fileRepository,
 		NotificationRepository: notificationRepository,
+		WorkOrderRepository:    workOrderRepository,
 		CategoryHandler:        category_handler.NewCategoryHandler(categoryService),
 		ConsumerHandler:        consumer_handler.NewConsumerHandler(consumerService),
 		ProviderHandler:        provider_handler.NewProviderHandler(providerService),

@@ -10,6 +10,7 @@ import (
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/provider"
 	serviceproposal "github.com/LoResuelvo/loresuelvo-api/internal/domain/service_proposal"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/user"
+	workorder "github.com/LoResuelvo/loresuelvo-api/internal/domain/work_order"
 	"github.com/stretchr/testify/mock"
 )
 
@@ -137,6 +138,22 @@ func (m *MockServiceProposalRepository) FindByUserID(ctx context.Context, userID
 	}
 
 	return args.Get(0).([]*serviceproposal.ServiceProposal), args.Error(1)
+}
+
+func (m *MockServiceProposalRepository) FindByID(ctx context.Context, id int) (*serviceproposal.ServiceProposal, error) {
+	args := m.Called(ctx, id)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*serviceproposal.ServiceProposal), args.Error(1)
+}
+
+func (m *MockServiceProposalRepository) SaveWithWorkOrder(ctx context.Context, proposal *serviceproposal.ServiceProposal, order *workorder.WorkOrder) (*workorder.WorkOrder, error) {
+	args := m.Called(ctx, proposal, order)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*workorder.WorkOrder), args.Error(1)
 }
 
 type MockNotificationRepository struct {

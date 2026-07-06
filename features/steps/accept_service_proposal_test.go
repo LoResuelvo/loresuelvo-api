@@ -176,7 +176,10 @@ func (suite *testSuite) serviceProposalHasStatus(proposalID int, expected servic
 	if !exists {
 		return fmt.Errorf("expected fixture for service proposal id %d", proposalID)
 	}
-	proposals, err := repositories.NewServiceProposalRepository(suite.database).FindByUserID(context.Background(), fixture.consumerID)
+	proposals, err := repositories.NewServiceProposalRepository(
+		suite.database,
+		repositories.NewWorkOrderRepository(suite.database),
+	).FindByUserID(context.Background(), fixture.consumerID)
 	if err != nil {
 		return fmt.Errorf("finding service proposal fixture: %w", err)
 	}

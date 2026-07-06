@@ -13,6 +13,7 @@ import (
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/provider"
 	serviceproposal "github.com/LoResuelvo/loresuelvo-api/internal/domain/service_proposal"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/user"
+	workorder "github.com/LoResuelvo/loresuelvo-api/internal/domain/work_order"
 	"github.com/LoResuelvo/loresuelvo-api/internal/infrastructure/db"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -47,14 +48,17 @@ func newServiceProposalRepositoryTest(t *testing.T) serviceProposalRepositoryTes
 		userRepository:            userRepository,
 		categoryRepository:        repositories.NewCategoryRepository(database),
 		conversationRepository:    repositories.NewConversationRepository(database, messageRepository),
-		serviceProposalRepository: repositories.NewServiceProposalRepository(database),
+		serviceProposalRepository: repositories.NewServiceProposalRepository(database, repositories.NewWorkOrderRepository(database)),
 	}
 }
 
 func cleanServiceProposalRepositoryTestDatabase(t *testing.T, database *sql.DB) {
 	t.Helper()
 
-	_, err := database.Exec("DELETE FROM service_proposals")
+	_, err := database.Exec("DELETE FROM work_orders")
+	require.NoError(t, err, "could not clean work orders")
+
+	_, err = database.Exec("DELETE FROM service_proposals")
 	require.NoError(t, err, "could not clean service proposals")
 
 	_, err = database.Exec("DELETE FROM conversations")
@@ -71,6 +75,69 @@ func cleanServiceProposalRepositoryTestDatabase(t *testing.T, database *sql.DB) 
 
 	_, err = database.Exec("DELETE FROM categories")
 	require.NoError(t, err, "could not clean categories")
+}
+
+func TestServiceProposalRepositorySavesAcceptanceWithWorkOrderAtomically(t *testing.T) {
+	testContext := newServiceProposalRepositoryTest(t)
+	consumerID := savedConsumerIDWithData(t, jobRequestRepositoryTestContext{
+		userRepository: testContext.userRepository,
+	}, "auth0|acceptance-consumer", "acceptance.consumer@example.com", "Ana", "Perez")
+	providerID := savedProviderIDWithData(t, jobRequestRepositoryTestContext{
+		database:           testContext.database,
+		userRepository:     testContext.userRepository,
+		categoryRepository: testContext.categoryRepository,
+	}, "auth0|acceptance-provider", "acceptance.provider@example.com", "Juan", "Gomez", "Plomeria")
+	activeConversation, err := conversation.NewPendingConversation(consumerID, providerID)
+	require.NoError(t, err)
+	require.NoError(t, activeConversation.Activate())
+	activeConversation, err = testContext.conversationRepository.SaveConversation(context.Background(), activeConversation)
+	require.NoError(t, err)
+
+	proposal, err := serviceproposal.NewServiceProposal(
+		&provider.Provider{BaseUser: &user.BaseUser{ID: providerID}},
+		&consumer.Consumer{BaseUser: &user.BaseUser{ID: consumerID}},
+		activeConversation,
+		1500050,
+		time.Now().Add(24*time.Hour).UTC().Truncate(time.Microsecond),
+		"Reparacion de perdida de agua.",
+		clockadapter.NewSystemClock(),
+	)
+	require.NoError(t, err)
+	proposal, err = testContext.serviceProposalRepository.Save(proposal)
+	require.NoError(t, err)
+
+	acceptedOn := time.Now().UTC().Truncate(time.Microsecond)
+	order := workorder.New(proposal.ID, consumerID, providerID, acceptedOn)
+	proposal.Status = serviceproposal.StatusAccepted
+
+	savedOrder, err := testContext.serviceProposalRepository.SaveWithWorkOrder(context.Background(), proposal, order)
+
+	require.NoError(t, err)
+	require.NotNil(t, savedOrder)
+	assert.NotZero(t, savedOrder.ID)
+	assert.Equal(t, workorder.StatusScheduled, savedOrder.Status)
+
+	var storedProposalStatus serviceproposal.Status
+	require.NoError(t, testContext.database.QueryRow(
+		"SELECT status FROM service_proposals WHERE id = $1",
+		proposal.ID,
+	).Scan(&storedProposalStatus))
+	assert.Equal(t, serviceproposal.StatusAccepted, storedProposalStatus)
+
+	var storedProposalID, storedConsumerID, storedProviderID int
+	var storedStatus workorder.Status
+	var storedAcceptedOn time.Time
+	require.NoError(t, testContext.database.QueryRow(
+		`SELECT service_proposal_id, consumer_id, provider_id, status, accepted_on
+		FROM work_orders
+		WHERE id = $1`,
+		savedOrder.ID,
+	).Scan(&storedProposalID, &storedConsumerID, &storedProviderID, &storedStatus, &storedAcceptedOn))
+	assert.Equal(t, proposal.ID, storedProposalID)
+	assert.Equal(t, consumerID, storedConsumerID)
+	assert.Equal(t, providerID, storedProviderID)
+	assert.Equal(t, workorder.StatusScheduled, storedStatus)
+	assert.Equal(t, acceptedOn, storedAcceptedOn.UTC())
 }
 
 func TestServiceProposalRepositoryCanSave(t *testing.T) {

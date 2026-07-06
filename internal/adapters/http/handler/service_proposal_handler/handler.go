@@ -1,6 +1,7 @@
 package service_proposal_handler
 
 import (
+	"fmt"
 	"net/http"
 
 	httphandler "github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler"
@@ -57,4 +58,26 @@ func (h *ServiceProposalHandler) GetServiceProposals(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, serviceProposalSummaryResponsesFromDomain(serviceProposals))
+}
+
+func (h *ServiceProposalHandler) AcceptServiceProposal(c *gin.Context) {
+	auth0ID, ok := httphandler.GetAuthenticatedUserID(c)
+	if !ok {
+		return
+	}
+
+	proposalID, err := httphandler.PositiveIDFromString(c.Param("serviceProposalID"), "service proposal id")
+	if err != nil {
+		httphandler.RespondError(c, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	proposal, order, err := h.serviceProposalService.Accept(c.Request.Context(), auth0ID, proposalID)
+	if err != nil {
+		handleAcceptServiceProposalError(c, err)
+		return
+	}
+
+	c.Header("Location", fmt.Sprintf("/work-orders/%d", order.ID))
+	c.JSON(http.StatusCreated, workOrderResponseFromDomain(proposal, order))
 }

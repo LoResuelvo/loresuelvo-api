@@ -8,6 +8,7 @@ import (
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/notification"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/provider"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/user"
+	workorder "github.com/LoResuelvo/loresuelvo-api/internal/domain/work_order"
 )
 
 type ConversationRepository interface {
@@ -16,7 +17,9 @@ type ConversationRepository interface {
 
 type ServiceProposalRepository interface {
 	Save(serviceProposal *ServiceProposal) (*ServiceProposal, error)
+	FindByID(ctx context.Context, id int) (*ServiceProposal, error)
 	FindByUserID(ctx context.Context, userID int) ([]*ServiceProposal, error)
+	SaveWithWorkOrder(ctx context.Context, serviceProposal *ServiceProposal, workOrder *workorder.WorkOrder) (*workorder.WorkOrder, error)
 }
 
 type UserRepository interface {
