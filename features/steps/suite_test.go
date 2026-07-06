@@ -31,6 +31,7 @@ type testSuite struct {
 	userRepository         *repositories.UserRepository
 	fileRepository         *repositories.FileRepository
 	notificationRepository *repositories.NotificationRepository
+	workOrderRepository    *repositories.WorkOrderRepository
 	auth0Validator         *validator.Validator
 	tokenBuilder           *auth0.TokenBuilder
 	chatbot                *chatbotadapter.FakeChatbot
@@ -218,6 +219,7 @@ func newTestSuite(tb testing.TB, database *sql.DB) *testSuite {
 		userRepository:         dependencies.UserRepository,
 		fileRepository:         dependencies.FileRepository,
 		notificationRepository: dependencies.NotificationRepository,
+		workOrderRepository:    dependencies.WorkOrderRepository,
 		auth0Validator:         auth0Validator,
 		tokenBuilder:           tokenBuilder,
 		chatbot:                chatbot,

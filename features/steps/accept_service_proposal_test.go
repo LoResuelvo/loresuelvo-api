@@ -3,6 +3,7 @@ package steps_test
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -10,6 +11,7 @@ import (
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/repositories"
 	serviceproposal "github.com/LoResuelvo/loresuelvo-api/internal/domain/service_proposal"
+	workorder "github.com/LoResuelvo/loresuelvo-api/internal/domain/work_order"
 	"github.com/cucumber/godog"
 )
 
@@ -307,21 +309,31 @@ func (suite *testSuite) systemRejectsExpiredServiceProposal() error {
 }
 
 func (suite *testSuite) systemKeepsOneWorkOrderForServiceProposal() error {
-	return suite.assertRememberedWorkOrderCount(suite.lastServiceProposalID, 1)
+	return suite.assertPersistedWorkOrder(suite.lastServiceProposalID)
 }
 
 func (suite *testSuite) systemRegistersOneWorkOrderForAcceptedProposal() error {
-	return suite.assertRememberedWorkOrderCount(suite.lastServiceProposalID, 1)
+	return suite.assertPersistedWorkOrder(suite.lastServiceProposalID)
 }
 
 func (suite *testSuite) systemDoesNotRegisterWorkOrderForServiceProposal() error {
-	return suite.assertRememberedWorkOrderCount(suite.lastServiceProposalID, 0)
+	_, err := suite.workOrderRepository.FindByServiceProposalID(context.Background(), suite.lastServiceProposalID)
+	if errors.Is(err, workorder.ErrDoesNotExist) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	return fmt.Errorf("expected no work order for service proposal %d", suite.lastServiceProposalID)
 }
 
-func (suite *testSuite) assertRememberedWorkOrderCount(proposalID, expected int) error {
-	count := len(suite.workOrdersByServiceProposalID[proposalID])
-	if count != expected {
-		return fmt.Errorf("expected %d work orders for service proposal %d, got %d", expected, proposalID, count)
+func (suite *testSuite) assertPersistedWorkOrder(proposalID int) error {
+	order, err := suite.workOrderRepository.FindByServiceProposalID(context.Background(), proposalID)
+	if err != nil {
+		return err
+	}
+	if order.ServiceProposalID != proposalID {
+		return fmt.Errorf("expected work order for service proposal %d, got %d", proposalID, order.ServiceProposalID)
 	}
 	return nil
 }

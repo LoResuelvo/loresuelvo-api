@@ -25,6 +25,7 @@ type serviceProposalRepositoryTestContext struct {
 	categoryRepository        *repositories.CategoryRepository
 	conversationRepository    *repositories.ConversationRepository
 	serviceProposalRepository *repositories.ServiceProposalRepository
+	workOrderRepository       *repositories.WorkOrderRepository
 }
 
 func newServiceProposalRepositoryTest(t *testing.T) serviceProposalRepositoryTestContext {
@@ -42,13 +43,15 @@ func newServiceProposalRepositoryTest(t *testing.T) serviceProposalRepositoryTes
 
 	userRepository := repositories.NewUserRepository(database)
 	messageRepository := repositories.NewMessageRepository(database, repositories.NewMessageImageRepository(database))
+	workOrderRepository := repositories.NewWorkOrderRepository(database)
 
 	return serviceProposalRepositoryTestContext{
 		database:                  database,
 		userRepository:            userRepository,
 		categoryRepository:        repositories.NewCategoryRepository(database),
 		conversationRepository:    repositories.NewConversationRepository(database, messageRepository),
-		serviceProposalRepository: repositories.NewServiceProposalRepository(database, repositories.NewWorkOrderRepository(database)),
+		serviceProposalRepository: repositories.NewServiceProposalRepository(database, workOrderRepository),
+		workOrderRepository:       workOrderRepository,
 	}
 }
 
@@ -138,6 +141,19 @@ func TestServiceProposalRepositorySavesAcceptanceWithWorkOrderAtomically(t *test
 	assert.Equal(t, providerID, storedProviderID)
 	assert.Equal(t, workorder.StatusScheduled, storedStatus)
 	assert.Equal(t, acceptedOn, storedAcceptedOn.UTC())
+
+	foundOrder, err := testContext.workOrderRepository.FindByServiceProposalID(context.Background(), proposal.ID)
+	require.NoError(t, err)
+	assert.Equal(t, savedOrder, foundOrder)
+}
+
+func TestWorkOrderRepositoryReturnsNotFoundForMissingServiceProposal(t *testing.T) {
+	testContext := newServiceProposalRepositoryTest(t)
+
+	foundOrder, err := testContext.workOrderRepository.FindByServiceProposalID(context.Background(), 999999)
+
+	assert.Nil(t, foundOrder)
+	assert.ErrorIs(t, err, workorder.ErrDoesNotExist)
 }
 
 func TestServiceProposalRepositoryCanSave(t *testing.T) {

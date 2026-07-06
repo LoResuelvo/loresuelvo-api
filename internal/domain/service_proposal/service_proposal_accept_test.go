@@ -42,3 +42,48 @@ func TestAcceptedServiceProposalCreatesProviderNotification(t *testing.T) {
 	assert.Equal(t, createdAt, createdNotification.CreatedAt)
 	clock.AssertExpectations(t)
 }
+
+func TestServiceProposalRejectsAcceptanceByAnotherConsumer(t *testing.T) {
+	now := time.Date(2026, time.July, 4, 13, 0, 0, 0, time.UTC)
+	proposal := validSavedServiceProposal()
+	proposal.ScheduledOn = now.Add(time.Hour)
+
+	order, err := proposal.Accept(validConsumerID+100, now)
+
+	assert.Nil(t, order)
+	assert.ErrorIs(t, err, serviceproposal.ErrOnlyRecipientCanAccept)
+	assert.Equal(t, serviceproposal.StatusPending, proposal.Status)
+}
+
+func TestServiceProposalRejectsAcceptanceWhenNotPending(t *testing.T) {
+	now := time.Date(2026, time.July, 4, 13, 0, 0, 0, time.UTC)
+
+	for _, status := range []serviceproposal.Status{
+		serviceproposal.StatusAccepted,
+		serviceproposal.StatusRejected,
+	} {
+		t.Run(string(status), func(t *testing.T) {
+			proposal := validSavedServiceProposal()
+			proposal.Status = status
+			proposal.ScheduledOn = now.Add(time.Hour)
+
+			order, err := proposal.Accept(validConsumerID, now)
+
+			assert.Nil(t, order)
+			assert.ErrorIs(t, err, serviceproposal.ErrOnlyPendingCanBeAccepted)
+			assert.Equal(t, status, proposal.Status)
+		})
+	}
+}
+
+func TestServiceProposalRejectsAcceptanceAtScheduledTime(t *testing.T) {
+	scheduledOn := time.Date(2026, time.July, 5, 12, 30, 0, 0, time.UTC)
+	proposal := validSavedServiceProposal()
+	proposal.ScheduledOn = scheduledOn
+
+	order, err := proposal.Accept(validConsumerID, scheduledOn)
+
+	assert.Nil(t, order)
+	assert.ErrorIs(t, err, serviceproposal.ErrServiceProposalExpired)
+	assert.Equal(t, serviceproposal.StatusPending, proposal.Status)
+}
