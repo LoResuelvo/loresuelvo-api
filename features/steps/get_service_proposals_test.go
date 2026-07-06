@@ -51,6 +51,14 @@ type serviceProposalFixtureParticipants struct {
 	conversation conversation.Conversation
 }
 
+type serviceProposalFixture struct {
+	providerID  int
+	consumerID  int
+	amountCents int64
+	scheduledOn time.Time
+	description string
+}
+
 func registerGetServiceProposalsSteps(sc *godog.ScenarioContext, suite *testSuite) {
 	sc.Step(`^que existe una propuesta de servicio pendiente de "([^"]*)" para "([^"]*)" por "([^"]*)" para la fecha y hora "([^"]*)" con la descripción:$`, suite.thereIsPendingServiceProposalWithDetails)
 	sc.Step(`^que existe una propuesta de servicio pendiente de "([^"]*)" para "([^"]*)"$`, suite.thereIsPendingServiceProposal)
@@ -216,7 +224,7 @@ func (suite *testSuite) saveServiceProposalFixture(
 	description string,
 ) error {
 	repository := repositories.NewServiceProposalRepository(suite.database)
-	_, err := repository.Save(&serviceproposal.ServiceProposal{
+	savedProposal, err := repository.Save(&serviceproposal.ServiceProposal{
 		Provider:     participants.provider,
 		Consumer:     participants.consumer,
 		Conversation: participants.conversation,
@@ -227,6 +235,16 @@ func (suite *testSuite) saveServiceProposalFixture(
 	})
 	if err != nil {
 		return fmt.Errorf("saving service proposal fixture: %w", err)
+	}
+
+	suite.lastServiceProposalID = savedProposal.ID
+	suite.serviceProposalIDs = append(suite.serviceProposalIDs, savedProposal.ID)
+	suite.serviceProposalFixtures[savedProposal.ID] = serviceProposalFixture{
+		providerID:  participants.provider.ID,
+		consumerID:  participants.consumer.ID,
+		amountCents: amountCents,
+		scheduledOn: scheduledOn,
+		description: description,
 	}
 
 	return nil
