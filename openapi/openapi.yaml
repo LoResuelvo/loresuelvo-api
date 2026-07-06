@@ -60,6 +60,8 @@ paths:
     $ref: ./paths/job-request-accept.yaml
   /service-proposals:
     $ref: ./paths/service-proposals.yaml
+  /service-proposals/{serviceProposalId}/accept:
+    $ref: ./paths/service-proposal-accept.yaml
   /conversations/{conversationId}:
     $ref: ./paths/conversation-by-id.yaml
   /conversations/{conversationId}/messages:
@@ -202,6 +204,8 @@ components:
       $ref: ./components/schemas/create-service-proposal-request.yaml
     ServiceProposal:
       $ref: ./components/schemas/service-proposal.yaml
+    WorkOrder:
+      $ref: ./components/schemas/work-order.yaml
     CreateChatbotConversationRequest:
       $ref: ./components/schemas/create-chatbot-conversation-request.yaml
     ChatbotConversationResponse:
