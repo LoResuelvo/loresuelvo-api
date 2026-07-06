@@ -7,16 +7,20 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/LoResuelvo/loresuelvo-api/internal/domain/consumer"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/notification"
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/user"
 )
+
+type notificationRecipientFinder interface {
+	FindByID(ctx context.Context, id int) (user.User, error)
+}
 
 type NotificationNotificator struct {
 	hub            *Hub
-	userRepository userAuthIDFinder
+	userRepository notificationRecipientFinder
 }
 
-func NewNotificationNotificator(hub *Hub, userRepository userAuthIDFinder) *NotificationNotificator {
+func NewNotificationNotificator(hub *Hub, userRepository notificationRecipientFinder) *NotificationNotificator {
 	return &NotificationNotificator{
 		hub:            hub,
 		userRepository: userRepository,
@@ -28,17 +32,18 @@ func (n *NotificationNotificator) Notify(ctx context.Context, notification *noti
 		return fmt.Errorf("notifying realtime notification: notification is required")
 	}
 
-	authID, err := n.userRepository.FindAuthIDByID(notification.UserID)
+	recipient, err := n.userRepository.FindByID(ctx, notification.UserID)
 	if err != nil {
-		return fmt.Errorf("finding notification user auth id: %w", err)
+		return fmt.Errorf("finding notification recipient: %w", err)
 	}
+	recipientBase := recipient.Base()
 
 	event, err := BuildNotificationEvent(notification)
 	if err != nil {
 		return fmt.Errorf("building realtime notification event: %w", err)
 	}
 
-	n.hub.BroadcastToParticipant(ctx, authID, consumer.Role, notification.UserID, event)
+	n.hub.BroadcastToParticipant(ctx, recipientBase.AuthID, recipientBase.Role, recipientBase.ID, event)
 	return nil
 }
 

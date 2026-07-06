@@ -52,16 +52,8 @@ func (s *Service) CreateServiceProposal(ctx context.Context, auth0ID string, con
 		return nil, err
 	}
 
-	notification := savedProposal.CreateNotification(s.clock)
-	savedNotification, err := s.notificationRepository.Save(ctx, notification)
-	if err != nil {
+	if err := s.saveAndNotify(ctx, savedProposal.CreateReceivedNotification(s.clock)); err != nil {
 		return nil, err
-	}
-
-	if s.notificator != nil {
-		if err := s.notificator.Notify(ctx, savedNotification); err != nil {
-			return nil, err
-		}
 	}
 
 	return savedProposal, nil
@@ -121,7 +113,24 @@ func (s *Service) Accept(ctx context.Context, auth0ID string, proposalID int) (*
 	if err != nil {
 		return nil, nil, err
 	}
+
+	if err := s.saveAndNotify(ctx, proposal.CreateAcceptedNotification(s.clock)); err != nil {
+		return nil, nil, err
+	}
 	return proposal, savedOrder, nil
+}
+
+func (s *Service) saveAndNotify(ctx context.Context, createdNotification *notification.Notification) error {
+	savedNotification, err := s.notificationRepository.Save(ctx, createdNotification)
+	if err != nil {
+		return err
+	}
+	if s.notificator != nil {
+		if err := s.notificator.Notify(ctx, savedNotification); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func serviceProposalSummaryFor(proposal *ServiceProposal, viewerRole string) (readmodel.ServiceProposalSummary, error) {

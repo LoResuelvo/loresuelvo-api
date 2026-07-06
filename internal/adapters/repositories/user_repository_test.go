@@ -64,6 +64,22 @@ func TestUserRepositoryCanFindByEmail(t *testing.T) {
 	assert.True(t, repo.FindByEmail(user.Email), "User should be found by email")
 }
 
+func TestUserRepositoryCanFindPolymorphicUserByID(t *testing.T) {
+	repo := newUserRepositoryTest(t)
+	expected := validUser()
+	saved, err := repo.Save(context.Background(), expected)
+	require.NoError(t, err)
+
+	found, err := repo.FindByID(context.Background(), saved.Base().ID)
+
+	require.NoError(t, err)
+	foundConsumer, ok := found.(*consumer.Consumer)
+	require.True(t, ok, "expected consumer, got %T", found)
+	assert.Equal(t, saved.Base().ID, foundConsumer.ID)
+	assert.Equal(t, saved.Base().AuthID, foundConsumer.AuthID)
+	assert.Equal(t, consumer.Role, foundConsumer.Role)
+}
+
 func TestUserRepositoryFindByEmailReturnsFalseIfUserDoesNotExist(t *testing.T) {
 	repo := newUserRepositoryTest(t)
 

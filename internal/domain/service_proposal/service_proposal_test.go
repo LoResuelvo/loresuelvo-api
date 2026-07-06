@@ -90,7 +90,7 @@ func TestShouldCreateANotification(t *testing.T) {
 		validProvider, validConsumer, validConversation, validServiceAmount,
 		validServiceScheduledOn, validServiceDescription, clock)
 
-	notification := serviceProposal.CreateNotification(clock)
+	notification := serviceProposal.CreateReceivedNotification(clock)
 
 	assert.NotNil(t, notification)
 	assert.Equal(t, expectedNotification, notification)

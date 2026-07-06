@@ -16,6 +16,14 @@ type UserRepository struct {
 	db *sql.DB
 }
 
+const userWithProfileSelectSQL = `SELECT u.id, u.auth_id, u.email, u.name, u.surname, u.role,
+	c.user_id, p.user_id, cat.id, cat.name, cat.normalized_name,
+	COALESCE(p.profile_photo_file_id::text, '')
+	FROM users u
+	LEFT JOIN consumers c ON c.user_id = u.id
+	LEFT JOIN providers p ON p.user_id = u.id
+	LEFT JOIN categories cat ON cat.id = p.category_id`
+
 func NewUserRepository(db *sql.DB) *UserRepository {
 	return &UserRepository{
 		db: db,
@@ -100,34 +108,43 @@ func (repository *UserRepository) FindByEmail(email string) bool {
 }
 
 func (repository *UserRepository) FindByAuthID(authID string) (user.User, error) {
+	return scanUserWithProfile(
+		repository.db.QueryRow(userWithProfileSelectSQL+" WHERE u.auth_id = $1", authID),
+		"auth id",
+	)
+}
+
+func (repository *UserRepository) FindByID(ctx context.Context, id int) (user.User, error) {
+	return scanUserWithProfile(
+		repository.db.QueryRowContext(ctx, userWithProfileSelectSQL+" WHERE u.id = $1", id),
+		"id",
+	)
+}
+
+type rowScanner interface {
+	Scan(dest ...any) error
+}
+
+func scanUserWithProfile(row rowScanner, lookup string) (user.User, error) {
 	var base user.BaseUser
 	var consumerID, providerID, categoryID sql.NullInt64
 	var categoryName, normalizedCategoryName, profilePhotoFileID sql.NullString
-	err := repository.db.QueryRow(
-		`SELECT u.id, u.auth_id, u.email, u.name, u.surname, u.role,
-			c.user_id, p.user_id, cat.id, cat.name, cat.normalized_name,
-			COALESCE(p.profile_photo_file_id::text, '')
-		FROM users u
-		LEFT JOIN consumers c ON c.user_id = u.id
-		LEFT JOIN providers p ON p.user_id = u.id
-		LEFT JOIN categories cat ON cat.id = p.category_id
-		WHERE u.auth_id = $1`, authID,
-	).Scan(
+	err := row.Scan(
 		&base.ID, &base.AuthID, &base.Email, &base.Name, &base.Surname, &base.Role,
 		&consumerID, &providerID, &categoryID, &categoryName, &normalizedCategoryName, &profilePhotoFileID,
 	)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("finding user by %s: %w", lookup, err)
 	}
 	switch base.Role {
 	case consumer.Role:
 		if !consumerID.Valid {
-			return nil, fmt.Errorf("finding user by auth id: consumer profile is missing")
+			return nil, fmt.Errorf("finding user by %s: consumer profile is missing", lookup)
 		}
 		return &consumer.Consumer{BaseUser: &base}, nil
 	case provider.Role:
 		if !providerID.Valid || !categoryID.Valid {
-			return nil, fmt.Errorf("finding user by auth id: provider profile is incomplete")
+			return nil, fmt.Errorf("finding user by %s: provider profile is incomplete", lookup)
 		}
 		return &provider.Provider{
 			BaseUser: &base,
@@ -139,7 +156,7 @@ func (repository *UserRepository) FindByAuthID(authID string) (user.User, error)
 			ProfilePhotoFileID: profilePhotoFileID.String,
 		}, nil
 	default:
-		return nil, fmt.Errorf("finding user by auth id: unsupported role %q", base.Role)
+		return nil, fmt.Errorf("finding user by %s: unsupported role %q", lookup, base.Role)
 	}
 }
 

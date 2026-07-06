@@ -162,7 +162,7 @@ func TestAcceptServiceProposalCreatesScheduledWorkOrder(t *testing.T) {
 	resetMocks(&env.userRepo.Mock, &env.serviceRepo.Mock, &env.clock.Mock)
 	env.userRepo.On("FindByAuthID", validConsumerAuth0ID).Return(consumerUser, nil).Once()
 	env.serviceRepo.On("FindByID", mock.Anything, proposal.ID).Return(proposal, nil).Once()
-	env.clock.On("Now").Return(now).Once()
+	env.clock.On("Now").Return(now).Twice()
 	env.serviceRepo.
 		On("SaveWithWorkOrder", mock.Anything, proposal, mock.MatchedBy(func(order *workorder.WorkOrder) bool {
 			return order.ServiceProposalID == proposal.ID &&
@@ -182,6 +182,55 @@ func TestAcceptServiceProposalCreatesScheduledWorkOrder(t *testing.T) {
 	env.userRepo.AssertExpectations(t)
 	env.serviceRepo.AssertExpectations(t)
 	env.clock.AssertExpectations(t)
+}
+
+func TestAcceptServiceProposalNotifiesProviderAfterSavingNotification(t *testing.T) {
+	env := setupServiceProposalTest()
+	now := time.Date(2026, time.July, 4, 13, 0, 0, 0, time.UTC)
+	proposal := validSavedServiceProposal()
+	proposal.ScheduledOn = now.Add(time.Hour)
+	consumerUser := &consumer.Consumer{BaseUser: &user.BaseUser{ID: validConsumerID, Role: consumer.Role}}
+	savedOrder := &workorder.WorkOrder{ID: 9}
+	savedNotification := &notification.Notification{
+		ID:           11,
+		UserID:       validProviderID,
+		Type:         notification.TypeServiceProposalAccepted,
+		ResourceType: notification.ResourceServiceProposal,
+		ResourceID:   proposal.ID,
+		CreatedAt:    now,
+	}
+
+	resetMocks(
+		&env.userRepo.Mock,
+		&env.serviceRepo.Mock,
+		&env.notificationRepo.Mock,
+		&env.notificator.Mock,
+		&env.clock.Mock,
+	)
+	env.userRepo.On("FindByAuthID", validConsumerAuth0ID).Return(consumerUser, nil).Once()
+	env.serviceRepo.On("FindByID", mock.Anything, proposal.ID).Return(proposal, nil).Once()
+	env.clock.On("Now").Return(now).Twice()
+	env.serviceRepo.
+		On("SaveWithWorkOrder", mock.Anything, proposal, mock.AnythingOfType("*workorder.WorkOrder")).
+		Return(savedOrder, nil).
+		Once()
+	env.notificationRepo.
+		On("Save", mock.Anything, mock.MatchedBy(func(created *notification.Notification) bool {
+			return created.UserID == validProviderID &&
+				created.Type == notification.TypeServiceProposalAccepted &&
+				created.ResourceType == notification.ResourceServiceProposal &&
+				created.ResourceID == proposal.ID &&
+				created.CreatedAt.Equal(now)
+		})).
+		Return(savedNotification, nil).
+		Once()
+	env.notificator.On("Notify", mock.Anything, savedNotification).Return(nil).Once()
+
+	_, _, err := env.newService().Accept(t.Context(), validConsumerAuth0ID, proposal.ID)
+
+	require.NoError(t, err)
+	env.notificationRepo.AssertExpectations(t)
+	env.notificator.AssertExpectations(t)
 }
 
 func TestCreateProposalShouldPersist(t *testing.T) {

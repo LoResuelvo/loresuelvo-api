@@ -51,10 +51,26 @@ func NewServiceProposal(provider *provider.Provider, consumer *consumer.Consumer
 	}, nil
 }
 
-func (sp *ServiceProposal) CreateNotification(clock clock.Clock) *notification.Notification {
-	return notification.NewNotification(
+func (sp *ServiceProposal) CreateReceivedNotification(clock clock.Clock) *notification.Notification {
+	return sp.createNotification(
 		sp.Consumer.ID,
 		notification.TypeServiceProposalReceived,
+		clock,
+	)
+}
+
+func (sp *ServiceProposal) CreateAcceptedNotification(clock clock.Clock) *notification.Notification {
+	return sp.createNotification(
+		sp.Provider.ID,
+		notification.TypeServiceProposalAccepted,
+		clock,
+	)
+}
+
+func (sp *ServiceProposal) createNotification(recipientID int, notificationType notification.Type, clock clock.Clock) *notification.Notification {
+	return notification.NewNotification(
+		recipientID,
+		notificationType,
 		notification.ResourceServiceProposal,
 		sp.ID,
 		clock,
