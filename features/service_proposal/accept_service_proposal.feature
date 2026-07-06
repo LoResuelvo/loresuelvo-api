@@ -1,4 +1,3 @@
-@wip
 Feature: Confirmar propuesta de servicio
     Como consumidor
     quiero confirmar el acuerdo del servicio propuesto por el prestador
@@ -13,7 +12,7 @@ Feature: Confirmar propuesta de servicio
 
     Rule: El consumidor destinatario puede confirmar una propuesta pendiente
 
-        Scenario: 55.1-CSP Confirmar una propuesta de servicio pendiente
+        Scenario: 21.1-CSP Confirmar una propuesta de servicio pendiente
             Given que existe una propuesta de servicio pendiente de "juan.plomero@example.com" para "ana@example.com" por "15000.50" para la fecha y hora "2026-07-05T09:30:00-03:00" con la descripción:
                 """
                 Reparación de pérdida de agua en cocina con materiales incluidos.
@@ -25,7 +24,8 @@ Feature: Confirmar propuesta de servicio
             And la orden de trabajo queda vinculada a la propuesta aceptada
             And la orden de trabajo conserva el consumidor, el prestador, el monto, la fecha y hora y la descripción acordados
 
-        Scenario: 55.2-CSP Notificar al prestador la confirmación de su propuesta
+        @wip
+        Scenario: 21.2-CSP Notificar al prestador la confirmación de su propuesta
             Given que existe una propuesta de servicio pendiente de "juan.plomero@example.com" para "ana@example.com"
             And que el prestador "juan.plomero@example.com" está disponible para recibir mensajes en tiempo real
             And que estoy autenticado como consumidor "ana@example.com"
@@ -34,7 +34,8 @@ Feature: Confirmar propuesta de servicio
 
     Rule: Solo el consumidor destinatario puede confirmar la propuesta
 
-        Scenario: 55.3-CSP Rechazar confirmación por otro consumidor
+        @wip
+        Scenario: 21.3-CSP Rechazar confirmación por otro consumidor
             Given que existe una propuesta de servicio pendiente de "juan.plomero@example.com" para "ana@example.com"
             And que estoy autenticado como consumidor "carla@example.com"
             When intento confirmar la propuesta de servicio pendiente de "ana@example.com"
@@ -42,7 +43,8 @@ Feature: Confirmar propuesta de servicio
             And la propuesta de servicio permanece pendiente
             And el sistema no registra una orden de trabajo para la propuesta
 
-        Scenario: 55.4-CSP Rechazar confirmación por el prestador
+        @wip
+        Scenario: 21.4-CSP Rechazar confirmación por el prestador
             Given que existe una propuesta de servicio pendiente de "juan.plomero@example.com" para "ana@example.com"
             And que estoy autenticado como prestador "juan.plomero@example.com"
             When intento confirmar la propuesta de servicio pendiente
@@ -52,21 +54,24 @@ Feature: Confirmar propuesta de servicio
 
     Rule: Solamente las propuestas pendientes y vigentes pueden confirmarse
 
-        Scenario: 55.5-CSP Rechazar una segunda confirmación de la misma propuesta
+        @wip
+        Scenario: 21.5-CSP Rechazar una segunda confirmación de la misma propuesta
             Given que existe una propuesta de servicio aceptada de "juan.plomero@example.com" para "ana@example.com"
             And que estoy autenticado como consumidor "ana@example.com"
             When intento confirmar nuevamente la propuesta de servicio aceptada
             Then el sistema rechaza confirmar una propuesta de servicio ya aceptada
             And el sistema conserva una única orden de trabajo para la propuesta
 
-        Scenario: 55.6-CSP Rechazar confirmación de una propuesta rechazada
+        @wip
+        Scenario: 21.6-CSP Rechazar confirmación de una propuesta rechazada
             Given que existe una propuesta de servicio rechazada de "juan.plomero@example.com" para "ana@example.com"
             And que estoy autenticado como consumidor "ana@example.com"
             When intento confirmar la propuesta de servicio rechazada
             Then el sistema rechaza confirmar una propuesta de servicio rechazada
             And el sistema no registra una orden de trabajo para la propuesta
 
-        Scenario: 55.7-CSP Rechazar confirmación de una propuesta vencida
+        @wip
+        Scenario: 21.7-CSP Rechazar confirmación de una propuesta vencida
             Given que existe una propuesta de servicio pendiente de "juan.plomero@example.com" para "ana@example.com" por "15000.50" para la fecha y hora "2026-07-05T09:30:00-03:00" con la descripción:
                 """
                 Reparación de pérdida de agua en cocina con materiales incluidos.
@@ -80,7 +85,8 @@ Feature: Confirmar propuesta de servicio
 
     Rule: Confirmar una propuesta no modifica otras propuestas pendientes
 
-        Scenario: 55.8-CSP Conservar otras propuestas pendientes entre los participantes
+        @wip
+        Scenario: 21.8-CSP Conservar otras propuestas pendientes entre los participantes
             Given que existen dos propuestas de servicio pendientes de "juan.plomero@example.com" para "ana@example.com"
             And que estoy autenticado como consumidor "ana@example.com"
             When confirmo una de las propuestas de servicio pendientes
@@ -90,7 +96,8 @@ Feature: Confirmar propuesta de servicio
 
     Rule: Solo usuarios autenticados pueden confirmar propuestas
 
-        Scenario: 55.9-CSP Rechazar confirmación sin sesión válida
+        @wip
+        Scenario: 21.9-CSP Rechazar confirmación sin sesión válida
             Given que existe una propuesta de servicio pendiente de "juan.plomero@example.com" para "ana@example.com"
             And que no tengo una sesión válida
             When intento confirmar la propuesta de servicio pendiente
