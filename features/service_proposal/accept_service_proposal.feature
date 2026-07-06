@@ -24,7 +24,6 @@ Feature: Confirmar propuesta de servicio
             And la orden de trabajo queda vinculada a la propuesta aceptada
             And la orden de trabajo conserva el consumidor, el prestador, el monto, la fecha y hora y la descripción acordados
 
-        @wip
         Scenario: 21.2-CSP Notificar al prestador la confirmación de su propuesta
             Given que existe una propuesta de servicio pendiente de "juan.plomero@example.com" para "ana@example.com"
             And que el prestador "juan.plomero@example.com" está disponible para recibir mensajes en tiempo real
