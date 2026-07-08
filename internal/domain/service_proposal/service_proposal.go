@@ -8,7 +8,6 @@ import (
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/conversation"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/notification"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/provider"
-	workorder "github.com/LoResuelvo/loresuelvo-api/internal/domain/work_order"
 )
 
 type Status string
@@ -77,19 +76,43 @@ func (sp *ServiceProposal) createNotification(recipientID int, notificationType 
 	)
 }
 
-func (sp *ServiceProposal) Accept(consumerID int, acceptedOn time.Time) (*workorder.WorkOrder, error) {
+func (sp *ServiceProposal) Accept(consumerID int, acceptedOn time.Time) error {
 	if sp.Consumer == nil || sp.Consumer.ID != consumerID {
-		return nil, ErrOnlyRecipientCanAccept
+		return ErrOnlyRecipientCanAccept
 	}
 	if sp.Status != StatusPending {
-		return nil, ErrOnlyPendingCanBeAccepted
+		return ErrOnlyPendingCanBeAccepted
 	}
 	if !sp.ScheduledOn.After(acceptedOn) {
-		return nil, ErrServiceProposalExpired
+		return ErrServiceProposalExpired
 	}
 
 	sp.Status = StatusAccepted
-	return workorder.New(sp.ID, sp.Consumer.ID, sp.Provider.ID, acceptedOn), nil
+	return nil
+}
+
+func (sp *ServiceProposal) ServiceProposalID() int {
+	return sp.ID
+}
+
+func (sp *ServiceProposal) ServiceProposalAmount() int64 {
+	return sp.Amount
+}
+
+func (sp *ServiceProposal) ServiceProposalScheduledOn() time.Time {
+	return sp.ScheduledOn
+}
+
+func (sp *ServiceProposal) ServiceProposalDescription() string {
+	return sp.Description
+}
+
+func (sp *ServiceProposal) ConsumerID() int {
+	return sp.Consumer.ID
+}
+
+func (sp *ServiceProposal) ProviderID() int {
+	return sp.Provider.ID
 }
 
 func validateParameters(amount int64, scheduledOn time.Time, clock clock.Clock) error {

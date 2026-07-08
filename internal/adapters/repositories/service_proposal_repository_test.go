@@ -43,14 +43,15 @@ func newServiceProposalRepositoryTest(t *testing.T) serviceProposalRepositoryTes
 
 	userRepository := repositories.NewUserRepository(database)
 	messageRepository := repositories.NewMessageRepository(database, repositories.NewMessageImageRepository(database))
-	workOrderRepository := repositories.NewWorkOrderRepository(database)
+	serviceProposalRepository := repositories.NewServiceProposalRepository(database)
+	workOrderRepository := repositories.NewWorkOrderRepository(database, serviceProposalRepository)
 
 	return serviceProposalRepositoryTestContext{
 		database:                  database,
 		userRepository:            userRepository,
 		categoryRepository:        repositories.NewCategoryRepository(database),
 		conversationRepository:    repositories.NewConversationRepository(database, messageRepository),
-		serviceProposalRepository: repositories.NewServiceProposalRepository(database, workOrderRepository),
+		serviceProposalRepository: serviceProposalRepository,
 		workOrderRepository:       workOrderRepository,
 	}
 }
@@ -110,10 +111,11 @@ func TestServiceProposalRepositorySavesAcceptanceWithWorkOrderAtomically(t *test
 	require.NoError(t, err)
 
 	acceptedOn := time.Now().UTC().Truncate(time.Microsecond)
-	order := workorder.New(proposal.ID, consumerID, providerID, acceptedOn)
+	order, err := workorder.New(proposal, acceptedOn)
+	require.NoError(t, err)
 	proposal.Status = serviceproposal.StatusAccepted
 
-	savedOrder, err := testContext.serviceProposalRepository.SaveWithWorkOrder(context.Background(), proposal, order)
+	savedOrder, err := testContext.workOrderRepository.Save(context.Background(), order)
 
 	require.NoError(t, err)
 	require.NotNil(t, savedOrder)
@@ -127,24 +129,25 @@ func TestServiceProposalRepositorySavesAcceptanceWithWorkOrderAtomically(t *test
 	).Scan(&storedProposalStatus))
 	assert.Equal(t, serviceproposal.StatusAccepted, storedProposalStatus)
 
-	var storedProposalID, storedConsumerID, storedProviderID int
+	var storedProposalID int
 	var storedStatus workorder.Status
 	var storedAcceptedOn time.Time
 	require.NoError(t, testContext.database.QueryRow(
-		`SELECT service_proposal_id, consumer_id, provider_id, status, accepted_on
+		`SELECT service_proposal_id, status, accepted_on
 		FROM work_orders
 		WHERE id = $1`,
 		savedOrder.ID,
-	).Scan(&storedProposalID, &storedConsumerID, &storedProviderID, &storedStatus, &storedAcceptedOn))
+	).Scan(&storedProposalID, &storedStatus, &storedAcceptedOn))
 	assert.Equal(t, proposal.ID, storedProposalID)
-	assert.Equal(t, consumerID, storedConsumerID)
-	assert.Equal(t, providerID, storedProviderID)
 	assert.Equal(t, workorder.StatusScheduled, storedStatus)
 	assert.Equal(t, acceptedOn, storedAcceptedOn.UTC())
 
 	foundOrder, err := testContext.workOrderRepository.FindByServiceProposalID(context.Background(), proposal.ID)
 	require.NoError(t, err)
-	assert.Equal(t, savedOrder, foundOrder)
+	assert.Equal(t, savedOrder.ID, foundOrder.ID)
+	assert.Equal(t, savedOrder.ServiceProposal.ServiceProposalID(), foundOrder.ServiceProposal.ServiceProposalID())
+	assert.Equal(t, savedOrder.Status, foundOrder.Status)
+	assert.Equal(t, savedOrder.AcceptedOn.UTC(), foundOrder.AcceptedOn.UTC())
 }
 
 func TestWorkOrderRepositoryReturnsNotFoundForMissingServiceProposal(t *testing.T) {

@@ -22,6 +22,7 @@ type serviceProposalTestEnv struct {
 	consumerRepo     *MockConsumerRepository
 	conversationRepo *MockConversationRepository
 	serviceRepo      *MockServiceProposalRepository
+	workOrderRepo    *MockWorkOrderRepository
 	notificationRepo *MockNotificationRepository
 	notificator      *MockNotificator
 	clock            *MockClock
@@ -34,6 +35,7 @@ func setupServiceProposalTest() *serviceProposalTestEnv {
 	consumerRepo := new(MockConsumerRepository)
 	conversationRepo := new(MockConversationRepository)
 	serviceRepo := new(MockServiceProposalRepository)
+	workOrderRepo := new(MockWorkOrderRepository)
 	notificationRepo := new(MockNotificationRepository)
 	notificator := new(MockNotificator)
 	clock := new(MockClock)
@@ -94,6 +96,7 @@ func setupServiceProposalTest() *serviceProposalTestEnv {
 		consumerRepo:     consumerRepo,
 		conversationRepo: conversationRepo,
 		serviceRepo:      serviceRepo,
+		workOrderRepo:    workOrderRepo,
 		notificationRepo: notificationRepo,
 		notificator:      notificator,
 		clock:            clock,
@@ -118,6 +121,7 @@ func validSavedServiceProposal() *serviceproposal.ServiceProposal {
 func (env *serviceProposalTestEnv) newService() *serviceproposal.Service {
 	return serviceproposal.NewService(
 		env.serviceRepo,
+		env.workOrderRepo,
 		env.userRepo,
 		env.conversationRepo,
 		env.notificationRepo,
@@ -151,36 +155,32 @@ func TestAcceptServiceProposalCreatesScheduledWorkOrder(t *testing.T) {
 	proposal.ScheduledOn = now.Add(time.Hour)
 	consumerUser := &consumer.Consumer{BaseUser: &user.BaseUser{ID: validConsumerID, Role: consumer.Role}}
 	savedOrder := &workorder.WorkOrder{
-		ID:                9,
-		ServiceProposalID: proposal.ID,
-		ConsumerID:        validConsumerID,
-		ProviderID:        validProviderID,
-		Status:            workorder.StatusScheduled,
-		AcceptedOn:        now,
+		ID:              9,
+		ServiceProposal: proposal,
+		Status:          workorder.StatusScheduled,
+		AcceptedOn:      now,
 	}
 
-	resetMocks(&env.userRepo.Mock, &env.serviceRepo.Mock, &env.clock.Mock)
+	resetMocks(&env.userRepo.Mock, &env.serviceRepo.Mock, &env.workOrderRepo.Mock, &env.clock.Mock)
 	env.userRepo.On("FindByAuthID", validConsumerAuth0ID).Return(consumerUser, nil).Once()
 	env.serviceRepo.On("FindByID", mock.Anything, proposal.ID).Return(proposal, nil).Once()
 	env.clock.On("Now").Return(now).Twice()
-	env.serviceRepo.
-		On("SaveWithWorkOrder", mock.Anything, proposal, mock.MatchedBy(func(order *workorder.WorkOrder) bool {
-			return order.ServiceProposalID == proposal.ID &&
-				order.ConsumerID == validConsumerID &&
-				order.ProviderID == validProviderID &&
+	env.workOrderRepo.
+		On("Save", mock.Anything, mock.MatchedBy(func(order *workorder.WorkOrder) bool {
+			return order.ServiceProposal == proposal &&
 				order.Status == workorder.StatusScheduled &&
 				order.AcceptedOn.Equal(now)
 		})).
 		Return(savedOrder, nil).
 		Once()
 
-	acceptedProposal, createdOrder, err := env.newService().Accept(t.Context(), validConsumerAuth0ID, proposal.ID)
+	createdOrder, err := env.newService().Accept(t.Context(), validConsumerAuth0ID, proposal.ID)
 
 	require.NoError(t, err)
-	assert.Equal(t, serviceproposal.StatusAccepted, acceptedProposal.Status)
 	assert.Equal(t, savedOrder, createdOrder)
 	env.userRepo.AssertExpectations(t)
 	env.serviceRepo.AssertExpectations(t)
+	env.workOrderRepo.AssertExpectations(t)
 	env.clock.AssertExpectations(t)
 }
 
@@ -190,7 +190,7 @@ func TestAcceptServiceProposalNotifiesProviderAfterSavingNotification(t *testing
 	proposal := validSavedServiceProposal()
 	proposal.ScheduledOn = now.Add(time.Hour)
 	consumerUser := &consumer.Consumer{BaseUser: &user.BaseUser{ID: validConsumerID, Role: consumer.Role}}
-	savedOrder := &workorder.WorkOrder{ID: 9}
+	savedOrder := &workorder.WorkOrder{ID: 9, ServiceProposal: proposal}
 	savedNotification := &notification.Notification{
 		ID:           11,
 		UserID:       validProviderID,
@@ -203,6 +203,7 @@ func TestAcceptServiceProposalNotifiesProviderAfterSavingNotification(t *testing
 	resetMocks(
 		&env.userRepo.Mock,
 		&env.serviceRepo.Mock,
+		&env.workOrderRepo.Mock,
 		&env.notificationRepo.Mock,
 		&env.notificator.Mock,
 		&env.clock.Mock,
@@ -210,8 +211,10 @@ func TestAcceptServiceProposalNotifiesProviderAfterSavingNotification(t *testing
 	env.userRepo.On("FindByAuthID", validConsumerAuth0ID).Return(consumerUser, nil).Once()
 	env.serviceRepo.On("FindByID", mock.Anything, proposal.ID).Return(proposal, nil).Once()
 	env.clock.On("Now").Return(now).Twice()
-	env.serviceRepo.
-		On("SaveWithWorkOrder", mock.Anything, proposal, mock.AnythingOfType("*workorder.WorkOrder")).
+	env.workOrderRepo.
+		On("Save", mock.Anything, mock.MatchedBy(func(order *workorder.WorkOrder) bool {
+			return order.ServiceProposal == proposal && order.AcceptedOn.Equal(now)
+		})).
 		Return(savedOrder, nil).
 		Once()
 	env.notificationRepo.
@@ -226,7 +229,7 @@ func TestAcceptServiceProposalNotifiesProviderAfterSavingNotification(t *testing
 		Once()
 	env.notificator.On("Notify", mock.Anything, savedNotification).Return(nil).Once()
 
-	_, _, err := env.newService().Accept(t.Context(), validConsumerAuth0ID, proposal.ID)
+	_, err := env.newService().Accept(t.Context(), validConsumerAuth0ID, proposal.ID)
 
 	require.NoError(t, err)
 	env.notificationRepo.AssertExpectations(t)
@@ -352,6 +355,7 @@ func TestGetServiceProposalsWithoutServiceProposals(t *testing.T) {
 	consumerRepo := new(MockConsumerRepository)
 	conversationRepo := new(MockConversationRepository)
 	serviceRepo := new(MockServiceProposalRepository)
+	workOrderRepo := new(MockWorkOrderRepository)
 	notificationRepo := new(MockNotificationRepository)
 	clock := new(MockClock)
 
@@ -366,7 +370,7 @@ func TestGetServiceProposalsWithoutServiceProposals(t *testing.T) {
 
 	fileURLResolver := new(MockFileURLResolver)
 	fileURLResolver.On("ResolvePublicURLs", mock.Anything, mock.Anything).Return(map[string]string{}, nil)
-	service := serviceproposal.NewService(serviceRepo, userRepo, conversationRepo, notificationRepo, nil, fileURLResolver, clock)
+	service := serviceproposal.NewService(serviceRepo, workOrderRepo, userRepo, conversationRepo, notificationRepo, nil, fileURLResolver, clock)
 
 	serviceProposals, err := service.GetServiceProposals(t.Context(), validProviderAuth0ID)
 

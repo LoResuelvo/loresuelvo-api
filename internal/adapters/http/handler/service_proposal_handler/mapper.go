@@ -28,15 +28,15 @@ func serviceProposalCreationResponseFromDomain(proposal *serviceproposal.Service
 	return response
 }
 
-func workOrderResponseFromDomain(proposal *serviceproposal.ServiceProposal, order *workorder.WorkOrder) workOrderResponse {
+func workOrderResponseFromDomain(order *workorder.WorkOrder) workOrderResponse {
 	return workOrderResponse{
 		ID:                order.ID,
-		ServiceProposalID: order.ServiceProposalID,
-		ConsumerID:        order.ConsumerID,
-		ProviderID:        order.ProviderID,
-		AmountCents:       proposal.Amount,
-		ScheduledOn:       proposal.ScheduledOn,
-		Description:       proposal.Description,
+		ServiceProposalID: order.ServiceProposalID(),
+		ConsumerID:        order.ConsumerID(),
+		ProviderID:        order.ProviderID(),
+		AmountCents:       order.Amount(),
+		ScheduledOn:       order.ScheduledOn(),
+		Description:       order.Description(),
 		Status:            string(order.Status),
 		AcceptedOn:        order.AcceptedOn,
 	}

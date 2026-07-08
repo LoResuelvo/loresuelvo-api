@@ -16,6 +16,7 @@ import (
 
 type Service struct {
 	repository             ServiceProposalRepository
+	workOrderRepository    WorkOrderRepository
 	userRepository         UserRepository
 	conversationRepository ConversationRepository
 	notificationRepository NotificationRepository
@@ -24,9 +25,10 @@ type Service struct {
 	clock                  clock.Clock
 }
 
-func NewService(serviceRepo ServiceProposalRepository, userRepo UserRepository, conversationRepo ConversationRepository, notificationRepo NotificationRepository, notificator notification.Notificator, fileURLResolver FileURLResolver, clock clock.Clock) *Service {
+func NewService(serviceRepo ServiceProposalRepository, workOrderRepo WorkOrderRepository, userRepo UserRepository, conversationRepo ConversationRepository, notificationRepo NotificationRepository, notificator notification.Notificator, fileURLResolver FileURLResolver, clock clock.Clock) *Service {
 	return &Service{
 		repository:             serviceRepo,
+		workOrderRepository:    workOrderRepo,
 		userRepository:         userRepo,
 		conversationRepository: conversationRepo,
 		notificationRepository: notificationRepo,
@@ -93,31 +95,36 @@ func (s *Service) GetServiceProposals(ctx context.Context, auth0ID string) ([]re
 	return summaries, nil
 }
 
-func (s *Service) Accept(ctx context.Context, auth0ID string, proposalID int) (*ServiceProposal, *workorder.WorkOrder, error) {
+func (s *Service) Accept(ctx context.Context, auth0ID string, proposalID int) (*workorder.WorkOrder, error) {
 	foundUser, err := s.userRepository.FindByAuthID(auth0ID)
 	if err != nil {
-		return nil, nil, ErrOnlyRecipientCanAccept
+		return nil, ErrOnlyRecipientCanAccept
 	}
 
 	proposal, err := s.repository.FindByID(ctx, proposalID)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
-	order, err := proposal.Accept(foundUser.Base().ID, s.clock.Now())
-	if err != nil {
-		return nil, nil, err
+	acceptedOn := s.clock.Now()
+	if err := proposal.Accept(foundUser.Base().ID, acceptedOn); err != nil {
+		return nil, err
 	}
 
-	savedOrder, err := s.repository.SaveWithWorkOrder(ctx, proposal, order)
+	order, err := workorder.New(proposal, acceptedOn)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
+	}
+
+	savedOrder, err := s.workOrderRepository.Save(ctx, order)
+	if err != nil {
+		return nil, err
 	}
 
 	if err := s.saveAndNotify(ctx, proposal.CreateAcceptedNotification(s.clock)); err != nil {
-		return nil, nil, err
+		return nil, err
 	}
-	return proposal, savedOrder, nil
+	return savedOrder, nil
 }
 
 func (s *Service) saveAndNotify(ctx context.Context, createdNotification *notification.Notification) error {

@@ -180,7 +180,6 @@ func (suite *testSuite) serviceProposalHasStatus(proposalID int, expected servic
 	}
 	proposals, err := repositories.NewServiceProposalRepository(
 		suite.database,
-		repositories.NewWorkOrderRepository(suite.database),
 	).FindByUserID(context.Background(), fixture.consumerID)
 	if err != nil {
 		return fmt.Errorf("finding service proposal fixture: %w", err)
@@ -332,8 +331,8 @@ func (suite *testSuite) assertPersistedWorkOrder(proposalID int) error {
 	if err != nil {
 		return err
 	}
-	if order.ServiceProposalID != proposalID {
-		return fmt.Errorf("expected work order for service proposal %d, got %d", proposalID, order.ServiceProposalID)
+	if order.ServiceProposal.ServiceProposalID() != proposalID {
+		return fmt.Errorf("expected work order for service proposal %d, got %d", proposalID, order.ServiceProposal.ServiceProposalID())
 	}
 	return nil
 }

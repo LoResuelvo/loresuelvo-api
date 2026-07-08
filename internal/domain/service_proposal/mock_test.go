@@ -148,8 +148,12 @@ func (m *MockServiceProposalRepository) FindByID(ctx context.Context, id int) (*
 	return args.Get(0).(*serviceproposal.ServiceProposal), args.Error(1)
 }
 
-func (m *MockServiceProposalRepository) SaveWithWorkOrder(ctx context.Context, proposal *serviceproposal.ServiceProposal, order *workorder.WorkOrder) (*workorder.WorkOrder, error) {
-	args := m.Called(ctx, proposal, order)
+type MockWorkOrderRepository struct {
+	mock.Mock
+}
+
+func (m *MockWorkOrderRepository) Save(ctx context.Context, order *workorder.WorkOrder) (*workorder.WorkOrder, error) {
+	args := m.Called(ctx, order)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}

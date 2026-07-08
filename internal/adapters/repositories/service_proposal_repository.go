@@ -12,19 +12,14 @@ import (
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/provider"
 	serviceproposal "github.com/LoResuelvo/loresuelvo-api/internal/domain/service_proposal"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/user"
-	workorder "github.com/LoResuelvo/loresuelvo-api/internal/domain/work_order"
 )
 
 type ServiceProposalRepository struct {
-	db                  *sql.DB
-	workOrderRepository *WorkOrderRepository
+	db *sql.DB
 }
 
-func NewServiceProposalRepository(db *sql.DB, workOrderRepository *WorkOrderRepository) *ServiceProposalRepository {
-	return &ServiceProposalRepository{
-		db:                  db,
-		workOrderRepository: workOrderRepository,
-	}
+func NewServiceProposalRepository(db *sql.DB) *ServiceProposalRepository {
+	return &ServiceProposalRepository{db: db}
 }
 
 func (r *ServiceProposalRepository) Save(serviceProposal *serviceproposal.ServiceProposal) (*serviceproposal.ServiceProposal, error) {
@@ -114,18 +109,16 @@ func (r *ServiceProposalRepository) FindByID(ctx context.Context, id int) (*serv
 	return &proposal, nil
 }
 
-func (r *ServiceProposalRepository) SaveWithWorkOrder(
+func (r *ServiceProposalRepository) updateAcceptedWithTx(
 	ctx context.Context,
+	tx *sql.Tx,
 	proposal *serviceproposal.ServiceProposal,
-	order *workorder.WorkOrder,
-) (*workorder.WorkOrder, error) {
-	if proposal == nil {
-		return nil, fmt.Errorf("saving accepted service proposal: service proposal is required")
+) error {
+	if tx == nil {
+		return fmt.Errorf("updating accepted service proposal: transaction is required")
 	}
-
-	tx, err := r.db.BeginTx(ctx, nil)
-	if err != nil {
-		return nil, fmt.Errorf("beginning service proposal acceptance transaction: %w", err)
+	if proposal == nil {
+		return fmt.Errorf("updating accepted service proposal: service proposal is required")
 	}
 
 	result, err := tx.ExecContext(
@@ -138,31 +131,16 @@ func (r *ServiceProposalRepository) SaveWithWorkOrder(
 		serviceproposal.StatusPending,
 	)
 	if err != nil {
-		return nil, rollbackServiceProposalAcceptance(tx, fmt.Errorf("updating accepted service proposal: %w", err))
+		return fmt.Errorf("updating accepted service proposal: %w", err)
 	}
 	affected, err := result.RowsAffected()
 	if err != nil {
-		return nil, rollbackServiceProposalAcceptance(tx, fmt.Errorf("checking accepted service proposal update: %w", err))
+		return fmt.Errorf("checking accepted service proposal update: %w", err)
 	}
 	if affected != 1 {
-		return nil, rollbackServiceProposalAcceptance(tx, serviceproposal.ErrOnlyPendingCanBeAccepted)
+		return serviceproposal.ErrOnlyPendingCanBeAccepted
 	}
-
-	savedOrder, err := r.workOrderRepository.saveWithTx(ctx, tx, order)
-	if err != nil {
-		return nil, rollbackServiceProposalAcceptance(tx, err)
-	}
-	if err := tx.Commit(); err != nil {
-		return nil, fmt.Errorf("committing service proposal acceptance: %w", err)
-	}
-	return savedOrder, nil
-}
-
-func rollbackServiceProposalAcceptance(tx *sql.Tx, cause error) error {
-	if rollbackErr := tx.Rollback(); rollbackErr != nil {
-		return fmt.Errorf("%w: rolling back service proposal acceptance: %v", cause, rollbackErr)
-	}
-	return cause
+	return nil
 }
 
 func (r *ServiceProposalRepository) FindByUserID(ctx context.Context, userID int) ([]*serviceproposal.ServiceProposal, error) {

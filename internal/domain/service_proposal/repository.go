@@ -19,7 +19,10 @@ type ServiceProposalRepository interface {
 	Save(serviceProposal *ServiceProposal) (*ServiceProposal, error)
 	FindByID(ctx context.Context, id int) (*ServiceProposal, error)
 	FindByUserID(ctx context.Context, userID int) ([]*ServiceProposal, error)
-	SaveWithWorkOrder(ctx context.Context, serviceProposal *ServiceProposal, workOrder *workorder.WorkOrder) (*workorder.WorkOrder, error)
+}
+
+type WorkOrderRepository interface {
+	Save(ctx context.Context, workOrder *workorder.WorkOrder) (*workorder.WorkOrder, error)
 }
 
 type UserRepository interface {

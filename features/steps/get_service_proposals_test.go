@@ -223,7 +223,7 @@ func (suite *testSuite) saveServiceProposalFixture(
 	scheduledOn time.Time,
 	description string,
 ) error {
-	repository := repositories.NewServiceProposalRepository(suite.database, repositories.NewWorkOrderRepository(suite.database))
+	repository := repositories.NewServiceProposalRepository(suite.database)
 	savedProposal, err := repository.Save(&serviceproposal.ServiceProposal{
 		Provider:     participants.provider,
 		Consumer:     participants.consumer,

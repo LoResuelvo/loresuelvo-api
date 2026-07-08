@@ -16,13 +16,14 @@ func TestServiceProposalAccept(t *testing.T) {
 	proposal := validSavedServiceProposal()
 	proposal.ScheduledOn = now.Add(time.Hour)
 
-	order, err := proposal.Accept(validConsumerID, now)
+	err := proposal.Accept(validConsumerID, now)
 
 	require.NoError(t, err)
 	assert.Equal(t, serviceproposal.StatusAccepted, proposal.Status)
-	assert.Equal(t, proposal.ID, order.ServiceProposalID)
-	assert.Equal(t, validConsumerID, order.ConsumerID)
-	assert.Equal(t, validProviderID, order.ProviderID)
+
+	order, err := workorder.New(proposal, now)
+	require.NoError(t, err)
+	assert.Equal(t, proposal, order.ServiceProposal)
 	assert.Equal(t, workorder.StatusScheduled, order.Status)
 	assert.Equal(t, now, order.AcceptedOn)
 }
@@ -48,9 +49,8 @@ func TestServiceProposalRejectsAcceptanceByAnotherConsumer(t *testing.T) {
 	proposal := validSavedServiceProposal()
 	proposal.ScheduledOn = now.Add(time.Hour)
 
-	order, err := proposal.Accept(validConsumerID+100, now)
+	err := proposal.Accept(validConsumerID+100, now)
 
-	assert.Nil(t, order)
 	assert.ErrorIs(t, err, serviceproposal.ErrOnlyRecipientCanAccept)
 	assert.Equal(t, serviceproposal.StatusPending, proposal.Status)
 }
@@ -67,9 +67,8 @@ func TestServiceProposalRejectsAcceptanceWhenNotPending(t *testing.T) {
 			proposal.Status = status
 			proposal.ScheduledOn = now.Add(time.Hour)
 
-			order, err := proposal.Accept(validConsumerID, now)
+			err := proposal.Accept(validConsumerID, now)
 
-			assert.Nil(t, order)
 			assert.ErrorIs(t, err, serviceproposal.ErrOnlyPendingCanBeAccepted)
 			assert.Equal(t, status, proposal.Status)
 		})
@@ -81,9 +80,8 @@ func TestServiceProposalRejectsAcceptanceAtScheduledTime(t *testing.T) {
 	proposal := validSavedServiceProposal()
 	proposal.ScheduledOn = scheduledOn
 
-	order, err := proposal.Accept(validConsumerID, scheduledOn)
+	err := proposal.Accept(validConsumerID, scheduledOn)
 
-	assert.Nil(t, order)
 	assert.ErrorIs(t, err, serviceproposal.ErrServiceProposalExpired)
 	assert.Equal(t, serviceproposal.StatusPending, proposal.Status)
 }

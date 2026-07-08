@@ -72,12 +72,12 @@ func (h *ServiceProposalHandler) AcceptServiceProposal(c *gin.Context) {
 		return
 	}
 
-	proposal, order, err := h.serviceProposalService.Accept(c.Request.Context(), auth0ID, proposalID)
+	order, err := h.serviceProposalService.Accept(c.Request.Context(), auth0ID, proposalID)
 	if err != nil {
 		handleAcceptServiceProposalError(c, err)
 		return
 	}
 
 	c.Header("Location", fmt.Sprintf("/work-orders/%d", order.ID))
-	c.JSON(http.StatusCreated, workOrderResponseFromDomain(proposal, order))
+	c.JSON(http.StatusCreated, workOrderResponseFromDomain(order))
 }
