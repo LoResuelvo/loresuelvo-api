@@ -6,8 +6,11 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/consumer"
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/provider"
 	serviceproposal "github.com/LoResuelvo/loresuelvo-api/internal/domain/service_proposal"
 	workorder "github.com/LoResuelvo/loresuelvo-api/internal/domain/work_order"
+	readmodel "github.com/LoResuelvo/loresuelvo-api/internal/domain/work_order/read_model"
 )
 
 type WorkOrderRepository struct {
@@ -77,6 +80,73 @@ func (r *WorkOrderRepository) FindByServiceProposalID(ctx context.Context, servi
 	order.ServiceProposal = foundProposal
 
 	return &order, nil
+}
+
+func (r *WorkOrderRepository) FindByUserID(ctx context.Context, userID int, viewerRole string) ([]readmodel.WorkOrderSummary, error) {
+	if viewerRole != consumer.Role && viewerRole != provider.Role {
+		return nil, fmt.Errorf("finding work orders by user id: unsupported viewer role %q", viewerRole)
+	}
+
+	rows, err := r.db.QueryContext(
+		ctx,
+		`SELECT
+			wo.id,
+			wo.service_proposal_id,
+			sp.amount_cents,
+			sp.scheduled_on,
+			sp.description,
+			wo.status,
+			wo.accepted_on,
+			CASE WHEN $2 = $3 THEN provider_user.id ELSE consumer_user.id END AS counterpart_id,
+			CASE WHEN $2 = $3 THEN $4 ELSE $3 END AS counterpart_role,
+			CASE WHEN $2 = $3 THEN provider_user.name ELSE consumer_user.name END AS counterpart_name,
+			CASE WHEN $2 = $3 THEN provider_user.surname ELSE consumer_user.surname END AS counterpart_surname,
+			CASE WHEN $2 = $3 THEN cat.name ELSE '' END AS counterpart_category_name,
+			CASE WHEN $2 = $3 THEN COALESCE(p.profile_photo_file_id::text, '') ELSE '' END AS counterpart_profile_photo_file_id
+		FROM work_orders wo
+		INNER JOIN service_proposals sp ON sp.id = wo.service_proposal_id
+		INNER JOIN users consumer_user ON consumer_user.id = sp.consumer_id
+		INNER JOIN providers p ON p.user_id = sp.provider_id
+		INNER JOIN users provider_user ON provider_user.id = p.user_id
+		INNER JOIN categories cat ON cat.id = p.category_id
+		WHERE sp.consumer_id = $1 OR sp.provider_id = $1
+		ORDER BY sp.scheduled_on ASC, wo.id ASC`,
+		userID,
+		viewerRole,
+		consumer.Role,
+		provider.Role,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("finding work orders by user id: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	orders := make([]readmodel.WorkOrderSummary, 0)
+	for rows.Next() {
+		var order readmodel.WorkOrderSummary
+		if err := rows.Scan(
+			&order.ID,
+			&order.ServiceProposalID,
+			&order.Amount,
+			&order.ScheduledOn,
+			&order.Description,
+			&order.Status,
+			&order.AcceptedOn,
+			&order.Counterpart.ID,
+			&order.Counterpart.Role,
+			&order.Counterpart.Name,
+			&order.Counterpart.Surname,
+			&order.Counterpart.CategoryName,
+			&order.Counterpart.ProfilePhotoFileID,
+		); err != nil {
+			return nil, fmt.Errorf("scanning work orders by user id: %w", err)
+		}
+		orders = append(orders, order)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterating work orders by user id: %w", err)
+	}
+	return orders, nil
 }
 
 func (r *WorkOrderRepository) saveWithTx(ctx context.Context, tx *sql.Tx, order *workorder.WorkOrder) (*workorder.WorkOrder, error) {

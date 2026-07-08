@@ -1,4 +1,3 @@
-@wip
 Feature: 21.1 Obtener órdenes de trabajo
     Como usuario
     quiero obtener mis órdenes de trabajo

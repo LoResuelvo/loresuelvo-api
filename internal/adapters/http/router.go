@@ -13,6 +13,7 @@ import (
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/service_proposal_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/test_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/user_handler"
+	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/work_order_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/middleware"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/realtime"
 	"github.com/auth0/go-jwt-middleware/v3/validator"
@@ -28,6 +29,7 @@ type RouterConfig struct {
 	UserHandler            *user_handler.UserHandler
 	FileHandler            *file_handler.FileHandler
 	ServiceProposalHandler *service_proposal_handler.ServiceProposalHandler
+	WorkOrderHandler       *work_order_handler.WorkOrderHandler
 	TestHandler            *test_handler.TestHandler
 	RealtimeHandler        *realtime.Handler
 	Auth0Validator         *validator.Validator
@@ -42,6 +44,7 @@ type Router struct {
 	userHandler            *user_handler.UserHandler
 	fileHandler            *file_handler.FileHandler
 	serviceProposalHandler *service_proposal_handler.ServiceProposalHandler
+	workOrderHandler       *work_order_handler.WorkOrderHandler
 	testHandler            *test_handler.TestHandler
 	realtimeHandler        *realtime.Handler
 	auth0Validator         *validator.Validator
@@ -57,6 +60,7 @@ func NewRouter(config RouterConfig) *Router {
 		userHandler:            config.UserHandler,
 		fileHandler:            config.FileHandler,
 		serviceProposalHandler: config.ServiceProposalHandler,
+		workOrderHandler:       config.WorkOrderHandler,
 		testHandler:            config.TestHandler,
 		realtimeHandler:        config.RealtimeHandler,
 		auth0Validator:         config.Auth0Validator,
@@ -87,6 +91,7 @@ func (router *Router) SetUp() (*gin.Engine, error) {
 	router.registerConversationRoutes(engine, authMiddleware)
 	router.registerChatbotRoutes(engine, authMiddleware)
 	router.registerServiceProposalRoutes(engine, authMiddleware)
+	router.registerWorkOrderRoutes(engine, authMiddleware)
 	router.registerAuthenticatedRoutes(engine, authMiddleware)
 	router.registerFileRoutes(engine, authMiddleware)
 	router.registerRealtimeRoutes(engine, authMiddleware)
@@ -138,6 +143,10 @@ func (router *Router) registerServiceProposalRoutes(engine *gin.Engine, authMidd
 	engine.POST("/service-proposals", authMiddleware, router.serviceProposalHandler.CreateServiceProposal)
 	engine.GET("/service-proposals", authMiddleware, router.serviceProposalHandler.GetServiceProposals)
 	engine.POST("/service-proposals/:serviceProposalID/accept", authMiddleware, router.serviceProposalHandler.AcceptServiceProposal)
+}
+
+func (router *Router) registerWorkOrderRoutes(engine *gin.Engine, authMiddleware gin.HandlerFunc) {
+	engine.GET("/work-orders", authMiddleware, router.workOrderHandler.GetWorkOrders)
 }
 
 func (router *Router) registerAuthenticatedRoutes(engine *gin.Engine, authMiddleware gin.HandlerFunc) {

@@ -16,6 +16,7 @@ import (
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/service_proposal_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/test_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/user_handler"
+	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/work_order_handler"
 	notificationadapter "github.com/LoResuelvo/loresuelvo-api/internal/adapters/notification"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/realtime"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/repositories"
@@ -28,6 +29,7 @@ import (
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/provider"
 	serviceproposal "github.com/LoResuelvo/loresuelvo-api/internal/domain/service_proposal"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/user"
+	workorder "github.com/LoResuelvo/loresuelvo-api/internal/domain/work_order"
 	"github.com/auth0/go-jwt-middleware/v3/validator"
 )
 
@@ -51,6 +53,7 @@ type Dependencies struct {
 	UserHandler            *user_handler.UserHandler
 	FileHandler            *file_handler.FileHandler
 	ServiceProposalHandler *service_proposal_handler.ServiceProposalHandler
+	WorkOrderHandler       *work_order_handler.WorkOrderHandler
 	TestHandler            *test_handler.TestHandler
 
 	Hub              *realtime.Hub
@@ -70,6 +73,7 @@ func (dependencies *Dependencies) RouterConfig(auth0Validator *validator.Validat
 		UserHandler:            dependencies.UserHandler,
 		FileHandler:            dependencies.FileHandler,
 		ServiceProposalHandler: dependencies.ServiceProposalHandler,
+		WorkOrderHandler:       dependencies.WorkOrderHandler,
 		TestHandler:            dependencies.TestHandler,
 		RealtimeHandler:        dependencies.RealtimeHandler,
 		Auth0Validator:         auth0Validator,
@@ -132,6 +136,7 @@ func NewDependenciesWithChatbot(database *sql.DB, chatbot conversation.Chatbot) 
 	userService := user.NewService(userRepository)
 	servicePorposalService := serviceproposal.NewService(
 		serviceProposalRepository, workOrderRepository, userRepository, conversationRepository, notificationRepository, notificator, fileService, clockadapter)
+	workOrderService := workorder.NewService(workOrderRepository, userRepository, fileService)
 	_ = cancel // TODO: wire shutdown signal to cancel context
 
 	return &Dependencies{
@@ -153,6 +158,7 @@ func NewDependenciesWithChatbot(database *sql.DB, chatbot conversation.Chatbot) 
 		UserHandler:            user_handler.NewUserHandler(userService),
 		FileHandler:            file_handler.NewFileHandler(fileService),
 		ServiceProposalHandler: service_proposal_handler.NewServiceProposalHandler(servicePorposalService),
+		WorkOrderHandler:       work_order_handler.NewWorkOrderHandler(workOrderService),
 		TestHandler:            test_handler.NewTestHandler(clockadapter),
 		Hub:                    hub,
 		RealtimeHandler:        realtimeHandler,
