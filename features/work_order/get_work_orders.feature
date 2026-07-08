@@ -50,7 +50,7 @@ Feature: 21.1 Obtener órdenes de trabajo
                 """
             And la orden de trabajo incluye el identificador de la propuesta de servicio aceptada
             And la contraparte de la orden de trabajo es la consumidora "Ana Pérez"
-            And la contraparte no incluye un rubro
+            And la contraparte de la orden de trabajo no incluye un rubro
 
     Rule: El listado solo incluye órdenes propias y muestra primero las más próximas
 
