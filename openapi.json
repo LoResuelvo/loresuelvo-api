@@ -53,6 +53,10 @@
             "description": "Service proposal endpoints."
         },
         {
+            "name": "WorkOrders",
+            "description": "Work order endpoints."
+        },
+        {
             "name": "Users",
             "description": "Authenticated user session endpoints."
         },
@@ -2244,6 +2248,80 @@
                 }
             }
         },
+        "/work-orders": {
+            "get": {
+                "summary": "List the authenticated user's work orders",
+                "tags": [
+                    "WorkOrders"
+                ],
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Scheduled work orders involving the authenticated user, ordered by scheduled service date ascending. The array is empty when there are no work orders.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/WorkOrderSummary"
+                                    }
+                                },
+                                "examples": {
+                                    "withOrders": {
+                                        "value": [
+                                            {
+                                                "id": 42,
+                                                "service_proposal_id": 10,
+                                                "amount_cents": 1500050,
+                                                "scheduled_on": "2026-07-05T12:30:00Z",
+                                                "description": "Reparación de pérdida de agua en cocina con materiales incluidos.",
+                                                "status": "scheduled",
+                                                "accepted_on": "2026-07-04T13:00:00Z",
+                                                "counterpart": {
+                                                    "id": 2,
+                                                    "role": "provider",
+                                                    "name": "Juan",
+                                                    "surname": "Gómez",
+                                                    "category_name": "Plomería",
+                                                    "profile_photo_url": "https://cdn.example/public/profile-photo.jpg"
+                                                }
+                                            }
+                                        ]
+                                    },
+                                    "empty": {
+                                        "value": []
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AuthErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Work orders could not be retrieved",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/conversations/{conversationId}": {
             "get": {
                 "tags": [
@@ -3412,6 +3490,93 @@
                     "accepted_on": {
                         "type": "string",
                         "format": "date-time"
+                    }
+                },
+                "additionalProperties": false
+            },
+            "WorkOrderSummary": {
+                "type": "object",
+                "description": "Scheduled work order item returned for the authenticated user.",
+                "required": [
+                    "id",
+                    "service_proposal_id",
+                    "amount_cents",
+                    "scheduled_on",
+                    "description",
+                    "status",
+                    "accepted_on",
+                    "counterpart"
+                ],
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "minimum": 1
+                    },
+                    "service_proposal_id": {
+                        "type": "integer",
+                        "minimum": 1
+                    },
+                    "amount_cents": {
+                        "type": "integer",
+                        "format": "int64",
+                        "minimum": 1
+                    },
+                    "scheduled_on": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "description": {
+                        "type": "string",
+                        "minLength": 1
+                    },
+                    "status": {
+                        "type": "string",
+                        "enum": [
+                            "scheduled"
+                        ]
+                    },
+                    "accepted_on": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "counterpart": {
+                        "$ref": "#/components/schemas/WorkOrderCounterpart"
+                    }
+                },
+                "additionalProperties": false
+            },
+            "WorkOrderCounterpart": {
+                "type": "object",
+                "required": [
+                    "id",
+                    "role",
+                    "name",
+                    "surname"
+                ],
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "minimum": 1
+                    },
+                    "role": {
+                        "type": "string",
+                        "enum": [
+                            "consumer",
+                            "provider"
+                        ]
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "surname": {
+                        "type": "string"
+                    },
+                    "category_name": {
+                        "type": "string"
+                    },
+                    "profile_photo_url": {
+                        "type": "string",
+                        "format": "uri"
                     }
                 },
                 "additionalProperties": false

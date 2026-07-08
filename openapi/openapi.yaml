@@ -29,6 +29,8 @@ tags:
   description: Job request creation endpoints.
 - name: ServiceProposals
   description: Service proposal endpoints.
+- name: WorkOrders
+  description: Work order endpoints.
 - name: Users
   description: Authenticated user session endpoints.
 - name: Realtime
@@ -62,6 +64,8 @@ paths:
     $ref: ./paths/service-proposals.yaml
   /service-proposals/{serviceProposalId}/accept:
     $ref: ./paths/service-proposal-accept.yaml
+  /work-orders:
+    $ref: ./paths/work-orders.yaml
   /conversations/{conversationId}:
     $ref: ./paths/conversation-by-id.yaml
   /conversations/{conversationId}/messages:
@@ -206,6 +210,10 @@ components:
       $ref: ./components/schemas/service-proposal.yaml
     WorkOrder:
       $ref: ./components/schemas/work-order.yaml
+    WorkOrderSummary:
+      $ref: ./components/schemas/work-order-summary.yaml
+    WorkOrderCounterpart:
+      $ref: ./components/schemas/work-order-counterpart.yaml
     CreateChatbotConversationRequest:
       $ref: ./components/schemas/create-chatbot-conversation-request.yaml
     ChatbotConversationResponse:

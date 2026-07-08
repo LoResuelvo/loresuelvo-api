@@ -1,0 +1,46 @@
+get:
+  summary: List the authenticated user's work orders
+  tags:
+    - WorkOrders
+  security:
+    - BearerAuth: []
+  responses:
+    '200':
+      description: Scheduled work orders involving the authenticated user, ordered by scheduled service date ascending. The array is empty when there are no work orders.
+      content:
+        application/json:
+          schema:
+            type: array
+            items:
+              $ref: '#/components/schemas/WorkOrderSummary'
+          examples:
+            withOrders:
+              value:
+                - id: 42
+                  service_proposal_id: 10
+                  amount_cents: 1500050
+                  scheduled_on: '2026-07-05T12:30:00Z'
+                  description: Reparación de pérdida de agua en cocina con materiales incluidos.
+                  status: scheduled
+                  accepted_on: '2026-07-04T13:00:00Z'
+                  counterpart:
+                    id: 2
+                    role: provider
+                    name: Juan
+                    surname: Gómez
+                    category_name: Plomería
+                    profile_photo_url: https://cdn.example/public/profile-photo.jpg
+            empty:
+              value: []
+    '401':
+      description: Missing or invalid authentication
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/AuthErrorResponse'
+    '500':
+      description: Work orders could not be retrieved
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'

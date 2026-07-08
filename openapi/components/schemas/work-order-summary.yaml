@@ -1,0 +1,38 @@
+type: object
+description: Scheduled work order item returned for the authenticated user.
+required:
+  - id
+  - service_proposal_id
+  - amount_cents
+  - scheduled_on
+  - description
+  - status
+  - accepted_on
+  - counterpart
+properties:
+  id:
+    type: integer
+    minimum: 1
+  service_proposal_id:
+    type: integer
+    minimum: 1
+  amount_cents:
+    type: integer
+    format: int64
+    minimum: 1
+  scheduled_on:
+    type: string
+    format: date-time
+  description:
+    type: string
+    minLength: 1
+  status:
+    type: string
+    enum:
+      - scheduled
+  accepted_on:
+    type: string
+    format: date-time
+  counterpart:
+    $ref: '#/components/schemas/WorkOrderCounterpart'
+additionalProperties: false
