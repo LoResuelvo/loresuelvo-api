@@ -6,7 +6,7 @@ import (
 )
 
 type Task interface {
-	Execute() error
+	UrgentNotification() error
 }
 
 type scheduler struct {
@@ -35,7 +35,7 @@ func (s *scheduler) Run(ctx context.Context) {
 }
 
 func (s *scheduler) executeTask() {
-	if err := s.task.Execute(); err != nil {
+	if err := s.task.UrgentNotification(); err != nil {
 		// TODO: LOGGER aqui.
 		return
 	}
