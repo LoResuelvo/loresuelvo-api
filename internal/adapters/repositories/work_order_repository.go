@@ -10,6 +10,7 @@ import (
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/consumer"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/provider"
 	serviceproposal "github.com/LoResuelvo/loresuelvo-api/internal/domain/service_proposal"
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/user"
 	workorder "github.com/LoResuelvo/loresuelvo-api/internal/domain/work_order"
 	readmodel "github.com/LoResuelvo/loresuelvo-api/internal/domain/work_order/read_model"
 )
@@ -150,7 +151,7 @@ func (r *WorkOrderRepository) FindByUserID(ctx context.Context, userID int, view
 	return orders, nil
 }
 
-func (r *WorkOrderRepository) FindWithLessScheduledTimeThan(ctx context.Context, actualTime time.Time) ([]*workorder.WorkOrder, error) {
+func (r *WorkOrderRepository) FindScheduledBetween(ctx context.Context, from time.Time, to time.Time) ([]*workorder.WorkOrder, error) {
 	rows, err := r.db.QueryContext(
 		ctx,
 		`SELECT
@@ -160,14 +161,18 @@ func (r *WorkOrderRepository) FindWithLessScheduledTimeThan(ctx context.Context,
 			sp.scheduled_on,
 			sp.description,
 			wo.status,
-			wo.accepted_on
+			wo.accepted_on,
+			sp.consumer_id,
+			sp.provider_id
 		FROM work_orders wo
 		INNER JOIN service_proposals sp ON sp.id = wo.service_proposal_id
-		WHERE sp.scheduled_on < $1`,
-		actualTime,
+		WHERE sp.scheduled_on >= $1 AND sp.scheduled_on < $2
+		ORDER BY sp.scheduled_on ASC, wo.id ASC`,
+		from,
+		to,
 	)
 	if err != nil {
-		return nil, fmt.Errorf("finding work orders with less scheduled time than: %w", err)
+		return nil, fmt.Errorf("finding work orders scheduled between: %w", err)
 	}
 	defer func() { _ = rows.Close() }()
 
@@ -175,6 +180,8 @@ func (r *WorkOrderRepository) FindWithLessScheduledTimeThan(ctx context.Context,
 	for rows.Next() {
 		var order workorder.WorkOrder
 		var proposal serviceproposal.ServiceProposal
+		proposal.Consumer = &consumer.Consumer{BaseUser: &user.BaseUser{}}
+		proposal.Provider = &provider.Provider{BaseUser: &user.BaseUser{}}
 		if err := rows.Scan(
 			&order.ID,
 			&proposal.ID,
@@ -183,14 +190,16 @@ func (r *WorkOrderRepository) FindWithLessScheduledTimeThan(ctx context.Context,
 			&proposal.Description,
 			&order.Status,
 			&order.AcceptedOn,
+			&proposal.Consumer.ID,
+			&proposal.Provider.ID,
 		); err != nil {
-			return nil, fmt.Errorf("scanning work orders with less scheduled time than: %w", err)
+			return nil, fmt.Errorf("scanning work orders scheduled between: %w", err)
 		}
 		order.ServiceProposal = &proposal
 		workOrders = append(workOrders, &order)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterating work orders with less scheduled time than: %w", err)
+		return nil, fmt.Errorf("iterating work orders scheduled between: %w", err)
 	}
 	return workOrders, nil
 }

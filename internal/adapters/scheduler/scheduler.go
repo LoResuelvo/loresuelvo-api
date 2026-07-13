@@ -2,41 +2,58 @@ package scheduler
 
 import (
 	"context"
+	"log/slog"
 	"time"
 )
 
 type Task interface {
-	UrgentNotification() error
+	UrgentNotification(ctx context.Context) error
 }
 
-type scheduler struct {
-	interval time.Duration
-	task     Task
+type ticker interface {
+	Chan() <-chan time.Time
+	Stop()
 }
 
-func NewScheduler(interval time.Duration, task Task) *scheduler {
-	return &scheduler{
+type timeTicker struct {
+	*time.Ticker
+}
+
+func (t timeTicker) Chan() <-chan time.Time {
+	return t.C
+}
+
+type Scheduler struct {
+	interval  time.Duration
+	task      Task
+	newTicker func(time.Duration) ticker
+}
+
+func NewScheduler(interval time.Duration, task Task) *Scheduler {
+	return &Scheduler{
 		interval: interval,
 		task:     task,
+		newTicker: func(interval time.Duration) ticker {
+			return timeTicker{Ticker: time.NewTicker(interval)}
+		},
 	}
 }
 
-func (s *scheduler) Run(ctx context.Context) {
-	ticker := time.NewTicker(s.interval)
+func (s *Scheduler) Run(ctx context.Context) {
+	ticker := s.newTicker(s.interval)
 	defer ticker.Stop()
 	for {
 		select {
-		case <-ticker.C:
-			s.executeTask()
+		case <-ticker.Chan():
+			if err := s.RunOnce(ctx); err != nil {
+				slog.Error("scheduler task failed", "error", err)
+			}
 		case <-ctx.Done():
 			return
 		}
 	}
 }
 
-func (s *scheduler) executeTask() {
-	if err := s.task.UrgentNotification(); err != nil {
-		// TODO: LOGGER aqui.
-		return
-	}
+func (s *Scheduler) RunOnce(ctx context.Context) error {
+	return s.task.UrgentNotification(ctx)
 }
