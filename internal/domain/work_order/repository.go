@@ -11,7 +11,7 @@ import (
 
 type Reader interface {
 	FindByUserID(ctx context.Context, userID int, viewerRole string) ([]readmodel.WorkOrderSummary, error)
-	FindWithLessScheduledTimeThan(ctx context.Context, actualTime time.Time) ([]*WorkOrder, error)
+	FindScheduledBetween(ctx context.Context, from time.Time, to time.Time) ([]*WorkOrder, error)
 }
 
 type NotificationRepository interface {

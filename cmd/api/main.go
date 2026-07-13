@@ -12,15 +12,19 @@ import (
 )
 
 func main() {
-	database, err := db.ConnectPostgres(context.Background(), db.NewPostgresConfigFromEnv())
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	database, err := db.ConnectPostgres(ctx, db.NewPostgresConfigFromEnv())
 	if err != nil {
 		panic(err)
 	}
 	defer database.Close()
 
-	bootstrap.StartDefaultDataSeederFromEnv(context.Background(), database)
+	bootstrap.StartDefaultDataSeederFromEnv(ctx, database)
 
 	dependencies := bootstrap.NewDependencies(database)
+	go dependencies.UrgentWorkOrderScheduler.Run(ctx)
 
 	auth0Validator, err := auth0.NewValidatorFromEnv()
 	if err != nil {

@@ -3,6 +3,7 @@ package bootstrap
 import (
 	"context"
 	"database/sql"
+	"time"
 
 	chatbotadapter "github.com/LoResuelvo/loresuelvo-api/internal/adapters/chatbot"
 	clockadapter "github.com/LoResuelvo/loresuelvo-api/internal/adapters/clock"
@@ -20,6 +21,7 @@ import (
 	notificationadapter "github.com/LoResuelvo/loresuelvo-api/internal/adapters/notification"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/realtime"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/repositories"
+	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/scheduler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/storage"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/category"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/consumer"
@@ -34,16 +36,18 @@ import (
 )
 
 type Dependencies struct {
-	UserRepository         *repositories.UserRepository
-	CategoryRepository     *repositories.CategoryRepository
-	ConversationRepository *repositories.ConversationRepository
-	MessageRepository      *repositories.MessageRepository
-	MessageImageRepository *repositories.MessageImageRepository
-	JobRequestRepository   *repositories.JobRequestRepository
-	ConversationReader     *repositories.ConversationReader
-	FileRepository         *repositories.FileRepository
-	NotificationRepository *repositories.NotificationRepository
-	WorkOrderRepository    *repositories.WorkOrderRepository
+	UserRepository           *repositories.UserRepository
+	CategoryRepository       *repositories.CategoryRepository
+	ConversationRepository   *repositories.ConversationRepository
+	MessageRepository        *repositories.MessageRepository
+	MessageImageRepository   *repositories.MessageImageRepository
+	JobRequestRepository     *repositories.JobRequestRepository
+	ConversationReader       *repositories.ConversationReader
+	FileRepository           *repositories.FileRepository
+	NotificationRepository   *repositories.NotificationRepository
+	WorkOrderRepository      *repositories.WorkOrderRepository
+	WorkOrderService         *workorder.Service
+	UrgentWorkOrderScheduler *scheduler.Scheduler
 
 	CategoryHandler        *category_handler.CategoryHandler
 	ConsumerHandler        *consumer_handler.ConsumerHandler
@@ -136,33 +140,43 @@ func NewDependenciesWithChatbot(database *sql.DB, chatbot conversation.Chatbot) 
 	userService := user.NewService(userRepository)
 	servicePorposalService := serviceproposal.NewService(
 		serviceProposalRepository, workOrderRepository, userRepository, conversationRepository, notificationRepository, notificator, fileService, clockadapter)
-	workOrderService := workorder.NewService(workOrderRepository, userRepository, fileService)
+	workOrderService := workorder.NewService(
+		workOrderRepository,
+		userRepository,
+		fileService,
+		notificationRepository,
+		notificator,
+		clockadapter,
+	)
+	urgentWorkOrderScheduler := scheduler.NewScheduler(time.Hour, workOrderService)
 	_ = cancel // TODO: wire shutdown signal to cancel context
 
 	return &Dependencies{
-		UserRepository:         userRepository,
-		CategoryRepository:     categoryRepository,
-		ConversationRepository: conversationRepository,
-		MessageRepository:      messageRepository,
-		MessageImageRepository: messageImageRepository,
-		JobRequestRepository:   jobRequestRepository,
-		ConversationReader:     conversationReader,
-		FileRepository:         fileRepository,
-		NotificationRepository: notificationRepository,
-		WorkOrderRepository:    workOrderRepository,
-		CategoryHandler:        category_handler.NewCategoryHandler(categoryService),
-		ConsumerHandler:        consumer_handler.NewConsumerHandler(consumerService),
-		ProviderHandler:        provider_handler.NewProviderHandler(providerService),
-		ConversationHandler:    conversation_handler.NewConversationHandler(conversationService),
-		JobRequestHandler:      job_request_handler.NewJobRequestHandler(jobRequestService),
-		UserHandler:            user_handler.NewUserHandler(userService),
-		FileHandler:            file_handler.NewFileHandler(fileService),
-		ServiceProposalHandler: service_proposal_handler.NewServiceProposalHandler(servicePorposalService),
-		WorkOrderHandler:       work_order_handler.NewWorkOrderHandler(workOrderService),
-		TestHandler:            test_handler.NewTestHandler(clockadapter),
-		Hub:                    hub,
-		RealtimeHandler:        realtimeHandler,
-		MessagePublisher:       messagePublisher,
-		Clock:                  clockadapter,
+		UserRepository:           userRepository,
+		CategoryRepository:       categoryRepository,
+		ConversationRepository:   conversationRepository,
+		MessageRepository:        messageRepository,
+		MessageImageRepository:   messageImageRepository,
+		JobRequestRepository:     jobRequestRepository,
+		ConversationReader:       conversationReader,
+		FileRepository:           fileRepository,
+		NotificationRepository:   notificationRepository,
+		WorkOrderRepository:      workOrderRepository,
+		WorkOrderService:         workOrderService,
+		UrgentWorkOrderScheduler: urgentWorkOrderScheduler,
+		CategoryHandler:          category_handler.NewCategoryHandler(categoryService),
+		ConsumerHandler:          consumer_handler.NewConsumerHandler(consumerService),
+		ProviderHandler:          provider_handler.NewProviderHandler(providerService),
+		ConversationHandler:      conversation_handler.NewConversationHandler(conversationService),
+		JobRequestHandler:        job_request_handler.NewJobRequestHandler(jobRequestService),
+		UserHandler:              user_handler.NewUserHandler(userService),
+		FileHandler:              file_handler.NewFileHandler(fileService),
+		ServiceProposalHandler:   service_proposal_handler.NewServiceProposalHandler(servicePorposalService),
+		WorkOrderHandler:         work_order_handler.NewWorkOrderHandler(workOrderService),
+		TestHandler:              test_handler.NewTestHandler(clockadapter),
+		Hub:                      hub,
+		RealtimeHandler:          realtimeHandler,
+		MessagePublisher:         messagePublisher,
+		Clock:                    clockadapter,
 	}
 }

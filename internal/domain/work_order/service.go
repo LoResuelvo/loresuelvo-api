@@ -2,6 +2,7 @@ package workorder
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -19,8 +20,22 @@ type Service struct {
 	notificationRepository NotificationRepository
 }
 
-func NewService(reader Reader, userRepository UserRepository, fileURLResolver FileURLResolver) *Service {
-	return &Service{reader: reader, userRepository: userRepository, fileURLResolver: fileURLResolver}
+func NewService(
+	reader Reader,
+	userRepository UserRepository,
+	fileURLResolver FileURLResolver,
+	notificationRepository NotificationRepository,
+	notificator notification.Notificator,
+	clock clock.Clock,
+) *Service {
+	return &Service{
+		reader:                 reader,
+		userRepository:         userRepository,
+		fileURLResolver:        fileURLResolver,
+		notificationRepository: notificationRepository,
+		notificator:            notificator,
+		clock:                  clock,
+	}
 }
 
 func (s *Service) GetWorkOrders(ctx context.Context, auth0ID string) ([]readmodel.WorkOrderSummary, error) {
@@ -53,35 +68,29 @@ func (s *Service) GetWorkOrders(ctx context.Context, auth0ID string) ([]readmode
 }
 
 func (s *Service) UrgentNotification(ctx context.Context) error {
-	actualTime := s.clock.Now().Add(time.Hour * 24)
-	urgentWorkOrders, err := s.reader.FindWithLessScheduledTimeThan(ctx, actualTime)
+	now := s.clock.Now()
+	urgentWorkOrders, err := s.reader.FindScheduledBetween(ctx, now, now.Add(24*time.Hour))
 	if err != nil {
 		return err
 	}
 
+	var notificationErrors []error
 	for _, order := range urgentWorkOrders {
 		consumerNotification, providerNotification := s.notificationForUsers(order)
+		for _, createdNotification := range []*notification.Notification{consumerNotification, providerNotification} {
+			savedNotification, saveErr := s.notificationRepository.Save(ctx, createdNotification)
+			if saveErr != nil {
+				notificationErrors = append(notificationErrors, saveErr)
+				continue
+			}
 
-		consumerNotification, err := s.notificationRepository.Save(ctx, consumerNotification)
-		if err != nil {
-			return err
-		}
-
-		providerNotification, err = s.notificationRepository.Save(ctx, providerNotification)
-		if err != nil {
-			return err
-		}
-
-		if err := s.notificator.Notify(ctx, consumerNotification); err != nil {
-			return err
-		}
-
-		if err := s.notificator.Notify(ctx, providerNotification); err != nil {
-			return err
+			if notifyErr := s.notificator.Notify(ctx, savedNotification); notifyErr != nil {
+				notificationErrors = append(notificationErrors, notifyErr)
+			}
 		}
 	}
 
-	return nil
+	return errors.Join(notificationErrors...)
 }
 
 func (s *Service) notificationForUsers(order *WorkOrder) (*notification.Notification, *notification.Notification) {
