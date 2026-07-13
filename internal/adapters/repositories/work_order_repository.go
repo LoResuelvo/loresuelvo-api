@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/consumer"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/provider"
@@ -147,6 +148,51 @@ func (r *WorkOrderRepository) FindByUserID(ctx context.Context, userID int, view
 		return nil, fmt.Errorf("iterating work orders by user id: %w", err)
 	}
 	return orders, nil
+}
+
+func (r *WorkOrderRepository) FindWithLessScheduledTimeThan(ctx context.Context, actualTime time.Time) ([]*workorder.WorkOrder, error) {
+	rows, err := r.db.QueryContext(
+		ctx,
+		`SELECT
+			wo.id,
+			wo.service_proposal_id,
+			sp.amount_cents,
+			sp.scheduled_on,
+			sp.description,
+			wo.status,
+			wo.accepted_on
+		FROM work_orders wo
+		INNER JOIN service_proposals sp ON sp.id = wo.service_proposal_id
+		WHERE sp.scheduled_on < $1`,
+		actualTime,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("finding work orders with less scheduled time than: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	workOrders := make([]*workorder.WorkOrder, 0)
+	for rows.Next() {
+		var order workorder.WorkOrder
+		var proposal serviceproposal.ServiceProposal
+		if err := rows.Scan(
+			&order.ID,
+			&proposal.ID,
+			&proposal.Amount,
+			&proposal.ScheduledOn,
+			&proposal.Description,
+			&order.Status,
+			&order.AcceptedOn,
+		); err != nil {
+			return nil, fmt.Errorf("scanning work orders with less scheduled time than: %w", err)
+		}
+		order.ServiceProposal = &proposal
+		workOrders = append(workOrders, &order)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterating work orders with less scheduled time than: %w", err)
+	}
+	return workOrders, nil
 }
 
 func (r *WorkOrderRepository) saveWithTx(ctx context.Context, tx *sql.Tx, order *workorder.WorkOrder) (*workorder.WorkOrder, error) {
