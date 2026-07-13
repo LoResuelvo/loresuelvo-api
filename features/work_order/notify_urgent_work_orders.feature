@@ -1,4 +1,3 @@
-@wip
 Feature: Notificar ordenes de trabajo urgentes
     Como usuario
     quiero recibir notificación de mis turnos urgentes
