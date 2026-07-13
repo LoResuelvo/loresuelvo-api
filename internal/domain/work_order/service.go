@@ -3,6 +3,7 @@ package workorder
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/clock"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/notification"
@@ -52,7 +53,7 @@ func (s *Service) GetWorkOrders(ctx context.Context, auth0ID string) ([]readmode
 }
 
 func (s *Service) UrgentNotification(ctx context.Context) error {
-	actualTime := s.clock.Now()
+	actualTime := s.clock.Now().Add(time.Hour * 24)
 	urgentWorkOrders, err := s.reader.FindWithLessScheduledTimeThan(ctx, actualTime)
 	if err != nil {
 		return err
