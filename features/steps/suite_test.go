@@ -12,6 +12,7 @@ import (
 	clockadapter "github.com/LoResuelvo/loresuelvo-api/internal/adapters/clock"
 	httpadapter "github.com/LoResuelvo/loresuelvo-api/internal/adapters/http"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/repositories"
+	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/scheduler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/bootstrap"
 	filedomain "github.com/LoResuelvo/loresuelvo-api/internal/domain/file"
 	"github.com/LoResuelvo/loresuelvo-api/internal/infrastructure/db"
@@ -22,20 +23,21 @@ import (
 )
 
 type testSuite struct {
-	server                 *httptest.Server
-	database               *sql.DB
-	categoryRepository     *repositories.CategoryRepository
-	conversationRepository *repositories.ConversationRepository
-	messageRepository      *repositories.MessageRepository
-	jobRequestRepository   *repositories.JobRequestRepository
-	userRepository         *repositories.UserRepository
-	fileRepository         *repositories.FileRepository
-	notificationRepository *repositories.NotificationRepository
-	workOrderRepository    *repositories.WorkOrderRepository
-	auth0Validator         *validator.Validator
-	tokenBuilder           *auth0.TokenBuilder
-	chatbot                *chatbotadapter.FakeChatbot
-	clock                  *clockadapter.SystemClock
+	server                   *httptest.Server
+	database                 *sql.DB
+	categoryRepository       *repositories.CategoryRepository
+	conversationRepository   *repositories.ConversationRepository
+	messageRepository        *repositories.MessageRepository
+	jobRequestRepository     *repositories.JobRequestRepository
+	userRepository           *repositories.UserRepository
+	fileRepository           *repositories.FileRepository
+	notificationRepository   *repositories.NotificationRepository
+	workOrderRepository      *repositories.WorkOrderRepository
+	urgentWorkOrderScheduler *scheduler.Scheduler
+	auth0Validator           *validator.Validator
+	tokenBuilder             *auth0.TokenBuilder
+	chatbot                  *chatbotadapter.FakeChatbot
+	clock                    *clockadapter.SystemClock
 
 	lastStatus                              int
 	lastBody                                []byte
@@ -98,6 +100,7 @@ func (s *testSuite) registerAllSteps(sc *godog.ScenarioContext) {
 	registerGetServiceProposalsSteps(sc, s)
 	registerAcceptServiceProposalSteps(sc, s)
 	registerGetWorkOrdersSteps(sc, s)
+	registerNotifyUrgentWorkOrdersSteps(sc, s)
 	registerGetJobRequestSteps(sc, s)
 	registerJobRequestImagesSteps(sc, s)
 	registerAcceptJobRequestSteps(sc, s)
@@ -211,20 +214,21 @@ func newTestSuite(tb testing.TB, database *sql.DB) *testSuite {
 	})
 
 	return &testSuite{
-		server:                 server,
-		database:               database,
-		categoryRepository:     dependencies.CategoryRepository,
-		conversationRepository: dependencies.ConversationRepository,
-		messageRepository:      dependencies.MessageRepository,
-		jobRequestRepository:   dependencies.JobRequestRepository,
-		userRepository:         dependencies.UserRepository,
-		fileRepository:         dependencies.FileRepository,
-		notificationRepository: dependencies.NotificationRepository,
-		workOrderRepository:    dependencies.WorkOrderRepository,
-		auth0Validator:         auth0Validator,
-		tokenBuilder:           tokenBuilder,
-		chatbot:                chatbot,
-		clock:                  dependencies.Clock,
+		server:                   server,
+		database:                 database,
+		categoryRepository:       dependencies.CategoryRepository,
+		conversationRepository:   dependencies.ConversationRepository,
+		messageRepository:        dependencies.MessageRepository,
+		jobRequestRepository:     dependencies.JobRequestRepository,
+		userRepository:           dependencies.UserRepository,
+		fileRepository:           dependencies.FileRepository,
+		notificationRepository:   dependencies.NotificationRepository,
+		workOrderRepository:      dependencies.WorkOrderRepository,
+		urgentWorkOrderScheduler: dependencies.UrgentWorkOrderScheduler,
+		auth0Validator:           auth0Validator,
+		tokenBuilder:             tokenBuilder,
+		chatbot:                  chatbot,
+		clock:                    dependencies.Clock,
 
 		categoryIDsByName:                  map[string]int{},
 		participantRolesByFullName:         map[string]string{},
