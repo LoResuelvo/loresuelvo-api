@@ -25,6 +25,9 @@ type providerRepositoryMock struct {
 	saveErr                error
 	saveID                 int
 	findByCategoryIDErr    error
+	providerByID           *provider.Provider
+	findProviderByIDErr    error
+	requestedProviderID    int
 }
 
 type categoryFinderMock struct {
@@ -113,6 +116,14 @@ func (repository *providerRepositoryMock) FindProvidersByCategoryID(categoryID i
 		return nil, repository.findByCategoryIDErr
 	}
 	return repository.providersByCategoryID[categoryID], nil
+}
+
+func (repository *providerRepositoryMock) FindProviderByID(_ context.Context, providerID int) (*provider.Provider, error) {
+	repository.requestedProviderID = providerID
+	if repository.findProviderByIDErr != nil {
+		return nil, repository.findProviderByIDErr
+	}
+	return repository.providerByID, nil
 }
 
 func TestRegisterProviderWithValidData(t *testing.T) {
@@ -422,6 +433,60 @@ func TestFilterProvidersByCategoryIDWrapsProfilePhotoURLResolutionError(t *testi
 	assert.Nil(t, providers)
 	assert.ErrorIs(t, err, expectedErr)
 	assert.ErrorContains(t, err, "resolving provider profile photo urls")
+}
+
+func TestGetProviderProfileResolvesProfilePhotoURL(t *testing.T) {
+	providerCategory := existingCategory()
+	foundProvider, err := provider.NewProvider(
+		"auth0|juan", "juan@example.com", "Juan", "Gómez", &providerCategory,
+		&filedomain.Image{FileID: "profile-photo-id", OriginalName: "juan.jpg"},
+	)
+	require.NoError(t, err)
+	foundProvider.ID = 12
+
+	repository := &providerRepositoryMock{providerByID: foundProvider}
+	fileService := &profilePhotoValidatorMock{profilePhotoURLsByFile: map[string]string{
+		"profile-photo-id": "https://cdn.example/juan.jpg",
+	}}
+	providerManager := provider.NewService(repository, categoryFinderWithExistingCategory(), fileService)
+
+	profile, err := providerManager.GetProviderProfile(context.Background(), 12)
+
+	require.NoError(t, err)
+	assert.Equal(t, 12, repository.requestedProviderID)
+	assert.Equal(t, []string{"profile-photo-id"}, fileService.resolvedFileIDs)
+	assert.Equal(t, "https://cdn.example/juan.jpg", profile.ProfilePhoto.URL)
+	assert.Equal(t, "juan.jpg", profile.ProfilePhoto.OriginalName)
+}
+
+func TestGetProviderProfileReturnsNotFoundError(t *testing.T) {
+	repository := &providerRepositoryMock{findProviderByIDErr: provider.ErrDoesNotExist}
+	providerManager := provider.NewService(repository, categoryFinderWithExistingCategory(), &profilePhotoValidatorMock{})
+
+	profile, err := providerManager.GetProviderProfile(context.Background(), 999)
+
+	require.ErrorIs(t, err, provider.ErrDoesNotExist)
+	assert.Nil(t, profile)
+}
+
+func TestGetProviderProfileWrapsProfilePhotoURLResolutionError(t *testing.T) {
+	providerCategory := existingCategory()
+	foundProvider, err := provider.NewProvider(
+		"auth0|juan", "juan@example.com", "Juan", "Gómez", &providerCategory,
+		&filedomain.Image{FileID: "profile-photo-id"},
+	)
+	require.NoError(t, err)
+	expectedErr := errors.New("storage unavailable")
+	providerManager := provider.NewService(
+		&providerRepositoryMock{providerByID: foundProvider},
+		categoryFinderWithExistingCategory(),
+		&profilePhotoValidatorMock{resolveErr: expectedErr},
+	)
+
+	profile, err := providerManager.GetProviderProfile(context.Background(), 12)
+
+	require.ErrorIs(t, err, expectedErr)
+	assert.Nil(t, profile)
 }
 
 func TestFilterProvidersByCategoryIDRequiresCategoryID(t *testing.T) {

@@ -61,6 +61,22 @@ func (h *ProviderHandler) FilterProvidersByCategory(c *gin.Context) {
 	c.JSON(http.StatusOK, providerSummaryResponsesFromDomain(providers))
 }
 
+func (h *ProviderHandler) GetProviderProfile(c *gin.Context) {
+	providerID, err := providerIDFromPath(c)
+	if err != nil {
+		httphandler.RespondError(c, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	foundProvider, err := h.providerService.GetProviderProfile(c.Request.Context(), providerID)
+	if err != nil {
+		handleGetProviderProfileError(c, err)
+		return
+	}
+
+	c.JSON(http.StatusOK, providerProfileResponseFromDomain(*foundProvider))
+}
+
 func categoryIDFromQuery(c *gin.Context) (int, error) {
 	categoryID, err := strconv.Atoi(strings.TrimSpace(c.Query("category_id")))
 	if err != nil || categoryID <= 0 {
@@ -68,4 +84,13 @@ func categoryIDFromQuery(c *gin.Context) (int, error) {
 	}
 
 	return categoryID, nil
+}
+
+func providerIDFromPath(c *gin.Context) (int, error) {
+	providerID, err := strconv.Atoi(strings.TrimSpace(c.Param("providerID")))
+	if err != nil || providerID <= 0 {
+		return 0, provider.ErrDoesNotExist
+	}
+
+	return providerID, nil
 }

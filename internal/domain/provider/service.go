@@ -81,6 +81,21 @@ func (s *Service) FilterProvidersByCategoryID(ctx context.Context, categoryID in
 	return WithProfilePhotoURLs(providers, profilePhotoURLs), nil
 }
 
+func (s *Service) GetProviderProfile(ctx context.Context, providerID int) (*Provider, error) {
+	foundProvider, err := s.userRepository.FindProviderByID(ctx, providerID)
+	if err != nil {
+		return nil, err
+	}
+
+	profilePhotoURL, err := s.fileService.ResolvePublicURL(ctx, foundProvider.ProfilePhoto.FileID)
+	if err != nil {
+		return nil, fmt.Errorf("resolving provider profile photo url: %w", err)
+	}
+	foundProvider.ProfilePhoto.URL = profilePhotoURL
+
+	return foundProvider, nil
+}
+
 func (s *Service) validateCategory(categoryID int) (*category.Category, error) {
 	if categoryID <= 0 {
 		return nil, category.ErrIDRequired

@@ -117,6 +117,7 @@ func (router *Router) registerConsumerRoutes(engine *gin.Engine, authMiddleware 
 
 func (router *Router) registerProviderRoutes(engine *gin.Engine, authMiddleware gin.HandlerFunc) {
 	engine.GET("/providers", router.providerHandler.FilterProvidersByCategory)
+	engine.GET("/providers/:providerID", authMiddleware, router.providerHandler.GetProviderProfile)
 	engine.POST("/providers", authMiddleware, router.providerHandler.RegisterProvider)
 }
 

@@ -37,3 +37,19 @@ func providerSummaryResponsesFromDomain(providers []provider.Provider) []provide
 
 	return response
 }
+
+func providerProfileResponseFromDomain(foundProvider provider.Provider) providerProfileResponse {
+	return providerProfileResponse{
+		ID:      foundProvider.ID,
+		Name:    foundProvider.Name(),
+		Surname: foundProvider.Surname(),
+		ProfilePhoto: providerProfilePhotoResponse{
+			OriginalName: foundProvider.ProfilePhoto.OriginalName,
+			URL:          foundProvider.ProfilePhoto.URL,
+		},
+		Category: providerProfileCategoryResponse{
+			ID:   foundProvider.Category.ID,
+			Name: foundProvider.Category.Name,
+		},
+	}
+}

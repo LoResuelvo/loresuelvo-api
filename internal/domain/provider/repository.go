@@ -10,6 +10,7 @@ import (
 type UserRepository interface {
 	Save(ctx context.Context, user user.User) (user.User, error)
 	FindByEmail(email string) bool
+	FindProviderByID(ctx context.Context, providerID int) (*Provider, error)
 	FindProvidersByCategoryID(categoryID int) ([]Provider, error)
 }
 

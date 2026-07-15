@@ -7,6 +7,7 @@ import (
 	httphandler "github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/category"
 	filedomain "github.com/LoResuelvo/loresuelvo-api/internal/domain/file"
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/provider"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/validator"
 	"github.com/gin-gonic/gin"
 )
@@ -37,6 +38,15 @@ func handleFilterProvidersError(c *gin.Context, err error) {
 	}
 
 	if errors.Is(err, category.ErrDoesNotExist) {
+		httphandler.RespondError(c, http.StatusNotFound, err.Error())
+		return
+	}
+
+	httphandler.RespondError(c, http.StatusInternalServerError, err.Error())
+}
+
+func handleGetProviderProfileError(c *gin.Context, err error) {
+	if errors.Is(err, provider.ErrDoesNotExist) {
 		httphandler.RespondError(c, http.StatusNotFound, err.Error())
 		return
 	}

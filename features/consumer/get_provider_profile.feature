@@ -11,7 +11,6 @@ Feature: Ver información de perfil de un prestador
 
   Rule: El perfil presenta la información pública disponible del prestador
 
-    @wip
     Scenario: 01-VPP Consultar el perfil de un prestador
       Given que existe un prestador llamado "Juan Gómez" en el rubro "Plomería" con foto de perfil
       When consulto el perfil del prestador "Juan Gómez"
@@ -22,7 +21,6 @@ Feature: Ver información de perfil de un prestador
 
   Rule: El perfil público no expone información privada del prestador
 
-    @wip
     Scenario: 02-VPP Ocultar datos privados del prestador
       Given que existe un prestador llamado "Juan Gómez" en el rubro "Plomería" con foto de perfil
       When consulto el perfil del prestador "Juan Gómez"
@@ -31,14 +29,12 @@ Feature: Ver información de perfil de un prestador
 
   Rule: El prestador consultado debe existir
 
-    @wip
     Scenario: 03-VPP Informar que el prestador no existe
       When consulto el perfil de un prestador inexistente
       Then el sistema informa que el prestador no fue encontrado
 
   Rule: Solo un usuario autenticado puede consultar perfiles de prestadores
 
-    @wip
     Scenario: 04-VPP Rechazar la consulta sin sesión válida
       Given que existe un prestador llamado "Juan Gómez" en el rubro "Plomería" con foto de perfil
       And que no tengo una sesión válida
