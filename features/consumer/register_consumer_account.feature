@@ -8,7 +8,7 @@ Feature: Registrar cuenta nueva de consumidor
 
     @wip
     Scenario: 01-RCN Registrar una cuenta nueva con foto de perfil
-        Given que cargué una foto de perfil válida
+        Given que cargué una foto de perfil válida para mi registro como consumidor
         When me registro como usuario consumidor con correo "ana@example.com", nombre "Ana Perez" y apellido "Mamani Tipula"
         Then el sistema confirma el registro
         And el registro del consumidor incluye su foto de perfil

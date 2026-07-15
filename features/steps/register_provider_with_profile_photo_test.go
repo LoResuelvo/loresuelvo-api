@@ -55,6 +55,10 @@ func (suite *testSuite) uploadValidProviderProfilePhoto() error {
 }
 
 func (suite *testSuite) uploadValidProviderProfilePhotoFor(auth0ID string) (string, error) {
+	return suite.uploadValidProfilePhotoFor(auth0ID)
+}
+
+func (suite *testSuite) uploadValidProfilePhotoFor(auth0ID string) (string, error) {
 	response, err := suite.requestProfilePhotoPresign(auth0ID, presignFileRequest{
 		OriginalName: "foto-perfil.jpg",
 		MimeType:     "image/jpeg",

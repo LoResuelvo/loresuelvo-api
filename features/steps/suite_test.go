@@ -46,6 +46,7 @@ type testSuite struct {
 	lastJobRequestID                        int
 	lastWorkRequestProviderID               int
 	providerProfilePhotoFileID              string
+	consumerProfilePhotoFileID              string
 	realtimeConnections                     map[string]*realtimeTestConnection
 	chatbotConversationIDs                  []int
 	chatbotConversationStatuses             []string
