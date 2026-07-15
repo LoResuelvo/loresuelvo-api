@@ -5,76 +5,120 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 
 	"github.com/cucumber/godog"
 )
 
-const (
-	loginConsumerAuth0ID = "auth0|login-consumer-test"
-	loginProviderAuth0ID = "auth0|login-provider-test"
-)
+const unregisteredLoginAuth0ID = "auth0|unregistered-login-test"
 
-func registerLoginSteps(sc *godog.ScenarioContext, suite *testSuite) {
-	sc.Step(`^que estoy registrado como consumidor$`, suite.iAmRegisteredAsConsumer)
-	sc.Step(`^que estoy registrado como prestador$`, suite.iAmRegisteredAsProvider)
-	sc.Step(`^que no tengo una sesión válida$`, suite.iDoNotHaveAValidSession)
-	sc.Step(`^consulto mi información de usuario autenticado$`, suite.requestAuthenticatedUserInfo)
-	sc.Step(`^el sistema informa que tengo rol "([^"]*)"$`, suite.systemReportsRole)
-	sc.Step(`^el sistema deniega el acceso$`, suite.systemDeniesAccess)
+type currentUserProfilePhotoResponse struct {
+	OriginalName string `json:"original_name"`
+	URL          string `json:"url"`
 }
 
-func (suite *testSuite) iAmRegisteredAsConsumer() error {
-	resp, err := suite.postConsumerRegistrationWithAuth0ID(loginConsumerAuth0ID, consumerRegistrationRequest{
-		Email:   "login-consumer@example.com",
-		Name:    "Consumer",
-		Surname: "Login",
+type currentUserCategoryResponse struct {
+	Name string `json:"name"`
+}
+
+type currentUserResponse struct {
+	Name         string                           `json:"name"`
+	Surname      string                           `json:"surname"`
+	Email        string                           `json:"email"`
+	Role         string                           `json:"role"`
+	ProfilePhoto *currentUserProfilePhotoResponse `json:"profile_photo,omitempty"`
+	Category     *currentUserCategoryResponse     `json:"category,omitempty"`
+}
+
+func registerLoginSteps(sc *godog.ScenarioContext, suite *testSuite) {
+	sc.Step(`^que existe un consumidor registrado con correo "([^"]*)", nombre "([^"]*)" y apellido "([^"]*)" sin foto de perfil$`, suite.thereIsRegisteredConsumerWithoutProfilePhoto)
+	sc.Step(`^que existe un consumidor registrado con correo "([^"]*)", nombre "([^"]*)" y apellido "([^"]*)" con la foto de perfil cargada$`, suite.thereIsRegisteredConsumerWithProfilePhoto)
+	sc.Step(`^que cargué una foto de perfil válida para mi registro como prestador$`, suite.uploadValidLoginProviderProfilePhoto)
+	sc.Step(`^que existe un prestador registrado con correo "([^"]*)", nombre "([^"]*)", apellido "([^"]*)", rubro "([^"]*)" y la foto de perfil cargada$`, suite.thereIsRegisteredProviderWithProfilePhoto)
+	sc.Step(`^que estoy autenticado con una identidad que no pertenece a un usuario registrado$`, suite.iAmAuthenticatedAsUnregisteredUser)
+	sc.Step(`^que no tengo una sesión válida$`, suite.iDoNotHaveAValidSession)
+	sc.Step(`^consulto mi información de usuario autenticado$`, suite.requestAuthenticatedUserInfo)
+	sc.Step(`^el sistema devuelve mi perfil de (consumidor|prestador)$`, suite.systemReturnsMyUserProfile)
+	sc.Step(`^el perfil contiene el nombre "([^"]*)", apellido "([^"]*)" y correo "([^"]*)"$`, suite.profileContainsPersonalInformation)
+	sc.Step(`^el perfil informa el rol "([^"]*)"$`, suite.profileReportsRole)
+	sc.Step(`^el perfil no incluye una foto de perfil$`, suite.profileDoesNotIncludeProfilePhoto)
+	sc.Step(`^el perfil incluye la foto de perfil$`, suite.profileIncludesProfilePhoto)
+	sc.Step(`^el perfil incluye el rubro "([^"]*)"$`, suite.profileIncludesCategory)
+	sc.Step(`^el sistema deniega el acceso$`, suite.systemDeniesAccess)
+	sc.Step(`^el sistema informa que el usuario no fue encontrado$`, suite.systemReportsUserNotFound)
+}
+
+func (suite *testSuite) thereIsRegisteredConsumerWithoutProfilePhoto(email, name, surname string) error {
+	return suite.registerConsumerProfileFixture(email, consumerRegistrationRequest{Email: email, Name: name, Surname: surname})
+}
+
+func (suite *testSuite) thereIsRegisteredConsumerWithProfilePhoto(email, name, surname string) error {
+	auth0ID := auth0IDForConsumerEmail(email)
+	fileID, err := suite.uploadValidProfilePhotoFor(auth0ID)
+	if err != nil {
+		return err
+	}
+
+	return suite.registerConsumerProfileFixture(email, consumerRegistrationRequest{
+		Email: email, Name: name, Surname: surname, ProfilePhotoFileID: fileID,
 	})
+}
+
+func (suite *testSuite) registerConsumerProfileFixture(email string, request consumerRegistrationRequest) error {
+	resp, err := suite.postConsumerRegistrationWithAuth0ID(auth0IDForConsumerEmail(email), request)
 	if err != nil {
 		return err
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusConflict {
-		body, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("could not prepare registered consumer: status %d, body %s", resp.StatusCode, string(body))
-	}
+	return requireFixtureCreated(resp, "consumer")
+}
 
-	suite.currentAuth0ID = loginConsumerAuth0ID
+func (suite *testSuite) uploadValidLoginProviderProfilePhoto() error {
+	fileID, err := suite.uploadValidProviderProfilePhotoFor(auth0IDForProviderEmail("juan@example.com"))
+	if err != nil {
+		return err
+	}
+	suite.providerProfilePhotoFileID = fileID
 	return nil
 }
 
-func (suite *testSuite) iAmRegisteredAsProvider() error {
-	if err := suite.thereIsCategoryNamed("Plomería"); err != nil {
-		return err
-	}
-
-	categoryID, err := suite.categoryIDFor("Plomería")
+func (suite *testSuite) thereIsRegisteredProviderWithProfilePhoto(email, name, surname, categoryName string) error {
+	categoryID, err := suite.categoryIDFor(categoryName)
 	if err != nil {
 		return err
 	}
 
-	resp, err := suite.postProviderRegistrationWithAuth0ID(loginProviderAuth0ID, providerRegistrationRequest{
-		Email:                  "login-provider@example.com",
-		Name:                   "Provider",
-		Surname:                "Login",
-		CategoryID:             categoryID,
-		CoverageZone:           []string{"Zona Norte"},
-		CriminalRecordFile:     "criminal-record.pdf",
-		CUITCertificateFile:    "cuit-certificate.pdf",
-		BiometricValidationID:  "biometric-validation-approved",
-		ProfessionalCredential: "professional-license-or-certificate.pdf",
+	auth0ID := auth0IDForProviderEmail(email)
+	fileID := suite.providerProfilePhotoFileID
+	if fileID == "" {
+		fileID, err = suite.uploadValidProviderProfilePhotoFor(auth0ID)
+		if err != nil {
+			return err
+		}
+	}
+
+	resp, err := suite.postProviderRegistrationWithAuth0ID(auth0ID, providerRegistrationRequest{
+		Email: email, Name: name, Surname: surname, CategoryID: categoryID, ProfilePhotoFileID: fileID,
 	})
 	if err != nil {
 		return err
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusConflict {
-		body, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("could not prepare registered provider: status %d, body %s", resp.StatusCode, string(body))
-	}
+	return requireFixtureCreated(resp, "provider")
+}
 
-	suite.currentAuth0ID = loginProviderAuth0ID
+func requireFixtureCreated(resp *http.Response, fixtureName string) error {
+	if resp.StatusCode == http.StatusCreated || resp.StatusCode == http.StatusConflict {
+		return nil
+	}
+	body, _ := io.ReadAll(resp.Body)
+	return fmt.Errorf("could not prepare registered %s: status %d, body %s", fixtureName, resp.StatusCode, string(body))
+}
+
+func (suite *testSuite) iAmAuthenticatedAsUnregisteredUser() error {
+	suite.currentAuth0ID = unregisteredLoginAuth0ID
 	return nil
 }
 
@@ -94,36 +138,95 @@ func (suite *testSuite) requestAuthenticatedUserInfo() error {
 	if err != nil {
 		return fmt.Errorf("failed to read response body: %w", err)
 	}
-
 	suite.lastStatus = resp.StatusCode
 	suite.lastBody = body
-
 	return nil
 }
 
-func (suite *testSuite) systemReportsRole(role string) error {
-	if suite.lastStatus != http.StatusOK {
-		return fmt.Errorf("expected status code %d, got %d with body %s", http.StatusOK, suite.lastStatus, string(suite.lastBody))
+func (suite *testSuite) systemReturnsMyUserProfile(userType string) error {
+	if err := suite.lastResponseShouldHaveStatusCode(http.StatusOK); err != nil {
+		return err
 	}
 
-	var response map[string]any
-	if err := json.Unmarshal(suite.lastBody, &response); err != nil {
-		return fmt.Errorf("response is not valid JSON: %w", err)
-	}
+	expectedRole := map[string]string{"consumidor": "consumer", "prestador": "provider"}[userType]
+	return suite.profileReportsRole(expectedRole)
+}
 
-	if responseContainsRole(response, role) {
-		return nil
+func (suite *testSuite) profileContainsPersonalInformation(name, surname, email string) error {
+	response, err := suite.currentUserResponse()
+	if err != nil {
+		return err
 	}
+	if response.Name != name || response.Surname != surname || response.Email != email {
+		return fmt.Errorf("expected profile %q %q <%s>, got body %s", name, surname, email, string(suite.lastBody))
+	}
+	return nil
+}
 
-	return fmt.Errorf("expected role %q in response, got body %s", role, string(suite.lastBody))
+func (suite *testSuite) profileReportsRole(role string) error {
+	response, err := suite.currentUserResponse()
+	if err != nil {
+		return err
+	}
+	if response.Role != role {
+		return fmt.Errorf("expected role %q, got body %s", role, string(suite.lastBody))
+	}
+	return nil
+}
+
+func (suite *testSuite) profileDoesNotIncludeProfilePhoto() error {
+	response, err := suite.currentUserResponse()
+	if err != nil {
+		return err
+	}
+	if response.ProfilePhoto != nil {
+		return fmt.Errorf("expected profile without profile_photo, got body %s", string(suite.lastBody))
+	}
+	return nil
+}
+
+func (suite *testSuite) profileIncludesProfilePhoto() error {
+	response, err := suite.currentUserResponse()
+	if err != nil {
+		return err
+	}
+	if response.ProfilePhoto == nil || strings.TrimSpace(response.ProfilePhoto.OriginalName) == "" || strings.TrimSpace(response.ProfilePhoto.URL) == "" {
+		return fmt.Errorf("expected profile_photo with original_name and url, got body %s", string(suite.lastBody))
+	}
+	return nil
+}
+
+func (suite *testSuite) profileIncludesCategory(categoryName string) error {
+	response, err := suite.currentUserResponse()
+	if err != nil {
+		return err
+	}
+	if response.Category == nil || response.Category.Name != categoryName {
+		return fmt.Errorf("expected category %q, got body %s", categoryName, string(suite.lastBody))
+	}
+	return nil
 }
 
 func (suite *testSuite) systemDeniesAccess() error {
-	if suite.lastStatus != http.StatusUnauthorized && suite.lastStatus != http.StatusForbidden && suite.lastStatus != http.StatusNotFound {
+	if suite.lastStatus != http.StatusUnauthorized && suite.lastStatus != http.StatusForbidden {
 		return fmt.Errorf("expected access to be denied, got status %d with body %s", suite.lastStatus, string(suite.lastBody))
 	}
-
 	return nil
+}
+
+func (suite *testSuite) systemReportsUserNotFound() error {
+	return suite.lastResponseShouldHaveStatusCode(http.StatusNotFound)
+}
+
+func (suite *testSuite) currentUserResponse() (*currentUserResponse, error) {
+	if err := suite.lastResponseShouldHaveStatusCode(http.StatusOK); err != nil {
+		return nil, err
+	}
+	var response currentUserResponse
+	if err := json.Unmarshal(suite.lastBody, &response); err != nil {
+		return nil, fmt.Errorf("current user response is not valid JSON: %w", err)
+	}
+	return &response, nil
 }
 
 func (suite *testSuite) getAuthenticatedUserInfo() (*http.Response, error) {
@@ -139,28 +242,5 @@ func (suite *testSuite) getAuthenticatedUserInfo() (*http.Response, error) {
 	if err != nil {
 		return nil, fmt.Errorf("API connection failed: %w", err)
 	}
-
 	return resp, nil
-}
-
-func responseContainsRole(response map[string]any, role string) bool {
-	if returnedRole, ok := response["Role"].(string); ok && isExpectedRole(returnedRole, role) {
-		return true
-	}
-
-	return false
-}
-
-func isExpectedRole(returned string, expected string) bool {
-	equivalentRoles := map[string]string{
-		"consumer":   "consumer",
-		"consumidor": "consumer",
-		"provider":   "provider",
-		"prestador":  "provider",
-	}
-
-	returnedRole, returnedExists := equivalentRoles[returned]
-	expectedRole, expectedExists := equivalentRoles[expected]
-
-	return returnedExists && expectedExists && returnedRole == expectedRole
 }
