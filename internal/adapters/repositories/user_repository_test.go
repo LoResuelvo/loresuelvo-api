@@ -28,7 +28,7 @@ func newUserRepositoryTest(t *testing.T) *repositories.UserRepository {
 }
 
 func validUser() *consumer.Consumer {
-	user, _ := consumer.NewConsumer("auth0|josue", "josugod@gmail.com", "Josue", "el pro")
+	user, _ := consumer.NewConsumer("auth0|josue", "josugod@gmail.com", "Josue", "el pro", "")
 	return user
 }
 

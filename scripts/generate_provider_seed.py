@@ -145,7 +145,7 @@ def build_providers(count: int, categories: list[str], asset_variants: int) -> l
                 "category": category,
                 "profile_photo_file_id": str(uuid.uuid5(uuid.NAMESPACE_DNS, f"loresuelvo-seed-provider-{provider_code}")),
                 "profile_photo_name": file_name,
-                "profile_photo_key": f"seed/provider_profile_photo/providers-100/{file_name}",
+                "profile_photo_key": f"seed/profile_photo/providers-100/{file_name}",
                 "asset_source": f"provider_profile_photo/{category_slug}-{asset_variant:02d}.webp",
             }
         )

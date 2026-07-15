@@ -35,12 +35,12 @@ func (s *Service) RegisterProvider(ctx context.Context, authID, email, name, sur
 		return nil, err
 	}
 
-	if err := s.validateProfilePhoto(ctx, authID, profilePhotoFileID); err != nil {
+	provider, err := NewProvider(authID, email, name, surname, category, profilePhotoFileID)
+	if err != nil {
 		return nil, err
 	}
 
-	provider, err := NewProvider(authID, email, name, surname, category, profilePhotoFileID)
-	if err != nil {
+	if err := s.validateProfilePhoto(ctx, authID, profilePhotoFileID); err != nil {
 		return nil, err
 	}
 
@@ -100,7 +100,10 @@ func (s *Service) validateCategory(categoryID int) (*category.Category, error) {
 }
 
 func (s *Service) validateProfilePhoto(ctx context.Context, authID, profilePhotoFileID string) error {
-	err := s.fileService.ValidateProviderProfilePhoto(ctx, authID, profilePhotoFileID)
+	if profilePhotoFileID == "" {
+		return filedomain.ErrProfilePhotoRequired
+	}
+	err := s.fileService.ValidateProfilePhoto(ctx, authID, profilePhotoFileID)
 	if errors.Is(err, filedomain.ErrProfilePhotoRequired) || errors.Is(err, filedomain.ErrProfilePhotoNotAvailable) {
 		return err
 	}

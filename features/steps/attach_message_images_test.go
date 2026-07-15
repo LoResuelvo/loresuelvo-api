@@ -89,7 +89,7 @@ func (suite *testSuite) consumerUploadedAndConfirmedMessageImage(email, name str
 }
 
 func (suite *testSuite) uploadAndConfirmProfilePhotoImage(name string) error {
-	return suite.uploadAndRememberImage(suite.currentAuth0ID, name, providerProfilePhotoPurpose, true)
+	return suite.uploadAndRememberImage(suite.currentAuth0ID, name, profilePhotoPurpose, true)
 }
 
 func (suite *testSuite) uploadAndRememberImage(authID, name, purpose string, confirm bool) error {

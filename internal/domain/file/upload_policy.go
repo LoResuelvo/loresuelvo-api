@@ -1,7 +1,7 @@
 package file
 
 const (
-	maxProviderProfilePhotoBytes     = 5 * 1024 * 1024
+	maxProfilePhotoBytes             = 5 * 1024 * 1024
 	maxConversationMessageImageBytes = 5 * 1024 * 1024
 	maxJobRequestImageBytes          = 5 * 1024 * 1024
 	MaxConversationMessageImages     = 5
@@ -24,10 +24,10 @@ func (policy UploadPolicy) Allows(metadata FileMetadata) bool {
 	return ok
 }
 
-var providerProfilePhotoPolicy = UploadPolicy{
-	Purpose:      PurposeProviderProfilePhoto,
+var profilePhotoPolicy = UploadPolicy{
+	Purpose:      PurposeProfilePhoto,
 	Visibility:   VisibilityPublic,
-	MaxSizeBytes: maxProviderProfilePhotoBytes,
+	MaxSizeBytes: maxProfilePhotoBytes,
 	AllowedMimeTypes: map[string]struct{}{
 		"image/jpeg": {},
 		"image/png":  {},
@@ -62,7 +62,7 @@ var jobRequestImagePolicy = UploadPolicy{
 
 func defaultUploadPolicies() map[string]UploadPolicy {
 	return map[string]UploadPolicy{
-		PurposeProviderProfilePhoto:     providerProfilePhotoPolicy,
+		PurposeProfilePhoto:             profilePhotoPolicy,
 		PurposeConversationMessageImage: conversationMessageImagePolicy,
 		PurposeJobRequestImage:          jobRequestImagePolicy,
 	}

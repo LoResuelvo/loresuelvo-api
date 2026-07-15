@@ -169,7 +169,7 @@ func (r *ServiceProposalRepository) FindByUserID(ctx context.Context, userID int
 			cat.id,
 			cat.name,
 			cat.normalized_name,
-			p.profile_photo_file_id
+			provider_user.profile_photo_file_id
 		FROM service_proposals sp
 		INNER JOIN conversations c ON c.id = sp.conversation_id
 		INNER JOIN users consumer_user ON consumer_user.id = sp.consumer_id
@@ -227,11 +227,11 @@ func (r *ServiceProposalRepository) FindByUserID(ctx context.Context, userID int
 
 		consumerUser.Role = consumer.Role
 		providerUser.Role = provider.Role
+		providerUser.ProfilePhotoFileID = profilePhotoFileID
 		proposal.Consumer = &consumer.Consumer{BaseUser: &consumerUser}
 		proposal.Provider = &provider.Provider{
-			BaseUser:           &providerUser,
-			Category:           &providerCategory,
-			ProfilePhotoFileID: profilePhotoFileID,
+			BaseUser: &providerUser,
+			Category: &providerCategory,
 		}
 		proposal.Conversation = &conversation.WorkConversation{
 			BaseConversation: &baseConversation,

@@ -104,7 +104,7 @@ func (r *WorkOrderRepository) FindByUserID(ctx context.Context, userID int, view
 			CASE WHEN $2 = $3 THEN provider_user.name ELSE consumer_user.name END AS counterpart_name,
 			CASE WHEN $2 = $3 THEN provider_user.surname ELSE consumer_user.surname END AS counterpart_surname,
 			CASE WHEN $2 = $3 THEN cat.name ELSE '' END AS counterpart_category_name,
-			CASE WHEN $2 = $3 THEN COALESCE(p.profile_photo_file_id::text, '') ELSE '' END AS counterpart_profile_photo_file_id
+			CASE WHEN $2 = $3 THEN COALESCE(provider_user.profile_photo_file_id::text, '') ELSE COALESCE(consumer_user.profile_photo_file_id::text, '') END AS counterpart_profile_photo_file_id
 		FROM work_orders wo
 		INNER JOIN service_proposals sp ON sp.id = wo.service_proposal_id
 		INNER JOIN users consumer_user ON consumer_user.id = sp.consumer_id

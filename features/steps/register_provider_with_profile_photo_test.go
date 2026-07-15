@@ -11,9 +11,9 @@ import (
 )
 
 const (
-	providerProfilePhotoPurpose = "provider_profile_photo"
-	validProfilePhotoSizeBytes  = 1024 * 1024
-	oversizedProfilePhotoBytes  = 6 * 1024 * 1024
+	profilePhotoPurpose        = "profile_photo"
+	validProfilePhotoSizeBytes = 1024 * 1024
+	oversizedProfilePhotoBytes = 6 * 1024 * 1024
 )
 
 type presignFileRequest struct {
@@ -63,7 +63,7 @@ func (suite *testSuite) uploadValidProfilePhotoFor(auth0ID string) (string, erro
 		OriginalName: "foto-perfil.jpg",
 		MimeType:     "image/jpeg",
 		SizeBytes:    validProfilePhotoSizeBytes,
-		Purpose:      providerProfilePhotoPurpose,
+		Purpose:      profilePhotoPurpose,
 	})
 	if err != nil {
 		return "", err
@@ -118,7 +118,7 @@ func (suite *testSuite) tryUploadProviderProfilePhotoWithInvalidFormat() error {
 		OriginalName: "foto-perfil.gif",
 		MimeType:     "image/gif",
 		SizeBytes:    validProfilePhotoSizeBytes,
-		Purpose:      providerProfilePhotoPurpose,
+		Purpose:      profilePhotoPurpose,
 	})
 	return err
 }
@@ -128,7 +128,7 @@ func (suite *testSuite) tryUploadOversizedProviderProfilePhoto() error {
 		OriginalName: "foto-perfil.jpg",
 		MimeType:     "image/jpeg",
 		SizeBytes:    oversizedProfilePhotoBytes,
-		Purpose:      providerProfilePhotoPurpose,
+		Purpose:      profilePhotoPurpose,
 	})
 	return err
 }

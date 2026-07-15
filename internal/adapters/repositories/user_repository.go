@@ -18,7 +18,7 @@ type UserRepository struct {
 
 const userWithProfileSelectSQL = `SELECT u.id, u.auth_id, u.email, u.name, u.surname, u.role,
 	c.user_id, p.user_id, cat.id, cat.name, cat.normalized_name,
-	COALESCE(p.profile_photo_file_id::text, '')
+	COALESCE(u.profile_photo_file_id::text, '')
 	FROM users u
 	LEFT JOIN consumers c ON c.user_id = u.id
 	LEFT JOIN providers p ON p.user_id = u.id
@@ -55,8 +55,8 @@ func (repository *UserRepository) Save(ctx context.Context, userToSave user.User
 			break
 		}
 		_, err = tx.ExecContext(ctx,
-			`INSERT INTO providers (user_id, category_id, profile_photo_file_id) VALUES ($1, $2, $3)`,
-			typedUser.ID, typedUser.Category.ID, typedUser.ProfilePhotoFileID)
+			`INSERT INTO providers (user_id, category_id) VALUES ($1, $2)`,
+			typedUser.ID, typedUser.Category.ID)
 	default:
 		err = fmt.Errorf("saving user: unsupported user type %T", userToSave)
 	}
@@ -77,14 +77,15 @@ func saveBaseUser(ctx context.Context, queryRower userQueryRower, userToSave *us
 	var userID int
 	err := queryRower.QueryRowContext(
 		ctx,
-		`INSERT INTO users (auth_id, email, name, surname, role, created_on, updated_on)
-		VALUES ($1, $2, $3, $4, $5, NOW(), NOW())
+		`INSERT INTO users (auth_id, email, name, surname, role, profile_photo_file_id, created_on, updated_on)
+		VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
 		RETURNING id`,
 		userToSave.AuthID,
 		userToSave.Email,
 		userToSave.Name,
 		userToSave.Surname,
 		userToSave.Role,
+		sql.NullString{String: userToSave.ProfilePhotoFileID, Valid: userToSave.ProfilePhotoFileID != ""},
 	).Scan(&userID)
 	if err != nil {
 		return 0, fmt.Errorf("saving user: %w", err)
@@ -128,10 +129,10 @@ type rowScanner interface {
 func scanUserWithProfile(row rowScanner, lookup string) (user.User, error) {
 	var base user.BaseUser
 	var consumerID, providerID, categoryID sql.NullInt64
-	var categoryName, normalizedCategoryName, profilePhotoFileID sql.NullString
+	var categoryName, normalizedCategoryName sql.NullString
 	err := row.Scan(
 		&base.ID, &base.AuthID, &base.Email, &base.Name, &base.Surname, &base.Role,
-		&consumerID, &providerID, &categoryID, &categoryName, &normalizedCategoryName, &profilePhotoFileID,
+		&consumerID, &providerID, &categoryID, &categoryName, &normalizedCategoryName, &base.ProfilePhotoFileID,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("finding user by %s: %w", lookup, err)
@@ -153,7 +154,6 @@ func scanUserWithProfile(row rowScanner, lookup string) (user.User, error) {
 				Name:           categoryName.String,
 				NormalizedName: normalizedCategoryName.String,
 			},
-			ProfilePhotoFileID: profilePhotoFileID.String,
 		}, nil
 	default:
 		return nil, fmt.Errorf("finding user by %s: unsupported role %q", lookup, base.Role)
@@ -200,7 +200,8 @@ func (repository *UserRepository) FindConsumerByID(consumerID int) (*consumer.Co
 			users.email,
 			users.name,
 			users.surname,
-			users.role
+			users.role,
+			COALESCE(users.profile_photo_file_id::text, '')
 		FROM consumers
 		INNER JOIN users ON users.id = consumers.user_id
 		WHERE consumers.user_id = $1`,
@@ -212,6 +213,7 @@ func (repository *UserRepository) FindConsumerByID(consumerID int) (*consumer.Co
 		&consumerUser.Name,
 		&consumerUser.Surname,
 		&consumerUser.Role,
+		&consumerUser.ProfilePhotoFileID,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("finding consumer by id: %w", err)
@@ -296,7 +298,7 @@ const providerSelectSQL = `SELECT providers.user_id,
 	categories.id,
 	categories.name,
 	categories.normalized_name,
-	COALESCE(providers.profile_photo_file_id::text, '')
+	COALESCE(users.profile_photo_file_id::text, '')
 FROM providers
 INNER JOIN users ON users.id = providers.user_id
 INNER JOIN categories ON categories.id = providers.category_id`
@@ -319,7 +321,7 @@ func scanProvider(scanner providerScanner) (*provider.Provider, error) {
 		&providerCategory.ID,
 		&providerCategory.Name,
 		&providerCategory.NormalizedName,
-		&foundProvider.ProfilePhotoFileID,
+		&providerUser.ProfilePhotoFileID,
 	); err != nil {
 		return nil, err
 	}

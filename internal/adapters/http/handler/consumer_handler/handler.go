@@ -33,11 +33,11 @@ func (h *ConsumerHandler) RegisterConsumer(c *gin.Context) {
 
 	req = normalizeRegisterConsumerRequest(req)
 
-	err := h.consumerService.RegisterConsumer(c.Request.Context(), auth0ID, req.Email, req.Name, req.Surname)
+	createdConsumer, err := h.consumerService.RegisterConsumer(c.Request.Context(), auth0ID, req.Email, req.Name, req.Surname, req.ProfilePhotoFileID)
 	if err != nil {
 		handleRegisterConsumerError(c, err)
 		return
 	}
 
-	c.JSON(http.StatusCreated, registeredConsumerResponse())
+	c.JSON(http.StatusCreated, consumerSummaryResponseFromDomain(*createdConsumer))
 }

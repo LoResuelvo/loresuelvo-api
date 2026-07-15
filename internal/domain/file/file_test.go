@@ -60,11 +60,11 @@ func TestNewPendingFileCreatesPendingFile(t *testing.T) {
 
 	file, err := filedomain.NewPendingFile(
 		"file-id",
-		"files/2026/06/provider_profile_photo/file-id.jpg",
+		"files/2026/06/profile_photo/file-id.jpg",
 		"public",
 		metadata,
 		filedomain.VisibilityPublic,
-		filedomain.PurposeProviderProfilePhoto,
+		filedomain.PurposeProfilePhoto,
 		"auth0|provider",
 		now,
 	)
@@ -77,7 +77,7 @@ func TestNewPendingFileCreatesPendingFile(t *testing.T) {
 }
 
 func TestNewPendingFileReturnsValidationError(t *testing.T) {
-	file, err := filedomain.NewPendingFile("", "key", "bucket", validFileMetadata(t), filedomain.VisibilityPublic, filedomain.PurposeProviderProfilePhoto, "auth0|provider", validFileTime())
+	file, err := filedomain.NewPendingFile("", "key", "bucket", validFileMetadata(t), filedomain.VisibilityPublic, filedomain.PurposeProfilePhoto, "auth0|provider", validFileTime())
 
 	assert.Nil(t, file)
 	assert.ErrorIs(t, err, filedomain.ErrFileIDRequired)
@@ -90,12 +90,12 @@ func TestNewFileCreatesFileAndExposesState(t *testing.T) {
 
 	file, err := filedomain.NewFile(
 		"file-id",
-		"files/2026/06/provider_profile_photo/file-id.jpg",
+		"files/2026/06/profile_photo/file-id.jpg",
 		"public",
 		metadata,
 		filedomain.StatusConfirmed,
 		filedomain.VisibilityPublic,
-		filedomain.PurposeProviderProfilePhoto,
+		filedomain.PurposeProfilePhoto,
 		"auth0|provider",
 		createdOn,
 		updatedOn,
@@ -109,7 +109,7 @@ func TestNewFileCreatesFileAndExposesState(t *testing.T) {
 	assert.True(t, file.IsConfirmed())
 	assert.True(t, file.IsPublic())
 	assert.True(t, file.WasUploadedBy("auth0|provider"))
-	assert.True(t, file.HasPurpose(filedomain.PurposeProviderProfilePhoto))
+	assert.True(t, file.HasPurpose(filedomain.PurposeProfilePhoto))
 }
 
 func TestNewFileValidatesRequiredFields(t *testing.T) {
@@ -128,15 +128,15 @@ func TestNewFileValidatesRequiredFields(t *testing.T) {
 		updatedOn   time.Time
 		expectedErr error
 	}{
-		{name: "id", key: "key", bucket: "bucket", status: filedomain.StatusPending, visibility: filedomain.VisibilityPublic, purpose: filedomain.PurposeProviderProfilePhoto, uploader: "auth0|provider", createdOn: now, updatedOn: now, expectedErr: filedomain.ErrFileIDRequired},
-		{name: "status", id: "file-id", key: "key", bucket: "bucket", visibility: filedomain.VisibilityPublic, purpose: filedomain.PurposeProviderProfilePhoto, uploader: "auth0|provider", createdOn: now, updatedOn: now, expectedErr: filedomain.ErrFileStatusRequired},
-		{name: "key", id: "file-id", bucket: "bucket", status: filedomain.StatusPending, visibility: filedomain.VisibilityPublic, purpose: filedomain.PurposeProviderProfilePhoto, uploader: "auth0|provider", createdOn: now, updatedOn: now, expectedErr: filedomain.ErrFileKeyRequired},
-		{name: "bucket", id: "file-id", key: "key", status: filedomain.StatusPending, visibility: filedomain.VisibilityPublic, purpose: filedomain.PurposeProviderProfilePhoto, uploader: "auth0|provider", createdOn: now, updatedOn: now, expectedErr: filedomain.ErrFileBucketRequired},
-		{name: "visibility", id: "file-id", key: "key", bucket: "bucket", status: filedomain.StatusPending, purpose: filedomain.PurposeProviderProfilePhoto, uploader: "auth0|provider", createdOn: now, updatedOn: now, expectedErr: filedomain.ErrVisibilityRequired},
+		{name: "id", key: "key", bucket: "bucket", status: filedomain.StatusPending, visibility: filedomain.VisibilityPublic, purpose: filedomain.PurposeProfilePhoto, uploader: "auth0|provider", createdOn: now, updatedOn: now, expectedErr: filedomain.ErrFileIDRequired},
+		{name: "status", id: "file-id", key: "key", bucket: "bucket", visibility: filedomain.VisibilityPublic, purpose: filedomain.PurposeProfilePhoto, uploader: "auth0|provider", createdOn: now, updatedOn: now, expectedErr: filedomain.ErrFileStatusRequired},
+		{name: "key", id: "file-id", bucket: "bucket", status: filedomain.StatusPending, visibility: filedomain.VisibilityPublic, purpose: filedomain.PurposeProfilePhoto, uploader: "auth0|provider", createdOn: now, updatedOn: now, expectedErr: filedomain.ErrFileKeyRequired},
+		{name: "bucket", id: "file-id", key: "key", status: filedomain.StatusPending, visibility: filedomain.VisibilityPublic, purpose: filedomain.PurposeProfilePhoto, uploader: "auth0|provider", createdOn: now, updatedOn: now, expectedErr: filedomain.ErrFileBucketRequired},
+		{name: "visibility", id: "file-id", key: "key", bucket: "bucket", status: filedomain.StatusPending, purpose: filedomain.PurposeProfilePhoto, uploader: "auth0|provider", createdOn: now, updatedOn: now, expectedErr: filedomain.ErrVisibilityRequired},
 		{name: "purpose", id: "file-id", key: "key", bucket: "bucket", status: filedomain.StatusPending, visibility: filedomain.VisibilityPublic, uploader: "auth0|provider", createdOn: now, updatedOn: now, expectedErr: filedomain.ErrPurposeRequired},
-		{name: "uploader", id: "file-id", key: "key", bucket: "bucket", status: filedomain.StatusPending, visibility: filedomain.VisibilityPublic, purpose: filedomain.PurposeProviderProfilePhoto, createdOn: now, updatedOn: now, expectedErr: filedomain.ErrUploaderRequired},
-		{name: "created timestamp", id: "file-id", key: "key", bucket: "bucket", status: filedomain.StatusPending, visibility: filedomain.VisibilityPublic, purpose: filedomain.PurposeProviderProfilePhoto, uploader: "auth0|provider", updatedOn: now, expectedErr: filedomain.ErrFileTimestampRequired},
-		{name: "updated timestamp", id: "file-id", key: "key", bucket: "bucket", status: filedomain.StatusPending, visibility: filedomain.VisibilityPublic, purpose: filedomain.PurposeProviderProfilePhoto, uploader: "auth0|provider", createdOn: now, expectedErr: filedomain.ErrFileTimestampRequired},
+		{name: "uploader", id: "file-id", key: "key", bucket: "bucket", status: filedomain.StatusPending, visibility: filedomain.VisibilityPublic, purpose: filedomain.PurposeProfilePhoto, createdOn: now, updatedOn: now, expectedErr: filedomain.ErrUploaderRequired},
+		{name: "created timestamp", id: "file-id", key: "key", bucket: "bucket", status: filedomain.StatusPending, visibility: filedomain.VisibilityPublic, purpose: filedomain.PurposeProfilePhoto, uploader: "auth0|provider", updatedOn: now, expectedErr: filedomain.ErrFileTimestampRequired},
+		{name: "updated timestamp", id: "file-id", key: "key", bucket: "bucket", status: filedomain.StatusPending, visibility: filedomain.VisibilityPublic, purpose: filedomain.PurposeProfilePhoto, uploader: "auth0|provider", createdOn: now, expectedErr: filedomain.ErrFileTimestampRequired},
 	}
 
 	for _, tt := range tests {
@@ -151,7 +151,7 @@ func TestNewFileValidatesRequiredFields(t *testing.T) {
 
 func TestConfirmMarksFileConfirmed(t *testing.T) {
 	now := validFileTime()
-	file, err := filedomain.NewPendingFile("file-id", "key", "bucket", validFileMetadata(t), filedomain.VisibilityPublic, filedomain.PurposeProviderProfilePhoto, "auth0|provider", now)
+	file, err := filedomain.NewPendingFile("file-id", "key", "bucket", validFileMetadata(t), filedomain.VisibilityPublic, filedomain.PurposeProfilePhoto, "auth0|provider", now)
 	require.NoError(t, err)
 	confirmedOn := now.Add(time.Hour)
 

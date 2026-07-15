@@ -20,10 +20,10 @@ const (
 	seedMaxAttempts   = 60
 	defaultSeedsFile  = "seeds/default.yaml"
 
-	seedProviderRole                = "provider"
-	seedProviderProfilePhotoPurpose = "provider_profile_photo"
-	seedPublicFileStatus            = "confirmed"
-	seedPublicFileVisibility        = "public"
+	seedProviderRole         = "provider"
+	seedProfilePhotoPurpose  = "profile_photo"
+	seedPublicFileStatus     = "confirmed"
+	seedPublicFileVisibility = "public"
 )
 
 type seedData struct {
@@ -202,7 +202,7 @@ func seedDefaultProvider(ctx context.Context, tx *sql.Tx, publicBucket string, s
 		return err
 	}
 
-	if err := upsertSeedProvider(ctx, tx, userID, categoryID, seed.ProfilePhotoFileID); err != nil {
+	if err := upsertSeedProvider(ctx, tx, userID, categoryID); err != nil {
 		return err
 	}
 
@@ -252,7 +252,7 @@ func upsertSeedProviderProfilePhoto(ctx context.Context, tx *sql.Tx, publicBucke
 		seed.ProfilePhotoName,
 		seedPublicFileStatus,
 		seedPublicFileVisibility,
-		seedProviderProfilePhotoPurpose,
+		seedProfilePhotoPurpose,
 		seed.AuthID,
 	)
 	if err != nil {
@@ -266,13 +266,14 @@ func upsertSeedProviderUser(ctx context.Context, tx *sql.Tx, seed providerSeed) 
 	var userID int
 	err := tx.QueryRowContext(
 		ctx,
-		`INSERT INTO users (auth_id, email, name, surname, role, created_on, updated_on)
-		VALUES ($1, $2, $3, $4, $5, NOW(), NOW())
+		`INSERT INTO users (auth_id, email, name, surname, role, profile_photo_file_id, created_on, updated_on)
+		VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
 		ON CONFLICT (auth_id) DO UPDATE
 		SET email = EXCLUDED.email,
 			name = EXCLUDED.name,
 			surname = EXCLUDED.surname,
 			role = EXCLUDED.role,
+			profile_photo_file_id = EXCLUDED.profile_photo_file_id,
 			updated_on = NOW()
 		RETURNING id`,
 		seed.AuthID,
@@ -280,6 +281,7 @@ func upsertSeedProviderUser(ctx context.Context, tx *sql.Tx, seed providerSeed) 
 		seed.Name,
 		seed.Surname,
 		seedProviderRole,
+		seed.ProfilePhotoFileID,
 	).Scan(&userID)
 	if err != nil {
 		return 0, fmt.Errorf("seeding provider user %q: %w", seed.AuthID, err)
@@ -288,7 +290,7 @@ func upsertSeedProviderUser(ctx context.Context, tx *sql.Tx, seed providerSeed) 
 	return userID, nil
 }
 
-func upsertSeedProvider(ctx context.Context, tx *sql.Tx, userID, categoryID int, profilePhotoFileID string) error {
+func upsertSeedProvider(ctx context.Context, tx *sql.Tx, userID, categoryID int) error {
 	var providerID int
 	err := tx.QueryRowContext(
 		ctx,
@@ -298,11 +300,10 @@ func upsertSeedProvider(ctx context.Context, tx *sql.Tx, userID, categoryID int,
 	if errors.Is(err, sql.ErrNoRows) {
 		_, err = tx.ExecContext(
 			ctx,
-			`INSERT INTO providers (user_id, category_id, profile_photo_file_id)
-			VALUES ($1, $2, $3)`,
+			`INSERT INTO providers (user_id, category_id)
+			VALUES ($1, $2)`,
 			userID,
 			categoryID,
-			profilePhotoFileID,
 		)
 		if err != nil {
 			return fmt.Errorf("inserting provider seed for user %d: %w", userID, err)
@@ -316,12 +317,10 @@ func upsertSeedProvider(ctx context.Context, tx *sql.Tx, userID, categoryID int,
 	_, err = tx.ExecContext(
 		ctx,
 		`UPDATE providers
-		SET category_id = $2,
-			profile_photo_file_id = $3
+		SET category_id = $2
 		WHERE id = $1`,
 		providerID,
 		categoryID,
-		profilePhotoFileID,
 	)
 	if err != nil {
 		return fmt.Errorf("updating provider seed %d: %w", providerID, err)

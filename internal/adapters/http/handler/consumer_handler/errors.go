@@ -1,6 +1,7 @@
 package consumer_handler
 
 import (
+	"errors"
 	"net/http"
 
 	httphandler "github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler"
@@ -9,7 +10,7 @@ import (
 )
 
 func handleRegisterConsumerError(c *gin.Context, err error) {
-	if err == validator.ErrEmailAlreadyRegistered {
+	if errors.Is(err, validator.ErrEmailAlreadyRegistered) {
 		httphandler.RespondError(c, http.StatusConflict, err.Error())
 		return
 	}

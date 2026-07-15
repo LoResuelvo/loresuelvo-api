@@ -9,7 +9,7 @@ const (
 	VisibilityPublic  = "public"
 	VisibilityPrivate = "private"
 
-	PurposeProviderProfilePhoto     = "provider_profile_photo"
+	PurposeProfilePhoto             = "profile_photo"
 	PurposeConversationMessageImage = "conversation_message_image"
 	PurposeJobRequestImage          = "job_request_image"
 )

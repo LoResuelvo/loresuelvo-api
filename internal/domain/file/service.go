@@ -111,16 +111,12 @@ func (s *Service) confirmedFileURL(file File) string {
 	return s.publicURL(file)
 }
 
-func (s *Service) ValidateProviderProfilePhoto(ctx context.Context, authID, fileID string) error {
-	if fileID == "" {
-		return ErrProfilePhotoRequired
-	}
-
+func (s *Service) ValidateProfilePhoto(ctx context.Context, authID, fileID string) error {
 	file, err := s.repository.FindByID(ctx, fileID)
 	if err != nil {
 		return ErrProfilePhotoNotAvailable
 	}
-	if !isValidProviderProfilePhotoFor(*file, authID) {
+	if !isValidProfilePhotoFor(*file, authID) {
 		return ErrProfilePhotoNotAvailable
 	}
 
@@ -426,12 +422,12 @@ func uniqueNonEmptyFileIDs(fileIDs []string) []string {
 	return unique
 }
 
-func isValidProviderProfilePhotoFor(file File, authID string) bool {
+func isValidProfilePhotoFor(file File, authID string) bool {
 	return file.IsConfirmed() &&
 		file.IsPublic() &&
 		file.WasUploadedBy(authID) &&
-		file.HasPurpose(PurposeProviderProfilePhoto) &&
-		providerProfilePhotoPolicy.Allows(file.Metadata())
+		file.HasPurpose(PurposeProfilePhoto) &&
+		profilePhotoPolicy.Allows(file.Metadata())
 }
 
 func isValidConversationMessageImageFor(file File, authID string) bool {

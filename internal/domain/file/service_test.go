@@ -120,7 +120,7 @@ func newFileService(repo *fileRepositoryMock, storage *storageMock) *filedomain.
 	return filedomain.NewService(repo, storage, "public", "private", fixedClock{})
 }
 
-func TestRequestUploadCreatesPendingProviderProfilePhoto(t *testing.T) {
+func TestRequestUploadCreatesPendingProfilePhoto(t *testing.T) {
 	repo := newFileRepositoryMock()
 	service := newFileService(repo, newStorageMock())
 
@@ -129,12 +129,12 @@ func TestRequestUploadCreatesPendingProviderProfilePhoto(t *testing.T) {
 		OriginalName: "foto.jpg",
 		MimeType:     "image/jpeg",
 		SizeBytes:    1024,
-		Purpose:      filedomain.PurposeProviderProfilePhoto,
+		Purpose:      filedomain.PurposeProfilePhoto,
 	})
 
 	require.NoError(t, err)
 	assert.NotEmpty(t, result.FileID)
-	assert.Contains(t, result.Key, "files/2026/06/provider_profile_photo/")
+	assert.Contains(t, result.Key, "files/2026/06/profile_photo/")
 	assert.Equal(t, "https://upload", result.URL)
 	createdFile := repo.files[result.FileID]
 	assert.Equal(t, filedomain.StatusPending, createdFile.Status)
@@ -203,7 +203,7 @@ func TestValidateConversationMessageImageRejectsWrongOwnerAndPurpose(t *testing.
 	storage := newStorageMock()
 	service := newFileService(repo, storage)
 	upload, err := service.RequestUpload(context.Background(), filedomain.PresignRequest{
-		AuthID: "auth0|provider", OriginalName: "profile.jpg", MimeType: "image/jpeg", SizeBytes: 1024, Purpose: filedomain.PurposeProviderProfilePhoto,
+		AuthID: "auth0|provider", OriginalName: "profile.jpg", MimeType: "image/jpeg", SizeBytes: 1024, Purpose: filedomain.PurposeProfilePhoto,
 	})
 	require.NoError(t, err)
 	_, err = service.ConfirmUpload(context.Background(), filedomain.ConfirmRequest{AuthID: "auth0|provider", FileID: upload.FileID, Key: upload.Key, MimeType: "image/jpeg", SizeBytes: 1024})
@@ -247,7 +247,7 @@ func TestRequestUploadRequiresUploader(t *testing.T) {
 		OriginalName: "foto.jpg",
 		MimeType:     "image/jpeg",
 		SizeBytes:    1024,
-		Purpose:      filedomain.PurposeProviderProfilePhoto,
+		Purpose:      filedomain.PurposeProfilePhoto,
 	})
 
 	assert.ErrorIs(t, err, filedomain.ErrUploaderRequired)
@@ -262,7 +262,7 @@ func TestRequestUploadWrapsStorageError(t *testing.T) {
 		OriginalName: "foto.jpg",
 		MimeType:     "image/jpeg",
 		SizeBytes:    1024,
-		Purpose:      filedomain.PurposeProviderProfilePhoto,
+		Purpose:      filedomain.PurposeProfilePhoto,
 	})
 
 	assert.ErrorIs(t, err, expectedErr)
@@ -280,14 +280,14 @@ func TestRequestUploadWrapsRepositorySaveError(t *testing.T) {
 		OriginalName: "foto.jpg",
 		MimeType:     "image/jpeg",
 		SizeBytes:    1024,
-		Purpose:      filedomain.PurposeProviderProfilePhoto,
+		Purpose:      filedomain.PurposeProfilePhoto,
 	})
 
 	assert.ErrorIs(t, err, expectedErr)
 	assert.ErrorContains(t, err, "saving pending file")
 }
 
-func TestRequestUploadAcceptsWebPProviderProfilePhoto(t *testing.T) {
+func TestRequestUploadAcceptsWebPProfilePhoto(t *testing.T) {
 	service := newFileService(newFileRepositoryMock(), newStorageMock())
 
 	_, err := service.RequestUpload(context.Background(), filedomain.PresignRequest{
@@ -295,7 +295,7 @@ func TestRequestUploadAcceptsWebPProviderProfilePhoto(t *testing.T) {
 		OriginalName: "foto.webp",
 		MimeType:     "image/webp",
 		SizeBytes:    1024,
-		Purpose:      filedomain.PurposeProviderProfilePhoto,
+		Purpose:      filedomain.PurposeProfilePhoto,
 	})
 
 	assert.NoError(t, err)
@@ -309,7 +309,7 @@ func TestRequestUploadRejectsInvalidProfilePhotoMimeType(t *testing.T) {
 		OriginalName: "foto.gif",
 		MimeType:     "image/gif",
 		SizeBytes:    1024,
-		Purpose:      filedomain.PurposeProviderProfilePhoto,
+		Purpose:      filedomain.PurposeProfilePhoto,
 	})
 
 	assert.ErrorIs(t, err, filedomain.ErrUnsupportedProfilePhoto)
@@ -322,7 +322,7 @@ func TestRequestUploadRequiresOriginalName(t *testing.T) {
 		AuthID:    "auth0|provider",
 		MimeType:  "image/jpeg",
 		SizeBytes: 1024,
-		Purpose:   filedomain.PurposeProviderProfilePhoto,
+		Purpose:   filedomain.PurposeProfilePhoto,
 	})
 
 	assert.ErrorIs(t, err, filedomain.ErrOriginalNameRequired)
@@ -336,7 +336,7 @@ func TestRequestUploadRejectsOversizedProfilePhoto(t *testing.T) {
 		OriginalName: "foto.jpg",
 		MimeType:     "image/jpeg",
 		SizeBytes:    6 * 1024 * 1024,
-		Purpose:      filedomain.PurposeProviderProfilePhoto,
+		Purpose:      filedomain.PurposeProfilePhoto,
 	})
 
 	assert.ErrorIs(t, err, filedomain.ErrUnsupportedProfilePhoto)
@@ -379,7 +379,7 @@ func TestConfirmUploadMarksFileAsConfirmed(t *testing.T) {
 		OriginalName: "foto.png",
 		MimeType:     "image/png",
 		SizeBytes:    2048,
-		Purpose:      filedomain.PurposeProviderProfilePhoto,
+		Purpose:      filedomain.PurposeProfilePhoto,
 	})
 	require.NoError(t, err)
 
@@ -394,7 +394,7 @@ func TestConfirmUploadMarksFileAsConfirmed(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, upload.FileID, confirmed.FileID)
 	assert.Equal(t, "https://cdn/public/"+upload.Key, confirmed.URL)
-	assert.NoError(t, service.ValidateProviderProfilePhoto(context.Background(), "auth0|provider", upload.FileID))
+	assert.NoError(t, service.ValidateProfilePhoto(context.Background(), "auth0|provider", upload.FileID))
 }
 
 func TestConfirmUploadRejectsUnavailableFile(t *testing.T) {
@@ -421,7 +421,7 @@ func TestConfirmUploadRejectsMismatchedRequestData(t *testing.T) {
 		OriginalName: "foto.png",
 		MimeType:     "image/png",
 		SizeBytes:    2048,
-		Purpose:      filedomain.PurposeProviderProfilePhoto,
+		Purpose:      filedomain.PurposeProfilePhoto,
 	})
 	require.NoError(t, err)
 
@@ -445,7 +445,7 @@ func TestConfirmUploadRejectsMismatchedMetadataRequestData(t *testing.T) {
 		OriginalName: "foto.png",
 		MimeType:     "image/png",
 		SizeBytes:    2048,
-		Purpose:      filedomain.PurposeProviderProfilePhoto,
+		Purpose:      filedomain.PurposeProfilePhoto,
 	})
 	require.NoError(t, err)
 
@@ -469,7 +469,7 @@ func TestConfirmUploadRejectsUnreadableObjectMetadata(t *testing.T) {
 		OriginalName: "foto.png",
 		MimeType:     "image/png",
 		SizeBytes:    2048,
-		Purpose:      filedomain.PurposeProviderProfilePhoto,
+		Purpose:      filedomain.PurposeProfilePhoto,
 	})
 	require.NoError(t, err)
 	storage.readErr = errors.New("metadata unavailable")
@@ -494,7 +494,7 @@ func TestConfirmUploadRejectsMismatchedObjectMetadata(t *testing.T) {
 		OriginalName: "foto.png",
 		MimeType:     "image/png",
 		SizeBytes:    2048,
-		Purpose:      filedomain.PurposeProviderProfilePhoto,
+		Purpose:      filedomain.PurposeProfilePhoto,
 	})
 	require.NoError(t, err)
 	storage.metadataByObject["public/"+upload.Key] = filedomain.ObjectMetadata{MimeType: "image/jpeg", SizeBytes: 2048}
@@ -519,7 +519,7 @@ func TestConfirmUploadWrapsRepositorySaveError(t *testing.T) {
 		OriginalName: "foto.png",
 		MimeType:     "image/png",
 		SizeBytes:    2048,
-		Purpose:      filedomain.PurposeProviderProfilePhoto,
+		Purpose:      filedomain.PurposeProfilePhoto,
 	})
 	require.NoError(t, err)
 	expectedErr := errors.New("repository unavailable")
@@ -537,7 +537,7 @@ func TestConfirmUploadWrapsRepositorySaveError(t *testing.T) {
 	assert.ErrorContains(t, err, "confirming file upload")
 }
 
-func TestValidateProviderProfilePhotoRequiresConfirmedOwnerFile(t *testing.T) {
+func TestValidateProfilePhotoRequiresConfirmedOwnerFile(t *testing.T) {
 	repo := newFileRepositoryMock()
 	service := newFileService(repo, newStorageMock())
 	upload, err := service.RequestUpload(context.Background(), filedomain.PresignRequest{
@@ -545,15 +545,15 @@ func TestValidateProviderProfilePhotoRequiresConfirmedOwnerFile(t *testing.T) {
 		OriginalName: "foto.jpg",
 		MimeType:     "image/jpeg",
 		SizeBytes:    1024,
-		Purpose:      filedomain.PurposeProviderProfilePhoto,
+		Purpose:      filedomain.PurposeProfilePhoto,
 	})
 	require.NoError(t, err)
 
-	assert.ErrorIs(t, service.ValidateProviderProfilePhoto(context.Background(), "auth0|provider", ""), filedomain.ErrProfilePhotoRequired)
-	assert.ErrorIs(t, service.ValidateProviderProfilePhoto(context.Background(), "auth0|provider", upload.FileID), filedomain.ErrProfilePhotoNotAvailable)
+	assert.ErrorIs(t, service.ValidateProfilePhoto(context.Background(), "auth0|provider", ""), filedomain.ErrProfilePhotoNotAvailable)
+	assert.ErrorIs(t, service.ValidateProfilePhoto(context.Background(), "auth0|provider", upload.FileID), filedomain.ErrProfilePhotoNotAvailable)
 }
 
-func TestValidateProviderProfilePhotoRejectsWrongOwner(t *testing.T) {
+func TestValidateProfilePhotoRejectsWrongOwner(t *testing.T) {
 	repo := newFileRepositoryMock()
 	storage := newStorageMock()
 	service := newFileService(repo, storage)
@@ -562,7 +562,7 @@ func TestValidateProviderProfilePhotoRejectsWrongOwner(t *testing.T) {
 		OriginalName: "foto.jpg",
 		MimeType:     "image/jpeg",
 		SizeBytes:    1024,
-		Purpose:      filedomain.PurposeProviderProfilePhoto,
+		Purpose:      filedomain.PurposeProfilePhoto,
 	})
 	require.NoError(t, err)
 	_, err = service.ConfirmUpload(context.Background(), filedomain.ConfirmRequest{
@@ -574,15 +574,15 @@ func TestValidateProviderProfilePhotoRejectsWrongOwner(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	err = service.ValidateProviderProfilePhoto(context.Background(), "auth0|other", upload.FileID)
+	err = service.ValidateProfilePhoto(context.Background(), "auth0|other", upload.FileID)
 
 	assert.ErrorIs(t, err, filedomain.ErrProfilePhotoNotAvailable)
 }
 
-func TestValidateProviderProfilePhotoRejectsMissingFile(t *testing.T) {
+func TestValidateProfilePhotoRejectsMissingFile(t *testing.T) {
 	service := newFileService(newFileRepositoryMock(), newStorageMock())
 
-	err := service.ValidateProviderProfilePhoto(context.Background(), "auth0|provider", "missing")
+	err := service.ValidateProfilePhoto(context.Background(), "auth0|provider", "missing")
 
 	assert.ErrorIs(t, err, filedomain.ErrProfilePhotoNotAvailable)
 }
@@ -596,7 +596,7 @@ func TestResolvePublicURLReturnsConfirmedPublicFileURL(t *testing.T) {
 		OriginalName: "foto.jpg",
 		MimeType:     "image/jpeg",
 		SizeBytes:    1024,
-		Purpose:      filedomain.PurposeProviderProfilePhoto,
+		Purpose:      filedomain.PurposeProfilePhoto,
 	})
 	require.NoError(t, err)
 	_, err = service.ConfirmUpload(context.Background(), filedomain.ConfirmRequest{
@@ -632,7 +632,7 @@ func TestResolvePublicURLsReturnsConfirmedPublicFileURLsInBatch(t *testing.T) {
 		OriginalName: "foto.jpg",
 		MimeType:     "image/jpeg",
 		SizeBytes:    1024,
-		Purpose:      filedomain.PurposeProviderProfilePhoto,
+		Purpose:      filedomain.PurposeProfilePhoto,
 	})
 	require.NoError(t, err)
 	_, err = service.ConfirmUpload(context.Background(), filedomain.ConfirmRequest{
@@ -658,7 +658,7 @@ func TestResolvePublicURLsSkipsPendingFiles(t *testing.T) {
 		OriginalName: "foto.jpg",
 		MimeType:     "image/jpeg",
 		SizeBytes:    1024,
-		Purpose:      filedomain.PurposeProviderProfilePhoto,
+		Purpose:      filedomain.PurposeProfilePhoto,
 	})
 	require.NoError(t, err)
 

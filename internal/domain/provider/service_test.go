@@ -40,7 +40,7 @@ type profilePhotoValidatorMock struct {
 	resolveErr             error
 }
 
-func (m *profilePhotoValidatorMock) ValidateProviderProfilePhoto(_ context.Context, authID, fileID string) error {
+func (m *profilePhotoValidatorMock) ValidateProfilePhoto(_ context.Context, authID, fileID string) error {
 	m.validatedAuthID = authID
 	m.validatedFileID = fileID
 	return m.err

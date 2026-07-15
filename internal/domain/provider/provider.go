@@ -9,8 +9,7 @@ const Role = "provider"
 
 type Provider struct {
 	*user.BaseUser
-	Category           *category.Category
-	ProfilePhotoFileID string
+	Category *category.Category
 }
 
 func NewProvider(auth0ID string, email string, name string, surname string, providerCategory *category.Category, profilePhotoFileID string) (*Provider, error) {
@@ -18,15 +17,14 @@ func NewProvider(auth0ID string, email string, name string, surname string, prov
 		return nil, category.ErrDoesNotExist
 	}
 
-	providerUser, err := user.New(auth0ID, name, surname, email, Role)
+	providerUser, err := user.New(auth0ID, name, surname, email, Role, profilePhotoFileID)
 	if err != nil {
 		return nil, err
 	}
 
 	return &Provider{
-		BaseUser:           providerUser,
-		Category:           providerCategory,
-		ProfilePhotoFileID: profilePhotoFileID,
+		BaseUser: providerUser,
+		Category: providerCategory,
 	}, nil
 }
 

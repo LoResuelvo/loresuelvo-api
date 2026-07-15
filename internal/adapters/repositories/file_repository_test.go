@@ -41,11 +41,11 @@ func validFileEntity(t *testing.T) filedomain.File {
 	require.NoError(t, err)
 	file, err := filedomain.NewPendingFile(
 		"4af47f1b-97b6-4b32-baa0-b95d6077f919",
-		"files/2026/06/provider_profile_photo/4af47f1b-97b6-4b32-baa0-b95d6077f919.jpg",
+		"files/2026/06/profile_photo/4af47f1b-97b6-4b32-baa0-b95d6077f919.jpg",
 		"public-bucket",
 		*metadata,
 		filedomain.VisibilityPublic,
-		filedomain.PurposeProviderProfilePhoto,
+		filedomain.PurposeProfilePhoto,
 		"auth0|provider",
 		time.Date(2026, 6, 6, 0, 0, 0, 0, time.UTC),
 	)
