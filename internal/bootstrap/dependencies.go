@@ -137,7 +137,7 @@ func NewDependenciesWithChatbot(database *sql.DB, chatbot conversation.Chatbot) 
 		conversationRepository,
 		fileService,
 	)
-	userService := user.NewService(userRepository)
+	userService := user.NewService(userRepository, fileService)
 	servicePorposalService := serviceproposal.NewService(
 		serviceProposalRepository, workOrderRepository, userRepository, conversationRepository, notificationRepository, notificator, fileService, clockadapter)
 	workOrderService := workorder.NewService(

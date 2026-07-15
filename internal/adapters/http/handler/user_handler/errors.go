@@ -14,5 +14,5 @@ func handleGetCurrentUserError(c *gin.Context, err error) {
 		return
 	}
 
-	httphandler.RespondError(c, http.StatusBadRequest, err.Error())
+	httphandler.RespondError(c, http.StatusInternalServerError, err.Error())
 }

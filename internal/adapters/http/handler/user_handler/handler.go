@@ -22,11 +22,17 @@ func (h *UserHandler) GetCurrentUser(c *gin.Context) {
 		return
 	}
 
-	currentUser, err := h.userService.GetCurrentUser(auth0ID)
+	currentUser, err := h.userService.GetCurrentUser(c.Request.Context(), auth0ID)
 	if err != nil {
 		handleGetCurrentUserError(c, err)
 		return
 	}
 
-	c.JSON(http.StatusOK, currentUser)
+	response, err := currentUserResponseFromDomain(currentUser)
+	if err != nil {
+		handleGetCurrentUserError(c, err)
+		return
+	}
+
+	c.JSON(http.StatusOK, response)
 }

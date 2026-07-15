@@ -6,7 +6,6 @@ Feature: Obtener la información del usuario autenticado
 
   Rule: La respuesta contiene la información común de cualquier usuario
 
-    @wip
     Scenario: 01-ME Obtener el perfil completo de un consumidor sin foto
       Given que existe un consumidor registrado con correo "ana@example.com", nombre "Ana" y apellido "Pérez" sin foto de perfil
       And que estoy autenticado como consumidor "ana@example.com"
@@ -16,7 +15,6 @@ Feature: Obtener la información del usuario autenticado
       And el perfil informa el rol "consumer"
       And el perfil no incluye una foto de perfil
 
-    @wip
     Scenario: 02-ME Obtener el perfil completo de un consumidor con foto
       Given que cargué una foto de perfil válida para mi registro como consumidor
       And que existe un consumidor registrado con correo "ana@example.com", nombre "Ana" y apellido "Pérez" con la foto de perfil cargada
@@ -29,7 +27,6 @@ Feature: Obtener la información del usuario autenticado
 
   Rule: La respuesta contiene la información específica del prestador
 
-    @wip
     Scenario: 03-ME Obtener el perfil completo de un prestador
       Given que existe el rubro "Plomería"
       And que cargué una foto de perfil válida para mi registro como prestador
@@ -49,7 +46,6 @@ Feature: Obtener la información del usuario autenticado
       When consulto mi información de usuario autenticado
       Then el sistema deniega el acceso
 
-    @wip
     Scenario: 05-ME Informar que el usuario autenticado no está registrado
       Given que estoy autenticado con una identidad que no pertenece a un usuario registrado
       When consulto mi información de usuario autenticado

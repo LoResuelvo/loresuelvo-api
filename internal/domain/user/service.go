@@ -1,17 +1,35 @@
 package user
 
+import (
+	"context"
+	"fmt"
+)
+
 type Service struct {
-	repository Repository
+	repository              Repository
+	profilePhotoURLResolver ProfilePhotoURLResolver
 }
 
-func NewService(repository Repository) *Service {
-	return &Service{repository: repository}
+func NewService(repository Repository, profilePhotoURLResolver ProfilePhotoURLResolver) *Service {
+	return &Service{repository: repository, profilePhotoURLResolver: profilePhotoURLResolver}
 }
 
-func (s *Service) GetCurrentUser(authID string) (User, error) {
-	user, err := s.repository.FindByAuthID(authID)
+func (s *Service) GetCurrentUser(ctx context.Context, authID string) (User, error) {
+	currentUser, err := s.repository.FindByAuthID(authID)
 	if err != nil {
 		return nil, ErrNotFound
 	}
-	return user, nil
+
+	profilePhoto := currentUser.Base().ProfilePhoto
+	if profilePhoto == nil {
+		return currentUser, nil
+	}
+
+	profilePhotoURL, err := s.profilePhotoURLResolver.ResolvePublicURL(ctx, profilePhoto.FileID)
+	if err != nil {
+		return nil, fmt.Errorf("resolving current user profile photo URL: %w", err)
+	}
+	profilePhoto.URL = profilePhotoURL
+
+	return currentUser, nil
 }
