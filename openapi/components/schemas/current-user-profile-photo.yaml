@@ -1,0 +1,14 @@
+type: object
+description: Public profile photo information.
+required:
+- original_name
+- url
+properties:
+  original_name:
+    type: string
+    example: foto-perfil.jpg
+  url:
+    type: string
+    format: uri
+    example: https://cdn.example/profile/foto-perfil.jpg
+additionalProperties: false

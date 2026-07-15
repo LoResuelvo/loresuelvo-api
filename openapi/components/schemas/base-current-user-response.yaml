@@ -1,0 +1,30 @@
+type: object
+description: Information shared by every authenticated user profile.
+required:
+- id
+- name
+- surname
+- email
+- role
+properties:
+  id:
+    type: integer
+    format: int32
+    example: 10
+  name:
+    type: string
+    example: Ana
+  surname:
+    type: string
+    example: Pérez
+  email:
+    type: string
+    format: email
+    example: ana@example.com
+  role:
+    type: string
+    enum:
+    - consumer
+    - provider
+  profile_photo:
+    $ref: '#/components/schemas/CurrentUserProfilePhoto'

@@ -3,9 +3,9 @@ get:
   - Users
   operationId: getCurrentUser
   summary: Get the authenticated user
-  description: Returns the user associated with the Auth0 subject contained in the
-    Bearer JWT. The response property names currently match the exported Go struct
-    fields because the User struct has no json tags.
+  description: Returns the complete consumer or provider profile associated with the
+    Auth0 subject contained in the Bearer JWT. The role property discriminates the
+    concrete response schema.
   security:
   - BearerAuth: []
   responses:
@@ -14,24 +14,33 @@ get:
       content:
         application/json:
           schema:
-            $ref: '#/components/schemas/User'
+            $ref: '#/components/schemas/CurrentUserResponse'
           examples:
             consumer:
               summary: Consumer user
               value:
-                AuthID: auth0|login-consumer-test
-                Name: Consumer
-                Surname: Login
-                Email: login-consumer@example.com
-                Role: consumer
+                id: 10
+                name: Ana
+                surname: Pérez
+                email: ana@example.com
+                role: consumer
+                profile_photo:
+                  original_name: foto-perfil.jpg
+                  url: https://cdn.example/profile/foto-perfil.jpg
             provider:
               summary: Provider user
               value:
-                AuthID: auth0|login-provider-test
-                Name: Provider
-                Surname: Login
-                Email: login-provider@example.com
-                Role: provider
+                id: 20
+                name: Juan
+                surname: Gómez
+                email: juan@example.com
+                role: provider
+                profile_photo:
+                  original_name: foto-perfil.jpg
+                  url: https://cdn.example/profile/foto-perfil.jpg
+                category:
+                  id: 1
+                  name: Plomería
     '401':
       description: Authentication failed or the authenticated user id could not be
         obtained from the request context.
@@ -63,3 +72,10 @@ get:
             userNotFound:
               value:
                 error: User was not found
+    '500':
+      description: The user profile could not be prepared, for example because the
+        profile photo URL could not be resolved.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'

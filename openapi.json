@@ -2662,7 +2662,7 @@
                 ],
                 "operationId": "getCurrentUser",
                 "summary": "Get the authenticated user",
-                "description": "Returns the user associated with the Auth0 subject contained in the Bearer JWT. The response property names currently match the exported Go struct fields because the User struct has no json tags.",
+                "description": "Returns the complete consumer or provider profile associated with the Auth0 subject contained in the Bearer JWT. The role property discriminates the concrete response schema.",
                 "security": [
                     {
                         "BearerAuth": []
@@ -2674,27 +2674,39 @@
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/User"
+                                    "$ref": "#/components/schemas/CurrentUserResponse"
                                 },
                                 "examples": {
                                     "consumer": {
                                         "summary": "Consumer user",
                                         "value": {
-                                            "AuthID": "auth0|login-consumer-test",
-                                            "Name": "Consumer",
-                                            "Surname": "Login",
-                                            "Email": "login-consumer@example.com",
-                                            "Role": "consumer"
+                                            "id": 10,
+                                            "name": "Ana",
+                                            "surname": "Pérez",
+                                            "email": "ana@example.com",
+                                            "role": "consumer",
+                                            "profile_photo": {
+                                                "original_name": "foto-perfil.jpg",
+                                                "url": "https://cdn.example/profile/foto-perfil.jpg"
+                                            }
                                         }
                                     },
                                     "provider": {
                                         "summary": "Provider user",
                                         "value": {
-                                            "AuthID": "auth0|login-provider-test",
-                                            "Name": "Provider",
-                                            "Surname": "Login",
-                                            "Email": "login-provider@example.com",
-                                            "Role": "provider"
+                                            "id": 20,
+                                            "name": "Juan",
+                                            "surname": "Gómez",
+                                            "email": "juan@example.com",
+                                            "role": "provider",
+                                            "profile_photo": {
+                                                "original_name": "foto-perfil.jpg",
+                                                "url": "https://cdn.example/profile/foto-perfil.jpg"
+                                            },
+                                            "category": {
+                                                "id": 1,
+                                                "name": "Plomería"
+                                            }
                                         }
                                     }
                                 }
@@ -2745,6 +2757,16 @@
                                             "error": "User was not found"
                                         }
                                     }
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "The user profile could not be prepared, for example because the profile photo URL could not be resolved.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
                                 }
                             }
                         }
@@ -4202,43 +4224,129 @@
                 },
                 "additionalProperties": false
             },
-            "User": {
+            "CurrentUserResponse": {
+                "description": "Complete authenticated profile discriminated by role.",
+                "oneOf": [
+                    {
+                        "$ref": "#/components/schemas/ConsumerCurrentUserResponse"
+                    },
+                    {
+                        "$ref": "#/components/schemas/ProviderCurrentUserResponse"
+                    }
+                ],
+                "discriminator": {
+                    "propertyName": "role",
+                    "mapping": {
+                        "consumer": "#/components/schemas/ConsumerCurrentUserResponse",
+                        "provider": "#/components/schemas/ProviderCurrentUserResponse"
+                    }
+                }
+            },
+            "BaseCurrentUserResponse": {
                 "type": "object",
-                "description": "Authenticated user response. Field names are currently capitalized because they are serialized from exported Go struct fields without json tags.",
+                "description": "Information shared by every authenticated user profile.",
                 "required": [
-                    "AuthID",
-                    "Name",
-                    "Surname",
-                    "Email",
-                    "Role"
+                    "id",
+                    "name",
+                    "surname",
+                    "email",
+                    "role"
                 ],
                 "properties": {
-                    "AuthID": {
-                        "type": "string",
-                        "description": "Auth0 subject persisted for this user.",
-                        "example": "auth0|login-consumer-test"
+                    "id": {
+                        "type": "integer",
+                        "format": "int32",
+                        "example": 10
                     },
-                    "Name": {
+                    "name": {
                         "type": "string",
-                        "example": "Consumer"
+                        "example": "Ana"
                     },
-                    "Surname": {
+                    "surname": {
                         "type": "string",
-                        "example": "Login"
+                        "example": "Pérez"
                     },
-                    "Email": {
+                    "email": {
                         "type": "string",
                         "format": "email",
-                        "example": "login-consumer@example.com"
+                        "example": "ana@example.com"
                     },
-                    "Role": {
+                    "role": {
                         "type": "string",
-                        "description": "Persisted user role.",
                         "enum": [
                             "consumer",
                             "provider"
+                        ]
+                    },
+                    "profile_photo": {
+                        "$ref": "#/components/schemas/CurrentUserProfilePhoto"
+                    }
+                }
+            },
+            "ConsumerCurrentUserResponse": {
+                "description": "Complete authenticated Consumer profile.",
+                "allOf": [
+                    {
+                        "$ref": "#/components/schemas/BaseCurrentUserResponse"
+                    },
+                    {
+                        "type": "object",
+                        "required": [
+                            "role"
                         ],
-                        "example": "consumer"
+                        "properties": {
+                            "role": {
+                                "type": "string",
+                                "enum": [
+                                    "consumer"
+                                ]
+                            }
+                        }
+                    }
+                ]
+            },
+            "ProviderCurrentUserResponse": {
+                "description": "Complete authenticated Provider profile.",
+                "allOf": [
+                    {
+                        "$ref": "#/components/schemas/BaseCurrentUserResponse"
+                    },
+                    {
+                        "type": "object",
+                        "required": [
+                            "role",
+                            "category"
+                        ],
+                        "properties": {
+                            "role": {
+                                "type": "string",
+                                "enum": [
+                                    "provider"
+                                ]
+                            },
+                            "category": {
+                                "$ref": "#/components/schemas/CategoryListItem"
+                            }
+                        }
+                    }
+                ]
+            },
+            "CurrentUserProfilePhoto": {
+                "type": "object",
+                "description": "Public profile photo information.",
+                "required": [
+                    "original_name",
+                    "url"
+                ],
+                "properties": {
+                    "original_name": {
+                        "type": "string",
+                        "example": "foto-perfil.jpg"
+                    },
+                    "url": {
+                        "type": "string",
+                        "format": "uri",
+                        "example": "https://cdn.example/profile/foto-perfil.jpg"
                     }
                 },
                 "additionalProperties": false

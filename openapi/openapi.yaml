@@ -248,8 +248,16 @@ components:
       $ref: ./components/schemas/error-response.yaml
     AuthErrorResponse:
       $ref: ./components/schemas/auth-error-response.yaml
-    User:
-      $ref: ./components/schemas/user.yaml
+    CurrentUserResponse:
+      $ref: ./components/schemas/current-user-response.yaml
+    BaseCurrentUserResponse:
+      $ref: ./components/schemas/base-current-user-response.yaml
+    ConsumerCurrentUserResponse:
+      $ref: ./components/schemas/consumer-current-user-response.yaml
+    ProviderCurrentUserResponse:
+      $ref: ./components/schemas/provider-current-user-response.yaml
+    CurrentUserProfilePhoto:
+      $ref: ./components/schemas/current-user-profile-photo.yaml
     CreateCategoryRequest:
       $ref: ./components/schemas/create-category-request.yaml
     Category:

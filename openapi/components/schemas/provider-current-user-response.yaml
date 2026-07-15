@@ -1,0 +1,14 @@
+description: Complete authenticated Provider profile.
+allOf:
+- $ref: '#/components/schemas/BaseCurrentUserResponse'
+- type: object
+  required:
+  - role
+  - category
+  properties:
+    role:
+      type: string
+      enum:
+      - provider
+    category:
+      $ref: '#/components/schemas/CategoryListItem'
