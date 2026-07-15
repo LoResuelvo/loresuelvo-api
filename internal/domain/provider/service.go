@@ -7,7 +7,6 @@ import (
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/category"
 	filedomain "github.com/LoResuelvo/loresuelvo-api/internal/domain/file"
-	readmodel "github.com/LoResuelvo/loresuelvo-api/internal/domain/provider/read_model"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/validator"
 )
 
@@ -25,7 +24,7 @@ func NewService(repository UserRepository, categoryFinder CategoryFinder, fileSe
 	}
 }
 
-func (s *Service) RegisterProvider(ctx context.Context, authID, email, name, surname string, categoryID int, profilePhotoFileID string) (*readmodel.ProviderSummary, error) {
+func (s *Service) RegisterProvider(ctx context.Context, authID, email, name, surname string, categoryID int, profilePhotoFileID string) (*Provider, error) {
 	if s.userRepository.FindByEmail(email) {
 		return nil, validator.ErrEmailAlreadyRegistered
 	}
@@ -35,7 +34,7 @@ func (s *Service) RegisterProvider(ctx context.Context, authID, email, name, sur
 		return nil, err
 	}
 
-	provider, err := NewProvider(authID, email, name, surname, category, profilePhotoFileID)
+	provider, err := NewProvider(authID, email, name, surname, category, &filedomain.Image{FileID: profilePhotoFileID})
 	if err != nil {
 		return nil, err
 	}
@@ -48,22 +47,18 @@ func (s *Service) RegisterProvider(ctx context.Context, authID, email, name, sur
 	if err != nil {
 		return nil, fmt.Errorf("resolving provider profile photo url: %w", err)
 	}
+	provider.ProfilePhoto.URL = profilePhotoURL
 
 	savedUser, err := s.userRepository.Save(ctx, provider)
 	if err != nil {
 		return nil, err
 	}
 
-	return &readmodel.ProviderSummary{
-		ID:              savedUser.Base().ID,
-		Name:            provider.Name(),
-		Surname:         provider.Surname(),
-		CategoryName:    category.Name,
-		ProfilePhotoURL: profilePhotoURL,
-	}, nil
+	provider.ID = savedUser.Base().ID
+	return provider, nil
 }
 
-func (s *Service) FilterProvidersByCategoryID(ctx context.Context, categoryID int) ([]readmodel.ProviderSummary, error) {
+func (s *Service) FilterProvidersByCategoryID(ctx context.Context, categoryID int) ([]Provider, error) {
 	if _, err := s.validateCategory(categoryID); err != nil {
 		return nil, err
 	}
@@ -75,7 +70,7 @@ func (s *Service) FilterProvidersByCategoryID(ctx context.Context, categoryID in
 
 	profilePhotoFileIDs := make([]string, 0, len(providers))
 	for i := range providers {
-		profilePhotoFileIDs = append(profilePhotoFileIDs, providers[i].ProfilePhotoFileID)
+		profilePhotoFileIDs = append(profilePhotoFileIDs, providers[i].ProfilePhoto.FileID)
 	}
 
 	profilePhotoURLs, err := s.fileService.ResolvePublicURLs(ctx, profilePhotoFileIDs)
@@ -83,7 +78,7 @@ func (s *Service) FilterProvidersByCategoryID(ctx context.Context, categoryID in
 		return nil, fmt.Errorf("resolving provider profile photo urls: %w", err)
 	}
 
-	return SummariesWithProfilePhotoURLs(providers, profilePhotoURLs), nil
+	return WithProfilePhotoURLs(providers, profilePhotoURLs), nil
 }
 
 func (s *Service) validateCategory(categoryID int) (*category.Category, error) {

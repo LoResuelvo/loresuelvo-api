@@ -37,7 +37,7 @@ func jobRequestSummaryResponsesFromReadModel(jobRequests []readmodel.JobRequestS
 	return formattedJobRequests
 }
 
-func jobRequestImageResponsesFromDomain(images []filedomain.MessageImage) []messageImageResponse {
+func jobRequestImageResponsesFromDomain(images []filedomain.Image) []messageImageResponse {
 	response := make([]messageImageResponse, 0, len(images))
 	for _, image := range images {
 		response = append(response, messageImageResponse{

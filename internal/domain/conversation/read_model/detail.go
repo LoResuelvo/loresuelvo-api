@@ -4,7 +4,7 @@ import (
 	"time"
 
 	filedomain "github.com/LoResuelvo/loresuelvo-api/internal/domain/file"
-	providerreadmodel "github.com/LoResuelvo/loresuelvo-api/internal/domain/provider/read_model"
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/provider"
 )
 
 type ConversationDetail struct {
@@ -25,7 +25,7 @@ type ChatbotConversationDetail struct {
 	Title                string
 	ResponseStatus       string
 	Assessment           *ProblemAssessmentDetail
-	RecommendedProviders []providerreadmodel.ProviderSummary
+	RecommendedProviders []provider.Provider
 }
 
 type ProblemAssessmentDetail struct {

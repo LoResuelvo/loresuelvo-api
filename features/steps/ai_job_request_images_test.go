@@ -90,7 +90,7 @@ func (suite *testSuite) jobRequestContainsImages(firstName, secondName string) e
 	if err != nil {
 		return err
 	}
-	return suite.assertMessageImagesFromDomain(request.Images, []string{firstName, secondName})
+	return assertImageNames(request.Images, []string{firstName, secondName})
 }
 
 func (suite *testSuite) jobRequestContainsImage(imageName string) error {
@@ -98,7 +98,7 @@ func (suite *testSuite) jobRequestContainsImage(imageName string) error {
 	if err != nil {
 		return err
 	}
-	return suite.assertMessageImagesFromDomain(request.Images, []string{imageName})
+	return assertImageNames(request.Images, []string{imageName})
 }
 
 func (suite *testSuite) jobRequestDoesNotContainImage(imageName string) error {
@@ -212,11 +212,18 @@ func (suite *testSuite) currentAssessmentImages() ([]filedomain.MessageImage, er
 	return append([]filedomain.MessageImage(nil), chatbotConversation.CurrentAssessment.Images...), nil
 }
 
-func (suite *testSuite) assertMessageImagesFromDomain(images []filedomain.MessageImage, expectedNames []string) error {
-	return assertDomainImageNames(images, expectedNames)
+func assertDomainImageNames(images []filedomain.MessageImage, expectedNames []string) error {
+	actualNames := make([]string, 0, len(images))
+	for _, image := range images {
+		actualNames = append(actualNames, strings.TrimSpace(image.OriginalName))
+	}
+	if strings.Join(actualNames, "\x00") != strings.Join(expectedNames, "\x00") {
+		return fmt.Errorf("expected image names %v, got %v", expectedNames, actualNames)
+	}
+	return nil
 }
 
-func assertDomainImageNames(images []filedomain.MessageImage, expectedNames []string) error {
+func assertImageNames(images []filedomain.Image, expectedNames []string) error {
 	actualNames := make([]string, 0, len(images))
 	for _, image := range images {
 		actualNames = append(actualNames, strings.TrimSpace(image.OriginalName))

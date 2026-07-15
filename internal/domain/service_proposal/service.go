@@ -161,10 +161,10 @@ func serviceProposalSummaryFor(proposal *ServiceProposal, viewerRole string) (re
 		summary.Counterpart = readmodel.Counterpart{
 			ID:                 proposal.Provider.ID,
 			Role:               provider.Role,
-			Name:               proposal.Provider.Base().Name,
-			Surname:            proposal.Provider.Base().Surname,
-			CategoryName:       proposal.Provider.Category.Name,
-			ProfilePhotoFileID: proposal.Provider.ProfilePhotoFileID,
+			Name:               proposal.Provider.Name(),
+			Surname:            proposal.Provider.Surname(),
+			CategoryName:       proposal.Provider.Categoryname(),
+			ProfilePhotoFileID: proposal.Provider.ProfilePhotoFileID(),
 		}
 	case provider.Role:
 		if proposal.Consumer == nil {
@@ -173,8 +173,8 @@ func serviceProposalSummaryFor(proposal *ServiceProposal, viewerRole string) (re
 		summary.Counterpart = readmodel.Counterpart{
 			ID:      proposal.Consumer.ID,
 			Role:    consumer.Role,
-			Name:    proposal.Consumer.Base().Name,
-			Surname: proposal.Consumer.Base().Surname,
+			Name:    proposal.Consumer.Name(),
+			Surname: proposal.Consumer.Surname(),
 		}
 	default:
 		return readmodel.ServiceProposalSummary{}, fmt.Errorf("mapping service proposal summary: unsupported viewer role %q", viewerRole)

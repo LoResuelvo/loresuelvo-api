@@ -8,6 +8,7 @@ import (
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/category"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/consumer"
+	filedomain "github.com/LoResuelvo/loresuelvo-api/internal/domain/file"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/provider"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/user"
 )
@@ -18,11 +19,12 @@ type UserRepository struct {
 
 const userWithProfileSelectSQL = `SELECT u.id, u.auth_id, u.email, u.name, u.surname, u.role,
 	c.user_id, p.user_id, cat.id, cat.name, cat.normalized_name,
-	COALESCE(u.profile_photo_file_id::text, '')
+	COALESCE(u.profile_photo_file_id::text, ''), COALESCE(profile_photo.original_name, '')
 	FROM users u
 	LEFT JOIN consumers c ON c.user_id = u.id
 	LEFT JOIN providers p ON p.user_id = u.id
-	LEFT JOIN categories cat ON cat.id = p.category_id`
+	LEFT JOIN categories cat ON cat.id = p.category_id
+	LEFT JOIN files profile_photo ON profile_photo.id = u.profile_photo_file_id`
 
 func NewUserRepository(db *sql.DB) *UserRepository {
 	return &UserRepository{
@@ -85,7 +87,7 @@ func saveBaseUser(ctx context.Context, queryRower userQueryRower, userToSave *us
 		userToSave.Name,
 		userToSave.Surname,
 		userToSave.Role,
-		sql.NullString{String: userToSave.ProfilePhotoFileID, Valid: userToSave.ProfilePhotoFileID != ""},
+		nullableImageFileID(userToSave.ProfilePhoto),
 	).Scan(&userID)
 	if err != nil {
 		return 0, fmt.Errorf("saving user: %w", err)
@@ -130,13 +132,16 @@ func scanUserWithProfile(row rowScanner, lookup string) (user.User, error) {
 	var base user.BaseUser
 	var consumerID, providerID, categoryID sql.NullInt64
 	var categoryName, normalizedCategoryName sql.NullString
+	var profilePhotoFileID, profilePhotoOriginalName string
 	err := row.Scan(
 		&base.ID, &base.AuthID, &base.Email, &base.Name, &base.Surname, &base.Role,
-		&consumerID, &providerID, &categoryID, &categoryName, &normalizedCategoryName, &base.ProfilePhotoFileID,
+		&consumerID, &providerID, &categoryID, &categoryName, &normalizedCategoryName,
+		&profilePhotoFileID, &profilePhotoOriginalName,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("finding user by %s: %w", lookup, err)
 	}
+	base.ProfilePhoto = imageFromPersistence(profilePhotoFileID, profilePhotoOriginalName)
 	switch base.Role {
 	case consumer.Role:
 		if !consumerID.Valid {
@@ -194,6 +199,7 @@ func (repository *UserRepository) FindIDByEmail(email string) (int, error) {
 func (repository *UserRepository) FindConsumerByID(consumerID int) (*consumer.Consumer, error) {
 	var foundConsumer consumer.Consumer
 	var consumerUser user.BaseUser
+	var profilePhotoFileID, profilePhotoOriginalName string
 	err := repository.db.QueryRow(
 		`SELECT consumers.user_id,
 			users.auth_id,
@@ -201,9 +207,11 @@ func (repository *UserRepository) FindConsumerByID(consumerID int) (*consumer.Co
 			users.name,
 			users.surname,
 			users.role,
-			COALESCE(users.profile_photo_file_id::text, '')
+			COALESCE(users.profile_photo_file_id::text, ''),
+			COALESCE(profile_photo.original_name, '')
 		FROM consumers
 		INNER JOIN users ON users.id = consumers.user_id
+		LEFT JOIN files profile_photo ON profile_photo.id = users.profile_photo_file_id
 		WHERE consumers.user_id = $1`,
 		consumerID,
 	).Scan(
@@ -213,13 +221,15 @@ func (repository *UserRepository) FindConsumerByID(consumerID int) (*consumer.Co
 		&consumerUser.Name,
 		&consumerUser.Surname,
 		&consumerUser.Role,
-		&consumerUser.ProfilePhotoFileID,
+		&profilePhotoFileID,
+		&profilePhotoOriginalName,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("finding consumer by id: %w", err)
 	}
 
 	foundConsumer.BaseUser = &consumerUser
+	foundConsumer.ProfilePhoto = imageFromPersistence(profilePhotoFileID, profilePhotoOriginalName)
 	return &foundConsumer, nil
 }
 
@@ -298,10 +308,12 @@ const providerSelectSQL = `SELECT providers.user_id,
 	categories.id,
 	categories.name,
 	categories.normalized_name,
-	COALESCE(users.profile_photo_file_id::text, '')
+	COALESCE(users.profile_photo_file_id::text, ''),
+	COALESCE(profile_photo.original_name, '')
 FROM providers
 INNER JOIN users ON users.id = providers.user_id
-INNER JOIN categories ON categories.id = providers.category_id`
+INNER JOIN categories ON categories.id = providers.category_id
+LEFT JOIN files profile_photo ON profile_photo.id = users.profile_photo_file_id`
 
 type providerScanner interface {
 	Scan(dest ...any) error
@@ -311,6 +323,7 @@ func scanProvider(scanner providerScanner) (*provider.Provider, error) {
 	var foundProvider provider.Provider
 	var providerCategory category.Category
 	var providerUser user.BaseUser
+	var profilePhotoFileID, profilePhotoOriginalName string
 	if err := scanner.Scan(
 		&providerUser.ID,
 		&providerUser.AuthID,
@@ -321,13 +334,29 @@ func scanProvider(scanner providerScanner) (*provider.Provider, error) {
 		&providerCategory.ID,
 		&providerCategory.Name,
 		&providerCategory.NormalizedName,
-		&providerUser.ProfilePhotoFileID,
+		&profilePhotoFileID,
+		&profilePhotoOriginalName,
 	); err != nil {
 		return nil, err
 	}
 	foundProvider.BaseUser = &providerUser
+	foundProvider.ProfilePhoto = imageFromPersistence(profilePhotoFileID, profilePhotoOriginalName)
 	foundProvider.Category = &providerCategory
 	return &foundProvider, nil
+}
+
+func imageFromPersistence(fileID, originalName string) *filedomain.Image {
+	if fileID == "" {
+		return nil
+	}
+	return &filedomain.Image{FileID: fileID, OriginalName: originalName}
+}
+
+func nullableImageFileID(image *filedomain.Image) sql.NullString {
+	if image == nil {
+		return sql.NullString{}
+	}
+	return sql.NullString{String: image.FileID, Valid: true}
 }
 
 func (repository *UserRepository) DeleteAll() error {

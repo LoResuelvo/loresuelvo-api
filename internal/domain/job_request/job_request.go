@@ -36,7 +36,7 @@ func NewFromAssessment(consumerID, providerID int, assessment conversation.Probl
 	if !assessment.RequiresProfessional() {
 		return nil, ErrAssessmentNotContactable
 	}
-	jobRequest, err := New(consumerID, providerID, assessment.ProblemTitle, assessment.ProblemDescription, assessment.Images)
+	jobRequest, err := New(consumerID, providerID, assessment.ProblemTitle, assessment.ProblemDescription, images(assessment.Images))
 	if err != nil {
 		return nil, err
 	}
@@ -46,6 +46,18 @@ func NewFromAssessment(consumerID, providerID int, assessment conversation.Probl
 	}
 	jobRequest.SourceAssessmentID = &assessmentID
 	return jobRequest, nil
+}
+
+func images(images []filedomain.MessageImage) []filedomain.Image {
+	result := make([]filedomain.Image, 0, len(images))
+	for _, image := range images {
+		result = append(result, filedomain.Image{
+			FileID:       image.FileID,
+			OriginalName: image.OriginalName,
+			URL:          image.URL,
+		})
+	}
+	return result
 }
 
 func New(consumerID, providerID int, title, description string, images []filedomain.Image) (*JobRequest, error) {

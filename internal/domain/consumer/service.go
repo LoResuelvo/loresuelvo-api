@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 
-	readmodel "github.com/LoResuelvo/loresuelvo-api/internal/domain/consumer/read_model"
 	filedomain "github.com/LoResuelvo/loresuelvo-api/internal/domain/file"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/validator"
 )
@@ -22,12 +21,16 @@ func NewService(userRepository UserRepository, fileService FileService) *Service
 	}
 }
 
-func (cm *Service) RegisterConsumer(ctx context.Context, auth0ID, email, name, surname, profilePhotoFileID string) (*readmodel.ConsumerSummary, error) {
+func (cm *Service) RegisterConsumer(ctx context.Context, auth0ID, email, name, surname, profilePhotoFileID string) (*Consumer, error) {
 	if cm.userRepository.FindByEmail(email) {
 		return nil, validator.ErrEmailAlreadyRegistered
 	}
 
-	consumer, err := NewConsumer(auth0ID, email, name, surname, profilePhotoFileID)
+	var profilePhoto *filedomain.Image
+	if profilePhotoFileID != "" {
+		profilePhoto = &filedomain.Image{FileID: profilePhotoFileID}
+	}
+	consumer, err := NewConsumer(auth0ID, email, name, surname, profilePhoto)
 	if err != nil {
 		return nil, err
 	}
@@ -47,6 +50,7 @@ func (cm *Service) RegisterConsumer(ctx context.Context, auth0ID, email, name, s
 		if err != nil {
 			return nil, fmt.Errorf("resolving consumer profile photo url: %w", err)
 		}
+		consumer.ProfilePhoto.URL = profilePhotoURL
 	}
 
 	savedUser, err := cm.userRepository.Save(ctx, consumer)
@@ -54,10 +58,6 @@ func (cm *Service) RegisterConsumer(ctx context.Context, auth0ID, email, name, s
 		return nil, err
 	}
 
-	return &readmodel.ConsumerSummary{
-		ID:              savedUser.Base().ID,
-		Name:            consumer.Name,
-		Surname:         consumer.Surname,
-		ProfilePhotoURL: profilePhotoURL,
-	}, nil
+	consumer.ID = savedUser.Base().ID
+	return consumer, nil
 }

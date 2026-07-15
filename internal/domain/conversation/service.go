@@ -11,7 +11,6 @@ import (
 	readmodel "github.com/LoResuelvo/loresuelvo-api/internal/domain/conversation/read_model"
 	filedomain "github.com/LoResuelvo/loresuelvo-api/internal/domain/file"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/provider"
-	providerreadmodel "github.com/LoResuelvo/loresuelvo-api/internal/domain/provider/read_model"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/user"
 )
 
@@ -275,7 +274,7 @@ func (s *Service) ContinueChatbotConversation(ctx context.Context, authID string
 	return chatbotTurnResult(savedConversation, answer), nil
 }
 
-func (s *Service) recommendationForCurrentAssessment(ctx context.Context, chatbotConversation *ChatBotConversation) (*category.Category, []providerreadmodel.ProviderSummary, error) {
+func (s *Service) recommendationForCurrentAssessment(ctx context.Context, chatbotConversation *ChatBotConversation) (*category.Category, []provider.Provider, error) {
 	assessment := chatbotConversation.CurrentAssessment
 	if assessment == nil || assessment.ProblemCategoryID == nil {
 		return nil, nil, nil
@@ -298,7 +297,7 @@ func (s *Service) recommendationForCurrentAssessment(ctx context.Context, chatbo
 	if err != nil {
 		return nil, nil, err
 	}
-	summaries, err := s.providerSummariesWithProfilePhotoURLs(ctx, providers)
+	summaries, err := s.providersWithProfilePhotoURLs(ctx, providers)
 	return matched, summaries, err
 }
 
@@ -689,7 +688,7 @@ func (s *Service) withCounterpartProfilePhotoURL(ctx context.Context, detail *re
 }
 
 // TODO: Let the chatbot rank providers using richer provider attributes when recommendation criteria evolve.
-func (s *Service) assessmentResult(ctx context.Context, chatbotResponse ChatbotResponse, availableCategories []category.Category) (*category.Category, []providerreadmodel.ProviderSummary, error) {
+func (s *Service) assessmentResult(ctx context.Context, chatbotResponse ChatbotResponse, availableCategories []category.Category) (*category.Category, []provider.Provider, error) {
 	if chatbotResponse.Assessment.Action == ChatbotAssessmentUnchanged {
 		return nil, nil, nil
 	}
@@ -710,7 +709,7 @@ func (s *Service) assessmentResult(ctx context.Context, chatbotResponse ChatbotR
 		return nil, nil, err
 	}
 
-	summaries, err := s.providerSummariesWithProfilePhotoURLs(ctx, providers)
+	summaries, err := s.providersWithProfilePhotoURLs(ctx, providers)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -742,7 +741,7 @@ func (s *Service) withRecommendedProviders(ctx context.Context, detail *readmode
 		return nil, err
 	}
 
-	detail.Chatbot.RecommendedProviders, err = s.providerSummariesWithProfilePhotoURLs(ctx, providers)
+	detail.Chatbot.RecommendedProviders, err = s.providersWithProfilePhotoURLs(ctx, providers)
 	if err != nil {
 		return nil, err
 	}
@@ -750,10 +749,10 @@ func (s *Service) withRecommendedProviders(ctx context.Context, detail *readmode
 	return detail, nil
 }
 
-func (s *Service) providerSummariesWithProfilePhotoURLs(ctx context.Context, providers []provider.Provider) ([]providerreadmodel.ProviderSummary, error) {
+func (s *Service) providersWithProfilePhotoURLs(ctx context.Context, providers []provider.Provider) ([]provider.Provider, error) {
 	profilePhotoFileIDs := make([]string, 0, len(providers))
 	for i := range providers {
-		profilePhotoFileIDs = append(profilePhotoFileIDs, providers[i].ProfilePhotoFileID)
+		profilePhotoFileIDs = append(profilePhotoFileIDs, providers[i].ProfilePhoto.FileID)
 	}
 
 	profilePhotoURLs, err := s.fileService.ResolvePublicURLs(ctx, profilePhotoFileIDs)
@@ -761,7 +760,7 @@ func (s *Service) providerSummariesWithProfilePhotoURLs(ctx context.Context, pro
 		return nil, fmt.Errorf("resolving chatbot recommended provider profile photo urls: %w", err)
 	}
 
-	return provider.SummariesWithProfilePhotoURLs(providers, profilePhotoURLs), nil
+	return provider.WithProfilePhotoURLs(providers, profilePhotoURLs), nil
 }
 
 func (s *Service) availableCategoriesForChatbot() ([]category.Category, error) {

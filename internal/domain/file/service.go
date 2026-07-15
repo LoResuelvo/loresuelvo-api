@@ -161,7 +161,7 @@ func (s *Service) ValidateMessageImages(ctx context.Context, authID string, file
 	}
 	result := make([]MessageImage, 0, len(files))
 	for _, file := range files {
-		result = append(result, MessageImage{FileID: file.ID, OriginalName: file.OriginalName()})
+		result = append(result, MessageImage{Image: Image{FileID: file.ID, OriginalName: file.OriginalName()}})
 	}
 	return result, nil
 }
@@ -324,13 +324,17 @@ func (s *Service) ResolveMessageImages(ctx context.Context, fileIDs []string) (m
 		if err != nil {
 			return nil, err
 		}
-		result[file.ID] = resolved
+		result[file.ID] = MessageImage{Image: resolved}
 	}
 	return result, nil
 }
 
 func (s *Service) resolveMessageImage(ctx context.Context, file File) (MessageImage, error) {
-	return s.resolveImage(ctx, file)
+	resolved, err := s.resolveImage(ctx, file)
+	if err != nil {
+		return MessageImage{}, err
+	}
+	return MessageImage{Image: resolved}, nil
 }
 
 func (s *Service) ResolveJobRequestImages(ctx context.Context, images []Image) ([]Image, error) {

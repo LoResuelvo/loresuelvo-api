@@ -137,14 +137,14 @@ func TestRegisterProviderWithValidData(t *testing.T) {
 	assert.Equal(t, "Plomería", repository.savedProvider.Category.Name)
 	require.NotNil(t, createdProvider)
 	assert.Equal(t, 1, createdProvider.ID)
-	assert.Equal(t, "Ana", createdProvider.Name)
-	assert.Equal(t, "Perez", createdProvider.Surname)
-	assert.Equal(t, "Plomería", createdProvider.CategoryName)
-	assert.Equal(t, "https://cdn/profile-photo.jpg", createdProvider.ProfilePhotoURL)
+	assert.Equal(t, "Ana", createdProvider.Name())
+	assert.Equal(t, "Perez", createdProvider.Surname())
+	assert.Equal(t, "Plomería", createdProvider.Category.Name)
+	assert.Equal(t, "https://cdn/profile-photo.jpg", createdProvider.ProfilePhoto.URL)
 }
 
 func TestNewProviderRequiresCategory(t *testing.T) {
-	createdProvider, err := provider.NewProvider("auth0|ana", "ana@example.com", "Ana", "Perez", nil, "profile-photo-file-id")
+	createdProvider, err := provider.NewProvider("auth0|ana", "ana@example.com", "Ana", "Perez", nil, &filedomain.Image{FileID: "profile-photo-file-id"})
 
 	assert.Nil(t, createdProvider)
 	assert.ErrorIs(t, err, category.ErrDoesNotExist)
@@ -152,7 +152,7 @@ func TestNewProviderRequiresCategory(t *testing.T) {
 
 func TestNewProviderExposesUserFieldsThroughAccessors(t *testing.T) {
 	providerCategory := existingCategory()
-	createdProvider, err := provider.NewProvider("auth0|ana", "ana@example.com", "Ana", "Perez", &providerCategory, "profile-photo-file-id")
+	createdProvider, err := provider.NewProvider("auth0|ana", "ana@example.com", "Ana", "Perez", &providerCategory, &filedomain.Image{FileID: "profile-photo-file-id"})
 
 	require.NoError(t, err)
 	assert.Equal(t, "auth0|ana", createdProvider.AuthID())
@@ -343,7 +343,7 @@ func TestRegisterProviderWithWrongCategoryID(t *testing.T) {
 
 func TestFilterProvidersByCategoryID(t *testing.T) {
 	providerCategory := existingCategory()
-	providerToReturn, err := provider.NewProvider("auth0|ana", "ana@example.com", "Ana", "Perez", &providerCategory, "profile-photo-file-id")
+	providerToReturn, err := provider.NewProvider("auth0|ana", "ana@example.com", "Ana", "Perez", &providerCategory, &filedomain.Image{FileID: "profile-photo-file-id"})
 	require.NoError(t, err)
 	providerToReturn.ID = 1
 	repository := &providerRepositoryMock{
@@ -360,10 +360,10 @@ func TestFilterProvidersByCategoryID(t *testing.T) {
 	require.NoError(t, err)
 	assert.Len(t, providers, 1)
 	assert.Equal(t, 1, providers[0].ID)
-	assert.Equal(t, "Ana", providers[0].Name)
-	assert.Equal(t, "Perez", providers[0].Surname)
-	assert.Equal(t, "Plomería", providers[0].CategoryName)
-	assert.Equal(t, "https://cdn/profile-photo.jpg", providers[0].ProfilePhotoURL)
+	assert.Equal(t, "Ana", providers[0].Name())
+	assert.Equal(t, "Perez", providers[0].Surname())
+	assert.Equal(t, "Plomería", providers[0].Category.Name)
+	assert.Equal(t, "https://cdn/profile-photo.jpg", providers[0].ProfilePhoto.URL)
 	assert.Equal(t, []string{"profile-photo-file-id"}, profilePhotoValidator.resolvedFileIDs)
 	assert.True(t, repository.findByCategoryIDCalled, "providers should be searched by category id")
 	assert.Equal(t, providerCategory.ID, repository.requestedCategoryID)
@@ -407,7 +407,7 @@ func TestFilterProvidersByCategoryIDReturnsRepositoryError(t *testing.T) {
 func TestFilterProvidersByCategoryIDWrapsProfilePhotoURLResolutionError(t *testing.T) {
 	expectedErr := errors.New("resolve urls")
 	providerCategory := existingCategory()
-	providerToReturn, err := provider.NewProvider("auth0|ana", "ana@example.com", "Ana", "Perez", &providerCategory, "profile-photo-file-id")
+	providerToReturn, err := provider.NewProvider("auth0|ana", "ana@example.com", "Ana", "Perez", &providerCategory, &filedomain.Image{FileID: "profile-photo-file-id"})
 	require.NoError(t, err)
 	repository := &providerRepositoryMock{
 		providersByCategoryID: map[int][]provider.Provider{

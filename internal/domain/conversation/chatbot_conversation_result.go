@@ -2,7 +2,7 @@ package conversation
 
 import (
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/category"
-	providerreadmodel "github.com/LoResuelvo/loresuelvo-api/internal/domain/provider/read_model"
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/provider"
 )
 
 type ChatbotConversationTurnResult struct {
@@ -10,7 +10,7 @@ type ChatbotConversationTurnResult struct {
 	ResponseStatus       ChatbotResponseStatus
 	Assessment           *ProblemAssessment
 	ProblemCategory      *category.Category
-	RecommendedProviders []providerreadmodel.ProviderSummary
+	RecommendedProviders []provider.Provider
 }
 
 type ChatbotConversationResult = ChatbotConversationTurnResult

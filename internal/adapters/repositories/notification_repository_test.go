@@ -52,7 +52,7 @@ func cleanNotificationRepositoryTestDatabase(t *testing.T, database *sql.DB) {
 
 func TestNotificationRepositoryCanSave(t *testing.T) {
 	testContext := newNotificationRepositoryTest(t)
-	consumerToSave, err := consumer.NewConsumer("auth0|notification-consumer", "notification.consumer@example.com", "Ana", "Perez", "")
+	consumerToSave, err := consumer.NewConsumer("auth0|notification-consumer", "notification.consumer@example.com", "Ana", "Perez", nil)
 	require.NoError(t, err)
 	_, err = testContext.userRepository.Save(context.Background(), consumerToSave)
 	require.NoError(t, err)

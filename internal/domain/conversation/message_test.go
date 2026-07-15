@@ -54,7 +54,7 @@ func TestNewProviderMessageRejectsEmptyContent(t *testing.T) {
 }
 
 func TestNewConsumerMessageWithImagesAllowsEmptyText(t *testing.T) {
-	message, err := conversation.NewConsumerMessage("   ", filedomain.MessageImage{FileID: "file-id", OriginalName: "problem.jpg"})
+	message, err := conversation.NewConsumerMessage("   ", filedomain.MessageImage{Image: filedomain.Image{FileID: "file-id", OriginalName: "problem.jpg"}})
 
 	require.NoError(t, err)
 	assert.Empty(t, message.Content)
@@ -63,7 +63,7 @@ func TestNewConsumerMessageWithImagesAllowsEmptyText(t *testing.T) {
 }
 
 func TestNewConsumerMessageWithImagesRejectsDuplicateFiles(t *testing.T) {
-	message, err := conversation.NewConsumerMessage("Problem", filedomain.MessageImage{FileID: "file-id"}, filedomain.MessageImage{FileID: "file-id"})
+	message, err := conversation.NewConsumerMessage("Problem", filedomain.MessageImage{Image: filedomain.Image{FileID: "file-id"}}, filedomain.MessageImage{Image: filedomain.Image{FileID: "file-id"}})
 
 	assert.Nil(t, message)
 	assert.ErrorIs(t, err, conversation.ErrMessageImageNotAvailable)

@@ -4,7 +4,7 @@ import (
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/conversation"
 	readmodel "github.com/LoResuelvo/loresuelvo-api/internal/domain/conversation/read_model"
 	filedomain "github.com/LoResuelvo/loresuelvo-api/internal/domain/file"
-	providerreadmodel "github.com/LoResuelvo/loresuelvo-api/internal/domain/provider/read_model"
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/provider"
 )
 
 func sentMessageResponseFromDomain(message conversation.Message) sentMessageResponse {
@@ -145,17 +145,21 @@ func assessmentResponse(present bool, outcome string, category *problemCategoryR
 	return &problemAssessmentResponse{Outcome: outcome, ProblemCategory: category}
 }
 
-func providerSummaryResponseFromDomain(provider providerreadmodel.ProviderSummary) providerSummaryResponse {
+func providerSummaryResponseFromDomain(provider provider.Provider) providerSummaryResponse {
+	profilePhotoURL := ""
+	if provider.ProfilePhoto != nil {
+		profilePhotoURL = provider.ProfilePhoto.URL
+	}
 	return providerSummaryResponse{
 		ID:              provider.ID,
-		Name:            provider.Name,
-		Surname:         provider.Surname,
-		CategoryName:    provider.CategoryName,
-		ProfilePhotoURL: provider.ProfilePhotoURL,
+		Name:            provider.Name(),
+		Surname:         provider.Surname(),
+		CategoryName:    provider.Categoryname(),
+		ProfilePhotoURL: profilePhotoURL,
 	}
 }
 
-func providerSummaryResponsesFromDomain(providers []providerreadmodel.ProviderSummary) []providerSummaryResponse {
+func providerSummaryResponsesFromDomain(providers []provider.Provider) []providerSummaryResponse {
 	response := make([]providerSummaryResponse, 0, len(providers))
 	for _, foundProvider := range providers {
 		response = append(response, providerSummaryResponseFromDomain(foundProvider))

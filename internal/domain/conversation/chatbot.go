@@ -6,7 +6,7 @@ import (
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/category"
 	filedomain "github.com/LoResuelvo/loresuelvo-api/internal/domain/file"
-	providerreadmodel "github.com/LoResuelvo/loresuelvo-api/internal/domain/provider/read_model"
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/provider"
 )
 
 type Chatbot interface {
@@ -66,7 +66,7 @@ type chatbotAnswer struct {
 	response             *ChatbotResponse
 	message              *Message
 	problemCategory      *category.Category
-	recommendedProviders []providerreadmodel.ProviderSummary
+	recommendedProviders []provider.Provider
 }
 
 func ParseChatbotAssessmentAction(value string) (ChatbotAssessmentAction, error) {

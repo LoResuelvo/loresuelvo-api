@@ -1,6 +1,9 @@
 package consumer
 
-import "github.com/LoResuelvo/loresuelvo-api/internal/domain/user"
+import (
+	filedomain "github.com/LoResuelvo/loresuelvo-api/internal/domain/file"
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/user"
+)
 
 const Role = "consumer"
 
@@ -8,12 +11,20 @@ type Consumer struct {
 	*user.BaseUser
 }
 
-func NewConsumer(auth0ID, email, name, surname, profilePhotoFileID string) (*Consumer, error) {
-	baseUser, err := user.New(auth0ID, name, surname, email, Role, profilePhotoFileID)
+func NewConsumer(auth0ID, email, name, surname string, profilePhoto *filedomain.Image) (*Consumer, error) {
+	baseUser, err := user.New(auth0ID, name, surname, email, Role, profilePhoto)
 	if err != nil {
 		return nil, err
 	}
 	return &Consumer{
 		BaseUser: baseUser,
 	}, nil
+}
+
+func (p Consumer) Name() string {
+	return p.BaseUser.Name
+}
+
+func (p Consumer) Surname() string {
+	return p.BaseUser.Surname
 }

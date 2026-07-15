@@ -76,7 +76,7 @@ func validProviderWithData(t *testing.T, categoryRepository *repositories.Catego
 
 	savedCategory := savedCategoryForProvider(t, categoryRepository, categoryName)
 	profilePhotoFileID := savedProviderProfilePhotoFileID(t, database, authID)
-	provider, err := provider.NewProvider(authID, email, name, surname, savedCategory, profilePhotoFileID)
+	provider, err := provider.NewProvider(authID, email, name, surname, savedCategory, &filedomain.Image{FileID: profilePhotoFileID})
 	require.NoError(t, err, "could not prepare provider")
 	return provider
 }
@@ -230,14 +230,15 @@ func TestProviderRepositoryCanFindProvidersByCategoryID(t *testing.T) {
 	require.NotNil(t, providers[0].Category)
 	assert.Equal(t, plumbingProvider.Category.ID, providers[0].Category.ID)
 	assert.Equal(t, "Plomería", providers[0].Category.Name)
-	assert.Equal(t, plumbingProvider.ProfilePhotoFileID, providers[0].ProfilePhotoFileID)
+	assert.Equal(t, plumbingProvider.ProfilePhoto.FileID, providers[0].ProfilePhoto.FileID)
+	assert.Equal(t, "foto.jpg", providers[0].ProfilePhoto.OriginalName)
 	assert.NotZero(t, providers[1].ID)
 	assert.Equal(t, "Pedro", providers[1].Name())
 	assert.Equal(t, "Dib", providers[1].Surname())
 	require.NotNil(t, providers[1].Category)
 	assert.Equal(t, anotherPlumbingProvider.Category.ID, providers[1].Category.ID)
 	assert.Equal(t, "Plomería", providers[1].Category.Name)
-	assert.Equal(t, anotherPlumbingProvider.ProfilePhotoFileID, providers[1].ProfilePhotoFileID)
+	assert.Equal(t, anotherPlumbingProvider.ProfilePhoto.FileID, providers[1].ProfilePhoto.FileID)
 }
 
 func TestProviderRepositoryFindByCategoryIDReturnsEmptyListIfNoProvidersExistForCategory(t *testing.T) {
@@ -285,7 +286,8 @@ func TestProviderRepositoryCanFindByAuthID(t *testing.T) {
 	require.NotNil(t, foundProvider.Category)
 	assert.Equal(t, providerToSave.Category.ID, foundProvider.Category.ID)
 	assert.Equal(t, providerToSave.Category.Name, foundProvider.Category.Name)
-	assert.Equal(t, providerToSave.ProfilePhotoFileID, foundProvider.ProfilePhotoFileID)
+	assert.Equal(t, providerToSave.ProfilePhoto.FileID, foundProvider.ProfilePhoto.FileID)
+	assert.Equal(t, "foto.jpg", foundProvider.ProfilePhoto.OriginalName)
 }
 
 func TestProviderRepositoryCanFindByID(t *testing.T) {

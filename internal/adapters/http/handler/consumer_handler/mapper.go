@@ -1,8 +1,10 @@
 package consumer_handler
 
-import "strings"
+import (
+	"strings"
 
-import readmodel "github.com/LoResuelvo/loresuelvo-api/internal/domain/consumer/read_model"
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/consumer"
+)
 
 func normalizeRegisterConsumerRequest(req registerConsumerRequest) registerConsumerRequest {
 	req.Email = strings.TrimSpace(req.Email)
@@ -13,11 +15,15 @@ func normalizeRegisterConsumerRequest(req registerConsumerRequest) registerConsu
 	return req
 }
 
-func consumerSummaryResponseFromDomain(consumer readmodel.ConsumerSummary) consumerSummaryResponse {
+func consumerSummaryResponseFromDomain(consumer consumer.Consumer) consumerSummaryResponse {
+	profilePhotoURL := ""
+	if consumer.ProfilePhoto != nil {
+		profilePhotoURL = consumer.ProfilePhoto.URL
+	}
 	return consumerSummaryResponse{
 		ID:              consumer.ID,
-		Name:            consumer.Name,
-		Surname:         consumer.Surname,
-		ProfilePhotoURL: consumer.ProfilePhotoURL,
+		Name:            consumer.Name(),
+		Surname:         consumer.Surname(),
+		ProfilePhotoURL: profilePhotoURL,
 	}
 }

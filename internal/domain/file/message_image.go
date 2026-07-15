@@ -4,10 +4,12 @@ type Image struct {
 	FileID       string
 	OriginalName string
 	URL          string
-	Description  string
 }
 
-type MessageImage = Image
+type MessageImage struct {
+	Image
+	Description string
+}
 
 type MessageImageContent struct {
 	MessageImage

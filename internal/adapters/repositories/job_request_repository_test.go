@@ -82,7 +82,7 @@ func savedConsumerIDForJobRequest(t *testing.T, testContext jobRequestRepository
 func savedConsumerIDWithData(t *testing.T, testContext jobRequestRepositoryTestContext, authID, email, name, surname string) int {
 	t.Helper()
 
-	consumerToSave, err := consumer.NewConsumer(authID, email, name, surname, "")
+	consumerToSave, err := consumer.NewConsumer(authID, email, name, surname, nil)
 	require.NoError(t, err)
 	_, err = testContext.userRepository.Save(context.Background(), consumerToSave)
 	require.NoError(t, err)
@@ -136,7 +136,7 @@ func validJobRequest(t *testing.T, consumerID, providerID int) jobrequest.JobReq
 	return *requestToSave
 }
 
-func savedJobRequestImage(t *testing.T, testContext jobRequestRepositoryTestContext, fileID, originalName, uploaderAuthID string) filedomain.MessageImage {
+func savedJobRequestImage(t *testing.T, testContext jobRequestRepositoryTestContext, fileID, originalName, uploaderAuthID string) filedomain.Image {
 	t.Helper()
 
 	_, err := testContext.database.Exec(
@@ -149,14 +149,14 @@ func savedJobRequestImage(t *testing.T, testContext jobRequestRepositoryTestCont
 	)
 	require.NoError(t, err)
 
-	return filedomain.MessageImage{FileID: fileID, OriginalName: originalName}
+	return filedomain.Image{FileID: fileID, OriginalName: originalName}
 }
 
 func TestJobRequestRepositoryCanSaveRequestWithConversation(t *testing.T) {
 	testContext := newJobRequestRepositoryTest(t)
 	consumerID, providerID := savedJobRequestParticipants(t, testContext)
 	requestToSave := validJobRequest(t, consumerID, providerID)
-	requestToSave.Images = []filedomain.MessageImage{
+	requestToSave.Images = []filedomain.Image{
 		savedJobRequestImage(t, testContext, "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", "perdida-bajo-mesada.jpg", "auth0|job-request-consumer"),
 	}
 	pendingConversation := conversationForJobRequest(t, consumerID, providerID)

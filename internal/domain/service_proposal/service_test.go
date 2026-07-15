@@ -7,6 +7,7 @@ import (
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/category"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/consumer"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/conversation"
+	filedomain "github.com/LoResuelvo/loresuelvo-api/internal/domain/file"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/notification"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/provider"
 	serviceproposal "github.com/LoResuelvo/loresuelvo-api/internal/domain/service_proposal"
@@ -397,7 +398,7 @@ func TestConsumerGetsPendingServiceProposal(t *testing.T) {
 	expectedProposal.Provider.BaseUser.Name = "Juan"
 	expectedProposal.Provider.BaseUser.Surname = "Gomez"
 	expectedProposal.Provider.Category = &category.Category{Name: "Plomeria"}
-	expectedProposal.Provider.ProfilePhotoFileID = "provider-photo"
+	expectedProposal.Provider.ProfilePhoto = &filedomain.Image{FileID: "provider-photo"}
 
 	resetMocks(&env.userRepo.Mock, &env.serviceRepo.Mock)
 	env.userRepo.

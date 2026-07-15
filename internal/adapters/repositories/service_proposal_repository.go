@@ -227,7 +227,7 @@ func (r *ServiceProposalRepository) FindByUserID(ctx context.Context, userID int
 
 		consumerUser.Role = consumer.Role
 		providerUser.Role = provider.Role
-		providerUser.ProfilePhotoFileID = profilePhotoFileID
+		providerUser.ProfilePhoto = imageFromPersistence(profilePhotoFileID, "")
 		proposal.Consumer = &consumer.Consumer{BaseUser: &consumerUser}
 		proposal.Provider = &provider.Provider{
 			BaseUser: &providerUser,

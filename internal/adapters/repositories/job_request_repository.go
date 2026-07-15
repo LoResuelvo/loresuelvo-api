@@ -86,7 +86,7 @@ func (repository *JobRequestRepository) SaveWithConversation(jobRequest jobreque
 	if err != nil {
 		return nil, rollbackJobRequestTx(tx, mapJobRequestInsertError(err))
 	}
-	savedJobRequest.Images = append([]filedomain.MessageImage(nil), jobRequest.Images...)
+	savedJobRequest.Images = append([]filedomain.Image(nil), jobRequest.Images...)
 
 	if err := saveJobRequestImagesWithTx(ctx, tx, savedJobRequest.ID, savedJobRequest.Images); err != nil {
 		return nil, rollbackJobRequestTx(tx, err)
@@ -280,7 +280,7 @@ func (repository *JobRequestRepository) FindByUserAuthID(userAuthID string) ([]r
 	return jobRequests, nil
 }
 
-func saveJobRequestImagesWithTx(ctx context.Context, tx *sql.Tx, jobRequestID int, images []filedomain.MessageImage) error {
+func saveJobRequestImagesWithTx(ctx context.Context, tx *sql.Tx, jobRequestID int, images []filedomain.Image) error {
 	for position, image := range images {
 		_, err := tx.ExecContext(
 			ctx,
@@ -350,13 +350,13 @@ func (repository *JobRequestRepository) findImagesByJobRequestIDs(jobRequestIDs 
 	return imagesByJobRequestID, nil
 }
 
-func domainImagesFromReadModel(images []readmodel.JobRequestImage) []filedomain.MessageImage {
+func domainImagesFromReadModel(images []readmodel.JobRequestImage) []filedomain.Image {
 	if len(images) == 0 {
-		return []filedomain.MessageImage{}
+		return []filedomain.Image{}
 	}
-	result := make([]filedomain.MessageImage, 0, len(images))
+	result := make([]filedomain.Image, 0, len(images))
 	for _, image := range images {
-		result = append(result, filedomain.MessageImage{
+		result = append(result, filedomain.Image{
 			FileID:       image.FileID,
 			OriginalName: image.OriginalName,
 			URL:          image.URL,

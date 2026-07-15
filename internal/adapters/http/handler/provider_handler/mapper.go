@@ -3,7 +3,7 @@ package provider_handler
 import (
 	"strings"
 
-	providerreadmodel "github.com/LoResuelvo/loresuelvo-api/internal/domain/provider/read_model"
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/provider"
 )
 
 func normalizeRegisterProviderRequest(req registerProviderRequest) registerProviderRequest {
@@ -15,17 +15,21 @@ func normalizeRegisterProviderRequest(req registerProviderRequest) registerProvi
 	return req
 }
 
-func providerSummaryResponseFromDomain(provider providerreadmodel.ProviderSummary) providerSummaryResponse {
+func providerSummaryResponseFromDomain(provider provider.Provider) providerSummaryResponse {
+	profilePhotoURL := ""
+	if provider.ProfilePhoto != nil {
+		profilePhotoURL = provider.ProfilePhoto.URL
+	}
 	return providerSummaryResponse{
 		ID:              provider.ID,
-		Name:            provider.Name,
-		Surname:         provider.Surname,
-		CategoryName:    provider.CategoryName,
-		ProfilePhotoURL: provider.ProfilePhotoURL,
+		Name:            provider.Name(),
+		Surname:         provider.Surname(),
+		CategoryName:    provider.Categoryname(),
+		ProfilePhotoURL: profilePhotoURL,
 	}
 }
 
-func providerSummaryResponsesFromDomain(providers []providerreadmodel.ProviderSummary) []providerSummaryResponse {
+func providerSummaryResponsesFromDomain(providers []provider.Provider) []providerSummaryResponse {
 	response := make([]providerSummaryResponse, 0, len(providers))
 	for _, provider := range providers {
 		response = append(response, providerSummaryResponseFromDomain(provider))

@@ -63,8 +63,8 @@ func TestRegisterConsumerWithProfilePhoto(t *testing.T) {
 
 	assert.NoError(t, err)
 	assert.Equal(t, 10, created.ID)
-	assert.Equal(t, "https://cdn/profile.jpg", created.ProfilePhotoURL)
-	assert.Equal(t, "profile-file-id", repository.savedConsumer.ProfilePhotoFileID)
+	assert.Equal(t, "https://cdn/profile.jpg", created.ProfilePhoto.URL)
+	assert.Equal(t, "profile-file-id", repository.savedConsumer.ProfilePhoto.FileID)
 	assert.Equal(t, "auth0|ana", files.validatedAuthID)
 	assert.Equal(t, "profile-file-id", files.validatedFileID)
 	assert.Equal(t, "profile-file-id", files.resolvedFileID)
@@ -80,8 +80,8 @@ func TestRegisterConsumerWithoutProfilePhoto(t *testing.T) {
 	)
 
 	assert.NoError(t, err)
-	assert.Empty(t, created.ProfilePhotoURL)
-	assert.Empty(t, repository.savedConsumer.ProfilePhotoFileID)
+	assert.Nil(t, created.ProfilePhoto)
+	assert.Nil(t, repository.savedConsumer.ProfilePhoto)
 	assert.Empty(t, files.validatedFileID)
 	assert.Empty(t, files.resolvedFileID)
 }

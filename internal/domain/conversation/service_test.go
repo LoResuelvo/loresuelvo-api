@@ -307,7 +307,7 @@ func (m *fileURLResolverMock) PrepareMessageImages(_ context.Context, _ string, 
 	}
 	files := make([]filedomain.MessageImage, 0, len(fileIDs))
 	for _, fileID := range fileIDs {
-		files = append(files, filedomain.MessageImage{FileID: fileID, OriginalName: fileID + ".jpg", URL: "https://files/" + fileID})
+		files = append(files, filedomain.MessageImage{Image: filedomain.Image{FileID: fileID, OriginalName: fileID + ".jpg", URL: "https://files/" + fileID}})
 	}
 	return files, m.err
 }
@@ -319,7 +319,7 @@ func (m *fileURLResolverMock) PrepareChatbotMessageImages(_ context.Context, _ s
 	files := make([]filedomain.MessageImageContent, 0, len(fileIDs))
 	for _, fileID := range fileIDs {
 		files = append(files, filedomain.MessageImageContent{
-			MessageImage: filedomain.MessageImage{FileID: fileID, OriginalName: fileID + ".jpg", URL: "https://files/" + fileID},
+			MessageImage: filedomain.MessageImage{Image: filedomain.Image{FileID: fileID, OriginalName: fileID + ".jpg", URL: "https://files/" + fileID}},
 			MimeType:     "image/jpeg",
 			Data:         []byte("image-bytes-" + fileID),
 		})
@@ -336,7 +336,7 @@ func (m *fileURLResolverMock) ResolveMessageImages(_ context.Context, fileIDs []
 	}
 	files := make(map[string]filedomain.MessageImage, len(fileIDs))
 	for _, fileID := range fileIDs {
-		files[fileID] = filedomain.MessageImage{FileID: fileID, OriginalName: fileID + ".jpg", URL: "https://files/" + fileID}
+		files[fileID] = filedomain.MessageImage{Image: filedomain.Image{FileID: fileID, OriginalName: fileID + ".jpg", URL: "https://files/" + fileID}}
 	}
 	return files, nil
 }
@@ -494,14 +494,14 @@ func TestCreateChatbotConversationAcceptsImageOnlyMessage(t *testing.T) {
 	savedChatbotConversation := repo.savedChatbot.(*conversation.ChatBotConversation)
 	require.Len(t, savedChatbotConversation.Messages(), 2)
 	assert.Empty(t, savedChatbotConversation.Messages()[0].Content)
-	assert.Equal(t, []filedomain.MessageImage{{FileID: "image-file-id", OriginalName: "image-file-id.jpg", URL: "https://files/image-file-id", Description: "Descripción de prueba"}}, savedChatbotConversation.Messages()[0].Images)
+	assert.Equal(t, []filedomain.MessageImage{{Image: filedomain.Image{FileID: "image-file-id", OriginalName: "image-file-id.jpg", URL: "https://files/image-file-id"}, Description: "Descripción de prueba"}}, savedChatbotConversation.Messages()[0].Images)
 }
 
 func TestCreateChatbotConversationIncludesRecommendedProvidersWhenDiagnosisIsCompleted(t *testing.T) {
 	repo := &conversationRepositoryMock{}
 	consumerIDFinder := &consumerIDFinderMock{consumerID: 10}
 	plumbingCategory := &category.Category{ID: 3, Name: "Plomería", NormalizedName: "plomería"}
-	recommendedProvider, err := provider.NewProvider("auth0|provider", "juan@example.com", "Juan", "Gómez", plumbingCategory, "provider-photo-file-id")
+	recommendedProvider, err := provider.NewProvider("auth0|provider", "juan@example.com", "Juan", "Gómez", plumbingCategory, &filedomain.Image{FileID: "provider-photo-file-id"})
 	require.NoError(t, err)
 	recommendedProvider.ID = 20
 	categoryLister := &recommendationCategoryListerMock{categories: []category.Category{*plumbingCategory}}
@@ -535,10 +535,10 @@ func TestCreateChatbotConversationIncludesRecommendedProvidersWhenDiagnosisIsCom
 	assert.Equal(t, []string{"provider-photo-file-id"}, fileURLResolver.resolvedFileIDs)
 	require.Len(t, createdResult.RecommendedProviders, 1)
 	assert.Equal(t, 20, createdResult.RecommendedProviders[0].ID)
-	assert.Equal(t, "Juan", createdResult.RecommendedProviders[0].Name)
-	assert.Equal(t, "Gómez", createdResult.RecommendedProviders[0].Surname)
-	assert.Equal(t, "Plomería", createdResult.RecommendedProviders[0].CategoryName)
-	assert.Equal(t, "https://cdn/provider.jpg", createdResult.RecommendedProviders[0].ProfilePhotoURL)
+	assert.Equal(t, "Juan", createdResult.RecommendedProviders[0].Name())
+	assert.Equal(t, "Gómez", createdResult.RecommendedProviders[0].Surname())
+	assert.Equal(t, "Plomería", createdResult.RecommendedProviders[0].Category.Name)
+	assert.Equal(t, "https://cdn/provider.jpg", createdResult.RecommendedProviders[0].ProfilePhoto.URL)
 }
 
 func TestCreateChatbotConversationDoesNotRecommendProvidersBeforeDiagnosisIsCompleted(t *testing.T) {
@@ -698,7 +698,7 @@ func TestContinueChatbotConversationSendsCurrentTurnImagesToChatbot(t *testing.T
 	require.Len(t, chatbot.question.Images, 1)
 	assert.Equal(t, "detail-image-id", chatbot.question.Images[0].FileID)
 	require.Len(t, result.Conversation.Messages(), 2)
-	assert.Equal(t, []filedomain.MessageImage{{FileID: "detail-image-id", OriginalName: "detail-image-id.jpg", URL: "https://files/detail-image-id", Description: "Descripción de prueba"}}, result.Conversation.Messages()[0].Images)
+	assert.Equal(t, []filedomain.MessageImage{{Image: filedomain.Image{FileID: "detail-image-id", OriginalName: "detail-image-id.jpg", URL: "https://files/detail-image-id"}, Description: "Descripción de prueba"}}, result.Conversation.Messages()[0].Images)
 }
 
 func TestContinueChatbotConversationSummarizesPendingContextWhenRecentMessageLimitIsReached(t *testing.T) {
@@ -844,7 +844,7 @@ func TestGetByIDReturnsChatbotConversationDetailForOwnerConsumer(t *testing.T) {
 	}}
 	consumerIDFinder := &consumerIDFinderMock{consumerID: 10}
 	plumbingCategory := &category.Category{ID: recommendedCategoryID, Name: "Plomería", NormalizedName: "plomería"}
-	recommendedProvider, err := provider.NewProvider("auth0|provider", "juan@example.com", "Juan", "Gómez", plumbingCategory, "provider-photo-file-id")
+	recommendedProvider, err := provider.NewProvider("auth0|provider", "juan@example.com", "Juan", "Gómez", plumbingCategory, &filedomain.Image{FileID: "provider-photo-file-id"})
 	require.NoError(t, err)
 	recommendedProvider.ID = 20
 	providerFinder := &providerIDFinderMock{providers: []provider.Provider{*recommendedProvider}}
@@ -878,7 +878,7 @@ func TestGetByIDReturnsChatbotConversationDetailForOwnerConsumer(t *testing.T) {
 	require.NotNil(t, foundConversation.Chatbot)
 	require.Len(t, foundConversation.Chatbot.RecommendedProviders, 1)
 	assert.Equal(t, 20, foundConversation.Chatbot.RecommendedProviders[0].ID)
-	assert.Equal(t, "https://cdn/provider.jpg", foundConversation.Chatbot.RecommendedProviders[0].ProfilePhotoURL)
+	assert.Equal(t, "https://cdn/provider.jpg", foundConversation.Chatbot.RecommendedProviders[0].ProfilePhoto.URL)
 }
 
 func TestGetByIDRejectsChatbotConversationForNonOwnerConsumer(t *testing.T) {

@@ -77,7 +77,7 @@ func attachImagesToMessages(messages []conversation.Message, imagesByMessageID m
 		persistedImages := imagesByMessageID[messages[index].ID]
 		messages[index].Images = make([]filedomain.MessageImage, 0, len(persistedImages))
 		for _, image := range persistedImages {
-			messages[index].Images = append(messages[index].Images, filedomain.MessageImage{FileID: image.FileID, OriginalName: image.OriginalName, Description: image.Description})
+			messages[index].Images = append(messages[index].Images, filedomain.MessageImage{Image: filedomain.Image{FileID: image.FileID, OriginalName: image.OriginalName}, Description: image.Description})
 		}
 	}
 }
@@ -87,7 +87,7 @@ func attachImagesToMessageDetails(messages []readmodel.MessageDetail, imagesByMe
 		persistedImages := imagesByMessageID[messages[index].ID]
 		messages[index].Images = make([]filedomain.MessageImage, 0, len(persistedImages))
 		for _, image := range persistedImages {
-			messages[index].Images = append(messages[index].Images, filedomain.MessageImage{FileID: image.FileID, OriginalName: image.OriginalName, Description: image.Description})
+			messages[index].Images = append(messages[index].Images, filedomain.MessageImage{Image: filedomain.Image{FileID: image.FileID, OriginalName: image.OriginalName}, Description: image.Description})
 		}
 	}
 }

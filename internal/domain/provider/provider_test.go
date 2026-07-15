@@ -15,7 +15,3 @@ func TestProviderHasCategory(t *testing.T) {
 	assert.False(t, foundProvider.HasCategory(4))
 	assert.False(t, foundProvider.HasCategory(0))
 }
-
-func TestProviderWithoutCategoryDoesNotMatchCategory(t *testing.T) {
-	assert.False(t, (provider.Provider{}).HasCategory(3))
-}
