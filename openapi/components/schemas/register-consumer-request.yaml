@@ -1,6 +1,6 @@
 type: object
 description: Payload accepted by POST /consumers. The implementation trims surrounding
-  whitespace from all string fields before validation/persistence.
+  whitespace from all string fields before validation/persistence. The profile photo is optional.
 required:
 - email
 properties:
@@ -19,3 +19,9 @@ properties:
     description: Consumer surname. The current implementation persists the value but
       does not enforce non-empty validation.
     example: Mamani Tipula
+  profile_photo_file_id:
+    type: string
+    format: uuid
+    description: Optional confirmed public profile photo file identifier uploaded by the authenticated consumer.
+    example: 4af47f1b-97b6-4b32-baa0-b95d6077f919
+additionalProperties: false

@@ -34,5 +34,5 @@ properties:
     type: string
     format: uri
     description: Public provider profile photo URL. Present only when the counterpart is a provider.
-    example: https://cdn.example/files/2026/06/provider_profile_photo/juan.jpg
+    example: https://cdn.example/files/2026/06/profile_photo/juan.jpg
 additionalProperties: false

@@ -329,11 +329,12 @@
                             },
                             "examples": {
                                 "validConsumer": {
-                                    "summary": "Valid consumer registration",
+                                    "summary": "Valid consumer registration with an optional profile photo",
                                     "value": {
                                         "email": "ana@example.com",
                                         "name": "Ana Perez",
-                                        "surname": "Mamani Tipula"
+                                        "surname": "Mamani Tipula",
+                                        "profile_photo_file_id": "4af47f1b-97b6-4b32-baa0-b95d6077f919"
                                     }
                                 }
                             }
@@ -346,12 +347,15 @@
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/MessageResponse"
+                                    "$ref": "#/components/schemas/ConsumerSummary"
                                 },
                                 "examples": {
                                     "registered": {
                                         "value": {
-                                            "message": "cuenta registrada exitosamente"
+                                            "id": 42,
+                                            "name": "Ana Perez",
+                                            "surname": "Mamani Tipula",
+                                            "profile_photo_url": "https://cdn.example/files/2026/07/profile_photo/4af47f1b-97b6-4b32-baa0-b95d6077f919.jpg"
                                         }
                                     }
                                 }
@@ -359,7 +363,7 @@
                         }
                     },
                     "400": {
-                        "description": "The request body is not valid JSON, cannot be bound to the expected payload, or contains an invalid email format.",
+                        "description": "The request body is not valid JSON, cannot be bound to the expected payload, contains an invalid email format, or references an unavailable profile photo.",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -376,6 +380,12 @@
                                         "summary": "Invalid JSON body",
                                         "value": {
                                             "error": "invalid character '}' looking for beginning of object key string"
+                                        }
+                                    },
+                                    "unavailableProfilePhoto": {
+                                        "summary": "Missing, unconfirmed, foreign, or invalid-purpose profile photo",
+                                        "value": {
+                                            "error": "Profile photo could not be uploaded"
                                         }
                                     }
                                 }
@@ -478,14 +488,14 @@
                                                 "name": "Juan",
                                                 "surname": "Pérez",
                                                 "category_name": "Plomería",
-                                                "profile_photo_url": "https://cdn.example/files/2026/06/provider_profile_photo/juan.jpg"
+                                                "profile_photo_url": "https://cdn.example/files/2026/06/profile_photo/juan.jpg"
                                             },
                                             {
                                                 "id": 2,
                                                 "name": "Pedro",
                                                 "surname": "Dib",
                                                 "category_name": "Plomería",
-                                                "profile_photo_url": "https://cdn.example/files/2026/06/provider_profile_photo/pedro.jpg"
+                                                "profile_photo_url": "https://cdn.example/files/2026/06/profile_photo/pedro.jpg"
                                             }
                                         ]
                                     },
@@ -612,7 +622,7 @@
                                             "name": "Juan",
                                             "surname": "Pérez",
                                             "category_name": "Plomería",
-                                            "profile_photo_url": "https://cdn.example/files/2026/06/provider_profile_photo/juan.jpg"
+                                            "profile_photo_url": "https://cdn.example/files/2026/06/profile_photo/juan.jpg"
                                         }
                                     }
                                 }
@@ -914,7 +924,7 @@
                                                     "name": "Juan",
                                                     "surname": "Gómez",
                                                     "category_name": "Plomería",
-                                                    "profile_photo_url": "https://cdn.example/files/2026/06/provider_profile_photo/juan.jpg"
+                                                    "profile_photo_url": "https://cdn.example/files/2026/06/profile_photo/juan.jpg"
                                                 },
                                                 "last_message": {
                                                     "id": 1,
@@ -2368,7 +2378,7 @@
                                                 "name": "Juan",
                                                 "surname": "Gómez",
                                                 "category_name": "Plomería",
-                                                "profile_photo_url": "https://cdn.example/files/2026/06/provider_profile_photo/juan.jpg"
+                                                "profile_photo_url": "https://cdn.example/files/2026/06/profile_photo/juan.jpg"
                                             },
                                             "messages": [
                                                 {
@@ -2855,7 +2865,7 @@
         "schemas": {
             "RegisterConsumerRequest": {
                 "type": "object",
-                "description": "Payload accepted by POST /consumers. The implementation trims surrounding whitespace from all string fields before validation/persistence.",
+                "description": "Payload accepted by POST /consumers. The implementation trims surrounding whitespace from all string fields before validation/persistence. The profile photo is optional.",
                 "required": [
                     "email"
                 ],
@@ -2875,6 +2885,43 @@
                         "type": "string",
                         "description": "Consumer surname. The current implementation persists the value but does not enforce non-empty validation.",
                         "example": "Mamani Tipula"
+                    },
+                    "profile_photo_file_id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "Optional confirmed public profile photo file identifier uploaded by the authenticated consumer.",
+                        "example": "4af47f1b-97b6-4b32-baa0-b95d6077f919"
+                    }
+                },
+                "additionalProperties": false
+            },
+            "ConsumerSummary": {
+                "type": "object",
+                "description": "Consumer account created by the registration operation.",
+                "required": [
+                    "id",
+                    "name",
+                    "surname"
+                ],
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "format": "int32",
+                        "example": 42
+                    },
+                    "name": {
+                        "type": "string",
+                        "example": "Ana Perez"
+                    },
+                    "surname": {
+                        "type": "string",
+                        "example": "Mamani Tipula"
+                    },
+                    "profile_photo_url": {
+                        "type": "string",
+                        "format": "uri",
+                        "description": "Public profile photo URL. Omitted when the consumer registered without a photo.",
+                        "example": "https://cdn.example/files/2026/07/profile_photo/4af47f1b-97b6-4b32-baa0-b95d6077f919.jpg"
                     }
                 }
             },
@@ -2965,7 +3012,7 @@
                         "type": "string",
                         "format": "uri",
                         "description": "Public provider profile photo URL.",
-                        "example": "https://cdn.example/files/2026/06/provider_profile_photo/4af47f1b-97b6-4b32-baa0-b95d6077f919.jpg"
+                        "example": "https://cdn.example/files/2026/06/profile_photo/4af47f1b-97b6-4b32-baa0-b95d6077f919.jpg"
                     }
                 },
                 "additionalProperties": false
@@ -2987,22 +3034,22 @@
                     },
                     "mime_type": {
                         "type": "string",
-                        "description": "File MIME type. Provider profile photos accept image/jpeg, image/png, and image/webp.",
+                        "description": "File MIME type. Profile photos accept image/jpeg, image/png, and image/webp.",
                         "example": "image/jpeg"
                     },
                     "size_bytes": {
                         "type": "integer",
                         "format": "int32",
-                        "description": "File size in bytes. Provider profile photos must not exceed 5 MB.",
+                        "description": "File size in bytes. Profile photos must not exceed 5 MB.",
                         "example": 1048576
                     },
                     "purpose": {
                         "type": "string",
                         "description": "Intended business use for the file.",
                         "enum": [
-                            "provider_profile_photo"
+                            "profile_photo"
                         ],
-                        "example": "provider_profile_photo"
+                        "example": "profile_photo"
                     }
                 },
                 "additionalProperties": false
@@ -3025,7 +3072,7 @@
                     "key": {
                         "type": "string",
                         "description": "Storage object key generated by the API.",
-                        "example": "files/2026/06/provider_profile_photo/4af47f1b-97b6-4b32-baa0-b95d6077f919.jpg"
+                        "example": "files/2026/06/profile_photo/4af47f1b-97b6-4b32-baa0-b95d6077f919.jpg"
                     },
                     "upload_url": {
                         "type": "string",
@@ -3057,7 +3104,7 @@
                     "key": {
                         "type": "string",
                         "description": "Storage object key returned by the presign endpoint.",
-                        "example": "files/2026/06/provider_profile_photo/4af47f1b-97b6-4b32-baa0-b95d6077f919.jpg"
+                        "example": "files/2026/06/profile_photo/4af47f1b-97b6-4b32-baa0-b95d6077f919.jpg"
                     },
                     "mime_type": {
                         "type": "string",
@@ -3090,7 +3137,7 @@
                         "type": "string",
                         "format": "uri",
                         "description": "Public URL for confirmed public files. Omitted for private files.",
-                        "example": "https://cdn.example/files/2026/06/provider_profile_photo/4af47f1b-97b6-4b32-baa0-b95d6077f919.jpg"
+                        "example": "https://cdn.example/files/2026/06/profile_photo/4af47f1b-97b6-4b32-baa0-b95d6077f919.jpg"
                     },
                     "original_name": {
                         "type": "string",
@@ -3948,7 +3995,7 @@
                         "type": "string",
                         "format": "uri",
                         "description": "Public provider profile photo URL. Present only when the counterpart is a provider.",
-                        "example": "https://cdn.example/files/2026/06/provider_profile_photo/juan.jpg"
+                        "example": "https://cdn.example/files/2026/06/profile_photo/juan.jpg"
                     }
                 },
                 "additionalProperties": false

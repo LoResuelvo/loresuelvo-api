@@ -1,0 +1,22 @@
+type: object
+description: Consumer account created by the registration operation.
+required:
+- id
+- name
+- surname
+properties:
+  id:
+    type: integer
+    format: int32
+    example: 42
+  name:
+    type: string
+    example: Ana Perez
+  surname:
+    type: string
+    example: Mamani Tipula
+  profile_photo_url:
+    type: string
+    format: uri
+    description: Public profile photo URL. Omitted when the consumer registered without a photo.
+    example: https://cdn.example/files/2026/07/profile_photo/4af47f1b-97b6-4b32-baa0-b95d6077f919.jpg

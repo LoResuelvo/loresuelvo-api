@@ -180,6 +180,8 @@ components:
   schemas:
     RegisterConsumerRequest:
       $ref: ./components/schemas/register-consumer-request.yaml
+    ConsumerSummary:
+      $ref: ./components/schemas/consumer-summary.yaml
     RegisterProviderRequest:
       $ref: ./components/schemas/register-provider-request.yaml
     ProviderSummary:

@@ -34,7 +34,7 @@ get:
                   name: Juan
                   surname: Gómez
                   category_name: Plomería
-                  profile_photo_url: https://cdn.example/files/2026/06/provider_profile_photo/juan.jpg
+                  profile_photo_url: https://cdn.example/files/2026/06/profile_photo/juan.jpg
                 messages:
                 - id: 1
                   sender_role: consumer

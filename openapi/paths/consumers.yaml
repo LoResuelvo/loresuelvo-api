@@ -16,25 +16,29 @@ post:
           $ref: '#/components/schemas/RegisterConsumerRequest'
         examples:
           validConsumer:
-            summary: Valid consumer registration
+            summary: Valid consumer registration with an optional profile photo
             value:
               email: ana@example.com
               name: Ana Perez
               surname: Mamani Tipula
+              profile_photo_file_id: 4af47f1b-97b6-4b32-baa0-b95d6077f919
   responses:
     '201':
       description: Consumer account registered successfully.
       content:
         application/json:
           schema:
-            $ref: '#/components/schemas/MessageResponse'
+            $ref: '#/components/schemas/ConsumerSummary'
           examples:
             registered:
               value:
-                message: cuenta registrada exitosamente
+                id: 42
+                name: Ana Perez
+                surname: Mamani Tipula
+                profile_photo_url: https://cdn.example/files/2026/07/profile_photo/4af47f1b-97b6-4b32-baa0-b95d6077f919.jpg
     '400':
       description: The request body is not valid JSON, cannot be bound to the expected
-        payload, or contains an invalid email format.
+        payload, contains an invalid email format, or references an unavailable profile photo.
       content:
         application/json:
           schema:
@@ -48,6 +52,10 @@ post:
               summary: Invalid JSON body
               value:
                 error: invalid character '}' looking for beginning of object key string
+            unavailableProfilePhoto:
+              summary: Missing, unconfirmed, foreign, or invalid-purpose profile photo
+              value:
+                error: Profile photo could not be uploaded
     '401':
       description: Authentication failed or the authenticated user id could not be
         obtained from the request context.
