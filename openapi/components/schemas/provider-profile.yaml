@@ -1,0 +1,24 @@
+type: object
+description: Public Provider profile available to authenticated users.
+required:
+- id
+- name
+- surname
+- profile_photo
+- category
+properties:
+  id:
+    type: integer
+    format: int32
+    example: 12
+  name:
+    type: string
+    example: Juan
+  surname:
+    type: string
+    example: Gómez
+  profile_photo:
+    $ref: '#/components/schemas/CurrentUserProfilePhoto'
+  category:
+    $ref: '#/components/schemas/CategoryListItem'
+additionalProperties: false

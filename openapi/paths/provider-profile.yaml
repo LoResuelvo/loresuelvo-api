@@ -1,0 +1,61 @@
+get:
+  tags:
+  - Providers
+  operationId: getProviderProfile
+  summary: Get a Provider public profile
+  description: Returns the currently available public information for an existing
+    Provider. Email, authentication identity, and private documents are not exposed.
+  security:
+  - BearerAuth: []
+  parameters:
+  - name: providerID
+    in: path
+    required: true
+    description: Provider user identifier.
+    schema:
+      type: integer
+      format: int32
+      minimum: 1
+  responses:
+    '200':
+      description: Provider profile found.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ProviderProfile'
+          example:
+            id: 12
+            name: Juan
+            surname: Gómez
+            profile_photo:
+              original_name: foto-perfil.jpg
+              url: https://cdn.example/profile/foto-perfil.jpg
+            category:
+              id: 1
+              name: Plomería
+    '400':
+      description: The Provider identifier is invalid.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    '401':
+      description: Authentication failed.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/AuthErrorResponse'
+    '404':
+      description: No Provider exists with the requested identifier.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: Provider does not exist
+    '500':
+      description: Unexpected error while preparing the Provider profile.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'

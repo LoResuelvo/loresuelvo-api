@@ -44,6 +44,8 @@ paths:
     $ref: ./paths/consumers.yaml
   /providers:
     $ref: ./paths/providers.yaml
+  /providers/{providerID}:
+    $ref: ./paths/provider-profile.yaml
   /files/presign:
     $ref: ./paths/files-presign.yaml
   /files/{fileID}/confirm:
@@ -186,6 +188,8 @@ components:
       $ref: ./components/schemas/register-provider-request.yaml
     ProviderSummary:
       $ref: ./components/schemas/provider-summary.yaml
+    ProviderProfile:
+      $ref: ./components/schemas/provider-profile.yaml
     PresignFileRequest:
       $ref: ./components/schemas/presign-file-request.yaml
     PresignFileResponse:
