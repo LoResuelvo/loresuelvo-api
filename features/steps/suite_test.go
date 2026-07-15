@@ -45,6 +45,7 @@ type testSuite struct {
 	lastConversationID                      int
 	lastJobRequestID                        int
 	lastWorkRequestProviderID               int
+	lastProviderProfileID                   int
 	providerProfilePhotoFileID              string
 	consumerProfilePhotoFileID              string
 	realtimeConnections                     map[string]*realtimeTestConnection
@@ -92,6 +93,7 @@ func (s *testSuite) registerAllSteps(sc *godog.ScenarioContext) {
 	registerListCategoriesSteps(sc, s)
 	registerFilterProvidersByCategorySteps(sc, s)
 	registerLoginSteps(sc, s)
+	registerGetProviderProfileSteps(sc, s)
 	registerSendContactRequestToProviderSteps(sc, s)
 	registerGetConversationSteps(sc, s)
 	registerGetConversationsSteps(sc, s)
@@ -155,6 +157,7 @@ func (s *testSuite) cleanup() error {
 	s.participantRolesByFullName = map[string]string{}
 	s.realtimeConnections = map[string]*realtimeTestConnection{}
 	s.lastWorkRequestProviderID = 0
+	s.lastProviderProfileID = 0
 	s.lastJobRequestID = 0
 	s.providerProfilePhotoFileID = ""
 	s.chatbot.Reset()
