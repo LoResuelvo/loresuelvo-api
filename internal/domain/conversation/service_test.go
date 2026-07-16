@@ -29,9 +29,7 @@ func (c fixedClock) Now() time.Time {
 type conversationRepositoryMock struct {
 	savedConversation      conversation.Conversation
 	savedMessage           conversation.Message
-	addedMessage           conversation.Message
 	savedResult            conversation.Conversation
-	addedResult            *conversation.Message
 	savedChatbot           conversation.Conversation
 	savedChatbotResult     conversation.Conversation
 	updatedConversation    conversation.Conversation
@@ -40,7 +38,6 @@ type conversationRepositoryMock struct {
 	saveCalled             bool
 	updateCalled           bool
 	updateCalls            int
-	addMessageCalled       bool
 	findByIDCalled         bool
 	countCalled            bool
 	startProcessingCalled  bool
@@ -60,10 +57,26 @@ func (r *conversationRepositoryMock) ExistsBetween(consumerID, providerID int) (
 }
 
 func (r *conversationRepositoryMock) SaveConversation(ctx context.Context, c conversation.Conversation) (conversation.Conversation, error) {
-	r.saveCalled = true
+	if c.ID() > 0 {
+		r.updateCalled = true
+		r.updateCalls++
+		r.updatedConversation = c
+	} else {
+		r.saveCalled = true
+	}
 	r.savedConversation = c
 	if c.ConversationType() == conversation.TypeChatbot {
 		r.savedChatbot = c
+	}
+	if chatbotConversation, ok := c.(*conversation.ChatBotConversation); ok && c.ID() > 0 {
+		if chatbotConversation.ProcessingStartedAt() != nil {
+			r.startProcessingCalled = true
+			if r.startProcessingErr != nil {
+				return nil, r.startProcessingErr
+			}
+		} else if r.startProcessingCalled {
+			r.finishProcessingCalled = true
+		}
 	}
 	if r.err != nil {
 		return nil, r.err
@@ -74,16 +87,20 @@ func (r *conversationRepositoryMock) SaveConversation(ctx context.Context, c con
 	if r.savedChatbotResult != nil {
 		return r.savedChatbotResult, nil
 	}
-	c.SetPersistenceState(1, time.Time{})
+	if c.ID() == 0 {
+		c.SetPersistenceState(1, time.Time{})
+	}
 	messages := c.Messages()
 	for index := range messages {
-		messages[index].ID = index + 1
-		messages[index].ConversationID = c.ID()
-		messages[index].CreatedOn = time.Now()
+		if messages[index].ID == 0 {
+			messages[index].ID = index + 1
+			messages[index].ConversationID = c.ID()
+			messages[index].CreatedOn = time.Now()
+		}
 	}
 	c.SetMessages(messages)
 	if len(messages) > 0 {
-		r.savedMessage = messages[0]
+		r.savedMessage = messages[len(messages)-1]
 	}
 	return c, nil
 }
@@ -97,54 +114,6 @@ func (r *conversationRepositoryMock) FindByID(ctx context.Context, conversationI
 		return r.foundResult, nil
 	}
 	return nil, conversation.ErrConversationDoesNotExist
-}
-
-func (r *conversationRepositoryMock) AddMessage(ctx context.Context, conversationID int, m conversation.Message) (*conversation.Message, error) {
-	r.addMessageCalled = true
-	r.addedMessage = m
-	if r.err != nil {
-		return nil, r.err
-	}
-	if r.addedResult != nil {
-		return r.addedResult, nil
-	}
-	m.ID = 2
-	m.ConversationID = conversationID
-	m.CreatedOn = time.Now()
-	return &m, nil
-}
-
-func (r *conversationRepositoryMock) UpdateConversation(ctx context.Context, c conversation.Conversation) (conversation.Conversation, error) {
-	r.updateCalled = true
-	r.updateCalls++
-	r.updatedConversation = c
-
-	if chatbotConversation, ok := c.(*conversation.ChatBotConversation); ok {
-		if chatbotConversation.ProcessingStartedAt() != nil {
-			r.startProcessingCalled = true
-			if r.startProcessingErr != nil {
-				return nil, r.startProcessingErr
-			}
-		} else if r.startProcessingCalled {
-			r.finishProcessingCalled = true
-		}
-	}
-
-	if r.err != nil {
-		return nil, r.err
-	}
-
-	messages := c.Messages()
-	for index := range messages {
-		if messages[index].ID == 0 {
-			messages[index].ID = index + 1
-			messages[index].ConversationID = c.ID()
-			messages[index].CreatedOn = time.Now()
-		}
-	}
-	c.SetMessages(messages)
-
-	return c, nil
 }
 
 func (r *conversationRepositoryMock) CountMessagesBySenderRole(ctx context.Context, conversationID int, senderRole string) (int, error) {
@@ -944,9 +913,9 @@ func TestSendMessageAddsConsumerMessageForParticipantConsumer(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, sentMessage)
 	assert.True(t, repo.findByIDCalled)
-	assert.True(t, repo.addMessageCalled)
-	assert.Equal(t, conversation.SenderConsumer, repo.addedMessage.SenderRole)
-	assert.Equal(t, "¿El jueves te queda cómodo?", repo.addedMessage.Content)
+	assert.True(t, repo.updateCalled)
+	assert.Equal(t, conversation.SenderConsumer, repo.savedMessage.SenderRole)
+	assert.Equal(t, "¿El jueves te queda cómodo?", repo.savedMessage.Content)
 	assert.Equal(t, 1, sentMessage.ConversationID)
 }
 
@@ -975,7 +944,7 @@ func TestSendMessageRejectsUnavailableImageBeforePersistence(t *testing.T) {
 
 	assert.Nil(t, sentMessage)
 	assert.ErrorIs(t, err, conversation.ErrMessageImageNotAvailable)
-	assert.False(t, repo.addMessageCalled)
+	assert.False(t, repo.updateCalled)
 }
 
 func TestSendMessageAddsProviderMessageForParticipantProvider(t *testing.T) {
@@ -990,9 +959,9 @@ func TestSendMessageAddsProviderMessageForParticipantProvider(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, sentMessage)
 	assert.True(t, repo.findByIDCalled)
-	assert.True(t, repo.addMessageCalled)
-	assert.Equal(t, conversation.SenderProvider, repo.addedMessage.SenderRole)
-	assert.Equal(t, "Sí, puedo pasar el jueves a las 10", repo.addedMessage.Content)
+	assert.True(t, repo.updateCalled)
+	assert.Equal(t, conversation.SenderProvider, repo.savedMessage.SenderRole)
+	assert.Equal(t, "Sí, puedo pasar el jueves a las 10", repo.savedMessage.Content)
 	assert.Equal(t, 1, sentMessage.ConversationID)
 }
 
@@ -1008,7 +977,7 @@ func TestSendMessageRejectsProviderMessageInPendingConversation(t *testing.T) {
 	assert.ErrorIs(t, err, conversation.ErrPendingConversationRequiresAcceptance)
 	assert.Nil(t, sentMessage)
 	assert.True(t, repo.findByIDCalled)
-	assert.False(t, repo.addMessageCalled)
+	assert.False(t, repo.updateCalled)
 }
 
 func TestSendMessageRejectsConsumerMessageWhenPendingLimitWasReached(t *testing.T) {
@@ -1026,7 +995,7 @@ func TestSendMessageRejectsConsumerMessageWhenPendingLimitWasReached(t *testing.
 	assert.ErrorIs(t, err, conversation.ErrPendingConversationMessageLimitReached)
 	assert.Nil(t, sentMessage)
 	assert.True(t, repo.countCalled)
-	assert.False(t, repo.addMessageCalled)
+	assert.False(t, repo.updateCalled)
 }
 
 func TestSendMessageRejectsAuthenticatedUserThatIsNotParticipant(t *testing.T) {
@@ -1041,7 +1010,7 @@ func TestSendMessageRejectsAuthenticatedUserThatIsNotParticipant(t *testing.T) {
 	assert.ErrorIs(t, err, conversation.ErrConversationAccessDenied)
 	assert.Nil(t, sentMessage)
 	assert.True(t, repo.findByIDCalled)
-	assert.False(t, repo.addMessageCalled)
+	assert.False(t, repo.updateCalled)
 }
 
 func TestSendMessageReturnsNotFoundWhenConversationDoesNotExist(t *testing.T) {
@@ -1056,7 +1025,7 @@ func TestSendMessageReturnsNotFoundWhenConversationDoesNotExist(t *testing.T) {
 	assert.ErrorIs(t, err, conversation.ErrConversationDoesNotExist)
 	assert.Nil(t, sentMessage)
 	assert.True(t, repo.findByIDCalled)
-	assert.False(t, repo.addMessageCalled)
+	assert.False(t, repo.updateCalled)
 }
 
 func TestSendMessageRejectsEmptyContent(t *testing.T) {
@@ -1072,7 +1041,7 @@ func TestSendMessageRejectsEmptyContent(t *testing.T) {
 	assert.ErrorIs(t, err, conversation.ErrMessageRequired)
 	assert.Nil(t, sentMessage)
 	assert.True(t, repo.findByIDCalled)
-	assert.False(t, repo.addMessageCalled)
+	assert.False(t, repo.updateCalled)
 	assert.False(t, publisher.publishCalled)
 }
 

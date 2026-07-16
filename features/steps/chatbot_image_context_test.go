@@ -109,13 +109,16 @@ func (suite *testSuite) chatbotDoesNotReceiveHistoricalImageBytes(imageName stri
 }
 
 func (suite *testSuite) iContinuedConversationUntilContextSummaryWasNeeded() error {
+	foundConversation, err := suite.conversationRepository.FindByID(context.Background(), suite.lastConversationID)
+	if err != nil {
+		return err
+	}
 	for index := 0; index < conversation.ChatbotRecentMessageLimit; index++ {
 		message := mustConsumerMessage(fmt.Sprintf("Información adicional %d sobre el problema.", index+1))
-		if _, err := suite.conversationRepository.AddMessage(context.Background(), suite.lastConversationID, message); err != nil {
-			return err
-		}
+		foundConversation.AddMessage(message)
 	}
-	return nil
+	_, err = suite.conversationRepository.SaveConversation(context.Background(), foundConversation)
+	return err
 }
 
 func (suite *testSuite) sendLaterQuestionAboutDampStain() error {

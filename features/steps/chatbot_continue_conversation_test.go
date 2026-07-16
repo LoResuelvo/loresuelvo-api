@@ -47,18 +47,20 @@ func (suite *testSuite) iHaveActiveChatbotConversationWithManyMessagesAboutKitch
 
 	recentMessage := "Todavía no sé si el agua sale del sifón o de una conexión flexible."
 	suite.expectedRecentChatbotContextMessage = recentMessage
+	foundConversation, err := suite.conversationRepository.FindByID(context.Background(), suite.lastConversationID)
+	if err != nil {
+		return err
+	}
 
 	for _, message := range []conversation.Message{
 		mustConsumerMessage("La pérdida empezó ayer después de lavar los platos."),
 		mustChatbotMessage("Revisá si el agua aparece solo cuando usás la bacha."),
 		mustConsumerMessage(recentMessage),
 	} {
-		if _, err := suite.conversationRepository.AddMessage(context.Background(), suite.lastConversationID, message); err != nil {
-			return fmt.Errorf("could not add chatbot conversation fixture message: %w", err)
-		}
+		foundConversation.AddMessage(message)
 	}
-
-	return nil
+	_, err = suite.conversationRepository.SaveConversation(context.Background(), foundConversation)
+	return err
 }
 
 func (suite *testSuite) thereIsChatbotConversationContextSummary(summary *godog.DocString) error {
@@ -81,7 +83,7 @@ func (suite *testSuite) thereIsChatbotConversationContextSummary(summary *godog.
 	}); err != nil {
 		return err
 	}
-	_, err = suite.conversationRepository.UpdateConversation(context.Background(), chatbotConversation)
+	_, err = suite.conversationRepository.SaveConversation(context.Background(), chatbotConversation)
 	return err
 }
 
@@ -109,7 +111,7 @@ func (suite *testSuite) chatbotConversationIsProcessingPreviousResponse() error 
 	if err := chatbotConversation.StartProcessing(time.Now().UTC()); err != nil {
 		return err
 	}
-	_, err = suite.conversationRepository.UpdateConversation(context.Background(), chatbotConversation)
+	_, err = suite.conversationRepository.SaveConversation(context.Background(), chatbotConversation)
 	return err
 }
 

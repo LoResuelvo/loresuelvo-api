@@ -124,16 +124,18 @@ func (s *Service) SendMessage(ctx context.Context, authID string, conversationID
 		return nil, err
 	}
 	foundConversation.AddMessage(*message)
-
-	// TODO: El repo Conversation debe tratar únicamente con Conversation, por lo tanto, métodos como AddMessage no deberían existir.
-	sentMessage, err := s.conversationRepository.AddMessage(ctx, conversationID, *message)
+	savedConversation, err := s.conversationRepository.SaveConversation(ctx, foundConversation)
 	if err != nil {
 		return nil, err
 	}
+	sentMessage, ok := savedConversation.LastMessage()
+	if !ok {
+		return nil, ErrConversationDoesNotExist
+	}
 
-	s.messagePublisher.PublishMessage(ctx, foundConversation, authID, *sentMessage)
+	s.messagePublisher.PublishMessage(ctx, savedConversation, authID, sentMessage)
 
-	return sentMessage, nil
+	return &sentMessage, nil
 }
 
 func (s *Service) ListWorkConversations(ctx context.Context, authID string) ([]readmodel.ConversationSummary, error) {
@@ -365,13 +367,13 @@ func (s *Service) startChatbotProcessing(ctx context.Context, chatbotConversatio
 		return err
 	}
 
-	_, err := s.conversationRepository.UpdateConversation(ctx, chatbotConversation)
+	_, err := s.conversationRepository.SaveConversation(ctx, chatbotConversation)
 	return err
 }
 
 func (s *Service) finishChatbotProcessing(ctx context.Context, chatbotConversation *ChatBotConversation) {
 	chatbotConversation.FinishProcessing()
-	_, _ = s.conversationRepository.UpdateConversation(ctx, chatbotConversation)
+	_, _ = s.conversationRepository.SaveConversation(ctx, chatbotConversation)
 }
 
 func (s *Service) refreshChatbotContextIfNeeded(ctx context.Context, chatbotConversation *ChatBotConversation) error {
@@ -393,7 +395,7 @@ func (s *Service) refreshChatbotContextIfNeeded(ctx context.Context, chatbotConv
 		return err
 	}
 
-	_, err = s.conversationRepository.UpdateConversation(ctx, chatbotConversation)
+	_, err = s.conversationRepository.SaveConversation(ctx, chatbotConversation)
 	return err
 }
 
@@ -415,7 +417,7 @@ func (s *Service) saveChatbotTurn(ctx context.Context, chatbotConversation *Chat
 	}
 	chatbotConversation.FinishProcessing()
 
-	return s.conversationRepository.UpdateConversation(ctx, chatbotConversation)
+	return s.conversationRepository.SaveConversation(ctx, chatbotConversation)
 }
 
 func applyChatbotImageDescriptions(message *Message, descriptions []ChatbotImageDescription) error {

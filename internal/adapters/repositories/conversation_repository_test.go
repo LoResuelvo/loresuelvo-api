@@ -15,6 +15,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func saveConversationWithMessage(repository *repositories.ConversationRepository, conversationToSave conversation.Conversation, message conversation.Message) (conversation.Conversation, error) {
+	conversationToSave.AddMessage(message)
+	return repository.SaveConversation(context.Background(), conversationToSave)
+}
+
 type conversationRepositoryTestContext struct {
 	database               *sql.DB
 	userRepository         *repositories.UserRepository
@@ -126,7 +131,7 @@ func TestConversationRepositoryCanSaveConversationWithMessage(t *testing.T) {
 	consumerID, providerID := savedConversationParticipants(t, testContext)
 	conversationToSave, messageToSave := pendingConversationWithMessage(t, consumerID, providerID)
 
-	savedConversation, err := testContext.conversationRepository.SaveWithMessage(conversationToSave, messageToSave)
+	savedConversation, err := saveConversationWithMessage(testContext.conversationRepository, conversationToSave, messageToSave)
 
 	require.NoError(t, err)
 	require.NotNil(t, savedConversation)
@@ -153,10 +158,11 @@ func TestConversationRepositoryRejectsDuplicateConversation(t *testing.T) {
 	consumerID, providerID := savedConversationParticipants(t, testContext)
 	conversationToSave, messageToSave := pendingConversationWithMessage(t, consumerID, providerID)
 
-	_, err := testContext.conversationRepository.SaveWithMessage(conversationToSave, messageToSave)
+	_, err := saveConversationWithMessage(testContext.conversationRepository, conversationToSave, messageToSave)
 	require.NoError(t, err)
 
-	duplicateConversation, err := testContext.conversationRepository.SaveWithMessage(conversationToSave, messageToSave)
+	duplicateConversationToSave, duplicateMessage := pendingConversationWithMessage(t, consumerID, providerID)
+	duplicateConversation, err := saveConversationWithMessage(testContext.conversationRepository, duplicateConversationToSave, duplicateMessage)
 
 	assert.ErrorIs(t, err, conversation.ErrAlreadyExists)
 	assert.Nil(t, duplicateConversation)
@@ -171,7 +177,7 @@ func TestConversationRepositoryCanCheckExistenceBetweenParticipants(t *testing.T
 	require.NoError(t, err)
 	assert.False(t, existsBeforeSave)
 
-	_, err = testContext.conversationRepository.SaveWithMessage(conversationToSave, messageToSave)
+	_, err = saveConversationWithMessage(testContext.conversationRepository, conversationToSave, messageToSave)
 	require.NoError(t, err)
 
 	existsAfterSave, err := testContext.conversationRepository.ExistsBetween(consumerID, providerID)
@@ -183,7 +189,7 @@ func TestConversationRepositoryCanFindConversationBetweenParticipants(t *testing
 	testContext := newConversationRepositoryTest(t)
 	consumerID, providerID := savedConversationParticipants(t, testContext)
 	conversationToSave, messageToSave := pendingConversationWithMessage(t, consumerID, providerID)
-	savedConversation, err := testContext.conversationRepository.SaveWithMessage(conversationToSave, messageToSave)
+	savedConversation, err := saveConversationWithMessage(testContext.conversationRepository, conversationToSave, messageToSave)
 	require.NoError(t, err)
 
 	foundConversation, err := testContext.conversationRepository.FindBetween(consumerID, providerID)
@@ -198,7 +204,7 @@ func TestConversationRepositoryCanDeleteBetweenParticipants(t *testing.T) {
 	testContext := newConversationRepositoryTest(t)
 	consumerID, providerID := savedConversationParticipants(t, testContext)
 	conversationToSave, messageToSave := pendingConversationWithMessage(t, consumerID, providerID)
-	_, err := testContext.conversationRepository.SaveWithMessage(conversationToSave, messageToSave)
+	_, err := saveConversationWithMessage(testContext.conversationRepository, conversationToSave, messageToSave)
 	require.NoError(t, err)
 
 	err = testContext.conversationRepository.DeleteBetween(consumerID, providerID)
@@ -213,7 +219,7 @@ func TestConversationRepositoryCanDeleteAllConversations(t *testing.T) {
 	testContext := newConversationRepositoryTest(t)
 	consumerID, providerID := savedConversationParticipants(t, testContext)
 	conversationToSave, messageToSave := pendingConversationWithMessage(t, consumerID, providerID)
-	_, err := testContext.conversationRepository.SaveWithMessage(conversationToSave, messageToSave)
+	_, err := saveConversationWithMessage(testContext.conversationRepository, conversationToSave, messageToSave)
 	require.NoError(t, err)
 
 	err = testContext.conversationRepository.DeleteAll()
@@ -228,7 +234,7 @@ func TestMessageRepositoryReportsMissingMessageInConversation(t *testing.T) {
 	testContext := newConversationRepositoryTest(t)
 	consumerID, providerID := savedConversationParticipants(t, testContext)
 	conversationToSave, messageToSave := pendingConversationWithMessage(t, consumerID, providerID)
-	savedConversation, err := testContext.conversationRepository.SaveWithMessage(conversationToSave, messageToSave)
+	savedConversation, err := saveConversationWithMessage(testContext.conversationRepository, conversationToSave, messageToSave)
 	require.NoError(t, err)
 
 	exists, err := testContext.messageRepository.ExistsInConversation(savedConversation.ID(), "otro mensaje")
@@ -241,7 +247,7 @@ func TestMessageRepositoryCanDeleteAllMessages(t *testing.T) {
 	testContext := newConversationRepositoryTest(t)
 	consumerID, providerID := savedConversationParticipants(t, testContext)
 	conversationToSave, messageToSave := pendingConversationWithMessage(t, consumerID, providerID)
-	savedConversation, err := testContext.conversationRepository.SaveWithMessage(conversationToSave, messageToSave)
+	savedConversation, err := saveConversationWithMessage(testContext.conversationRepository, conversationToSave, messageToSave)
 	require.NoError(t, err)
 
 	err = testContext.messageRepository.DeleteAll()
@@ -260,7 +266,7 @@ func TestConversationRepositoryCanFindByID(t *testing.T) {
 	testContext := newConversationRepositoryTest(t)
 	consumerID, providerID := savedConversationParticipants(t, testContext)
 	conversationToSave, messageToSave := pendingConversationWithMessage(t, consumerID, providerID)
-	savedConversation, err := testContext.conversationRepository.SaveWithMessage(conversationToSave, messageToSave)
+	savedConversation, err := saveConversationWithMessage(testContext.conversationRepository, conversationToSave, messageToSave)
 	require.NoError(t, err)
 
 	foundConversation, err := testContext.conversationRepository.FindByID(context.Background(), savedConversation.ID())
@@ -285,15 +291,15 @@ func TestConversationRepositoryFindByIDReturnsNotFoundIfConversationDoesNotExist
 	assert.Nil(t, foundConversation)
 }
 
-func TestConversationRepositoryCanSaveStatus(t *testing.T) {
+func TestConversationRepositoryCanSaveUpdatedStatus(t *testing.T) {
 	testContext := newConversationRepositoryTest(t)
 	consumerID, providerID := savedConversationParticipants(t, testContext)
 	conversationToSave, messageToSave := pendingConversationWithMessage(t, consumerID, providerID)
-	savedConversation, err := testContext.conversationRepository.SaveWithMessage(conversationToSave, messageToSave)
+	savedConversation, err := saveConversationWithMessage(testContext.conversationRepository, conversationToSave, messageToSave)
 	require.NoError(t, err)
 	require.NoError(t, savedConversation.Activate())
 
-	err = testContext.conversationRepository.SaveStatus(context.Background(), savedConversation)
+	_, err = testContext.conversationRepository.SaveConversation(context.Background(), savedConversation)
 
 	require.NoError(t, err)
 	foundConversation, err := testContext.conversationRepository.FindByID(context.Background(), savedConversation.ID())
@@ -301,30 +307,32 @@ func TestConversationRepositoryCanSaveStatus(t *testing.T) {
 	assert.Equal(t, conversation.StatusActive, foundConversation.Status())
 }
 
-func TestConversationRepositorySaveStatusReturnsNotFoundIfConversationDoesNotExist(t *testing.T) {
+func TestConversationRepositorySaveReturnsNotFoundIfConversationDoesNotExist(t *testing.T) {
 	testContext := newConversationRepositoryTest(t)
 
-	err := testContext.conversationRepository.SaveStatus(context.Background(), &conversation.WorkConversation{
+	_, err := testContext.conversationRepository.SaveConversation(context.Background(), &conversation.WorkConversation{
 		BaseConversation: conversation.RehydrateBaseConversation(999999999, conversation.TypeWork, conversation.StatusActive, time.Time{}, nil),
 	})
 
 	assert.ErrorIs(t, err, conversation.ErrConversationDoesNotExist)
 }
 
-func TestConversationRepositoryCanAddMessageToConversation(t *testing.T) {
+func TestConversationRepositoryCanSaveConversationWithNewMessage(t *testing.T) {
 	testContext := newConversationRepositoryTest(t)
 	consumerID, providerID := savedConversationParticipants(t, testContext)
 	conversationToSave, messageToSave := pendingConversationWithMessage(t, consumerID, providerID)
-	savedConversation, err := testContext.conversationRepository.SaveWithMessage(conversationToSave, messageToSave)
+	savedConversation, err := saveConversationWithMessage(testContext.conversationRepository, conversationToSave, messageToSave)
 	require.NoError(t, err)
 
 	providerMessage, err := conversation.NewProviderMessage("Sí, puedo pasar el jueves a las 10")
 	require.NoError(t, err)
 
-	savedMessage, err := testContext.conversationRepository.AddMessage(context.Background(), savedConversation.ID(), *providerMessage)
+	savedConversation.AddMessage(*providerMessage)
+	savedConversation, err = testContext.conversationRepository.SaveConversation(context.Background(), savedConversation)
 
 	require.NoError(t, err)
-	require.NotNil(t, savedMessage)
+	savedMessage, ok := savedConversation.LastMessage()
+	require.True(t, ok)
 	assert.NotZero(t, savedMessage.ID)
 	assert.Equal(t, savedConversation.ID(), savedMessage.ConversationID)
 	assert.Equal(t, conversation.SenderProvider, savedMessage.SenderRole)
@@ -340,15 +348,19 @@ func TestConversationRepositoryCanAddMessageToConversation(t *testing.T) {
 	assert.Equal(t, savedMessage.CreatedOn, foundConversation.UpdatedOn())
 }
 
-func TestConversationRepositoryAddMessageReturnsNotFoundForMissingConversation(t *testing.T) {
+func TestConversationRepositorySaveWithNewMessageReturnsNotFoundForMissingConversation(t *testing.T) {
 	testContext := newConversationRepositoryTest(t)
 	providerMessage, err := conversation.NewProviderMessage("Sí, puedo pasar el jueves a las 10")
 	require.NoError(t, err)
 
-	savedMessage, err := testContext.conversationRepository.AddMessage(context.Background(), 999999999, *providerMessage)
+	missingConversation := &conversation.WorkConversation{
+		BaseConversation: conversation.RehydrateBaseConversation(999999999, conversation.TypeWork, conversation.StatusActive, time.Time{}, nil),
+	}
+	missingConversation.AddMessage(*providerMessage)
+	savedConversation, err := testContext.conversationRepository.SaveConversation(context.Background(), missingConversation)
 
 	assert.ErrorIs(t, err, conversation.ErrConversationDoesNotExist)
-	assert.Nil(t, savedMessage)
+	assert.Nil(t, savedConversation)
 }
 
 func savedChatbotConversationForRepository(t *testing.T, testContext conversationRepositoryTestContext) conversation.Conversation {
@@ -376,7 +388,7 @@ func TestConversationRepositoryCanUpdateChatbotContext(t *testing.T) {
 
 	savedChatbotConversation := savedConversation.(*conversation.ChatBotConversation)
 	require.NoError(t, savedChatbotConversation.UpdateContext(conversation.ChatbotConversationContext{Summary: "La consumidora reportó una pérdida bajo la pileta.", LastSummarizedMessageID: 2}))
-	updatedConversation, err := testContext.conversationRepository.UpdateConversation(context.Background(), savedChatbotConversation)
+	updatedConversation, err := testContext.conversationRepository.SaveConversation(context.Background(), savedChatbotConversation)
 
 	require.NoError(t, err)
 	require.NotNil(t, updatedConversation)
@@ -454,7 +466,7 @@ func TestConversationRepositoryCanUpdateConversationWithChatbotTurn(t *testing.T
 	}, &savedCategory.ID))
 	require.NoError(t, savedChatbotConversation.AddTurn(*consumerMessage, *chatbotMessage))
 	savedChatbotConversation.FinishProcessing()
-	updatedConversation, err := testContext.conversationRepository.UpdateConversation(context.Background(), savedChatbotConversation)
+	updatedConversation, err := testContext.conversationRepository.SaveConversation(context.Background(), savedChatbotConversation)
 
 	require.NoError(t, err)
 	foundConversation, err := testContext.conversationRepository.FindByID(context.Background(), updatedConversation.ID())
@@ -480,18 +492,18 @@ func TestConversationRepositoryPreventsConcurrentChatbotProcessing(t *testing.T)
 	savedChatbotConversation := savedConversation.(*conversation.ChatBotConversation)
 
 	require.NoError(t, savedChatbotConversation.StartProcessing(time.Now().UTC()))
-	_, err = testContext.conversationRepository.UpdateConversation(context.Background(), savedChatbotConversation)
+	_, err = testContext.conversationRepository.SaveConversation(context.Background(), savedChatbotConversation)
 	require.NoError(t, err)
 
 	require.NoError(t, concurrentConversation.StartProcessing(time.Now().UTC()))
-	_, err = testContext.conversationRepository.UpdateConversation(context.Background(), concurrentConversation)
+	_, err = testContext.conversationRepository.SaveConversation(context.Background(), concurrentConversation)
 	assert.ErrorIs(t, err, conversation.ErrChatbotConversationAlreadyProcessing)
 
 	savedChatbotConversation.FinishProcessing()
-	_, err = testContext.conversationRepository.UpdateConversation(context.Background(), savedChatbotConversation)
+	_, err = testContext.conversationRepository.SaveConversation(context.Background(), savedChatbotConversation)
 	require.NoError(t, err)
 	require.NoError(t, savedChatbotConversation.StartProcessing(time.Now().UTC()))
-	_, err = testContext.conversationRepository.UpdateConversation(context.Background(), savedChatbotConversation)
+	_, err = testContext.conversationRepository.SaveConversation(context.Background(), savedChatbotConversation)
 	assert.NoError(t, err)
 }
 
@@ -502,14 +514,14 @@ func TestConversationRepositoryAllowsContextUpdateWhileSameChatbotProcessingOwns
 	startedOn := time.Now().UTC().Truncate(time.Microsecond)
 
 	require.NoError(t, savedChatbotConversation.StartProcessing(startedOn))
-	_, err := testContext.conversationRepository.UpdateConversation(context.Background(), savedChatbotConversation)
+	_, err := testContext.conversationRepository.SaveConversation(context.Background(), savedChatbotConversation)
 	require.NoError(t, err)
 	require.NoError(t, savedChatbotConversation.UpdateContext(conversation.ChatbotConversationContext{
 		Summary:                 "Contexto actualizado durante el procesamiento",
 		LastSummarizedMessageID: 2,
 	}))
 
-	_, err = testContext.conversationRepository.UpdateConversation(context.Background(), savedChatbotConversation)
+	_, err = testContext.conversationRepository.SaveConversation(context.Background(), savedChatbotConversation)
 
 	require.NoError(t, err)
 	foundConversation, err := testContext.conversationRepository.FindByID(context.Background(), savedConversation.ID())

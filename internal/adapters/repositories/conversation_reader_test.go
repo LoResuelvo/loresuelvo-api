@@ -26,7 +26,7 @@ func newSavedConversationReaderFixture(t *testing.T) conversationReaderFixture {
 	testContext := newConversationRepositoryTest(t)
 	consumerID, providerID := savedConversationParticipants(t, testContext)
 	conversationToSave, messageToSave := pendingConversationWithMessage(t, consumerID, providerID)
-	savedConversation, err := testContext.conversationRepository.SaveWithMessage(conversationToSave, messageToSave)
+	savedConversation, err := saveConversationWithMessage(testContext.conversationRepository, conversationToSave, messageToSave)
 	require.NoError(t, err)
 
 	return conversationReaderFixture{
@@ -138,8 +138,11 @@ func TestConversationReaderReflectsSentMessageAsLatestAndDetailLastMessage(t *te
 	fixture := newSavedConversationReaderFixture(t)
 	providerMessage, err := conversation.NewProviderMessage("Sí, puedo pasar el jueves a las 10")
 	require.NoError(t, err)
-	sentMessage, err := fixture.conversationRepository.AddMessage(context.Background(), fixture.savedConversation.ID(), *providerMessage)
+	fixture.savedConversation.AddMessage(*providerMessage)
+	savedConversation, err := fixture.conversationRepository.SaveConversation(context.Background(), fixture.savedConversation)
 	require.NoError(t, err)
+	sentMessage, ok := savedConversation.LastMessage()
+	require.True(t, ok)
 
 	consumerSummaries, err := fixture.reader.FindSummariesByParticipantIDRoleAndType(context.Background(), fixture.consumerID, conversation.SenderConsumer, conversation.TypeWork)
 	require.NoError(t, err)
@@ -194,7 +197,7 @@ func TestConversationReaderFindsChatbotSummariesByConsumerIDAndType(t *testing.T
 	require.NoError(t, err)
 
 	workConversation, workMessage := pendingConversationWithMessage(t, consumerID, providerID)
-	_, err = testContext.conversationRepository.SaveWithMessage(workConversation, workMessage)
+	_, err = saveConversationWithMessage(testContext.conversationRepository, workConversation, workMessage)
 	require.NoError(t, err)
 
 	summaries, err := reader.FindSummariesByParticipantIDRoleAndType(context.Background(), consumerID, conversation.SenderConsumer, conversation.TypeChatbot)

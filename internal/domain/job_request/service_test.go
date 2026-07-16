@@ -244,13 +244,13 @@ func (m *conversationRepo) FindByID(ctx context.Context, conversationID int) (co
 	return nil, conversation.ErrConversationDoesNotExist
 }
 
-func (m *conversationRepo) SaveStatus(ctx context.Context, conversation conversation.Conversation) error {
+func (m *conversationRepo) SaveConversation(ctx context.Context, conversation conversation.Conversation) (conversation.Conversation, error) {
 	m.saveStatusCalled = true
 	m.savedConversation = conversation
 	if m.err != nil {
-		return m.err
+		return nil, m.err
 	}
-	return nil
+	return conversation, nil
 }
 
 type jobRequestImageValidatorMock struct {

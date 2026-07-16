@@ -163,7 +163,7 @@ func (s *Service) Accept(ctx context.Context, providerAuthID string, jobRequestI
 		return nil, err
 	}
 
-	if err := s.conversationRepository.SaveStatus(ctx, linkedConversation); err != nil {
+	if _, err := s.conversationRepository.SaveConversation(ctx, linkedConversation); err != nil {
 		return nil, err
 	}
 

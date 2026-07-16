@@ -24,5 +24,5 @@ type UserRepository interface {
 
 type ConversationRepository interface {
 	FindByID(ctx context.Context, conversationID int) (conversation.Conversation, error)
-	SaveStatus(ctx context.Context, conversation conversation.Conversation) error
+	SaveConversation(ctx context.Context, conversation conversation.Conversation) (conversation.Conversation, error)
 }

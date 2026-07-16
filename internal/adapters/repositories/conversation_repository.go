@@ -40,6 +40,14 @@ func (repository *ConversationRepository) ExistsBetween(consumerID, providerID i
 }
 
 func (repository *ConversationRepository) SaveConversation(ctx context.Context, conversationToSave conversation.Conversation) (conversation.Conversation, error) {
+	if conversationToSave.ID() > 0 {
+		return repository.updateConversation(ctx, conversationToSave)
+	}
+
+	return repository.createConversation(ctx, conversationToSave)
+}
+
+func (repository *ConversationRepository) createConversation(ctx context.Context, conversationToSave conversation.Conversation) (conversation.Conversation, error) {
 	tx, err := repository.db.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, fmt.Errorf("beginning conversation transaction: %w", err)
@@ -54,11 +62,6 @@ func (repository *ConversationRepository) SaveConversation(ctx context.Context, 
 	}
 
 	return conversationToSave, nil
-}
-
-func (repository *ConversationRepository) SaveWithMessage(conversationToSave conversation.Conversation, message conversation.Message) (conversation.Conversation, error) {
-	conversationToSave.AddMessage(message)
-	return repository.SaveConversation(context.Background(), conversationToSave)
 }
 
 func (repository *ConversationRepository) saveConversationWithTx(ctx context.Context, tx *sql.Tx, conversationToSave conversation.Conversation) error {
@@ -107,32 +110,6 @@ func (repository *ConversationRepository) saveConversationWithTx(ctx context.Con
 	return nil
 }
 
-func (repository *ConversationRepository) AddMessage(ctx context.Context, conversationID int, message conversation.Message) (*conversation.Message, error) {
-	tx, err := repository.db.BeginTx(ctx, nil)
-	if err != nil {
-		return nil, fmt.Errorf("beginning add message transaction: %w", err)
-	}
-
-	if err := lockConversationByID(ctx, tx, conversationID); err != nil {
-		return nil, rollbackConversationTx(tx, err)
-	}
-
-	savedMessage, err := repository.messageRepository.saveWithTx(ctx, tx, conversationID, message)
-	if err != nil {
-		return nil, rollbackConversationTx(tx, err)
-	}
-
-	if err := repository.updateTimestampWithTx(ctx, tx, conversationID, savedMessage.CreatedOn); err != nil {
-		return nil, rollbackConversationTx(tx, err)
-	}
-
-	if err := tx.Commit(); err != nil {
-		return nil, fmt.Errorf("committing add message transaction: %w", err)
-	}
-
-	return savedMessage, nil
-}
-
 func (repository *ConversationRepository) CountMessagesBySenderRole(ctx context.Context, conversationID int, senderRole string) (int, error) {
 	var count int
 	err := repository.db.QueryRowContext(
@@ -150,7 +127,7 @@ func (repository *ConversationRepository) CountMessagesBySenderRole(ctx context.
 	return count, nil
 }
 
-func (repository *ConversationRepository) UpdateConversation(ctx context.Context, conversationToUpdate conversation.Conversation) (conversation.Conversation, error) {
+func (repository *ConversationRepository) updateConversation(ctx context.Context, conversationToUpdate conversation.Conversation) (conversation.Conversation, error) {
 	if conversationToUpdate.ID() <= 0 {
 		return nil, conversation.ErrConversationDoesNotExist
 	}
@@ -549,31 +526,6 @@ func optionalIntFromSQLNullInt64(value sql.NullInt64) *int {
 
 	converted := int(value.Int64)
 	return &converted
-}
-
-func (repository *ConversationRepository) SaveStatus(ctx context.Context, conversationToSave conversation.Conversation) error {
-	result, err := repository.db.ExecContext(
-		ctx,
-		`UPDATE conversations
-		SET status = $2, updated_on = NOW()
-		WHERE id = $1`,
-		conversationToSave.ID(),
-		conversationToSave.Status(),
-	)
-
-	if err != nil {
-		return fmt.Errorf("updating conversation status: %w", err)
-	}
-
-	rowsAffected, err := result.RowsAffected()
-	if err != nil {
-		return fmt.Errorf("checking updated conversation rows: %w", err)
-	}
-	if rowsAffected == 0 {
-		return conversation.ErrConversationDoesNotExist
-	}
-
-	return nil
 }
 
 func (repository *ConversationRepository) saveWorkConversationWithTx(ctx context.Context, tx *sql.Tx, conversationToSave *conversation.WorkConversation) error {
