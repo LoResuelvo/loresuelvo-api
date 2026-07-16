@@ -317,7 +317,7 @@ func (s *Service) ResolveMessageImages(ctx context.Context, fileIDs []string) (m
 
 	result := make(map[string]MessageImage, len(files))
 	for _, file := range files {
-		if !isAvailableConversationMessageImage(file) {
+		if !isAvailableImageForPurpose(file, PurposeConversationMessageImage) {
 			continue
 		}
 		resolved, err := s.resolveImage(ctx, file)
@@ -359,7 +359,7 @@ func (s *Service) ResolveJobRequestImages(ctx context.Context, images []Image) (
 	}
 	filesByID := make(map[string]File, len(files))
 	for _, file := range files {
-		if !isAvailableJobRequestImage(file) && !isAvailableConversationMessageImage(file) {
+		if !isAvailableImageForPurpose(file, PurposeJobRequestImage) && !isAvailableImageForPurpose(file, PurposeConversationMessageImage) {
 			return nil, ErrJobRequestImageNotAvailable
 		}
 		filesByID[file.ID] = file
@@ -435,24 +435,16 @@ func isValidProfilePhotoFor(file File, authID string) bool {
 }
 
 func isValidConversationMessageImageFor(file File, authID string) bool {
-	return isAvailableConversationMessageImage(file) && file.WasUploadedBy(authID)
-}
-
-func isAvailableConversationMessageImage(file File) bool {
-	return file.IsConfirmed() &&
-		!file.IsPublic() &&
-		file.HasPurpose(PurposeConversationMessageImage) &&
-		conversationMessageImagePolicy.Allows(file.Metadata())
+	return isAvailableImageForPurpose(file, PurposeConversationMessageImage) && file.WasUploadedBy(authID)
 }
 
 func isValidJobRequestImageFor(file File, authID string) bool {
-	return isAvailableJobRequestImage(file) && file.WasUploadedBy(authID)
+	return isAvailableImageForPurpose(file, PurposeJobRequestImage) && file.WasUploadedBy(authID)
 }
 
-// TODO: No repetir código.
-func isAvailableJobRequestImage(file File) bool {
+func isAvailableImageForPurpose(file File, purpose string) bool {
 	return file.IsConfirmed() &&
 		!file.IsPublic() &&
-		file.HasPurpose(PurposeJobRequestImage) &&
+		file.HasPurpose(purpose) &&
 		jobRequestImagePolicy.Allows(file.Metadata())
 }
