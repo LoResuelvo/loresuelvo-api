@@ -57,7 +57,13 @@ func (h *ServiceProposalHandler) GetServiceProposals(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, serviceProposalSummaryResponsesFromDomain(serviceProposals))
+	response, err := serviceProposalSummaryResponsesFromDomain(serviceProposals, auth0ID)
+	if err != nil {
+		httphandler.RespondError(c, http.StatusInternalServerError, "Could not map service proposals")
+		return
+	}
+
+	c.JSON(http.StatusOK, response)
 }
 
 func (h *ServiceProposalHandler) AcceptServiceProposal(c *gin.Context) {

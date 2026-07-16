@@ -419,11 +419,12 @@ func TestConsumerGetsPendingServiceProposal(t *testing.T) {
 
 	require.NoError(t, err)
 	require.Len(t, proposals, 1)
+	assert.Same(t, expectedProposal, proposals[0])
 	assert.Equal(t, expectedProposal.ID, proposals[0].ID)
-	assert.Equal(t, "Juan", proposals[0].Counterpart.Name)
-	assert.Equal(t, "Gomez", proposals[0].Counterpart.Surname)
-	assert.Equal(t, "Plomeria", proposals[0].Counterpart.CategoryName)
-	assert.Equal(t, "https://cdn/provider.jpg", proposals[0].Counterpart.ProfilePhotoURL)
+	assert.Equal(t, "Juan", proposals[0].Provider.Name())
+	assert.Equal(t, "Gomez", proposals[0].Provider.Surname())
+	assert.Equal(t, "Plomeria", proposals[0].Provider.Categoryname())
+	assert.Equal(t, "https://cdn/provider.jpg", proposals[0].Provider.ProfilePhoto.URL)
 	env.userRepo.AssertExpectations(t)
 	env.serviceRepo.AssertExpectations(t)
 }

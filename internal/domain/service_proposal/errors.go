@@ -13,4 +13,5 @@ var (
 	ErrOnlyRecipientCanAccept   = errors.New("Only the recipient consumer can accept the service proposal")
 	ErrOnlyPendingCanBeAccepted = errors.New("Only pending service proposals can be accepted")
 	ErrServiceProposalExpired   = errors.New("Service proposal has expired")
+	ErrOnlyParticipantCanView   = errors.New("Only a participant can view the service proposal")
 )

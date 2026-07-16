@@ -162,6 +162,7 @@ func (r *ServiceProposalRepository) FindByUserID(ctx context.Context, userID int
 			consumer_user.email,
 			consumer_user.name,
 			consumer_user.surname,
+			consumer_user.profile_photo_file_id,
 			provider_user.id,
 			provider_user.auth_id,
 			provider_user.email,
@@ -189,14 +190,15 @@ func (r *ServiceProposalRepository) FindByUserID(ctx context.Context, userID int
 	proposals := make([]*serviceproposal.ServiceProposal, 0)
 	for rows.Next() {
 		var (
-			proposal           serviceproposal.ServiceProposal
-			conversationID     int
-			conversationType   string
-			conversationStatus string
-			consumerUser       user.BaseUser
-			providerUser       user.BaseUser
-			providerCategory   category.Category
-			profilePhotoFileID string
+			proposal                   serviceproposal.ServiceProposal
+			conversationID             int
+			conversationType           string
+			conversationStatus         string
+			consumerUser               user.BaseUser
+			providerUser               user.BaseUser
+			providerCategory           category.Category
+			consumerProfilePhotoFileID sql.NullString
+			providerProfilePhotoFileID sql.NullString
 		)
 
 		err := rows.Scan(
@@ -214,6 +216,7 @@ func (r *ServiceProposalRepository) FindByUserID(ctx context.Context, userID int
 			&consumerUser.Email,
 			&consumerUser.Name,
 			&consumerUser.Surname,
+			&consumerProfilePhotoFileID,
 			&providerUser.ID,
 			&providerUser.AuthID,
 			&providerUser.Email,
@@ -222,7 +225,7 @@ func (r *ServiceProposalRepository) FindByUserID(ctx context.Context, userID int
 			&providerCategory.ID,
 			&providerCategory.Name,
 			&providerCategory.NormalizedName,
-			&profilePhotoFileID,
+			&providerProfilePhotoFileID,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("scanning service proposal by user id: %w", err)
@@ -233,7 +236,8 @@ func (r *ServiceProposalRepository) FindByUserID(ctx context.Context, userID int
 
 		consumerUser.Role = consumer.Role
 		providerUser.Role = provider.Role
-		providerUser.ProfilePhoto = imageFromPersistence(profilePhotoFileID, "")
+		consumerUser.ProfilePhoto = imageFromPersistence(consumerProfilePhotoFileID.String, "")
+		providerUser.ProfilePhoto = imageFromPersistence(providerProfilePhotoFileID.String, "")
 		proposal.Consumer = &consumer.Consumer{BaseUser: &consumerUser}
 		proposal.Provider = &provider.Provider{
 			BaseUser: &providerUser,

@@ -8,6 +8,7 @@ import (
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/conversation"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/notification"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/provider"
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/user"
 )
 
 type Status string
@@ -113,6 +114,16 @@ func (sp *ServiceProposal) ConsumerID() int {
 
 func (sp *ServiceProposal) ProviderID() int {
 	return sp.Provider.ID
+}
+
+func (sp *ServiceProposal) CounterpartFor(authID string) (user.User, error) {
+	if sp.Consumer.Base().AuthID == authID {
+		return sp.Provider, nil
+	}
+	if sp.Provider.Base().AuthID == authID {
+		return sp.Consumer, nil
+	}
+	return nil, ErrOnlyParticipantCanView
 }
 
 func validateParameters(amount int64, scheduledOn time.Time, clock clock.Clock) error {

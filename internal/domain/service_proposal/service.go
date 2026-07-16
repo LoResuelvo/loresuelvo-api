@@ -10,7 +10,7 @@ import (
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/conversation"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/notification"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/provider"
-	readmodel "github.com/LoResuelvo/loresuelvo-api/internal/domain/service_proposal/read_model"
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/user"
 	workorder "github.com/LoResuelvo/loresuelvo-api/internal/domain/work_order"
 )
 
@@ -61,7 +61,7 @@ func (s *Service) CreateServiceProposal(ctx context.Context, auth0ID string, con
 	return savedProposal, nil
 }
 
-func (s *Service) GetServiceProposals(ctx context.Context, auth0ID string) ([]readmodel.ServiceProposalSummary, error) {
+func (s *Service) GetServiceProposals(ctx context.Context, auth0ID string) ([]*ServiceProposal, error) {
 	foundUser, err := s.userRepository.FindByAuthID(auth0ID)
 	if err != nil {
 		return nil, err
@@ -72,16 +72,12 @@ func (s *Service) GetServiceProposals(ctx context.Context, auth0ID string) ([]re
 		return nil, err
 	}
 
-	summaries := make([]readmodel.ServiceProposalSummary, 0, len(proposals))
-	fileIDs := make([]string, 0, len(proposals))
+	fileIDs := make([]string, 0, len(proposals)*2)
 	for _, proposal := range proposals {
-		summary, err := serviceProposalSummaryFor(proposal, foundUser.Base().Role)
-		if err != nil {
-			return nil, err
-		}
-		summaries = append(summaries, summary)
-		if summary.Counterpart.ProfilePhotoFileID != "" {
-			fileIDs = append(fileIDs, summary.Counterpart.ProfilePhotoFileID)
+		for _, participant := range []user.User{proposal.Consumer, proposal.Provider} {
+			if participant.Base().ProfilePhoto != nil {
+				fileIDs = append(fileIDs, participant.Base().ProfilePhoto.FileID)
+			}
 		}
 	}
 
@@ -89,10 +85,14 @@ func (s *Service) GetServiceProposals(ctx context.Context, auth0ID string) ([]re
 	if err != nil {
 		return nil, fmt.Errorf("resolving service proposal counterpart profile photos: %w", err)
 	}
-	for index := range summaries {
-		summaries[index].Counterpart.ProfilePhotoURL = urlsByFileID[summaries[index].Counterpart.ProfilePhotoFileID]
+	for _, proposal := range proposals {
+		for _, participant := range []user.User{proposal.Consumer, proposal.Provider} {
+			if participant.Base().ProfilePhoto != nil {
+				participant.Base().ProfilePhoto.URL = urlsByFileID[participant.Base().ProfilePhoto.FileID]
+			}
+		}
 	}
-	return summaries, nil
+	return proposals, nil
 }
 
 func (s *Service) Accept(ctx context.Context, auth0ID string, proposalID int) (*workorder.WorkOrder, error) {
@@ -138,48 +138,6 @@ func (s *Service) saveAndNotify(ctx context.Context, createdNotification *notifi
 		}
 	}
 	return nil
-}
-
-func serviceProposalSummaryFor(proposal *ServiceProposal, viewerRole string) (readmodel.ServiceProposalSummary, error) {
-	if proposal == nil || proposal.Conversation == nil {
-		return readmodel.ServiceProposalSummary{}, fmt.Errorf("mapping service proposal summary: incomplete proposal")
-	}
-	summary := readmodel.ServiceProposalSummary{
-		ID:             proposal.ID,
-		ConversationID: proposal.Conversation.ID(),
-		Amount:         proposal.Amount,
-		ScheduledOn:    proposal.ScheduledOn,
-		Description:    proposal.Description,
-		Status:         string(proposal.Status),
-		CreatedOn:      proposal.CreatedOn,
-	}
-	switch viewerRole {
-	case consumer.Role:
-		if proposal.Provider == nil || proposal.Provider.Category == nil {
-			return readmodel.ServiceProposalSummary{}, fmt.Errorf("mapping service proposal summary: incomplete provider counterpart")
-		}
-		summary.Counterpart = readmodel.Counterpart{
-			ID:                 proposal.Provider.ID,
-			Role:               provider.Role,
-			Name:               proposal.Provider.Name(),
-			Surname:            proposal.Provider.Surname(),
-			CategoryName:       proposal.Provider.Categoryname(),
-			ProfilePhotoFileID: proposal.Provider.ProfilePhotoFileID(),
-		}
-	case provider.Role:
-		if proposal.Consumer == nil {
-			return readmodel.ServiceProposalSummary{}, fmt.Errorf("mapping service proposal summary: incomplete consumer counterpart")
-		}
-		summary.Counterpart = readmodel.Counterpart{
-			ID:      proposal.Consumer.ID,
-			Role:    consumer.Role,
-			Name:    proposal.Consumer.Name(),
-			Surname: proposal.Consumer.Surname(),
-		}
-	default:
-		return readmodel.ServiceProposalSummary{}, fmt.Errorf("mapping service proposal summary: unsupported viewer role %q", viewerRole)
-	}
-	return summary, nil
 }
 
 func (s *Service) getParticipants(providerAuth0ID string, consumerID int) (*provider.Provider, *consumer.Consumer, conversation.Conversation, error) {

@@ -73,6 +73,40 @@ func TestShouldCreateAsPending(t *testing.T) {
 	assert.Equal(t, serviceproposal.StatusPending, serviceProposal.Status)
 }
 
+func TestServiceProposalReturnsCounterpartForConsumer(t *testing.T) {
+	consumerUser := &consumer.Consumer{BaseUser: &user.BaseUser{AuthID: "auth0|consumer"}}
+	providerUser := &provider.Provider{BaseUser: &user.BaseUser{AuthID: "auth0|provider"}}
+	proposal := &serviceproposal.ServiceProposal{Consumer: consumerUser, Provider: providerUser}
+
+	counterpart, err := proposal.CounterpartFor("auth0|consumer")
+
+	assert.NoError(t, err)
+	assert.Same(t, providerUser, counterpart)
+}
+
+func TestServiceProposalReturnsCounterpartForProvider(t *testing.T) {
+	consumerUser := &consumer.Consumer{BaseUser: &user.BaseUser{AuthID: "auth0|consumer"}}
+	providerUser := &provider.Provider{BaseUser: &user.BaseUser{AuthID: "auth0|provider"}}
+	proposal := &serviceproposal.ServiceProposal{Consumer: consumerUser, Provider: providerUser}
+
+	counterpart, err := proposal.CounterpartFor("auth0|provider")
+
+	assert.NoError(t, err)
+	assert.Same(t, consumerUser, counterpart)
+}
+
+func TestServiceProposalRejectsNonParticipantCounterpartAccess(t *testing.T) {
+	proposal := &serviceproposal.ServiceProposal{
+		Consumer: &consumer.Consumer{BaseUser: &user.BaseUser{AuthID: "auth0|consumer"}},
+		Provider: &provider.Provider{BaseUser: &user.BaseUser{AuthID: "auth0|provider"}},
+	}
+
+	counterpart, err := proposal.CounterpartFor("auth0|other")
+
+	assert.ErrorIs(t, err, serviceproposal.ErrOnlyParticipantCanView)
+	assert.Nil(t, counterpart)
+}
+
 func TestShouldCreateANotification(t *testing.T) {
 	clock := new(MockClock)
 	frezzedTime := time.Now()
