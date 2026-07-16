@@ -392,7 +392,7 @@ func TestConsumerGetsPendingServiceProposal(t *testing.T) {
 		Status:      serviceproposal.StatusPending,
 		CreatedOn:   time.Now(),
 		Conversation: &conversation.WorkConversation{
-			BaseConversation: &conversation.BaseConversation{ID: 10},
+			BaseConversation: conversation.RehydrateBaseConversation(10, conversation.TypeWork, "", time.Time{}, nil),
 		},
 	}
 	expectedProposal.Provider.BaseUser.Name = "Juan"

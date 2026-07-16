@@ -179,7 +179,7 @@ func TestJobRequestRepositoryCanSaveRequestWithConversation(t *testing.T) {
 	foundWorkConversation := foundConversation.(*conversation.WorkConversation)
 	assert.Equal(t, consumerID, foundWorkConversation.ConsumerID)
 	assert.Equal(t, providerID, foundWorkConversation.ProviderID)
-	assert.Equal(t, conversation.StatusPending, foundWorkConversation.Base().Status)
+	assert.Equal(t, conversation.StatusPending, foundWorkConversation.Status())
 
 	foundJobRequest, err := testContext.jobRequestRepository.FindByConversationID(savedJobRequest.ConversationID)
 	require.NoError(t, err)

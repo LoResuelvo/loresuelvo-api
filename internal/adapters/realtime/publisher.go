@@ -48,7 +48,7 @@ func (p *Publisher) PublishMessage(ctx context.Context, conv conversation.Conver
 		return
 	}
 
-	event, err := BuildMessageEvent(conv.Base().ID, message)
+	event, err := BuildMessageEvent(conv.ID(), message)
 	if err != nil {
 		slog.Error("realtime publisher: failed to build event", "error", err)
 		return

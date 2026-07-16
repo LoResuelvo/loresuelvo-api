@@ -63,33 +63,26 @@ func (s *Service) GetByID(ctx context.Context, authID string, conversationID int
 	}
 }
 
-// TODO: No duplicar código, adaptador se encarga de resolver según el tipo de Usuario
 func (s *Service) getWorkConversationDetail(ctx context.Context, authID string, workConversation *WorkConversation) (*readmodel.ConversationDetail, error) {
-	if s.authenticatedConsumerMatches(authID, workConversation.ConsumerID) {
-		detail, err := s.conversationReader.FindDetailByIDRoleAndType(ctx, workConversation.Base().ID, SenderConsumer, TypeWork)
-		if err != nil {
-			return nil, err
-		}
-		detail, err = s.withCounterpartProfilePhotoURL(ctx, detail)
-		if err != nil {
-			return nil, err
-		}
-		return s.withMessageImageURLs(ctx, detail)
+	authenticatedUser, err := s.authenticatedUserForConversation(authID, workConversation)
+	if err != nil {
+		return nil, err
 	}
 
-	if s.authenticatedProviderMatches(authID, workConversation.ProviderID) {
-		detail, err := s.conversationReader.FindDetailByIDRoleAndType(ctx, workConversation.Base().ID, SenderProvider, TypeWork)
-		if err != nil {
-			return nil, err
-		}
-		detail, err = s.withCounterpartProfilePhotoURL(ctx, detail)
-		if err != nil {
-			return nil, err
-		}
-		return s.withMessageImageURLs(ctx, detail)
+	detail, err := s.conversationReader.FindDetailByIDRoleAndType(
+		ctx,
+		workConversation.ID(),
+		authenticatedUser.Base().Role,
+		workConversation.ConversationType(),
+	)
+	if err != nil {
+		return nil, err
 	}
-
-	return nil, ErrConversationAccessDenied
+	detail, err = s.withCounterpartProfilePhotoURL(ctx, detail)
+	if err != nil {
+		return nil, err
+	}
+	return s.withMessageImageURLs(ctx, detail)
 }
 
 func (s *Service) getChatbotConversationDetail(ctx context.Context, authID string, chatbotConversation *ChatBotConversation) (*readmodel.ConversationDetail, error) {
@@ -97,7 +90,7 @@ func (s *Service) getChatbotConversationDetail(ctx context.Context, authID strin
 		return nil, ErrConversationAccessDenied
 	}
 
-	detail, err := s.conversationReader.FindDetailByIDRoleAndType(ctx, chatbotConversation.Base().ID, SenderConsumer, TypeChatbot)
+	detail, err := s.conversationReader.FindDetailByIDRoleAndType(ctx, chatbotConversation.ID(), SenderConsumer, TypeChatbot)
 	if err != nil {
 		return nil, err
 	}
@@ -543,11 +536,6 @@ func (s *Service) authenticatedUserForConversation(authID string, conversation *
 	return authenticatedUser, nil
 }
 
-func (s *Service) authenticatedProviderMatches(authID string, providerID int) bool {
-	authenticatedUser, err := s.userRepository.FindByAuthID(authID)
-	return err == nil && authenticatedUser.Base().Role == SenderProvider && authenticatedUser.Base().ID == providerID
-}
-
 func (s *Service) senderRoleForAuthenticatedParticipant(authID string, foundConversation Conversation) (string, error) {
 	workConversation, ok := foundConversation.(*WorkConversation)
 	if !ok {
@@ -632,7 +620,7 @@ func (s *Service) withMessageImageURLs(ctx context.Context, detail *readmodel.Co
 }
 
 func (s *Service) ensureMessageAllowedInCurrentConversationState(ctx context.Context, foundConversation Conversation, message Message) error {
-	if foundConversation.Base().Status != StatusPending {
+	if foundConversation.Status() != StatusPending {
 		return nil
 	}
 
@@ -640,7 +628,7 @@ func (s *Service) ensureMessageAllowedInCurrentConversationState(ctx context.Con
 		return ErrPendingConversationRequiresAcceptance
 	}
 
-	sentMessages, err := s.conversationRepository.CountMessagesBySenderRole(ctx, foundConversation.Base().ID, SenderConsumer)
+	sentMessages, err := s.conversationRepository.CountMessagesBySenderRole(ctx, foundConversation.ID(), SenderConsumer)
 	if err != nil {
 		return err
 	}

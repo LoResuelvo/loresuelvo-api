@@ -62,32 +62,34 @@ func (repository *ConversationRepository) SaveWithMessage(conversationToSave con
 }
 
 func (repository *ConversationRepository) saveConversationWithTx(ctx context.Context, tx *sql.Tx, conversationToSave conversation.Conversation) error {
-	base := conversationToSave.Base()
+	var conversationID int
+	var updatedOn time.Time
 	err := tx.QueryRowContext(
 		ctx,
 		`INSERT INTO conversations (type, status, created_on, updated_on)
 		VALUES ($1, $2, NOW(), NOW())
 		RETURNING id, updated_on`,
-		base.Type,
-		base.Status,
+		conversationToSave.ConversationType(),
+		conversationToSave.Status(),
 	).Scan(
-		&base.ID,
-		&base.UpdatedOn,
+		&conversationID,
+		&updatedOn,
 	)
 	if err != nil {
 		return mapConversationInsertError(err)
 	}
+	conversationToSave.SetPersistenceState(conversationID, updatedOn)
 
 	messages := conversationToSave.Messages()
 	baseMessages := make([]conversation.Message, 0, len(messages))
 	for _, message := range messages {
-		savedMessage, err := repository.messageRepository.saveWithTx(ctx, tx, base.ID, message)
+		savedMessage, err := repository.messageRepository.saveWithTx(ctx, tx, conversationID, message)
 		if err != nil {
 			return err
 		}
 		baseMessages = append(baseMessages, *savedMessage)
 	}
-	base.SetMessages(baseMessages)
+	conversationToSave.SetMessages(baseMessages)
 
 	switch typedConversation := conversationToSave.(type) {
 	case *conversation.WorkConversation:
@@ -149,8 +151,7 @@ func (repository *ConversationRepository) CountMessagesBySenderRole(ctx context.
 }
 
 func (repository *ConversationRepository) UpdateConversation(ctx context.Context, conversationToUpdate conversation.Conversation) (conversation.Conversation, error) {
-	base := conversationToUpdate.Base()
-	if base.ID <= 0 {
+	if conversationToUpdate.ID() <= 0 {
 		return nil, conversation.ErrConversationDoesNotExist
 	}
 
@@ -159,7 +160,7 @@ func (repository *ConversationRepository) UpdateConversation(ctx context.Context
 		return nil, fmt.Errorf("beginning update conversation transaction: %w", err)
 	}
 
-	if err := lockConversationByID(ctx, tx, base.ID); err != nil {
+	if err := lockConversationByID(ctx, tx, conversationToUpdate.ID()); err != nil {
 		return nil, rollbackConversationTx(tx, err)
 	}
 
@@ -172,8 +173,8 @@ func (repository *ConversationRepository) UpdateConversation(ctx context.Context
 		return nil, rollbackConversationTx(tx, err)
 	}
 	if lastSavedMessage != nil {
-		base.SetMessages(savedMessages)
-		if err := repository.updateTimestampWithTx(ctx, tx, base.ID, lastSavedMessage.CreatedOn); err != nil {
+		conversationToUpdate.SetMessages(savedMessages)
+		if err := repository.updateTimestampWithTx(ctx, tx, conversationToUpdate.ID(), lastSavedMessage.CreatedOn); err != nil {
 			return nil, rollbackConversationTx(tx, err)
 		}
 	}
@@ -192,14 +193,13 @@ func (repository *ConversationRepository) UpdateConversation(ctx context.Context
 }
 
 func (repository *ConversationRepository) updateConversationStatusWithTx(ctx context.Context, tx *sql.Tx, conversationToUpdate conversation.Conversation) error {
-	base := conversationToUpdate.Base()
 	result, err := tx.ExecContext(
 		ctx,
 		`UPDATE conversations
 		SET status = $2
 		WHERE id = $1`,
-		base.ID,
-		base.Status,
+		conversationToUpdate.ID(),
+		conversationToUpdate.Status(),
 	)
 	if err != nil {
 		return fmt.Errorf("updating conversation status: %w", err)
@@ -217,7 +217,7 @@ func (repository *ConversationRepository) updateConversationStatusWithTx(ctx con
 }
 
 func (repository *ConversationRepository) saveNewMessagesWithTx(ctx context.Context, tx *sql.Tx, conversationToUpdate conversation.Conversation) ([]conversation.Message, *conversation.Message, error) {
-	conversationID := conversationToUpdate.Base().ID
+	conversationID := conversationToUpdate.ID()
 	savedMessages := make([]conversation.Message, 0, len(conversationToUpdate.Messages()))
 	var lastSavedMessage *conversation.Message
 
@@ -261,7 +261,7 @@ func (repository *ConversationRepository) updateChatbotConversationWithTx(ctx co
 			last_response_status = $4,
 			current_assessment_id = $5
 		WHERE conversation_id = $1`,
-		chatbotConversation.Base().ID,
+		chatbotConversation.ID(),
 		chatbotConversation.Context.Summary,
 		chatbotConversation.Context.LastSummarizedMessageID,
 		chatbotConversation.LastResponseStatus,
@@ -292,7 +292,7 @@ func (repository *ConversationRepository) startChatbotProcessingWithTx(ctx conte
 			processing_started_on = $4
 		WHERE conversation_id = $1
 			AND (processing_started_on IS NULL OR processing_started_on = $4 OR processing_started_on < $5)`,
-		chatbotConversation.Base().ID,
+		chatbotConversation.ID(),
 		chatbotConversation.Context.Summary,
 		chatbotConversation.Context.LastSummarizedMessageID,
 		startedOn,
@@ -311,7 +311,7 @@ func (repository *ConversationRepository) startChatbotProcessingWithTx(ctx conte
 	}
 
 	var exists bool
-	if err := tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM chatbot_conversations WHERE conversation_id = $1)`, chatbotConversation.Base().ID).Scan(&exists); err != nil {
+	if err := tx.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM chatbot_conversations WHERE conversation_id = $1)`, chatbotConversation.ID()).Scan(&exists); err != nil {
 		return fmt.Errorf("checking chatbot conversation existence: %w", err)
 	}
 	if !exists {
@@ -348,7 +348,9 @@ func (repository *ConversationRepository) DeleteAll() error {
 }
 
 func (repository *ConversationRepository) FindBetween(consumerID, providerID int) (conversation.Conversation, error) {
-	foundConversation := &conversation.WorkConversation{BaseConversation: &conversation.BaseConversation{Type: conversation.TypeWork}}
+	var conversationID int
+	var status string
+	var updatedOn time.Time
 	err := repository.db.QueryRow(
 		`SELECT c.id, wc.consumer_id, wc.provider_id, c.status, c.updated_on
 		FROM conversations c
@@ -357,21 +359,27 @@ func (repository *ConversationRepository) FindBetween(consumerID, providerID int
 		consumerID,
 		providerID,
 	).Scan(
-		&foundConversation.BaseConversation.ID,
-		&foundConversation.ConsumerID,
-		&foundConversation.ProviderID,
-		&foundConversation.BaseConversation.Status,
-		&foundConversation.BaseConversation.UpdatedOn,
+		&conversationID,
+		&consumerID,
+		&providerID,
+		&status,
+		&updatedOn,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("finding conversation between consumer and provider: %w", err)
 	}
 
-	return foundConversation, nil
+	return &conversation.WorkConversation{
+		BaseConversation: conversation.RehydrateBaseConversation(conversationID, conversation.TypeWork, status, updatedOn, nil),
+		ConsumerID:       consumerID,
+		ProviderID:       providerID,
+	}, nil
 }
 
 func (repository *ConversationRepository) FindByID(ctx context.Context, conversationID int) (conversation.Conversation, error) {
-	var base conversation.BaseConversation
+	var foundConversationID int
+	var status string
+	var updatedOn time.Time
 	var consumerID int
 	var providerID int
 	var title sql.NullString
@@ -415,7 +423,7 @@ func (repository *ConversationRepository) FindByID(ctx context.Context, conversa
 		WHERE c.id = $1`,
 		conversationID,
 	).Scan(
-		&base.ID,
+		&foundConversationID,
 		&consumerID,
 		&providerID,
 		&title,
@@ -430,8 +438,8 @@ func (repository *ConversationRepository) FindByID(ctx context.Context, conversa
 		&assessmentTitle,
 		&assessmentDescription,
 		&assessmentBasedOnMessageID,
-		&base.Status,
-		&base.UpdatedOn,
+		&status,
+		&updatedOn,
 		&conversationType,
 	)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -441,12 +449,11 @@ func (repository *ConversationRepository) FindByID(ctx context.Context, conversa
 		return nil, fmt.Errorf("finding conversation by id: %w", err)
 	}
 
-	base.Type = conversationType
 	messages, err := repository.findMessagesByConversationID(ctx, conversationID)
 	if err != nil {
 		return nil, err
 	}
-	base.SetMessages(messages)
+	base := conversation.RehydrateBaseConversation(foundConversationID, conversationType, status, updatedOn, messages)
 
 	switch conversationType {
 	case conversation.TypeChatbot:
@@ -459,7 +466,7 @@ func (repository *ConversationRepository) FindByID(ctx context.Context, conversa
 			return nil, err
 		}
 		chatbotConversation := &conversation.ChatBotConversation{
-			BaseConversation:   &base,
+			BaseConversation:   base,
 			ConsumerID:         consumerID,
 			Title:              title.String,
 			LastResponseStatus: responseStatus,
@@ -476,7 +483,7 @@ func (repository *ConversationRepository) FindByID(ctx context.Context, conversa
 			}
 			chatbotConversation.CurrentAssessment = &conversation.ProblemAssessment{
 				ID:                    int(assessmentID.Int64),
-				ChatbotConversationID: base.ID,
+				ChatbotConversationID: base.ID(),
 				Version:               int(assessmentVersion.Int64),
 				Outcome:               outcome,
 				ProblemCategoryID:     optionalIntFromSQLNullInt64(assessmentCategoryID),
@@ -492,7 +499,7 @@ func (repository *ConversationRepository) FindByID(ctx context.Context, conversa
 		return chatbotConversation, nil
 	case conversation.TypeWork:
 		return &conversation.WorkConversation{
-			BaseConversation: &base,
+			BaseConversation: base,
 			ConsumerID:       consumerID,
 			ProviderID:       providerID,
 		}, nil
@@ -545,14 +552,13 @@ func optionalIntFromSQLNullInt64(value sql.NullInt64) *int {
 }
 
 func (repository *ConversationRepository) SaveStatus(ctx context.Context, conversationToSave conversation.Conversation) error {
-	base := conversationToSave.Base()
 	result, err := repository.db.ExecContext(
 		ctx,
 		`UPDATE conversations
 		SET status = $2, updated_on = NOW()
 		WHERE id = $1`,
-		base.ID,
-		base.Status,
+		conversationToSave.ID(),
+		conversationToSave.Status(),
 	)
 
 	if err != nil {
@@ -575,7 +581,7 @@ func (repository *ConversationRepository) saveWorkConversationWithTx(ctx context
 		ctx,
 		`INSERT INTO work_conversations (conversation_id, consumer_id, provider_id)
 		VALUES ($1, $2, $3)`,
-		conversationToSave.Base().ID,
+		conversationToSave.ID(),
 		conversationToSave.ConsumerID,
 		conversationToSave.ProviderID,
 	)
@@ -603,7 +609,7 @@ func (repository *ConversationRepository) saveChatbotConversationWithTx(ctx cont
 			last_response_status
 		)
 		VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-		conversationToSave.Base().ID,
+		conversationToSave.ID(),
 		conversationToSave.ConsumerID,
 		conversationToSave.Title,
 		conversationToSave.Context.Summary,
@@ -623,7 +629,7 @@ func (repository *ConversationRepository) saveChatbotConversationWithTx(ctx cont
 	}
 	_, err = tx.ExecContext(ctx,
 		`UPDATE chatbot_conversations SET current_assessment_id = $2 WHERE conversation_id = $1`,
-		conversationToSave.Base().ID,
+		conversationToSave.ID(),
 		conversationToSave.CurrentAssessment.ID,
 	)
 	return err
@@ -636,7 +642,7 @@ func (repository *ConversationRepository) saveCurrentAssessmentWithTx(ctx contex
 	}
 	messages := chatbotConversation.Messages()
 
-	assessment.ChatbotConversationID = chatbotConversation.Base().ID
+	assessment.ChatbotConversationID = chatbotConversation.ID()
 	assessment.BasedOnMessageID = messages[len(messages)-1].ID
 	if err := assessment.Validate(); err != nil {
 		return err

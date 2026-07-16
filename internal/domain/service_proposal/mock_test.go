@@ -22,7 +22,7 @@ var (
 	validServiceDescription       = "Service description"
 	validServiceAmount      int64 = 1000
 	validServiceScheduledOn       = time.Now().Add(time.Hour)
-	validConversation             = &conversation.WorkConversation{BaseConversation: &conversation.BaseConversation{Status: conversation.StatusActive}}
+	validConversation             = &conversation.WorkConversation{BaseConversation: conversation.NewBaseConversation(conversation.TypeWork, conversation.StatusActive)}
 )
 
 func resetMocks(mocks ...*mock.Mock) {

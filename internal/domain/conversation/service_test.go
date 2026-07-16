@@ -74,11 +74,11 @@ func (r *conversationRepositoryMock) SaveConversation(ctx context.Context, c con
 	if r.savedChatbotResult != nil {
 		return r.savedChatbotResult, nil
 	}
-	c.Base().ID = 1
+	c.SetPersistenceState(1, time.Time{})
 	messages := c.Messages()
 	for index := range messages {
 		messages[index].ID = index + 1
-		messages[index].ConversationID = c.Base().ID
+		messages[index].ConversationID = c.ID()
 		messages[index].CreatedOn = time.Now()
 	}
 	c.SetMessages(messages)
@@ -138,7 +138,7 @@ func (r *conversationRepositoryMock) UpdateConversation(ctx context.Context, c c
 	for index := range messages {
 		if messages[index].ID == 0 {
 			messages[index].ID = index + 1
-			messages[index].ConversationID = c.Base().ID
+			messages[index].ConversationID = c.ID()
 			messages[index].CreatedOn = time.Now()
 		}
 	}
@@ -181,8 +181,9 @@ type providerIDFinderMock struct {
 }
 
 type userRepositoryMock struct {
-	consumer *consumerIDFinderMock
-	provider *providerIDFinderMock
+	consumer          *consumerIDFinderMock
+	provider          *providerIDFinderMock
+	findByAuthIDCalls int
 }
 
 func newUserRepositoryMock(consumer *consumerIDFinderMock, provider *providerIDFinderMock) *userRepositoryMock {
@@ -190,6 +191,7 @@ func newUserRepositoryMock(consumer *consumerIDFinderMock, provider *providerIDF
 }
 
 func (m *userRepositoryMock) FindByAuthID(authID string) (user.User, error) {
+	m.findByAuthIDCalls++
 	if m.consumer != nil {
 		if id, err := m.consumer.FindIDByAuthID(authID); err == nil {
 			return &user.BaseUser{ID: id, AuthID: authID, Role: conversation.SenderConsumer}, nil
@@ -462,7 +464,7 @@ func TestCreateChatbotConversationCreatesActiveConversationWithConsumerAndChatbo
 	assert.Empty(t, savedChatbotConversation.Context.Summary)
 	assert.Zero(t, savedChatbotConversation.Context.LastSummarizedMessageID)
 	assert.Equal(t, conversation.ChatbotResponseAnswered, createdResult.ResponseStatus)
-	assert.Equal(t, conversation.StatusActive, savedChatbotConversation.Base().Status)
+	assert.Equal(t, conversation.StatusActive, savedChatbotConversation.Status())
 	require.Len(t, savedChatbotConversation.Messages(), 2)
 	assert.Equal(t, conversation.SenderConsumer, savedChatbotConversation.Messages()[0].SenderRole)
 	assert.Equal(t, "Tengo una pérdida de agua en la cocina", savedChatbotConversation.Messages()[0].Content)
@@ -635,7 +637,7 @@ func TestCreateChatbotConversationReturnsChatbotErrors(t *testing.T) {
 func TestContinueChatbotConversationAddsConsumerAndChatbotMessagesToExistingChatbotConversation(t *testing.T) {
 	repo := &conversationRepositoryMock{
 		foundResult: &conversation.ChatBotConversation{
-			BaseConversation: &conversation.BaseConversation{ID: 7, Type: conversation.TypeChatbot, Status: conversation.StatusActive},
+			BaseConversation: conversation.RehydrateBaseConversation(7, conversation.TypeChatbot, conversation.StatusActive, time.Time{}, nil),
 			ConsumerID:       10,
 			Title:            "Pérdida de agua en la cocina",
 			Context: conversation.ChatbotConversationContext{
@@ -678,7 +680,7 @@ func TestContinueChatbotConversationAddsConsumerAndChatbotMessagesToExistingChat
 func TestContinueChatbotConversationSendsCurrentTurnImagesToChatbot(t *testing.T) {
 	repo := &conversationRepositoryMock{
 		foundResult: &conversation.ChatBotConversation{
-			BaseConversation: &conversation.BaseConversation{ID: 7, Type: conversation.TypeChatbot, Status: conversation.StatusActive},
+			BaseConversation: conversation.RehydrateBaseConversation(7, conversation.TypeChatbot, conversation.StatusActive, time.Time{}, nil),
 			ConsumerID:       10,
 			Title:            "Pérdida de agua en la cocina",
 		},
@@ -703,7 +705,7 @@ func TestContinueChatbotConversationSendsCurrentTurnImagesToChatbot(t *testing.T
 
 func TestContinueChatbotConversationSummarizesPendingContextWhenRecentMessageLimitIsReached(t *testing.T) {
 	chatbotConversation := &conversation.ChatBotConversation{
-		BaseConversation: &conversation.BaseConversation{ID: 7, Type: conversation.TypeChatbot, Status: conversation.StatusActive},
+		BaseConversation: conversation.RehydrateBaseConversation(7, conversation.TypeChatbot, conversation.StatusActive, time.Time{}, nil),
 		ConsumerID:       10,
 		Title:            "Pérdida de agua en la cocina",
 		Context: conversation.ChatbotConversationContext{
@@ -750,7 +752,7 @@ func TestContinueChatbotConversationSummarizesPendingContextWhenRecentMessageLim
 
 func TestContinueChatbotConversationRejectsAnotherConsumer(t *testing.T) {
 	repo := &conversationRepositoryMock{foundResult: &conversation.ChatBotConversation{
-		BaseConversation: &conversation.BaseConversation{ID: 7, Type: conversation.TypeChatbot, Status: conversation.StatusActive},
+		BaseConversation: conversation.RehydrateBaseConversation(7, conversation.TypeChatbot, conversation.StatusActive, time.Time{}, nil),
 		ConsumerID:       10,
 		Title:            "Pérdida de agua",
 	}}
@@ -767,7 +769,7 @@ func TestContinueChatbotConversationRejectsAnotherConsumer(t *testing.T) {
 func TestContinueChatbotConversationReturnsProcessingConflict(t *testing.T) {
 	repo := &conversationRepositoryMock{
 		foundResult: &conversation.ChatBotConversation{
-			BaseConversation: &conversation.BaseConversation{ID: 7, Type: conversation.TypeChatbot, Status: conversation.StatusActive},
+			BaseConversation: conversation.RehydrateBaseConversation(7, conversation.TypeChatbot, conversation.StatusActive, time.Time{}, nil),
 			ConsumerID:       10,
 			Title:            "Pérdida de agua",
 		},
@@ -818,7 +820,8 @@ func TestGetByIDReturnsConversationDetailForParticipantProvider(t *testing.T) {
 	providerIDFinder := &providerIDFinderMock{providerID: 20}
 	conversationReader := &conversationReaderMock{detail: conversationDetailFixture(conversation.SenderConsumer)}
 
-	service := conversation.NewService(repo, newUserRepositoryMock(consumerIDFinder, providerIDFinder), conversationReader, nil, &chatbotMock{}, nil, &fileURLResolverMock{}, fixedClock{now: time.Now().UTC()})
+	userRepository := newUserRepositoryMock(consumerIDFinder, providerIDFinder)
+	service := conversation.NewService(repo, userRepository, conversationReader, nil, &chatbotMock{}, nil, &fileURLResolverMock{}, fixedClock{now: time.Now().UTC()})
 
 	foundConversation, err := service.GetByID(context.Background(), "auth0|provider", 1)
 
@@ -828,12 +831,15 @@ func TestGetByIDReturnsConversationDetailForParticipantProvider(t *testing.T) {
 	require.NotNil(t, foundConversation.Work)
 	assert.Equal(t, 10, foundConversation.Work.Counterpart.ID)
 	assert.Equal(t, conversation.SenderConsumer, foundConversation.Work.Counterpart.Role)
+	assert.Equal(t, 1, userRepository.findByAuthIDCalls)
+	assert.Equal(t, conversation.SenderProvider, conversationReader.requestedParticipantRole)
+	assert.Equal(t, conversation.TypeWork, conversationReader.requestedConversationType)
 }
 
 func TestGetByIDReturnsChatbotConversationDetailForOwnerConsumer(t *testing.T) {
 	recommendedCategoryID := 3
 	repo := &conversationRepositoryMock{foundResult: &conversation.ChatBotConversation{
-		BaseConversation:   &conversation.BaseConversation{ID: 7, Type: conversation.TypeChatbot, Status: conversation.StatusActive},
+		BaseConversation:   conversation.RehydrateBaseConversation(7, conversation.TypeChatbot, conversation.StatusActive, time.Time{}, nil),
 		ConsumerID:         10,
 		Title:              "Pérdida de agua en la cocina",
 		LastResponseStatus: conversation.ChatbotResponseAnswered,
@@ -883,7 +889,7 @@ func TestGetByIDReturnsChatbotConversationDetailForOwnerConsumer(t *testing.T) {
 
 func TestGetByIDRejectsChatbotConversationForNonOwnerConsumer(t *testing.T) {
 	repo := &conversationRepositoryMock{foundResult: &conversation.ChatBotConversation{
-		BaseConversation: &conversation.BaseConversation{ID: 7, Type: conversation.TypeChatbot, Status: conversation.StatusActive},
+		BaseConversation: conversation.RehydrateBaseConversation(7, conversation.TypeChatbot, conversation.StatusActive, time.Time{}, nil),
 		ConsumerID:       10,
 	}}
 	consumerIDFinder := &consumerIDFinderMock{consumerID: 999}
@@ -1083,7 +1089,7 @@ func TestSendMessagePublishesMessageAfterSuccessfulPersistence(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, sentMessage)
 	assert.True(t, publisher.publishCalled)
-	assert.Equal(t, 1, publisher.publishedConversation.Base().ID)
+	assert.Equal(t, 1, publisher.publishedConversation.ID())
 	assert.Equal(t, "auth0|consumer", publisher.publishedSenderAuthID)
 }
 
@@ -1245,14 +1251,9 @@ func conversationDetailFixture(counterpartRole string) *readmodel.ConversationDe
 func conversationFixture() conversation.Conversation {
 	now := time.Now()
 	fixture := &conversation.WorkConversation{
-		BaseConversation: &conversation.BaseConversation{
-			ID:        1,
-			Type:      conversation.TypeWork,
-			Status:    conversation.StatusPending,
-			UpdatedOn: now,
-		},
-		ConsumerID: 10,
-		ProviderID: 20,
+		BaseConversation: conversation.RehydrateBaseConversation(1, conversation.TypeWork, conversation.StatusPending, now, nil),
+		ConsumerID:       10,
+		ProviderID:       20,
 	}
 	fixture.SetMessages([]conversation.Message{
 		{
@@ -1269,7 +1270,7 @@ func conversationFixture() conversation.Conversation {
 
 func activeConversationFixture() conversation.Conversation {
 	fixture := conversationFixture()
-	fixture.Base().Status = "active"
+	_ = fixture.Activate()
 	return fixture
 }
 

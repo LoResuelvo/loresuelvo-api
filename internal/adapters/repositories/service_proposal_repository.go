@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/category"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/consumer"
@@ -54,7 +55,7 @@ func (r *ServiceProposalRepository) Save(serviceProposal *serviceproposal.Servic
 		RETURNING id`,
 		serviceProposal.Consumer.ID,
 		serviceProposal.Provider.ID,
-		serviceProposal.Conversation.Base().ID,
+		serviceProposal.Conversation.ID(),
 		serviceProposal.Amount,
 		serviceProposal.ScheduledOn,
 		serviceProposal.Description,
@@ -189,7 +190,9 @@ func (r *ServiceProposalRepository) FindByUserID(ctx context.Context, userID int
 	for rows.Next() {
 		var (
 			proposal           serviceproposal.ServiceProposal
-			baseConversation   conversation.BaseConversation
+			conversationID     int
+			conversationType   string
+			conversationStatus string
 			consumerUser       user.BaseUser
 			providerUser       user.BaseUser
 			providerCategory   category.Category
@@ -203,9 +206,9 @@ func (r *ServiceProposalRepository) FindByUserID(ctx context.Context, userID int
 			&proposal.Description,
 			&proposal.Status,
 			&proposal.CreatedOn,
-			&baseConversation.ID,
-			&baseConversation.Type,
-			&baseConversation.Status,
+			&conversationID,
+			&conversationType,
+			&conversationStatus,
 			&consumerUser.ID,
 			&consumerUser.AuthID,
 			&consumerUser.Email,
@@ -224,6 +227,9 @@ func (r *ServiceProposalRepository) FindByUserID(ctx context.Context, userID int
 		if err != nil {
 			return nil, fmt.Errorf("scanning service proposal by user id: %w", err)
 		}
+		if conversationType != conversation.TypeWork {
+			return nil, fmt.Errorf("scanning service proposal by user id: unsupported conversation type %q", conversationType)
+		}
 
 		consumerUser.Role = consumer.Role
 		providerUser.Role = provider.Role
@@ -234,7 +240,7 @@ func (r *ServiceProposalRepository) FindByUserID(ctx context.Context, userID int
 			Category: &providerCategory,
 		}
 		proposal.Conversation = &conversation.WorkConversation{
-			BaseConversation: &baseConversation,
+			BaseConversation: conversation.RehydrateBaseConversation(conversationID, conversation.TypeWork, conversationStatus, time.Time{}, nil),
 			ConsumerID:       consumerUser.ID,
 			ProviderID:       providerUser.ID,
 		}

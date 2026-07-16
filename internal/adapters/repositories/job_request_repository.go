@@ -42,7 +42,7 @@ func (repository *JobRequestRepository) SaveWithConversation(jobRequest jobreque
 		VALUES ($1, $2, NOW(), NOW())
 		RETURNING id`,
 		workConversation.ConversationType(),
-		workConversation.Status,
+		workConversation.Status(),
 	).Scan(&conversationID)
 	if err != nil {
 		return nil, rollbackJobRequestTx(tx, mapJobRequestInsertError(err))

@@ -146,7 +146,7 @@ func serviceProposalSummaryFor(proposal *ServiceProposal, viewerRole string) (re
 	}
 	summary := readmodel.ServiceProposalSummary{
 		ID:             proposal.ID,
-		ConversationID: proposal.Conversation.Base().ID,
+		ConversationID: proposal.Conversation.ID(),
 		Amount:         proposal.Amount,
 		ScheduledOn:    proposal.ScheduledOn,
 		Description:    proposal.Description,

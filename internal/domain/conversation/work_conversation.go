@@ -16,11 +16,8 @@ func NewPendingConversation(consumerID, providerID int) (Conversation, error) {
 	}
 
 	return &WorkConversation{
-		BaseConversation: &BaseConversation{
-			Type:   TypeWork,
-			Status: StatusPending,
-		},
-		ConsumerID: consumerID,
-		ProviderID: providerID,
+		BaseConversation: NewBaseConversation(TypeWork, StatusPending),
+		ConsumerID:       consumerID,
+		ProviderID:       providerID,
 	}, nil
 }

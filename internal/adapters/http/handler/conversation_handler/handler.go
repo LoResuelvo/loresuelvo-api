@@ -114,7 +114,7 @@ func (h *ConversationHandler) CreateChatbotConversation(c *gin.Context) {
 		return
 	}
 
-	c.Header("Location", fmt.Sprintf("/chatbot/conversations/%d", createdConversation.Conversation.Base().ID))
+	c.Header("Location", fmt.Sprintf("/chatbot/conversations/%d", createdConversation.Conversation.ID()))
 	c.JSON(http.StatusCreated, chatbotConversationResponseFromDomain(*createdConversation))
 }
 

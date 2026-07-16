@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/category"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/conversation"
@@ -145,7 +146,7 @@ func TestCreateFromChatbotAssessmentCopiesCurrentAssessment(t *testing.T) {
 		repo,
 		newUserRepositoryMock(&consumerRepo{consumerID: 10}, &providerRepo{exists: true, categoryID: categoryID}),
 		&conversationRepo{foundConversation: &conversation.ChatBotConversation{
-			BaseConversation: &conversation.BaseConversation{ID: 7, Type: conversation.TypeChatbot},
+			BaseConversation: conversation.RehydrateBaseConversation(7, conversation.TypeChatbot, "", time.Time{}, nil),
 			ConsumerID:       10, CurrentAssessment: assessment,
 		}},
 		fileServiceForJobRequestTest(),
@@ -168,7 +169,7 @@ func TestCreateFromChatbotAssessmentRejectsSelfServiceOutcome(t *testing.T) {
 		&jobRequestRepositoryMock{},
 		newUserRepositoryMock(&consumerRepo{consumerID: 10}, &providerRepo{exists: true}),
 		&conversationRepo{foundConversation: &conversation.ChatBotConversation{
-			BaseConversation: &conversation.BaseConversation{ID: 7, Type: conversation.TypeChatbot},
+			BaseConversation: conversation.RehydrateBaseConversation(7, conversation.TypeChatbot, "", time.Time{}, nil),
 			ConsumerID:       10,
 			CurrentAssessment: &conversation.ProblemAssessment{
 				ID: 9, Version: 1, Outcome: conversation.AssessmentSelfService,
@@ -190,7 +191,7 @@ func TestCreateFromChatbotAssessmentRejectsDifferentOwner(t *testing.T) {
 		&jobRequestRepositoryMock{},
 		newUserRepositoryMock(&consumerRepo{consumerID: 11}, &providerRepo{exists: true}),
 		&conversationRepo{foundConversation: &conversation.ChatBotConversation{
-			BaseConversation: &conversation.BaseConversation{ID: 7, Type: conversation.TypeChatbot},
+			BaseConversation: conversation.RehydrateBaseConversation(7, conversation.TypeChatbot, "", time.Time{}, nil),
 			ConsumerID:       10,
 		}},
 		fileServiceForJobRequestTest(),
@@ -304,7 +305,7 @@ func TestCreateJobRequestSavesRequestWithPendingConversation(t *testing.T) {
 	assert.Equal(t, "Necesito ayuda esta semana", firstSavedRequest.Description)
 	assert.Equal(t, jobrequest.StatusPending, firstSavedRequest.Status)
 	savedConversation := repo.savedConversation.(*conversation.WorkConversation)
-	assert.Equal(t, conversation.StatusPending, savedConversation.Base().Status)
+	assert.Equal(t, conversation.StatusPending, savedConversation.Status())
 	assert.Equal(t, 10, savedConversation.ConsumerID)
 	assert.Equal(t, 20, savedConversation.ProviderID)
 	assert.Equal(t, 1, createdRequest.ID)
@@ -483,13 +484,9 @@ func TestAcceptJobRequestActivatesLinkedConversationForAssignedProvider(t *testi
 	}
 	conversationRepo := &conversationRepo{
 		foundConversation: &conversation.WorkConversation{
-			BaseConversation: &conversation.BaseConversation{
-				ID:     30,
-				Type:   conversation.TypeWork,
-				Status: conversation.StatusPending,
-			},
-			ConsumerID: 10,
-			ProviderID: 20,
+			BaseConversation: conversation.RehydrateBaseConversation(30, conversation.TypeWork, conversation.StatusPending, time.Time{}, nil),
+			ConsumerID:       10,
+			ProviderID:       20,
 		},
 	}
 	service := jobrequest.NewService(
@@ -510,7 +507,7 @@ func TestAcceptJobRequestActivatesLinkedConversationForAssignedProvider(t *testi
 	assert.True(t, repo.saveStatusCalled)
 	assert.Equal(t, jobrequest.StatusAccepted, acceptedJobRequest.Status)
 	assert.Equal(t, jobrequest.StatusAccepted, repo.savedStatus)
-	assert.Equal(t, conversation.StatusActive, conversationRepo.savedConversation.Base().Status)
+	assert.Equal(t, conversation.StatusActive, conversationRepo.savedConversation.Status())
 }
 
 func TestAcceptJobRequestRejectsProviderThatIsNotAssigned(t *testing.T) {

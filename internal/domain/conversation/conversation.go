@@ -13,21 +13,35 @@ const (
 )
 
 type Conversation interface {
+	ID() int
 	ConversationType() string
-	Base() *BaseConversation
+	Status() string
+	UpdatedOn() time.Time
+	SetPersistenceState(id int, updatedOn time.Time)
 	IsActive() bool
 	Activate() error
 	AddMessage(message Message)
 	Messages() []Message
+	LastMessage() (Message, bool)
 	SetMessages(messages []Message)
 }
 
 type BaseConversation struct {
-	ID        int
-	Type      string
-	Status    string
-	UpdatedOn time.Time
-	messages  []Message
+	id               int
+	conversationType string
+	status           string
+	updatedOn        time.Time
+	messages         []Message
+}
+
+func NewBaseConversation(conversationType, status string) *BaseConversation {
+	return &BaseConversation{conversationType: conversationType, status: status}
+}
+
+func RehydrateBaseConversation(id int, conversationType, status string, updatedOn time.Time, messages []Message) *BaseConversation {
+	conversation := &BaseConversation{id: id, conversationType: conversationType, status: status, updatedOn: updatedOn}
+	conversation.SetMessages(messages)
+	return conversation
 }
 
 func (conversation *BaseConversation) AddMessage(message Message) {
@@ -35,24 +49,37 @@ func (conversation *BaseConversation) AddMessage(message Message) {
 }
 
 func (conversation *BaseConversation) Activate() error {
-	if conversation.Status != StatusPending {
+	if conversation.status != StatusPending {
 		return ErrOnlyPendingConversationCanBeActivated
 	}
 
-	conversation.Status = StatusActive
+	conversation.status = StatusActive
 	return nil
 }
 
-func (conversation *BaseConversation) ConversationType() string {
-	return conversation.Type
+func (conversation *BaseConversation) ID() int {
+	return conversation.id
 }
 
-func (conversation *BaseConversation) Base() *BaseConversation {
-	return conversation
+func (conversation *BaseConversation) Status() string {
+	return conversation.status
+}
+
+func (conversation *BaseConversation) UpdatedOn() time.Time {
+	return conversation.updatedOn
+}
+
+func (conversation *BaseConversation) SetPersistenceState(id int, updatedOn time.Time) {
+	conversation.id = id
+	conversation.updatedOn = updatedOn
 }
 
 func (conversation *BaseConversation) Messages() []Message {
 	return conversation.messages
+}
+
+func (conversation *BaseConversation) ConversationType() string {
+	return conversation.conversationType
 }
 
 func (conversation *BaseConversation) LastMessage() (Message, bool) {
@@ -68,5 +95,5 @@ func (conversation *BaseConversation) SetMessages(messages []Message) {
 }
 
 func (conversation *BaseConversation) IsActive() bool {
-	return conversation.Status == StatusActive
+	return conversation.status == StatusActive
 }

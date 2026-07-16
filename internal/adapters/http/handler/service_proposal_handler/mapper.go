@@ -22,7 +22,7 @@ func serviceProposalCreationResponseFromDomain(proposal *serviceproposal.Service
 		response.ConsumerID = proposal.Consumer.ID
 	}
 	if proposal.Conversation != nil {
-		response.ConversationID = proposal.Conversation.Base().ID
+		response.ConversationID = proposal.Conversation.ID()
 	}
 
 	return response

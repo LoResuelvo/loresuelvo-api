@@ -46,10 +46,7 @@ func NewChatbotConversation(consumerID int, title string) (Conversation, error) 
 		trimmedTitle = "Consulta del hogar"
 	}
 	return &ChatBotConversation{
-		BaseConversation: &BaseConversation{
-			Type:   TypeChatbot,
-			Status: StatusActive,
-		},
+		BaseConversation:   NewBaseConversation(TypeChatbot, StatusActive),
 		ConsumerID:         consumerID,
 		Title:              trimmedTitle,
 		LastResponseStatus: ChatbotResponseAnswered,
@@ -73,7 +70,7 @@ func (conversation *ChatBotConversation) ApplyResponse(response ChatbotResponse,
 		version = conversation.CurrentAssessment.Version + 1
 	}
 	assessment, err := NewProblemAssessment(
-		conversation.Base().ID,
+		conversation.ID(),
 		version,
 		response.Assessment.Outcome,
 		problemCategoryID,

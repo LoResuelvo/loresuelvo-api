@@ -49,8 +49,8 @@ func chatbotConversationResponseFromDomain(result conversation.ChatbotConversati
 		}
 	}
 	return chatbotConversationResponse{
-		ID:     result.Conversation.Base().ID,
-		Status: result.Conversation.Base().Status,
+		ID:     result.Conversation.ID(),
+		Status: result.Conversation.Status(),
 		chatbotConversationDetail: chatbotConversationDetail{
 			Title:                title,
 			ResponseStatus:       string(result.ResponseStatus),

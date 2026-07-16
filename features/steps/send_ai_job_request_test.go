@@ -566,7 +566,7 @@ func (suite *testSuite) workConversationIDWithCurrentConsumer(providerID int) (i
 	if err != nil {
 		return 0, err
 	}
-	return foundConversation.Base().ID, nil
+	return foundConversation.ID(), nil
 }
 
 func (suite *testSuite) assertPendingWorkConversationCreated(providerID int) error {
@@ -581,10 +581,10 @@ func (suite *testSuite) assertPendingWorkConversationCreated(providerID int) err
 	if foundConversation.ConversationType() != conversation.TypeWork {
 		return fmt.Errorf("expected work conversation, got %q", foundConversation.ConversationType())
 	}
-	if foundConversation.Base().Status != conversation.StatusPending {
-		return fmt.Errorf("expected pending work conversation, got status %q", foundConversation.Base().Status)
+	if foundConversation.Status() != conversation.StatusPending {
+		return fmt.Errorf("expected pending work conversation, got status %q", foundConversation.Status())
 	}
-	if foundConversation.Base().ID == suite.aiWorkConversationIDsBeforeContact[providerID] {
+	if foundConversation.ID() == suite.aiWorkConversationIDsBeforeContact[providerID] {
 		return fmt.Errorf("expected a new pending work conversation for provider id %d", providerID)
 	}
 

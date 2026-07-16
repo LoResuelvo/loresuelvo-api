@@ -50,7 +50,7 @@ func TestConversationMustBeAccepted(t *testing.T) {
 		On("Now").
 		Return(time.Now())
 
-	pendingConversation := &conversation.WorkConversation{BaseConversation: &conversation.BaseConversation{Status: conversation.StatusPending}}
+	pendingConversation := &conversation.WorkConversation{BaseConversation: conversation.NewBaseConversation(conversation.TypeWork, conversation.StatusPending)}
 
 	serviceProposal, err := serviceproposal.NewServiceProposal(
 		validProvider, validConsumer, pendingConversation, validServiceAmount,
