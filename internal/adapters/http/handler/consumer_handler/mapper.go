@@ -17,11 +17,11 @@ func normalizeRegisterConsumerRequest(req registerConsumerRequest) registerConsu
 
 func consumerSummaryResponseFromDomain(consumer consumer.Consumer) consumerSummaryResponse {
 	profilePhotoURL := ""
-	if consumer.ProfilePhoto != nil {
-		profilePhotoURL = consumer.ProfilePhoto.URL
+	if consumer.ProfilePhoto() != nil {
+		profilePhotoURL = consumer.ProfilePhoto().URL
 	}
 	return consumerSummaryResponse{
-		ID:              consumer.ID,
+		ID:              consumer.ID(),
 		Name:            consumer.Name(),
 		Surname:         consumer.Surname(),
 		ProfilePhotoURL: profilePhotoURL,

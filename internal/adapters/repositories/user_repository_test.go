@@ -39,7 +39,7 @@ func TestUserRepositoryCanSaveAUser(t *testing.T) {
 	_, err := repo.Save(context.Background(), user)
 
 	assert.NoError(t, err)
-	exists := repo.FindByEmail(user.Email)
+	exists := repo.FindByEmail(user.Email())
 	assert.True(t, exists, "User should be saved on database")
 }
 
@@ -51,7 +51,7 @@ func TestUserRepositoryCanDeleteAllUsers(t *testing.T) {
 	err := repo.DeleteAll()
 
 	assert.NoError(t, err)
-	exists := repo.FindByEmail(validUser().Email)
+	exists := repo.FindByEmail(validUser().Email())
 	assert.False(t, exists, "All users should be deleted from database")
 }
 
@@ -61,7 +61,7 @@ func TestUserRepositoryCanFindByEmail(t *testing.T) {
 
 	_, _ = repo.Save(context.Background(), user)
 
-	assert.True(t, repo.FindByEmail(user.Email), "User should be found by email")
+	assert.True(t, repo.FindByEmail(user.Email()), "User should be found by email")
 }
 
 func TestUserRepositoryCanFindPolymorphicUserByID(t *testing.T) {
@@ -70,14 +70,14 @@ func TestUserRepositoryCanFindPolymorphicUserByID(t *testing.T) {
 	saved, err := repo.Save(context.Background(), expected)
 	require.NoError(t, err)
 
-	found, err := repo.FindByID(context.Background(), saved.Base().ID)
+	found, err := repo.FindByID(context.Background(), saved.ID())
 
 	require.NoError(t, err)
 	foundConsumer, ok := found.(*consumer.Consumer)
 	require.True(t, ok, "expected consumer, got %T", found)
-	assert.Equal(t, saved.Base().ID, foundConsumer.ID)
-	assert.Equal(t, saved.Base().AuthID, foundConsumer.AuthID)
-	assert.Equal(t, consumer.Role, foundConsumer.Role)
+	assert.Equal(t, saved.ID(), foundConsumer.ID())
+	assert.Equal(t, saved.AuthID(), foundConsumer.AuthID())
+	assert.Equal(t, consumer.Role, foundConsumer.Role())
 }
 
 func TestUserRepositoryFindByEmailReturnsFalseIfUserDoesNotExist(t *testing.T) {

@@ -131,7 +131,7 @@ func (m *providerRepo) FindByID(ctx context.Context, providerID int) (*provider.
 	if !m.exists {
 		return nil, provider.ErrDoesNotExist
 	}
-	return &provider.Provider{BaseUser: &user.BaseUser{ID: providerID, Role: provider.Role}, Category: &category.Category{ID: m.categoryID}}, nil
+	return &provider.Provider{BaseUser: user.RehydrateBaseUser(providerID, "", "", "", "", provider.Role, nil), Category: &category.Category{ID: m.categoryID}}, nil
 }
 
 func TestCreateFromChatbotAssessmentCopiesCurrentAssessment(t *testing.T) {

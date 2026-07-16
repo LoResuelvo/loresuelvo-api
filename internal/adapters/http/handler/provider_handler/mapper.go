@@ -17,11 +17,11 @@ func normalizeRegisterProviderRequest(req registerProviderRequest) registerProvi
 
 func providerSummaryResponseFromDomain(provider provider.Provider) providerSummaryResponse {
 	profilePhotoURL := ""
-	if provider.ProfilePhoto != nil {
-		profilePhotoURL = provider.ProfilePhoto.URL
+	if provider.ProfilePhoto() != nil {
+		profilePhotoURL = provider.ProfilePhoto().URL
 	}
 	return providerSummaryResponse{
-		ID:              provider.ID,
+		ID:              provider.ID(),
 		Name:            provider.Name(),
 		Surname:         provider.Surname(),
 		CategoryName:    provider.Categoryname(),
@@ -40,12 +40,12 @@ func providerSummaryResponsesFromDomain(providers []provider.Provider) []provide
 
 func providerProfileResponseFromDomain(foundProvider provider.Provider) providerProfileResponse {
 	return providerProfileResponse{
-		ID:      foundProvider.ID,
+		ID:      foundProvider.ID(),
 		Name:    foundProvider.Name(),
 		Surname: foundProvider.Surname(),
 		ProfilePhoto: providerProfilePhotoResponse{
-			OriginalName: foundProvider.ProfilePhoto.OriginalName,
-			URL:          foundProvider.ProfilePhoto.URL,
+			OriginalName: foundProvider.ProfilePhoto().OriginalName,
+			URL:          foundProvider.ProfilePhoto().URL,
 		},
 		Category: providerProfileCategoryResponse{
 			ID:   foundProvider.Category.ID,

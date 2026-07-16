@@ -47,7 +47,7 @@ func TestConsumerRepositoryCanSaveAConsumer(t *testing.T) {
 	_, err := repo.Save(context.Background(), consumerUser(consumer))
 
 	assert.NoError(t, err)
-	exists := repo.FindByEmail(consumer.BaseUser.Email)
+	exists := repo.FindByEmail(consumer.Email())
 	assert.True(t, exists, "Consumer should be saved on database")
 }
 
@@ -59,7 +59,7 @@ func TestConsumerRepositoryCanDeleteAllConsumers(t *testing.T) {
 	err := repo.DeleteAll()
 
 	assert.NoError(t, err)
-	exists := repo.FindByEmail(validConsumer().BaseUser.Email)
+	exists := repo.FindByEmail(validConsumer().Email())
 	assert.False(t, exists, "All consumers should be deleted from database")
 }
 
@@ -70,7 +70,7 @@ func TestConsumerRepositoryCanFindByEmail(t *testing.T) {
 	_, err := repo.Save(context.Background(), consumerUser(consumer))
 
 	assert.NoError(t, err, "saving consumer should not return an error")
-	assert.True(t, repo.FindByEmail(consumer.BaseUser.Email), "Consumer should be found by email")
+	assert.True(t, repo.FindByEmail(consumer.Email()), "Consumer should be found by email")
 }
 
 func TestConsumerRepositoryFindByEmailReturnsFalseIfConsumerDoesNotExist(t *testing.T) {
@@ -86,7 +86,7 @@ func TestConsumerRepositoryCanFindIDByEmail(t *testing.T) {
 	_, err := repo.Save(context.Background(), consumerUser(consumer))
 	require.NoError(t, err, "saving consumer should not return an error")
 
-	consumerID, err := repo.FindIDByEmail(consumer.BaseUser.Email)
+	consumerID, err := repo.FindIDByEmail(consumer.Email())
 
 	require.NoError(t, err)
 	assert.NotZero(t, consumerID)
@@ -99,7 +99,7 @@ func TestConsumerRepositoryCanFindIDByAuthID(t *testing.T) {
 	_, err := repo.Save(context.Background(), consumerUser(consumer))
 	require.NoError(t, err, "saving consumer should not return an error")
 
-	consumerID, err := repo.FindIDByAuthID(consumer.BaseUser.AuthID)
+	consumerID, err := repo.FindIDByAuthID(consumer.AuthID())
 
 	require.NoError(t, err)
 	assert.NotZero(t, consumerID)
@@ -111,17 +111,17 @@ func TestConsumerRepositoryCanFindByID(t *testing.T) {
 
 	_, err := repo.Save(context.Background(), consumerUser(consumerToSave))
 	require.NoError(t, err, "saving consumer should not return an error")
-	consumerID, err := repo.FindIDByEmail(consumerToSave.BaseUser.Email)
+	consumerID, err := repo.FindIDByEmail(consumerToSave.Email())
 	require.NoError(t, err)
 
 	foundConsumer, err := repo.FindConsumerByID(consumerID)
 
 	require.NoError(t, err)
-	assert.Equal(t, consumerID, foundConsumer.ID)
+	assert.Equal(t, consumerID, foundConsumer.ID())
 	require.NotNil(t, foundConsumer.BaseUser)
-	assert.Equal(t, consumerToSave.BaseUser.AuthID, foundConsumer.BaseUser.AuthID)
-	assert.Equal(t, consumerToSave.BaseUser.Email, foundConsumer.BaseUser.Email)
-	assert.Equal(t, consumerToSave.BaseUser.Name, foundConsumer.BaseUser.Name)
-	assert.Equal(t, consumerToSave.BaseUser.Surname, foundConsumer.BaseUser.Surname)
-	assert.Equal(t, consumerToSave.BaseUser.Role, foundConsumer.BaseUser.Role)
+	assert.Equal(t, consumerToSave.AuthID(), foundConsumer.AuthID())
+	assert.Equal(t, consumerToSave.Email(), foundConsumer.Email())
+	assert.Equal(t, consumerToSave.Name(), foundConsumer.Name())
+	assert.Equal(t, consumerToSave.Surname(), foundConsumer.Surname())
+	assert.Equal(t, consumerToSave.Role(), foundConsumer.Role())
 }

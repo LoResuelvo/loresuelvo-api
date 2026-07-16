@@ -180,8 +180,7 @@ func (r *WorkOrderRepository) FindScheduledBetween(ctx context.Context, from tim
 	for rows.Next() {
 		var order workorder.WorkOrder
 		var proposal serviceproposal.ServiceProposal
-		proposal.Consumer = &consumer.Consumer{BaseUser: &user.BaseUser{}}
-		proposal.Provider = &provider.Provider{BaseUser: &user.BaseUser{}}
+		var consumerID, providerID int
 		if err := rows.Scan(
 			&order.ID,
 			&proposal.ID,
@@ -190,11 +189,13 @@ func (r *WorkOrderRepository) FindScheduledBetween(ctx context.Context, from tim
 			&proposal.Description,
 			&order.Status,
 			&order.AcceptedOn,
-			&proposal.Consumer.ID,
-			&proposal.Provider.ID,
+			&consumerID,
+			&providerID,
 		); err != nil {
 			return nil, fmt.Errorf("scanning work orders scheduled between: %w", err)
 		}
+		proposal.Consumer = &consumer.Consumer{BaseUser: user.RehydrateBaseUser(consumerID, "", "", "", "", consumer.Role, nil)}
+		proposal.Provider = &provider.Provider{BaseUser: user.RehydrateBaseUser(providerID, "", "", "", "", provider.Role, nil)}
 		order.ServiceProposal = &proposal
 		workOrders = append(workOrders, &order)
 	}

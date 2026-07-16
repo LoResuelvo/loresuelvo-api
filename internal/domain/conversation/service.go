@@ -72,7 +72,7 @@ func (s *Service) getWorkConversationDetail(ctx context.Context, authID string, 
 	detail, err := s.conversationReader.FindDetailByIDRoleAndType(
 		ctx,
 		workConversation.ID(),
-		authenticatedUser.Base().Role,
+		authenticatedUser.Role(),
 		workConversation.ConversationType(),
 	)
 	if err != nil {
@@ -152,7 +152,7 @@ func (s *Service) ListWorkConversations(ctx context.Context, authID string) ([]r
 
 func (s *Service) ListChatbotConversations(ctx context.Context, authID string) ([]readmodel.ConversationSummary, error) {
 	user, err := s.userRepository.FindByAuthID(authID)
-	if err != nil || user.Base().Role != SenderConsumer {
+	if err != nil || user.Role() != SenderConsumer {
 		return nil, ErrOnlyConsumerCanListChatbotConversations
 	}
 
@@ -298,11 +298,11 @@ func (s *Service) recommendationForCurrentAssessment(ctx context.Context, chatbo
 
 func (s *Service) chatbotConsumerID(authID string) (int, error) {
 	foundUser, err := s.userRepository.FindByAuthID(authID)
-	if err != nil || foundUser.Base().Role != SenderConsumer {
+	if err != nil || foundUser.Role() != SenderConsumer {
 		return 0, ErrOnlyConsumerCanMessageChatbot
 	}
 
-	return foundUser.Base().ID, nil
+	return foundUser.ID(), nil
 }
 
 func (s *Service) findOwnedChatbotConversation(ctx context.Context, conversationID int, consumerID int) (*ChatBotConversation, error) {
@@ -520,7 +520,7 @@ func copyCurrentAssessment(foundConversation Conversation) *ProblemAssessment {
 
 func (s *Service) authenticatedConsumerMatches(authID string, consumerID int) bool {
 	authenticatedUser, err := s.userRepository.FindByAuthID(authID)
-	return err == nil && authenticatedUser.Base().Role == SenderConsumer && authenticatedUser.Base().ID == consumerID
+	return err == nil && authenticatedUser.Role() == SenderConsumer && authenticatedUser.ID() == consumerID
 }
 
 func (s *Service) authenticatedUserForConversation(authID string, conversation *WorkConversation) (user.User, error) {
@@ -528,10 +528,11 @@ func (s *Service) authenticatedUserForConversation(authID string, conversation *
 	if err != nil {
 		return nil, ErrConversationAccessDenied
 	}
-	base := authenticatedUser.Base()
-	if (base.Role == SenderConsumer && base.ID != conversation.ConsumerID) ||
-		(base.Role == SenderProvider && base.ID != conversation.ProviderID) ||
-		(base.Role != SenderConsumer && base.Role != SenderProvider) {
+	role := authenticatedUser.Role()
+	userID := authenticatedUser.ID()
+	if (role == SenderConsumer && userID != conversation.ConsumerID) ||
+		(role == SenderProvider && userID != conversation.ProviderID) ||
+		(role != SenderConsumer && role != SenderProvider) {
 		return nil, ErrConversationAccessDenied
 	}
 
@@ -549,7 +550,7 @@ func (s *Service) senderRoleForAuthenticatedParticipant(authID string, foundConv
 		return "", err
 	}
 
-	return authenticatedUser.Base().Role, nil
+	return authenticatedUser.Role(), nil
 }
 
 func newParticipantMessage(senderRole, content string, images []filedomain.MessageImage) (*Message, error) {
@@ -742,7 +743,7 @@ func (s *Service) withRecommendedProviders(ctx context.Context, detail *readmode
 func (s *Service) providersWithProfilePhotoURLs(ctx context.Context, providers []provider.Provider) ([]provider.Provider, error) {
 	profilePhotoFileIDs := make([]string, 0, len(providers))
 	for i := range providers {
-		profilePhotoFileIDs = append(profilePhotoFileIDs, providers[i].ProfilePhoto.FileID)
+		profilePhotoFileIDs = append(profilePhotoFileIDs, providers[i].ProfilePhoto().FileID)
 	}
 
 	profilePhotoURLs, err := s.fileService.ResolvePublicURLs(ctx, profilePhotoFileIDs)

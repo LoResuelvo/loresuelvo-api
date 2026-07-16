@@ -36,14 +36,12 @@ func (n *NotificationNotificator) Notify(ctx context.Context, notification *noti
 	if err != nil {
 		return fmt.Errorf("finding notification recipient: %w", err)
 	}
-	recipientBase := recipient.Base()
-
 	event, err := BuildNotificationEvent(notification)
 	if err != nil {
 		return fmt.Errorf("building realtime notification event: %w", err)
 	}
 
-	n.hub.BroadcastToParticipant(ctx, recipientBase.AuthID, recipientBase.Role, recipientBase.ID, event)
+	n.hub.BroadcastToParticipant(ctx, recipient.AuthID(), recipient.Role(), recipient.ID(), event)
 	return nil
 }
 

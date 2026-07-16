@@ -16,8 +16,8 @@ import (
 var (
 	invalidServiceAmount      int64 = -100
 	invalidServiceScheduledOn       = time.Now().Add(-time.Hour)
-	validProvider                   = &provider.Provider{BaseUser: &user.BaseUser{ID: validProviderID}}
-	validConsumer                   = &consumer.Consumer{BaseUser: &user.BaseUser{ID: validConsumerID}}
+	validProvider                   = &provider.Provider{BaseUser: user.RehydrateBaseUser(validProviderID, "", "", "", "", "", nil)}
+	validConsumer                   = &consumer.Consumer{BaseUser: user.RehydrateBaseUser(validConsumerID, "", "", "", "", "", nil)}
 )
 
 func TestInvalidAmount(t *testing.T) {
@@ -74,8 +74,8 @@ func TestShouldCreateAsPending(t *testing.T) {
 }
 
 func TestServiceProposalReturnsCounterpartForConsumer(t *testing.T) {
-	consumerUser := &consumer.Consumer{BaseUser: &user.BaseUser{AuthID: "auth0|consumer"}}
-	providerUser := &provider.Provider{BaseUser: &user.BaseUser{AuthID: "auth0|provider"}}
+	consumerUser := &consumer.Consumer{BaseUser: user.RehydrateBaseUser(0, "auth0|consumer", "", "", "", "", nil)}
+	providerUser := &provider.Provider{BaseUser: user.RehydrateBaseUser(0, "auth0|provider", "", "", "", "", nil)}
 	proposal := &serviceproposal.ServiceProposal{Consumer: consumerUser, Provider: providerUser}
 
 	counterpart, err := proposal.CounterpartFor("auth0|consumer")
@@ -85,8 +85,8 @@ func TestServiceProposalReturnsCounterpartForConsumer(t *testing.T) {
 }
 
 func TestServiceProposalReturnsCounterpartForProvider(t *testing.T) {
-	consumerUser := &consumer.Consumer{BaseUser: &user.BaseUser{AuthID: "auth0|consumer"}}
-	providerUser := &provider.Provider{BaseUser: &user.BaseUser{AuthID: "auth0|provider"}}
+	consumerUser := &consumer.Consumer{BaseUser: user.RehydrateBaseUser(0, "auth0|consumer", "", "", "", "", nil)}
+	providerUser := &provider.Provider{BaseUser: user.RehydrateBaseUser(0, "auth0|provider", "", "", "", "", nil)}
 	proposal := &serviceproposal.ServiceProposal{Consumer: consumerUser, Provider: providerUser}
 
 	counterpart, err := proposal.CounterpartFor("auth0|provider")
@@ -97,8 +97,8 @@ func TestServiceProposalReturnsCounterpartForProvider(t *testing.T) {
 
 func TestServiceProposalRejectsNonParticipantCounterpartAccess(t *testing.T) {
 	proposal := &serviceproposal.ServiceProposal{
-		Consumer: &consumer.Consumer{BaseUser: &user.BaseUser{AuthID: "auth0|consumer"}},
-		Provider: &provider.Provider{BaseUser: &user.BaseUser{AuthID: "auth0|provider"}},
+		Consumer: &consumer.Consumer{BaseUser: user.RehydrateBaseUser(0, "auth0|consumer", "", "", "", "", nil)},
+		Provider: &provider.Provider{BaseUser: user.RehydrateBaseUser(0, "auth0|provider", "", "", "", "", nil)},
 	}
 
 	counterpart, err := proposal.CounterpartFor("auth0|other")
@@ -112,7 +112,7 @@ func TestShouldCreateANotification(t *testing.T) {
 	frezzedTime := time.Now()
 	clock.On("Now").Return(frezzedTime)
 	expectedNotification := &notification.Notification{
-		UserID:       validConsumer.ID,
+		UserID:       validConsumer.ID(),
 		Type:         notification.TypeServiceProposalReceived,
 		ResourceType: notification.ResourceServiceProposal,
 		ResourceID:   0,

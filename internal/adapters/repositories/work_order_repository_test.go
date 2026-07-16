@@ -57,8 +57,8 @@ func saveScheduledWorkOrderAt(
 ) *workorder.WorkOrder {
 	t.Helper()
 	proposal, err := serviceproposal.NewServiceProposal(
-		&provider.Provider{BaseUser: &user.BaseUser{ID: providerID}},
-		&consumer.Consumer{BaseUser: &user.BaseUser{ID: consumerID}},
+		&provider.Provider{BaseUser: user.RehydrateBaseUser(providerID, "", "", "", "", "", nil)},
+		&consumer.Consumer{BaseUser: user.RehydrateBaseUser(consumerID, "", "", "", "", "", nil)},
 		activeConversation,
 		1500050,
 		scheduledOn,

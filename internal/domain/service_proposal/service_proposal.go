@@ -53,7 +53,7 @@ func NewServiceProposal(provider *provider.Provider, consumer *consumer.Consumer
 
 func (sp *ServiceProposal) CreateReceivedNotification(clock clock.Clock) *notification.Notification {
 	return sp.createNotification(
-		sp.Consumer.ID,
+		sp.Consumer.ID(),
 		notification.TypeServiceProposalReceived,
 		clock,
 	)
@@ -61,7 +61,7 @@ func (sp *ServiceProposal) CreateReceivedNotification(clock clock.Clock) *notifi
 
 func (sp *ServiceProposal) CreateAcceptedNotification(clock clock.Clock) *notification.Notification {
 	return sp.createNotification(
-		sp.Provider.ID,
+		sp.Provider.ID(),
 		notification.TypeServiceProposalAccepted,
 		clock,
 	)
@@ -78,7 +78,7 @@ func (sp *ServiceProposal) createNotification(recipientID int, notificationType 
 }
 
 func (sp *ServiceProposal) Accept(consumerID int, acceptedOn time.Time) error {
-	if sp.Consumer == nil || sp.Consumer.ID != consumerID {
+	if sp.Consumer == nil || sp.Consumer.ID() != consumerID {
 		return ErrOnlyRecipientCanAccept
 	}
 	if sp.Status != StatusPending {
@@ -109,18 +109,18 @@ func (sp *ServiceProposal) ServiceProposalDescription() string {
 }
 
 func (sp *ServiceProposal) ConsumerID() int {
-	return sp.Consumer.ID
+	return sp.Consumer.ID()
 }
 
 func (sp *ServiceProposal) ProviderID() int {
-	return sp.Provider.ID
+	return sp.Provider.ID()
 }
 
 func (sp *ServiceProposal) CounterpartFor(authID string) (user.User, error) {
-	if sp.Consumer.Base().AuthID == authID {
+	if sp.Consumer.AuthID() == authID {
 		return sp.Provider, nil
 	}
-	if sp.Provider.Base().AuthID == authID {
+	if sp.Provider.AuthID() == authID {
 		return sp.Consumer, nil
 	}
 	return nil, ErrOnlyParticipantCanView

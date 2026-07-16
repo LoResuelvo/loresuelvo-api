@@ -44,7 +44,7 @@ func (s *Service) GetWorkOrders(ctx context.Context, auth0ID string) ([]readmode
 		return nil, err
 	}
 
-	orders, err := s.reader.FindByUserID(ctx, foundUser.Base().ID, foundUser.Base().Role)
+	orders, err := s.reader.FindByUserID(ctx, foundUser.ID(), foundUser.Role())
 	if err != nil {
 		return nil, err
 	}

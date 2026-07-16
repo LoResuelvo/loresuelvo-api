@@ -147,11 +147,11 @@ func assessmentResponse(present bool, outcome string, category *problemCategoryR
 
 func providerSummaryResponseFromDomain(provider provider.Provider) providerSummaryResponse {
 	profilePhotoURL := ""
-	if provider.ProfilePhoto != nil {
-		profilePhotoURL = provider.ProfilePhoto.URL
+	if provider.ProfilePhoto() != nil {
+		profilePhotoURL = provider.ProfilePhoto().URL
 	}
 	return providerSummaryResponse{
-		ID:              provider.ID,
+		ID:              provider.ID(),
 		Name:            provider.Name(),
 		Surname:         provider.Surname(),
 		CategoryName:    provider.Categoryname(),

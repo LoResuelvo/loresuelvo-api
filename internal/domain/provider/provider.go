@@ -29,28 +29,8 @@ func NewProvider(auth0ID string, email string, name string, surname string, prov
 	}, nil
 }
 
-func (p Provider) AuthID() string {
-	return p.BaseUser.AuthID
-}
-
-func (p Provider) Email() string {
-	return p.BaseUser.Email
-}
-
-func (p Provider) Name() string {
-	return p.BaseUser.Name
-}
-
-func (p Provider) Surname() string {
-	return p.BaseUser.Surname
-}
-
 func (p Provider) Categoryname() string {
 	return p.Category.Name
-}
-
-func (p Provider) ProfilePhotoFileID() string {
-	return p.BaseUser.ProfilePhoto.FileID
 }
 
 func (p Provider) HasCategory(categoryID int) bool {

@@ -240,8 +240,8 @@ func (suite *testSuite) saveServiceProposalFixture(
 	suite.lastServiceProposalID = savedProposal.ID
 	suite.serviceProposalIDs = append(suite.serviceProposalIDs, savedProposal.ID)
 	suite.serviceProposalFixtures[savedProposal.ID] = serviceProposalFixture{
-		providerID:  participants.provider.ID,
-		consumerID:  participants.consumer.ID,
+		providerID:  participants.provider.ID(),
+		consumerID:  participants.consumer.ID(),
 		amountCents: amountCents,
 		scheduledOn: scheduledOn,
 		description: description,

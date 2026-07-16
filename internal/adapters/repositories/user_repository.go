@@ -38,27 +38,27 @@ func (repository *UserRepository) Save(ctx context.Context, userToSave user.User
 		return nil, fmt.Errorf("beginning user transaction: %w", err)
 	}
 
-	userID, err := saveBaseUser(ctx, tx, userToSave.Base())
+	userID, err := saveBaseUser(ctx, tx, userToSave)
 	if err != nil {
 		return nil, rollbackUserTx(tx, err)
 	}
-	userToSave.Base().ID = userID
+	userToSave.SetPersistenceID(userID)
 
 	switch typedUser := userToSave.(type) {
 	case *consumer.Consumer:
-		if typedUser.Role != consumer.Role {
-			err = fmt.Errorf("consumer has role %q", typedUser.Role)
+		if typedUser.Role() != consumer.Role {
+			err = fmt.Errorf("consumer has role %q", typedUser.Role())
 			break
 		}
-		_, err = tx.ExecContext(ctx, `INSERT INTO consumers (user_id) VALUES ($1)`, typedUser.ID)
+		_, err = tx.ExecContext(ctx, `INSERT INTO consumers (user_id) VALUES ($1)`, typedUser.ID())
 	case *provider.Provider:
-		if typedUser.Role != provider.Role || typedUser.Category == nil {
+		if typedUser.Role() != provider.Role || typedUser.Category == nil {
 			err = fmt.Errorf("provider has invalid role or category")
 			break
 		}
 		_, err = tx.ExecContext(ctx,
 			`INSERT INTO providers (user_id, category_id) VALUES ($1, $2)`,
-			typedUser.ID, typedUser.Category.ID)
+			typedUser.ID(), typedUser.Category.ID)
 	default:
 		err = fmt.Errorf("saving user: unsupported user type %T", userToSave)
 	}
@@ -75,19 +75,19 @@ type userQueryRower interface {
 	QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row
 }
 
-func saveBaseUser(ctx context.Context, queryRower userQueryRower, userToSave *user.BaseUser) (int, error) {
+func saveBaseUser(ctx context.Context, queryRower userQueryRower, userToSave user.User) (int, error) {
 	var userID int
 	err := queryRower.QueryRowContext(
 		ctx,
 		`INSERT INTO users (auth_id, email, name, surname, role, profile_photo_file_id, created_on, updated_on)
 		VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
 		RETURNING id`,
-		userToSave.AuthID,
-		userToSave.Email,
-		userToSave.Name,
-		userToSave.Surname,
-		userToSave.Role,
-		nullableImageFileID(userToSave.ProfilePhoto),
+		userToSave.AuthID(),
+		userToSave.Email(),
+		userToSave.Name(),
+		userToSave.Surname(),
+		userToSave.Role(),
+		nullableImageFileID(userToSave.ProfilePhoto()),
 	).Scan(&userID)
 	if err != nil {
 		return 0, fmt.Errorf("saving user: %w", err)
@@ -129,31 +129,32 @@ type rowScanner interface {
 }
 
 func scanUserWithProfile(row rowScanner, lookup string) (user.User, error) {
-	var base user.BaseUser
+	var id int
+	var authID, email, name, surname, role string
 	var consumerID, providerID, categoryID sql.NullInt64
 	var categoryName, normalizedCategoryName sql.NullString
 	var profilePhotoFileID, profilePhotoOriginalName string
 	err := row.Scan(
-		&base.ID, &base.AuthID, &base.Email, &base.Name, &base.Surname, &base.Role,
+		&id, &authID, &email, &name, &surname, &role,
 		&consumerID, &providerID, &categoryID, &categoryName, &normalizedCategoryName,
 		&profilePhotoFileID, &profilePhotoOriginalName,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("finding user by %s: %w", lookup, err)
 	}
-	base.ProfilePhoto = imageFromPersistence(profilePhotoFileID, profilePhotoOriginalName)
-	switch base.Role {
+	base := user.RehydrateBaseUser(id, authID, email, name, surname, role, imageFromPersistence(profilePhotoFileID, profilePhotoOriginalName))
+	switch role {
 	case consumer.Role:
 		if !consumerID.Valid {
 			return nil, fmt.Errorf("finding user by %s: consumer profile is missing", lookup)
 		}
-		return &consumer.Consumer{BaseUser: &base}, nil
+		return &consumer.Consumer{BaseUser: base}, nil
 	case provider.Role:
 		if !providerID.Valid || !categoryID.Valid {
 			return nil, fmt.Errorf("finding user by %s: provider profile is incomplete", lookup)
 		}
 		return &provider.Provider{
-			BaseUser: &base,
+			BaseUser: base,
 			Category: &category.Category{
 				ID:             int(categoryID.Int64),
 				Name:           categoryName.String,
@@ -161,7 +162,7 @@ func scanUserWithProfile(row rowScanner, lookup string) (user.User, error) {
 			},
 		}, nil
 	default:
-		return nil, fmt.Errorf("finding user by %s: unsupported role %q", lookup, base.Role)
+		return nil, fmt.Errorf("finding user by %s: unsupported role %q", lookup, role)
 	}
 }
 
@@ -170,7 +171,7 @@ func (repository *UserRepository) FindIDByAuthID(authID string) (int, error) {
 	if err != nil {
 		return 0, err
 	}
-	return foundUser.Base().ID, nil
+	return foundUser.ID(), nil
 }
 
 func rollbackUserTx(tx *sql.Tx, originalErr error) error {
@@ -197,8 +198,8 @@ func (repository *UserRepository) FindIDByEmail(email string) (int, error) {
 }
 
 func (repository *UserRepository) FindConsumerByID(consumerID int) (*consumer.Consumer, error) {
-	var foundConsumer consumer.Consumer
-	var consumerUser user.BaseUser
+	var id int
+	var authID, email, name, surname, role string
 	var profilePhotoFileID, profilePhotoOriginalName string
 	err := repository.db.QueryRow(
 		`SELECT consumers.user_id,
@@ -215,12 +216,12 @@ func (repository *UserRepository) FindConsumerByID(consumerID int) (*consumer.Co
 		WHERE consumers.user_id = $1`,
 		consumerID,
 	).Scan(
-		&consumerUser.ID,
-		&consumerUser.AuthID,
-		&consumerUser.Email,
-		&consumerUser.Name,
-		&consumerUser.Surname,
-		&consumerUser.Role,
+		&id,
+		&authID,
+		&email,
+		&name,
+		&surname,
+		&role,
 		&profilePhotoFileID,
 		&profilePhotoOriginalName,
 	)
@@ -228,9 +229,10 @@ func (repository *UserRepository) FindConsumerByID(consumerID int) (*consumer.Co
 		return nil, fmt.Errorf("finding consumer by id: %w", err)
 	}
 
-	foundConsumer.BaseUser = &consumerUser
-	foundConsumer.ProfilePhoto = imageFromPersistence(profilePhotoFileID, profilePhotoOriginalName)
-	return &foundConsumer, nil
+	return &consumer.Consumer{BaseUser: user.RehydrateBaseUser(
+		id, authID, email, name, surname, role,
+		imageFromPersistence(profilePhotoFileID, profilePhotoOriginalName),
+	)}, nil
 }
 
 func (repository *UserRepository) ExistsProviderByID(id int) (bool, error) {
@@ -320,17 +322,17 @@ type providerScanner interface {
 }
 
 func scanProvider(scanner providerScanner) (*provider.Provider, error) {
-	var foundProvider provider.Provider
+	var id int
+	var authID, email, name, surname, role string
 	var providerCategory category.Category
-	var providerUser user.BaseUser
 	var profilePhotoFileID, profilePhotoOriginalName string
 	if err := scanner.Scan(
-		&providerUser.ID,
-		&providerUser.AuthID,
-		&providerUser.Email,
-		&providerUser.Name,
-		&providerUser.Surname,
-		&providerUser.Role,
+		&id,
+		&authID,
+		&email,
+		&name,
+		&surname,
+		&role,
 		&providerCategory.ID,
 		&providerCategory.Name,
 		&providerCategory.NormalizedName,
@@ -339,10 +341,10 @@ func scanProvider(scanner providerScanner) (*provider.Provider, error) {
 	); err != nil {
 		return nil, err
 	}
-	foundProvider.BaseUser = &providerUser
-	foundProvider.ProfilePhoto = imageFromPersistence(profilePhotoFileID, profilePhotoOriginalName)
-	foundProvider.Category = &providerCategory
-	return &foundProvider, nil
+	return &provider.Provider{
+		BaseUser: user.RehydrateBaseUser(id, authID, email, name, surname, role, imageFromPersistence(profilePhotoFileID, profilePhotoOriginalName)),
+		Category: &providerCategory,
+	}, nil
 }
 
 func imageFromPersistence(fileID, originalName string) *filedomain.Image {

@@ -20,7 +20,7 @@ func (s *Service) GetCurrentUser(ctx context.Context, authID string) (User, erro
 		return nil, ErrNotFound
 	}
 
-	profilePhoto := currentUser.Base().ProfilePhoto
+	profilePhoto := currentUser.ProfilePhoto()
 	if profilePhoto == nil {
 		return currentUser, nil
 	}
@@ -29,7 +29,7 @@ func (s *Service) GetCurrentUser(ctx context.Context, authID string) (User, erro
 	if err != nil {
 		return nil, fmt.Errorf("resolving current user profile photo URL: %w", err)
 	}
-	profilePhoto.URL = profilePhotoURL
+	currentUser.SetProfilePhotoURL(profilePhotoURL)
 
 	return currentUser, nil
 }

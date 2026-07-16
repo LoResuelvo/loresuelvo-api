@@ -14,7 +14,7 @@ func TestUserOwnsProfilePhotoImage(t *testing.T) {
 	createdUser, err := user.New("auth0|123", "Andres", "Colina", "andres@example.com", "consumer", profilePhoto)
 
 	assert.NoError(t, err)
-	assert.Same(t, profilePhoto, createdUser.ProfilePhoto)
+	assert.Same(t, profilePhoto, createdUser.ProfilePhoto())
 }
 
 func TestUserReturnsErrorOnInvalidEmailFormat(t *testing.T) {

@@ -97,10 +97,10 @@ func (repository *providerRepositoryMock) Save(_ context.Context, userToSave use
 		return nil, repository.saveErr
 	}
 	if repository.saveID != 0 {
-		providerToSave.ID = repository.saveID
+		providerToSave.SetPersistenceID(repository.saveID)
 		return providerToSave, nil
 	}
-	providerToSave.ID = 1
+	providerToSave.SetPersistenceID(1)
 	return providerToSave, nil
 }
 
@@ -147,11 +147,11 @@ func TestRegisterProviderWithValidData(t *testing.T) {
 	assert.Equal(t, "ana@example.com", repository.savedProvider.Email())
 	assert.Equal(t, "Plomería", repository.savedProvider.Category.Name)
 	require.NotNil(t, createdProvider)
-	assert.Equal(t, 1, createdProvider.ID)
+	assert.Equal(t, 1, createdProvider.ID())
 	assert.Equal(t, "Ana", createdProvider.Name())
 	assert.Equal(t, "Perez", createdProvider.Surname())
 	assert.Equal(t, "Plomería", createdProvider.Category.Name)
-	assert.Equal(t, "https://cdn/profile-photo.jpg", createdProvider.ProfilePhoto.URL)
+	assert.Equal(t, "https://cdn/profile-photo.jpg", createdProvider.ProfilePhoto().URL)
 }
 
 func TestNewProviderRequiresCategory(t *testing.T) {
@@ -170,7 +170,7 @@ func TestNewProviderExposesUserFieldsThroughAccessors(t *testing.T) {
 	assert.Equal(t, "ana@example.com", createdProvider.Email())
 	assert.Equal(t, "Ana", createdProvider.Name())
 	assert.Equal(t, "Perez", createdProvider.Surname())
-	assert.Equal(t, provider.Role, createdProvider.BaseUser.Role)
+	assert.Equal(t, provider.Role, createdProvider.Role())
 }
 
 func TestRegisterProviderWithEmailWithoutArroba(t *testing.T) {
@@ -356,7 +356,7 @@ func TestFilterProvidersByCategoryID(t *testing.T) {
 	providerCategory := existingCategory()
 	providerToReturn, err := provider.NewProvider("auth0|ana", "ana@example.com", "Ana", "Perez", &providerCategory, &filedomain.Image{FileID: "profile-photo-file-id"})
 	require.NoError(t, err)
-	providerToReturn.ID = 1
+	providerToReturn.SetPersistenceID(1)
 	repository := &providerRepositoryMock{
 		providersByCategoryID: map[int][]provider.Provider{
 			providerCategory.ID: {*providerToReturn},
@@ -370,11 +370,11 @@ func TestFilterProvidersByCategoryID(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.Len(t, providers, 1)
-	assert.Equal(t, 1, providers[0].ID)
+	assert.Equal(t, 1, providers[0].ID())
 	assert.Equal(t, "Ana", providers[0].Name())
 	assert.Equal(t, "Perez", providers[0].Surname())
 	assert.Equal(t, "Plomería", providers[0].Category.Name)
-	assert.Equal(t, "https://cdn/profile-photo.jpg", providers[0].ProfilePhoto.URL)
+	assert.Equal(t, "https://cdn/profile-photo.jpg", providers[0].ProfilePhoto().URL)
 	assert.Equal(t, []string{"profile-photo-file-id"}, profilePhotoValidator.resolvedFileIDs)
 	assert.True(t, repository.findByCategoryIDCalled, "providers should be searched by category id")
 	assert.Equal(t, providerCategory.ID, repository.requestedCategoryID)
@@ -442,7 +442,7 @@ func TestGetProviderProfileResolvesProfilePhotoURL(t *testing.T) {
 		&filedomain.Image{FileID: "profile-photo-id", OriginalName: "juan.jpg"},
 	)
 	require.NoError(t, err)
-	foundProvider.ID = 12
+	foundProvider.SetPersistenceID(12)
 
 	repository := &providerRepositoryMock{providerByID: foundProvider}
 	fileService := &profilePhotoValidatorMock{profilePhotoURLsByFile: map[string]string{
@@ -455,8 +455,8 @@ func TestGetProviderProfileResolvesProfilePhotoURL(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, 12, repository.requestedProviderID)
 	assert.Equal(t, []string{"profile-photo-id"}, fileService.resolvedFileIDs)
-	assert.Equal(t, "https://cdn.example/juan.jpg", profile.ProfilePhoto.URL)
-	assert.Equal(t, "juan.jpg", profile.ProfilePhoto.OriginalName)
+	assert.Equal(t, "https://cdn.example/juan.jpg", profile.ProfilePhoto().URL)
+	assert.Equal(t, "juan.jpg", profile.ProfilePhoto().OriginalName)
 }
 
 func TestGetProviderProfileReturnsNotFoundError(t *testing.T) {

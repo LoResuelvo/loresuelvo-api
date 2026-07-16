@@ -16,10 +16,10 @@ func serviceProposalCreationResponseFromDomain(proposal *serviceproposal.Service
 	}
 
 	if proposal.Provider != nil {
-		response.ProviderID = proposal.Provider.ID
+		response.ProviderID = proposal.Provider.ID()
 	}
 	if proposal.Consumer != nil {
-		response.ConsumerID = proposal.Consumer.ID
+		response.ConsumerID = proposal.Consumer.ID()
 	}
 	if proposal.Conversation != nil {
 		response.ConversationID = proposal.Conversation.ID()
@@ -49,15 +49,14 @@ func serviceProposalSummaryResponsesFromDomain(proposals []*serviceproposal.Serv
 		if err != nil {
 			return nil, err
 		}
-		counterpartBase := counterpart.Base()
 		counterpartResponse := serviceProposalCounterpartResponse{
-			ID:      counterpartBase.ID,
-			Role:    counterpartBase.Role,
-			Name:    counterpartBase.Name,
-			Surname: counterpartBase.Surname,
+			ID:      counterpart.ID(),
+			Role:    counterpart.Role(),
+			Name:    counterpart.Name(),
+			Surname: counterpart.Surname(),
 		}
-		if counterpartBase.ProfilePhoto != nil {
-			counterpartResponse.ProfilePhotoURL = counterpartBase.ProfilePhoto.URL
+		if profilePhoto := counterpart.ProfilePhoto(); profilePhoto != nil {
+			counterpartResponse.ProfilePhotoURL = profilePhoto.URL
 		}
 		if counterpartProvider, ok := counterpart.(*provider.Provider); ok {
 			counterpartResponse.CategoryName = counterpartProvider.Categoryname()

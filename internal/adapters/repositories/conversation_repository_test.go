@@ -91,7 +91,7 @@ func savedConsumerIDForConversationWithData(t *testing.T, testContext conversati
 	_, err = testContext.userRepository.Save(context.Background(), consumerToSave)
 	require.NoError(t, err)
 
-	consumerID, err := testContext.userRepository.FindIDByEmail(consumerToSave.BaseUser.Email)
+	consumerID, err := testContext.userRepository.FindIDByEmail(consumerToSave.Email())
 	require.NoError(t, err)
 	return consumerID
 }

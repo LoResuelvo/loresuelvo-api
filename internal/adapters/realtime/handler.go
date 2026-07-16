@@ -91,8 +91,8 @@ func (h *Handler) upgrade(w http.ResponseWriter, r *http.Request) (*websocket.Co
 
 func (h *Handler) resolveParticipantForRole(auth0ID, role string) (profileID int, err error) {
 	foundUser, err := h.userFinder.FindByAuthID(auth0ID)
-	if err != nil || foundUser.Base().Role != role {
+	if err != nil || foundUser.Role() != role {
 		return 0, conversation.ErrConversationAccessDenied
 	}
-	return foundUser.Base().ID, nil
+	return foundUser.ID(), nil
 }

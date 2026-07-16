@@ -78,8 +78,8 @@ func workOrderFixture(id, consumerID, providerID int, scheduledOn time.Time) *wo
 		ID: id,
 		ServiceProposal: &serviceproposal.ServiceProposal{
 			ID:          id + 100,
-			Consumer:    &consumer.Consumer{BaseUser: &user.BaseUser{ID: consumerID}},
-			Provider:    &provider.Provider{BaseUser: &user.BaseUser{ID: providerID}},
+			Consumer:    &consumer.Consumer{BaseUser: user.RehydrateBaseUser(consumerID, "", "", "", "", "", nil)},
+			Provider:    &provider.Provider{BaseUser: user.RehydrateBaseUser(providerID, "", "", "", "", "", nil)},
 			ScheduledOn: scheduledOn,
 		},
 		Status: workorder.StatusScheduled,

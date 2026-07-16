@@ -16,8 +16,7 @@ type ConversationReader struct {
 }
 
 func (reader *ConversationReader) FindSummariesByUserAndType(ctx context.Context, foundUser user.User, conversationType string) ([]readmodel.ConversationSummary, error) {
-	base := foundUser.Base()
-	return reader.FindSummariesByParticipantIDRoleAndType(ctx, base.ID, base.Role, conversationType)
+	return reader.FindSummariesByParticipantIDRoleAndType(ctx, foundUser.ID(), foundUser.Role(), conversationType)
 }
 
 func NewConversationReader(db *sql.DB, messageImageRepository *MessageImageRepository) *ConversationReader {

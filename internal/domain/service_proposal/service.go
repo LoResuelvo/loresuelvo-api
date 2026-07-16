@@ -67,7 +67,7 @@ func (s *Service) GetServiceProposals(ctx context.Context, auth0ID string) ([]*S
 		return nil, err
 	}
 
-	proposals, err := s.repository.FindByUserID(ctx, foundUser.Base().ID)
+	proposals, err := s.repository.FindByUserID(ctx, foundUser.ID())
 	if err != nil {
 		return nil, err
 	}
@@ -75,8 +75,8 @@ func (s *Service) GetServiceProposals(ctx context.Context, auth0ID string) ([]*S
 	fileIDs := make([]string, 0, len(proposals)*2)
 	for _, proposal := range proposals {
 		for _, participant := range []user.User{proposal.Consumer, proposal.Provider} {
-			if participant.Base().ProfilePhoto != nil {
-				fileIDs = append(fileIDs, participant.Base().ProfilePhoto.FileID)
+			if participant.ProfilePhoto() != nil {
+				fileIDs = append(fileIDs, participant.ProfilePhoto().FileID)
 			}
 		}
 	}
@@ -87,8 +87,8 @@ func (s *Service) GetServiceProposals(ctx context.Context, auth0ID string) ([]*S
 	}
 	for _, proposal := range proposals {
 		for _, participant := range []user.User{proposal.Consumer, proposal.Provider} {
-			if participant.Base().ProfilePhoto != nil {
-				participant.Base().ProfilePhoto.URL = urlsByFileID[participant.Base().ProfilePhoto.FileID]
+			if participant.ProfilePhoto() != nil {
+				participant.SetProfilePhotoURL(urlsByFileID[participant.ProfilePhoto().FileID])
 			}
 		}
 	}
@@ -107,7 +107,7 @@ func (s *Service) Accept(ctx context.Context, auth0ID string, proposalID int) (*
 	}
 
 	acceptedOn := s.clock.Now()
-	if err := proposal.Accept(foundUser.Base().ID, acceptedOn); err != nil {
+	if err := proposal.Accept(foundUser.ID(), acceptedOn); err != nil {
 		return nil, err
 	}
 
@@ -151,7 +151,7 @@ func (s *Service) getParticipants(providerAuth0ID string, consumerID int) (*prov
 		return nil, nil, nil, ErrConsumerRequired
 	}
 
-	conversation, err := s.conversationRepository.FindBetween(consumer.Base().ID, provider.Base().ID)
+	conversation, err := s.conversationRepository.FindBetween(consumer.ID(), provider.ID())
 	if err != nil {
 		return nil, nil, nil, ErrConversationRequired
 	}

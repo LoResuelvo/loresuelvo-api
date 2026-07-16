@@ -9,7 +9,7 @@ import (
 )
 
 func currentUserResponseFromDomain(currentUser user.User) (any, error) {
-	baseResponse := baseCurrentUserResponseFromDomain(currentUser.Base())
+	baseResponse := baseCurrentUserResponseFromDomain(currentUser)
 
 	switch typedUser := currentUser.(type) {
 	case *consumer.Consumer:
@@ -27,18 +27,18 @@ func currentUserResponseFromDomain(currentUser user.User) (any, error) {
 	}
 }
 
-func baseCurrentUserResponseFromDomain(currentUser *user.BaseUser) currentUserResponse {
+func baseCurrentUserResponseFromDomain(currentUser user.User) currentUserResponse {
 	response := currentUserResponse{
-		ID:      currentUser.ID,
-		Name:    currentUser.Name,
-		Surname: currentUser.Surname,
-		Email:   currentUser.Email,
-		Role:    currentUser.Role,
+		ID:      currentUser.ID(),
+		Name:    currentUser.Name(),
+		Surname: currentUser.Surname(),
+		Email:   currentUser.Email(),
+		Role:    currentUser.Role(),
 	}
-	if currentUser.ProfilePhoto != nil {
+	if profilePhoto := currentUser.ProfilePhoto(); profilePhoto != nil {
 		response.ProfilePhoto = &currentUserProfilePhotoResponse{
-			OriginalName: currentUser.ProfilePhoto.OriginalName,
-			URL:          currentUser.ProfilePhoto.URL,
+			OriginalName: profilePhoto.OriginalName,
+			URL:          profilePhoto.URL,
 		}
 	}
 

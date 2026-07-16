@@ -26,7 +26,7 @@ func (repository *userRepositoryMock) FindByEmail(email string) bool {
 
 func (repository *userRepositoryMock) FindByAuthID(id string) (user.User, error) {
 	repository.findByAuthIDCalled = true
-	if repository.user == nil || repository.user.Base().AuthID != id {
+	if repository.user == nil || repository.user.AuthID() != id {
 		return nil, user.ErrNotFound
 	}
 	return repository.user, nil
@@ -44,14 +44,14 @@ func (resolver *profilePhotoURLResolverMock) ResolvePublicURL(_ context.Context,
 }
 
 func TestGetExistingUser(t *testing.T) {
-	repository := &userRepositoryMock{user: &user.BaseUser{AuthID: "auth0|ana"}}
+	repository := &userRepositoryMock{user: user.RehydrateBaseUser(0, "auth0|ana", "", "", "", "", nil)}
 	userManager := user.NewService(repository, &profilePhotoURLResolverMock{})
 
 	currentUser, err := userManager.GetCurrentUser(context.Background(), "auth0|ana")
 
 	require.NoError(t, err)
 	require.NotNil(t, currentUser)
-	assert.Equal(t, "auth0|ana", currentUser.Base().AuthID)
+	assert.Equal(t, "auth0|ana", currentUser.AuthID())
 	assert.True(t, repository.findByAuthIDCalled, "user should be searched by auth ID")
 }
 
@@ -68,7 +68,7 @@ func TestGetNonExistingUser(t *testing.T) {
 
 func TestGetCurrentUserResolvesProfilePhotoURL(t *testing.T) {
 	profilePhoto := &filedomain.Image{FileID: "photo-id", OriginalName: "profile.jpg"}
-	repository := &userRepositoryMock{user: &user.BaseUser{AuthID: "auth0|ana", ProfilePhoto: profilePhoto}}
+	repository := &userRepositoryMock{user: user.RehydrateBaseUser(0, "auth0|ana", "", "", "", "", profilePhoto)}
 	resolver := &profilePhotoURLResolverMock{url: "https://files/profile.jpg"}
 	userManager := user.NewService(repository, resolver)
 
@@ -76,15 +76,12 @@ func TestGetCurrentUserResolvesProfilePhotoURL(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.Equal(t, "photo-id", resolver.resolvedFileID)
-	assert.Equal(t, "https://files/profile.jpg", currentUser.Base().ProfilePhoto.URL)
+	assert.Equal(t, "https://files/profile.jpg", currentUser.ProfilePhoto().URL)
 }
 
 func TestGetCurrentUserReturnsProfilePhotoURLResolutionError(t *testing.T) {
 	expectedErr := errors.New("storage unavailable")
-	repository := &userRepositoryMock{user: &user.BaseUser{
-		AuthID:       "auth0|ana",
-		ProfilePhoto: &filedomain.Image{FileID: "photo-id"},
-	}}
+	repository := &userRepositoryMock{user: user.RehydrateBaseUser(0, "auth0|ana", "", "", "", "", &filedomain.Image{FileID: "photo-id"})}
 	userManager := user.NewService(repository, &profilePhotoURLResolverMock{err: expectedErr})
 
 	currentUser, err := userManager.GetCurrentUser(context.Background(), "auth0|ana")

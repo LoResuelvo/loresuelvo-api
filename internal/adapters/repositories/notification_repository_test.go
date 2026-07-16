@@ -56,7 +56,7 @@ func TestNotificationRepositoryCanSave(t *testing.T) {
 	require.NoError(t, err)
 	_, err = testContext.userRepository.Save(context.Background(), consumerToSave)
 	require.NoError(t, err)
-	consumerID, err := testContext.userRepository.FindIDByEmail(consumerToSave.Email)
+	consumerID, err := testContext.userRepository.FindIDByEmail(consumerToSave.Email())
 	require.NoError(t, err)
 	createdAt := time.Now().UTC().Truncate(time.Microsecond)
 	notificationToSave := &notification.Notification{

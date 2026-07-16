@@ -21,8 +21,8 @@ type consumerRepositoryMock struct {
 
 func (repository *consumerRepositoryMock) Save(_ context.Context, userToSave user.User) (user.User, error) {
 	repository.savedConsumer = *userToSave.(*consumer.Consumer)
-	repository.savedConsumer.ID = 10
-	userToSave.Base().ID = 10
+	repository.savedConsumer.SetPersistenceID(10)
+	userToSave.SetPersistenceID(10)
 	repository.saveCalled = true
 	return userToSave, nil
 }
@@ -62,9 +62,9 @@ func TestRegisterConsumerWithProfilePhoto(t *testing.T) {
 	)
 
 	assert.NoError(t, err)
-	assert.Equal(t, 10, created.ID)
-	assert.Equal(t, "https://cdn/profile.jpg", created.ProfilePhoto.URL)
-	assert.Equal(t, "profile-file-id", repository.savedConsumer.ProfilePhoto.FileID)
+	assert.Equal(t, 10, created.ID())
+	assert.Equal(t, "https://cdn/profile.jpg", created.ProfilePhoto().URL)
+	assert.Equal(t, "profile-file-id", repository.savedConsumer.ProfilePhoto().FileID)
 	assert.Equal(t, "auth0|ana", files.validatedAuthID)
 	assert.Equal(t, "profile-file-id", files.validatedFileID)
 	assert.Equal(t, "profile-file-id", files.resolvedFileID)
@@ -80,8 +80,8 @@ func TestRegisterConsumerWithoutProfilePhoto(t *testing.T) {
 	)
 
 	assert.NoError(t, err)
-	assert.Nil(t, created.ProfilePhoto)
-	assert.Nil(t, repository.savedConsumer.ProfilePhoto)
+	assert.Nil(t, created.ProfilePhoto())
+	assert.Nil(t, repository.savedConsumer.ProfilePhoto())
 	assert.Empty(t, files.validatedFileID)
 	assert.Empty(t, files.resolvedFileID)
 }

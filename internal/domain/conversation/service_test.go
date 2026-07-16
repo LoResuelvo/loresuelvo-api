@@ -163,13 +163,13 @@ func (m *userRepositoryMock) FindByAuthID(authID string) (user.User, error) {
 	m.findByAuthIDCalls++
 	if m.consumer != nil {
 		if id, err := m.consumer.FindIDByAuthID(authID); err == nil {
-			return &user.BaseUser{ID: id, AuthID: authID, Role: conversation.SenderConsumer}, nil
+			return user.RehydrateBaseUser(id, authID, "", "", "", conversation.SenderConsumer, nil), nil
 		}
 	}
 	if m.provider != nil {
 		id, err := m.provider.FindIDByAuthID(authID)
 		if err == nil {
-			return &user.BaseUser{ID: id, AuthID: authID, Role: conversation.SenderProvider}, nil
+			return user.RehydrateBaseUser(id, authID, "", "", "", conversation.SenderProvider, nil), nil
 		}
 		return nil, err
 	}
@@ -181,7 +181,7 @@ func (m *userRepositoryMock) FindIDByAuthID(authID string) (int, error) {
 	if err != nil {
 		return 0, err
 	}
-	return found.Base().ID, nil
+	return found.ID(), nil
 }
 
 func (m *userRepositoryMock) FindAuthIDByID(id int) (string, error) { return "", nil }
@@ -253,7 +253,7 @@ func (m *conversationReaderMock) FindSummariesByParticipantIDRoleAndType(ctx con
 }
 
 func (m *conversationReaderMock) FindSummariesByUserAndType(ctx context.Context, foundUser user.User, conversationType string) ([]readmodel.ConversationSummary, error) {
-	return m.FindSummariesByParticipantIDRoleAndType(ctx, foundUser.Base().ID, foundUser.Base().Role, conversationType)
+	return m.FindSummariesByParticipantIDRoleAndType(ctx, foundUser.ID(), foundUser.Role(), conversationType)
 }
 
 func (m *conversationReaderMock) FindDetailByIDRoleAndType(ctx context.Context, conversationID int, participantRole string, conversationType string) (*readmodel.ConversationDetail, error) {
@@ -474,7 +474,7 @@ func TestCreateChatbotConversationIncludesRecommendedProvidersWhenDiagnosisIsCom
 	plumbingCategory := &category.Category{ID: 3, Name: "Plomería", NormalizedName: "plomería"}
 	recommendedProvider, err := provider.NewProvider("auth0|provider", "juan@example.com", "Juan", "Gómez", plumbingCategory, &filedomain.Image{FileID: "provider-photo-file-id"})
 	require.NoError(t, err)
-	recommendedProvider.ID = 20
+	recommendedProvider.SetPersistenceID(20)
 	categoryLister := &recommendationCategoryListerMock{categories: []category.Category{*plumbingCategory}}
 	providerFinder := &providerIDFinderMock{providers: []provider.Provider{*recommendedProvider}}
 	fileURLResolver := &fileURLResolverMock{urlsByFileID: map[string]string{"provider-photo-file-id": "https://cdn/provider.jpg"}}
@@ -505,11 +505,11 @@ func TestCreateChatbotConversationIncludesRecommendedProvidersWhenDiagnosisIsCom
 	assert.Equal(t, 3, providerFinder.requestedCategoryID)
 	assert.Equal(t, []string{"provider-photo-file-id"}, fileURLResolver.resolvedFileIDs)
 	require.Len(t, createdResult.RecommendedProviders, 1)
-	assert.Equal(t, 20, createdResult.RecommendedProviders[0].ID)
+	assert.Equal(t, 20, createdResult.RecommendedProviders[0].ID())
 	assert.Equal(t, "Juan", createdResult.RecommendedProviders[0].Name())
 	assert.Equal(t, "Gómez", createdResult.RecommendedProviders[0].Surname())
 	assert.Equal(t, "Plomería", createdResult.RecommendedProviders[0].Category.Name)
-	assert.Equal(t, "https://cdn/provider.jpg", createdResult.RecommendedProviders[0].ProfilePhoto.URL)
+	assert.Equal(t, "https://cdn/provider.jpg", createdResult.RecommendedProviders[0].ProfilePhoto().URL)
 }
 
 func TestCreateChatbotConversationDoesNotRecommendProvidersBeforeDiagnosisIsCompleted(t *testing.T) {
@@ -821,7 +821,7 @@ func TestGetByIDReturnsChatbotConversationDetailForOwnerConsumer(t *testing.T) {
 	plumbingCategory := &category.Category{ID: recommendedCategoryID, Name: "Plomería", NormalizedName: "plomería"}
 	recommendedProvider, err := provider.NewProvider("auth0|provider", "juan@example.com", "Juan", "Gómez", plumbingCategory, &filedomain.Image{FileID: "provider-photo-file-id"})
 	require.NoError(t, err)
-	recommendedProvider.ID = 20
+	recommendedProvider.SetPersistenceID(20)
 	providerFinder := &providerIDFinderMock{providers: []provider.Provider{*recommendedProvider}}
 	conversationReader := &conversationReaderMock{detail: &readmodel.ConversationDetail{
 		ID:     7,
@@ -852,8 +852,8 @@ func TestGetByIDReturnsChatbotConversationDetailForOwnerConsumer(t *testing.T) {
 	assert.Equal(t, recommendedCategoryID, providerFinder.requestedCategoryID)
 	require.NotNil(t, foundConversation.Chatbot)
 	require.Len(t, foundConversation.Chatbot.RecommendedProviders, 1)
-	assert.Equal(t, 20, foundConversation.Chatbot.RecommendedProviders[0].ID)
-	assert.Equal(t, "https://cdn/provider.jpg", foundConversation.Chatbot.RecommendedProviders[0].ProfilePhoto.URL)
+	assert.Equal(t, 20, foundConversation.Chatbot.RecommendedProviders[0].ID())
+	assert.Equal(t, "https://cdn/provider.jpg", foundConversation.Chatbot.RecommendedProviders[0].ProfilePhoto().URL)
 }
 
 func TestGetByIDRejectsChatbotConversationForNonOwnerConsumer(t *testing.T) {

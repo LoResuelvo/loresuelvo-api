@@ -224,21 +224,21 @@ func TestProviderRepositoryCanFindProvidersByCategoryID(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.Len(t, providers, 2)
-	assert.NotZero(t, providers[0].ID)
+	assert.NotZero(t, providers[0].ID())
 	assert.Equal(t, "Juan", providers[0].Name())
 	assert.Equal(t, "Pérez", providers[0].Surname())
 	require.NotNil(t, providers[0].Category)
 	assert.Equal(t, plumbingProvider.Category.ID, providers[0].Category.ID)
 	assert.Equal(t, "Plomería", providers[0].Category.Name)
-	assert.Equal(t, plumbingProvider.ProfilePhoto.FileID, providers[0].ProfilePhoto.FileID)
-	assert.Equal(t, "foto.jpg", providers[0].ProfilePhoto.OriginalName)
+	assert.Equal(t, plumbingProvider.ProfilePhoto().FileID, providers[0].ProfilePhoto().FileID)
+	assert.Equal(t, "foto.jpg", providers[0].ProfilePhoto().OriginalName)
 	assert.NotZero(t, providers[1].ID)
 	assert.Equal(t, "Pedro", providers[1].Name())
 	assert.Equal(t, "Dib", providers[1].Surname())
 	require.NotNil(t, providers[1].Category)
 	assert.Equal(t, anotherPlumbingProvider.Category.ID, providers[1].Category.ID)
 	assert.Equal(t, "Plomería", providers[1].Category.Name)
-	assert.Equal(t, anotherPlumbingProvider.ProfilePhoto.FileID, providers[1].ProfilePhoto.FileID)
+	assert.Equal(t, anotherPlumbingProvider.ProfilePhoto().FileID, providers[1].ProfilePhoto().FileID)
 }
 
 func TestProviderRepositoryFindByCategoryIDReturnsEmptyListIfNoProvidersExistForCategory(t *testing.T) {
@@ -272,13 +272,13 @@ func TestProviderRepositoryCanFindByAuthID(t *testing.T) {
 	providerToSave := validProvider(t, testContext)
 
 	savedUser, err := repo.Save(context.Background(), providerUser(providerToSave))
-	providerID := savedUser.Base().ID
+	providerID := savedUser.ID()
 	require.NoError(t, err, "saving provider should not return an error")
 
 	foundProvider, err := repo.FindProviderByAuthID(providerToSave.AuthID())
 
 	require.NoError(t, err)
-	assert.Equal(t, providerID, foundProvider.ID)
+	assert.Equal(t, providerID, foundProvider.ID())
 	assert.Equal(t, providerToSave.AuthID(), foundProvider.AuthID())
 	assert.Equal(t, providerToSave.Email(), foundProvider.Email())
 	assert.Equal(t, providerToSave.Name(), foundProvider.Name())
@@ -286,21 +286,21 @@ func TestProviderRepositoryCanFindByAuthID(t *testing.T) {
 	require.NotNil(t, foundProvider.Category)
 	assert.Equal(t, providerToSave.Category.ID, foundProvider.Category.ID)
 	assert.Equal(t, providerToSave.Category.Name, foundProvider.Category.Name)
-	assert.Equal(t, providerToSave.ProfilePhoto.FileID, foundProvider.ProfilePhoto.FileID)
-	assert.Equal(t, "foto.jpg", foundProvider.ProfilePhoto.OriginalName)
+	assert.Equal(t, providerToSave.ProfilePhoto().FileID, foundProvider.ProfilePhoto().FileID)
+	assert.Equal(t, "foto.jpg", foundProvider.ProfilePhoto().OriginalName)
 }
 
 func TestProviderRepositoryCanFindByID(t *testing.T) {
 	testContext := newProviderRepositoryTest(t)
 	providerToSave := validProvider(t, testContext)
 	savedUser, err := testContext.providerRepository.Save(context.Background(), providerUser(providerToSave))
-	providerID := savedUser.Base().ID
+	providerID := savedUser.ID()
 	require.NoError(t, err)
 
 	foundProvider, err := testContext.providerRepository.FindProviderByID(context.Background(), providerID)
 
 	require.NoError(t, err)
-	assert.Equal(t, providerID, foundProvider.ID)
+	assert.Equal(t, providerID, foundProvider.ID())
 	assert.Equal(t, providerToSave.Name(), foundProvider.Name())
 	require.NotNil(t, foundProvider.Category)
 	assert.Equal(t, providerToSave.Category.ID, foundProvider.Category.ID)

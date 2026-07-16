@@ -52,19 +52,19 @@ func setupServiceProposalTest() *serviceProposalTestEnv {
 	userRepo.
 		On("FindByAuthID", validProviderAuth0ID).
 		Return(&provider.Provider{
-			BaseUser: &user.BaseUser{ID: validProviderID},
+			BaseUser: user.RehydrateBaseUser(validProviderID, "", "", "", "", "", nil),
 		}, nil)
 
 	providerRepo.
 		On("FindByAuthID", validProviderAuth0ID).
 		Return(&provider.Provider{
-			BaseUser: &user.BaseUser{ID: validProviderID},
+			BaseUser: user.RehydrateBaseUser(validProviderID, "", "", "", "", "", nil),
 		}, nil)
 
 	consumerRepo.
 		On("FindByID", validConsumerID).
 		Return(&consumer.Consumer{
-			BaseUser: &user.BaseUser{ID: validConsumerID},
+			BaseUser: user.RehydrateBaseUser(validConsumerID, "", "", "", "", "", nil),
 		}, nil)
 
 	conversationRepo.
@@ -109,8 +109,8 @@ func setupServiceProposalTest() *serviceProposalTestEnv {
 func validSavedServiceProposal() *serviceproposal.ServiceProposal {
 	return &serviceproposal.ServiceProposal{
 		ID:           77,
-		Provider:     &provider.Provider{BaseUser: &user.BaseUser{ID: validProviderID}},
-		Consumer:     &consumer.Consumer{BaseUser: &user.BaseUser{ID: validConsumerID}},
+		Provider:     &provider.Provider{BaseUser: user.RehydrateBaseUser(validProviderID, "", "", "", "", "", nil)},
+		Consumer:     &consumer.Consumer{BaseUser: user.RehydrateBaseUser(validConsumerID, "", "", "", "", "", nil)},
 		Conversation: validConversation,
 		Amount:       validServiceAmount,
 		ScheduledOn:  validServiceScheduledOn,
@@ -154,7 +154,7 @@ func TestAcceptServiceProposalCreatesScheduledWorkOrder(t *testing.T) {
 	now := time.Date(2026, time.July, 4, 13, 0, 0, 0, time.UTC)
 	proposal := validSavedServiceProposal()
 	proposal.ScheduledOn = now.Add(time.Hour)
-	consumerUser := &consumer.Consumer{BaseUser: &user.BaseUser{ID: validConsumerID, Role: consumer.Role}}
+	consumerUser := &consumer.Consumer{BaseUser: user.RehydrateBaseUser(validConsumerID, "", "", "", "", consumer.Role, nil)}
 	savedOrder := &workorder.WorkOrder{
 		ID:              9,
 		ServiceProposal: proposal,
@@ -190,7 +190,7 @@ func TestAcceptServiceProposalNotifiesProviderAfterSavingNotification(t *testing
 	now := time.Date(2026, time.July, 4, 13, 0, 0, 0, time.UTC)
 	proposal := validSavedServiceProposal()
 	proposal.ScheduledOn = now.Add(time.Hour)
-	consumerUser := &consumer.Consumer{BaseUser: &user.BaseUser{ID: validConsumerID, Role: consumer.Role}}
+	consumerUser := &consumer.Consumer{BaseUser: user.RehydrateBaseUser(validConsumerID, "", "", "", "", consumer.Role, nil)}
 	savedOrder := &workorder.WorkOrder{ID: 9, ServiceProposal: proposal}
 	savedNotification := &notification.Notification{
 		ID:           11,
@@ -363,7 +363,7 @@ func TestGetServiceProposalsWithoutServiceProposals(t *testing.T) {
 	userRepo := &MockUserRepository{provider: providerRepo, consumer: consumerRepo}
 	userRepo.
 		On("FindByAuthID", validProviderAuth0ID).
-		Return(&provider.Provider{BaseUser: &user.BaseUser{ID: validProviderID}}, nil)
+		Return(&provider.Provider{BaseUser: user.RehydrateBaseUser(validProviderID, "", "", "", "", "", nil)}, nil)
 
 	serviceRepo.
 		On("FindByUserID", mock.Anything, validProviderID).
@@ -384,8 +384,8 @@ func TestConsumerGetsPendingServiceProposal(t *testing.T) {
 	env := setupServiceProposalTest()
 	expectedProposal := &serviceproposal.ServiceProposal{
 		ID:          1,
-		Provider:    &provider.Provider{BaseUser: &user.BaseUser{ID: validProviderID}},
-		Consumer:    &consumer.Consumer{BaseUser: &user.BaseUser{ID: validConsumerID, Role: consumer.Role}},
+		Provider:    &provider.Provider{BaseUser: user.RehydrateBaseUser(validProviderID, "", "", "Juan", "Gomez", provider.Role, &filedomain.Image{FileID: "provider-photo"})},
+		Consumer:    &consumer.Consumer{BaseUser: user.RehydrateBaseUser(validConsumerID, "", "", "", "", consumer.Role, nil)},
 		Amount:      validServiceAmount,
 		ScheduledOn: validServiceScheduledOn,
 		Description: validServiceDescription,
@@ -395,10 +395,7 @@ func TestConsumerGetsPendingServiceProposal(t *testing.T) {
 			BaseConversation: conversation.RehydrateBaseConversation(10, conversation.TypeWork, "", time.Time{}, nil),
 		},
 	}
-	expectedProposal.Provider.BaseUser.Name = "Juan"
-	expectedProposal.Provider.BaseUser.Surname = "Gomez"
 	expectedProposal.Provider.Category = &category.Category{Name: "Plomeria"}
-	expectedProposal.Provider.ProfilePhoto = &filedomain.Image{FileID: "provider-photo"}
 
 	resetMocks(&env.userRepo.Mock, &env.serviceRepo.Mock)
 	env.userRepo.
@@ -424,7 +421,7 @@ func TestConsumerGetsPendingServiceProposal(t *testing.T) {
 	assert.Equal(t, "Juan", proposals[0].Provider.Name())
 	assert.Equal(t, "Gomez", proposals[0].Provider.Surname())
 	assert.Equal(t, "Plomeria", proposals[0].Provider.Categoryname())
-	assert.Equal(t, "https://cdn/provider.jpg", proposals[0].Provider.ProfilePhoto.URL)
+	assert.Equal(t, "https://cdn/provider.jpg", proposals[0].Provider.ProfilePhoto().URL)
 	env.userRepo.AssertExpectations(t)
 	env.serviceRepo.AssertExpectations(t)
 }

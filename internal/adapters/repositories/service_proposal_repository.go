@@ -53,8 +53,8 @@ func (r *ServiceProposalRepository) Save(serviceProposal *serviceproposal.Servic
 		)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW())
 		RETURNING id`,
-		serviceProposal.Consumer.ID,
-		serviceProposal.Provider.ID,
+		serviceProposal.Consumer.ID(),
+		serviceProposal.Provider.ID(),
 		serviceProposal.Conversation.ID(),
 		serviceProposal.Amount,
 		serviceProposal.ScheduledOn,
@@ -105,8 +105,8 @@ func (r *ServiceProposalRepository) FindByID(ctx context.Context, id int) (*serv
 		return nil, fmt.Errorf("finding service proposal by id: %w", err)
 	}
 
-	proposal.Consumer = &consumer.Consumer{BaseUser: &user.BaseUser{ID: consumerID, Role: consumer.Role}}
-	proposal.Provider = &provider.Provider{BaseUser: &user.BaseUser{ID: providerID, Role: provider.Role}}
+	proposal.Consumer = &consumer.Consumer{BaseUser: user.RehydrateBaseUser(consumerID, "", "", "", "", consumer.Role, nil)}
+	proposal.Provider = &provider.Provider{BaseUser: user.RehydrateBaseUser(providerID, "", "", "", "", provider.Role, nil)}
 	return &proposal, nil
 }
 
@@ -194,8 +194,16 @@ func (r *ServiceProposalRepository) FindByUserID(ctx context.Context, userID int
 			conversationID             int
 			conversationType           string
 			conversationStatus         string
-			consumerUser               user.BaseUser
-			providerUser               user.BaseUser
+			consumerID                 int
+			consumerAuthID             string
+			consumerEmail              string
+			consumerName               string
+			consumerSurname            string
+			providerID                 int
+			providerAuthID             string
+			providerEmail              string
+			providerName               string
+			providerSurname            string
 			providerCategory           category.Category
 			consumerProfilePhotoFileID sql.NullString
 			providerProfilePhotoFileID sql.NullString
@@ -211,17 +219,17 @@ func (r *ServiceProposalRepository) FindByUserID(ctx context.Context, userID int
 			&conversationID,
 			&conversationType,
 			&conversationStatus,
-			&consumerUser.ID,
-			&consumerUser.AuthID,
-			&consumerUser.Email,
-			&consumerUser.Name,
-			&consumerUser.Surname,
+			&consumerID,
+			&consumerAuthID,
+			&consumerEmail,
+			&consumerName,
+			&consumerSurname,
 			&consumerProfilePhotoFileID,
-			&providerUser.ID,
-			&providerUser.AuthID,
-			&providerUser.Email,
-			&providerUser.Name,
-			&providerUser.Surname,
+			&providerID,
+			&providerAuthID,
+			&providerEmail,
+			&providerName,
+			&providerSurname,
 			&providerCategory.ID,
 			&providerCategory.Name,
 			&providerCategory.NormalizedName,
@@ -234,19 +242,17 @@ func (r *ServiceProposalRepository) FindByUserID(ctx context.Context, userID int
 			return nil, fmt.Errorf("scanning service proposal by user id: unsupported conversation type %q", conversationType)
 		}
 
-		consumerUser.Role = consumer.Role
-		providerUser.Role = provider.Role
-		consumerUser.ProfilePhoto = imageFromPersistence(consumerProfilePhotoFileID.String, "")
-		providerUser.ProfilePhoto = imageFromPersistence(providerProfilePhotoFileID.String, "")
-		proposal.Consumer = &consumer.Consumer{BaseUser: &consumerUser}
+		consumerUser := user.RehydrateBaseUser(consumerID, consumerAuthID, consumerEmail, consumerName, consumerSurname, consumer.Role, imageFromPersistence(consumerProfilePhotoFileID.String, ""))
+		providerUser := user.RehydrateBaseUser(providerID, providerAuthID, providerEmail, providerName, providerSurname, provider.Role, imageFromPersistence(providerProfilePhotoFileID.String, ""))
+		proposal.Consumer = &consumer.Consumer{BaseUser: consumerUser}
 		proposal.Provider = &provider.Provider{
-			BaseUser: &providerUser,
+			BaseUser: providerUser,
 			Category: &providerCategory,
 		}
 		proposal.Conversation = &conversation.WorkConversation{
 			BaseConversation: conversation.RehydrateBaseConversation(conversationID, conversation.TypeWork, conversationStatus, time.Time{}, nil),
-			ConsumerID:       consumerUser.ID,
-			ProviderID:       providerUser.ID,
+			ConsumerID:       consumerID,
+			ProviderID:       providerID,
 		}
 		proposals = append(proposals, &proposal)
 	}

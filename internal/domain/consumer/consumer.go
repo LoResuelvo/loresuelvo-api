@@ -20,11 +20,3 @@ func NewConsumer(auth0ID, email, name, surname string, profilePhoto *filedomain.
 		BaseUser: baseUser,
 	}, nil
 }
-
-func (p Consumer) Name() string {
-	return p.BaseUser.Name
-}
-
-func (p Consumer) Surname() string {
-	return p.BaseUser.Surname
-}

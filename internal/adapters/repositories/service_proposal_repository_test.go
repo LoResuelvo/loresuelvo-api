@@ -98,8 +98,8 @@ func TestServiceProposalRepositorySavesAcceptanceWithWorkOrderAtomically(t *test
 	require.NoError(t, err)
 
 	proposal, err := serviceproposal.NewServiceProposal(
-		&provider.Provider{BaseUser: &user.BaseUser{ID: providerID}},
-		&consumer.Consumer{BaseUser: &user.BaseUser{ID: consumerID}},
+		&provider.Provider{BaseUser: user.RehydrateBaseUser(providerID, "", "", "", "", "", nil)},
+		&consumer.Consumer{BaseUser: user.RehydrateBaseUser(consumerID, "", "", "", "", "", nil)},
 		activeConversation,
 		1500050,
 		time.Now().Add(24*time.Hour).UTC().Truncate(time.Microsecond),
@@ -176,8 +176,8 @@ func TestServiceProposalRepositoryCanSave(t *testing.T) {
 	require.NoError(t, err)
 	scheduledOn := time.Now().Add(24 * time.Hour).UTC().Truncate(time.Microsecond)
 	proposalToSave, err := serviceproposal.NewServiceProposal(
-		&provider.Provider{BaseUser: &user.BaseUser{ID: providerID}},
-		&consumer.Consumer{BaseUser: &user.BaseUser{ID: consumerID}},
+		&provider.Provider{BaseUser: user.RehydrateBaseUser(providerID, "", "", "", "", "", nil)},
+		&consumer.Consumer{BaseUser: user.RehydrateBaseUser(consumerID, "", "", "", "", "", nil)},
 		activeConversation,
 		1500050,
 		scheduledOn,
@@ -191,8 +191,8 @@ func TestServiceProposalRepositoryCanSave(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, savedProposal)
 	assert.NotZero(t, savedProposal.ID)
-	assert.Equal(t, consumerID, savedProposal.Consumer.ID)
-	assert.Equal(t, providerID, savedProposal.Provider.ID)
+	assert.Equal(t, consumerID, savedProposal.Consumer.ID())
+	assert.Equal(t, providerID, savedProposal.Provider.ID())
 	assert.Equal(t, activeConversation.ID(), savedProposal.Conversation.ID())
 	assert.Equal(t, proposalToSave.Amount, savedProposal.Amount)
 	assert.Equal(t, proposalToSave.ScheduledOn, savedProposal.ScheduledOn)
@@ -245,8 +245,8 @@ func TestServiceProposalRepositoryFindsPendingProposalForConsumer(t *testing.T) 
 	require.NoError(t, err)
 
 	expected, err := serviceproposal.NewServiceProposal(
-		&provider.Provider{BaseUser: &user.BaseUser{ID: providerID}},
-		&consumer.Consumer{BaseUser: &user.BaseUser{ID: consumerID}},
+		&provider.Provider{BaseUser: user.RehydrateBaseUser(providerID, "", "", "", "", "", nil)},
+		&consumer.Consumer{BaseUser: user.RehydrateBaseUser(consumerID, "", "", "", "", "", nil)},
 		activeConversation,
 		1500050,
 		time.Now().Add(24*time.Hour).UTC().Truncate(time.Microsecond),
@@ -262,10 +262,10 @@ func TestServiceProposalRepositoryFindsPendingProposalForConsumer(t *testing.T) 
 	require.NoError(t, err)
 	require.Len(t, found, 1)
 	assert.Equal(t, expected.ID, found[0].ID)
-	assert.Equal(t, consumerID, found[0].Consumer.ID)
-	assert.Equal(t, providerID, found[0].Provider.ID)
-	assert.Equal(t, "Juan", found[0].Provider.Base().Name)
-	assert.Equal(t, "Gomez", found[0].Provider.Base().Surname)
+	assert.Equal(t, consumerID, found[0].Consumer.ID())
+	assert.Equal(t, providerID, found[0].Provider.ID())
+	assert.Equal(t, "Juan", found[0].Provider.Name())
+	assert.Equal(t, "Gomez", found[0].Provider.Surname())
 	assert.Equal(t, "Plomeria", found[0].Provider.Category.Name)
 	assert.Equal(t, activeConversation.ID(), found[0].Conversation.ID())
 	assert.Equal(t, serviceproposal.StatusPending, found[0].Status)

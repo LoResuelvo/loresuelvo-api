@@ -47,14 +47,14 @@ func (s *Service) RegisterProvider(ctx context.Context, authID, email, name, sur
 	if err != nil {
 		return nil, fmt.Errorf("resolving provider profile photo url: %w", err)
 	}
-	provider.ProfilePhoto.URL = profilePhotoURL
+	provider.SetProfilePhotoURL(profilePhotoURL)
 
 	savedUser, err := s.userRepository.Save(ctx, provider)
 	if err != nil {
 		return nil, err
 	}
 
-	provider.ID = savedUser.Base().ID
+	provider.SetPersistenceID(savedUser.ID())
 	return provider, nil
 }
 
@@ -70,7 +70,7 @@ func (s *Service) FilterProvidersByCategoryID(ctx context.Context, categoryID in
 
 	profilePhotoFileIDs := make([]string, 0, len(providers))
 	for i := range providers {
-		profilePhotoFileIDs = append(profilePhotoFileIDs, providers[i].ProfilePhoto.FileID)
+		profilePhotoFileIDs = append(profilePhotoFileIDs, providers[i].ProfilePhoto().FileID)
 	}
 
 	profilePhotoURLs, err := s.fileService.ResolvePublicURLs(ctx, profilePhotoFileIDs)
@@ -87,11 +87,11 @@ func (s *Service) GetProviderProfile(ctx context.Context, providerID int) (*Prov
 		return nil, err
 	}
 
-	profilePhotoURL, err := s.fileService.ResolvePublicURL(ctx, foundProvider.ProfilePhoto.FileID)
+	profilePhotoURL, err := s.fileService.ResolvePublicURL(ctx, foundProvider.ProfilePhoto().FileID)
 	if err != nil {
 		return nil, fmt.Errorf("resolving provider profile photo url: %w", err)
 	}
-	foundProvider.ProfilePhoto.URL = profilePhotoURL
+	foundProvider.SetProfilePhotoURL(profilePhotoURL)
 
 	return foundProvider, nil
 }

@@ -24,7 +24,7 @@ func (s notificationAuthIDFinderStub) FindByID(_ context.Context, id int) (user.
 	if s.err != nil {
 		return nil, s.err
 	}
-	base := &user.BaseUser{ID: id, AuthID: s.authID, Role: s.role}
+	base := user.RehydrateBaseUser(id, s.authID, "", "", "", s.role, nil)
 	if s.role == provider.Role {
 		return &provider.Provider{BaseUser: base}, nil
 	}

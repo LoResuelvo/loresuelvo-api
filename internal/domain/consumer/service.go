@@ -50,7 +50,7 @@ func (cm *Service) RegisterConsumer(ctx context.Context, auth0ID, email, name, s
 		if err != nil {
 			return nil, fmt.Errorf("resolving consumer profile photo url: %w", err)
 		}
-		consumer.ProfilePhoto.URL = profilePhotoURL
+		consumer.SetProfilePhotoURL(profilePhotoURL)
 	}
 
 	savedUser, err := cm.userRepository.Save(ctx, consumer)
@@ -58,6 +58,6 @@ func (cm *Service) RegisterConsumer(ctx context.Context, auth0ID, email, name, s
 		return nil, err
 	}
 
-	consumer.ID = savedUser.Base().ID
+	consumer.SetPersistenceID(savedUser.ID())
 	return consumer, nil
 }
