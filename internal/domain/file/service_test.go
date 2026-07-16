@@ -167,7 +167,7 @@ func TestValidateAndResolveConversationMessageImage(t *testing.T) {
 	_, err = service.ConfirmUpload(context.Background(), filedomain.ConfirmRequest{AuthID: "auth0|consumer", FileID: upload.FileID, Key: upload.Key, MimeType: "image/jpeg", SizeBytes: 1024})
 	require.NoError(t, err)
 
-	validated, err := service.ValidateMessageImages(context.Background(), "auth0|consumer", []string{upload.FileID})
+	validated, err := service.PrepareMessageImages(context.Background(), "auth0|consumer", []string{upload.FileID})
 	require.NoError(t, err)
 	require.Len(t, validated, 1)
 	resolved, err := service.ResolveMessageImages(context.Background(), []string{upload.FileID})
@@ -198,7 +198,7 @@ func TestPrepareChatbotMessageImagesReturnsPrivateImageContent(t *testing.T) {
 	assert.Equal(t, "https://download/private/"+upload.Key, prepared[0].URL)
 }
 
-func TestValidateConversationMessageImageRejectsWrongOwnerAndPurpose(t *testing.T) {
+func TestPrepareConversationMessageImageRejectsWrongOwnerAndPurpose(t *testing.T) {
 	repo := newFileRepositoryMock()
 	storage := newStorageMock()
 	service := newFileService(repo, storage)
@@ -209,7 +209,7 @@ func TestValidateConversationMessageImageRejectsWrongOwnerAndPurpose(t *testing.
 	_, err = service.ConfirmUpload(context.Background(), filedomain.ConfirmRequest{AuthID: "auth0|provider", FileID: upload.FileID, Key: upload.Key, MimeType: "image/jpeg", SizeBytes: 1024})
 	require.NoError(t, err)
 
-	_, err = service.ValidateMessageImages(context.Background(), "auth0|other", []string{upload.FileID})
+	_, err = service.PrepareMessageImages(context.Background(), "auth0|other", []string{upload.FileID})
 	assert.ErrorIs(t, err, filedomain.ErrMessageImageNotAvailable)
 }
 

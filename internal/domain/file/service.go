@@ -18,6 +18,24 @@ type Service struct {
 	policies      map[string]UploadPolicy
 }
 
+type imageValidation struct {
+	policy       UploadPolicy
+	maxFiles     int
+	errorContext string
+}
+
+var conversationMessageImageValidation = imageValidation{
+	policy:       conversationMessageImagePolicy,
+	maxFiles:     MaxConversationMessageImages,
+	errorContext: "message",
+}
+
+var jobRequestImageValidation = imageValidation{
+	policy:       jobRequestImagePolicy,
+	maxFiles:     MaxJobRequestImages,
+	errorContext: "job request",
+}
+
 func NewService(repository Repository, storage Storage, publicBucket, privateBucket string, clock domainclock.Clock) *Service {
 	return &Service{
 		repository:    repository,
@@ -154,18 +172,6 @@ func (s *Service) ResolvePublicURLs(ctx context.Context, fileIDs []string) (map[
 	return urlsByID, nil
 }
 
-func (s *Service) ValidateMessageImages(ctx context.Context, authID string, fileIDs []string) ([]MessageImage, error) {
-	files, err := s.validatedMessageImageFiles(ctx, authID, fileIDs)
-	if err != nil {
-		return nil, err
-	}
-	result := make([]MessageImage, 0, len(files))
-	for _, file := range files {
-		result = append(result, MessageImage{Image: Image{FileID: file.ID, OriginalName: file.OriginalName()}})
-	}
-	return result, nil
-}
-
 func (s *Service) PrepareJobRequestImages(ctx context.Context, authID string, fileIDs []string) ([]Image, error) {
 	files, err := s.validatedJobRequestImageFiles(ctx, authID, fileIDs)
 	if err != nil {
@@ -230,66 +236,36 @@ func (s *Service) PrepareChatbotMessageImages(ctx context.Context, authID string
 }
 
 func (s *Service) validatedMessageImageFiles(ctx context.Context, authID string, fileIDs []string) ([]File, error) {
-	if len(fileIDs) == 0 {
-		return []File{}, nil
-	}
-	if len(fileIDs) > MaxConversationMessageImages {
-		return nil, ErrMessageImageNotAvailable
-	}
-	uniqueFileIDs := uniqueNonEmptyFileIDs(fileIDs)
-	if len(uniqueFileIDs) != len(fileIDs) {
-		return nil, ErrMessageImageNotAvailable
-	}
-
-	files, err := s.repository.FindByIDs(ctx, uniqueFileIDs)
-	if err != nil {
-		return nil, fmt.Errorf("finding message images for validation: %w", err)
-	}
-	if len(files) != len(uniqueFileIDs) {
-		return nil, ErrMessageImageNotAvailable
-	}
-	filesByID := make(map[string]File, len(files))
-	for _, file := range files {
-		if !isValidConversationMessageImageFor(file, authID) {
-			return nil, ErrMessageImageNotAvailable
-		}
-		filesByID[file.ID] = file
-	}
-
-	result := make([]File, 0, len(fileIDs))
-	for _, fileID := range fileIDs {
-		file, ok := filesByID[fileID]
-		if !ok {
-			return nil, ErrMessageImageNotAvailable
-		}
-		result = append(result, file)
-	}
-	return result, nil
+	return s.validatedImageFiles(ctx, authID, fileIDs, conversationMessageImageValidation)
 }
 
 func (s *Service) validatedJobRequestImageFiles(ctx context.Context, authID string, fileIDs []string) ([]File, error) {
+	return s.validatedImageFiles(ctx, authID, fileIDs, jobRequestImageValidation)
+}
+
+func (s *Service) validatedImageFiles(ctx context.Context, authID string, fileIDs []string, validation imageValidation) ([]File, error) {
 	if len(fileIDs) == 0 {
 		return []File{}, nil
 	}
-	if len(fileIDs) > MaxJobRequestImages {
-		return nil, ErrJobRequestImageNotAvailable
+	if len(fileIDs) > validation.maxFiles {
+		return nil, validation.policy.InvalidMetadataError
 	}
 	uniqueFileIDs := uniqueNonEmptyFileIDs(fileIDs)
 	if len(uniqueFileIDs) != len(fileIDs) {
-		return nil, ErrJobRequestImageNotAvailable
+		return nil, validation.policy.InvalidMetadataError
 	}
 
 	files, err := s.repository.FindByIDs(ctx, uniqueFileIDs)
 	if err != nil {
-		return nil, fmt.Errorf("finding job request images for validation: %w", err)
+		return nil, fmt.Errorf("finding %s images for validation: %w", validation.errorContext, err)
 	}
 	if len(files) != len(uniqueFileIDs) {
-		return nil, ErrJobRequestImageNotAvailable
+		return nil, validation.policy.InvalidMetadataError
 	}
 	filesByID := make(map[string]File, len(files))
 	for _, file := range files {
-		if !isValidJobRequestImageFor(file, authID) {
-			return nil, ErrJobRequestImageNotAvailable
+		if !isValidImageFor(file, authID, validation.policy) {
+			return nil, validation.policy.InvalidMetadataError
 		}
 		filesByID[file.ID] = file
 	}
@@ -298,7 +274,7 @@ func (s *Service) validatedJobRequestImageFiles(ctx context.Context, authID stri
 	for _, fileID := range fileIDs {
 		file, ok := filesByID[fileID]
 		if !ok {
-			return nil, ErrJobRequestImageNotAvailable
+			return nil, validation.policy.InvalidMetadataError
 		}
 		result = append(result, file)
 	}
@@ -317,7 +293,7 @@ func (s *Service) ResolveMessageImages(ctx context.Context, fileIDs []string) (m
 
 	result := make(map[string]MessageImage, len(files))
 	for _, file := range files {
-		if !isAvailableImageForPurpose(file, PurposeConversationMessageImage) {
+		if !isAvailableImageForPolicy(file, conversationMessageImagePolicy) {
 			continue
 		}
 		resolved, err := s.resolveImage(ctx, file)
@@ -359,7 +335,7 @@ func (s *Service) ResolveJobRequestImages(ctx context.Context, images []Image) (
 	}
 	filesByID := make(map[string]File, len(files))
 	for _, file := range files {
-		if !isAvailableImageForPurpose(file, PurposeJobRequestImage) && !isAvailableImageForPurpose(file, PurposeConversationMessageImage) {
+		if !isAvailableImageForAnyPolicy(file, jobRequestImagePolicy, conversationMessageImagePolicy) {
 			return nil, ErrJobRequestImageNotAvailable
 		}
 		filesByID[file.ID] = file
@@ -427,24 +403,25 @@ func uniqueNonEmptyFileIDs(fileIDs []string) []string {
 }
 
 func isValidProfilePhotoFor(file File, authID string) bool {
+	return isValidImageFor(file, authID, profilePhotoPolicy)
+}
+
+func isValidImageFor(file File, authID string, policy UploadPolicy) bool {
+	return isAvailableImageForPolicy(file, policy) && file.WasUploadedBy(authID)
+}
+
+func isAvailableImageForPolicy(file File, policy UploadPolicy) bool {
 	return file.IsConfirmed() &&
-		file.IsPublic() &&
-		file.WasUploadedBy(authID) &&
-		file.HasPurpose(PurposeProfilePhoto) &&
-		profilePhotoPolicy.Allows(file.Metadata())
+		file.Visibility == policy.Visibility &&
+		file.HasPurpose(policy.Purpose) &&
+		policy.Allows(file.Metadata())
 }
 
-func isValidConversationMessageImageFor(file File, authID string) bool {
-	return isAvailableImageForPurpose(file, PurposeConversationMessageImage) && file.WasUploadedBy(authID)
-}
-
-func isValidJobRequestImageFor(file File, authID string) bool {
-	return isAvailableImageForPurpose(file, PurposeJobRequestImage) && file.WasUploadedBy(authID)
-}
-
-func isAvailableImageForPurpose(file File, purpose string) bool {
-	return file.IsConfirmed() &&
-		!file.IsPublic() &&
-		file.HasPurpose(purpose) &&
-		jobRequestImagePolicy.Allows(file.Metadata())
+func isAvailableImageForAnyPolicy(file File, policies ...UploadPolicy) bool {
+	for _, policy := range policies {
+		if isAvailableImageForPolicy(file, policy) {
+			return true
+		}
+	}
+	return false
 }
