@@ -37,6 +37,10 @@
             "description": "Provider account registration and search endpoints."
         },
         {
+            "name": "PaymentAccounts",
+            "description": "Provider payment account connection endpoints."
+        },
+        {
             "name": "Files",
             "description": "File upload endpoints."
         },
@@ -813,6 +817,247 @@
                     },
                     "500": {
                         "description": "Unexpected error while preparing the Provider profile.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/providers/me/payment-accounts/authorization": {
+            "post": {
+                "tags": [
+                    "PaymentAccounts"
+                ],
+                "operationId": "startPaymentAccountAuthorization",
+                "summary": "Start payment-account authorization",
+                "description": "Creates a short-lived provider-bound state and PKCE verifier, then returns the active payment provider's authorization URL.",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Authorization attempt created.",
+                        "headers": {
+                            "Location": {
+                                "description": "URI of the provider's payment-account connection status resource.",
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PaymentAccountAuthorization"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AuthErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "The authenticated user is not a provider.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "The provider already has an account connected for the active payment provider.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "The authorization attempt could not be created.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/providers/me/payment-accounts": {
+            "get": {
+                "tags": [
+                    "PaymentAccounts"
+                ],
+                "operationId": "getPaymentAccountConnection",
+                "summary": "Get the provider's payment-account connection status",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Current connection status.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PaymentAccountConnection"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AuthErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "The authenticated user is not a provider.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "The connection status could not be retrieved.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/oauth/payment-accounts/callback": {
+            "get": {
+                "tags": [
+                    "PaymentAccounts"
+                ],
+                "operationId": "completePaymentAccountAuthorization",
+                "summary": "Complete payment-account authorization",
+                "description": "Public redirect URI invoked by the active payment provider. On success it\nvalidates the one-time state, exchanges the authorization code server-to-server,\npersists protected seller credentials, and redirects the browser to the frontend.\nWhen the provider rejects authorization, the API consumes the one-time attempt\nwithout linking an account and redirects the browser to the configured cancellation URL.\n",
+                "security": [],
+                "parameters": [
+                    {
+                        "name": "code",
+                        "in": "query",
+                        "required": false,
+                        "description": "Required when the authorization succeeds.",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "state",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "error",
+                        "in": "query",
+                        "required": false,
+                        "description": "OAuth error returned instead of code. `access_denied` represents a rejected authorization.",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "error_description",
+                        "in": "query",
+                        "required": false,
+                        "description": "Optional provider-supplied OAuth error description. It is not exposed to API clients.",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "303": {
+                        "description": "The browser is redirected to the configured frontend success or cancellation URL.",
+                        "headers": {
+                            "Location": {
+                                "schema": {
+                                    "type": "string",
+                                    "format": "uri"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Missing, invalid, expired, or already-consumed authorization data.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                },
+                                "examples": {
+                                    "unusableAuthorizationCode": {
+                                        "value": {
+                                            "error": "authorization code cannot be used"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "The payment account cannot receive marketplace payments or is already linked to another provider.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                },
+                                "examples": {
+                                    "marketplacePaymentsDisabled": {
+                                        "value": {
+                                            "error": "payment account cannot receive marketplace payments"
+                                        }
+                                    },
+                                    "accountAlreadyLinked": {
+                                        "value": {
+                                            "error": "payment account is already linked to another provider"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Payment-account authorization could not be completed.",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -2099,7 +2344,7 @@
                 ],
                 "operationId": "createServiceProposal",
                 "summary": "Create a service proposal",
-                "description": "Creates a pending service proposal from the authenticated provider to a consumer.\nThe provider and consumer must already have an active work conversation.\n\nAfter the proposal is persisted, the API stores a notification for the consumer\nand publishes it through the realtime WebSocket channel when the consumer is connected.\n",
+                "description": "Creates a pending service proposal from the authenticated provider to a consumer.\nThe provider and consumer must already have an active work conversation.\nThe provider must also have a connected payment account enabled to receive\nmarketplace payments.\n\nAfter the proposal is persisted, the API stores a notification for the consumer\nand publishes it through the realtime WebSocket channel when the consumer is connected.\n",
                 "security": [
                     {
                         "BearerAuth": []
@@ -2218,7 +2463,7 @@
                         }
                     },
                     "409": {
-                        "description": "The provider and consumer do not have an active work conversation.",
+                        "description": "The provider and consumer do not have an active work conversation, or the provider has no connected payment account enabled to receive marketplace payments.",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -2228,6 +2473,11 @@
                                     "activeConversationRequired": {
                                         "value": {
                                             "error": "Provider and consumer must have an active conversation before creating a service proposal"
+                                        }
+                                    },
+                                    "paymentAccountRequired": {
+                                        "value": {
+                                            "error": "A connected payment account is required before creating a service proposal"
                                         }
                                     }
                                 }
@@ -3164,6 +3414,53 @@
                     },
                     "category": {
                         "$ref": "#/components/schemas/CategoryListItem"
+                    }
+                },
+                "additionalProperties": false
+            },
+            "PaymentAccountAuthorization": {
+                "type": "object",
+                "required": [
+                    "authorization_url",
+                    "state"
+                ],
+                "properties": {
+                    "authorization_url": {
+                        "type": "string",
+                        "format": "uri",
+                        "description": "Active payment provider URL where the provider must grant authorization."
+                    },
+                    "state": {
+                        "type": "string",
+                        "description": "Opaque one-time correlation value already included in authorization_url."
+                    }
+                },
+                "additionalProperties": false
+            },
+            "PaymentAccountConnection": {
+                "type": "object",
+                "required": [
+                    "status",
+                    "can_receive_payments",
+                    "can_send_service_proposals"
+                ],
+                "properties": {
+                    "status": {
+                        "type": "string",
+                        "enum": [
+                            "pending",
+                            "connected"
+                        ]
+                    },
+                    "account_id": {
+                        "type": "string",
+                        "description": "Mercado Pago seller user identifier. Present only when connected."
+                    },
+                    "can_receive_payments": {
+                        "type": "boolean"
+                    },
+                    "can_send_service_proposals": {
+                        "type": "boolean"
                     }
                 },
                 "additionalProperties": false

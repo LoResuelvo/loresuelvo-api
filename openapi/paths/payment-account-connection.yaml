@@ -1,0 +1,32 @@
+get:
+  tags:
+    - PaymentAccounts
+  operationId: getPaymentAccountConnection
+  summary: Get the provider's payment-account connection status
+  security:
+    - BearerAuth: []
+  responses:
+    '200':
+      description: Current connection status.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/PaymentAccountConnection'
+    '401':
+      description: Missing or invalid authentication.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/AuthErrorResponse'
+    '403':
+      description: The authenticated user is not a provider.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    '500':
+      description: The connection status could not be retrieved.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'

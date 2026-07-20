@@ -21,6 +21,8 @@ tags:
   description: Consumer account registration endpoints.
 - name: Providers
   description: Provider account registration and search endpoints.
+- name: PaymentAccounts
+  description: Provider payment account connection endpoints.
 - name: Files
   description: File upload endpoints.
 - name: Conversations
@@ -46,6 +48,12 @@ paths:
     $ref: ./paths/providers.yaml
   /providers/{providerID}:
     $ref: ./paths/provider-profile.yaml
+  /providers/me/payment-accounts/authorization:
+    $ref: ./paths/payment-account-authorization.yaml
+  /providers/me/payment-accounts:
+    $ref: ./paths/payment-account-connection.yaml
+  /oauth/payment-accounts/callback:
+    $ref: ./paths/payment-account-callback.yaml
   /files/presign:
     $ref: ./paths/files-presign.yaml
   /files/{fileID}/confirm:
@@ -190,6 +198,10 @@ components:
       $ref: ./components/schemas/provider-summary.yaml
     ProviderProfile:
       $ref: ./components/schemas/provider-profile.yaml
+    PaymentAccountAuthorization:
+      $ref: ./components/schemas/payment-account-authorization.yaml
+    PaymentAccountConnection:
+      $ref: ./components/schemas/payment-account-connection.yaml
     PresignFileRequest:
       $ref: ./components/schemas/presign-file-request.yaml
     PresignFileResponse:

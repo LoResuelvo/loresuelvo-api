@@ -1,0 +1,44 @@
+post:
+  tags:
+    - PaymentAccounts
+  operationId: startPaymentAccountAuthorization
+  summary: Start payment-account authorization
+  description: Creates a short-lived provider-bound state and PKCE verifier, then returns the active payment provider's authorization URL.
+  security:
+    - BearerAuth: []
+  responses:
+    '201':
+      description: Authorization attempt created.
+      headers:
+        Location:
+          description: URI of the provider's payment-account connection status resource.
+          schema:
+            type: string
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/PaymentAccountAuthorization'
+    '401':
+      description: Missing or invalid authentication.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/AuthErrorResponse'
+    '403':
+      description: The authenticated user is not a provider.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    '409':
+      description: The provider already has an account connected for the active payment provider.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    '500':
+      description: The authorization attempt could not be created.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'

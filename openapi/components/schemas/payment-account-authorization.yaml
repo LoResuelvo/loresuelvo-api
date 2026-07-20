@@ -1,0 +1,13 @@
+type: object
+required:
+  - authorization_url
+  - state
+properties:
+  authorization_url:
+    type: string
+    format: uri
+    description: Active payment provider URL where the provider must grant authorization.
+  state:
+    type: string
+    description: Opaque one-time correlation value already included in authorization_url.
+additionalProperties: false

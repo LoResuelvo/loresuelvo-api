@@ -1,0 +1,19 @@
+type: object
+required:
+  - status
+  - can_receive_payments
+  - can_send_service_proposals
+properties:
+  status:
+    type: string
+    enum:
+      - pending
+      - connected
+  account_id:
+    type: string
+    description: Mercado Pago seller user identifier. Present only when connected.
+  can_receive_payments:
+    type: boolean
+  can_send_service_proposals:
+    type: boolean
+additionalProperties: false

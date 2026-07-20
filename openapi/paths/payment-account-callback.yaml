@@ -1,0 +1,73 @@
+get:
+  tags:
+    - PaymentAccounts
+  operationId: completePaymentAccountAuthorization
+  summary: Complete payment-account authorization
+  description: |
+    Public redirect URI invoked by the active payment provider. On success it
+    validates the one-time state, exchanges the authorization code server-to-server,
+    persists protected seller credentials, and redirects the browser to the frontend.
+    When the provider rejects authorization, the API consumes the one-time attempt
+    without linking an account and redirects the browser to the configured cancellation URL.
+  security: []
+  parameters:
+    - name: code
+      in: query
+      required: false
+      description: Required when the authorization succeeds.
+      schema:
+        type: string
+    - name: state
+      in: query
+      required: true
+      schema:
+        type: string
+    - name: error
+      in: query
+      required: false
+      description: OAuth error returned instead of code. `access_denied` represents a rejected authorization.
+      schema:
+        type: string
+    - name: error_description
+      in: query
+      required: false
+      description: Optional provider-supplied OAuth error description. It is not exposed to API clients.
+      schema:
+        type: string
+  responses:
+    '303':
+      description: The browser is redirected to the configured frontend success or cancellation URL.
+      headers:
+        Location:
+          schema:
+            type: string
+            format: uri
+    '400':
+      description: Missing, invalid, expired, or already-consumed authorization data.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            unusableAuthorizationCode:
+              value:
+                error: authorization code cannot be used
+    '409':
+      description: The payment account cannot receive marketplace payments or is already linked to another provider.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            marketplacePaymentsDisabled:
+              value:
+                error: payment account cannot receive marketplace payments
+            accountAlreadyLinked:
+              value:
+                error: payment account is already linked to another provider
+    '500':
+      description: Payment-account authorization could not be completed.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
