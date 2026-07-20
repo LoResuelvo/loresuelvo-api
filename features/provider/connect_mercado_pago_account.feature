@@ -53,7 +53,6 @@ Feature: Conectar cuenta de Mercado Pago durante el registro de prestador
 
     Rule: Cada cuenta de Mercado Pago sólo puede pertenecer a un prestador de LoResuelvo
 
-        @wip
         Scenario: 35.3.5-CMP Rechazar una cuenta de Mercado Pago vinculada a otro prestador
             Given existe un prestador registrado con correo "pedro.plomero@example.com", nombre "Pedro", apellido "López" y rubro "Plomería"
             And que la cuenta de Mercado Pago "mp-pedro" está vinculada al prestador "pedro.plomero@example.com"
