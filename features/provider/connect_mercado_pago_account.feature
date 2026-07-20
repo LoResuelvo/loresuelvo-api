@@ -33,8 +33,13 @@ Feature: Conectar cuenta de Mercado Pago durante el registro de prestador
 
         Scenario: 35.3.3-CMP Mantener incompleta la habilitación mientras no se conecte Mercado Pago
             Given que existe un consumidor registrado con correo "ana@example.com", nombre "Ana" y apellido "Pérez"
+            And que existe un chat activo entre el consumidor "ana@example.com" y el prestador "juan.plomero@example.com" con el mensaje inicial:
+                """
+                Necesito reparar una pérdida de agua en la cocina.
+                """
+            And que la fecha y hora actual del sistema es "2026-07-20T12:00:00Z"
             And que estoy autenticado como prestador "juan.plomero@example.com"
-            When intento enviar una propuesta de servicio al consumidor "ana@example.com", sin haber conectado una cuenta de Mercado Pago
+            When intento enviar una propuesta de servicio al consumidor "ana@example.com" sin haber conectado una cuenta de Mercado Pago
             Then el sistema informa que la conexión de Mercado Pago está pendiente
             And la propuesta de servicio no se envía
 
