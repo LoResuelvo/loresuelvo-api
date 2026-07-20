@@ -42,7 +42,6 @@ Feature: Conectar cuenta de Mercado Pago durante el registro de prestador
             Then el sistema informa que la conexión de Mercado Pago está pendiente
             And la propuesta de servicio no se envía
 
-        @wip
         Scenario: 35.3.4-CMP Conservar el registro cuando el prestador rechaza la autorización
             Given que estoy autenticado como prestador "juan.plomero@example.com"
             When inicio la conexión de mi cuenta de Mercado Pago
