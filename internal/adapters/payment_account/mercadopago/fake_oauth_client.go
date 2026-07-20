@@ -2,15 +2,12 @@ package mercadopago
 
 import (
 	"context"
-	"errors"
 	"net/url"
 	"strings"
 	"time"
 
 	paymentaccount "github.com/LoResuelvo/loresuelvo-api/internal/domain/payment_account"
 )
-
-var ErrFakeAuthorizationCodeInvalid = errors.New("Mercado Pago authorization code is invalid")
 
 type FakeOAuthClient struct{}
 
@@ -38,15 +35,25 @@ func (client *FakeOAuthClient) AuthorizationURL(state, codeVerifier string) (str
 
 func (client *FakeOAuthClient) ExchangeAuthorizationCode(_ context.Context, code, _ string) (paymentaccount.OAuthCredentials, error) {
 	const enabledPrefix = "marketplace-enabled:"
-	if !strings.HasPrefix(code, enabledPrefix) {
-		return paymentaccount.OAuthCredentials{}, ErrFakeAuthorizationCodeInvalid
+	const disabledPrefix = "marketplace-disabled:"
+	var (
+		externalAccountID string
+		canReceive        bool
+	)
+	switch {
+	case strings.HasPrefix(code, enabledPrefix):
+		externalAccountID = strings.TrimPrefix(code, enabledPrefix)
+		canReceive = true
+	case strings.HasPrefix(code, disabledPrefix):
+		externalAccountID = strings.TrimPrefix(code, disabledPrefix)
+	default:
+		return paymentaccount.OAuthCredentials{}, paymentaccount.ErrAuthorizationCodeUnusable
 	}
-	externalAccountID := strings.TrimPrefix(code, enabledPrefix)
 	return paymentaccount.OAuthCredentials{
 		ExternalAccountID:             externalAccountID,
 		AccessToken:                   "fake-access-token-for-" + externalAccountID,
 		RefreshToken:                  "fake-refresh-token-for-" + externalAccountID,
 		ExpiresOn:                     time.Now().UTC().Add(180 * 24 * time.Hour),
-		CanReceiveMarketplacePayments: true,
+		CanReceiveMarketplacePayments: canReceive,
 	}, nil
 }

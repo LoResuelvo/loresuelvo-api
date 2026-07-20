@@ -209,10 +209,13 @@ func (suite *testSuite) mercadoPagoReturnsAuthorizationWithInvalidSecurityState(
 }
 
 func (suite *testSuite) mercadoPagoReturnsAuthorizationCode(code string) error {
-	return suite.requestMercadoPagoCallback(url.Values{
+	if err := suite.requestMercadoPagoCallback(url.Values{
 		"code":  []string{code},
 		"state": []string{suite.lastMercadoPagoOAuthState},
-	})
+	}); err != nil {
+		return err
+	}
+	return suite.lastResponseShouldHaveStatusCode(http.StatusBadRequest)
 }
 
 func (suite *testSuite) tryStartMercadoPagoConnectionForProvider(_ string) error {

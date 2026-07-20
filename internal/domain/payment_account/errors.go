@@ -8,6 +8,7 @@ var (
 	ErrPaymentProviderMismatch       = errors.New("authorization attempt belongs to a different payment provider")
 	ErrAuthorizationStateRequired    = errors.New("authorization state is required")
 	ErrAuthorizationCodeRequired     = errors.New("authorization code is required")
+	ErrAuthorizationCodeUnusable     = errors.New("authorization code cannot be used")
 	ErrAuthorizationAttemptExpired   = errors.New("authorization attempt has expired")
 	ErrAuthorizationAttemptNotFound  = errors.New("authorization attempt does not exist")
 	ErrConnectionNotFound            = errors.New("payment account connection does not exist")

@@ -104,6 +104,17 @@ func (client *OAuthClient) ExchangeAuthorizationCode(ctx context.Context, code, 
 	}
 	defer response.Body.Close()
 	if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
+		var oauthError struct {
+			Error string `json:"error"`
+		}
+		if decodeErr := json.NewDecoder(response.Body).Decode(&oauthError); decodeErr == nil {
+			switch oauthError.Error {
+			case "invalid_grant":
+				return paymentaccount.OAuthCredentials{}, paymentaccount.ErrAuthorizationCodeUnusable
+			case "unauthorized_client":
+				return paymentaccount.OAuthCredentials{}, paymentaccount.ErrMarketplacePaymentsNotEnabled
+			}
+		}
 		return paymentaccount.OAuthCredentials{}, fmt.Errorf("Mercado Pago token request returned status %d", response.StatusCode)
 	}
 
@@ -112,6 +123,7 @@ func (client *OAuthClient) ExchangeAuthorizationCode(ctx context.Context, code, 
 		RefreshToken string      `json:"refresh_token"`
 		UserID       json.Number `json:"user_id"`
 		ExpiresIn    int64       `json:"expires_in"`
+		Scope        string      `json:"scope"`
 	}
 	decoder := json.NewDecoder(response.Body)
 	decoder.UseNumber()
@@ -131,6 +143,19 @@ func (client *OAuthClient) ExchangeAuthorizationCode(ctx context.Context, code, 
 		AccessToken:                   tokenResponse.AccessToken,
 		RefreshToken:                  tokenResponse.RefreshToken,
 		ExpiresOn:                     time.Now().UTC().Add(time.Duration(tokenResponse.ExpiresIn) * time.Second),
-		CanReceiveMarketplacePayments: true,
+		CanReceiveMarketplacePayments: containsOAuthScopes(tokenResponse.Scope, "payments", "write"),
 	}, nil
+}
+
+func containsOAuthScopes(grantedScopes string, requiredScopes ...string) bool {
+	granted := make(map[string]struct{}, len(requiredScopes))
+	for _, scope := range strings.Fields(grantedScopes) {
+		granted[scope] = struct{}{}
+	}
+	for _, required := range requiredScopes {
+		if _, ok := granted[required]; !ok {
+			return false
+		}
+	}
+	return true
 }

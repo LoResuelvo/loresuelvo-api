@@ -15,6 +15,7 @@ func handlePaymentAccountError(c *gin.Context, err error) {
 		httphandler.RespondError(c, http.StatusForbidden, err.Error())
 	case errors.Is(err, paymentaccount.ErrAuthorizationStateRequired),
 		errors.Is(err, paymentaccount.ErrAuthorizationCodeRequired),
+		errors.Is(err, paymentaccount.ErrAuthorizationCodeUnusable),
 		errors.Is(err, paymentaccount.ErrAuthorizationAttemptExpired),
 		errors.Is(err, paymentaccount.ErrAuthorizationAttemptNotFound),
 		errors.Is(err, paymentaccount.ErrPaymentProviderMismatch):

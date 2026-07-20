@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/payment_account/mercadopago"
+	paymentaccount "github.com/LoResuelvo/loresuelvo-api/internal/domain/payment_account"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -32,6 +33,42 @@ func TestOAuthClientBuildsAuthorizationCodeURLWithPKCE(t *testing.T) {
 	assert.Equal(t, "state-secret", parsedURL.Query().Get("state"))
 	assert.Equal(t, "S-YYjGPeiHjsbIXpqrbVjcGUQn7X-4T468hBrBqm8pA", parsedURL.Query().Get("code_challenge"))
 	assert.Equal(t, "S256", parsedURL.Query().Get("code_challenge_method"))
+}
+
+func TestOAuthClientMapsUnusableAuthorizationCode(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(response http.ResponseWriter, _ *http.Request) {
+		response.Header().Set("Content-Type", "application/json")
+		response.WriteHeader(http.StatusBadRequest)
+		_ = json.NewEncoder(response).Encode(map[string]string{"error": "invalid_grant"})
+	}))
+	t.Cleanup(server.Close)
+	client := mercadopago.NewOAuthClient(mercadopago.Config{
+		ClientID: "app-id", ClientSecret: "app-secret",
+		RedirectURI: "https://api.loresuelvo.test/oauth/payment-accounts/callback",
+		APIBaseURL:  server.URL,
+	})
+
+	_, err := client.ExchangeAuthorizationCode(context.Background(), "expired-code", "pkce-verifier")
+
+	require.ErrorIs(t, err, paymentaccount.ErrAuthorizationCodeUnusable)
+}
+
+func TestOAuthClientMapsSellerWithoutMarketplaceAuthorization(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(response http.ResponseWriter, _ *http.Request) {
+		response.Header().Set("Content-Type", "application/json")
+		response.WriteHeader(http.StatusBadRequest)
+		_ = json.NewEncoder(response).Encode(map[string]string{"error": "unauthorized_client"})
+	}))
+	t.Cleanup(server.Close)
+	client := mercadopago.NewOAuthClient(mercadopago.Config{
+		ClientID: "app-id", ClientSecret: "app-secret",
+		RedirectURI: "https://api.loresuelvo.test/oauth/payment-accounts/callback",
+		APIBaseURL:  server.URL,
+	})
+
+	_, err := client.ExchangeAuthorizationCode(context.Background(), "authorization-code", "pkce-verifier")
+
+	require.ErrorIs(t, err, paymentaccount.ErrMarketplacePaymentsNotEnabled)
 }
 
 func TestConfigValidateRejectsMissingOAuthSettings(t *testing.T) {
@@ -70,6 +107,7 @@ func TestOAuthClientExchangesAuthorizationCodeServerToServer(t *testing.T) {
 			"refresh_token": "seller-refresh-token",
 			"user_id":       123456,
 			"expires_in":    15552000,
+			"scope":         "offline_access payments write",
 		})
 	}))
 	t.Cleanup(server.Close)
@@ -94,4 +132,27 @@ func TestOAuthClientExchangesAuthorizationCodeServerToServer(t *testing.T) {
 	assert.Equal(t, "seller-refresh-token", credentials.RefreshToken)
 	assert.True(t, credentials.CanReceiveMarketplacePayments)
 	assert.WithinDuration(t, beforeExchange.Add(180*24*time.Hour), credentials.ExpiresOn, time.Second)
+}
+
+func TestOAuthClientDoesNotClaimMarketplaceCapabilityWithoutPaymentWriteScopes(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(response http.ResponseWriter, _ *http.Request) {
+		response.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(response).Encode(map[string]any{
+			"access_token": "seller-access-token",
+			"user_id":      123456,
+			"expires_in":   15552000,
+			"scope":        "read offline_access",
+		})
+	}))
+	t.Cleanup(server.Close)
+	client := mercadopago.NewOAuthClient(mercadopago.Config{
+		ClientID: "app-id", ClientSecret: "app-secret",
+		RedirectURI: "https://api.loresuelvo.test/oauth/payment-accounts/callback",
+		APIBaseURL:  server.URL,
+	})
+
+	credentials, err := client.ExchangeAuthorizationCode(context.Background(), "authorization-code", "pkce-verifier")
+
+	require.NoError(t, err)
+	assert.False(t, credentials.CanReceiveMarketplacePayments)
 }

@@ -107,9 +107,18 @@ func (service *Service) CompleteAuthorization(ctx context.Context, state, code s
 	}
 	credentials, err := service.oauthConnector.ExchangeAuthorizationCode(ctx, code, codeVerifier)
 	if err != nil {
+		if errors.Is(err, ErrAuthorizationCodeUnusable) ||
+			errors.Is(err, ErrMarketplacePaymentsNotEnabled) {
+			if consumeErr := service.authorizationAttemptRepository.Consume(ctx, attempt); consumeErr != nil {
+				return nil, fmt.Errorf("consuming failed payment account authorization: %w", consumeErr)
+			}
+		}
 		return nil, fmt.Errorf("exchanging payment account authorization code: %w", err)
 	}
 	if err := ValidateOAuthCredentials(credentials); err != nil {
+		if consumeErr := service.authorizationAttemptRepository.Consume(ctx, attempt); consumeErr != nil {
+			return nil, fmt.Errorf("consuming invalid payment account authorization: %w", consumeErr)
+		}
 		return nil, err
 	}
 	accessTokenCiphertext, err := service.credentialProtector.Encrypt(credentials.AccessToken)

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/category"
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/consumer"
 	paymentaccount "github.com/LoResuelvo/loresuelvo-api/internal/domain/payment_account"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/provider"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/user"
@@ -64,6 +65,7 @@ type oauthConnectorStub struct {
 	authorizationURL      string
 	authorizationErr      error
 	credentials           paymentaccount.OAuthCredentials
+	exchangeErr           error
 	authorizationVerifier string
 	exchangedCode         string
 	exchangedVerifier     string
@@ -87,7 +89,7 @@ func (stub *oauthConnectorStub) AuthorizationURL(state, codeVerifier string) (st
 func (stub *oauthConnectorStub) ExchangeAuthorizationCode(_ context.Context, code, codeVerifier string) (paymentaccount.OAuthCredentials, error) {
 	stub.exchangedCode = code
 	stub.exchangedVerifier = codeVerifier
-	return stub.credentials, nil
+	return stub.credentials, stub.exchangeErr
 }
 
 type repositoryStub struct {
@@ -217,6 +219,33 @@ func TestStartAuthorizationRejectsAlreadyConnectedPaymentAccount(t *testing.T) {
 	_, err = service.StartAuthorization(context.Background(), providerAuthID)
 
 	require.ErrorIs(t, err, paymentaccount.ErrAlreadyConnected)
+	assert.Nil(t, repository.savedAttempt)
+}
+
+func TestStartAuthorizationRejectsAuthenticatedConsumer(t *testing.T) {
+	consumerUser, err := consumer.NewConsumer(
+		"auth0|consumer-payment-account-test",
+		"ana@example.com",
+		"Ana",
+		"Pérez",
+		nil,
+	)
+	require.NoError(t, err)
+	repository := &repositoryStub{}
+	service := paymentaccount.NewService(
+		userFinderStub{found: consumerUser},
+		repository,
+		repository,
+		&oauthConnectorStub{},
+		&credentialProtectorStub{},
+		&secretGeneratorStub{},
+		clockStub{},
+	)
+
+	authorization, err := service.StartAuthorization(context.Background(), "auth0|consumer-payment-account-test")
+
+	require.ErrorIs(t, err, paymentaccount.ErrOnlyProvidersCanConnect)
+	assert.Nil(t, authorization)
 	assert.Nil(t, repository.savedAttempt)
 }
 
@@ -354,6 +383,65 @@ func TestCompleteAuthorizationDoesNotProtectInvalidConnectorCredentials(t *testi
 	_, err := service.CompleteAuthorization(context.Background(), "state-secret", "authorization-code")
 
 	require.ErrorIs(t, err, paymentaccount.ErrAccessTokenRequired)
+	assert.Empty(t, credentialProtector.encryptedPlaintexts)
+	assert.Nil(t, repository.savedAccount)
+	assert.Same(t, attempt, repository.consumedAttempt)
+}
+
+func TestCompleteAuthorizationConsumesAttemptWhenAuthorizationCodeIsUnusable(t *testing.T) {
+	attempt := paymentaccount.NewAuthorizationAttempt(providerID, paymentaccount.PaymentProvider("mercado_pago"), []byte("stored-state-digest"), []byte("encrypted:pkce-verifier"), fixedNow.Add(10*time.Minute))
+	repository := &repositoryStub{foundAttempt: attempt}
+	credentialProtector := &credentialProtectorStub{}
+	service := paymentaccount.NewService(
+		userFinderStub{}, repository, repository,
+		&oauthConnectorStub{exchangeErr: paymentaccount.ErrAuthorizationCodeUnusable},
+		credentialProtector, &secretGeneratorStub{}, clockStub{},
+	)
+
+	account, err := service.CompleteAuthorization(context.Background(), "state-secret", "expired-code")
+
+	require.ErrorIs(t, err, paymentaccount.ErrAuthorizationCodeUnusable)
+	assert.Nil(t, account)
+	assert.Same(t, attempt, repository.consumedAttempt)
+	assert.Empty(t, credentialProtector.encryptedPlaintexts)
+	assert.Nil(t, repository.savedAccount)
+}
+
+func TestCompleteAuthorizationDoesNotMaskFailureToConsumeUnusableAttempt(t *testing.T) {
+	attempt := paymentaccount.NewAuthorizationAttempt(providerID, paymentaccount.PaymentProvider("mercado_pago"), []byte("stored-state-digest"), []byte("encrypted:pkce-verifier"), fixedNow.Add(10*time.Minute))
+	repository := &repositoryStub{foundAttempt: attempt, consumeErr: assert.AnError}
+	service := paymentaccount.NewService(
+		userFinderStub{}, repository, repository,
+		&oauthConnectorStub{exchangeErr: paymentaccount.ErrAuthorizationCodeUnusable},
+		&credentialProtectorStub{}, &secretGeneratorStub{}, clockStub{},
+	)
+
+	account, err := service.CompleteAuthorization(context.Background(), "state-secret", "expired-code")
+
+	require.ErrorIs(t, err, assert.AnError)
+	assert.ErrorContains(t, err, "consuming failed payment account authorization")
+	assert.Nil(t, account)
+	assert.Nil(t, repository.savedAccount)
+}
+
+func TestCompleteAuthorizationConsumesAttemptWhenMarketplacePaymentsAreDisabled(t *testing.T) {
+	attempt := paymentaccount.NewAuthorizationAttempt(providerID, paymentaccount.PaymentProvider("mercado_pago"), []byte("stored-state-digest"), []byte("encrypted:pkce-verifier"), fixedNow.Add(10*time.Minute))
+	repository := &repositoryStub{foundAttempt: attempt}
+	credentialProtector := &credentialProtectorStub{}
+	service := paymentaccount.NewService(
+		userFinderStub{}, repository, repository,
+		&oauthConnectorStub{credentials: paymentaccount.OAuthCredentials{
+			ExternalAccountID: "mp-disabled",
+			AccessToken:       "access-token",
+		}},
+		credentialProtector, &secretGeneratorStub{}, clockStub{},
+	)
+
+	account, err := service.CompleteAuthorization(context.Background(), "state-secret", "authorization-code")
+
+	require.ErrorIs(t, err, paymentaccount.ErrMarketplacePaymentsNotEnabled)
+	assert.Nil(t, account)
+	assert.Same(t, attempt, repository.consumedAttempt)
 	assert.Empty(t, credentialProtector.encryptedPlaintexts)
 	assert.Nil(t, repository.savedAccount)
 }
