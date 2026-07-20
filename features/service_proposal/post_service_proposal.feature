@@ -9,6 +9,7 @@ Feature: Crear propuesta de servicio
         And que existe un consumidor registrado con correo "ana@example.com", nombre "Ana" y apellido "Pérez"
         And que existe un consumidor registrado con correo "carla@example.com", nombre "Carla" y apellido "Gómez"
         And existe un prestador registrado con correo "juan.plomero@example.com", nombre "Juan", apellido "Gómez" y rubro "Plomería"
+        And que la cuenta de Mercado Pago "mp-juan" está vinculada al prestador "juan.plomero@example.com"
     
     Scenario: 53.1-PSP El prestador crear una propuesta de servicio exitosa
         Given que existe un chat activo entre el consumidor "ana@example.com" y el prestador "juan.plomero@example.com" con el mensaje inicial:
