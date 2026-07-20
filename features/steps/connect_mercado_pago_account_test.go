@@ -12,9 +12,9 @@ import (
 )
 
 const (
-	mercadoPagoAuthorizationPath = "/providers/me/payment-accounts/mercado-pago/authorization"
-	mercadoPagoCallbackPath      = "/oauth/mercado-pago/callback"
-	mercadoPagoConnectionPath    = "/providers/me/payment-accounts/mercado-pago"
+	mercadoPagoAuthorizationPath = "/providers/me/payment-accounts/authorization"
+	mercadoPagoCallbackPath      = "/oauth/payment-accounts/callback"
+	mercadoPagoConnectionPath    = "/providers/me/payment-accounts"
 )
 
 type mercadoPagoAccountFixture struct {

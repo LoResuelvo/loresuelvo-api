@@ -23,7 +23,10 @@ func main() {
 
 	bootstrap.StartDefaultDataSeederFromEnv(ctx, database)
 
-	dependencies := bootstrap.NewDependencies(database)
+	dependencies, err := bootstrap.NewDependencies(database)
+	if err != nil {
+		panic(err)
+	}
 	go dependencies.UrgentWorkOrderScheduler.Run(ctx)
 
 	auth0Validator, err := auth0.NewValidatorFromEnv()

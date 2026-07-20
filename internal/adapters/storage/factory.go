@@ -14,3 +14,18 @@ func NewStorageFromConfig(config Config) filedomain.Storage {
 		return NewMemoryStorage(config.PublicBaseURL)
 	}
 }
+
+type Components struct {
+	Storage       filedomain.Storage
+	PublicBucket  string
+	PrivateBucket string
+}
+
+func NewComponentsFromEnv() Components {
+	config := NewConfigFromEnv()
+	return Components{
+		Storage:       NewStorageFromConfig(config),
+		PublicBucket:  config.PublicBucket,
+		PrivateBucket: config.PrivateBucket,
+	}
+}

@@ -1,8 +1,10 @@
 package steps_test
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
+	"encoding/base64"
 	"fmt"
 	"net/http/httptest"
 	"testing"
@@ -10,7 +12,10 @@ import (
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/auth0"
 	chatbotadapter "github.com/LoResuelvo/loresuelvo-api/internal/adapters/chatbot"
 	clockadapter "github.com/LoResuelvo/loresuelvo-api/internal/adapters/clock"
+	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/cryptography"
 	httpadapter "github.com/LoResuelvo/loresuelvo-api/internal/adapters/http"
+	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/payment_account_handler"
+	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/payment_account/mercadopago"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/repositories"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/scheduler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/bootstrap"
@@ -33,6 +38,7 @@ type testSuite struct {
 	fileRepository           *repositories.FileRepository
 	notificationRepository   *repositories.NotificationRepository
 	workOrderRepository      *repositories.WorkOrderRepository
+	paymentAccountRepository *repositories.PaymentAccountRepository
 	urgentWorkOrderScheduler *scheduler.Scheduler
 	auth0Validator           *validator.Validator
 	tokenBuilder             *auth0.TokenBuilder
@@ -126,6 +132,10 @@ func (s *testSuite) registerAllSteps(sc *godog.ScenarioContext) {
 func (s *testSuite) cleanup() error {
 	s.closeRealtimeConnections()
 
+	if err := s.paymentAccountRepository.DeleteAll(); err != nil {
+		return fmt.Errorf("could not clean payment accounts: %w", err)
+	}
+
 	if err := s.jobRequestRepository.DeleteAll(); err != nil {
 		return fmt.Errorf("could not clean job requests: %w", err)
 	}
@@ -208,7 +218,20 @@ func newTestDb() *sql.DB {
 
 func newTestSuite(tb testing.TB, database *sql.DB) *testSuite {
 	chatbot := chatbotadapter.NewFakeChatbot()
-	dependencies := bootstrap.NewDependenciesWithChatbot(database, chatbot)
+	credentialCipher, err := cryptography.NewAESGCMCipher(
+		base64.StdEncoding.EncodeToString(bytes.Repeat([]byte{1}, 32)),
+	)
+	require.NoError(tb, err, "could not initialize test credential cipher")
+	dependencies := bootstrap.NewDependenciesWithPaymentAccountAdapters(
+		database,
+		chatbot,
+		mercadopago.NewFakeOAuthClient(),
+		credentialCipher,
+		cryptography.NewSecureSecretGenerator(),
+		payment_account_handler.Config{
+			ConnectionSuccessURL: "http://frontend.loresuelvo.test/provider/register/mercado-pago?result=success",
+		},
+	)
 	auth0Validator := auth0.NewFakeValidator()
 	tokenBuilder := auth0.NewTokenBuilder()
 
@@ -225,14 +248,15 @@ func newTestSuite(tb testing.TB, database *sql.DB) *testSuite {
 	return &testSuite{
 		server:                   server,
 		database:                 database,
-		categoryRepository:       dependencies.CategoryRepository,
-		conversationRepository:   dependencies.ConversationRepository,
-		messageRepository:        dependencies.MessageRepository,
-		jobRequestRepository:     dependencies.JobRequestRepository,
-		userRepository:           dependencies.UserRepository,
-		fileRepository:           dependencies.FileRepository,
-		notificationRepository:   dependencies.NotificationRepository,
-		workOrderRepository:      dependencies.WorkOrderRepository,
+		categoryRepository:       dependencies.Persistence.CategoryRepository,
+		conversationRepository:   dependencies.Persistence.ConversationRepository,
+		messageRepository:        dependencies.Persistence.MessageRepository,
+		jobRequestRepository:     dependencies.Persistence.JobRequestRepository,
+		userRepository:           dependencies.Persistence.UserRepository,
+		fileRepository:           dependencies.Persistence.FileRepository,
+		notificationRepository:   dependencies.Persistence.NotificationRepository,
+		workOrderRepository:      dependencies.Persistence.WorkOrderRepository,
+		paymentAccountRepository: dependencies.Persistence.PaymentAccountRepository,
 		urgentWorkOrderScheduler: dependencies.UrgentWorkOrderScheduler,
 		auth0Validator:           auth0Validator,
 		tokenBuilder:             tokenBuilder,

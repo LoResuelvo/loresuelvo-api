@@ -3,24 +3,27 @@ package bootstrap
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"time"
 
 	chatbotadapter "github.com/LoResuelvo/loresuelvo-api/internal/adapters/chatbot"
 	clockadapter "github.com/LoResuelvo/loresuelvo-api/internal/adapters/clock"
+	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/cryptography"
 	httpadapter "github.com/LoResuelvo/loresuelvo-api/internal/adapters/http"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/category_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/consumer_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/conversation_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/file_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/job_request_handler"
+	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/payment_account_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/provider_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/service_proposal_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/test_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/user_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/work_order_handler"
 	notificationadapter "github.com/LoResuelvo/loresuelvo-api/internal/adapters/notification"
+	paymentaccountadapter "github.com/LoResuelvo/loresuelvo-api/internal/adapters/payment_account"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/realtime"
-	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/repositories"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/scheduler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/storage"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/category"
@@ -28,6 +31,7 @@ import (
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/conversation"
 	filedomain "github.com/LoResuelvo/loresuelvo-api/internal/domain/file"
 	jobrequest "github.com/LoResuelvo/loresuelvo-api/internal/domain/job_request"
+	paymentaccount "github.com/LoResuelvo/loresuelvo-api/internal/domain/payment_account"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/provider"
 	serviceproposal "github.com/LoResuelvo/loresuelvo-api/internal/domain/service_proposal"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/user"
@@ -36,16 +40,7 @@ import (
 )
 
 type Dependencies struct {
-	UserRepository           *repositories.UserRepository
-	CategoryRepository       *repositories.CategoryRepository
-	ConversationRepository   *repositories.ConversationRepository
-	MessageRepository        *repositories.MessageRepository
-	MessageImageRepository   *repositories.MessageImageRepository
-	JobRequestRepository     *repositories.JobRequestRepository
-	ConversationReader       *repositories.ConversationReader
-	FileRepository           *repositories.FileRepository
-	NotificationRepository   *repositories.NotificationRepository
-	WorkOrderRepository      *repositories.WorkOrderRepository
+	Persistence              *PersistenceAdapters
 	WorkOrderService         *workorder.Service
 	UrgentWorkOrderScheduler *scheduler.Scheduler
 
@@ -54,6 +49,7 @@ type Dependencies struct {
 	ProviderHandler        *provider_handler.ProviderHandler
 	ConversationHandler    *conversation_handler.ConversationHandler
 	JobRequestHandler      *job_request_handler.JobRequestHandler
+	PaymentAccountHandler  *payment_account_handler.PaymentAccountHandler
 	UserHandler            *user_handler.UserHandler
 	FileHandler            *file_handler.FileHandler
 	ServiceProposalHandler *service_proposal_handler.ServiceProposalHandler
@@ -74,6 +70,7 @@ func (dependencies *Dependencies) RouterConfig(auth0Validator *validator.Validat
 		ProviderHandler:        dependencies.ProviderHandler,
 		ConversationHandler:    dependencies.ConversationHandler,
 		JobRequestHandler:      dependencies.JobRequestHandler,
+		PaymentAccountHandler:  dependencies.PaymentAccountHandler,
 		UserHandler:            dependencies.UserHandler,
 		FileHandler:            dependencies.FileHandler,
 		ServiceProposalHandler: dependencies.ServiceProposalHandler,
@@ -84,27 +81,45 @@ func (dependencies *Dependencies) RouterConfig(auth0Validator *validator.Validat
 	}
 }
 
-func NewDependencies(database *sql.DB) *Dependencies {
+func NewDependencies(database *sql.DB) (*Dependencies, error) {
 	return NewDependenciesWithChatbot(database, chatbotadapter.NewChatbotFromEnv())
 }
 
-func NewDependenciesWithChatbot(database *sql.DB, chatbot conversation.Chatbot) *Dependencies {
-	clockadapter := clockadapter.NewSystemClock()
-	userRepository := repositories.NewUserRepository(database)
-	categoryRepository := repositories.NewCategoryRepository(database)
-	messageImageRepository := repositories.NewMessageImageRepository(database)
-	messageRepository := repositories.NewMessageRepository(database, messageImageRepository)
-	conversationRepository := repositories.NewConversationRepository(database, messageRepository)
-	jobRequestRepository := repositories.NewJobRequestRepository(database)
-	conversationReader := repositories.NewConversationReader(database, messageImageRepository)
-	fileRepository := repositories.NewFileRepository(database)
-	serviceProposalRepository := repositories.NewServiceProposalRepository(database)
-	workOrderRepository := repositories.NewWorkOrderRepository(database, serviceProposalRepository)
-	notificationRepository := repositories.NewNotificationRepository(database)
+func NewDependenciesWithChatbot(database *sql.DB, chatbot conversation.Chatbot) (*Dependencies, error) {
+	paymentAccountOAuthConnector, err := paymentaccountadapter.NewOAuthConnectorFromEnv()
+	if err != nil {
+		return nil, err
+	}
+	credentialCipher, err := cryptography.NewCredentialCipherFromEnv()
+	if err != nil {
+		return nil, fmt.Errorf("configuring payment account credential encryption: %w", err)
+	}
+	paymentAccountHandlerConfig, err := payment_account_handler.NewConfigFromEnv()
+	if err != nil {
+		return nil, err
+	}
+	return NewDependenciesWithPaymentAccountAdapters(
+		database,
+		chatbot,
+		paymentAccountOAuthConnector,
+		credentialCipher,
+		cryptography.NewSecureSecretGenerator(),
+		paymentAccountHandlerConfig,
+	), nil
+}
 
-	storageConfig := storage.NewConfigFromEnv()
-	fileStorage := storage.NewStorageFromConfig(storageConfig)
-	fileService := filedomain.NewService(fileRepository, fileStorage, storageConfig.PublicBucket, storageConfig.PrivateBucket, clockadapter)
+func NewDependenciesWithPaymentAccountAdapters(
+	database *sql.DB,
+	chatbot conversation.Chatbot,
+	paymentAccountOAuthConnector paymentaccount.OAuthConnector,
+	credentialProtector paymentaccount.CredentialProtector,
+	secretGenerator paymentaccount.SecretGenerator,
+	paymentAccountHandlerConfig payment_account_handler.Config,
+) *Dependencies {
+	persistence := NewPersistenceAdapters(database)
+
+	storageComponents := storage.NewComponentsFromEnv()
+	systemClock := clockadapter.NewSystemClock()
 
 	// Realtime infrastructure
 	hub := realtime.NewHub()
@@ -113,55 +128,69 @@ func NewDependenciesWithChatbot(database *sql.DB, chatbot conversation.Chatbot) 
 
 	ticketStore := realtime.NewTicketStore()
 
-	messagePublisher := realtime.NewPublisher(hub, userRepository)
-	realtimeNotificationNotificator := realtime.NewNotificationNotificator(hub, userRepository)
+	messagePublisher := realtime.NewPublisher(hub, persistence.UserRepository)
+	realtimeNotificationNotificator := realtime.NewNotificationNotificator(hub, persistence.UserRepository)
 	notificator := notificationadapter.NewCompositeNotificator(realtimeNotificationNotificator)
-	realtimeHandler := realtime.NewHandler(hub, userRepository, ticketStore)
+	realtimeHandler := realtime.NewHandler(hub, persistence.UserRepository, ticketStore)
 
-	categoryService := category.NewService(categoryRepository)
-	providerService := provider.NewService(userRepository, categoryRepository, fileService)
-	consumerService := consumer.NewService(userRepository, fileService)
+	fileService := filedomain.NewService(
+		persistence.FileRepository,
+		storageComponents.Storage,
+		storageComponents.PublicBucket,
+		storageComponents.PrivateBucket,
+		systemClock,
+	)
+	categoryService := category.NewService(persistence.CategoryRepository)
+	providerService := provider.NewService(persistence.UserRepository, persistence.CategoryRepository, fileService)
+	consumerService := consumer.NewService(persistence.UserRepository, fileService)
 	conversationService := conversation.NewService(
-		conversationRepository,
-		userRepository,
-		conversationReader,
+		persistence.ConversationRepository,
+		persistence.UserRepository,
+		persistence.ConversationReader,
 		messagePublisher,
 		chatbot,
-		categoryRepository,
+		persistence.CategoryRepository,
 		fileService,
-		clockadapter,
+		systemClock,
 	)
 	jobRequestService := jobrequest.NewService(
-		jobRequestRepository,
-		userRepository,
-		conversationRepository,
+		persistence.JobRequestRepository,
+		persistence.UserRepository,
+		persistence.ConversationRepository,
 		fileService,
 	)
-	userService := user.NewService(userRepository, fileService)
+	userService := user.NewService(persistence.UserRepository, fileService)
 	servicePorposalService := serviceproposal.NewService(
-		serviceProposalRepository, workOrderRepository, userRepository, conversationRepository, notificationRepository, notificator, fileService, clockadapter)
-	workOrderService := workorder.NewService(
-		workOrderRepository,
-		userRepository,
-		fileService,
-		notificationRepository,
+		persistence.ServiceProposalRepository,
+		persistence.WorkOrderRepository,
+		persistence.UserRepository,
+		persistence.ConversationRepository,
+		persistence.NotificationRepository,
 		notificator,
-		clockadapter,
+		fileService,
+		systemClock)
+	workOrderService := workorder.NewService(
+		persistence.WorkOrderRepository,
+		persistence.UserRepository,
+		fileService,
+		persistence.NotificationRepository,
+		notificator,
+		systemClock,
+	)
+	paymentAccountService := paymentaccount.NewService(
+		persistence.UserRepository,
+		persistence.AuthorizationAttemptRepository,
+		persistence.PaymentAccountRepository,
+		paymentAccountOAuthConnector,
+		credentialProtector,
+		secretGenerator,
+		systemClock,
 	)
 	urgentWorkOrderScheduler := scheduler.NewScheduler(time.Hour, workOrderService)
 	_ = cancel // TODO: wire shutdown signal to cancel context
 
 	return &Dependencies{
-		UserRepository:           userRepository,
-		CategoryRepository:       categoryRepository,
-		ConversationRepository:   conversationRepository,
-		MessageRepository:        messageRepository,
-		MessageImageRepository:   messageImageRepository,
-		JobRequestRepository:     jobRequestRepository,
-		ConversationReader:       conversationReader,
-		FileRepository:           fileRepository,
-		NotificationRepository:   notificationRepository,
-		WorkOrderRepository:      workOrderRepository,
+		Persistence:              persistence,
 		WorkOrderService:         workOrderService,
 		UrgentWorkOrderScheduler: urgentWorkOrderScheduler,
 		CategoryHandler:          category_handler.NewCategoryHandler(categoryService),
@@ -169,14 +198,15 @@ func NewDependenciesWithChatbot(database *sql.DB, chatbot conversation.Chatbot) 
 		ProviderHandler:          provider_handler.NewProviderHandler(providerService),
 		ConversationHandler:      conversation_handler.NewConversationHandler(conversationService),
 		JobRequestHandler:        job_request_handler.NewJobRequestHandler(jobRequestService),
+		PaymentAccountHandler:    payment_account_handler.NewPaymentAccountHandler(paymentAccountService, paymentAccountHandlerConfig),
 		UserHandler:              user_handler.NewUserHandler(userService),
 		FileHandler:              file_handler.NewFileHandler(fileService),
 		ServiceProposalHandler:   service_proposal_handler.NewServiceProposalHandler(servicePorposalService),
 		WorkOrderHandler:         work_order_handler.NewWorkOrderHandler(workOrderService),
-		TestHandler:              test_handler.NewTestHandler(clockadapter),
+		TestHandler:              test_handler.NewTestHandler(systemClock),
 		Hub:                      hub,
 		RealtimeHandler:          realtimeHandler,
 		MessagePublisher:         messagePublisher,
-		Clock:                    clockadapter,
+		Clock:                    systemClock,
 	}
 }

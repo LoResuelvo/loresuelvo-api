@@ -30,6 +30,13 @@ services:
       STORAGE_ACCESS_KEY_ID: "loresuelvo-local"
       STORAGE_SECRET_ACCESS_KEY: "loresuelvo-local-secret"
       STORAGE_PRESIGN_EXPIRATION_SECONDS: "600"
+      MERCADO_PAGO_CLIENT_ID: "${MERCADO_PAGO_CLIENT_ID:-local-mercado-pago-app-id}"
+      MERCADO_PAGO_CLIENT_SECRET: "${MERCADO_PAGO_CLIENT_SECRET:-local-mercado-pago-client-secret}"
+      MERCADO_PAGO_REDIRECT_URI: "${MERCADO_PAGO_REDIRECT_URI:-http://localhost:8080/oauth/payment-accounts/callback}"
+      PAYMENT_ACCOUNT_PROVIDER: "${PAYMENT_ACCOUNT_PROVIDER:-mercado_pago}"
+      PAYMENT_ACCOUNT_CONNECTION_SUCCESS_URL: "${PAYMENT_ACCOUNT_CONNECTION_SUCCESS_URL:-http://localhost:3000/provider/register/mercado-pago?result=success}"
+      # Local-only 32-byte AES key encoded as base64. Override outside local development.
+      PAYMENT_ACCOUNT_CREDENTIAL_ENCRYPTION_KEY: "${PAYMENT_ACCOUNT_CREDENTIAL_ENCRYPTION_KEY:-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=}"
     env_file:
       - .env
     depends_on:
