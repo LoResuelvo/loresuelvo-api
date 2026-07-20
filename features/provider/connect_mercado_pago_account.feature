@@ -1,7 +1,7 @@
 Feature: Conectar cuenta de Mercado Pago durante el registro de prestador
     Como prestador
     quiero conectar mi cuenta de Mercado Pago durante mi registro
-    para quedar habilitado para recibir los pagos de los servicios contratados
+    para permitir que LoResuelvo gestione los cobros de mis servicios mediante mi cuenta
 
     Background:
         Given que existe el rubro "Plomería"
@@ -12,12 +12,11 @@ Feature: Conectar cuenta de Mercado Pago durante el registro de prestador
 
         Scenario: 35.3.1-CMP Conectar correctamente una cuenta de Mercado Pago
             Given que estoy autenticado como prestador "juan.plomero@example.com"
-            And que la cuenta de Mercado Pago "mp-juan" está habilitada para recibir pagos de marketplace
             When inicio la conexión de mi cuenta de Mercado Pago
             And autorizo a LoResuelvo a operar con la cuenta de Mercado Pago "mp-juan"
             Then el sistema confirma la conexión de la cuenta de Mercado Pago
             And la cuenta de Mercado Pago "mp-juan" queda vinculada al prestador "juan.plomero@example.com"
-            And el prestador "juan.plomero@example.com" queda habilitado para recibir pagos
+            And el prestador "juan.plomero@example.com" queda habilitado en LoResuelvo para procesar cobros
             And el prestador "juan.plomero@example.com" queda habilitado para enviar propuestas de servicio
 
         Scenario: 35.3.2-CMP No duplicar la conexión de una cuenta ya vinculada al mismo prestador
@@ -26,7 +25,7 @@ Feature: Conectar cuenta de Mercado Pago durante el registro de prestador
             When intento conectar nuevamente la cuenta de Mercado Pago "mp-juan"
             Then el sistema informa que el prestador ya tiene una cuenta de Mercado Pago conectada
             And el sistema conserva una única conexión con la cuenta de Mercado Pago "mp-juan"
-            And el prestador "juan.plomero@example.com" permanece habilitado para recibir pagos
+            And el prestador "juan.plomero@example.com" permanece habilitado en LoResuelvo para procesar cobros
 
     Rule: La conexión es obligatoria para completar la habilitación comercial del prestador
 
@@ -89,12 +88,12 @@ Feature: Conectar cuenta de Mercado Pago durante el registro de prestador
             Then el sistema deniega la conexión de la cuenta de Mercado Pago
             And la conexión de Mercado Pago de "juan.plomero@example.com" permanece pendiente
 
-    Rule: La cuenta de Mercado Pago debe estar habilitada para recibir pagos de marketplace
+    Rule: Mercado Pago debe otorgar credenciales para operar en nombre del prestador
 
-        Scenario: 35.3.9-CMP Rechazar una cuenta que no puede recibir pagos de marketplace
+        Scenario: 35.3.9-CMP Rechazar una autorización que no otorga credenciales
             Given que estoy autenticado como prestador "juan.plomero@example.com"
-            And que la cuenta de Mercado Pago "mp-juan" no está habilitada para recibir pagos de marketplace
-            When intento conectar la cuenta de Mercado Pago "mp-juan"
-            Then el sistema informa que la cuenta de Mercado Pago no está habilitada para recibir pagos
-            And el sistema no vincula la cuenta de Mercado Pago "mp-juan" al prestador
+            And que inicié la conexión de mi cuenta de Mercado Pago
+            When Mercado Pago rechaza emitir credenciales porque la aplicación no tiene autorización suficiente
+            Then el sistema informa que Mercado Pago no otorgó autorización para operar
+            And el sistema no vincula ninguna cuenta de Mercado Pago al prestador
             And la conexión de Mercado Pago permanece pendiente

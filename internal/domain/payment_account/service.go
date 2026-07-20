@@ -108,7 +108,7 @@ func (service *Service) CompleteAuthorization(ctx context.Context, state, code s
 	credentials, err := service.oauthConnector.ExchangeAuthorizationCode(ctx, code, codeVerifier)
 	if err != nil {
 		if errors.Is(err, ErrAuthorizationCodeUnusable) ||
-			errors.Is(err, ErrMarketplacePaymentsNotEnabled) {
+			errors.Is(err, ErrAuthorizationGrantUnavailable) {
 			if consumeErr := service.authorizationAttemptRepository.Consume(ctx, attempt); consumeErr != nil {
 				return nil, fmt.Errorf("consuming failed payment account authorization: %w", consumeErr)
 			}
@@ -139,7 +139,6 @@ func (service *Service) CompleteAuthorization(ctx context.Context, state, code s
 		accessTokenCiphertext,
 		refreshTokenCiphertext,
 		credentials.ExpiresOn,
-		credentials.CanReceiveMarketplacePayments,
 	)
 	if err != nil {
 		return nil, err

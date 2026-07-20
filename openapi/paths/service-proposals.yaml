@@ -33,8 +33,8 @@ post:
   description: |
     Creates a pending service proposal from the authenticated provider to a consumer.
     The provider and consumer must already have an active work conversation.
-    The provider must also have a connected payment account enabled to receive
-    marketplace payments.
+    The provider must also have completed the payment-account connection required
+    by LoResuelvo before sending proposals.
 
     After the proposal is persisted, the API stores a notification for the consumer
     and publishes it through the realtime WebSocket channel when the consumer is connected.
@@ -112,7 +112,7 @@ post:
               value:
                 error: Consumer is required
     '409':
-      description: The provider and consumer do not have an active work conversation, or the provider has no connected payment account enabled to receive marketplace payments.
+      description: The provider and consumer do not have an active work conversation, or the provider has not completed the required payment-account connection.
       content:
         application/json:
           schema:

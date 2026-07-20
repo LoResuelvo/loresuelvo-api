@@ -19,10 +19,6 @@ const (
 	mercadoPagoConnectionPath    = "/providers/me/payment-accounts"
 )
 
-type mercadoPagoAccountFixture struct {
-	marketplacePaymentsEnabled bool
-}
-
 type mercadoPagoAuthorizationResponse struct {
 	AuthorizationURL string `json:"authorization_url"`
 	State            string `json:"state"`
@@ -37,8 +33,6 @@ type mercadoPagoConnectionResponse struct {
 
 func registerConnectMercadoPagoAccountSteps(sc *godog.ScenarioContext, suite *testSuite) {
 	sc.Step(`^que el registro del prestador "([^"]*)" está pendiente de conectar una cuenta de Mercado Pago$`, suite.providerRegistrationIsPendingMercadoPagoConnection)
-	sc.Step(`^que la cuenta de Mercado Pago "([^"]*)" está habilitada para recibir pagos de marketplace$`, suite.mercadoPagoAccountIsEnabledForMarketplacePayments)
-	sc.Step(`^que la cuenta de Mercado Pago "([^"]*)" no está habilitada para recibir pagos de marketplace$`, suite.mercadoPagoAccountIsNotEnabledForMarketplacePayments)
 	sc.Step(`^que la cuenta de Mercado Pago "([^"]*)" ya está vinculada al prestador "([^"]*)"$`, suite.mercadoPagoAccountIsAlreadyLinkedToProvider)
 	sc.Step(`^que la cuenta de Mercado Pago "([^"]*)" está vinculada al prestador "([^"]*)"$`, suite.mercadoPagoAccountIsLinkedToProvider)
 	sc.Step(`^inicio la conexión de mi cuenta de Mercado Pago$`, suite.startMyMercadoPagoAccountConnection)
@@ -49,15 +43,16 @@ func registerConnectMercadoPagoAccountSteps(sc *godog.ScenarioContext, suite *te
 	sc.Step(`^intento conectar la cuenta de Mercado Pago "([^"]*)"$`, suite.tryConnectMercadoPagoAccount)
 	sc.Step(`^Mercado Pago retorna una autorización con un estado de seguridad inválido$`, suite.mercadoPagoReturnsAuthorizationWithInvalidSecurityState)
 	sc.Step(`^Mercado Pago retorna un código de autorización "([^"]*)"$`, suite.mercadoPagoReturnsAuthorizationCode)
+	sc.Step(`^Mercado Pago rechaza emitir credenciales porque la aplicación no tiene autorización suficiente$`, suite.mercadoPagoRejectsCredentialIssuance)
 	sc.Step(`^intento iniciar la conexión de una cuenta de Mercado Pago para el prestador "([^"]*)"$`, suite.tryStartMercadoPagoConnectionForProvider)
 	sc.Step(`^intento enviar una propuesta de servicio al consumidor "([^"]*)" sin haber conectado una cuenta de Mercado Pago$`, suite.trySendServiceProposalWithoutMercadoPagoAccount)
 	sc.Step(`^el sistema confirma la conexión de la cuenta de Mercado Pago$`, suite.systemConfirmsMercadoPagoAccountConnection)
 	sc.Step(`^la cuenta de Mercado Pago "([^"]*)" queda vinculada al prestador "([^"]*)"$`, suite.mercadoPagoAccountBecomesLinkedToProvider)
-	sc.Step(`^el prestador "([^"]*)" queda habilitado para recibir pagos$`, suite.providerCanReceivePayments)
+	sc.Step(`^el prestador "([^"]*)" queda habilitado en LoResuelvo para procesar cobros$`, suite.providerCanReceivePayments)
 	sc.Step(`^el prestador "([^"]*)" queda habilitado para enviar propuestas de servicio$`, suite.providerCanSendServiceProposals)
 	sc.Step(`^el sistema informa que el prestador ya tiene una cuenta de Mercado Pago conectada$`, suite.systemReportsProviderAlreadyHasMercadoPagoAccount)
 	sc.Step(`^el sistema conserva una única conexión con la cuenta de Mercado Pago "([^"]*)"$`, suite.systemKeepsSingleMercadoPagoAccountConnection)
-	sc.Step(`^el prestador "([^"]*)" permanece habilitado para recibir pagos$`, suite.providerRemainsAbleToReceivePayments)
+	sc.Step(`^el prestador "([^"]*)" permanece habilitado en LoResuelvo para procesar cobros$`, suite.providerRemainsAbleToReceivePayments)
 	sc.Step(`^el sistema informa que la conexión de Mercado Pago está pendiente$`, suite.systemReportsMercadoPagoConnectionIsPending)
 	sc.Step(`^la propuesta de servicio no se envía$`, suite.serviceProposalIsNotSent)
 	sc.Step(`^el sistema no vincula ninguna cuenta de Mercado Pago al prestador$`, suite.systemDoesNotLinkAnyMercadoPagoAccount)
@@ -70,8 +65,7 @@ func registerConnectMercadoPagoAccountSteps(sc *godog.ScenarioContext, suite *te
 	sc.Step(`^el sistema rechaza la respuesta de autorización$`, suite.systemRejectsAuthorizationResponse)
 	sc.Step(`^el sistema permite volver a iniciar la conexión$`, suite.systemAllowsRestartingMercadoPagoConnection)
 	sc.Step(`^el sistema deniega la conexión de la cuenta de Mercado Pago$`, suite.systemDeniesMercadoPagoAccountConnection)
-	sc.Step(`^el sistema informa que la cuenta de Mercado Pago no está habilitada para recibir pagos$`, suite.systemReportsMercadoPagoAccountCannotReceivePayments)
-	sc.Step(`^el sistema no vincula la cuenta de Mercado Pago "([^"]*)" al prestador$`, suite.systemDoesNotLinkMercadoPagoAccount)
+	sc.Step(`^el sistema informa que Mercado Pago no otorgó autorización para operar$`, suite.systemReportsMercadoPagoAuthorizationGrantUnavailable)
 }
 
 func (suite *testSuite) providerRegistrationIsPendingMercadoPagoConnection(providerEmail string) error {
@@ -79,16 +73,6 @@ func (suite *testSuite) providerRegistrationIsPendingMercadoPagoConnection(provi
 		return err
 	}
 
-	return nil
-}
-
-func (suite *testSuite) mercadoPagoAccountIsEnabledForMarketplacePayments(accountID string) error {
-	suite.mercadoPagoAccounts[accountID] = mercadoPagoAccountFixture{marketplacePaymentsEnabled: true}
-	return nil
-}
-
-func (suite *testSuite) mercadoPagoAccountIsNotEnabledForMarketplacePayments(accountID string) error {
-	suite.mercadoPagoAccounts[accountID] = mercadoPagoAccountFixture{marketplacePaymentsEnabled: false}
 	return nil
 }
 
@@ -104,8 +88,6 @@ func (suite *testSuite) prepareLinkedMercadoPagoAccount(accountID, providerEmail
 	previousAuth0ID := suite.currentAuth0ID
 	suite.currentAuth0ID = auth0IDForProviderEmail(providerEmail)
 	defer func() { suite.currentAuth0ID = previousAuth0ID }()
-	suite.mercadoPagoAccounts[accountID] = mercadoPagoAccountFixture{marketplacePaymentsEnabled: true}
-
 	if err := suite.startMyMercadoPagoAccountConnection(); err != nil {
 		return err
 	}
@@ -156,18 +138,8 @@ func (suite *testSuite) startedMyMercadoPagoAccountConnection() error {
 }
 
 func (suite *testSuite) authorizeLoResuelvoForMercadoPagoAccount(accountID string) error {
-	fixture, exists := suite.mercadoPagoAccounts[accountID]
-	if !exists {
-		return fmt.Errorf("Mercado Pago account fixture %q was not configured", accountID)
-	}
-
-	codePrefix := "marketplace-enabled"
-	if !fixture.marketplacePaymentsEnabled {
-		codePrefix = "marketplace-disabled"
-	}
-
 	return suite.requestMercadoPagoCallback(url.Values{
-		"code":  []string{codePrefix + ":" + accountID},
+		"code":  []string{"authorized:" + accountID},
 		"state": []string{suite.lastMercadoPagoOAuthState},
 	})
 }
@@ -203,7 +175,7 @@ func (suite *testSuite) tryConnectMercadoPagoAccount(accountID string) error {
 
 func (suite *testSuite) mercadoPagoReturnsAuthorizationWithInvalidSecurityState() error {
 	return suite.requestMercadoPagoCallback(url.Values{
-		"code":  []string{"marketplace-enabled:mp-juan"},
+		"code":  []string{"authorized:mp-juan"},
 		"state": []string{"invalid-" + suite.lastMercadoPagoOAuthState},
 	})
 }
@@ -216,6 +188,13 @@ func (suite *testSuite) mercadoPagoReturnsAuthorizationCode(code string) error {
 		return err
 	}
 	return suite.lastResponseShouldHaveStatusCode(http.StatusBadRequest)
+}
+
+func (suite *testSuite) mercadoPagoRejectsCredentialIssuance() error {
+	return suite.requestMercadoPagoCallback(url.Values{
+		"code":  []string{"authorization-not-granted"},
+		"state": []string{suite.lastMercadoPagoOAuthState},
+	})
 }
 
 func (suite *testSuite) tryStartMercadoPagoConnectionForProvider(_ string) error {
@@ -359,17 +338,16 @@ func (suite *testSuite) systemDeniesMercadoPagoAccountConnection() error {
 	return suite.mercadoPagoRequestShouldFailWithStatus(http.StatusForbidden)
 }
 
-func (suite *testSuite) systemReportsMercadoPagoAccountCannotReceivePayments() error {
-	return suite.mercadoPagoRequestShouldFailWithStatus(http.StatusConflict)
-}
-
-func (suite *testSuite) systemDoesNotLinkMercadoPagoAccount(accountID string) error {
-	connection, err := suite.currentProviderMercadoPagoConnection()
-	if err != nil {
+func (suite *testSuite) systemReportsMercadoPagoAuthorizationGrantUnavailable() error {
+	if err := suite.mercadoPagoRequestShouldFailWithStatus(http.StatusBadRequest); err != nil {
 		return err
 	}
-	if connection.Status != "pending" || connection.AccountID == accountID {
-		return fmt.Errorf("expected Mercado Pago account %q not to be linked, got body %s", accountID, string(suite.lastBody))
+	var response map[string]string
+	if err := json.Unmarshal(suite.lastBody, &response); err != nil {
+		return fmt.Errorf("decoding Mercado Pago authorization error response: %w", err)
+	}
+	if response["error"] != "payment account authorization grant is unavailable" {
+		return fmt.Errorf("expected unavailable authorization grant error, got body %s", string(suite.lastBody))
 	}
 	return nil
 }

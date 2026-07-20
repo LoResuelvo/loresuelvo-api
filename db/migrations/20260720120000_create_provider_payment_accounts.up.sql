@@ -24,7 +24,6 @@ CREATE TABLE provider_payment_accounts (
     access_token_ciphertext BYTEA NOT NULL,
     refresh_token_ciphertext BYTEA,
     token_expires_on TIMESTAMPTZ NOT NULL,
-    can_receive_marketplace_payments BOOLEAN NOT NULL DEFAULT FALSE,
     connected_on TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_on TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     CONSTRAINT provider_payment_accounts_provider_check

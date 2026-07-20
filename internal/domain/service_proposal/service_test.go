@@ -122,7 +122,6 @@ func validPaymentAccount(t *testing.T) *paymentaccount.PaymentAccount {
 		[]byte("encrypted-access-token"),
 		nil,
 		time.Now().Add(time.Hour),
-		true,
 	)
 	require.NoError(t, err)
 	return account
@@ -154,39 +153,6 @@ func (env *serviceProposalTestEnv) newService() *serviceproposal.Service {
 		paymentaccount.PaymentProvider("mercado_pago"),
 		env.clock,
 	)
-}
-
-func TestCreateServiceProposalRequiresPaymentAccountAbleToReceivePayments(t *testing.T) {
-	env := setupServiceProposalTest(t)
-	resetMocks(&env.paymentAccountRepo.Mock, &env.serviceRepo.Mock)
-	account, err := paymentaccount.NewPaymentAccount(
-		validProviderID,
-		paymentaccount.PaymentProvider("mercado_pago"),
-		"mp-provider",
-		[]byte("encrypted-access-token"),
-		nil,
-		time.Now().Add(time.Hour),
-		false,
-	)
-	require.NoError(t, err)
-	env.paymentAccountRepo.
-		On("FindByProviderID", mock.Anything, validProviderID, paymentaccount.PaymentProvider("mercado_pago")).
-		Return(account, nil).
-		Once()
-
-	proposal, err := env.newService().CreateServiceProposal(
-		t.Context(),
-		validProviderAuth0ID,
-		validConsumerID,
-		validServiceAmount,
-		validServiceScheduledOn,
-		validServiceDescription,
-	)
-
-	require.ErrorIs(t, err, serviceproposal.ErrPaymentAccountConnectionRequired)
-	assert.Nil(t, proposal)
-	env.serviceRepo.AssertNotCalled(t, "Save", mock.Anything)
-	env.paymentAccountRepo.AssertExpectations(t)
 }
 
 func TestCreateServiceProposalRequiresConnectedPaymentAccount(t *testing.T) {

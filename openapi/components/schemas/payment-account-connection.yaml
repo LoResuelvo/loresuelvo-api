@@ -14,6 +14,10 @@ properties:
     description: Mercado Pago seller user identifier. Present only when connected.
   can_receive_payments:
     type: boolean
+    description: |
+      LoResuelvo eligibility derived from a completed payment-account connection.
+      It does not attest Mercado Pago KYC or guarantee acceptance of a specific checkout.
   can_send_service_proposals:
     type: boolean
+    description: Whether LoResuelvo allows the provider to send service proposals.
 additionalProperties: false

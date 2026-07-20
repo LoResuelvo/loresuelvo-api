@@ -21,7 +21,6 @@ func TestPaymentAccountOwnsProtectedCredentialsAndExposesCapabilities(t *testing
 		accessTokenCiphertext,
 		refreshTokenCiphertext,
 		expiresOn,
-		true,
 	)
 
 	require.NoError(t, err)

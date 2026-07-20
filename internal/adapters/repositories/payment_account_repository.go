@@ -52,15 +52,14 @@ func (repository *PaymentAccountRepository) saveWithTx(ctx context.Context, tx *
 		ctx,
 		`INSERT INTO provider_payment_accounts
 		(provider_id, payment_provider, external_account_id, access_token_ciphertext,
-		 refresh_token_ciphertext, token_expires_on, can_receive_marketplace_payments)
-		VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+		 refresh_token_ciphertext, token_expires_on)
+		VALUES ($1, $2, $3, $4, $5, $6)`,
 		account.ProviderID(),
 		account.PaymentProvider(),
 		account.ExternalAccountID(),
 		account.AccessTokenCiphertext(),
 		nullableCiphertext(account.RefreshTokenCiphertext()),
 		account.TokenExpiresOn(),
-		account.CanReceivePayments(),
 	)
 	if err != nil {
 		var postgresError *pgconn.PgError
@@ -82,11 +81,10 @@ func (repository *PaymentAccountRepository) FindByProviderID(ctx context.Context
 	var accessTokenCiphertext []byte
 	var refreshTokenCiphertext []byte
 	var tokenExpiresOn time.Time
-	var canReceiveMarketplacePayments bool
 	err := repository.db.QueryRowContext(
 		ctx,
 		`SELECT external_account_id, access_token_ciphertext, refresh_token_ciphertext,
-		        token_expires_on, can_receive_marketplace_payments
+		        token_expires_on
 		FROM provider_payment_accounts
 		WHERE provider_id = $1 AND payment_provider = $2`,
 		providerID,
@@ -96,7 +94,6 @@ func (repository *PaymentAccountRepository) FindByProviderID(ctx context.Context
 		&accessTokenCiphertext,
 		&refreshTokenCiphertext,
 		&tokenExpiresOn,
-		&canReceiveMarketplacePayments,
 	)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, paymentaccount.ErrConnectionNotFound
@@ -111,7 +108,6 @@ func (repository *PaymentAccountRepository) FindByProviderID(ctx context.Context
 		accessTokenCiphertext,
 		refreshTokenCiphertext,
 		tokenExpiresOn,
-		canReceiveMarketplacePayments,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("restoring provider payment account: %w", err)

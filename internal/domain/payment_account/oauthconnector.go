@@ -13,11 +13,10 @@ type OAuthConnector interface {
 }
 
 type OAuthCredentials struct {
-	ExternalAccountID             string
-	AccessToken                   string
-	RefreshToken                  string
-	ExpiresOn                     time.Time
-	CanReceiveMarketplacePayments bool
+	ExternalAccountID string
+	AccessToken       string
+	RefreshToken      string
+	ExpiresOn         time.Time
 }
 
 func ValidateOAuthCredentials(credentials OAuthCredentials) error {
@@ -26,9 +25,6 @@ func ValidateOAuthCredentials(credentials OAuthCredentials) error {
 	}
 	if strings.TrimSpace(credentials.AccessToken) == "" {
 		return ErrAccessTokenRequired
-	}
-	if !credentials.CanReceiveMarketplacePayments {
-		return ErrMarketplacePaymentsNotEnabled
 	}
 	return nil
 }

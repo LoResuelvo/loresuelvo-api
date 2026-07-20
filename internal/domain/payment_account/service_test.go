@@ -202,7 +202,6 @@ func TestStartAuthorizationRejectsAlreadyConnectedPaymentAccount(t *testing.T) {
 		[]byte("encrypted-access-token"),
 		nil,
 		fixedNow.Add(time.Hour),
-		true,
 	)
 	require.NoError(t, err)
 	repository := &repositoryStub{foundAccount: connectedAccount}
@@ -304,11 +303,10 @@ func TestCompleteAuthorizationExchangesCodeAndConnectsAccount(t *testing.T) {
 	attempt.ID = 7
 	repository := &repositoryStub{foundAttempt: attempt}
 	oauthConnector := &oauthConnectorStub{credentials: paymentaccount.OAuthCredentials{
-		ExternalAccountID:             "mp-juan",
-		AccessToken:                   "access-token",
-		RefreshToken:                  "refresh-token",
-		ExpiresOn:                     fixedNow.Add(180 * 24 * time.Hour),
-		CanReceiveMarketplacePayments: true,
+		ExternalAccountID: "mp-juan",
+		AccessToken:       "access-token",
+		RefreshToken:      "refresh-token",
+		ExpiresOn:         fixedNow.Add(180 * 24 * time.Hour),
 	}}
 	credentialProtector := &credentialProtectorStub{}
 	service := paymentaccount.NewService(
@@ -346,10 +344,9 @@ func TestCompleteAuthorizationPreservesExternalAccountAlreadyLinkedError(t *test
 		saveAccountErr: paymentaccount.ErrExternalAccountAlreadyLinked,
 	}
 	oauthConnector := &oauthConnectorStub{credentials: paymentaccount.OAuthCredentials{
-		ExternalAccountID:             "mp-already-linked",
-		AccessToken:                   "access-token",
-		ExpiresOn:                     fixedNow.Add(180 * 24 * time.Hour),
-		CanReceiveMarketplacePayments: true,
+		ExternalAccountID: "mp-already-linked",
+		AccessToken:       "access-token",
+		ExpiresOn:         fixedNow.Add(180 * 24 * time.Hour),
 	}}
 	service := paymentaccount.NewService(
 		userFinderStub{}, repository, repository, oauthConnector,
@@ -372,8 +369,7 @@ func TestCompleteAuthorizationDoesNotProtectInvalidConnectorCredentials(t *testi
 		repository,
 		repository,
 		&oauthConnectorStub{credentials: paymentaccount.OAuthCredentials{
-			ExternalAccountID:             "mp-juan",
-			CanReceiveMarketplacePayments: true,
+			ExternalAccountID: "mp-juan",
 		}},
 		credentialProtector,
 		&secretGeneratorStub{},
@@ -424,22 +420,19 @@ func TestCompleteAuthorizationDoesNotMaskFailureToConsumeUnusableAttempt(t *test
 	assert.Nil(t, repository.savedAccount)
 }
 
-func TestCompleteAuthorizationConsumesAttemptWhenMarketplacePaymentsAreDisabled(t *testing.T) {
+func TestCompleteAuthorizationConsumesAttemptWhenAuthorizationGrantIsUnavailable(t *testing.T) {
 	attempt := paymentaccount.NewAuthorizationAttempt(providerID, paymentaccount.PaymentProvider("mercado_pago"), []byte("stored-state-digest"), []byte("encrypted:pkce-verifier"), fixedNow.Add(10*time.Minute))
 	repository := &repositoryStub{foundAttempt: attempt}
 	credentialProtector := &credentialProtectorStub{}
 	service := paymentaccount.NewService(
 		userFinderStub{}, repository, repository,
-		&oauthConnectorStub{credentials: paymentaccount.OAuthCredentials{
-			ExternalAccountID: "mp-disabled",
-			AccessToken:       "access-token",
-		}},
+		&oauthConnectorStub{exchangeErr: paymentaccount.ErrAuthorizationGrantUnavailable},
 		credentialProtector, &secretGeneratorStub{}, clockStub{},
 	)
 
 	account, err := service.CompleteAuthorization(context.Background(), "state-secret", "authorization-code")
 
-	require.ErrorIs(t, err, paymentaccount.ErrMarketplacePaymentsNotEnabled)
+	require.ErrorIs(t, err, paymentaccount.ErrAuthorizationGrantUnavailable)
 	assert.Nil(t, account)
 	assert.Same(t, attempt, repository.consumedAttempt)
 	assert.Empty(t, credentialProtector.encryptedPlaintexts)
@@ -471,7 +464,7 @@ func TestCompleteAuthorizationRejectsAttemptFromDifferentPaymentProvider(t *test
 
 func TestGetConnectionReturnsAuthenticatedProviderConnection(t *testing.T) {
 	providerUser := registeredProvider(t)
-	account, err := paymentaccount.NewPaymentAccount(providerID, paymentaccount.PaymentProvider("mercado_pago"), "mp-juan", []byte("encrypted-access-token"), nil, fixedNow.Add(time.Hour), true)
+	account, err := paymentaccount.NewPaymentAccount(providerID, paymentaccount.PaymentProvider("mercado_pago"), "mp-juan", []byte("encrypted-access-token"), nil, fixedNow.Add(time.Hour))
 	require.NoError(t, err)
 	repository := &repositoryStub{foundAccount: account}
 	service := paymentaccount.NewService(

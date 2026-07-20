@@ -8,13 +8,12 @@ import (
 const StatusConnected = "connected"
 
 type PaymentAccount struct {
-	providerID                    int
-	paymentProvider               PaymentProvider
-	externalAccountID             string
-	accessTokenCiphertext         []byte
-	refreshTokenCiphertext        []byte
-	tokenExpiresOn                time.Time
-	canReceiveMarketplacePayments bool
+	providerID             int
+	paymentProvider        PaymentProvider
+	externalAccountID      string
+	accessTokenCiphertext  []byte
+	refreshTokenCiphertext []byte
+	tokenExpiresOn         time.Time
 }
 
 func NewPaymentAccount(
@@ -24,7 +23,6 @@ func NewPaymentAccount(
 	accessTokenCiphertext,
 	refreshTokenCiphertext []byte,
 	tokenExpiresOn time.Time,
-	canReceiveMarketplacePayments bool,
 ) (*PaymentAccount, error) {
 	if paymentProvider == "" {
 		return nil, ErrPaymentProviderRequired
@@ -37,13 +35,12 @@ func NewPaymentAccount(
 		return nil, ErrAccessTokenRequired
 	}
 	return &PaymentAccount{
-		providerID:                    providerID,
-		paymentProvider:               paymentProvider,
-		externalAccountID:             externalAccountID,
-		accessTokenCiphertext:         append([]byte(nil), accessTokenCiphertext...),
-		refreshTokenCiphertext:        append([]byte(nil), refreshTokenCiphertext...),
-		tokenExpiresOn:                tokenExpiresOn.UTC(),
-		canReceiveMarketplacePayments: canReceiveMarketplacePayments,
+		providerID:             providerID,
+		paymentProvider:        paymentProvider,
+		externalAccountID:      externalAccountID,
+		accessTokenCiphertext:  append([]byte(nil), accessTokenCiphertext...),
+		refreshTokenCiphertext: append([]byte(nil), refreshTokenCiphertext...),
+		tokenExpiresOn:         tokenExpiresOn.UTC(),
 	}, nil
 }
 
@@ -59,6 +56,6 @@ func (account *PaymentAccount) RefreshTokenCiphertext() []byte {
 func (account *PaymentAccount) TokenExpiresOn() time.Time { return account.tokenExpiresOn }
 func (account *PaymentAccount) Status() string            { return StatusConnected }
 func (account *PaymentAccount) CanReceivePayments() bool {
-	return account.Status() == StatusConnected && account.canReceiveMarketplacePayments
+	return account.Status() == StatusConnected
 }
 func (account *PaymentAccount) CanSendServiceProposals() bool { return account.CanReceivePayments() }

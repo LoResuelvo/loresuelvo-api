@@ -1018,7 +1018,7 @@
                         }
                     },
                     "400": {
-                        "description": "Missing, invalid, expired, or already-consumed authorization data.",
+                        "description": "Missing, invalid, expired, already-consumed, or unavailable authorization grant.",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -1029,24 +1029,24 @@
                                         "value": {
                                             "error": "authorization code cannot be used"
                                         }
+                                    },
+                                    "unavailableAuthorizationGrant": {
+                                        "value": {
+                                            "error": "payment account authorization grant is unavailable"
+                                        }
                                     }
                                 }
                             }
                         }
                     },
                     "409": {
-                        "description": "The payment account cannot receive marketplace payments or is already linked to another provider.",
+                        "description": "The payment account is already linked to another provider.",
                         "content": {
                             "application/json": {
                                 "schema": {
                                     "$ref": "#/components/schemas/ErrorResponse"
                                 },
                                 "examples": {
-                                    "marketplacePaymentsDisabled": {
-                                        "value": {
-                                            "error": "payment account cannot receive marketplace payments"
-                                        }
-                                    },
                                     "accountAlreadyLinked": {
                                         "value": {
                                             "error": "payment account is already linked to another provider"
@@ -2344,7 +2344,7 @@
                 ],
                 "operationId": "createServiceProposal",
                 "summary": "Create a service proposal",
-                "description": "Creates a pending service proposal from the authenticated provider to a consumer.\nThe provider and consumer must already have an active work conversation.\nThe provider must also have a connected payment account enabled to receive\nmarketplace payments.\n\nAfter the proposal is persisted, the API stores a notification for the consumer\nand publishes it through the realtime WebSocket channel when the consumer is connected.\n",
+                "description": "Creates a pending service proposal from the authenticated provider to a consumer.\nThe provider and consumer must already have an active work conversation.\nThe provider must also have completed the payment-account connection required\nby LoResuelvo before sending proposals.\n\nAfter the proposal is persisted, the API stores a notification for the consumer\nand publishes it through the realtime WebSocket channel when the consumer is connected.\n",
                 "security": [
                     {
                         "BearerAuth": []
@@ -2463,7 +2463,7 @@
                         }
                     },
                     "409": {
-                        "description": "The provider and consumer do not have an active work conversation, or the provider has no connected payment account enabled to receive marketplace payments.",
+                        "description": "The provider and consumer do not have an active work conversation, or the provider has not completed the required payment-account connection.",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -3457,10 +3457,12 @@
                         "description": "Mercado Pago seller user identifier. Present only when connected."
                     },
                     "can_receive_payments": {
-                        "type": "boolean"
+                        "type": "boolean",
+                        "description": "LoResuelvo eligibility derived from a completed payment-account connection.\nIt does not attest Mercado Pago KYC or guarantee acceptance of a specific checkout.\n"
                     },
                     "can_send_service_proposals": {
-                        "type": "boolean"
+                        "type": "boolean",
+                        "description": "Whether LoResuelvo allows the provider to send service proposals."
                     }
                 },
                 "additionalProperties": false

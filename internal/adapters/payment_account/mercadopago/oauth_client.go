@@ -112,7 +112,7 @@ func (client *OAuthClient) ExchangeAuthorizationCode(ctx context.Context, code, 
 			case "invalid_grant":
 				return paymentaccount.OAuthCredentials{}, paymentaccount.ErrAuthorizationCodeUnusable
 			case "unauthorized_client":
-				return paymentaccount.OAuthCredentials{}, paymentaccount.ErrMarketplacePaymentsNotEnabled
+				return paymentaccount.OAuthCredentials{}, paymentaccount.ErrAuthorizationGrantUnavailable
 			}
 		}
 		return paymentaccount.OAuthCredentials{}, fmt.Errorf("Mercado Pago token request returned status %d", response.StatusCode)
@@ -123,7 +123,6 @@ func (client *OAuthClient) ExchangeAuthorizationCode(ctx context.Context, code, 
 		RefreshToken string      `json:"refresh_token"`
 		UserID       json.Number `json:"user_id"`
 		ExpiresIn    int64       `json:"expires_in"`
-		Scope        string      `json:"scope"`
 	}
 	decoder := json.NewDecoder(response.Body)
 	decoder.UseNumber()
@@ -139,23 +138,9 @@ func (client *OAuthClient) ExchangeAuthorizationCode(ctx context.Context, code, 
 	}
 
 	return paymentaccount.OAuthCredentials{
-		ExternalAccountID:             externalAccountID,
-		AccessToken:                   tokenResponse.AccessToken,
-		RefreshToken:                  tokenResponse.RefreshToken,
-		ExpiresOn:                     time.Now().UTC().Add(time.Duration(tokenResponse.ExpiresIn) * time.Second),
-		CanReceiveMarketplacePayments: containsOAuthScopes(tokenResponse.Scope, "payments", "write"),
+		ExternalAccountID: externalAccountID,
+		AccessToken:       tokenResponse.AccessToken,
+		RefreshToken:      tokenResponse.RefreshToken,
+		ExpiresOn:         time.Now().UTC().Add(time.Duration(tokenResponse.ExpiresIn) * time.Second),
 	}, nil
-}
-
-func containsOAuthScopes(grantedScopes string, requiredScopes ...string) bool {
-	granted := make(map[string]struct{}, len(requiredScopes))
-	for _, scope := range strings.Fields(grantedScopes) {
-		granted[scope] = struct{}{}
-	}
-	for _, required := range requiredScopes {
-		if _, ok := granted[required]; !ok {
-			return false
-		}
-	}
-	return true
 }

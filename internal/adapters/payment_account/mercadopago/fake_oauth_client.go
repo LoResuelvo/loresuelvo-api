@@ -34,26 +34,18 @@ func (client *FakeOAuthClient) AuthorizationURL(state, codeVerifier string) (str
 }
 
 func (client *FakeOAuthClient) ExchangeAuthorizationCode(_ context.Context, code, _ string) (paymentaccount.OAuthCredentials, error) {
-	const enabledPrefix = "marketplace-enabled:"
-	const disabledPrefix = "marketplace-disabled:"
-	var (
-		externalAccountID string
-		canReceive        bool
-	)
-	switch {
-	case strings.HasPrefix(code, enabledPrefix):
-		externalAccountID = strings.TrimPrefix(code, enabledPrefix)
-		canReceive = true
-	case strings.HasPrefix(code, disabledPrefix):
-		externalAccountID = strings.TrimPrefix(code, disabledPrefix)
-	default:
+	const authorizedPrefix = "authorized:"
+	if code == "authorization-not-granted" {
+		return paymentaccount.OAuthCredentials{}, paymentaccount.ErrAuthorizationGrantUnavailable
+	}
+	if !strings.HasPrefix(code, authorizedPrefix) {
 		return paymentaccount.OAuthCredentials{}, paymentaccount.ErrAuthorizationCodeUnusable
 	}
+	externalAccountID := strings.TrimPrefix(code, authorizedPrefix)
 	return paymentaccount.OAuthCredentials{
-		ExternalAccountID:             externalAccountID,
-		AccessToken:                   "fake-access-token-for-" + externalAccountID,
-		RefreshToken:                  "fake-refresh-token-for-" + externalAccountID,
-		ExpiresOn:                     time.Now().UTC().Add(180 * 24 * time.Hour),
-		CanReceiveMarketplacePayments: canReceive,
+		ExternalAccountID: externalAccountID,
+		AccessToken:       "fake-access-token-for-" + externalAccountID,
+		RefreshToken:      "fake-refresh-token-for-" + externalAccountID,
+		ExpiresOn:         time.Now().UTC().Add(180 * 24 * time.Hour),
 	}, nil
 }

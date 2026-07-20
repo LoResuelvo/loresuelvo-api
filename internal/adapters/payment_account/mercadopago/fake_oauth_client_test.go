@@ -10,14 +10,22 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestFakeOAuthClientRepresentsMarketplaceDisabledAccount(t *testing.T) {
+func TestFakeOAuthClientReturnsAuthorizedSellerCredentials(t *testing.T) {
 	credentials, err := mercadopago.NewFakeOAuthClient().ExchangeAuthorizationCode(
-		context.Background(), "marketplace-disabled:mp-juan", "pkce-verifier",
+		context.Background(), "authorized:mp-juan", "pkce-verifier",
 	)
 
 	require.NoError(t, err)
 	assert.Equal(t, "mp-juan", credentials.ExternalAccountID)
-	assert.False(t, credentials.CanReceiveMarketplacePayments)
+	assert.NotEmpty(t, credentials.AccessToken)
+}
+
+func TestFakeOAuthClientRejectsUnavailableAuthorizationGrant(t *testing.T) {
+	_, err := mercadopago.NewFakeOAuthClient().ExchangeAuthorizationCode(
+		context.Background(), "authorization-not-granted", "pkce-verifier",
+	)
+
+	require.ErrorIs(t, err, paymentaccount.ErrAuthorizationGrantUnavailable)
 }
 
 func TestFakeOAuthClientRejectsUnusableAuthorizationCode(t *testing.T) {

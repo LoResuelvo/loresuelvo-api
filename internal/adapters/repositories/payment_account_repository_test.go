@@ -80,7 +80,6 @@ func TestPaymentAccountRepositoryCompletesAuthorizationAtomically(t *testing.T) 
 		[]byte("opaque-access-token-ciphertext"),
 		[]byte("opaque-refresh-token-ciphertext"),
 		tokenExpiresOn,
-		true,
 	)
 	require.NoError(t, err)
 
@@ -123,7 +122,6 @@ func TestPaymentAccountRepositoryCompletesAuthorizationAtomically(t *testing.T) 
 		[]byte("second-opaque-access-token-ciphertext"),
 		nil,
 		tokenExpiresOn,
-		true,
 	)
 	require.NoError(t, err)
 
@@ -146,7 +144,6 @@ func TestPaymentAccountRepositoryRollsBackAccountWhenAuthorizationAttemptCannotB
 		[]byte("opaque-access-token-ciphertext"),
 		nil,
 		time.Now().UTC().Add(180*24*time.Hour),
-		true,
 	)
 	require.NoError(t, err)
 
@@ -182,7 +179,7 @@ func TestPaymentAccountRepositoryRejectsExternalAccountLinkedToAnotherProvider(t
 	firstAccount, err := paymentaccount.NewPaymentAccount(
 		testContext.providerID, provider, externalAccountID,
 		[]byte("first-access-token-ciphertext"), nil,
-		time.Now().UTC().Add(180*24*time.Hour), true,
+		time.Now().UTC().Add(180*24*time.Hour),
 	)
 	require.NoError(t, err)
 	require.NoError(t, testContext.accountStore.SaveFromAuthorization(context.Background(), firstAttempt.ID, firstAccount))
@@ -198,7 +195,7 @@ func TestPaymentAccountRepositoryRejectsExternalAccountLinkedToAnotherProvider(t
 	secondAccount, err := paymentaccount.NewPaymentAccount(
 		secondProviderID, provider, externalAccountID,
 		[]byte("second-access-token-ciphertext"), nil,
-		time.Now().UTC().Add(180*24*time.Hour), true,
+		time.Now().UTC().Add(180*24*time.Hour),
 	)
 	require.NoError(t, err)
 

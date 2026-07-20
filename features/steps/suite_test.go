@@ -85,7 +85,6 @@ type testSuite struct {
 	serviceProposalIDs                      []int
 	serviceProposalFixtures                 map[int]serviceProposalFixture
 	workOrdersByServiceProposalID           map[int][]workOrderResponse
-	mercadoPagoAccounts                     map[string]mercadoPagoAccountFixture
 	lastMercadoPagoOAuthState               string
 
 	categoryIDsByName              map[string]int
@@ -204,7 +203,6 @@ func (s *testSuite) cleanup() error {
 	s.serviceProposalIDs = nil
 	s.serviceProposalFixtures = map[int]serviceProposalFixture{}
 	s.workOrdersByServiceProposalID = map[int][]workOrderResponse{}
-	s.mercadoPagoAccounts = map[string]mercadoPagoAccountFixture{}
 	s.lastMercadoPagoOAuthState = ""
 	return nil
 }
@@ -275,7 +273,6 @@ func newTestSuite(tb testing.TB, database *sql.DB) *testSuite {
 		serviceProposalConversationIDs:     map[string]int{},
 		serviceProposalFixtures:            map[int]serviceProposalFixture{},
 		workOrdersByServiceProposalID:      map[int][]workOrderResponse{},
-		mercadoPagoAccounts:                map[string]mercadoPagoAccountFixture{},
 	}
 }
 

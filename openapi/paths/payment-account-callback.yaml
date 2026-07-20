@@ -43,7 +43,7 @@ get:
             type: string
             format: uri
     '400':
-      description: Missing, invalid, expired, or already-consumed authorization data.
+      description: Missing, invalid, expired, already-consumed, or unavailable authorization grant.
       content:
         application/json:
           schema:
@@ -52,16 +52,16 @@ get:
             unusableAuthorizationCode:
               value:
                 error: authorization code cannot be used
+            unavailableAuthorizationGrant:
+              value:
+                error: payment account authorization grant is unavailable
     '409':
-      description: The payment account cannot receive marketplace payments or is already linked to another provider.
+      description: The payment account is already linked to another provider.
       content:
         application/json:
           schema:
             $ref: '#/components/schemas/ErrorResponse'
           examples:
-            marketplacePaymentsDisabled:
-              value:
-                error: payment account cannot receive marketplace payments
             accountAlreadyLinked:
               value:
                 error: payment account is already linked to another provider
