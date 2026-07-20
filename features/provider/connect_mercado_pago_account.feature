@@ -30,7 +30,6 @@ Feature: Conectar cuenta de Mercado Pago durante el registro de prestador
 
     Rule: La conexión es obligatoria para completar la habilitación comercial del prestador
 
-        @wip
         Scenario: 35.3.3-CMP Mantener incompleta la habilitación mientras no se conecte Mercado Pago
             Given que existe un consumidor registrado con correo "ana@example.com", nombre "Ana" y apellido "Pérez"
             And que existe un chat activo entre el consumidor "ana@example.com" y el prestador "juan.plomero@example.com" con el mensaje inicial:
