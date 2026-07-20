@@ -160,3 +160,56 @@ func TestPaymentAccountRepositoryRollsBackAccountWhenAuthorizationAttemptCannotB
 	)
 	require.ErrorIs(t, err, paymentaccount.ErrConnectionNotFound)
 }
+
+func TestPaymentAccountRepositoryRejectsExternalAccountLinkedToAnotherProvider(t *testing.T) {
+	testContext := newPaymentAccountRepositoryTest(t)
+	secondProviderID := savedProviderIDWithData(t, jobRequestRepositoryTestContext{
+		database:           testContext.database,
+		userRepository:     repositories.NewUserRepository(testContext.database),
+		categoryRepository: repositories.NewCategoryRepository(testContext.database),
+	}, "auth0|second-payment-account-provider", "second.payment.provider@example.com", "Pedro", "Lopez", "Plomeria")
+	provider := paymentaccount.PaymentProvider("mercado_pago")
+	externalAccountID := "mp-shared-account"
+
+	firstAttempt := &paymentaccount.AuthorizationAttempt{
+		ProviderID:             testContext.providerID,
+		PaymentProvider:        provider,
+		StateDigest:            bytes.Repeat([]byte{5}, 32),
+		CodeVerifierCiphertext: []byte("first-opaque-pkce-ciphertext"),
+		ExpiresOn:              time.Now().UTC().Add(10 * time.Minute),
+	}
+	require.NoError(t, testContext.attemptStore.Save(context.Background(), firstAttempt))
+	firstAccount, err := paymentaccount.NewPaymentAccount(
+		testContext.providerID, provider, externalAccountID,
+		[]byte("first-access-token-ciphertext"), nil,
+		time.Now().UTC().Add(180*24*time.Hour), true,
+	)
+	require.NoError(t, err)
+	require.NoError(t, testContext.accountStore.SaveFromAuthorization(context.Background(), firstAttempt.ID, firstAccount))
+
+	secondAttempt := &paymentaccount.AuthorizationAttempt{
+		ProviderID:             secondProviderID,
+		PaymentProvider:        provider,
+		StateDigest:            bytes.Repeat([]byte{6}, 32),
+		CodeVerifierCiphertext: []byte("second-opaque-pkce-ciphertext"),
+		ExpiresOn:              time.Now().UTC().Add(10 * time.Minute),
+	}
+	require.NoError(t, testContext.attemptStore.Save(context.Background(), secondAttempt))
+	secondAccount, err := paymentaccount.NewPaymentAccount(
+		secondProviderID, provider, externalAccountID,
+		[]byte("second-access-token-ciphertext"), nil,
+		time.Now().UTC().Add(180*24*time.Hour), true,
+	)
+	require.NoError(t, err)
+
+	err = testContext.accountStore.SaveFromAuthorization(context.Background(), secondAttempt.ID, secondAccount)
+
+	require.ErrorIs(t, err, paymentaccount.ErrExternalAccountAlreadyLinked)
+	_, err = testContext.accountStore.FindByProviderID(context.Background(), secondProviderID, provider)
+	require.ErrorIs(t, err, paymentaccount.ErrConnectionNotFound)
+	_, err = testContext.attemptStore.FindByStateDigest(context.Background(), secondAttempt.StateDigest)
+	require.NoError(t, err, "rejected authorization attempt must remain unconsumed")
+	foundFirst, err := testContext.accountStore.FindByProviderID(context.Background(), testContext.providerID, provider)
+	require.NoError(t, err)
+	assert.Equal(t, externalAccountID, foundFirst.ExternalAccountID())
+}

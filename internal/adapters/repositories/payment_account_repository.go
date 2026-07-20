@@ -64,8 +64,13 @@ func (repository *PaymentAccountRepository) saveWithTx(ctx context.Context, tx *
 	)
 	if err != nil {
 		var postgresError *pgconn.PgError
-		if errors.As(err, &postgresError) && postgresError.ConstraintName == "provider_payment_accounts_provider_unique" {
-			return paymentaccount.ErrAlreadyConnected
+		if errors.As(err, &postgresError) {
+			switch postgresError.ConstraintName {
+			case "provider_payment_accounts_provider_unique":
+				return paymentaccount.ErrAlreadyConnected
+			case "provider_payment_accounts_external_unique":
+				return paymentaccount.ErrExternalAccountAlreadyLinked
+			}
 		}
 		return fmt.Errorf("saving provider payment account: %w", err)
 	}

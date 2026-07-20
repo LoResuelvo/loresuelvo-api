@@ -21,7 +21,8 @@ func handlePaymentAccountError(c *gin.Context, err error) {
 		httphandler.RespondError(c, http.StatusBadRequest, err.Error())
 	case errors.Is(err, paymentaccount.ErrMarketplacePaymentsNotEnabled):
 		httphandler.RespondError(c, http.StatusConflict, err.Error())
-	case errors.Is(err, paymentaccount.ErrAlreadyConnected):
+	case errors.Is(err, paymentaccount.ErrAlreadyConnected),
+		errors.Is(err, paymentaccount.ErrExternalAccountAlreadyLinked):
 		httphandler.RespondError(c, http.StatusConflict, err.Error())
 	case errors.Is(err, paymentaccount.ErrConnectionNotFound):
 		c.JSON(http.StatusOK, connectionResponse{Status: "pending"})

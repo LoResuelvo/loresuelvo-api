@@ -97,6 +97,7 @@ type repositoryStub struct {
 	foundAccount    *paymentaccount.PaymentAccount
 	consumedAttempt *paymentaccount.AuthorizationAttempt
 	consumeErr      error
+	saveAccountErr  error
 }
 
 func (stub *repositoryStub) Save(_ context.Context, attempt *paymentaccount.AuthorizationAttempt) error {
@@ -115,7 +116,7 @@ func (stub *repositoryStub) Consume(_ context.Context, attempt *paymentaccount.A
 
 func (stub *repositoryStub) SaveFromAuthorization(_ context.Context, _ int, account *paymentaccount.PaymentAccount) error {
 	stub.savedAccount = account
-	return nil
+	return stub.saveAccountErr
 }
 
 func (stub *repositoryStub) FindByProviderID(_ context.Context, _ int, _ paymentaccount.PaymentProvider) (*paymentaccount.PaymentAccount, error) {
@@ -307,6 +308,29 @@ func TestCompleteAuthorizationExchangesCodeAndConnectsAccount(t *testing.T) {
 	assert.Equal(t, paymentaccount.StatusConnected, account.Status())
 	assert.True(t, account.CanReceivePayments())
 	assert.True(t, account.CanSendServiceProposals())
+}
+
+func TestCompleteAuthorizationPreservesExternalAccountAlreadyLinkedError(t *testing.T) {
+	attempt := paymentaccount.NewAuthorizationAttempt(providerID, paymentaccount.PaymentProvider("mercado_pago"), []byte("stored-state-digest"), []byte("encrypted:pkce-verifier"), fixedNow.Add(10*time.Minute))
+	repository := &repositoryStub{
+		foundAttempt:   attempt,
+		saveAccountErr: paymentaccount.ErrExternalAccountAlreadyLinked,
+	}
+	oauthConnector := &oauthConnectorStub{credentials: paymentaccount.OAuthCredentials{
+		ExternalAccountID:             "mp-already-linked",
+		AccessToken:                   "access-token",
+		ExpiresOn:                     fixedNow.Add(180 * 24 * time.Hour),
+		CanReceiveMarketplacePayments: true,
+	}}
+	service := paymentaccount.NewService(
+		userFinderStub{}, repository, repository, oauthConnector,
+		&credentialProtectorStub{}, &secretGeneratorStub{}, clockStub{},
+	)
+
+	account, err := service.CompleteAuthorization(context.Background(), "state-secret", "authorization-code")
+
+	require.ErrorIs(t, err, paymentaccount.ErrExternalAccountAlreadyLinked)
+	assert.Nil(t, account)
 }
 
 func TestCompleteAuthorizationDoesNotProtectInvalidConnectorCredentials(t *testing.T) {
