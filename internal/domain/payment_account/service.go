@@ -3,6 +3,7 @@ package paymentaccount
 import (
 	"context"
 	"crypto/sha256"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -39,6 +40,9 @@ func (service *Service) StartAuthorization(ctx context.Context, authID string) (
 	if err != nil {
 		return nil, err
 	}
+	if err := service.ensurePaymentAccountIsNotConnected(ctx, providerID); err != nil {
+		return nil, err
+	}
 
 	state, err := service.secretGenerator.Generate()
 	if err != nil {
@@ -69,6 +73,17 @@ func (service *Service) StartAuthorization(ctx context.Context, authID string) (
 	}
 
 	return &Authorization{URL: authorizationURL, State: state}, nil
+}
+
+func (service *Service) ensurePaymentAccountIsNotConnected(ctx context.Context, providerID int) error {
+	_, err := service.paymentAccountRepository.FindByProviderID(ctx, providerID, service.oauthConnector.Provider())
+	if err == nil {
+		return ErrAlreadyConnected
+	}
+	if errors.Is(err, ErrConnectionNotFound) {
+		return nil
+	}
+	return fmt.Errorf("checking existing payment account connection: %w", err)
 }
 
 func (service *Service) CompleteAuthorization(ctx context.Context, state, code string) (*PaymentAccount, error) {

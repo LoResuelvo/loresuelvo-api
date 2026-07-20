@@ -8,6 +8,7 @@ import (
 	"time"
 
 	paymentaccount "github.com/LoResuelvo/loresuelvo-api/internal/domain/payment_account"
+	"github.com/jackc/pgx/v5/pgconn"
 )
 
 type PaymentAccountRepository struct {
@@ -62,6 +63,10 @@ func (repository *PaymentAccountRepository) saveWithTx(ctx context.Context, tx *
 		account.CanReceivePayments(),
 	)
 	if err != nil {
+		var postgresError *pgconn.PgError
+		if errors.As(err, &postgresError) && postgresError.ConstraintName == "provider_payment_accounts_provider_unique" {
+			return paymentaccount.ErrAlreadyConnected
+		}
 		return fmt.Errorf("saving provider payment account: %w", err)
 	}
 	return nil

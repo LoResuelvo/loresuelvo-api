@@ -112,7 +112,39 @@ func (stub *repositoryStub) SaveFromAuthorization(_ context.Context, _ int, acco
 }
 
 func (stub *repositoryStub) FindByProviderID(_ context.Context, _ int, _ paymentaccount.PaymentProvider) (*paymentaccount.PaymentAccount, error) {
+	if stub.foundAccount == nil {
+		return nil, paymentaccount.ErrConnectionNotFound
+	}
 	return stub.foundAccount, nil
+}
+
+func TestStartAuthorizationRejectsAlreadyConnectedPaymentAccount(t *testing.T) {
+	providerUser := registeredProvider(t)
+	connectedAccount, err := paymentaccount.NewPaymentAccount(
+		providerID,
+		paymentaccount.PaymentProvider("mercado_pago"),
+		"mp-juan",
+		[]byte("encrypted-access-token"),
+		nil,
+		fixedNow.Add(time.Hour),
+		true,
+	)
+	require.NoError(t, err)
+	repository := &repositoryStub{foundAccount: connectedAccount}
+	service := paymentaccount.NewService(
+		userFinderStub{found: providerUser},
+		repository,
+		repository,
+		&oauthConnectorStub{},
+		&credentialProtectorStub{},
+		&secretGeneratorStub{},
+		clockStub{},
+	)
+
+	_, err = service.StartAuthorization(context.Background(), providerAuthID)
+
+	require.ErrorIs(t, err, paymentaccount.ErrAlreadyConnected)
+	assert.Nil(t, repository.savedAttempt)
 }
 
 func TestStartAuthorizationCreatesProviderBoundAttemptAndPKCEURL(t *testing.T) {

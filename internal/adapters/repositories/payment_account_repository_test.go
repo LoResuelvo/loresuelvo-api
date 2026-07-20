@@ -107,6 +107,34 @@ func TestPaymentAccountRepositoryCompletesAuthorizationAtomically(t *testing.T) 
 	).Scan(&consumedOn))
 	assert.Equal(t, []byte("opaque-access-token-ciphertext"), accessTokenCiphertext)
 	assert.True(t, consumedOn.Valid)
+
+	secondAttempt := &paymentaccount.AuthorizationAttempt{
+		ProviderID:             testContext.providerID,
+		PaymentProvider:        paymentaccount.PaymentProvider("mercado_pago"),
+		StateDigest:            bytes.Repeat([]byte{4}, 32),
+		CodeVerifierCiphertext: []byte("second-opaque-pkce-ciphertext"),
+		ExpiresOn:              time.Now().UTC().Add(10 * time.Minute),
+	}
+	require.NoError(t, testContext.attemptStore.Save(context.Background(), secondAttempt))
+	secondAccount, err := paymentaccount.NewPaymentAccount(
+		testContext.providerID,
+		paymentaccount.PaymentProvider("mercado_pago"),
+		"mp-juan-secondary",
+		[]byte("second-opaque-access-token-ciphertext"),
+		nil,
+		tokenExpiresOn,
+		true,
+	)
+	require.NoError(t, err)
+
+	err = testContext.accountStore.SaveFromAuthorization(context.Background(), secondAttempt.ID, secondAccount)
+
+	require.ErrorIs(t, err, paymentaccount.ErrAlreadyConnected)
+	require.NoError(t, testContext.database.QueryRow(
+		"SELECT consumed_on FROM payment_account_authorization_attempts WHERE id = $1",
+		secondAttempt.ID,
+	).Scan(&consumedOn))
+	assert.False(t, consumedOn.Valid)
 }
 
 func TestPaymentAccountRepositoryRollsBackAccountWhenAuthorizationAttemptCannotBeConsumed(t *testing.T) {

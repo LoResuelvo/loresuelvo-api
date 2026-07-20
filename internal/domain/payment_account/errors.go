@@ -11,6 +11,7 @@ var (
 	ErrAuthorizationAttemptExpired   = errors.New("authorization attempt has expired")
 	ErrAuthorizationAttemptNotFound  = errors.New("authorization attempt does not exist")
 	ErrConnectionNotFound            = errors.New("payment account connection does not exist")
+	ErrAlreadyConnected              = errors.New("payment account is already connected")
 	ErrExternalAccountIDRequired     = errors.New("external payment account id is required")
 	ErrAccessTokenRequired           = errors.New("payment account access token is required")
 	ErrMarketplacePaymentsNotEnabled = errors.New("payment account cannot receive marketplace payments")
