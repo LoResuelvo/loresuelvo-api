@@ -20,7 +20,6 @@ Feature: Conectar cuenta de Mercado Pago durante el registro de prestador
             And el prestador "juan.plomero@example.com" queda habilitado para recibir pagos
             And el prestador "juan.plomero@example.com" queda habilitado para enviar propuestas de servicio
 
-        @wip
         Scenario: 35.3.2-CMP No duplicar la conexión de una cuenta ya vinculada al mismo prestador
             Given que la cuenta de Mercado Pago "mp-juan" ya está vinculada al prestador "juan.plomero@example.com"
             And que estoy autenticado como prestador "juan.plomero@example.com"
