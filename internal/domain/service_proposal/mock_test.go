@@ -7,6 +7,7 @@ import (
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/consumer"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/conversation"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/notification"
+	paymentaccount "github.com/LoResuelvo/loresuelvo-api/internal/domain/payment_account"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/provider"
 	serviceproposal "github.com/LoResuelvo/loresuelvo-api/internal/domain/service_proposal"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/user"
@@ -90,6 +91,18 @@ type MockClock struct {
 
 type MockFileURLResolver struct {
 	mock.Mock
+}
+
+type MockPaymentAccountRepository struct {
+	mock.Mock
+}
+
+func (m *MockPaymentAccountRepository) FindByProviderID(ctx context.Context, providerID int, paymentProvider paymentaccount.PaymentProvider) (*paymentaccount.PaymentAccount, error) {
+	args := m.Called(ctx, providerID, paymentProvider)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*paymentaccount.PaymentAccount), args.Error(1)
 }
 
 func (m *MockFileURLResolver) ResolvePublicURLs(ctx context.Context, fileIDs []string) (map[string]string, error) {

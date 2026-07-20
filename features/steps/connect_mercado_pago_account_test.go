@@ -1,6 +1,7 @@
 package steps_test
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -8,6 +9,7 @@ import (
 	"net/url"
 	"strings"
 
+	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/repositories"
 	"github.com/cucumber/godog"
 )
 
@@ -278,6 +280,17 @@ func (suite *testSuite) systemReportsMercadoPagoConnectionIsPending() error {
 func (suite *testSuite) serviceProposalIsNotSent() error {
 	if suite.lastStatus == http.StatusCreated {
 		return fmt.Errorf("expected service proposal not to be sent, got status %d with body %s", suite.lastStatus, string(suite.lastBody))
+	}
+	providerID, err := suite.userRepository.FindIDByAuthID(suite.currentAuth0ID)
+	if err != nil {
+		return fmt.Errorf("finding authenticated provider: %w", err)
+	}
+	proposals, err := repositories.NewServiceProposalRepository(suite.database).FindByUserID(context.Background(), providerID)
+	if err != nil {
+		return fmt.Errorf("finding provider service proposals: %w", err)
+	}
+	if len(proposals) != 0 {
+		return fmt.Errorf("expected no service proposal to be persisted, found %d", len(proposals))
 	}
 	return nil
 }

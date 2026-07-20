@@ -2,6 +2,7 @@ package serviceproposal
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -9,32 +10,37 @@ import (
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/consumer"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/conversation"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/notification"
+	paymentaccount "github.com/LoResuelvo/loresuelvo-api/internal/domain/payment_account"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/provider"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/user"
 	workorder "github.com/LoResuelvo/loresuelvo-api/internal/domain/work_order"
 )
 
 type Service struct {
-	repository             ServiceProposalRepository
-	workOrderRepository    WorkOrderRepository
-	userRepository         UserRepository
-	conversationRepository ConversationRepository
-	notificationRepository NotificationRepository
-	notificator            notification.Notificator
-	fileURLResolver        FileURLResolver
-	clock                  clock.Clock
+	repository               ServiceProposalRepository
+	workOrderRepository      WorkOrderRepository
+	userRepository           UserRepository
+	conversationRepository   ConversationRepository
+	notificationRepository   NotificationRepository
+	notificator              notification.Notificator
+	fileURLResolver          FileURLResolver
+	paymentAccountRepository PaymentAccountRepository
+	paymentProvider          paymentaccount.PaymentProvider
+	clock                    clock.Clock
 }
 
-func NewService(serviceRepo ServiceProposalRepository, workOrderRepo WorkOrderRepository, userRepo UserRepository, conversationRepo ConversationRepository, notificationRepo NotificationRepository, notificator notification.Notificator, fileURLResolver FileURLResolver, clock clock.Clock) *Service {
+func NewService(serviceRepo ServiceProposalRepository, workOrderRepo WorkOrderRepository, userRepo UserRepository, conversationRepo ConversationRepository, notificationRepo NotificationRepository, notificator notification.Notificator, fileURLResolver FileURLResolver, paymentAccountRepository PaymentAccountRepository, paymentProvider paymentaccount.PaymentProvider, clock clock.Clock) *Service {
 	return &Service{
-		repository:             serviceRepo,
-		workOrderRepository:    workOrderRepo,
-		userRepository:         userRepo,
-		conversationRepository: conversationRepo,
-		notificationRepository: notificationRepo,
-		notificator:            notificator,
-		fileURLResolver:        fileURLResolver,
-		clock:                  clock,
+		repository:               serviceRepo,
+		workOrderRepository:      workOrderRepo,
+		userRepository:           userRepo,
+		conversationRepository:   conversationRepo,
+		notificationRepository:   notificationRepo,
+		notificator:              notificator,
+		fileURLResolver:          fileURLResolver,
+		paymentAccountRepository: paymentAccountRepository,
+		paymentProvider:          paymentProvider,
+		clock:                    clock,
 	}
 }
 
@@ -42,6 +48,17 @@ func (s *Service) CreateServiceProposal(ctx context.Context, auth0ID string, con
 	provider, consumer, conversation, err := s.getParticipants(auth0ID, consumerID)
 	if err != nil {
 		return nil, err
+	}
+
+	paymentAccount, err := s.paymentAccountRepository.FindByProviderID(ctx, provider.ID(), s.paymentProvider)
+	if errors.Is(err, paymentaccount.ErrConnectionNotFound) {
+		return nil, ErrPaymentAccountConnectionRequired
+	}
+	if err != nil {
+		return nil, fmt.Errorf("finding provider payment account: %w", err)
+	}
+	if !paymentAccount.CanReceivePayments() {
+		return nil, ErrPaymentAccountConnectionRequired
 	}
 
 	serviceProposal, err := NewServiceProposal(provider, consumer, conversation, amount, scheduledOn, description, s.clock)

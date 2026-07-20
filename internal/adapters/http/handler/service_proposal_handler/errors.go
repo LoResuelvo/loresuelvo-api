@@ -22,7 +22,9 @@ func handleCreateServiceProposalError(c *gin.Context, err error) {
 		httphandler.RespondError(c, http.StatusNotFound, err.Error())
 		return
 	}
-	if errors.Is(err, serviceproposal.ErrConversationRequired) || errors.Is(err, serviceproposal.ErrConversationNotActive) {
+	if errors.Is(err, serviceproposal.ErrConversationRequired) ||
+		errors.Is(err, serviceproposal.ErrConversationNotActive) ||
+		errors.Is(err, serviceproposal.ErrPaymentAccountConnectionRequired) {
 		httphandler.RespondError(c, http.StatusConflict, err.Error())
 		return
 	}

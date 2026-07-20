@@ -9,6 +9,7 @@ import (
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/conversation"
 	filedomain "github.com/LoResuelvo/loresuelvo-api/internal/domain/file"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/notification"
+	paymentaccount "github.com/LoResuelvo/loresuelvo-api/internal/domain/payment_account"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/provider"
 	serviceproposal "github.com/LoResuelvo/loresuelvo-api/internal/domain/service_proposal"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/user"
@@ -19,19 +20,20 @@ import (
 )
 
 type serviceProposalTestEnv struct {
-	providerRepo     *MockProviderRepository
-	consumerRepo     *MockConsumerRepository
-	conversationRepo *MockConversationRepository
-	serviceRepo      *MockServiceProposalRepository
-	workOrderRepo    *MockWorkOrderRepository
-	notificationRepo *MockNotificationRepository
-	notificator      *MockNotificator
-	clock            *MockClock
-	userRepo         *MockUserRepository
-	fileURLResolver  *MockFileURLResolver
+	providerRepo       *MockProviderRepository
+	consumerRepo       *MockConsumerRepository
+	conversationRepo   *MockConversationRepository
+	serviceRepo        *MockServiceProposalRepository
+	workOrderRepo      *MockWorkOrderRepository
+	notificationRepo   *MockNotificationRepository
+	notificator        *MockNotificator
+	clock              *MockClock
+	userRepo           *MockUserRepository
+	fileURLResolver    *MockFileURLResolver
+	paymentAccountRepo *MockPaymentAccountRepository
 }
 
-func setupServiceProposalTest() *serviceProposalTestEnv {
+func setupServiceProposalTest(t *testing.T) *serviceProposalTestEnv {
 	providerRepo := new(MockProviderRepository)
 	consumerRepo := new(MockConsumerRepository)
 	conversationRepo := new(MockConversationRepository)
@@ -44,6 +46,10 @@ func setupServiceProposalTest() *serviceProposalTestEnv {
 	fileURLResolver.
 		On("ResolvePublicURLs", mock.Anything, mock.Anything).
 		Return(map[string]string{}, nil)
+	paymentAccountRepo := new(MockPaymentAccountRepository)
+	paymentAccountRepo.
+		On("FindByProviderID", mock.Anything, validProviderID, paymentaccount.PaymentProvider("mercado_pago")).
+		Return(validPaymentAccount(t), nil)
 
 	userRepo := &MockUserRepository{
 		provider: providerRepo,
@@ -93,17 +99,33 @@ func setupServiceProposalTest() *serviceProposalTestEnv {
 		Return(time.Now())
 
 	return &serviceProposalTestEnv{
-		providerRepo:     providerRepo,
-		consumerRepo:     consumerRepo,
-		conversationRepo: conversationRepo,
-		serviceRepo:      serviceRepo,
-		workOrderRepo:    workOrderRepo,
-		notificationRepo: notificationRepo,
-		notificator:      notificator,
-		clock:            clock,
-		userRepo:         userRepo,
-		fileURLResolver:  fileURLResolver,
+		providerRepo:       providerRepo,
+		consumerRepo:       consumerRepo,
+		conversationRepo:   conversationRepo,
+		serviceRepo:        serviceRepo,
+		workOrderRepo:      workOrderRepo,
+		notificationRepo:   notificationRepo,
+		notificator:        notificator,
+		clock:              clock,
+		userRepo:           userRepo,
+		fileURLResolver:    fileURLResolver,
+		paymentAccountRepo: paymentAccountRepo,
 	}
+}
+
+func validPaymentAccount(t *testing.T) *paymentaccount.PaymentAccount {
+	t.Helper()
+	account, err := paymentaccount.NewPaymentAccount(
+		validProviderID,
+		paymentaccount.PaymentProvider("mercado_pago"),
+		"mp-provider",
+		[]byte("encrypted-access-token"),
+		nil,
+		time.Now().Add(time.Hour),
+		true,
+	)
+	require.NoError(t, err)
+	return account
 }
 
 func validSavedServiceProposal() *serviceproposal.ServiceProposal {
@@ -128,12 +150,90 @@ func (env *serviceProposalTestEnv) newService() *serviceproposal.Service {
 		env.notificationRepo,
 		env.notificator,
 		env.fileURLResolver,
+		env.paymentAccountRepo,
+		paymentaccount.PaymentProvider("mercado_pago"),
 		env.clock,
 	)
 }
 
+func TestCreateServiceProposalRequiresPaymentAccountAbleToReceivePayments(t *testing.T) {
+	env := setupServiceProposalTest(t)
+	resetMocks(&env.paymentAccountRepo.Mock, &env.serviceRepo.Mock)
+	account, err := paymentaccount.NewPaymentAccount(
+		validProviderID,
+		paymentaccount.PaymentProvider("mercado_pago"),
+		"mp-provider",
+		[]byte("encrypted-access-token"),
+		nil,
+		time.Now().Add(time.Hour),
+		false,
+	)
+	require.NoError(t, err)
+	env.paymentAccountRepo.
+		On("FindByProviderID", mock.Anything, validProviderID, paymentaccount.PaymentProvider("mercado_pago")).
+		Return(account, nil).
+		Once()
+
+	proposal, err := env.newService().CreateServiceProposal(
+		t.Context(),
+		validProviderAuth0ID,
+		validConsumerID,
+		validServiceAmount,
+		validServiceScheduledOn,
+		validServiceDescription,
+	)
+
+	require.ErrorIs(t, err, serviceproposal.ErrPaymentAccountConnectionRequired)
+	assert.Nil(t, proposal)
+	env.serviceRepo.AssertNotCalled(t, "Save", mock.Anything)
+	env.paymentAccountRepo.AssertExpectations(t)
+}
+
+func TestCreateServiceProposalRequiresConnectedPaymentAccount(t *testing.T) {
+	env := setupServiceProposalTest(t)
+	resetMocks(&env.paymentAccountRepo.Mock, &env.serviceRepo.Mock)
+	env.paymentAccountRepo.
+		On("FindByProviderID", mock.Anything, validProviderID, paymentaccount.PaymentProvider("mercado_pago")).
+		Return(nil, paymentaccount.ErrConnectionNotFound).
+		Once()
+
+	proposal, err := env.newService().CreateServiceProposal(
+		t.Context(),
+		validProviderAuth0ID,
+		validConsumerID,
+		validServiceAmount,
+		validServiceScheduledOn,
+		validServiceDescription,
+	)
+
+	require.ErrorIs(t, err, serviceproposal.ErrPaymentAccountConnectionRequired)
+	assert.Nil(t, proposal)
+	env.serviceRepo.AssertNotCalled(t, "Save", mock.Anything)
+	env.paymentAccountRepo.AssertExpectations(t)
+}
+
+func TestCreateServiceProposalReturnsPaymentAccountLookupError(t *testing.T) {
+	env := setupServiceProposalTest(t)
+	resetMocks(&env.paymentAccountRepo.Mock, &env.serviceRepo.Mock)
+	env.paymentAccountRepo.
+		On("FindByProviderID", mock.Anything, validProviderID, paymentaccount.PaymentProvider("mercado_pago")).
+		Return(nil, assert.AnError).
+		Once()
+
+	proposal, err := env.newService().CreateServiceProposal(
+		t.Context(), validProviderAuth0ID, validConsumerID, validServiceAmount,
+		validServiceScheduledOn, validServiceDescription,
+	)
+
+	require.ErrorIs(t, err, assert.AnError)
+	assert.ErrorContains(t, err, "finding provider payment account")
+	assert.Nil(t, proposal)
+	env.serviceRepo.AssertNotCalled(t, "Save", mock.Anything)
+	env.paymentAccountRepo.AssertExpectations(t)
+}
+
 func TestCreateServiceProposal(t *testing.T) {
-	env := setupServiceProposalTest()
+	env := setupServiceProposalTest(t)
 	service := env.newService()
 
 	serviceProposal, err := service.CreateServiceProposal(
@@ -150,7 +250,7 @@ func TestCreateServiceProposal(t *testing.T) {
 }
 
 func TestAcceptServiceProposalCreatesScheduledWorkOrder(t *testing.T) {
-	env := setupServiceProposalTest()
+	env := setupServiceProposalTest(t)
 	now := time.Date(2026, time.July, 4, 13, 0, 0, 0, time.UTC)
 	proposal := validSavedServiceProposal()
 	proposal.ScheduledOn = now.Add(time.Hour)
@@ -186,7 +286,7 @@ func TestAcceptServiceProposalCreatesScheduledWorkOrder(t *testing.T) {
 }
 
 func TestAcceptServiceProposalNotifiesProviderAfterSavingNotification(t *testing.T) {
-	env := setupServiceProposalTest()
+	env := setupServiceProposalTest(t)
 	now := time.Date(2026, time.July, 4, 13, 0, 0, 0, time.UTC)
 	proposal := validSavedServiceProposal()
 	proposal.ScheduledOn = now.Add(time.Hour)
@@ -238,7 +338,7 @@ func TestAcceptServiceProposalNotifiesProviderAfterSavingNotification(t *testing
 }
 
 func TestCreateProposalShouldPersist(t *testing.T) {
-	env := setupServiceProposalTest()
+	env := setupServiceProposalTest(t)
 	resetMocks(&env.serviceRepo.Mock)
 	env.serviceRepo.
 		On("Save", mock.AnythingOfType("*serviceproposal.ServiceProposal")).
@@ -261,7 +361,7 @@ func TestCreateProposalShouldPersist(t *testing.T) {
 }
 
 func TestCreateServiceProposalWithNoConversation(t *testing.T) {
-	env := setupServiceProposalTest()
+	env := setupServiceProposalTest(t)
 	resetMocks(&env.conversationRepo.Mock)
 	env.conversationRepo.
 		On("FindBetween", validConsumerID, validProviderID).
@@ -286,7 +386,7 @@ func TestCreateServiceProposalWithNoConversation(t *testing.T) {
 	env.conversationRepo.AssertExpectations(t)
 }
 func TestCreationOfProposalShouldCreateNotification(t *testing.T) {
-	env := setupServiceProposalTest()
+	env := setupServiceProposalTest(t)
 	resetMocks(&env.notificationRepo.Mock)
 	env.notificationRepo.
 		On("Save", mock.Anything, mock.MatchedBy(func(notif *notification.Notification) bool {
@@ -310,7 +410,7 @@ func TestCreationOfProposalShouldCreateNotification(t *testing.T) {
 }
 
 func TestCreationOfProposalShouldNotifyAfterSavingNotification(t *testing.T) {
-	env := setupServiceProposalTest()
+	env := setupServiceProposalTest(t)
 	savedNotification := &notification.Notification{ID: 1, UserID: validConsumerID, ResourceID: validSavedServiceProposal().ID}
 	resetMocks(&env.notificationRepo.Mock, &env.notificator.Mock)
 	env.notificationRepo.
@@ -333,7 +433,7 @@ func TestCreationOfProposalShouldNotifyAfterSavingNotification(t *testing.T) {
 }
 
 func TestCreationOfProposalShouldNotNotifyWhenNotificationCannotBeSaved(t *testing.T) {
-	env := setupServiceProposalTest()
+	env := setupServiceProposalTest(t)
 	resetMocks(&env.notificationRepo.Mock, &env.notificator.Mock)
 	env.notificationRepo.
 		On("Save", mock.Anything, mock.AnythingOfType("*notification.Notification")).
@@ -371,7 +471,11 @@ func TestGetServiceProposalsWithoutServiceProposals(t *testing.T) {
 
 	fileURLResolver := new(MockFileURLResolver)
 	fileURLResolver.On("ResolvePublicURLs", mock.Anything, mock.Anything).Return(map[string]string{}, nil)
-	service := serviceproposal.NewService(serviceRepo, workOrderRepo, userRepo, conversationRepo, notificationRepo, nil, fileURLResolver, clock)
+	paymentAccountRepo := new(MockPaymentAccountRepository)
+	service := serviceproposal.NewService(
+		serviceRepo, workOrderRepo, userRepo, conversationRepo, notificationRepo,
+		nil, fileURLResolver, paymentAccountRepo, paymentaccount.PaymentProvider("mercado_pago"), clock,
+	)
 
 	serviceProposals, err := service.GetServiceProposals(t.Context(), validProviderAuth0ID)
 
@@ -381,7 +485,7 @@ func TestGetServiceProposalsWithoutServiceProposals(t *testing.T) {
 }
 
 func TestConsumerGetsPendingServiceProposal(t *testing.T) {
-	env := setupServiceProposalTest()
+	env := setupServiceProposalTest(t)
 	expectedProposal := &serviceproposal.ServiceProposal{
 		ID:          1,
 		Provider:    &provider.Provider{BaseUser: user.RehydrateBaseUser(validProviderID, "", "", "Juan", "Gomez", provider.Role, &filedomain.Image{FileID: "provider-photo"})},

@@ -160,6 +160,15 @@ func NewDependenciesWithPaymentAccountAdapters(
 		fileService,
 	)
 	userService := user.NewService(persistence.UserRepository, fileService)
+	paymentAccountService := paymentaccount.NewService(
+		persistence.UserRepository,
+		persistence.AuthorizationAttemptRepository,
+		persistence.PaymentAccountRepository,
+		paymentAccountOAuthConnector,
+		credentialProtector,
+		secretGenerator,
+		systemClock,
+	)
 	servicePorposalService := serviceproposal.NewService(
 		persistence.ServiceProposalRepository,
 		persistence.WorkOrderRepository,
@@ -168,6 +177,8 @@ func NewDependenciesWithPaymentAccountAdapters(
 		persistence.NotificationRepository,
 		notificator,
 		fileService,
+		persistence.PaymentAccountRepository,
+		paymentAccountOAuthConnector.Provider(),
 		systemClock)
 	workOrderService := workorder.NewService(
 		persistence.WorkOrderRepository,
@@ -175,15 +186,6 @@ func NewDependenciesWithPaymentAccountAdapters(
 		fileService,
 		persistence.NotificationRepository,
 		notificator,
-		systemClock,
-	)
-	paymentAccountService := paymentaccount.NewService(
-		persistence.UserRepository,
-		persistence.AuthorizationAttemptRepository,
-		persistence.PaymentAccountRepository,
-		paymentAccountOAuthConnector,
-		credentialProtector,
-		secretGenerator,
 		systemClock,
 	)
 	urgentWorkOrderScheduler := scheduler.NewScheduler(time.Hour, workOrderService)
