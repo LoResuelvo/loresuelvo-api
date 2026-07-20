@@ -1,4 +1,3 @@
-@wip
 Feature: Conectar cuenta de Mercado Pago durante el registro de prestador
     Como prestador
     quiero conectar mi cuenta de Mercado Pago durante mi registro
@@ -21,6 +20,7 @@ Feature: Conectar cuenta de Mercado Pago durante el registro de prestador
             And el prestador "juan.plomero@example.com" queda habilitado para recibir pagos
             And el prestador "juan.plomero@example.com" queda habilitado para enviar propuestas de servicio
 
+        @wip
         Scenario: 35.3.2-CMP No duplicar la conexión de una cuenta ya vinculada al mismo prestador
             Given que la cuenta de Mercado Pago "mp-juan" ya está vinculada al prestador "juan.plomero@example.com"
             And que estoy autenticado como prestador "juan.plomero@example.com"
@@ -31,6 +31,7 @@ Feature: Conectar cuenta de Mercado Pago durante el registro de prestador
 
     Rule: La conexión es obligatoria para completar la habilitación comercial del prestador
 
+        @wip
         Scenario: 35.3.3-CMP Mantener incompleta la habilitación mientras no se conecte Mercado Pago
             Given que existe un consumidor registrado con correo "ana@example.com", nombre "Ana" y apellido "Pérez"
             And que existe un chat activo entre el consumidor "ana@example.com" y el prestador "juan.plomero@example.com" con el mensaje inicial:
@@ -43,6 +44,7 @@ Feature: Conectar cuenta de Mercado Pago durante el registro de prestador
             Then el sistema informa que la conexión de Mercado Pago está pendiente
             And la propuesta de servicio no se envía
 
+        @wip
         Scenario: 35.3.4-CMP Conservar el registro cuando el prestador rechaza la autorización
             Given que estoy autenticado como prestador "juan.plomero@example.com"
             When inicio la conexión de mi cuenta de Mercado Pago
@@ -54,6 +56,7 @@ Feature: Conectar cuenta de Mercado Pago durante el registro de prestador
 
     Rule: Cada cuenta de Mercado Pago sólo puede pertenecer a un prestador de LoResuelvo
 
+        @wip
         Scenario: 35.3.5-CMP Rechazar una cuenta de Mercado Pago vinculada a otro prestador
             Given existe un prestador registrado con correo "pedro.plomero@example.com", nombre "Pedro", apellido "López" y rubro "Plomería"
             And que la cuenta de Mercado Pago "mp-pedro" está vinculada al prestador "pedro.plomero@example.com"
@@ -65,6 +68,7 @@ Feature: Conectar cuenta de Mercado Pago durante el registro de prestador
 
     Rule: La respuesta de autorización debe corresponder a una conexión iniciada por el prestador
 
+        @wip
         Scenario: 35.3.6-CMP Rechazar una respuesta de autorización con estado de seguridad inválido
             Given que estoy autenticado como prestador "juan.plomero@example.com"
             And que inicié la conexión de mi cuenta de Mercado Pago
@@ -73,6 +77,7 @@ Feature: Conectar cuenta de Mercado Pago durante el registro de prestador
             And el sistema no vincula ninguna cuenta de Mercado Pago al prestador
             And la conexión de Mercado Pago permanece pendiente
 
+        @wip
         Scenario: 35.3.7-CMP Rechazar una autorización que ya no puede utilizarse
             Given que estoy autenticado como prestador "juan.plomero@example.com"
             And que inicié la conexión de mi cuenta de Mercado Pago
@@ -83,6 +88,7 @@ Feature: Conectar cuenta de Mercado Pago durante el registro de prestador
 
     Rule: Sólo el prestador autenticado puede iniciar la conexión
 
+        @wip
         Scenario: 35.3.8-CMP Rechazar el inicio de conexión por un consumidor
             Given que existe un consumidor registrado con correo "ana@example.com", nombre "Ana" y apellido "Pérez"
             And que estoy autenticado como consumidor "ana@example.com"
@@ -92,6 +98,7 @@ Feature: Conectar cuenta de Mercado Pago durante el registro de prestador
 
     Rule: La cuenta de Mercado Pago debe estar habilitada para recibir pagos de marketplace
 
+        @wip
         Scenario: 35.3.9-CMP Rechazar una cuenta que no puede recibir pagos de marketplace
             Given que estoy autenticado como prestador "juan.plomero@example.com"
             And que la cuenta de Mercado Pago "mp-juan" no está habilitada para recibir pagos de marketplace
