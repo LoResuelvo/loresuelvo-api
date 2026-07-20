@@ -64,7 +64,6 @@ Feature: Conectar cuenta de Mercado Pago durante el registro de prestador
 
     Rule: La respuesta de autorización debe corresponder a una conexión iniciada por el prestador
 
-        @wip
         Scenario: 35.3.6-CMP Rechazar una respuesta de autorización con estado de seguridad inválido
             Given que estoy autenticado como prestador "juan.plomero@example.com"
             And que inicié la conexión de mi cuenta de Mercado Pago
@@ -73,7 +72,6 @@ Feature: Conectar cuenta de Mercado Pago durante el registro de prestador
             And el sistema no vincula ninguna cuenta de Mercado Pago al prestador
             And la conexión de Mercado Pago permanece pendiente
 
-        @wip
         Scenario: 35.3.7-CMP Rechazar una autorización que ya no puede utilizarse
             Given que estoy autenticado como prestador "juan.plomero@example.com"
             And que inicié la conexión de mi cuenta de Mercado Pago
@@ -84,7 +82,6 @@ Feature: Conectar cuenta de Mercado Pago durante el registro de prestador
 
     Rule: Sólo el prestador autenticado puede iniciar la conexión
 
-        @wip
         Scenario: 35.3.8-CMP Rechazar el inicio de conexión por un consumidor
             Given que existe un consumidor registrado con correo "ana@example.com", nombre "Ana" y apellido "Pérez"
             And que estoy autenticado como consumidor "ana@example.com"
@@ -94,7 +91,6 @@ Feature: Conectar cuenta de Mercado Pago durante el registro de prestador
 
     Rule: La cuenta de Mercado Pago debe estar habilitada para recibir pagos de marketplace
 
-        @wip
         Scenario: 35.3.9-CMP Rechazar una cuenta que no puede recibir pagos de marketplace
             Given que estoy autenticado como prestador "juan.plomero@example.com"
             And que la cuenta de Mercado Pago "mp-juan" no está habilitada para recibir pagos de marketplace
