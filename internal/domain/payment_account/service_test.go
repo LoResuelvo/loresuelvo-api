@@ -91,10 +91,12 @@ func (stub *oauthConnectorStub) ExchangeAuthorizationCode(_ context.Context, cod
 }
 
 type repositoryStub struct {
-	savedAttempt *paymentaccount.AuthorizationAttempt
-	foundAttempt *paymentaccount.AuthorizationAttempt
-	savedAccount *paymentaccount.PaymentAccount
-	foundAccount *paymentaccount.PaymentAccount
+	savedAttempt    *paymentaccount.AuthorizationAttempt
+	foundAttempt    *paymentaccount.AuthorizationAttempt
+	savedAccount    *paymentaccount.PaymentAccount
+	foundAccount    *paymentaccount.PaymentAccount
+	consumedAttempt *paymentaccount.AuthorizationAttempt
+	consumeErr      error
 }
 
 func (stub *repositoryStub) Save(_ context.Context, attempt *paymentaccount.AuthorizationAttempt) error {
@@ -104,6 +106,11 @@ func (stub *repositoryStub) Save(_ context.Context, attempt *paymentaccount.Auth
 
 func (stub *repositoryStub) FindByStateDigest(_ context.Context, _ []byte) (*paymentaccount.AuthorizationAttempt, error) {
 	return stub.foundAttempt, nil
+}
+
+func (stub *repositoryStub) Consume(_ context.Context, attempt *paymentaccount.AuthorizationAttempt) error {
+	stub.consumedAttempt = attempt
+	return stub.consumeErr
 }
 
 func (stub *repositoryStub) SaveFromAuthorization(_ context.Context, _ int, account *paymentaccount.PaymentAccount) error {
@@ -116,6 +123,71 @@ func (stub *repositoryStub) FindByProviderID(_ context.Context, _ int, _ payment
 		return nil, paymentaccount.ErrConnectionNotFound
 	}
 	return stub.foundAccount, nil
+}
+
+func TestRejectAuthorizationConsumesMatchingAttemptWithoutConnectingAccount(t *testing.T) {
+	attempt := paymentaccount.NewAuthorizationAttempt(
+		providerID,
+		paymentaccount.PaymentProvider("mercado_pago"),
+		[]byte("stored-state-digest"),
+		[]byte("encrypted:pkce-verifier"),
+		fixedNow.Add(10*time.Minute),
+	)
+	repository := &repositoryStub{foundAttempt: attempt}
+	oauthConnector := &oauthConnectorStub{}
+	credentialProtector := &credentialProtectorStub{}
+	service := paymentaccount.NewService(
+		userFinderStub{}, repository, repository, oauthConnector,
+		credentialProtector, &secretGeneratorStub{}, clockStub{},
+	)
+
+	err := service.RejectAuthorization(context.Background(), "state-secret")
+
+	require.NoError(t, err)
+	assert.Same(t, attempt, repository.consumedAttempt)
+	assert.Nil(t, repository.savedAccount)
+	assert.Empty(t, oauthConnector.exchangedCode)
+	assert.Empty(t, credentialProtector.decryptedValues)
+}
+
+func TestRejectAuthorizationDoesNotConsumeExpiredAttempt(t *testing.T) {
+	attempt := paymentaccount.NewAuthorizationAttempt(
+		providerID,
+		paymentaccount.PaymentProvider("mercado_pago"),
+		[]byte("stored-state-digest"),
+		[]byte("encrypted:pkce-verifier"),
+		fixedNow,
+	)
+	repository := &repositoryStub{foundAttempt: attempt}
+	service := paymentaccount.NewService(
+		userFinderStub{}, repository, repository, &oauthConnectorStub{},
+		&credentialProtectorStub{}, &secretGeneratorStub{}, clockStub{},
+	)
+
+	err := service.RejectAuthorization(context.Background(), "state-secret")
+
+	require.ErrorIs(t, err, paymentaccount.ErrAuthorizationAttemptExpired)
+	assert.Nil(t, repository.consumedAttempt)
+}
+
+func TestRejectAuthorizationReturnsConsumeError(t *testing.T) {
+	attempt := paymentaccount.NewAuthorizationAttempt(
+		providerID,
+		paymentaccount.PaymentProvider("mercado_pago"),
+		[]byte("stored-state-digest"),
+		[]byte("encrypted:pkce-verifier"),
+		fixedNow.Add(10*time.Minute),
+	)
+	repository := &repositoryStub{foundAttempt: attempt, consumeErr: assert.AnError}
+	service := paymentaccount.NewService(
+		userFinderStub{}, repository, repository, &oauthConnectorStub{},
+		&credentialProtectorStub{}, &secretGeneratorStub{}, clockStub{},
+	)
+
+	err := service.RejectAuthorization(context.Background(), "state-secret")
+
+	require.ErrorIs(t, err, assert.AnError)
+	assert.ErrorContains(t, err, "consuming rejected payment account authorization")
 }
 
 func TestStartAuthorizationRejectsAlreadyConnectedPaymentAccount(t *testing.T) {

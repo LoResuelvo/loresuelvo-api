@@ -47,6 +47,7 @@ type testSuite struct {
 
 	lastStatus                              int
 	lastBody                                []byte
+	lastLocation                            string
 	currentAuth0ID                          string
 	lastConversationID                      int
 	lastJobRequestID                        int
@@ -229,7 +230,8 @@ func newTestSuite(tb testing.TB, database *sql.DB) *testSuite {
 		credentialCipher,
 		cryptography.NewSecureSecretGenerator(),
 		payment_account_handler.Config{
-			ConnectionSuccessURL: "http://frontend.loresuelvo.test/provider/register/mercado-pago?result=success",
+			ConnectionSuccessURL:   "http://frontend.loresuelvo.test/provider/register/mercado-pago?result=success",
+			ConnectionCancelledURL: "http://frontend.loresuelvo.test/provider/register/mercado-pago?result=cancelled",
 		},
 	)
 	auth0Validator := auth0.NewFakeValidator()

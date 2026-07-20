@@ -173,11 +173,21 @@ func (suite *testSuite) authorizeLoResuelvoForMercadoPagoAccount(accountID strin
 }
 
 func (suite *testSuite) rejectLoResuelvoMercadoPagoAuthorization() error {
-	return suite.requestMercadoPagoCallback(url.Values{
+	if err := suite.requestMercadoPagoCallback(url.Values{
 		"error":             []string{"access_denied"},
 		"error_description": []string{"The provider denied authorization"},
 		"state":             []string{suite.lastMercadoPagoOAuthState},
-	})
+	}); err != nil {
+		return err
+	}
+	if err := suite.lastResponseShouldHaveStatusCode(http.StatusSeeOther); err != nil {
+		return err
+	}
+	expectedLocation := "http://frontend.loresuelvo.test/provider/register/mercado-pago?result=cancelled"
+	if suite.lastLocation != expectedLocation {
+		return fmt.Errorf("expected rejected authorization redirect to %q, got %q", expectedLocation, suite.lastLocation)
+	}
+	return nil
 }
 
 func (suite *testSuite) tryReconnectMercadoPagoAccount(_ string) error {
@@ -398,6 +408,7 @@ func (suite *testSuite) requestMercadoPago(method, path string, authenticated bo
 
 	suite.lastStatus = response.StatusCode
 	suite.lastBody = responseBody
+	suite.lastLocation = response.Header.Get("Location")
 	return nil
 }
 

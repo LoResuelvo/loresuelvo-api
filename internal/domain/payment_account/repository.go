@@ -14,6 +14,7 @@ type UserRepository interface {
 type AuthorizationAttemptRepository interface {
 	Save(ctx context.Context, attempt *AuthorizationAttempt) error
 	FindByStateDigest(ctx context.Context, stateDigest []byte) (*AuthorizationAttempt, error)
+	Consume(ctx context.Context, attempt *AuthorizationAttempt) error
 }
 
 type PaymentAccountRepository interface {

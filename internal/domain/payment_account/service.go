@@ -96,15 +96,9 @@ func (service *Service) CompleteAuthorization(ctx context.Context, state, code s
 		return nil, ErrAuthorizationCodeRequired
 	}
 
-	attempt, err := service.authorizationAttemptRepository.FindByStateDigest(ctx, stateDigest(state))
+	attempt, err := service.findActiveAuthorizationAttempt(ctx, state)
 	if err != nil {
 		return nil, err
-	}
-	if attempt.IsExpired(service.clock.Now()) {
-		return nil, ErrAuthorizationAttemptExpired
-	}
-	if attempt.PaymentProvider != service.oauthConnector.Provider() {
-		return nil, ErrPaymentProviderMismatch
 	}
 
 	codeVerifier, err := service.credentialProtector.Decrypt(attempt.CodeVerifierCiphertext)
@@ -146,6 +140,35 @@ func (service *Service) CompleteAuthorization(ctx context.Context, state, code s
 		return nil, fmt.Errorf("completing payment account authorization: %w", err)
 	}
 	return account, nil
+}
+
+func (service *Service) RejectAuthorization(ctx context.Context, state string) error {
+	state = strings.TrimSpace(state)
+	if state == "" {
+		return ErrAuthorizationStateRequired
+	}
+	attempt, err := service.findActiveAuthorizationAttempt(ctx, state)
+	if err != nil {
+		return err
+	}
+	if err := service.authorizationAttemptRepository.Consume(ctx, attempt); err != nil {
+		return fmt.Errorf("consuming rejected payment account authorization: %w", err)
+	}
+	return nil
+}
+
+func (service *Service) findActiveAuthorizationAttempt(ctx context.Context, state string) (*AuthorizationAttempt, error) {
+	attempt, err := service.authorizationAttemptRepository.FindByStateDigest(ctx, stateDigest(state))
+	if err != nil {
+		return nil, err
+	}
+	if attempt.IsExpired(service.clock.Now()) {
+		return nil, ErrAuthorizationAttemptExpired
+	}
+	if attempt.PaymentProvider != service.oauthConnector.Provider() {
+		return nil, ErrPaymentProviderMismatch
+	}
+	return attempt, nil
 }
 
 func (service *Service) GetConnection(ctx context.Context, authID string) (*PaymentAccount, error) {

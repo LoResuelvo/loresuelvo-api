@@ -62,8 +62,20 @@ func (repository *AuthorizationAttemptRepository) FindByStateDigest(ctx context.
 	return &attempt, nil
 }
 
+func (repository *AuthorizationAttemptRepository) Consume(ctx context.Context, attempt *paymentaccount.AuthorizationAttempt) error {
+	return consumeAuthorizationAttempt(ctx, repository.db, attempt.ID, attempt.ProviderID, attempt.PaymentProvider)
+}
+
 func (repository *AuthorizationAttemptRepository) markConsumedWithTx(ctx context.Context, tx *sql.Tx, attemptID, providerID int, paymentProvider paymentaccount.PaymentProvider) error {
-	result, err := tx.ExecContext(
+	return consumeAuthorizationAttempt(ctx, tx, attemptID, providerID, paymentProvider)
+}
+
+type contextExecutor interface {
+	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
+}
+
+func consumeAuthorizationAttempt(ctx context.Context, executor contextExecutor, attemptID, providerID int, paymentProvider paymentaccount.PaymentProvider) error {
+	result, err := executor.ExecContext(
 		ctx,
 		`UPDATE payment_account_authorization_attempts
 		SET consumed_on = NOW()

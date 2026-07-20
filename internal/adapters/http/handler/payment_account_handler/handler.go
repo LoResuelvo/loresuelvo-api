@@ -2,6 +2,7 @@ package payment_account_handler
 
 import (
 	"net/http"
+	"strings"
 
 	httphandler "github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler"
 	paymentaccount "github.com/LoResuelvo/loresuelvo-api/internal/domain/payment_account"
@@ -9,14 +10,16 @@ import (
 )
 
 type PaymentAccountHandler struct {
-	service            *paymentaccount.Service
-	successRedirectURL string
+	service              *paymentaccount.Service
+	successRedirectURL   string
+	cancelledRedirectURL string
 }
 
 func NewPaymentAccountHandler(service *paymentaccount.Service, config Config) *PaymentAccountHandler {
 	return &PaymentAccountHandler{
-		service:            service,
-		successRedirectURL: config.ConnectionSuccessURL,
+		service:              service,
+		successRedirectURL:   config.ConnectionSuccessURL,
+		cancelledRedirectURL: config.ConnectionCancelledURL,
 	}
 }
 
@@ -40,6 +43,20 @@ func (h *PaymentAccountHandler) StartAuthorization(c *gin.Context) {
 }
 
 func (h *PaymentAccountHandler) CompleteAuthorization(c *gin.Context) {
+	providerError := strings.TrimSpace(c.Query("error"))
+	if providerError != "" {
+		if providerError != "access_denied" {
+			httphandler.RespondError(c, http.StatusBadRequest, "payment account authorization failed")
+			return
+		}
+		if err := h.service.RejectAuthorization(c.Request.Context(), c.Query("state")); err != nil {
+			handlePaymentAccountError(c, err)
+			return
+		}
+		c.Redirect(http.StatusSeeOther, h.cancelledRedirectURL)
+		return
+	}
+
 	_, err := h.service.CompleteAuthorization(
 		c.Request.Context(),
 		c.Query("state"),

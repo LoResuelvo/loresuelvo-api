@@ -53,3 +53,23 @@ func TestAuthorizationAttemptRepositoryDoesNotHardcodePaymentProvider(t *testing
 	require.NoError(t, err)
 	assert.Equal(t, paymentaccount.PaymentProvider("uala"), found.PaymentProvider)
 }
+
+func TestAuthorizationAttemptRepositoryConsumesAttemptOnce(t *testing.T) {
+	testContext := newPaymentAccountRepositoryTest(t)
+	stateDigest := bytes.Repeat([]byte{8}, 32)
+	attempt := &paymentaccount.AuthorizationAttempt{
+		ProviderID:             testContext.providerID,
+		PaymentProvider:        paymentaccount.PaymentProvider("mercado_pago"),
+		StateDigest:            stateDigest,
+		CodeVerifierCiphertext: []byte("opaque-pkce-ciphertext"),
+		ExpiresOn:              time.Now().UTC().Add(10 * time.Minute),
+	}
+	require.NoError(t, testContext.attemptStore.Save(context.Background(), attempt))
+
+	err := testContext.attemptStore.Consume(context.Background(), attempt)
+
+	require.NoError(t, err)
+	_, err = testContext.attemptStore.FindByStateDigest(context.Background(), stateDigest)
+	require.ErrorIs(t, err, paymentaccount.ErrAuthorizationAttemptNotFound)
+	require.ErrorIs(t, testContext.attemptStore.Consume(context.Background(), attempt), paymentaccount.ErrAuthorizationAttemptNotFound)
+}
