@@ -10,6 +10,7 @@ import (
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/file_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/job_request_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/payment_account_handler"
+	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/payment_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/provider_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/service_proposal_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/test_handler"
@@ -28,6 +29,7 @@ type RouterConfig struct {
 	ConversationHandler    *conversation_handler.ConversationHandler
 	JobRequestHandler      *job_request_handler.JobRequestHandler
 	PaymentAccountHandler  *payment_account_handler.PaymentAccountHandler
+	PaymentHandler         *payment_handler.PaymentHandler
 	UserHandler            *user_handler.UserHandler
 	FileHandler            *file_handler.FileHandler
 	ServiceProposalHandler *service_proposal_handler.ServiceProposalHandler
@@ -44,6 +46,7 @@ type Router struct {
 	conversationHandler    *conversation_handler.ConversationHandler
 	jobRequestHandler      *job_request_handler.JobRequestHandler
 	paymentAccountHandler  *payment_account_handler.PaymentAccountHandler
+	paymentHandler         *payment_handler.PaymentHandler
 	userHandler            *user_handler.UserHandler
 	fileHandler            *file_handler.FileHandler
 	serviceProposalHandler *service_proposal_handler.ServiceProposalHandler
@@ -61,6 +64,7 @@ func NewRouter(config RouterConfig) *Router {
 		conversationHandler:    config.ConversationHandler,
 		jobRequestHandler:      config.JobRequestHandler,
 		paymentAccountHandler:  config.PaymentAccountHandler,
+		paymentHandler:         config.PaymentHandler,
 		userHandler:            config.UserHandler,
 		fileHandler:            config.FileHandler,
 		serviceProposalHandler: config.ServiceProposalHandler,
@@ -155,6 +159,7 @@ func (router *Router) registerServiceProposalRoutes(engine *gin.Engine, authMidd
 	engine.POST("/service-proposals", authMiddleware, router.serviceProposalHandler.CreateServiceProposal)
 	engine.GET("/service-proposals", authMiddleware, router.serviceProposalHandler.GetServiceProposals)
 	engine.POST("/service-proposals/:serviceProposalID/accept", authMiddleware, router.serviceProposalHandler.AcceptServiceProposal)
+	engine.POST("/service-proposals/:serviceProposalID/checkout-sessions", authMiddleware, router.paymentHandler.StartBookingCheckout)
 }
 
 func (router *Router) registerWorkOrderRoutes(engine *gin.Engine, authMiddleware gin.HandlerFunc) {

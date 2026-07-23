@@ -36,6 +36,10 @@ services:
       PAYMENT_ACCOUNT_PROVIDER: "${PAYMENT_ACCOUNT_PROVIDER:-mercado_pago}"
       PAYMENT_ACCOUNT_CONNECTION_SUCCESS_URL: "${PAYMENT_ACCOUNT_CONNECTION_SUCCESS_URL:-http://localhost:3000/provider/register/mercado-pago?result=success}"
       PAYMENT_ACCOUNT_CONNECTION_CANCELLED_URL: "${PAYMENT_ACCOUNT_CONNECTION_CANCELLED_URL:-http://localhost:3000/provider/register/mercado-pago?result=cancelled}"
+      PAYMENT_CHECKOUT_SUCCESS_URL: "${PAYMENT_CHECKOUT_SUCCESS_URL:-https://frontend.loresuelvo.test/payments/success}"
+      PAYMENT_CHECKOUT_PENDING_URL: "${PAYMENT_CHECKOUT_PENDING_URL:-https://frontend.loresuelvo.test/payments/pending}"
+      PAYMENT_CHECKOUT_FAILURE_URL: "${PAYMENT_CHECKOUT_FAILURE_URL:-https://frontend.loresuelvo.test/payments/failure}"
+      MERCADO_PAGO_NOTIFICATION_URL: "${MERCADO_PAGO_NOTIFICATION_URL:-https://api.loresuelvo.test/webhooks/mercado-pago}"
       # Local-only 32-byte AES key encoded as base64. Override outside local development.
       PAYMENT_ACCOUNT_CREDENTIAL_ENCRYPTION_KEY: "${PAYMENT_ACCOUNT_CREDENTIAL_ENCRYPTION_KEY:-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=}"
     env_file:

@@ -13,6 +13,7 @@ require (
 	github.com/gorilla/websocket v1.5.3
 	github.com/jackc/pgx/v5 v5.9.2
 	github.com/lestrrat-go/jwx/v3 v3.0.13
+	github.com/mercadopago/sdk-go v1.12.0
 	github.com/stretchr/testify v1.11.1
 	google.golang.org/genai v1.60.0
 	gopkg.in/yaml.v3 v3.0.1

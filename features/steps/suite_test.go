@@ -15,6 +15,7 @@ import (
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/cryptography"
 	httpadapter "github.com/LoResuelvo/loresuelvo-api/internal/adapters/http"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/payment_account_handler"
+	paymentmercadopago "github.com/LoResuelvo/loresuelvo-api/internal/adapters/payment/mercadopago"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/payment_account/mercadopago"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/repositories"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/scheduler"
@@ -39,11 +40,13 @@ type testSuite struct {
 	notificationRepository   *repositories.NotificationRepository
 	workOrderRepository      *repositories.WorkOrderRepository
 	paymentAccountRepository *repositories.PaymentAccountRepository
+	paymentIntentRepository  *repositories.PaymentIntentRepository
 	urgentWorkOrderScheduler *scheduler.Scheduler
 	auth0Validator           *validator.Validator
 	tokenBuilder             *auth0.TokenBuilder
 	chatbot                  *chatbotadapter.FakeChatbot
 	clock                    *clockadapter.SystemClock
+	checkoutClient           *paymentmercadopago.FakeCheckoutClient
 
 	lastStatus                              int
 	lastBody                                []byte
@@ -138,6 +141,10 @@ func (s *testSuite) registerAllSteps(sc *godog.ScenarioContext) {
 func (s *testSuite) cleanup() error {
 	s.closeRealtimeConnections()
 
+	if err := s.paymentIntentRepository.DeleteAll(); err != nil {
+		return fmt.Errorf("could not clean payment intents: %w", err)
+	}
+
 	if err := s.paymentAccountRepository.DeleteAll(); err != nil {
 		return fmt.Errorf("could not clean payment accounts: %w", err)
 	}
@@ -180,6 +187,7 @@ func (s *testSuite) cleanup() error {
 	s.lastJobRequestID = 0
 	s.providerProfilePhotoFileID = ""
 	s.chatbot.Reset()
+	s.checkoutClient.Reset()
 	s.chatbotConversationIDs = nil
 	s.chatbotConversationStatuses = nil
 	s.lastChatbotRecommendedCategoryName = ""
@@ -233,10 +241,12 @@ func newTestSuite(tb testing.TB, database *sql.DB) *testSuite {
 		base64.StdEncoding.EncodeToString(bytes.Repeat([]byte{1}, 32)),
 	)
 	require.NoError(tb, err, "could not initialize test credential cipher")
+	checkoutClient := paymentmercadopago.NewFakeCheckoutClient()
 	dependencies := bootstrap.NewDependenciesWithPaymentAccountAdapters(
 		database,
 		chatbot,
 		mercadopago.NewFakeOAuthClient(),
+		checkoutClient,
 		credentialCipher,
 		cryptography.NewSecureSecretGenerator(),
 		payment_account_handler.Config{
@@ -269,11 +279,13 @@ func newTestSuite(tb testing.TB, database *sql.DB) *testSuite {
 		notificationRepository:   dependencies.Persistence.NotificationRepository,
 		workOrderRepository:      dependencies.Persistence.WorkOrderRepository,
 		paymentAccountRepository: dependencies.Persistence.PaymentAccountRepository,
+		paymentIntentRepository:  dependencies.Persistence.PaymentIntentRepository,
 		urgentWorkOrderScheduler: dependencies.UrgentWorkOrderScheduler,
 		auth0Validator:           auth0Validator,
 		tokenBuilder:             tokenBuilder,
 		chatbot:                  chatbot,
 		clock:                    dependencies.Clock,
+		checkoutClient:           checkoutClient,
 
 		categoryIDsByName:                  map[string]int{},
 		participantRolesByFullName:         map[string]string{},

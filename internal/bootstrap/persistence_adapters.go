@@ -19,6 +19,7 @@ type PersistenceAdapters struct {
 	NotificationRepository         *repositories.NotificationRepository
 	WorkOrderRepository            *repositories.WorkOrderRepository
 	PaymentAccountRepository       *repositories.PaymentAccountRepository
+	PaymentIntentRepository        *repositories.PaymentIntentRepository
 	AuthorizationAttemptRepository *repositories.AuthorizationAttemptRepository
 }
 
@@ -36,6 +37,7 @@ func NewPersistenceAdapters(database *sql.DB) *PersistenceAdapters {
 	notificationRepository := repositories.NewNotificationRepository(database)
 	authorizationAttemptRepository := repositories.NewAuthorizationAttemptRepository(database)
 	paymentAccountRepository := repositories.NewPaymentAccountRepository(database, authorizationAttemptRepository)
+	paymentIntentRepository := repositories.NewPaymentIntentRepository(database)
 
 	return &PersistenceAdapters{
 		UserRepository:                 userRepository,
@@ -50,6 +52,7 @@ func NewPersistenceAdapters(database *sql.DB) *PersistenceAdapters {
 		NotificationRepository:         notificationRepository,
 		WorkOrderRepository:            workOrderRepository,
 		PaymentAccountRepository:       paymentAccountRepository,
+		PaymentIntentRepository:        paymentIntentRepository,
 		AuthorizationAttemptRepository: authorizationAttemptRepository,
 	}
 }

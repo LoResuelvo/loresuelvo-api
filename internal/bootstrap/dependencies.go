@@ -16,12 +16,14 @@ import (
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/file_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/job_request_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/payment_account_handler"
+	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/payment_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/provider_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/service_proposal_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/test_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/user_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/work_order_handler"
 	notificationadapter "github.com/LoResuelvo/loresuelvo-api/internal/adapters/notification"
+	mercadopagopayment "github.com/LoResuelvo/loresuelvo-api/internal/adapters/payment/mercadopago"
 	paymentaccountadapter "github.com/LoResuelvo/loresuelvo-api/internal/adapters/payment_account"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/realtime"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/scheduler"
@@ -31,12 +33,14 @@ import (
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/conversation"
 	filedomain "github.com/LoResuelvo/loresuelvo-api/internal/domain/file"
 	jobrequest "github.com/LoResuelvo/loresuelvo-api/internal/domain/job_request"
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/payment"
 	paymentaccount "github.com/LoResuelvo/loresuelvo-api/internal/domain/payment_account"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/provider"
 	serviceproposal "github.com/LoResuelvo/loresuelvo-api/internal/domain/service_proposal"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/user"
 	workorder "github.com/LoResuelvo/loresuelvo-api/internal/domain/work_order"
 	"github.com/auth0/go-jwt-middleware/v3/validator"
+	"github.com/google/uuid"
 )
 
 type Dependencies struct {
@@ -50,6 +54,7 @@ type Dependencies struct {
 	ConversationHandler    *conversation_handler.ConversationHandler
 	JobRequestHandler      *job_request_handler.JobRequestHandler
 	PaymentAccountHandler  *payment_account_handler.PaymentAccountHandler
+	PaymentHandler         *payment_handler.PaymentHandler
 	UserHandler            *user_handler.UserHandler
 	FileHandler            *file_handler.FileHandler
 	ServiceProposalHandler *service_proposal_handler.ServiceProposalHandler
@@ -71,6 +76,7 @@ func (dependencies *Dependencies) RouterConfig(auth0Validator *validator.Validat
 		ConversationHandler:    dependencies.ConversationHandler,
 		JobRequestHandler:      dependencies.JobRequestHandler,
 		PaymentAccountHandler:  dependencies.PaymentAccountHandler,
+		PaymentHandler:         dependencies.PaymentHandler,
 		UserHandler:            dependencies.UserHandler,
 		FileHandler:            dependencies.FileHandler,
 		ServiceProposalHandler: dependencies.ServiceProposalHandler,
@@ -98,10 +104,15 @@ func NewDependenciesWithChatbot(database *sql.DB, chatbot conversation.Chatbot) 
 	if err != nil {
 		return nil, err
 	}
+	checkoutGateway, err := mercadopagopayment.NewCheckoutClientFromEnv()
+	if err != nil {
+		return nil, fmt.Errorf("configuring Mercado Pago checkout: %w", err)
+	}
 	return NewDependenciesWithPaymentAccountAdapters(
 		database,
 		chatbot,
 		paymentAccountOAuthConnector,
+		checkoutGateway,
 		credentialCipher,
 		cryptography.NewSecureSecretGenerator(),
 		paymentAccountHandlerConfig,
@@ -112,6 +123,7 @@ func NewDependenciesWithPaymentAccountAdapters(
 	database *sql.DB,
 	chatbot conversation.Chatbot,
 	paymentAccountOAuthConnector paymentaccount.OAuthConnector,
+	checkoutGateway payment.CheckoutGateway,
 	credentialProtector paymentaccount.CredentialProtector,
 	secretGenerator paymentaccount.SecretGenerator,
 	paymentAccountHandlerConfig payment_account_handler.Config,
@@ -169,6 +181,16 @@ func NewDependenciesWithPaymentAccountAdapters(
 		secretGenerator,
 		systemClock,
 	)
+	paymentService := payment.NewService(
+		persistence.PaymentIntentRepository,
+		persistence.ServiceProposalRepository,
+		persistence.UserRepository,
+		persistence.PaymentAccountRepository,
+		credentialProtector,
+		checkoutGateway,
+		uuid.NewString,
+		systemClock,
+	)
 	servicePorposalService := serviceproposal.NewService(
 		persistence.ServiceProposalRepository,
 		persistence.WorkOrderRepository,
@@ -202,6 +224,7 @@ func NewDependenciesWithPaymentAccountAdapters(
 		ConversationHandler:      conversation_handler.NewConversationHandler(conversationService),
 		JobRequestHandler:        job_request_handler.NewJobRequestHandler(jobRequestService),
 		PaymentAccountHandler:    payment_account_handler.NewPaymentAccountHandler(paymentAccountService, paymentAccountHandlerConfig),
+		PaymentHandler:           payment_handler.NewPaymentHandler(paymentService),
 		UserHandler:              user_handler.NewUserHandler(userService),
 		FileHandler:              file_handler.NewFileHandler(fileService),
 		ServiceProposalHandler:   service_proposal_handler.NewServiceProposalHandler(servicePorposalService),
