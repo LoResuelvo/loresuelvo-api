@@ -9,6 +9,7 @@ required:
   - scheduled_on
   - description
   - status
+  - booking_terms
 properties:
   id:
     type: integer
@@ -34,7 +35,7 @@ properties:
     type: integer
     format: int64
     minimum: 1
-    description: Proposal amount expressed in cents.
+    description: Provider's total service price expressed in cents, excluding the platform fee.
     example: 1500050
   scheduled_on:
     type: string
@@ -50,4 +51,6 @@ properties:
       - accepted
       - rejected
     example: pending
+  booking_terms:
+    $ref: '#/components/schemas/BookingTerms'
 additionalProperties: false

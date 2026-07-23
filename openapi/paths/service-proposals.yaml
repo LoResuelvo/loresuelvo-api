@@ -72,8 +72,20 @@ post:
                 scheduled_on: '2026-07-05T12:30:00Z'
                 description: Reparación de pérdida de agua en cocina con materiales incluidos.
                 status: pending
+                booking_terms:
+                  currency: ARS
+                  service_total_cents: 1500050
+                  deposit_cents: 300010
+                  remaining_service_balance_cents: 1200040
+                  platform_fee_total_cents: 500000
+                  platform_fee_due_now_cents: 100000
+                  remaining_platform_fee_cents: 400000
+                  amount_due_now_cents: 400010
+                  remaining_amount_due_cents: 1600040
+                  contract_total_cents: 2000050
+                  booking_payment_deadline: '2026-07-04T12:30:00Z'
     '400':
-      description: The request body is invalid, required fields are missing, the amount is invalid, or scheduled_on is not in the future.
+      description: The request body is invalid, required fields are missing, the amount is invalid, or scheduled_on does not leave more than 24 hours of booking lead time.
       content:
         application/json:
           schema:
@@ -84,7 +96,10 @@ post:
                 error: Amount must be greater than zero
             invalidScheduledOn:
               value:
-                error: Scheduled date must be in the future
+                error: Scheduled on must be in the future
+            insufficientBookingLeadTime:
+              value:
+                error: Scheduled on must be more than 24 hours in the future
     '401':
       description: Authentication failed or the authenticated user id could not be obtained from the request context.
       content:

@@ -226,6 +226,8 @@ components:
       $ref: ./components/schemas/create-service-proposal-request.yaml
     ServiceProposal:
       $ref: ./components/schemas/service-proposal.yaml
+    BookingTerms:
+      $ref: ./components/schemas/booking-terms.yaml
     WorkOrder:
       $ref: ./components/schemas/work-order.yaml
     WorkOrderSummary:

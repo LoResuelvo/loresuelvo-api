@@ -8,6 +8,7 @@ required:
   - status
   - created_on
   - counterpart
+  - booking_terms
 properties:
   id:
     type: integer
@@ -19,6 +20,7 @@ properties:
     type: integer
     format: int64
     minimum: 1
+    description: Provider's total service price expressed in cents, excluding the platform fee.
   scheduled_on:
     type: string
     format: date-time
@@ -35,3 +37,5 @@ properties:
     format: date-time
   counterpart:
     $ref: '#/components/schemas/ServiceProposalCounterpart'
+  booking_terms:
+    $ref: '#/components/schemas/BookingTerms'

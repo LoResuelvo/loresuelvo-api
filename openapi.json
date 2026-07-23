@@ -2389,7 +2389,20 @@
                                             "amount_cents": 1500050,
                                             "scheduled_on": "2026-07-05T12:30:00Z",
                                             "description": "Reparación de pérdida de agua en cocina con materiales incluidos.",
-                                            "status": "pending"
+                                            "status": "pending",
+                                            "booking_terms": {
+                                                "currency": "ARS",
+                                                "service_total_cents": 1500050,
+                                                "deposit_cents": 300010,
+                                                "remaining_service_balance_cents": 1200040,
+                                                "platform_fee_total_cents": 500000,
+                                                "platform_fee_due_now_cents": 100000,
+                                                "remaining_platform_fee_cents": 400000,
+                                                "amount_due_now_cents": 400010,
+                                                "remaining_amount_due_cents": 1600040,
+                                                "contract_total_cents": 2000050,
+                                                "booking_payment_deadline": "2026-07-04T12:30:00Z"
+                                            }
                                         }
                                     }
                                 }
@@ -2397,7 +2410,7 @@
                         }
                     },
                     "400": {
-                        "description": "The request body is invalid, required fields are missing, the amount is invalid, or scheduled_on is not in the future.",
+                        "description": "The request body is invalid, required fields are missing, the amount is invalid, or scheduled_on does not leave more than 24 hours of booking lead time.",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -2411,7 +2424,12 @@
                                     },
                                     "invalidScheduledOn": {
                                         "value": {
-                                            "error": "Scheduled date must be in the future"
+                                            "error": "Scheduled on must be in the future"
+                                        }
+                                    },
+                                    "insufficientBookingLeadTime": {
+                                        "value": {
+                                            "error": "Scheduled on must be more than 24 hours in the future"
                                         }
                                     }
                                 }
@@ -3879,7 +3897,8 @@
                     "amount_cents",
                     "scheduled_on",
                     "description",
-                    "status"
+                    "status",
+                    "booking_terms"
                 ],
                 "properties": {
                     "id": {
@@ -3910,7 +3929,7 @@
                         "type": "integer",
                         "format": "int64",
                         "minimum": 1,
-                        "description": "Proposal amount expressed in cents.",
+                        "description": "Provider's total service price expressed in cents, excluding the platform fee.",
                         "example": 1500050
                     },
                     "scheduled_on": {
@@ -3930,6 +3949,96 @@
                             "rejected"
                         ],
                         "example": "pending"
+                    },
+                    "booking_terms": {
+                        "$ref": "#/components/schemas/BookingTerms"
+                    }
+                },
+                "additionalProperties": false
+            },
+            "BookingTerms": {
+                "type": "object",
+                "description": "Immutable booking terms captured when the service proposal is created. All amounts are expressed in the smallest currency unit.",
+                "required": [
+                    "currency",
+                    "service_total_cents",
+                    "deposit_cents",
+                    "remaining_service_balance_cents",
+                    "platform_fee_total_cents",
+                    "platform_fee_due_now_cents",
+                    "remaining_platform_fee_cents",
+                    "amount_due_now_cents",
+                    "remaining_amount_due_cents",
+                    "contract_total_cents",
+                    "booking_payment_deadline"
+                ],
+                "properties": {
+                    "currency": {
+                        "type": "string",
+                        "enum": [
+                            "ARS"
+                        ],
+                        "example": "ARS"
+                    },
+                    "service_total_cents": {
+                        "type": "integer",
+                        "format": "int64",
+                        "minimum": 1,
+                        "example": 10000000
+                    },
+                    "deposit_cents": {
+                        "type": "integer",
+                        "format": "int64",
+                        "minimum": 1,
+                        "example": 2000000
+                    },
+                    "remaining_service_balance_cents": {
+                        "type": "integer",
+                        "format": "int64",
+                        "minimum": 0,
+                        "example": 8000000
+                    },
+                    "platform_fee_total_cents": {
+                        "type": "integer",
+                        "format": "int64",
+                        "minimum": 0,
+                        "example": 500000
+                    },
+                    "platform_fee_due_now_cents": {
+                        "type": "integer",
+                        "format": "int64",
+                        "minimum": 0,
+                        "example": 100000
+                    },
+                    "remaining_platform_fee_cents": {
+                        "type": "integer",
+                        "format": "int64",
+                        "minimum": 0,
+                        "example": 400000
+                    },
+                    "amount_due_now_cents": {
+                        "type": "integer",
+                        "format": "int64",
+                        "minimum": 1,
+                        "example": 2100000
+                    },
+                    "remaining_amount_due_cents": {
+                        "type": "integer",
+                        "format": "int64",
+                        "minimum": 0,
+                        "example": 8400000
+                    },
+                    "contract_total_cents": {
+                        "type": "integer",
+                        "format": "int64",
+                        "minimum": 1,
+                        "example": 10500000
+                    },
+                    "booking_payment_deadline": {
+                        "type": "string",
+                        "format": "date-time",
+                        "description": "Immutable deadline for paying the booking deposit, fixed 24 hours before the scheduled service.",
+                        "example": "2026-07-04T12:30:00Z"
                     }
                 },
                 "additionalProperties": false
@@ -4849,7 +4958,8 @@
                     "description",
                     "status",
                     "created_on",
-                    "counterpart"
+                    "counterpart",
+                    "booking_terms"
                 ],
                 "properties": {
                     "id": {
@@ -4863,7 +4973,8 @@
                     "amount_cents": {
                         "type": "integer",
                         "format": "int64",
-                        "minimum": 1
+                        "minimum": 1,
+                        "description": "Provider's total service price expressed in cents, excluding the platform fee."
                     },
                     "scheduled_on": {
                         "type": "string",
@@ -4886,6 +4997,9 @@
                     },
                     "counterpart": {
                         "$ref": "#/components/schemas/ServiceProposalCounterpart"
+                    },
+                    "booking_terms": {
+                        "$ref": "#/components/schemas/BookingTerms"
                     }
                 }
             },
