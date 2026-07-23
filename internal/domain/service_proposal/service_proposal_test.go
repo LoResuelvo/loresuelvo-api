@@ -33,6 +33,35 @@ func TestInvalidTime(t *testing.T) {
 	assert.Nil(t, serviceProposal)
 }
 
+func TestServiceProposalRequiresMoreThanTwentyFourHoursLeadTime(t *testing.T) {
+	now := time.Date(2026, time.July, 4, 13, 0, 0, 0, time.UTC)
+	testCases := map[string]time.Time{
+		"exactly twenty-four hours":   now.Add(24 * time.Hour),
+		"less than twenty-four hours": now.Add(24*time.Hour - time.Second),
+	}
+
+	for name, scheduledOn := range testCases {
+		t.Run(name, func(t *testing.T) {
+			clock := new(MockClock)
+			clock.On("Now").Return(now).Once()
+
+			proposal, err := serviceproposal.NewServiceProposal(
+				validProvider,
+				validConsumer,
+				validConversation,
+				scheduledOn,
+				validServiceDescription,
+				validBookingTerms(),
+				clock,
+			)
+
+			assert.ErrorIs(t, err, serviceproposal.ErrInsufficientBookingLeadTime)
+			assert.Nil(t, proposal)
+			clock.AssertExpectations(t)
+		})
+	}
+}
+
 func TestConversationMustBeAccepted(t *testing.T) {
 	clock := new(MockClock)
 	clock.

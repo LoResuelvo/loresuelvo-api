@@ -11,6 +11,8 @@ import (
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/user"
 )
 
+const minimumBookingLeadTime = 24 * time.Hour
+
 type Status string
 
 const (
@@ -127,8 +129,12 @@ func (sp *ServiceProposal) CounterpartFor(authID string) (user.User, error) {
 }
 
 func validateParameters(scheduledOn time.Time, clock clock.Clock) error {
-	if scheduledOn.Before(clock.Now()) {
+	now := clock.Now()
+	if !scheduledOn.After(now) {
 		return ErrInvalidScheduledOn
+	}
+	if !scheduledOn.After(now.Add(minimumBookingLeadTime)) {
+		return ErrInsufficientBookingLeadTime
 	}
 
 	return nil

@@ -322,7 +322,10 @@ func (suite *testSuite) currentAndRemainingPaymentsAddUpTo(amount string) error 
 }
 
 func (suite *testSuite) systemRejectsProposalWithoutBookingLeadTime() error {
-	return suite.conversationRequestShouldFailWithStatus(http.StatusBadRequest)
+	if err := suite.lastResponseShouldHaveStatusCode(http.StatusBadRequest); err != nil {
+		return err
+	}
+	return suite.lastErrorResponseShouldSay(serviceproposal.ErrInsufficientBookingLeadTime.Error())
 }
 
 func (suite *testSuite) bookingPaymentDeadlineIs(expected string) error {

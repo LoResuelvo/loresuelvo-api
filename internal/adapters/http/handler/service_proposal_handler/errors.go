@@ -10,7 +10,9 @@ import (
 )
 
 func handleCreateServiceProposalError(c *gin.Context, err error) {
-	if errors.Is(err, serviceproposal.ErrInvalidAmount) || errors.Is(err, serviceproposal.ErrInvalidScheduledOn) {
+	if errors.Is(err, serviceproposal.ErrInvalidAmount) ||
+		errors.Is(err, serviceproposal.ErrInvalidScheduledOn) ||
+		errors.Is(err, serviceproposal.ErrInsufficientBookingLeadTime) {
 		httphandler.RespondError(c, http.StatusBadRequest, err.Error())
 		return
 	}

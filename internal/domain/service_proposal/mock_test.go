@@ -22,7 +22,7 @@ var (
 	validProviderAuth0ID          = "provider-auth0-id"
 	validServiceDescription       = "Service description"
 	validServiceAmount      int64 = 1000
-	validServiceScheduledOn       = time.Now().Add(time.Hour)
+	validServiceScheduledOn       = time.Now().Add(25 * time.Hour)
 	validConversation             = &conversation.WorkConversation{BaseConversation: conversation.NewBaseConversation(conversation.TypeWork, conversation.StatusActive)}
 )
 

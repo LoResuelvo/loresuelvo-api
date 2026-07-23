@@ -101,7 +101,7 @@ func TestServiceProposalRepositorySavesAcceptanceWithWorkOrderAtomically(t *test
 		&provider.Provider{BaseUser: user.RehydrateBaseUser(providerID, "", "", "", "", "", nil)},
 		&consumer.Consumer{BaseUser: user.RehydrateBaseUser(consumerID, "", "", "", "", "", nil)},
 		activeConversation,
-		time.Now().Add(24*time.Hour).UTC().Truncate(time.Microsecond),
+		time.Now().Add(25*time.Hour).UTC().Truncate(time.Microsecond),
 		"Reparacion de perdida de agua.",
 		bookingTermsForAmount(t, 1500050),
 		clockadapter.NewSystemClock(),
@@ -174,7 +174,7 @@ func TestServiceProposalRepositoryCanSave(t *testing.T) {
 	require.NoError(t, activeConversation.Activate())
 	activeConversation, err = testContext.conversationRepository.SaveConversation(context.Background(), activeConversation)
 	require.NoError(t, err)
-	scheduledOn := time.Now().Add(24 * time.Hour).UTC().Truncate(time.Microsecond)
+	scheduledOn := time.Now().Add(25 * time.Hour).UTC().Truncate(time.Microsecond)
 	proposalToSave, err := serviceproposal.NewServiceProposal(
 		&provider.Provider{BaseUser: user.RehydrateBaseUser(providerID, "", "", "", "", "", nil)},
 		&consumer.Consumer{BaseUser: user.RehydrateBaseUser(consumerID, "", "", "", "", "", nil)},
@@ -276,7 +276,7 @@ func TestServiceProposalRepositoryFindsPendingProposalForConsumer(t *testing.T) 
 		&provider.Provider{BaseUser: user.RehydrateBaseUser(providerID, "", "", "", "", "", nil)},
 		&consumer.Consumer{BaseUser: user.RehydrateBaseUser(consumerID, "", "", "", "", "", nil)},
 		activeConversation,
-		time.Now().Add(24*time.Hour).UTC().Truncate(time.Microsecond),
+		time.Now().Add(25*time.Hour).UTC().Truncate(time.Microsecond),
 		"Reparacion de perdida de agua en cocina con materiales incluidos.",
 		bookingTermsForAmount(t, 1500050),
 		clockadapter.NewSystemClock(),
