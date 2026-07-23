@@ -17,7 +17,7 @@ Feature: Crear propuesta de servicio
             Hola Juan, necesito reparar una pérdida de agua en la cocina. ¿Podrías ayudarme esta semana?
             """
         And que estoy autenticado como prestador "juan.plomero@example.com"
-        When envío una propuesta de servicio al consumidor "ana@example.com" por "15000.50" para la fecha y hora "2026-07-05T09:30:00-03:00" con la descripción:
+        When envío una propuesta de servicio al consumidor "ana@example.com" por "15000.50" para la fecha y hora "2026-07-06T09:30:00-03:00" con la descripción:
             """
             Reparación de pérdida de agua en cocina con materiales incluidos.
             """
@@ -32,7 +32,7 @@ Feature: Crear propuesta de servicio
             """
         And que el consumidor "ana@example.com" está disponible para recibir mensajes en tiempo real
         And que estoy autenticado como prestador "juan.plomero@example.com"
-        When envío una propuesta de servicio al consumidor "ana@example.com" por "15000.50" para la fecha y hora "2026-07-05T09:30:00-03:00" con la descripción:
+        When envío una propuesta de servicio al consumidor "ana@example.com" por "15000.50" para la fecha y hora "2026-07-06T09:30:00-03:00" con la descripción:
             """
             Reparación de pérdida de agua en cocina con materiales incluidos.
             """
@@ -46,7 +46,7 @@ Feature: Crear propuesta de servicio
             Hola Juan, necesito reparar una pérdida de agua en la cocina. ¿Podrías ayudarme esta semana?
             """
         And que estoy autenticado como prestador "juan.plomero@example.com"
-        When intento enviar una propuesta de servicio al consumidor "ana@example.com" por "0.00" para la fecha y hora "2026-07-05T09:30:00-03:00" con la descripción:
+        When intento enviar una propuesta de servicio al consumidor "ana@example.com" por "0.00" para la fecha y hora "2026-07-06T09:30:00-03:00" con la descripción:
             """
             Reparación de pérdida de agua en cocina con materiales incluidos.
             """
@@ -59,7 +59,7 @@ Feature: Crear propuesta de servicio
             Hola Pedro, necesito arreglar una canilla del baño.
             """
         And que estoy autenticado como prestador "juan.plomero@example.com"
-        When intento enviar una propuesta de servicio al consumidor "carla@example.com" por "15000.50" para la fecha y hora "2026-07-05T09:30:00-03:00" con la descripción:
+        When intento enviar una propuesta de servicio al consumidor "carla@example.com" por "15000.50" para la fecha y hora "2026-07-06T09:30:00-03:00" con la descripción:
             """
             Reparación de pérdida de agua en cocina con materiales incluidos.
             """
@@ -67,7 +67,7 @@ Feature: Crear propuesta de servicio
 
     Scenario: 53.5-PSP El prestador crear una propuesta de servicio a un consumidor con el que no tiene conversación
         Given que estoy autenticado como prestador "juan.plomero@example.com"
-        When intento enviar una propuesta de servicio al consumidor "ana@example.com" por "15000.50" para la fecha y hora "2026-07-05T09:30:00-03:00" con la descripción:
+        When intento enviar una propuesta de servicio al consumidor "ana@example.com" por "15000.50" para la fecha y hora "2026-07-06T09:30:00-03:00" con la descripción:
             """
             Reparación de pérdida de agua en cocina con materiales incluidos.
             """
@@ -79,7 +79,7 @@ Feature: Crear propuesta de servicio
             Hola Juan, necesito reparar una pérdida de agua en la cocina. ¿Podrías ayudarme esta semana?
             """
         And que estoy autenticado como prestador "juan.plomero@example.com"
-        When intento enviar una propuesta de servicio al consumidor "ana@example.com" por "15000.50" para la fecha y hora "2026-07-05T09:30:00-03:00" con la descripción:
+        When intento enviar una propuesta de servicio al consumidor "ana@example.com" por "15000.50" para la fecha y hora "2026-07-06T09:30:00-03:00" con la descripción:
             """
             Reparación de pérdida de agua en cocina con materiales incluidos.
             """
@@ -107,3 +107,59 @@ Feature: Crear propuesta de servicio
         And que estoy autenticado como prestador "juan.plomero@example.com"
         When intento enviar una propuesta de servicio al consumidor "ana@example.com" con falta de parámetros
         Then el sistema rechaza la propuesta de servicio porque faltan parámetros obligatorios
+
+    Rule: Se congelan los términos económicos al crear la propuesta aplicando una seña del veinte por ciento y una comisión total fija de cinco mil pesos
+
+        Background:
+            Given que existe un chat activo entre el consumidor "ana@example.com" y el prestador "juan.plomero@example.com"
+
+        @wip
+        Scenario: 53.9-PSP Calcular la seña y la comisión de la propuesta
+            Given que estoy autenticado como prestador "juan.plomero@example.com"
+            When envío una propuesta con precio total de servicio de "100000.00" pesos para la fecha y hora "2026-07-06T10:00:00-03:00"
+            Then el sistema registra la propuesta de servicio
+            And la propuesta conserva el siguiente desglose en pesos argentinos:
+                | concepto                              | monto     |
+                | precio total del servicio              | 100000.00 |
+                | seña del prestador                     | 20000.00  |
+                | saldo del servicio                     | 80000.00  |
+                | comisión total de LoResuelvo           | 5000.00   |
+                | comisión de LoResuelvo cobrada ahora   | 1000.00   |
+                | comisión de LoResuelvo pendiente       | 4000.00   |
+                | total a pagar ahora                    | 21000.00  |
+                | saldo total a pagar más adelante       | 84000.00  |
+                | total de la contratación               | 105000.00 |
+
+        @wip
+        Scenario: 53.10-PSP Redondear cada tramo inicial al centavo más cercano
+            Given que estoy autenticado como prestador "juan.plomero@example.com"
+            When envío una propuesta con precio total de servicio de "100000.03" pesos para la fecha y hora "2026-07-06T10:00:00-03:00"
+            Then el sistema registra la propuesta de servicio
+            And la propuesta conserva una seña del prestador de "20000.01" pesos
+            And la propuesta conserva una comisión de LoResuelvo cobrada ahora de "1000.00" pesos
+            And la propuesta conserva un total a pagar ahora de "21000.01" pesos
+            And la propuesta conserva un saldo total a pagar más adelante de "84000.02" pesos
+            And la suma del pago actual y el saldo posterior es "105000.03" pesos
+
+    Rule: La fecha programada debe dejar tiempo para pagar al menos un día antes
+
+        Background:
+            Given que existe un chat activo entre el consumidor "ana@example.com" y el prestador "juan.plomero@example.com"
+
+        @wip
+        Scenario Outline: 53.12-PSP Rechazar una propuesta que <caso>
+            Given que estoy autenticado como prestador "juan.plomero@example.com"
+            When intento enviar una propuesta con precio total de servicio de "100000.00" pesos para la fecha y hora "<fecha y hora programada>"
+            Then el sistema rechaza la propuesta porque no deja tiempo para pagar al menos un día antes
+
+            Examples:
+                | caso                                      | fecha y hora programada          |
+                | está programada exactamente a veinticuatro horas | 2026-07-05T10:00:00-03:00   |
+                | está programada a menos de veinticuatro horas    | 2026-07-05T09:59:59-03:00   |
+
+        @wip
+        Scenario: 53.14-PSP Admitir una propuesta que deja más de veinticuatro horas
+            Given que estoy autenticado como prestador "juan.plomero@example.com"
+            When envío una propuesta con precio total de servicio de "100000.00" pesos para la fecha y hora "2026-07-05T11:00:00-03:00"
+            Then el sistema registra la propuesta de servicio
+            And el límite para pagar la seña queda fijado en "2026-07-04T11:00:00-03:00"
