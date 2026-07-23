@@ -144,7 +144,6 @@ Feature: Crear propuesta de servicio
                 | está programada exactamente a veinticuatro horas | 2026-07-05T10:00:00-03:00   |
                 | está programada a menos de veinticuatro horas    | 2026-07-05T09:59:59-03:00   |
 
-        @wip
         Scenario: 53.14-PSP Admitir una propuesta que deja más de veinticuatro horas
             Given que estoy autenticado como prestador "juan.plomero@example.com"
             When envío una propuesta con precio total de servicio de "100000.00" pesos para la fecha y hora "2026-07-05T11:00:00-03:00"
