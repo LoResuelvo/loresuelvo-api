@@ -35,7 +35,6 @@ Feature: Contratar un servicio mediante el pago de una seña
 
     Rule: La vigencia de la URL de checkout es de treinta minutos o hasta el límite de pago de la propuesta, lo que ocurra primero
 
-        @wip
         Scenario Outline: 21.2-CSP Establecer la vigencia del checkout cuando <caso>
             Given que existe una propuesta de servicio pendiente de "juan.plomero@example.com" para "ana@example.com" programada para "2026-07-06T10:00:00-03:00"
             And que la fecha y hora actual del sistema es "<fecha y hora actual>"
