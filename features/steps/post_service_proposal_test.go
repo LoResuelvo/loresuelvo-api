@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 
 	httphandler "github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler"
@@ -23,14 +24,29 @@ type serviceProposalCreationRequest struct {
 }
 
 type serviceProposalCreationResponse struct {
-	ID             int       `json:"id"`
-	ConversationID int       `json:"conversation_id"`
-	ConsumerID     int       `json:"consumer_id"`
-	ProviderID     int       `json:"provider_id"`
-	AmountCents    int64     `json:"amount_cents"`
-	ScheduledOn    time.Time `json:"scheduled_on"`
-	Description    string    `json:"description"`
-	Status         string    `json:"status"`
+	ID             int                  `json:"id"`
+	ConversationID int                  `json:"conversation_id"`
+	ConsumerID     int                  `json:"consumer_id"`
+	ProviderID     int                  `json:"provider_id"`
+	AmountCents    int64                `json:"amount_cents"`
+	ScheduledOn    time.Time            `json:"scheduled_on"`
+	Description    string               `json:"description"`
+	Status         string               `json:"status"`
+	BookingTerms   bookingTermsResponse `json:"booking_terms"`
+}
+
+type bookingTermsResponse struct {
+	Currency                     string    `json:"currency"`
+	ServiceTotalCents            int64     `json:"service_total_cents"`
+	DepositCents                 int64     `json:"deposit_cents"`
+	RemainingServiceBalanceCents int64     `json:"remaining_service_balance_cents"`
+	PlatformFeeTotalCents        int64     `json:"platform_fee_total_cents"`
+	PlatformFeeDueNowCents       int64     `json:"platform_fee_due_now_cents"`
+	RemainingPlatformFeeCents    int64     `json:"remaining_platform_fee_cents"`
+	AmountDueNowCents            int64     `json:"amount_due_now_cents"`
+	RemainingAmountDueCents      int64     `json:"remaining_amount_due_cents"`
+	ContractTotalCents           int64     `json:"contract_total_cents"`
+	BookingPaymentDeadline       time.Time `json:"booking_payment_deadline"`
 }
 
 type realtimeNotificationEvent struct {
@@ -53,12 +69,22 @@ func registerPostServiceProposalSteps(sc *godog.ScenarioContext, suite *testSuit
 	sc.Step(`^envío una propuesta de servicio al consumidor "([^"]*)" por "([^"]*)" para la fecha y hora "([^"]*)" con la descripción:$`, suite.sendServiceProposalToConsumerForDateTimeWithDescription)
 	sc.Step(`^intento enviar una propuesta de servicio al consumidor "([^"]*)" por "([^"]*)" para la fecha y hora "([^"]*)" con la descripción:$`, suite.trySendServiceProposalToConsumerForDateTimeWithDescription)
 	sc.Step(`^intento enviar una propuesta de servicio al consumidor "([^"]*)" con falta de parámetros$`, suite.trySendServiceProposalToConsumerWithMissingParameters)
+	sc.Step(`^envío una propuesta con precio total de servicio de "([^"]*)" pesos para la fecha y hora "([^"]*)"$`, suite.sendServiceProposalWithServiceTotal)
+	sc.Step(`^intento enviar una propuesta con precio total de servicio de "([^"]*)" pesos para la fecha y hora "([^"]*)"$`, suite.trySendServiceProposalWithServiceTotal)
 	sc.Step(`^el sistema registra la propuesta de servicio$`, suite.systemRegistersServiceProposal)
 	sc.Step(`^el consumidor "([^"]*)" recibe en tiempo real la notificación de propuesta de servicio$`, suite.consumerReceivesRealtimeServiceProposalNotification)
 	sc.Step(`^el sistema rechaza la propuesta de servicio porque el monto es inválido$`, suite.systemRejectsServiceProposalBecauseAmountIsInvalid)
 	sc.Step(`^el sistema rechaza la propuesta de servicio porque no existe un chat activo con ese consumidor$`, suite.systemRejectsServiceProposalBecauseActiveChatIsRequired)
 	sc.Step(`^el sistema rechaza la propuesta de servicio porque la fecha y hora debe ser futura$`, suite.systemRejectsServiceProposalBecauseScheduledOnMustBeFuture)
 	sc.Step(`^el sistema rechaza la propuesta de servicio porque faltan parámetros obligatorios$`, suite.systemRejectsServiceProposalBecauseRequiredParametersAreMissing)
+	sc.Step(`^la propuesta conserva el siguiente desglose en pesos argentinos:$`, suite.serviceProposalKeepsPricingBreakdown)
+	sc.Step(`^la propuesta conserva una seña del prestador de "([^"]*)" pesos$`, suite.serviceProposalKeepsDeposit)
+	sc.Step(`^la propuesta conserva una comisión de LoResuelvo cobrada ahora de "([^"]*)" pesos$`, suite.serviceProposalKeepsPlatformFeeDueNow)
+	sc.Step(`^la propuesta conserva un total a pagar ahora de "([^"]*)" pesos$`, suite.serviceProposalKeepsAmountDueNow)
+	sc.Step(`^la propuesta conserva un saldo total a pagar más adelante de "([^"]*)" pesos$`, suite.serviceProposalKeepsRemainingAmountDue)
+	sc.Step(`^la suma del pago actual y el saldo posterior es "([^"]*)" pesos$`, suite.currentAndRemainingPaymentsAddUpTo)
+	sc.Step(`^el sistema rechaza la propuesta porque no deja tiempo para pagar al menos un día antes$`, suite.systemRejectsProposalWithoutBookingLeadTime)
+	sc.Step(`^el límite para pagar la seña queda fijado en "([^"]*)"$`, suite.bookingPaymentDeadlineIs)
 }
 
 func (suite *testSuite) systemDateTimeIs(currentDateTime string) error {
@@ -86,6 +112,18 @@ func (suite *testSuite) trySendServiceProposalToConsumerWithMissingParameters(co
 	return suite.requestServiceProposal(serviceProposalCreationRequest{ConsumerID: consumerID})
 }
 
+func (suite *testSuite) sendServiceProposalWithServiceTotal(amount, scheduledOn string) error {
+	return suite.requestServiceProposalToConsumer("ana@example.com", serviceProposalPayload{
+		amount:      amount,
+		scheduledOn: scheduledOn,
+		description: defaultServiceProposalDescription,
+	})
+}
+
+func (suite *testSuite) trySendServiceProposalWithServiceTotal(amount, scheduledOn string) error {
+	return suite.sendServiceProposalWithServiceTotal(amount, scheduledOn)
+}
+
 func (suite *testSuite) systemRegistersServiceProposal() error {
 	if err := suite.lastResponseShouldHaveStatusCode(http.StatusCreated); err != nil {
 		return err
@@ -98,6 +136,7 @@ func (suite *testSuite) systemRegistersServiceProposal() error {
 	if response.ID == 0 {
 		return fmt.Errorf("expected created service proposal id, got body %s", string(suite.lastBody))
 	}
+	suite.lastServiceProposalID = response.ID
 
 	expectedConversation, err := suite.conversationRepository.FindByID(context.Background(), suite.lastConversationID)
 	if err != nil {
@@ -204,6 +243,178 @@ func (suite *testSuite) systemRejectsServiceProposalBecauseScheduledOnMustBeFutu
 
 func (suite *testSuite) systemRejectsServiceProposalBecauseRequiredParametersAreMissing() error {
 	return suite.conversationRequestShouldFailWithStatus(http.StatusBadRequest)
+}
+
+func (suite *testSuite) serviceProposalKeepsPricingBreakdown(table *godog.Table) error {
+	terms, err := suite.bookingTermsForLastServiceProposal()
+	if err != nil {
+		return err
+	}
+	expected, err := bookingPricingTableInCents(table)
+	if err != nil {
+		return err
+	}
+
+	actual := map[string]int64{
+		"precio total del servicio":            terms.ServiceTotalCents,
+		"seña del prestador":                   terms.DepositCents,
+		"saldo del servicio":                   terms.RemainingServiceBalanceCents,
+		"comisión total de LoResuelvo":         terms.PlatformFeeTotalCents,
+		"comisión de LoResuelvo cobrada ahora": terms.PlatformFeeDueNowCents,
+		"comisión de LoResuelvo pendiente":     terms.RemainingPlatformFeeCents,
+		"total a pagar ahora":                  terms.AmountDueNowCents,
+		"saldo total a pagar más adelante":     terms.RemainingAmountDueCents,
+		"total de la contratación":             terms.ContractTotalCents,
+	}
+	for concept, expectedCents := range expected {
+		actualCents, exists := actual[concept]
+		if !exists {
+			return fmt.Errorf("unsupported booking pricing concept %q", concept)
+		}
+		if actualCents != expectedCents {
+			return fmt.Errorf("expected %s to be %d cents, got %d", concept, expectedCents, actualCents)
+		}
+	}
+	if terms.Currency != "ARS" {
+		return fmt.Errorf("expected booking terms currency %q, got %q", "ARS", terms.Currency)
+	}
+	return nil
+}
+
+func (suite *testSuite) serviceProposalKeepsDeposit(amount string) error {
+	return suite.assertLastBookingAmount("deposit", amount, func(terms bookingTermsResponse) int64 {
+		return terms.DepositCents
+	})
+}
+
+func (suite *testSuite) serviceProposalKeepsPlatformFeeDueNow(amount string) error {
+	return suite.assertLastBookingAmount("platform fee due now", amount, func(terms bookingTermsResponse) int64 {
+		return terms.PlatformFeeDueNowCents
+	})
+}
+
+func (suite *testSuite) serviceProposalKeepsAmountDueNow(amount string) error {
+	return suite.assertLastBookingAmount("amount due now", amount, func(terms bookingTermsResponse) int64 {
+		return terms.AmountDueNowCents
+	})
+}
+
+func (suite *testSuite) serviceProposalKeepsRemainingAmountDue(amount string) error {
+	return suite.assertLastBookingAmount("remaining amount due", amount, func(terms bookingTermsResponse) int64 {
+		return terms.RemainingAmountDueCents
+	})
+}
+
+func (suite *testSuite) currentAndRemainingPaymentsAddUpTo(amount string) error {
+	expected, err := httphandler.ParseAmountToCents(amount)
+	if err != nil {
+		return err
+	}
+	terms, err := suite.bookingTermsForLastServiceProposal()
+	if err != nil {
+		return err
+	}
+	actual := terms.AmountDueNowCents + terms.RemainingAmountDueCents
+	if actual != expected {
+		return fmt.Errorf("expected current and remaining payments to add up to %d cents, got %d", expected, actual)
+	}
+	return nil
+}
+
+func (suite *testSuite) systemRejectsProposalWithoutBookingLeadTime() error {
+	return suite.conversationRequestShouldFailWithStatus(http.StatusBadRequest)
+}
+
+func (suite *testSuite) bookingPaymentDeadlineIs(expected string) error {
+	expectedTime, err := time.Parse(time.RFC3339, expected)
+	if err != nil {
+		return fmt.Errorf("parsing expected booking payment deadline: %w", err)
+	}
+	terms, err := suite.bookingTermsForLastServiceProposal()
+	if err != nil {
+		return err
+	}
+	if !terms.BookingPaymentDeadline.Equal(expectedTime.UTC()) {
+		return fmt.Errorf(
+			"expected booking payment deadline %s, got %s",
+			expectedTime.UTC().Format(time.RFC3339),
+			terms.BookingPaymentDeadline.Format(time.RFC3339),
+		)
+	}
+	return nil
+}
+
+func (suite *testSuite) assertLastBookingAmount(name, amount string, value func(bookingTermsResponse) int64) error {
+	expected, err := httphandler.ParseAmountToCents(amount)
+	if err != nil {
+		return err
+	}
+	terms, err := suite.bookingTermsForLastServiceProposal()
+	if err != nil {
+		return err
+	}
+	actual := value(terms)
+	if actual != expected {
+		return fmt.Errorf("expected %s to be %d cents, got %d", name, expected, actual)
+	}
+	return nil
+}
+
+func (suite *testSuite) bookingTermsForLastServiceProposal() (bookingTermsResponse, error) {
+	if suite.lastServiceProposalID == 0 {
+		return bookingTermsResponse{}, fmt.Errorf("expected a created service proposal")
+	}
+	if suite.lastBookingTermsProposalID == suite.lastServiceProposalID {
+		return suite.lastBookingTerms, nil
+	}
+
+	previousStatus := suite.lastStatus
+	previousBody := append([]byte(nil), suite.lastBody...)
+	if err := suite.requestMyServiceProposals(); err != nil {
+		return bookingTermsResponse{}, err
+	}
+	proposals, err := suite.serviceProposalSummaryResponsesShouldHaveStatusCode(http.StatusOK)
+	suite.lastStatus = previousStatus
+	suite.lastBody = previousBody
+	if err != nil {
+		return bookingTermsResponse{}, err
+	}
+	for _, proposal := range proposals {
+		if proposal.ID == suite.lastServiceProposalID {
+			suite.lastBookingTermsProposalID = proposal.ID
+			suite.lastBookingTerms = proposal.BookingTerms
+			return proposal.BookingTerms, nil
+		}
+	}
+	return bookingTermsResponse{}, fmt.Errorf("expected service proposal %d in authenticated proposal list", suite.lastServiceProposalID)
+}
+
+func bookingPricingTableInCents(table *godog.Table) (map[string]int64, error) {
+	if table == nil || len(table.Rows) < 2 {
+		return nil, fmt.Errorf("expected booking pricing table with a header and at least one value")
+	}
+	if len(table.Rows[0].Cells) != 2 ||
+		strings.TrimSpace(table.Rows[0].Cells[0].Value) != "concepto" ||
+		strings.TrimSpace(table.Rows[0].Cells[1].Value) != "monto" {
+		return nil, fmt.Errorf("expected booking pricing table headers concepto and monto")
+	}
+
+	values := make(map[string]int64, len(table.Rows)-1)
+	for _, row := range table.Rows[1:] {
+		if len(row.Cells) != 2 {
+			return nil, fmt.Errorf("expected exactly two cells per booking pricing row")
+		}
+		concept := strings.TrimSpace(row.Cells[0].Value)
+		if _, duplicated := values[concept]; duplicated {
+			return nil, fmt.Errorf("duplicated booking pricing concept %q", concept)
+		}
+		cents, err := httphandler.ParseAmountToCents(strings.TrimSpace(row.Cells[1].Value))
+		if err != nil {
+			return nil, fmt.Errorf("parsing booking pricing amount for %q: %w", concept, err)
+		}
+		values[concept] = cents
+	}
+	return values, nil
 }
 
 type serviceProposalPayload struct {

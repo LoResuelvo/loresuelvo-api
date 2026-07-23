@@ -34,6 +34,7 @@ type serviceProposalSummaryResponse struct {
 	Status         string                             `json:"status"`
 	CreatedOn      time.Time                          `json:"created_on"`
 	Counterpart    serviceProposalCounterpartResponse `json:"counterpart"`
+	BookingTerms   bookingTermsResponse               `json:"booking_terms"`
 }
 
 type serviceProposalCounterpartResponse struct {

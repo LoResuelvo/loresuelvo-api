@@ -86,6 +86,12 @@ type testSuite struct {
 	serviceProposalFixtures                 map[int]serviceProposalFixture
 	workOrdersByServiceProposalID           map[int][]workOrderResponse
 	lastMercadoPagoOAuthState               string
+	lastPaymentIntentID                     string
+	previousPaymentIntentID                 string
+	lastCheckoutResponse                    checkoutSessionResponse
+	concurrentCheckoutResponses             []checkoutHTTPResponse
+	lastBookingTermsProposalID              int
+	lastBookingTerms                        bookingTermsResponse
 
 	categoryIDsByName              map[string]int
 	lastProviderFilterCategoryName string
@@ -204,6 +210,12 @@ func (s *testSuite) cleanup() error {
 	s.serviceProposalFixtures = map[int]serviceProposalFixture{}
 	s.workOrdersByServiceProposalID = map[int][]workOrderResponse{}
 	s.lastMercadoPagoOAuthState = ""
+	s.lastPaymentIntentID = ""
+	s.previousPaymentIntentID = ""
+	s.lastCheckoutResponse = checkoutSessionResponse{}
+	s.concurrentCheckoutResponses = nil
+	s.lastBookingTermsProposalID = 0
+	s.lastBookingTerms = bookingTermsResponse{}
 	return nil
 }
 

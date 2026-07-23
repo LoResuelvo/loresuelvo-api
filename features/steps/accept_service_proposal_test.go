@@ -7,15 +7,45 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
+	"sync"
 	"time"
 
+	httphandler "github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/repositories"
 	serviceproposal "github.com/LoResuelvo/loresuelvo-api/internal/domain/service_proposal"
 	workorder "github.com/LoResuelvo/loresuelvo-api/internal/domain/work_order"
 	"github.com/cucumber/godog"
 )
 
-const workOrderStatusScheduled = "scheduled"
+const (
+	workOrderStatusScheduled    = "scheduled"
+	checkoutReadyStatus         = "checkout_ready"
+	bookingDepositCheckoutPath  = "/service-proposals/%d/checkout-sessions"
+	paymentIntentPath           = "/payment-intents/%s"
+	defaultBookingCurrency      = "ARS"
+	defaultBookingProviderEmail = "juan.plomero@example.com"
+	defaultBookingConsumerEmail = "ana@example.com"
+)
+
+type checkoutSessionResponse struct {
+	PaymentIntentID string               `json:"payment_intent_id"`
+	Status          string               `json:"status"`
+	CheckoutURL     string               `json:"checkout_url"`
+	ExpiresOn       time.Time            `json:"expires_on"`
+	Pricing         bookingTermsResponse `json:"pricing"`
+}
+
+type paymentIntentResponse struct {
+	ID     string `json:"id"`
+	Status string `json:"status"`
+}
+
+type checkoutHTTPResponse struct {
+	Status int
+	Body   []byte
+	Value  checkoutSessionResponse
+}
 
 type workOrderResponse struct {
 	ID                int       `json:"id"`
@@ -30,100 +60,144 @@ type workOrderResponse struct {
 }
 
 func registerAcceptServiceProposalSteps(sc *godog.ScenarioContext, suite *testSuite) {
-	sc.Step(`^confirmo la propuesta de servicio pendiente$`, suite.confirmPendingServiceProposal)
-	sc.Step(`^intento confirmar la propuesta de servicio pendiente$`, suite.tryConfirmPendingServiceProposal)
-	sc.Step(`^intento confirmar la propuesta de servicio pendiente de "([^"]*)"$`, suite.tryConfirmPendingServiceProposalForConsumer)
-	sc.Step(`^intento confirmar nuevamente la propuesta de servicio aceptada$`, suite.tryConfirmPendingServiceProposal)
-	sc.Step(`^intento confirmar la propuesta de servicio rechazada$`, suite.tryConfirmPendingServiceProposal)
-	sc.Step(`^confirmo una de las propuestas de servicio pendientes$`, suite.confirmOnePendingServiceProposal)
+	sc.Step(`^que existe una propuesta de servicio pendiente de "([^"]*)" para "([^"]*)" programada para "([^"]*)"$`, suite.thereIsPendingServiceProposalScheduledOn)
+	sc.Step(`^que existe una propuesta de servicio pendiente de "([^"]*)" para "([^"]*)" por "([^"]*)" programada para "([^"]*)"$`, suite.thereIsPendingServiceProposalForAmountScheduledOn)
+	sc.Step(`^que "([^"]*)" inició el checkout de la seña de una propuesta pendiente de "([^"]*)"$`, suite.consumerStartedCheckoutForPendingProposal)
+	sc.Step(`^que inicié el checkout de la seña de la propuesta$`, suite.startedCheckoutForPreparedProposal)
+	sc.Step(`^que existe una propuesta de servicio pendiente de "([^"]*)" para "([^"]*)" con un intento de pago rechazado$`, suite.thereIsPendingProposalWithRejectedPayment)
 	sc.Step(`^que existe una propuesta de servicio aceptada de "([^"]*)" para "([^"]*)"$`, suite.thereIsAcceptedServiceProposal)
 	sc.Step(`^que existe una propuesta de servicio rechazada de "([^"]*)" para "([^"]*)"$`, suite.thereIsRejectedServiceProposal)
-	sc.Step(`^que existen dos propuestas de servicio pendientes de "([^"]*)" para "([^"]*)"$`, suite.thereAreTwoPendingServiceProposals)
+	sc.Step(`^que el límite para pagar la seña era "([^"]*)"$`, suite.bookingPaymentDeadlineWas)
+	sc.Step(`^que un primer pago aprobado ya confirmó la propuesta y generó su orden de trabajo$`, suite.firstApprovedPaymentConfirmedProposal)
+	sc.Step(`^que el pago aprobado de la seña confirmó la propuesta y generó su orden de trabajo$`, suite.approvedPaymentConfirmedProposal)
+	sc.Step(`^que la credencial de Mercado Pago de "([^"]*)" venció$`, suite.mercadoPagoCredentialExpired)
+	sc.Step(`^que su autorización permite renovarla$`, suite.mercadoPagoCredentialCanBeRefreshed)
+	sc.Step(`^que Mercado Pago rechaza su renovación$`, suite.mercadoPagoRejectsCredentialRefresh)
+
+	sc.Step(`^solicito pagar la seña de la propuesta de servicio pendiente$`, suite.requestPendingProposalCheckout)
+	sc.Step(`^"([^"]*)" solicita nuevamente pagar la seña de la propuesta$`, suite.consumerRequestsCheckoutAgain)
+	sc.Step(`^intento pagar la seña de la propuesta de servicio pendiente de "([^"]*)"$`, suite.tryPayPendingProposalForConsumer)
+	sc.Step(`^intento pagar la seña de la propuesta de servicio pendiente$`, suite.tryPayPendingProposal)
+	sc.Step(`^intento pagar la seña de la propuesta de servicio aceptada$`, suite.tryPayAcceptedProposal)
+	sc.Step(`^intento pagar la seña de la propuesta de servicio rechazada$`, suite.tryPayRejectedProposal)
+	sc.Step(`^solicito pagar la seña de la propuesta$`, suite.requestPreparedProposalCheckout)
+	sc.Step(`^solicito concurrentemente dos veces pagar la seña de la propuesta$`, suite.requestCheckoutConcurrentlyTwice)
+	sc.Step(`^el sistema procesa una notificación válida de Mercado Pago y verifica un pago aprobado por "([^"]*)" pesos argentinos para esa seña$`, suite.processApprovedPaymentForAmount)
+	sc.Step(`^el sistema procesa una notificación válida de Mercado Pago y verifica un pago aprobado para esa seña$`, suite.processApprovedPayment)
+	sc.Step(`^el sistema procesa una notificación válida de Mercado Pago y verifica un pago en proceso para esa seña$`, suite.processProcessingPayment)
+	sc.Step(`^el sistema procesa dos veces la misma notificación válida de Mercado Pago y verifica el pago aprobado$`, suite.processSameApprovedPaymentNotificationTwice)
+	sc.Step(`^el sistema procesa una notificación válida de Mercado Pago y verifica que el pago se aprobó en "([^"]*)"$`, suite.processPaymentApprovedOn)
+	sc.Step(`^el sistema procesa una notificación válida de Mercado Pago y verifica un segundo pago aprobado para la misma seña$`, suite.processSecondApprovedPayment)
+	sc.Step(`^el sistema procesa una notificación válida de Mercado Pago y verifica (una devolución|un contracargo) del pago de la seña$`, suite.processPaymentReversal)
+
+	sc.Step(`^el sistema entrega una URL para completar el checkout de la seña$`, suite.systemReturnsBookingCheckoutURL)
+	sc.Step(`^el sistema entrega una URL para completar un nuevo checkout$`, suite.systemReturnsNewCheckoutURL)
+	sc.Step(`^el sistema entrega una URL HTTPS de Checkout Pro$`, suite.systemReturnsHTTPSCheckoutProURL)
+	sc.Step(`^la respuesta identifica el intento de pago en estado "([^"]*)"$`, suite.responseIdentifiesPaymentIntentWithStatus)
+	sc.Step(`^la respuesta identifica un nuevo intento de pago en estado "([^"]*)"$`, suite.responseIdentifiesNewPaymentIntentWithStatus)
+	sc.Step(`^la respuesta informa el siguiente desglose en pesos argentinos:$`, suite.checkoutResponseIncludesPricingBreakdown)
+	sc.Step(`^la respuesta informa que la sesión de checkout vence en "([^"]*)"$`, suite.checkoutSessionExpiresOn)
+	sc.Step(`^el intento de pago puede consultarse en estado "([^"]*)"$`, suite.paymentIntentCanBeReadWithStatus)
 	sc.Step(`^la propuesta de servicio queda aceptada$`, suite.serviceProposalIsAccepted)
-	sc.Step(`^la propuesta de servicio confirmada queda aceptada$`, suite.serviceProposalIsAccepted)
+	sc.Step(`^la propuesta de servicio permanece aceptada$`, suite.serviceProposalRemainsAccepted)
 	sc.Step(`^la propuesta de servicio permanece pendiente$`, suite.serviceProposalRemainsPending)
-	sc.Step(`^la otra propuesta de servicio permanece pendiente$`, suite.otherServiceProposalRemainsPending)
 	sc.Step(`^el sistema registra una única orden de trabajo programada$`, suite.systemRegistersOneScheduledWorkOrder)
-	sc.Step(`^la orden de trabajo queda vinculada a la propuesta aceptada$`, suite.workOrderIsLinkedToAcceptedServiceProposal)
-	sc.Step(`^la orden de trabajo conserva el consumidor, el prestador, el monto, la fecha y hora y la descripción acordados$`, suite.workOrderKeepsAgreedTerms)
-	sc.Step(`^el prestador "([^"]*)" recibe en tiempo real la notificación de propuesta de servicio aceptada$`, suite.providerReceivesAcceptedServiceProposalNotification)
-	sc.Step(`^el sistema deniega la confirmación de la propuesta de servicio$`, suite.systemDeniesServiceProposalConfirmation)
-	sc.Step(`^el sistema rechaza confirmar una propuesta de servicio ya aceptada$`, suite.systemRejectsAlreadyAcceptedServiceProposal)
-	sc.Step(`^el sistema rechaza confirmar una propuesta de servicio rechazada$`, suite.systemRejectsRejectedServiceProposal)
-	sc.Step(`^el sistema rechaza la confirmación porque la propuesta de servicio está vencida$`, suite.systemRejectsExpiredServiceProposal)
+	sc.Step(`^el sistema registra una única orden de trabajo para la propuesta$`, suite.systemKeepsOneWorkOrderForServiceProposal)
 	sc.Step(`^el sistema conserva una única orden de trabajo para la propuesta$`, suite.systemKeepsOneWorkOrderForServiceProposal)
-	sc.Step(`^el sistema registra una única orden de trabajo para la propuesta aceptada$`, suite.systemRegistersOneWorkOrderForAcceptedProposal)
 	sc.Step(`^el sistema no registra una orden de trabajo para la propuesta$`, suite.systemDoesNotRegisterWorkOrderForServiceProposal)
+	sc.Step(`^la orden de trabajo queda vinculada a la propuesta aceptada$`, suite.workOrderIsLinkedToAcceptedServiceProposal)
+	sc.Step(`^la orden de trabajo conserva el consumidor, el prestador, el precio del servicio, la fecha y hora y la descripción acordados$`, suite.workOrderKeepsAgreedTerms)
+	sc.Step(`^el prestador "([^"]*)" recibe en tiempo real la notificación de propuesta de servicio aceptada$`, suite.providerReceivesAcceptedServiceProposalNotification)
+	sc.Step(`^el sistema deniega el pago de la seña$`, suite.systemDeniesBookingDepositPayment)
+	sc.Step(`^el sistema rechaza pagar una propuesta de servicio ya aceptada$`, suite.systemRejectsCheckoutForAcceptedProposal)
+	sc.Step(`^el sistema rechaza pagar una propuesta de servicio rechazada$`, suite.systemRejectsCheckoutForRejectedProposal)
+	sc.Step(`^el sistema rechaza el pago porque finalizó el plazo para confirmar la contratación$`, suite.systemRejectsCheckoutAfterBookingDeadline)
+	sc.Step(`^el sistema conserva un único intento de pago activo para la propuesta$`, suite.systemKeepsOneActivePaymentIntent)
+	sc.Step(`^el sistema conserva una única sesión de checkout activa para la propuesta$`, suite.systemKeepsOneActiveCheckoutSession)
+	sc.Step(`^ambas solicitudes obtienen la misma URL de checkout$`, suite.concurrentRequestsReturnSameCheckoutURL)
+	sc.Step(`^el sistema registra una única transacción para el pago externo$`, suite.systemRegistersOneTransactionForExternalPayment)
+	sc.Step(`^el sistema registra un incidente de pago "([^"]*)"$`, suite.systemRegistersPaymentIncident)
+	sc.Step(`^el sistema registra un incidente de pago "([^"]*)" para el segundo pago$`, suite.systemRegistersPaymentIncidentForSecondPayment)
+	sc.Step(`^la cuenta de pago del prestador permanece conectada$`, suite.providerPaymentAccountRemainsConnected)
+	sc.Step(`^el sistema informa que la cuenta de pago del prestador debe volver a autorizarse$`, suite.systemReportsPaymentAccountReauthorizationRequired)
+	sc.Step(`^la cuenta de pago del prestador queda en estado "([^"]*)"$`, suite.providerPaymentAccountHasStatus)
+	sc.Step(`^el sistema no registra una sesión de checkout activa$`, suite.systemDoesNotRegisterActiveCheckoutSession)
+	sc.Step(`^la orden de trabajo queda marcada como "([^"]*)"$`, suite.workOrderHasStatus)
 }
 
-func (suite *testSuite) confirmPendingServiceProposal() error {
-	return suite.requestServiceProposalAcceptance(suite.lastServiceProposalID)
+func (suite *testSuite) thereIsPendingServiceProposalScheduledOn(providerEmail, consumerEmail, scheduledOn string) error {
+	return suite.thereIsPendingServiceProposalForAmountScheduledOn(providerEmail, consumerEmail, "100000.00", scheduledOn)
 }
 
-func (suite *testSuite) tryConfirmPendingServiceProposal() error {
-	return suite.confirmPendingServiceProposal()
-}
-
-func (suite *testSuite) tryConfirmPendingServiceProposalForConsumer(_ string) error {
-	return suite.confirmPendingServiceProposal()
-}
-
-func (suite *testSuite) confirmOnePendingServiceProposal() error {
-	return suite.confirmPendingServiceProposal()
-}
-
-func (suite *testSuite) requestServiceProposalAcceptance(proposalID int) error {
-	if proposalID == 0 {
-		return fmt.Errorf("expected a prepared service proposal before confirming it")
-	}
-
-	httpReq, err := http.NewRequest(
-		http.MethodPost,
-		fmt.Sprintf("%s/service-proposals/%d/accept", suite.server.URL, proposalID),
-		nil,
-	)
+func (suite *testSuite) thereIsPendingServiceProposalForAmountScheduledOn(providerEmail, consumerEmail, amount, scheduledOn string) error {
+	amountCents, err := httphandler.ParseAmountToCents(amount)
 	if err != nil {
 		return err
 	}
-	if suite.currentAuth0ID != "" {
-		httpReq.Header.Set("Authorization", "Bearer "+suite.tokenBuilder.BuildToken(suite.currentAuth0ID, nil))
-	}
-
-	resp, err := http.DefaultClient.Do(httpReq)
+	scheduledAt, err := time.Parse(time.RFC3339, scheduledOn)
 	if err != nil {
-		return fmt.Errorf("API connection failed: %w", err)
+		return fmt.Errorf("parsing service proposal scheduled_on: %w", err)
 	}
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return fmt.Errorf("failed to read response body: %w", err)
-	}
-
-	suite.lastStatus = resp.StatusCode
-	suite.lastBody = body
-	if resp.StatusCode == http.StatusCreated {
-		workOrder, err := suite.workOrderResponseFromLastBody()
-		if err != nil {
-			return err
-		}
-		suite.workOrdersByServiceProposalID[proposalID] = append(
-			suite.workOrdersByServiceProposalID[proposalID],
-			workOrder,
-		)
-	}
-	return nil
+	return suite.createServiceProposalFixture(
+		providerEmail,
+		consumerEmail,
+		serviceproposal.StatusPending,
+		amountCents,
+		scheduledAt.UTC(),
+		defaultServiceProposalDescription,
+	)
 }
 
-func (suite *testSuite) thereIsAcceptedServiceProposal(providerEmail, consumerEmail string) error {
-	if err := suite.thereIsPendingServiceProposal(providerEmail, consumerEmail); err != nil {
+func (suite *testSuite) consumerStartedCheckoutForPendingProposal(consumerEmail, providerEmail string) error {
+	if err := suite.thereIsPendingServiceProposalForAmountScheduledOn(
+		providerEmail,
+		consumerEmail,
+		"100000.00",
+		"2026-07-06T10:00:00-03:00",
+	); err != nil {
 		return err
 	}
 	suite.currentAuth0ID = auth0IDForConsumerEmail(consumerEmail)
-	if err := suite.requestServiceProposalAcceptance(suite.lastServiceProposalID); err != nil {
+	return suite.startCheckoutForPreparedProposal()
+}
+
+func (suite *testSuite) startedCheckoutForPreparedProposal() error {
+	if suite.currentAuth0ID == "" {
+		suite.currentAuth0ID = auth0IDForConsumerEmail(defaultBookingConsumerEmail)
+	}
+	return suite.startCheckoutForPreparedProposal()
+}
+
+func (suite *testSuite) startCheckoutForPreparedProposal() error {
+	if err := suite.requestPreparedProposalCheckout(); err != nil {
 		return err
 	}
-	return suite.systemRegistersOneScheduledWorkOrder()
+	if suite.lastStatus != http.StatusCreated && suite.lastStatus != http.StatusOK {
+		return fmt.Errorf("preparing checkout: expected status 200 or 201, got %d with body %s", suite.lastStatus, suite.lastBody)
+	}
+	response, err := checkoutSessionResponseFromBody(suite.lastBody)
+	if err != nil {
+		return err
+	}
+	if response.PaymentIntentID == "" {
+		return fmt.Errorf("preparing checkout: response does not include payment_intent_id")
+	}
+	suite.rememberCheckoutResponse(response)
+	return nil
+}
+
+func (suite *testSuite) thereIsPendingProposalWithRejectedPayment(providerEmail, consumerEmail string) error {
+	return godog.ErrPending
+}
+
+func (suite *testSuite) thereIsAcceptedServiceProposal(providerEmail, consumerEmail string) error {
+	if err := suite.consumerStartedCheckoutForPendingProposal(consumerEmail, providerEmail); err != nil {
+		return err
+	}
+	if err := suite.processApprovedPayment(); err != nil {
+		return err
+	}
+	return suite.serviceProposalIsAccepted()
 }
 
 func (suite *testSuite) thereIsRejectedServiceProposal(providerEmail, consumerEmail string) error {
@@ -137,21 +211,363 @@ func (suite *testSuite) thereIsRejectedServiceProposal(providerEmail, consumerEm
 	)
 }
 
-func (suite *testSuite) thereAreTwoPendingServiceProposals(providerEmail, consumerEmail string) error {
-	participants, err := suite.prepareServiceProposalFixtureParticipants(providerEmail, consumerEmail)
+func (suite *testSuite) bookingPaymentDeadlineWas(expected string) error {
+	expectedTime, err := time.Parse(time.RFC3339, expected)
+	if err != nil {
+		return fmt.Errorf("parsing expected booking payment deadline: %w", err)
+	}
+	fixture, exists := suite.serviceProposalFixtures[suite.lastServiceProposalID]
+	if !exists {
+		return fmt.Errorf("expected a prepared service proposal")
+	}
+	actual := fixture.scheduledOn.Add(-24 * time.Hour)
+	if !actual.Equal(expectedTime.UTC()) {
+		return fmt.Errorf("expected prepared proposal payment deadline %s, got %s", expectedTime.UTC(), actual)
+	}
+	return nil
+}
+
+func (suite *testSuite) firstApprovedPaymentConfirmedProposal() error {
+	return suite.prepareConfirmedBooking()
+}
+
+func (suite *testSuite) approvedPaymentConfirmedProposal() error {
+	return suite.prepareConfirmedBooking()
+}
+
+func (suite *testSuite) prepareConfirmedBooking() error {
+	if err := suite.consumerStartedCheckoutForPendingProposal(defaultBookingConsumerEmail, defaultBookingProviderEmail); err != nil {
+		return err
+	}
+	if err := suite.processApprovedPayment(); err != nil {
+		return err
+	}
+	if err := suite.serviceProposalIsAccepted(); err != nil {
+		return err
+	}
+	return suite.systemRegistersOneScheduledWorkOrder()
+}
+
+func (suite *testSuite) mercadoPagoCredentialExpired(providerEmail string) error {
+	return godog.ErrPending
+}
+
+func (suite *testSuite) mercadoPagoCredentialCanBeRefreshed() error {
+	return godog.ErrPending
+}
+
+func (suite *testSuite) mercadoPagoRejectsCredentialRefresh() error {
+	return godog.ErrPending
+}
+
+func (suite *testSuite) requestPendingProposalCheckout() error {
+	return suite.requestPreparedProposalCheckout()
+}
+
+func (suite *testSuite) consumerRequestsCheckoutAgain(consumerEmail string) error {
+	suite.currentAuth0ID = auth0IDForConsumerEmail(consumerEmail)
+	return suite.requestPreparedProposalCheckout()
+}
+
+func (suite *testSuite) tryPayPendingProposalForConsumer(_ string) error {
+	return suite.requestPreparedProposalCheckout()
+}
+
+func (suite *testSuite) tryPayPendingProposal() error {
+	return suite.requestPreparedProposalCheckout()
+}
+
+func (suite *testSuite) tryPayAcceptedProposal() error {
+	return suite.requestPreparedProposalCheckout()
+}
+
+func (suite *testSuite) tryPayRejectedProposal() error {
+	return suite.requestPreparedProposalCheckout()
+}
+
+func (suite *testSuite) requestPreparedProposalCheckout() error {
+	suite.previousPaymentIntentID = suite.lastPaymentIntentID
+	response, err := suite.performCheckoutRequest(suite.lastServiceProposalID)
 	if err != nil {
 		return err
 	}
-	for range 2 {
-		if err := suite.saveServiceProposalFixture(
-			participants,
-			serviceproposal.StatusPending,
-			defaultServiceProposalAmount,
-			defaultServiceProposalScheduledOn,
-			defaultServiceProposalDescription,
-		); err != nil {
-			return err
+	suite.lastStatus = response.Status
+	suite.lastBody = response.Body
+	if response.Value.PaymentIntentID != "" {
+		suite.rememberCheckoutResponse(response.Value)
+	}
+	return nil
+}
+
+// requestServiceProposalAcceptance remains only as fixture support for older
+// WorkOrder scenarios until their setup is migrated with the payment
+// implementation. It is not registered as a step for the booking flow.
+func (suite *testSuite) requestServiceProposalAcceptance(proposalID int) error {
+	if proposalID == 0 {
+		return fmt.Errorf("expected a prepared service proposal before accepting it")
+	}
+	request, err := http.NewRequest(
+		http.MethodPost,
+		fmt.Sprintf("%s/service-proposals/%d/accept", suite.server.URL, proposalID),
+		nil,
+	)
+	if err != nil {
+		return err
+	}
+	if suite.currentAuth0ID != "" {
+		request.Header.Set("Authorization", "Bearer "+suite.tokenBuilder.BuildToken(suite.currentAuth0ID, nil))
+	}
+	response, err := http.DefaultClient.Do(request)
+	if err != nil {
+		return fmt.Errorf("API connection failed: %w", err)
+	}
+	defer response.Body.Close()
+	body, err := io.ReadAll(response.Body)
+	if err != nil {
+		return fmt.Errorf("reading service proposal acceptance response: %w", err)
+	}
+	suite.lastStatus = response.StatusCode
+	suite.lastBody = body
+	if response.StatusCode == http.StatusCreated {
+		var order workOrderResponse
+		if err := json.Unmarshal(body, &order); err != nil {
+			return fmt.Errorf("decoding service proposal acceptance response: %w", err)
 		}
+		suite.workOrdersByServiceProposalID[proposalID] = []workOrderResponse{order}
+	}
+	return nil
+}
+
+func (suite *testSuite) performCheckoutRequest(proposalID int) (checkoutHTTPResponse, error) {
+	if proposalID == 0 {
+		return checkoutHTTPResponse{}, fmt.Errorf("expected a prepared service proposal before requesting checkout")
+	}
+	request, err := http.NewRequest(
+		http.MethodPost,
+		suite.server.URL+fmt.Sprintf(bookingDepositCheckoutPath, proposalID),
+		nil,
+	)
+	if err != nil {
+		return checkoutHTTPResponse{}, err
+	}
+	if suite.currentAuth0ID != "" {
+		request.Header.Set("Authorization", "Bearer "+suite.tokenBuilder.BuildToken(suite.currentAuth0ID, nil))
+	}
+	response, err := http.DefaultClient.Do(request)
+	if err != nil {
+		return checkoutHTTPResponse{}, fmt.Errorf("API connection failed: %w", err)
+	}
+	defer response.Body.Close()
+	body, err := io.ReadAll(response.Body)
+	if err != nil {
+		return checkoutHTTPResponse{}, fmt.Errorf("reading checkout response: %w", err)
+	}
+	result := checkoutHTTPResponse{Status: response.StatusCode, Body: body}
+	if response.StatusCode == http.StatusCreated || response.StatusCode == http.StatusOK {
+		result.Value, err = checkoutSessionResponseFromBody(body)
+		if err != nil {
+			return checkoutHTTPResponse{}, err
+		}
+	}
+	return result, nil
+}
+
+func (suite *testSuite) requestCheckoutConcurrentlyTwice() error {
+	results := make([]checkoutHTTPResponse, 2)
+	errorsByRequest := make([]error, 2)
+	var waitGroup sync.WaitGroup
+	waitGroup.Add(2)
+	for index := range results {
+		go func(index int) {
+			defer waitGroup.Done()
+			results[index], errorsByRequest[index] = suite.performCheckoutRequest(suite.lastServiceProposalID)
+		}(index)
+	}
+	waitGroup.Wait()
+	for index, err := range errorsByRequest {
+		if err != nil {
+			return fmt.Errorf("checkout request %d failed: %w", index+1, err)
+		}
+		if results[index].Status != http.StatusCreated && results[index].Status != http.StatusOK {
+			return fmt.Errorf("checkout request %d returned status %d with body %s", index+1, results[index].Status, results[index].Body)
+		}
+	}
+	suite.concurrentCheckoutResponses = results
+	suite.rememberCheckoutResponse(results[0].Value)
+	return nil
+}
+
+func (suite *testSuite) processApprovedPaymentForAmount(amount string) error {
+	return godog.ErrPending
+}
+
+func (suite *testSuite) processApprovedPayment() error {
+	return godog.ErrPending
+}
+
+func (suite *testSuite) processProcessingPayment() error {
+	return godog.ErrPending
+}
+
+func (suite *testSuite) processSameApprovedPaymentNotificationTwice() error {
+	return godog.ErrPending
+}
+
+func (suite *testSuite) processPaymentApprovedOn(approvedOn string) error {
+	return godog.ErrPending
+}
+
+func (suite *testSuite) processSecondApprovedPayment() error {
+	return godog.ErrPending
+}
+
+func (suite *testSuite) processPaymentReversal(reversal string) error {
+	return godog.ErrPending
+}
+
+func (suite *testSuite) systemReturnsBookingCheckoutURL() error {
+	return suite.assertCheckoutURL(false)
+}
+
+func (suite *testSuite) systemReturnsNewCheckoutURL() error {
+	return suite.assertCheckoutURL(false)
+}
+
+func (suite *testSuite) systemReturnsHTTPSCheckoutProURL() error {
+	return suite.assertCheckoutURL(true)
+}
+
+func (suite *testSuite) assertCheckoutURL(requireHTTPS bool) error {
+	if suite.lastStatus != http.StatusCreated && suite.lastStatus != http.StatusOK {
+		return fmt.Errorf("expected checkout response status 200 or 201, got %d with body %s", suite.lastStatus, suite.lastBody)
+	}
+	response, err := checkoutSessionResponseFromBody(suite.lastBody)
+	if err != nil {
+		return err
+	}
+	parsed, err := url.Parse(response.CheckoutURL)
+	if err != nil {
+		return fmt.Errorf("parsing checkout_url: %w", err)
+	}
+	if parsed.IsAbs() == false || parsed.Host == "" {
+		return fmt.Errorf("expected absolute checkout_url, got %q", response.CheckoutURL)
+	}
+	if requireHTTPS && parsed.Scheme != "https" {
+		return fmt.Errorf("expected HTTPS checkout_url, got %q", response.CheckoutURL)
+	}
+	suite.rememberCheckoutResponse(response)
+	return nil
+}
+
+func (suite *testSuite) responseIdentifiesPaymentIntentWithStatus(expected string) error {
+	return suite.assertCheckoutPaymentIntent(expected, false)
+}
+
+func (suite *testSuite) responseIdentifiesNewPaymentIntentWithStatus(expected string) error {
+	return suite.assertCheckoutPaymentIntent(expected, true)
+}
+
+func (suite *testSuite) assertCheckoutPaymentIntent(expected string, mustBeNew bool) error {
+	response, err := checkoutSessionResponseFromBody(suite.lastBody)
+	if err != nil {
+		return err
+	}
+	if response.PaymentIntentID == "" {
+		return fmt.Errorf("expected checkout response to include payment_intent_id")
+	}
+	if response.Status != expected {
+		return fmt.Errorf("expected checkout payment intent status %q, got %q", expected, response.Status)
+	}
+	if mustBeNew && response.PaymentIntentID == suite.previousPaymentIntentID {
+		return fmt.Errorf("expected a new payment intent, got previous id %q", response.PaymentIntentID)
+	}
+	suite.rememberCheckoutResponse(response)
+	return nil
+}
+
+func (suite *testSuite) checkoutResponseIncludesPricingBreakdown(table *godog.Table) error {
+	response, err := checkoutSessionResponseFromBody(suite.lastBody)
+	if err != nil {
+		return err
+	}
+	expected, err := bookingPricingTableInCents(table)
+	if err != nil {
+		return err
+	}
+	actual := map[string]int64{
+		"precio total del servicio":            response.Pricing.ServiceTotalCents,
+		"seña del prestador":                   response.Pricing.DepositCents,
+		"comisión total de LoResuelvo":         response.Pricing.PlatformFeeTotalCents,
+		"comisión de LoResuelvo cobrada ahora": response.Pricing.PlatformFeeDueNowCents,
+		"total a pagar ahora":                  response.Pricing.AmountDueNowCents,
+		"saldo total a pagar más adelante":     response.Pricing.RemainingAmountDueCents,
+	}
+	for concept, expectedCents := range expected {
+		actualCents, exists := actual[concept]
+		if !exists {
+			return fmt.Errorf("unsupported checkout pricing concept %q", concept)
+		}
+		if actualCents != expectedCents {
+			return fmt.Errorf("expected %s to be %d cents, got %d", concept, expectedCents, actualCents)
+		}
+	}
+	if response.Pricing.Currency != defaultBookingCurrency {
+		return fmt.Errorf("expected checkout currency %q, got %q", defaultBookingCurrency, response.Pricing.Currency)
+	}
+	return nil
+}
+
+func (suite *testSuite) checkoutSessionExpiresOn(expected string) error {
+	expectedTime, err := time.Parse(time.RFC3339, expected)
+	if err != nil {
+		return fmt.Errorf("parsing expected checkout expiration: %w", err)
+	}
+	response, err := checkoutSessionResponseFromBody(suite.lastBody)
+	if err != nil {
+		return err
+	}
+	if !response.ExpiresOn.Equal(expectedTime.UTC()) {
+		return fmt.Errorf("expected checkout expiration %s, got %s", expectedTime.UTC(), response.ExpiresOn)
+	}
+	return nil
+}
+
+func (suite *testSuite) paymentIntentCanBeReadWithStatus(expected string) error {
+	if suite.lastPaymentIntentID == "" {
+		return fmt.Errorf("expected a prepared payment intent")
+	}
+	request, err := http.NewRequest(
+		http.MethodGet,
+		suite.server.URL+fmt.Sprintf(paymentIntentPath, url.PathEscape(suite.lastPaymentIntentID)),
+		nil,
+	)
+	if err != nil {
+		return err
+	}
+	if suite.currentAuth0ID != "" {
+		request.Header.Set("Authorization", "Bearer "+suite.tokenBuilder.BuildToken(suite.currentAuth0ID, nil))
+	}
+	response, err := http.DefaultClient.Do(request)
+	if err != nil {
+		return fmt.Errorf("API connection failed: %w", err)
+	}
+	defer response.Body.Close()
+	body, err := io.ReadAll(response.Body)
+	if err != nil {
+		return fmt.Errorf("reading payment intent response: %w", err)
+	}
+	if response.StatusCode != http.StatusOK {
+		return fmt.Errorf("expected payment intent status 200, got %d with body %s", response.StatusCode, body)
+	}
+	var intent paymentIntentResponse
+	if err := json.Unmarshal(body, &intent); err != nil {
+		return fmt.Errorf("decoding payment intent response: %w", err)
+	}
+	if intent.ID != suite.lastPaymentIntentID {
+		return fmt.Errorf("expected payment intent id %q, got %q", suite.lastPaymentIntentID, intent.ID)
+	}
+	if intent.Status != expected {
+		return fmt.Errorf("expected payment intent status %q, got %q", expected, intent.Status)
 	}
 	return nil
 }
@@ -160,17 +576,12 @@ func (suite *testSuite) serviceProposalIsAccepted() error {
 	return suite.serviceProposalHasStatus(suite.lastServiceProposalID, serviceproposal.StatusAccepted)
 }
 
-func (suite *testSuite) serviceProposalRemainsPending() error {
-	return suite.serviceProposalHasStatus(suite.lastServiceProposalID, serviceproposal.StatusPending)
+func (suite *testSuite) serviceProposalRemainsAccepted() error {
+	return suite.serviceProposalIsAccepted()
 }
 
-func (suite *testSuite) otherServiceProposalRemainsPending() error {
-	for _, proposalID := range suite.serviceProposalIDs {
-		if proposalID != suite.lastServiceProposalID {
-			return suite.serviceProposalHasStatus(proposalID, serviceproposal.StatusPending)
-		}
-	}
-	return fmt.Errorf("expected another prepared service proposal")
+func (suite *testSuite) serviceProposalRemainsPending() error {
+	return suite.serviceProposalHasStatus(suite.lastServiceProposalID, serviceproposal.StatusPending)
 }
 
 func (suite *testSuite) serviceProposalHasStatus(proposalID int, expected serviceproposal.Status) error {
@@ -178,9 +589,7 @@ func (suite *testSuite) serviceProposalHasStatus(proposalID int, expected servic
 	if !exists {
 		return fmt.Errorf("expected fixture for service proposal id %d", proposalID)
 	}
-	proposals, err := repositories.NewServiceProposalRepository(
-		suite.database,
-	).FindByUserID(context.Background(), fixture.consumerID)
+	proposals, err := repositories.NewServiceProposalRepository(suite.database).FindByUserID(context.Background(), fixture.consumerID)
 	if err != nil {
 		return fmt.Errorf("finding service proposal fixture: %w", err)
 	}
@@ -196,56 +605,64 @@ func (suite *testSuite) serviceProposalHasStatus(proposalID int, expected servic
 }
 
 func (suite *testSuite) systemRegistersOneScheduledWorkOrder() error {
-	if err := suite.lastResponseShouldHaveStatusCode(http.StatusCreated); err != nil {
-		return err
-	}
-	workOrder, err := suite.workOrderForLastServiceProposal()
+	order, err := suite.persistedWorkOrderForLastServiceProposal()
 	if err != nil {
 		return err
 	}
-	if workOrder.ID == 0 {
-		return fmt.Errorf("expected created work order id, got body %s", string(suite.lastBody))
+	if order.ID == 0 {
+		return fmt.Errorf("expected persisted work order id")
 	}
-	if workOrder.Status != workOrderStatusScheduled {
-		return fmt.Errorf("expected work order status %q, got %q", workOrderStatusScheduled, workOrder.Status)
+	if order.Status != workorder.StatusScheduled {
+		return fmt.Errorf("expected work order status %q, got %q", workorder.StatusScheduled, order.Status)
 	}
-	if workOrder.AcceptedOn.IsZero() {
-		return fmt.Errorf("expected work order accepted_on, got body %s", string(suite.lastBody))
+	if order.AcceptedOn.IsZero() {
+		return fmt.Errorf("expected work order accepted_on")
 	}
+	suite.rememberPersistedWorkOrder(order)
 	return nil
 }
 
-func (suite *testSuite) workOrderIsLinkedToAcceptedServiceProposal() error {
-	workOrder, err := suite.workOrderForLastServiceProposal()
+func (suite *testSuite) systemKeepsOneWorkOrderForServiceProposal() error {
+	return suite.systemRegistersOneScheduledWorkOrder()
+}
+
+func (suite *testSuite) systemDoesNotRegisterWorkOrderForServiceProposal() error {
+	_, err := suite.workOrderRepository.FindByServiceProposalID(context.Background(), suite.lastServiceProposalID)
+	if errors.Is(err, workorder.ErrDoesNotExist) {
+		return nil
+	}
 	if err != nil {
 		return err
 	}
-	if workOrder.ServiceProposalID != suite.lastServiceProposalID {
-		return fmt.Errorf("expected work order service_proposal_id %d, got %d", suite.lastServiceProposalID, workOrder.ServiceProposalID)
+	return fmt.Errorf("expected no work order for service proposal %d", suite.lastServiceProposalID)
+}
+
+func (suite *testSuite) workOrderIsLinkedToAcceptedServiceProposal() error {
+	order, err := suite.persistedWorkOrderForLastServiceProposal()
+	if err != nil {
+		return err
+	}
+	if order.ServiceProposalID() != suite.lastServiceProposalID {
+		return fmt.Errorf("expected work order service proposal id %d, got %d", suite.lastServiceProposalID, order.ServiceProposalID())
 	}
 	return nil
 }
 
 func (suite *testSuite) workOrderKeepsAgreedTerms() error {
-	workOrder, err := suite.workOrderForLastServiceProposal()
+	order, err := suite.persistedWorkOrderForLastServiceProposal()
 	if err != nil {
 		return err
 	}
-	fixture := suite.serviceProposalFixtures[suite.lastServiceProposalID]
-	if workOrder.ConsumerID != fixture.consumerID {
-		return fmt.Errorf("expected work order consumer_id %d, got %d", fixture.consumerID, workOrder.ConsumerID)
+	fixture, exists := suite.serviceProposalFixtures[suite.lastServiceProposalID]
+	if !exists {
+		return fmt.Errorf("expected service proposal fixture %d", suite.lastServiceProposalID)
 	}
-	if workOrder.ProviderID != fixture.providerID {
-		return fmt.Errorf("expected work order provider_id %d, got %d", fixture.providerID, workOrder.ProviderID)
-	}
-	if workOrder.AmountCents != fixture.amountCents {
-		return fmt.Errorf("expected work order amount_cents %d, got %d", fixture.amountCents, workOrder.AmountCents)
-	}
-	if !workOrder.ScheduledOn.Equal(fixture.scheduledOn.UTC()) {
-		return fmt.Errorf("expected work order scheduled_on %s, got %s", fixture.scheduledOn.UTC(), workOrder.ScheduledOn)
-	}
-	if workOrder.Description != fixture.description {
-		return fmt.Errorf("expected work order description %q, got %q", fixture.description, workOrder.Description)
+	if order.ConsumerID() != fixture.consumerID ||
+		order.ProviderID() != fixture.providerID ||
+		order.Amount() != fixture.amountCents ||
+		!order.ScheduledOn().Equal(fixture.scheduledOn.UTC()) ||
+		order.Description() != fixture.description {
+		return fmt.Errorf("persisted work order does not preserve the agreed service proposal terms")
 	}
 	return nil
 }
@@ -263,81 +680,137 @@ func (suite *testSuite) providerReceivesAcceptedServiceProposalNotification(emai
 		return fmt.Errorf("expected realtime event type %q, got %q", "notification.created", event.Type)
 	}
 	notification := event.Notification
-	if notification.ID == 0 {
-		return fmt.Errorf("expected realtime notification id to be present")
-	}
-	if notification.Type != "service_proposal_accepted" {
-		return fmt.Errorf("expected notification type %q, got %q", "service_proposal_accepted", notification.Type)
-	}
-	if notification.ResourceType != "service_proposal" {
-		return fmt.Errorf("expected notification resource_type %q, got %q", "service_proposal", notification.ResourceType)
-	}
 	providerID, err := suite.userRepository.FindIDByEmail(email)
 	if err != nil {
 		return fmt.Errorf("finding expected notification provider: %w", err)
 	}
-	if notification.UserID != providerID {
-		return fmt.Errorf("expected notification user_id %d, got %d", providerID, notification.UserID)
-	}
-	if notification.ResourceID != suite.lastServiceProposalID {
-		return fmt.Errorf("expected notification resource_id %d, got %d", suite.lastServiceProposalID, notification.ResourceID)
-	}
-	if notification.ReadAt != nil {
-		return fmt.Errorf("expected unread realtime notification, got read_at %s", notification.ReadAt.Format(time.RFC3339))
-	}
-	if notification.CreatedAt.IsZero() {
-		return fmt.Errorf("expected realtime notification created_at to be present")
+	if notification.ID == 0 ||
+		notification.UserID != providerID ||
+		notification.Type != "service_proposal_accepted" ||
+		notification.ResourceType != "service_proposal" ||
+		notification.ResourceID != suite.lastServiceProposalID ||
+		notification.ReadAt != nil ||
+		notification.CreatedAt.IsZero() {
+		return fmt.Errorf("unexpected accepted service proposal notification: %+v", notification)
 	}
 	return nil
 }
 
-func (suite *testSuite) systemDeniesServiceProposalConfirmation() error {
+func (suite *testSuite) systemDeniesBookingDepositPayment() error {
 	return suite.conversationRequestShouldFailWithStatus(http.StatusForbidden)
 }
 
-func (suite *testSuite) systemRejectsAlreadyAcceptedServiceProposal() error {
+func (suite *testSuite) systemRejectsCheckoutForAcceptedProposal() error {
 	return suite.conversationRequestShouldFailWithStatus(http.StatusConflict)
 }
 
-func (suite *testSuite) systemRejectsRejectedServiceProposal() error {
+func (suite *testSuite) systemRejectsCheckoutForRejectedProposal() error {
 	return suite.conversationRequestShouldFailWithStatus(http.StatusConflict)
 }
 
-func (suite *testSuite) systemRejectsExpiredServiceProposal() error {
+func (suite *testSuite) systemRejectsCheckoutAfterBookingDeadline() error {
 	return suite.conversationRequestShouldFailWithStatus(http.StatusConflict)
 }
 
-func (suite *testSuite) systemKeepsOneWorkOrderForServiceProposal() error {
-	return suite.assertPersistedWorkOrder(suite.lastServiceProposalID)
+func (suite *testSuite) systemKeepsOneActivePaymentIntent() error {
+	return godog.ErrPending
 }
 
-func (suite *testSuite) systemRegistersOneWorkOrderForAcceptedProposal() error {
-	return suite.assertPersistedWorkOrder(suite.lastServiceProposalID)
+func (suite *testSuite) systemKeepsOneActiveCheckoutSession() error {
+	return godog.ErrPending
 }
 
-func (suite *testSuite) systemDoesNotRegisterWorkOrderForServiceProposal() error {
-	_, err := suite.workOrderRepository.FindByServiceProposalID(context.Background(), suite.lastServiceProposalID)
-	if errors.Is(err, workorder.ErrDoesNotExist) {
-		return nil
+func (suite *testSuite) concurrentRequestsReturnSameCheckoutURL() error {
+	if len(suite.concurrentCheckoutResponses) != 2 {
+		return fmt.Errorf("expected exactly two concurrent checkout responses")
 	}
-	if err != nil {
-		return err
+	first := suite.concurrentCheckoutResponses[0].Value
+	second := suite.concurrentCheckoutResponses[1].Value
+	if first.CheckoutURL == "" || first.CheckoutURL != second.CheckoutURL {
+		return fmt.Errorf("expected both concurrent requests to return the same checkout URL, got %q and %q", first.CheckoutURL, second.CheckoutURL)
 	}
-	return fmt.Errorf("expected no work order for service proposal %d", suite.lastServiceProposalID)
-}
-
-func (suite *testSuite) assertPersistedWorkOrder(proposalID int) error {
-	order, err := suite.workOrderRepository.FindByServiceProposalID(context.Background(), proposalID)
-	if err != nil {
-		return err
-	}
-	if order.ServiceProposal.ServiceProposalID() != proposalID {
-		return fmt.Errorf("expected work order for service proposal %d, got %d", proposalID, order.ServiceProposal.ServiceProposalID())
+	if first.PaymentIntentID == "" || first.PaymentIntentID != second.PaymentIntentID {
+		return fmt.Errorf("expected both concurrent requests to identify the same payment intent")
 	}
 	return nil
 }
 
+func (suite *testSuite) systemRegistersOneTransactionForExternalPayment() error {
+	return godog.ErrPending
+}
+
+func (suite *testSuite) systemRegistersPaymentIncident(expected string) error {
+	return godog.ErrPending
+}
+
+func (suite *testSuite) systemRegistersPaymentIncidentForSecondPayment(expected string) error {
+	return godog.ErrPending
+}
+
+func (suite *testSuite) providerPaymentAccountRemainsConnected() error {
+	return suite.providerPaymentAccountHasStatus("connected")
+}
+
+func (suite *testSuite) systemReportsPaymentAccountReauthorizationRequired() error {
+	return suite.conversationRequestShouldFailWithStatus(http.StatusConflict)
+}
+
+func (suite *testSuite) providerPaymentAccountHasStatus(expected string) error {
+	connection, err := suite.mercadoPagoConnectionForProvider(defaultBookingProviderEmail)
+	if err != nil {
+		return err
+	}
+	if connection.Status != expected {
+		return fmt.Errorf("expected provider payment account status %q, got %q", expected, connection.Status)
+	}
+	return nil
+}
+
+func (suite *testSuite) systemDoesNotRegisterActiveCheckoutSession() error {
+	return godog.ErrPending
+}
+
+func (suite *testSuite) workOrderHasStatus(expected string) error {
+	order, err := suite.persistedWorkOrderForLastServiceProposal()
+	if err != nil {
+		return err
+	}
+	if string(order.Status) != expected {
+		return fmt.Errorf("expected work order status %q, got %q", expected, order.Status)
+	}
+	return nil
+}
+
+func (suite *testSuite) persistedWorkOrderForLastServiceProposal() (*workorder.WorkOrder, error) {
+	order, err := suite.workOrderRepository.FindByServiceProposalID(context.Background(), suite.lastServiceProposalID)
+	if err != nil {
+		return nil, fmt.Errorf("finding work order for service proposal %d: %w", suite.lastServiceProposalID, err)
+	}
+	return order, nil
+}
+
+func (suite *testSuite) rememberPersistedWorkOrder(order *workorder.WorkOrder) {
+	if order == nil {
+		return
+	}
+	response := workOrderResponse{
+		ID:                order.ID,
+		ServiceProposalID: order.ServiceProposalID(),
+		ConsumerID:        order.ConsumerID(),
+		ProviderID:        order.ProviderID(),
+		AmountCents:       order.Amount(),
+		ScheduledOn:       order.ScheduledOn(),
+		Description:       order.Description(),
+		Status:            string(order.Status),
+		AcceptedOn:        order.AcceptedOn,
+	}
+	suite.workOrdersByServiceProposalID[order.ServiceProposalID()] = []workOrderResponse{response}
+}
+
 func (suite *testSuite) workOrderForLastServiceProposal() (workOrderResponse, error) {
+	if order, err := suite.persistedWorkOrderForLastServiceProposal(); err == nil {
+		suite.rememberPersistedWorkOrder(order)
+	}
 	workOrders := suite.workOrdersByServiceProposalID[suite.lastServiceProposalID]
 	if len(workOrders) != 1 {
 		return workOrderResponse{}, fmt.Errorf(
@@ -349,10 +822,17 @@ func (suite *testSuite) workOrderForLastServiceProposal() (workOrderResponse, er
 	return workOrders[0], nil
 }
 
-func (suite *testSuite) workOrderResponseFromLastBody() (workOrderResponse, error) {
-	var response workOrderResponse
-	if err := json.Unmarshal(suite.lastBody, &response); err != nil {
-		return workOrderResponse{}, fmt.Errorf("response is not a valid JSON work order: %w", err)
+func (suite *testSuite) rememberCheckoutResponse(response checkoutSessionResponse) {
+	suite.lastCheckoutResponse = response
+	if response.PaymentIntentID != "" {
+		suite.lastPaymentIntentID = response.PaymentIntentID
+	}
+}
+
+func checkoutSessionResponseFromBody(body []byte) (checkoutSessionResponse, error) {
+	var response checkoutSessionResponse
+	if err := json.Unmarshal(body, &response); err != nil {
+		return checkoutSessionResponse{}, fmt.Errorf("response is not a valid checkout session: %w", err)
 	}
 	return response, nil
 }

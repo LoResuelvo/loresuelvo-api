@@ -2,6 +2,7 @@ package steps_test
 
 import (
 	"bufio"
+	"context"
 	"crypto/rand"
 	"crypto/sha1"
 	"encoding/base64"
@@ -42,6 +43,7 @@ type realtimeTestConnection struct {
 
 func registerRealtimeMessageSteps(sc *godog.ScenarioContext, suite *testSuite) {
 	sc.Step(`^que existe un chat activo entre el consumidor "([^"]*)" y el prestador "([^"]*)" con el mensaje inicial:$`, suite.thereIsActiveChatBetweenConsumerAndProviderWithInitialMessage)
+	sc.Step(`^que existe un chat activo entre el consumidor "([^"]*)" y el prestador "([^"]*)"$`, suite.thereIsActiveChatBetweenConsumerAndProvider)
 	sc.Step(`^que el consumidor "([^"]*)" está disponible para recibir mensajes en tiempo real$`, suite.consumerIsAvailableForRealtimeMessages)
 	sc.Step(`^que el prestador "([^"]*)" está disponible para recibir mensajes en tiempo real$`, suite.providerIsAvailableForRealtimeMessages)
 	sc.Step(`^envío un mensaje en el chat con el prestador "([^"]*)":$`, suite.sendMessageInChatWithProvider)
@@ -52,18 +54,28 @@ func registerRealtimeMessageSteps(sc *godog.ScenarioContext, suite *testSuite) {
 	sc.Step(`^el prestador "([^"]*)" no recibe mensajes en tiempo real$`, suite.providerDoesNotReceiveRealtimeMessages)
 }
 
+func (suite *testSuite) thereIsActiveChatBetweenConsumerAndProvider(consumerEmail, providerEmail string) error {
+	return suite.thereIsActiveChatBetweenConsumerAndProviderWithInitialMessage(
+		consumerEmail,
+		providerEmail,
+		&godog.DocString{Content: "Conversación preparada para una propuesta de servicio."},
+	)
+}
+
 func (suite *testSuite) thereIsActiveChatBetweenConsumerAndProviderWithInitialMessage(consumerEmail, providerEmail string, message *godog.DocString) error {
 	if err := suite.createPendingConversationBetweenConsumerAndProvider(consumerEmail, providerEmail, normalizeDocString(message)); err != nil {
 		return err
 	}
 
-	_, err := suite.database.Exec(
-		`UPDATE conversations SET status = $1 WHERE id = $2`,
-		conversationStatusActive,
-		suite.lastConversationID,
-	)
+	preparedConversation, err := suite.conversationRepository.FindByID(context.Background(), suite.lastConversationID)
 	if err != nil {
+		return fmt.Errorf("finding chat fixture before activation: %w", err)
+	}
+	if err := preparedConversation.Activate(); err != nil {
 		return fmt.Errorf("activating chat fixture: %w", err)
+	}
+	if _, err := suite.conversationRepository.SaveConversation(context.Background(), preparedConversation); err != nil {
+		return fmt.Errorf("saving active chat fixture: %w", err)
 	}
 
 	return nil
