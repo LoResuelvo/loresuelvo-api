@@ -26,6 +26,20 @@ func TestBookingPolicyCalculatesProposalTerms(t *testing.T) {
 	assert.Equal(t, int64(10500000), terms.ContractTotalCents())
 }
 
+func TestBookingPolicyRoundsInitialAmountsToNearestCent(t *testing.T) {
+	policy := serviceproposal.NewBookingPolicy()
+
+	terms, err := policy.Calculate(10000003)
+
+	require.NoError(t, err)
+	assert.Equal(t, int64(2000001), terms.DepositCents())
+	assert.Equal(t, int64(100000), terms.PlatformFeeDueNowCents())
+	assert.Equal(t, int64(2100001), terms.AmountDueNowCents())
+	assert.Equal(t, int64(8400002), terms.RemainingAmountDueCents())
+	assert.Equal(t, int64(10500003), terms.ContractTotalCents())
+	assert.Equal(t, terms.ContractTotalCents(), terms.AmountDueNowCents()+terms.RemainingAmountDueCents())
+}
+
 func TestBookingPolicyRejectsNonPositiveServiceTotal(t *testing.T) {
 	policy := serviceproposal.NewBookingPolicy()
 
