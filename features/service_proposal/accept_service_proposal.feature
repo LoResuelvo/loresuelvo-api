@@ -49,7 +49,6 @@ Feature: Contratar un servicio mediante el pago de una seña
 
     Rule: La contratación se confirma únicamente con un pago aprobado y verificado
 
-        @wip
         Scenario: 21.4-CSP Aceptar la propuesta y generar una única orden con la seña aprobada
             Given que "ana@example.com" inició el checkout de la seña de una propuesta pendiente de "juan.plomero@example.com"
             When el sistema procesa una notificación válida de Mercado Pago y verifica un pago aprobado por "21000.00" pesos argentinos para esa seña
