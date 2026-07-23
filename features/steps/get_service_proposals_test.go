@@ -225,7 +225,7 @@ func (suite *testSuite) saveServiceProposalFixture(
 	description string,
 ) error {
 	repository := repositories.NewServiceProposalRepository(suite.database)
-	bookingTerms, err := serviceproposal.NewBookingPolicy().Calculate(amountCents)
+	bookingTerms, err := serviceproposal.NewBookingPolicy().Calculate(amountCents, scheduledOn)
 	if err != nil {
 		return fmt.Errorf("calculating service proposal fixture booking terms: %w", err)
 	}

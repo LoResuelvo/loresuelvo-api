@@ -49,13 +49,14 @@ func (r *ServiceProposalRepository) Save(serviceProposal *serviceproposal.Servic
 			deposit_cents,
 			platform_fee_total_cents,
 			platform_fee_due_now_cents,
+			booking_payment_deadline,
 			scheduled_on,
 			description,
 			status,
 			created_on,
 			updated_on
 		)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW(), NOW())
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, NOW(), NOW())
 		RETURNING id`,
 		serviceProposal.Consumer.ID(),
 		serviceProposal.Provider.ID(),
@@ -65,6 +66,7 @@ func (r *ServiceProposalRepository) Save(serviceProposal *serviceproposal.Servic
 		serviceProposal.BookingTerms.DepositCents(),
 		serviceProposal.BookingTerms.PlatformFeeTotalCents(),
 		serviceProposal.BookingTerms.PlatformFeeDueNowCents(),
+		serviceProposal.BookingTerms.BookingPaymentDeadline(),
 		serviceProposal.ScheduledOn,
 		serviceProposal.Description,
 		serviceProposal.Status,
@@ -86,6 +88,7 @@ func (r *ServiceProposalRepository) FindByID(ctx context.Context, id int) (*serv
 		platformFeeTotalCents  int64
 		platformFeeDueNowCents int64
 		serviceTotalCents      int64
+		bookingPaymentDeadline time.Time
 	)
 	err := r.db.QueryRowContext(
 		ctx,
@@ -96,6 +99,7 @@ func (r *ServiceProposalRepository) FindByID(ctx context.Context, id int) (*serv
 			sp.deposit_cents,
 			sp.platform_fee_total_cents,
 			sp.platform_fee_due_now_cents,
+			sp.booking_payment_deadline,
 			sp.scheduled_on,
 			sp.description,
 			sp.status,
@@ -112,6 +116,7 @@ func (r *ServiceProposalRepository) FindByID(ctx context.Context, id int) (*serv
 		&depositCents,
 		&platformFeeTotalCents,
 		&platformFeeDueNowCents,
+		&bookingPaymentDeadline,
 		&proposal.ScheduledOn,
 		&proposal.Description,
 		&proposal.Status,
@@ -131,6 +136,7 @@ func (r *ServiceProposalRepository) FindByID(ctx context.Context, id int) (*serv
 		depositCents,
 		platformFeeTotalCents,
 		platformFeeDueNowCents,
+		bookingPaymentDeadline,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("rehydrating booking terms for service proposal %d: %w", proposal.ID, err)
@@ -185,6 +191,7 @@ func (r *ServiceProposalRepository) FindByUserID(ctx context.Context, userID int
 			sp.deposit_cents,
 			sp.platform_fee_total_cents,
 			sp.platform_fee_due_now_cents,
+			sp.booking_payment_deadline,
 			sp.scheduled_on,
 			sp.description,
 			sp.status,
@@ -231,6 +238,7 @@ func (r *ServiceProposalRepository) FindByUserID(ctx context.Context, userID int
 			platformFeeTotalCents      int64
 			platformFeeDueNowCents     int64
 			serviceTotalCents          int64
+			bookingPaymentDeadline     time.Time
 			conversationID             int
 			conversationType           string
 			conversationStatus         string
@@ -256,6 +264,7 @@ func (r *ServiceProposalRepository) FindByUserID(ctx context.Context, userID int
 			&depositCents,
 			&platformFeeTotalCents,
 			&platformFeeDueNowCents,
+			&bookingPaymentDeadline,
 			&proposal.ScheduledOn,
 			&proposal.Description,
 			&proposal.Status,
@@ -291,6 +300,7 @@ func (r *ServiceProposalRepository) FindByUserID(ctx context.Context, userID int
 			depositCents,
 			platformFeeTotalCents,
 			platformFeeDueNowCents,
+			bookingPaymentDeadline,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("rehydrating booking terms for service proposal %d: %w", proposal.ID, err)

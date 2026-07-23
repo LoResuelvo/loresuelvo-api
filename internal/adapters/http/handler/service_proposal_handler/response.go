@@ -27,16 +27,17 @@ type serviceProposalSummaryResponse struct {
 }
 
 type bookingTermsResponse struct {
-	Currency                     string `json:"currency"`
-	ServiceTotalCents            int64  `json:"service_total_cents"`
-	DepositCents                 int64  `json:"deposit_cents"`
-	RemainingServiceBalanceCents int64  `json:"remaining_service_balance_cents"`
-	PlatformFeeTotalCents        int64  `json:"platform_fee_total_cents"`
-	PlatformFeeDueNowCents       int64  `json:"platform_fee_due_now_cents"`
-	RemainingPlatformFeeCents    int64  `json:"remaining_platform_fee_cents"`
-	AmountDueNowCents            int64  `json:"amount_due_now_cents"`
-	RemainingAmountDueCents      int64  `json:"remaining_amount_due_cents"`
-	ContractTotalCents           int64  `json:"contract_total_cents"`
+	Currency                     string    `json:"currency"`
+	ServiceTotalCents            int64     `json:"service_total_cents"`
+	DepositCents                 int64     `json:"deposit_cents"`
+	RemainingServiceBalanceCents int64     `json:"remaining_service_balance_cents"`
+	PlatformFeeTotalCents        int64     `json:"platform_fee_total_cents"`
+	PlatformFeeDueNowCents       int64     `json:"platform_fee_due_now_cents"`
+	RemainingPlatformFeeCents    int64     `json:"remaining_platform_fee_cents"`
+	AmountDueNowCents            int64     `json:"amount_due_now_cents"`
+	RemainingAmountDueCents      int64     `json:"remaining_amount_due_cents"`
+	ContractTotalCents           int64     `json:"contract_total_cents"`
+	BookingPaymentDeadline       time.Time `json:"booking_payment_deadline"`
 }
 
 type serviceProposalCounterpartResponse struct {

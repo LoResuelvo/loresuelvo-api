@@ -63,7 +63,7 @@ func (s *Service) CreateServiceProposal(ctx context.Context, auth0ID string, con
 		return nil, ErrPaymentAccountConnectionRequired
 	}
 
-	bookingTerms, err := s.bookingPolicy.Calculate(amount)
+	bookingTerms, err := s.bookingPolicy.Calculate(amount, scheduledOn)
 	if err != nil {
 		return nil, err
 	}

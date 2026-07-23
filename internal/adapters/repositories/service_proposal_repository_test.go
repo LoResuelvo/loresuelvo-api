@@ -96,14 +96,15 @@ func TestServiceProposalRepositorySavesAcceptanceWithWorkOrderAtomically(t *test
 	require.NoError(t, activeConversation.Activate())
 	activeConversation, err = testContext.conversationRepository.SaveConversation(context.Background(), activeConversation)
 	require.NoError(t, err)
+	scheduledOn := time.Now().Add(25 * time.Hour).UTC().Truncate(time.Microsecond)
 
 	proposal, err := serviceproposal.NewServiceProposal(
 		&provider.Provider{BaseUser: user.RehydrateBaseUser(providerID, "", "", "", "", "", nil)},
 		&consumer.Consumer{BaseUser: user.RehydrateBaseUser(consumerID, "", "", "", "", "", nil)},
 		activeConversation,
-		time.Now().Add(25*time.Hour).UTC().Truncate(time.Microsecond),
+		scheduledOn,
 		"Reparacion de perdida de agua.",
-		bookingTermsForAmount(t, 1500050),
+		bookingTermsForAmount(t, 1500050, scheduledOn),
 		clockadapter.NewSystemClock(),
 	)
 	require.NoError(t, err)
@@ -181,7 +182,7 @@ func TestServiceProposalRepositoryCanSave(t *testing.T) {
 		activeConversation,
 		scheduledOn,
 		"Reparacion de perdida de agua en cocina con materiales incluidos.",
-		bookingTermsForAmount(t, 1500050),
+		bookingTermsForAmount(t, 1500050, scheduledOn),
 		clockadapter.NewSystemClock(),
 	)
 	require.NoError(t, err)
@@ -206,6 +207,7 @@ func TestServiceProposalRepositoryCanSave(t *testing.T) {
 	var storedDepositCents int64
 	var storedPlatformFeeTotalCents int64
 	var storedPlatformFeeDueNowCents int64
+	var storedBookingPaymentDeadline time.Time
 	var storedScheduledOn time.Time
 	var storedDescription string
 	var storedStatus serviceproposal.Status
@@ -219,6 +221,7 @@ func TestServiceProposalRepositoryCanSave(t *testing.T) {
 			deposit_cents,
 			platform_fee_total_cents,
 			platform_fee_due_now_cents,
+			booking_payment_deadline,
 			scheduled_on,
 			description,
 			status
@@ -234,6 +237,7 @@ func TestServiceProposalRepositoryCanSave(t *testing.T) {
 		&storedDepositCents,
 		&storedPlatformFeeTotalCents,
 		&storedPlatformFeeDueNowCents,
+		&storedBookingPaymentDeadline,
 		&storedScheduledOn,
 		&storedDescription,
 		&storedStatus,
@@ -247,6 +251,7 @@ func TestServiceProposalRepositoryCanSave(t *testing.T) {
 	assert.Equal(t, proposalToSave.BookingTerms.DepositCents(), storedDepositCents)
 	assert.Equal(t, proposalToSave.BookingTerms.PlatformFeeTotalCents(), storedPlatformFeeTotalCents)
 	assert.Equal(t, proposalToSave.BookingTerms.PlatformFeeDueNowCents(), storedPlatformFeeDueNowCents)
+	assert.Equal(t, proposalToSave.BookingTerms.BookingPaymentDeadline(), storedBookingPaymentDeadline.UTC())
 	assert.Equal(t, proposalToSave.ScheduledOn, storedScheduledOn.UTC())
 	assert.Equal(t, proposalToSave.Description, storedDescription)
 	assert.Equal(t, proposalToSave.Status, storedStatus)
@@ -271,14 +276,15 @@ func TestServiceProposalRepositoryFindsPendingProposalForConsumer(t *testing.T) 
 	require.NoError(t, activeConversation.Activate())
 	activeConversation, err = testContext.conversationRepository.SaveConversation(context.Background(), activeConversation)
 	require.NoError(t, err)
+	scheduledOn := time.Now().Add(25 * time.Hour).UTC().Truncate(time.Microsecond)
 
 	expected, err := serviceproposal.NewServiceProposal(
 		&provider.Provider{BaseUser: user.RehydrateBaseUser(providerID, "", "", "", "", "", nil)},
 		&consumer.Consumer{BaseUser: user.RehydrateBaseUser(consumerID, "", "", "", "", "", nil)},
 		activeConversation,
-		time.Now().Add(25*time.Hour).UTC().Truncate(time.Microsecond),
+		scheduledOn,
 		"Reparacion de perdida de agua en cocina con materiales incluidos.",
-		bookingTermsForAmount(t, 1500050),
+		bookingTermsForAmount(t, 1500050, scheduledOn),
 		clockadapter.NewSystemClock(),
 	)
 	require.NoError(t, err)
@@ -319,11 +325,12 @@ func assertBookingTermsEqual(
 	assert.Equal(t, expected.AmountDueNowCents(), actual.AmountDueNowCents())
 	assert.Equal(t, expected.RemainingAmountDueCents(), actual.RemainingAmountDueCents())
 	assert.Equal(t, expected.ContractTotalCents(), actual.ContractTotalCents())
+	assert.Equal(t, expected.BookingPaymentDeadline(), actual.BookingPaymentDeadline())
 }
 
-func bookingTermsForAmount(t *testing.T, amountCents int64) serviceproposal.BookingTerms {
+func bookingTermsForAmount(t *testing.T, amountCents int64, scheduledOn time.Time) serviceproposal.BookingTerms {
 	t.Helper()
-	terms, err := serviceproposal.NewBookingPolicy().Calculate(amountCents)
+	terms, err := serviceproposal.NewBookingPolicy().Calculate(amountCents, scheduledOn)
 	require.NoError(t, err)
 	return terms
 }

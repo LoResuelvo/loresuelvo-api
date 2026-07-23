@@ -162,6 +162,7 @@ func (r *WorkOrderRepository) FindScheduledBetween(ctx context.Context, from tim
 			sp.deposit_cents,
 			sp.platform_fee_total_cents,
 			sp.platform_fee_due_now_cents,
+			sp.booking_payment_deadline,
 			sp.scheduled_on,
 			sp.description,
 			wo.status,
@@ -187,6 +188,7 @@ func (r *WorkOrderRepository) FindScheduledBetween(ctx context.Context, from tim
 		var consumerID, providerID int
 		var serviceTotalCents, depositCents, platformFeeTotalCents, platformFeeDueNowCents int64
 		var currency string
+		var bookingPaymentDeadline time.Time
 		if err := rows.Scan(
 			&order.ID,
 			&proposal.ID,
@@ -195,6 +197,7 @@ func (r *WorkOrderRepository) FindScheduledBetween(ctx context.Context, from tim
 			&depositCents,
 			&platformFeeTotalCents,
 			&platformFeeDueNowCents,
+			&bookingPaymentDeadline,
 			&proposal.ScheduledOn,
 			&proposal.Description,
 			&order.Status,
@@ -210,6 +213,7 @@ func (r *WorkOrderRepository) FindScheduledBetween(ctx context.Context, from tim
 			depositCents,
 			platformFeeTotalCents,
 			platformFeeDueNowCents,
+			bookingPaymentDeadline,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("rehydrating booking terms for service proposal %d: %w", proposal.ID, err)

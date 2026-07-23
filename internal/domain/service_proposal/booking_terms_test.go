@@ -2,6 +2,7 @@ package serviceproposal_test
 
 import (
 	"testing"
+	"time"
 
 	serviceproposal "github.com/LoResuelvo/loresuelvo-api/internal/domain/service_proposal"
 	"github.com/stretchr/testify/assert"
@@ -10,8 +11,9 @@ import (
 
 func TestBookingPolicyCalculatesProposalTerms(t *testing.T) {
 	policy := serviceproposal.NewBookingPolicy()
+	scheduledOn := time.Date(2026, time.July, 5, 14, 0, 0, 0, time.UTC)
 
-	terms, err := policy.Calculate(10000000)
+	terms, err := policy.Calculate(10000000, scheduledOn)
 
 	require.NoError(t, err)
 	assert.Equal(t, "ARS", terms.Currency())
@@ -24,12 +26,13 @@ func TestBookingPolicyCalculatesProposalTerms(t *testing.T) {
 	assert.Equal(t, int64(2100000), terms.AmountDueNowCents())
 	assert.Equal(t, int64(8400000), terms.RemainingAmountDueCents())
 	assert.Equal(t, int64(10500000), terms.ContractTotalCents())
+	assert.Equal(t, scheduledOn.Add(-24*time.Hour), terms.BookingPaymentDeadline())
 }
 
 func TestBookingPolicyRoundsInitialAmountsToNearestCent(t *testing.T) {
 	policy := serviceproposal.NewBookingPolicy()
 
-	terms, err := policy.Calculate(10000003)
+	terms, err := policy.Calculate(10000003, time.Date(2026, time.July, 5, 14, 0, 0, 0, time.UTC))
 
 	require.NoError(t, err)
 	assert.Equal(t, int64(2000001), terms.DepositCents())
@@ -43,7 +46,7 @@ func TestBookingPolicyRoundsInitialAmountsToNearestCent(t *testing.T) {
 func TestBookingPolicyRejectsNonPositiveServiceTotal(t *testing.T) {
 	policy := serviceproposal.NewBookingPolicy()
 
-	terms, err := policy.Calculate(0)
+	terms, err := policy.Calculate(0, time.Date(2026, time.July, 5, 14, 0, 0, 0, time.UTC))
 
 	assert.ErrorIs(t, err, serviceproposal.ErrInvalidAmount)
 	assert.Equal(t, serviceproposal.BookingTerms{}, terms)

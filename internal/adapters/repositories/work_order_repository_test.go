@@ -47,7 +47,7 @@ func TestWorkOrderRepositoryFindsOnlyOrdersScheduledInsideWindow(t *testing.T) {
 	assert.Equal(t, int64(1500050), orders[0].Amount())
 	proposal, ok := orders[0].ServiceProposal.(*serviceproposal.ServiceProposal)
 	require.True(t, ok)
-	assertBookingTermsEqual(t, bookingTermsForAmount(t, 1500050), proposal.BookingTerms)
+	assertBookingTermsEqual(t, bookingTermsForAmount(t, 1500050, from.Add(time.Hour)), proposal.BookingTerms)
 	assert.Equal(t, from.Add(time.Hour), orders[0].ScheduledOn().UTC())
 }
 
@@ -66,7 +66,7 @@ func saveScheduledWorkOrderAt(
 		activeConversation,
 		scheduledOn,
 		"Urgent work order repository test.",
-		bookingTermsForAmount(t, 1500050),
+		bookingTermsForAmount(t, 1500050, scheduledOn),
 		clockadapter.NewSystemClock(),
 	)
 	require.NoError(t, err)

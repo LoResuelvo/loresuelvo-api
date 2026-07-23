@@ -3,6 +3,7 @@ package serviceproposal
 import (
 	"fmt"
 	"math"
+	"time"
 )
 
 const (
@@ -20,7 +21,7 @@ func NewBookingPolicy() BookingPolicy {
 	return BookingPolicy{configured: true}
 }
 
-func (policy BookingPolicy) Calculate(serviceTotalCents int64) (BookingTerms, error) {
+func (policy BookingPolicy) Calculate(serviceTotalCents int64, scheduledOn time.Time) (BookingTerms, error) {
 	if !policy.configured {
 		return BookingTerms{}, fmt.Errorf("calculating booking terms: booking policy is required")
 	}
@@ -40,6 +41,7 @@ func (policy BookingPolicy) Calculate(serviceTotalCents int64) (BookingTerms, er
 		depositCents,
 		bookingPlatformFeeTotalCents,
 		platformFeeDueNowCents,
+		scheduledOn.Add(-minimumBookingLeadTime),
 	)
 }
 
@@ -62,6 +64,7 @@ type BookingTerms struct {
 	amountDueNowCents            int64
 	remainingAmountDueCents      int64
 	contractTotalCents           int64
+	bookingPaymentDeadline       time.Time
 }
 
 func NewBookingTerms(
@@ -70,8 +73,16 @@ func NewBookingTerms(
 	depositCents int64,
 	platformFeeTotalCents int64,
 	platformFeeDueNowCents int64,
+	bookingPaymentDeadline time.Time,
 ) (BookingTerms, error) {
-	err := validate(currency, serviceTotalCents, depositCents, platformFeeTotalCents, platformFeeDueNowCents)
+	err := validate(
+		currency,
+		serviceTotalCents,
+		depositCents,
+		platformFeeTotalCents,
+		platformFeeDueNowCents,
+		bookingPaymentDeadline,
+	)
 	if err != nil {
 		return BookingTerms{}, err
 	}
@@ -90,6 +101,7 @@ func NewBookingTerms(
 		amountDueNowCents:            depositCents + platformFeeDueNowCents,
 		remainingAmountDueCents:      remainingServiceBalanceCents + remainingPlatformFeeCents,
 		contractTotalCents:           serviceTotalCents + platformFeeTotalCents,
+		bookingPaymentDeadline:       bookingPaymentDeadline,
 	}, nil
 }
 
@@ -105,8 +117,18 @@ func (terms BookingTerms) RemainingPlatformFeeCents() int64 { return terms.remai
 func (terms BookingTerms) AmountDueNowCents() int64         { return terms.amountDueNowCents }
 func (terms BookingTerms) RemainingAmountDueCents() int64   { return terms.remainingAmountDueCents }
 func (terms BookingTerms) ContractTotalCents() int64        { return terms.contractTotalCents }
+func (terms BookingTerms) BookingPaymentDeadline() time.Time {
+	return terms.bookingPaymentDeadline
+}
 
-func validate(currency string, serviceTotalCents, depositCents, platformFeeTotalCents, platformFeeDueNowCents int64) error {
+func validate(
+	currency string,
+	serviceTotalCents,
+	depositCents,
+	platformFeeTotalCents,
+	platformFeeDueNowCents int64,
+	bookingPaymentDeadline time.Time,
+) error {
 	if serviceTotalCents <= 0 {
 		return ErrInvalidAmount
 	}
@@ -124,6 +146,9 @@ func validate(currency string, serviceTotalCents, depositCents, platformFeeTotal
 	}
 	if platformFeeDueNowCents < 0 || platformFeeDueNowCents > platformFeeTotalCents {
 		return fmt.Errorf("creating booking terms: invalid platform fee due now")
+	}
+	if bookingPaymentDeadline.IsZero() {
+		return fmt.Errorf("creating booking terms: booking payment deadline is required")
 	}
 
 	return nil

@@ -141,7 +141,7 @@ func validSavedServiceProposal() *serviceproposal.ServiceProposal {
 }
 
 func validBookingTerms() serviceproposal.BookingTerms {
-	terms, err := serviceproposal.NewBookingPolicy().Calculate(validServiceAmount)
+	terms, err := serviceproposal.NewBookingPolicy().Calculate(validServiceAmount, validServiceScheduledOn)
 	if err != nil {
 		panic(err)
 	}

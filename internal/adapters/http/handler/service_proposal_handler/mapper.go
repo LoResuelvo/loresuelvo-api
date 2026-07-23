@@ -89,5 +89,6 @@ func bookingTermsResponseFromDomain(terms serviceproposal.BookingTerms) bookingT
 		AmountDueNowCents:            terms.AmountDueNowCents(),
 		RemainingAmountDueCents:      terms.RemainingAmountDueCents(),
 		ContractTotalCents:           terms.ContractTotalCents(),
+		BookingPaymentDeadline:       terms.BookingPaymentDeadline(),
 	}
 }
