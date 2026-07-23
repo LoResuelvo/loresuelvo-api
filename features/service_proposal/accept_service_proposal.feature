@@ -13,7 +13,6 @@ Feature: Contratar un servicio mediante el pago de una seña
 
     Rule: Solicitar la confirmación inicia el checkout sin aceptar todavía la propuesta
 
-        @wip
         Scenario: 21.1-CSP Iniciar el checkout de la seña de una propuesta pendiente
             Given que existe una propuesta de servicio pendiente de "juan.plomero@example.com" para "ana@example.com" por "100000.00" para la fecha y hora "2026-07-06T10:00:00-03:00" con la descripción:
                 """
