@@ -33,12 +33,11 @@ func NewPersistenceAdapters(database *sql.DB) *PersistenceAdapters {
 	conversationReader := repositories.NewConversationReader(database, messageImageRepository)
 	fileRepository := repositories.NewFileRepository(database)
 	serviceProposalRepository := repositories.NewServiceProposalRepository(database)
-	workOrderRepository := repositories.NewWorkOrderRepository(database, serviceProposalRepository)
+	paymentIntentRepository := repositories.NewPaymentIntentRepository(database)
+	workOrderRepository := repositories.NewWorkOrderRepository(database, serviceProposalRepository, paymentIntentRepository)
 	notificationRepository := repositories.NewNotificationRepository(database)
 	authorizationAttemptRepository := repositories.NewAuthorizationAttemptRepository(database)
 	paymentAccountRepository := repositories.NewPaymentAccountRepository(database, authorizationAttemptRepository)
-	paymentIntentRepository := repositories.NewPaymentIntentRepository(database)
-
 	return &PersistenceAdapters{
 		UserRepository:                 userRepository,
 		CategoryRepository:             categoryRepository,

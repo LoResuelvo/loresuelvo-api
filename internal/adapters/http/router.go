@@ -100,6 +100,7 @@ func (router *Router) SetUp() (*gin.Engine, error) {
 	router.registerConversationRoutes(engine, authMiddleware)
 	router.registerChatbotRoutes(engine, authMiddleware)
 	router.registerServiceProposalRoutes(engine, authMiddleware)
+	router.registerPaymentRoutes(engine, authMiddleware)
 	router.registerWorkOrderRoutes(engine, authMiddleware)
 	router.registerAuthenticatedRoutes(engine, authMiddleware)
 	router.registerFileRoutes(engine, authMiddleware)
@@ -160,6 +161,11 @@ func (router *Router) registerServiceProposalRoutes(engine *gin.Engine, authMidd
 	engine.GET("/service-proposals", authMiddleware, router.serviceProposalHandler.GetServiceProposals)
 	engine.POST("/service-proposals/:serviceProposalID/accept", authMiddleware, router.serviceProposalHandler.AcceptServiceProposal)
 	engine.POST("/service-proposals/:serviceProposalID/checkout-sessions", authMiddleware, router.paymentHandler.StartBookingCheckout)
+}
+
+func (router *Router) registerPaymentRoutes(engine *gin.Engine, authMiddleware gin.HandlerFunc) {
+	engine.GET("/payment-intents/:paymentIntentID", authMiddleware, router.paymentHandler.GetIntent)
+	engine.POST("/webhooks/mercado-pago", router.paymentHandler.ProcessMercadoPagoWebhook)
 }
 
 func (router *Router) registerWorkOrderRoutes(engine *gin.Engine, authMiddleware gin.HandlerFunc) {

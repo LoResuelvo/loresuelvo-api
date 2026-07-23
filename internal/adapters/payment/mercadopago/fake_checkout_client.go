@@ -2,6 +2,7 @@ package mercadopago
 
 import (
 	"context"
+	"fmt"
 	"net/url"
 	"sync"
 
@@ -12,10 +13,11 @@ import (
 type FakeCheckoutClient struct {
 	mu       sync.Mutex
 	requests []payment.CheckoutRequest
+	payments map[string]payment.ExternalPayment
 }
 
 func NewFakeCheckoutClient() *FakeCheckoutClient {
-	return &FakeCheckoutClient{}
+	return &FakeCheckoutClient{payments: make(map[string]payment.ExternalPayment)}
 }
 
 func (client *FakeCheckoutClient) Provider() paymentaccount.PaymentProvider {
@@ -40,8 +42,42 @@ func (client *FakeCheckoutClient) CreateCheckout(
 	return payment.ExternalCheckout{ID: preferenceID, URL: checkoutURL.String()}, nil
 }
 
+func (client *FakeCheckoutClient) AddApprovedPayment(
+	externalReference,
+	sellerAccountID string,
+	amountCents int64,
+) string {
+	client.mu.Lock()
+	defer client.mu.Unlock()
+	externalPaymentID := "fake-payment-" + externalReference
+	client.payments[externalPaymentID] = payment.ExternalPayment{
+		ID:                externalPaymentID,
+		SellerAccountID:   sellerAccountID,
+		ExternalReference: externalReference,
+		Status:            payment.ExternalPaymentStatusApproved,
+		Currency:          "ARS",
+		AmountCents:       amountCents,
+	}
+	return externalPaymentID
+}
+
+func (client *FakeCheckoutClient) GetPayment(
+	_ context.Context,
+	_,
+	externalPaymentID string,
+) (payment.ExternalPayment, error) {
+	client.mu.Lock()
+	defer client.mu.Unlock()
+	externalPayment, exists := client.payments[externalPaymentID]
+	if !exists {
+		return payment.ExternalPayment{}, fmt.Errorf("fake Mercado Pago payment %q does not exist", externalPaymentID)
+	}
+	return externalPayment, nil
+}
+
 func (client *FakeCheckoutClient) Reset() {
 	client.mu.Lock()
 	defer client.mu.Unlock()
 	client.requests = nil
+	client.payments = make(map[string]payment.ExternalPayment)
 }

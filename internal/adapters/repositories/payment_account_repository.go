@@ -77,19 +77,43 @@ func (repository *PaymentAccountRepository) saveWithTx(ctx context.Context, tx *
 }
 
 func (repository *PaymentAccountRepository) FindByProviderID(ctx context.Context, providerID int, paymentProvider paymentaccount.PaymentProvider) (*paymentaccount.PaymentAccount, error) {
-	var externalAccountID string
-	var accessTokenCiphertext []byte
-	var refreshTokenCiphertext []byte
-	var tokenExpiresOn time.Time
-	err := repository.db.QueryRowContext(
+	return scanPaymentAccount(repository.db.QueryRowContext(
 		ctx,
-		`SELECT external_account_id, access_token_ciphertext, refresh_token_ciphertext,
+		`SELECT provider_id, payment_provider, external_account_id, access_token_ciphertext, refresh_token_ciphertext,
 		        token_expires_on
 		FROM provider_payment_accounts
 		WHERE provider_id = $1 AND payment_provider = $2`,
 		providerID,
 		paymentProvider,
-	).Scan(
+	))
+}
+
+func (repository *PaymentAccountRepository) FindByExternalAccountID(
+	ctx context.Context,
+	externalAccountID string,
+	paymentProvider paymentaccount.PaymentProvider,
+) (*paymentaccount.PaymentAccount, error) {
+	return scanPaymentAccount(repository.db.QueryRowContext(
+		ctx,
+		`SELECT provider_id, payment_provider, external_account_id, access_token_ciphertext, refresh_token_ciphertext,
+		        token_expires_on
+		FROM provider_payment_accounts
+		WHERE external_account_id = $1 AND payment_provider = $2`,
+		externalAccountID,
+		paymentProvider,
+	))
+}
+
+func scanPaymentAccount(row *sql.Row) (*paymentaccount.PaymentAccount, error) {
+	var providerID int
+	var paymentProvider paymentaccount.PaymentProvider
+	var externalAccountID string
+	var accessTokenCiphertext []byte
+	var refreshTokenCiphertext []byte
+	var tokenExpiresOn time.Time
+	err := row.Scan(
+		&providerID,
+		&paymentProvider,
 		&externalAccountID,
 		&accessTokenCiphertext,
 		&refreshTokenCiphertext,

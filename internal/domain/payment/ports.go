@@ -7,11 +7,13 @@ import (
 	paymentaccount "github.com/LoResuelvo/loresuelvo-api/internal/domain/payment_account"
 	serviceproposal "github.com/LoResuelvo/loresuelvo-api/internal/domain/service_proposal"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/user"
+	workorder "github.com/LoResuelvo/loresuelvo-api/internal/domain/work_order"
 )
 
 type IntentRepository interface {
 	Save(ctx context.Context, intent *Intent) error
 	SaveCheckoutReady(ctx context.Context, intent *Intent) error
+	FindByID(ctx context.Context, id string) (*Intent, error)
 }
 
 type ServiceProposalFinder interface {
@@ -24,6 +26,7 @@ type UserFinder interface {
 
 type PaymentAccountFinder interface {
 	FindByProviderID(ctx context.Context, providerID int, paymentProvider paymentaccount.PaymentProvider) (*paymentaccount.PaymentAccount, error)
+	FindByExternalAccountID(ctx context.Context, externalAccountID string, paymentProvider paymentaccount.PaymentProvider) (*paymentaccount.PaymentAccount, error)
 }
 
 type CredentialDecryptor interface {
@@ -33,6 +36,19 @@ type CredentialDecryptor interface {
 type CheckoutGateway interface {
 	Provider() paymentaccount.PaymentProvider
 	CreateCheckout(ctx context.Context, accessToken string, request CheckoutRequest) (ExternalCheckout, error)
+}
+
+type PaymentVerifier interface {
+	GetPayment(ctx context.Context, accessToken, externalPaymentID string) (ExternalPayment, error)
+}
+
+type Gateway interface {
+	CheckoutGateway
+	PaymentVerifier
+}
+
+type PaidBookingConfirmer interface {
+	ConfirmPaidBooking(ctx context.Context, intent *Intent, order *workorder.WorkOrder) (*workorder.WorkOrder, error)
 }
 
 type CheckoutRequest struct {
@@ -49,6 +65,24 @@ type CheckoutRequest struct {
 type ExternalCheckout struct {
 	ID  string
 	URL string
+}
+
+type ExternalPaymentStatus string
+
+const ExternalPaymentStatusApproved ExternalPaymentStatus = "approved"
+
+type ExternalPayment struct {
+	ID                string
+	SellerAccountID   string
+	ExternalReference string
+	Status            ExternalPaymentStatus
+	Currency          string
+	AmountCents       int64
+}
+
+type PaymentNotification struct {
+	ExternalPaymentID string
+	SellerAccountID   string
 }
 
 type IDGenerator func() string

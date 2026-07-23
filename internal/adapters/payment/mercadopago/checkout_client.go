@@ -3,11 +3,14 @@ package mercadopago
 import (
 	"context"
 	"fmt"
+	"math"
+	"strconv"
 	"strings"
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/payment"
 	paymentaccount "github.com/LoResuelvo/loresuelvo-api/internal/domain/payment_account"
 	mercadopagoconfig "github.com/mercadopago/sdk-go/pkg/config"
+	mercadopagopayment "github.com/mercadopago/sdk-go/pkg/payment"
 	"github.com/mercadopago/sdk-go/pkg/preference"
 )
 
@@ -19,9 +22,16 @@ type preferenceCreator interface {
 
 type preferenceClientFactory func(accessToken string) (preferenceCreator, error)
 
+type paymentGetter interface {
+	Get(ctx context.Context, id int) (*mercadopagopayment.Response, error)
+}
+
+type paymentClientFactory func(accessToken string) (paymentGetter, error)
+
 type CheckoutClient struct {
 	config                  Config
 	preferenceClientFactory preferenceClientFactory
+	paymentClientFactory    paymentClientFactory
 }
 
 func NewCheckoutClient(config Config) (*CheckoutClient, error) {
@@ -31,6 +41,7 @@ func NewCheckoutClient(config Config) (*CheckoutClient, error) {
 	return &CheckoutClient{
 		config:                  config,
 		preferenceClientFactory: newSDKPreferenceClient,
+		paymentClientFactory:    newSDKPaymentClient,
 	}, nil
 }
 
@@ -48,6 +59,14 @@ func newSDKPreferenceClient(accessToken string) (preferenceCreator, error) {
 		return nil, fmt.Errorf("configuring Mercado Pago SDK: %w", err)
 	}
 	return preference.NewClient(sdkConfig), nil
+}
+
+func newSDKPaymentClient(accessToken string) (paymentGetter, error) {
+	sdkConfig, err := mercadopagoconfig.New(accessToken)
+	if err != nil {
+		return nil, fmt.Errorf("configuring Mercado Pago SDK: %w", err)
+	}
+	return mercadopagopayment.NewClient(sdkConfig), nil
 }
 
 func (client *CheckoutClient) CreateCheckout(
@@ -112,6 +131,52 @@ func (client *CheckoutClient) CreateCheckout(
 	}, nil
 }
 
+func (client *CheckoutClient) GetPayment(
+	ctx context.Context,
+	accessToken,
+	externalPaymentID string,
+) (payment.ExternalPayment, error) {
+	if strings.TrimSpace(accessToken) == "" {
+		return payment.ExternalPayment{}, fmt.Errorf("getting Mercado Pago payment: access token is required")
+	}
+	paymentID, err := strconv.Atoi(strings.TrimSpace(externalPaymentID))
+	if err != nil || paymentID <= 0 {
+		return payment.ExternalPayment{}, fmt.Errorf("getting Mercado Pago payment: invalid payment id")
+	}
+	paymentClient, err := client.paymentClientFactory(accessToken)
+	if err != nil {
+		return payment.ExternalPayment{}, err
+	}
+	response, err := paymentClient.Get(ctx, paymentID)
+	if err != nil {
+		return payment.ExternalPayment{}, fmt.Errorf("getting Mercado Pago payment with SDK: %w", err)
+	}
+	if response == nil {
+		return payment.ExternalPayment{}, fmt.Errorf("getting Mercado Pago payment: empty response")
+	}
+	amountCents, err := centsFromSDKAmount(response.TransactionAmount)
+	if err != nil {
+		return payment.ExternalPayment{}, fmt.Errorf("getting Mercado Pago payment: %w", err)
+	}
+	return payment.ExternalPayment{
+		ID:                strconv.Itoa(response.ID),
+		SellerAccountID:   strconv.FormatInt(response.CollectorID, 10),
+		ExternalReference: response.ExternalReference,
+		Status:            payment.ExternalPaymentStatus(response.Status),
+		Currency:          response.CurrencyID,
+		AmountCents:       amountCents,
+	}, nil
+}
+
 func sdkAmountFromCents(cents int64) float64 {
 	return float64(cents) / 100
+}
+
+func centsFromSDKAmount(amount float64) (int64, error) {
+	cents := amount * 100
+	rounded := math.Round(cents)
+	if math.IsNaN(amount) || math.IsInf(amount, 0) || amount <= 0 || math.Abs(cents-rounded) > 0.000001 {
+		return 0, fmt.Errorf("invalid transaction amount")
+	}
+	return int64(rounded), nil
 }

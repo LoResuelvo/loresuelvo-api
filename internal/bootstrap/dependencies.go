@@ -104,15 +104,20 @@ func NewDependenciesWithChatbot(database *sql.DB, chatbot conversation.Chatbot) 
 	if err != nil {
 		return nil, err
 	}
-	checkoutGateway, err := mercadopagopayment.NewCheckoutClientFromEnv()
+	paymentGateway, err := mercadopagopayment.NewCheckoutClientFromEnv()
 	if err != nil {
 		return nil, fmt.Errorf("configuring Mercado Pago checkout: %w", err)
+	}
+	webhookVerifier, err := mercadopagopayment.NewWebhookVerifierFromEnv()
+	if err != nil {
+		return nil, err
 	}
 	return NewDependenciesWithPaymentAccountAdapters(
 		database,
 		chatbot,
 		paymentAccountOAuthConnector,
-		checkoutGateway,
+		paymentGateway,
+		webhookVerifier,
 		credentialCipher,
 		cryptography.NewSecureSecretGenerator(),
 		paymentAccountHandlerConfig,
@@ -123,7 +128,8 @@ func NewDependenciesWithPaymentAccountAdapters(
 	database *sql.DB,
 	chatbot conversation.Chatbot,
 	paymentAccountOAuthConnector paymentaccount.OAuthConnector,
-	checkoutGateway payment.CheckoutGateway,
+	paymentGateway payment.Gateway,
+	webhookVerifier payment_handler.WebhookVerifier,
 	credentialProtector paymentaccount.CredentialProtector,
 	secretGenerator paymentaccount.SecretGenerator,
 	paymentAccountHandlerConfig payment_account_handler.Config,
@@ -187,7 +193,9 @@ func NewDependenciesWithPaymentAccountAdapters(
 		persistence.UserRepository,
 		persistence.PaymentAccountRepository,
 		credentialProtector,
-		checkoutGateway,
+		paymentGateway,
+		paymentGateway,
+		persistence.WorkOrderRepository,
 		uuid.NewString,
 		systemClock,
 	)
@@ -224,7 +232,7 @@ func NewDependenciesWithPaymentAccountAdapters(
 		ConversationHandler:      conversation_handler.NewConversationHandler(conversationService),
 		JobRequestHandler:        job_request_handler.NewJobRequestHandler(jobRequestService),
 		PaymentAccountHandler:    payment_account_handler.NewPaymentAccountHandler(paymentAccountService, paymentAccountHandlerConfig),
-		PaymentHandler:           payment_handler.NewPaymentHandler(paymentService),
+		PaymentHandler:           payment_handler.NewPaymentHandler(paymentService, webhookVerifier),
 		UserHandler:              user_handler.NewUserHandler(userService),
 		FileHandler:              file_handler.NewFileHandler(fileService),
 		ServiceProposalHandler:   service_proposal_handler.NewServiceProposalHandler(servicePorposalService),

@@ -8,6 +8,7 @@ import (
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/clock"
 	serviceproposal "github.com/LoResuelvo/loresuelvo-api/internal/domain/service_proposal"
+	workorder "github.com/LoResuelvo/loresuelvo-api/internal/domain/work_order"
 )
 
 const bookingCheckoutValidity = 30 * time.Minute
@@ -19,6 +20,8 @@ type Service struct {
 	paymentAccountFinder  PaymentAccountFinder
 	credentialDecryptor   CredentialDecryptor
 	checkoutGateway       CheckoutGateway
+	paymentVerifier       PaymentVerifier
+	paidBookingConfirmer  PaidBookingConfirmer
 	idGenerator           IDGenerator
 	clock                 clock.Clock
 }
@@ -30,6 +33,8 @@ func NewService(
 	paymentAccountFinder PaymentAccountFinder,
 	credentialDecryptor CredentialDecryptor,
 	checkoutGateway CheckoutGateway,
+	paymentVerifier PaymentVerifier,
+	paidBookingConfirmer PaidBookingConfirmer,
 	idGenerator IDGenerator,
 	clock clock.Clock,
 ) *Service {
@@ -40,6 +45,8 @@ func NewService(
 		paymentAccountFinder:  paymentAccountFinder,
 		credentialDecryptor:   credentialDecryptor,
 		checkoutGateway:       checkoutGateway,
+		paymentVerifier:       paymentVerifier,
+		paidBookingConfirmer:  paidBookingConfirmer,
 		idGenerator:           idGenerator,
 		clock:                 clock,
 	}
@@ -131,4 +138,81 @@ func (service *Service) StartBookingCheckout(ctx context.Context, authID string,
 	}
 
 	return intent, nil
+}
+
+func (service *Service) GetIntent(ctx context.Context, authID, intentID string) (*Intent, error) {
+	foundUser, err := service.userFinder.FindByAuthID(authID)
+	if err != nil {
+		return nil, ErrOnlyProposalRecipientCanView
+	}
+	intent, err := service.intentRepository.FindByID(ctx, intentID)
+	if err != nil {
+		return nil, err
+	}
+	proposal, err := service.serviceProposalFinder.FindByID(ctx, intent.ServiceProposalID)
+	if err != nil {
+		return nil, err
+	}
+	if proposal.Consumer == nil || proposal.Consumer.ID() != foundUser.ID() {
+		return nil, ErrOnlyProposalRecipientCanView
+	}
+	return intent, nil
+}
+
+func (service *Service) ProcessPaymentNotification(
+	ctx context.Context,
+	notification PaymentNotification,
+) error {
+	if strings.TrimSpace(notification.ExternalPaymentID) == "" ||
+		strings.TrimSpace(notification.SellerAccountID) == "" {
+		return ErrInvalidExternalPayment
+	}
+	account, err := service.paymentAccountFinder.FindByExternalAccountID(
+		ctx,
+		notification.SellerAccountID,
+		service.checkoutGateway.Provider(),
+	)
+	if err != nil {
+		return fmt.Errorf("finding notified payment account: %w", err)
+	}
+	accessToken, err := service.credentialDecryptor.Decrypt(account.AccessTokenCiphertext())
+	if err != nil {
+		return fmt.Errorf("decrypting notified payment credential: %w", err)
+	}
+	externalPayment, err := service.paymentVerifier.GetPayment(
+		ctx,
+		accessToken,
+		notification.ExternalPaymentID,
+	)
+	if err != nil {
+		return fmt.Errorf("verifying external payment: %w", err)
+	}
+	if externalPayment.ID != notification.ExternalPaymentID ||
+		externalPayment.SellerAccountID != notification.SellerAccountID {
+		return ErrInvalidExternalPayment
+	}
+
+	intent, err := service.intentRepository.FindByID(ctx, externalPayment.ExternalReference)
+	if err != nil {
+		return err
+	}
+	now := service.clock.Now().UTC()
+	if err := intent.MarkPaid(externalPayment, now); err != nil {
+		return err
+	}
+	proposal, err := service.serviceProposalFinder.FindByID(ctx, intent.ServiceProposalID)
+	if err != nil {
+		return err
+	}
+	if err := proposal.Accept(proposal.Consumer.ID(), now); err != nil {
+		return err
+	}
+	order, err := workorder.New(proposal, now)
+	if err != nil {
+		return err
+	}
+	if _, err := service.paidBookingConfirmer.ConfirmPaidBooking(ctx, intent, order); err != nil {
+		return err
+	}
+	return nil
 }

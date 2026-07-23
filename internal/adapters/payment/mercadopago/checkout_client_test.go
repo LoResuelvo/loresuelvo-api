@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/payment"
+	mercadopagopayment "github.com/mercadopago/sdk-go/pkg/payment"
 	"github.com/mercadopago/sdk-go/pkg/preference"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -17,6 +18,17 @@ type preferenceCreatorStub struct {
 	request  preference.Request
 	response *preference.Response
 	err      error
+}
+
+type paymentGetterStub struct {
+	id       int
+	response *mercadopagopayment.Response
+	err      error
+}
+
+func (getter *paymentGetterStub) Get(_ context.Context, id int) (*mercadopagopayment.Response, error) {
+	getter.id = id
+	return getter.response, getter.err
 }
 
 func (creator *preferenceCreatorStub) Create(
@@ -112,4 +124,39 @@ func TestSDKAmountFromCentsPreservesCentPrecisionAtAdapterBoundary(t *testing.T)
 	require.NoError(t, err)
 	assert.Contains(t, string(encoded), `"unit_price":100000.03`)
 	assert.Contains(t, string(encoded), `"marketplace_fee":5000.03`)
+}
+
+func TestCheckoutClientGetsVerifiedPaymentWithSellerCredential(t *testing.T) {
+	client, err := NewCheckoutClient(Config{
+		SuccessURL:      "https://app.loresuelvo.test/payments/success",
+		PendingURL:      "https://app.loresuelvo.test/payments/pending",
+		FailureURL:      "https://app.loresuelvo.test/payments/failure",
+		NotificationURL: "https://api.loresuelvo.test/webhooks/mercado-pago",
+	})
+	require.NoError(t, err)
+	getter := &paymentGetterStub{response: &mercadopagopayment.Response{
+		ID:                123456,
+		CollectorID:       987654,
+		ExternalReference: "f69bfe31-ce5d-4f85-a8c5-643ca2dcaa36",
+		Status:            "approved",
+		CurrencyID:        "ARS",
+		TransactionAmount: 21000,
+	}}
+	var accessToken string
+	client.paymentClientFactory = func(token string) (paymentGetter, error) {
+		accessToken = token
+		return getter, nil
+	}
+
+	externalPayment, err := client.GetPayment(context.Background(), "seller-token", "123456")
+
+	require.NoError(t, err)
+	assert.Equal(t, 123456, getter.id)
+	assert.Equal(t, "seller-token", accessToken)
+	assert.Equal(t, "123456", externalPayment.ID)
+	assert.Equal(t, "987654", externalPayment.SellerAccountID)
+	assert.Equal(t, "f69bfe31-ce5d-4f85-a8c5-643ca2dcaa36", externalPayment.ExternalReference)
+	assert.Equal(t, payment.ExternalPaymentStatusApproved, externalPayment.Status)
+	assert.Equal(t, "ARS", externalPayment.Currency)
+	assert.Equal(t, int64(2100000), externalPayment.AmountCents)
 }

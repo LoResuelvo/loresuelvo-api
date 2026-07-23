@@ -17,6 +17,7 @@ type IntentStatus string
 const (
 	StatusRequiresCheckout IntentStatus = "requires_checkout"
 	StatusCheckoutReady    IntentStatus = "checkout_ready"
+	StatusPaid             IntentStatus = "paid"
 )
 
 type Intent struct {
@@ -95,5 +96,22 @@ func (intent *Intent) MarkCheckoutReady(externalID, checkoutURL string, expiresO
 		CreatedOn:  now,
 	}
 	intent.UpdatedOn = now
+	return nil
+}
+
+func (intent *Intent) MarkPaid(externalPayment ExternalPayment, now time.Time) error {
+	if intent == nil ||
+		intent.Status != StatusCheckoutReady ||
+		strings.TrimSpace(externalPayment.ID) == "" ||
+		externalPayment.Status != ExternalPaymentStatusApproved ||
+		externalPayment.ExternalReference != intent.ID ||
+		externalPayment.Currency != intent.Currency ||
+		externalPayment.AmountCents != intent.TotalAmountCents ||
+		now.IsZero() {
+		return ErrInvalidExternalPayment
+	}
+
+	intent.Status = StatusPaid
+	intent.UpdatedOn = now.UTC()
 	return nil
 }

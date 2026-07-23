@@ -11,6 +11,7 @@ import (
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/provider"
 	serviceproposal "github.com/LoResuelvo/loresuelvo-api/internal/domain/service_proposal"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/user"
+	workorder "github.com/LoResuelvo/loresuelvo-api/internal/domain/work_order"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -18,6 +19,14 @@ import (
 type intentRepositoryStub struct {
 	saved              *payment.Intent
 	checkoutReadySaved *payment.Intent
+	found              *payment.Intent
+}
+
+func (repository *intentRepositoryStub) FindByID(context.Context, string) (*payment.Intent, error) {
+	if repository.found == nil {
+		return nil, payment.ErrIntentDoesNotExist
+	}
+	return repository.found, nil
 }
 
 func (repository *intentRepositoryStub) Save(_ context.Context, intent *payment.Intent) error {
@@ -50,6 +59,14 @@ type paymentAccountFinderStub struct {
 	account *paymentaccount.PaymentAccount
 }
 
+func (finder paymentAccountFinderStub) FindByExternalAccountID(
+	context.Context,
+	string,
+	paymentaccount.PaymentProvider,
+) (*paymentaccount.PaymentAccount, error) {
+	return finder.account, nil
+}
+
 func (finder paymentAccountFinderStub) FindByProviderID(
 	context.Context,
 	int,
@@ -67,6 +84,7 @@ func (credentialDecryptorStub) Decrypt([]byte) (string, error) {
 type checkoutGatewayStub struct {
 	accessToken string
 	request     payment.CheckoutRequest
+	payment     payment.ExternalPayment
 }
 
 func (gateway *checkoutGatewayStub) Provider() paymentaccount.PaymentProvider {
@@ -84,6 +102,29 @@ func (gateway *checkoutGatewayStub) CreateCheckout(
 		ID:  "mp-preference-42",
 		URL: "https://www.mercadopago.com.ar/checkout/v1/redirect?pref_id=mp-preference-42",
 	}, nil
+}
+
+func (gateway *checkoutGatewayStub) GetPayment(
+	context.Context,
+	string,
+	string,
+) (payment.ExternalPayment, error) {
+	return gateway.payment, nil
+}
+
+type paidBookingConfirmerStub struct {
+	intent *payment.Intent
+	order  *workorder.WorkOrder
+}
+
+func (confirmer *paidBookingConfirmerStub) ConfirmPaidBooking(
+	_ context.Context,
+	intent *payment.Intent,
+	order *workorder.WorkOrder,
+) (*workorder.WorkOrder, error) {
+	confirmer.intent = intent
+	confirmer.order = order
+	return order, nil
 }
 
 type clockStub struct {
@@ -142,6 +183,8 @@ func TestStartBookingCheckoutCreatesReadyIntentWithFrozenProposalPricing(t *test
 		paymentAccountFinderStub{account: account},
 		credentialDecryptorStub{},
 		checkoutGateway,
+		checkoutGateway,
+		nil,
 		func() string { return "f69bfe31-ce5d-4f85-a8c5-643ca2dcaa36" },
 		clockStub{now: now},
 	)
@@ -164,4 +207,84 @@ func TestStartBookingCheckoutCreatesReadyIntentWithFrozenProposalPricing(t *test
 	require.NotNil(t, intent.CheckoutSession)
 	assert.Equal(t, checkoutGateway.request.ExpiresOn, intent.CheckoutSession.ExpiresOn)
 	assert.Equal(t, serviceproposal.StatusPending, proposal.Status)
+}
+
+func TestProcessApprovedPaymentConfirmsPaidBooking(t *testing.T) {
+	now := time.Date(2026, time.July, 4, 13, 0, 0, 0, time.UTC)
+	scheduledOn := now.Add(48 * time.Hour)
+	terms, err := serviceproposal.NewBookingPolicy().Calculate(10000000, scheduledOn)
+	require.NoError(t, err)
+	proposalConsumer := &consumer.Consumer{BaseUser: user.RehydrateBaseUser(
+		10, "auth0|consumer", "ana@example.com", "Ana", "Pérez", consumer.Role, nil,
+	)}
+	proposalProvider := &provider.Provider{BaseUser: user.RehydrateBaseUser(
+		20, "auth0|provider", "juan@example.com", "Juan", "Gómez", provider.Role, nil,
+	)}
+	proposal := &serviceproposal.ServiceProposal{
+		ID:           42,
+		Consumer:     proposalConsumer,
+		Provider:     proposalProvider,
+		Status:       serviceproposal.StatusPending,
+		ScheduledOn:  scheduledOn,
+		Description:  "Reparación de pérdida de agua.",
+		BookingTerms: terms,
+	}
+	intent, err := payment.NewBookingDepositIntent(
+		"f69bfe31-ce5d-4f85-a8c5-643ca2dcaa36",
+		proposal.ID,
+		terms,
+		now.Add(-time.Minute),
+	)
+	require.NoError(t, err)
+	require.NoError(t, intent.MarkCheckoutReady(
+		"mp-preference-42",
+		"https://www.mercadopago.com.ar/checkout/v1/redirect?pref_id=mp-preference-42",
+		now.Add(29*time.Minute),
+		now.Add(-30*time.Second),
+	))
+	account, err := paymentaccount.NewPaymentAccount(
+		proposalProvider.ID(),
+		paymentaccount.PaymentProvider("mercado_pago"),
+		"mp-provider",
+		[]byte("encrypted-access-token"),
+		nil,
+		now.Add(24*time.Hour),
+	)
+	require.NoError(t, err)
+	intentRepository := &intentRepositoryStub{found: intent}
+	gateway := &checkoutGatewayStub{payment: payment.ExternalPayment{
+		ID:                "123456",
+		SellerAccountID:   "mp-provider",
+		ExternalReference: intent.ID,
+		Status:            payment.ExternalPaymentStatusApproved,
+		Currency:          "ARS",
+		AmountCents:       intent.TotalAmountCents,
+	}}
+	confirmer := &paidBookingConfirmerStub{}
+	service := payment.NewService(
+		intentRepository,
+		proposalFinderStub{proposal: proposal},
+		userFinderStub{},
+		paymentAccountFinderStub{account: account},
+		credentialDecryptorStub{},
+		gateway,
+		gateway,
+		confirmer,
+		func() string { return "unused" },
+		clockStub{now: now},
+	)
+
+	err = service.ProcessPaymentNotification(context.Background(), payment.PaymentNotification{
+		ExternalPaymentID: "123456",
+		SellerAccountID:   "mp-provider",
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, payment.StatusPaid, intent.Status)
+	assert.Equal(t, serviceproposal.StatusAccepted, proposal.Status)
+	assert.Same(t, intent, confirmer.intent)
+	require.NotNil(t, confirmer.order)
+	assert.Equal(t, proposal.ID, confirmer.order.ServiceProposalID())
+	assert.Equal(t, workorder.StatusScheduled, confirmer.order.Status)
+	assert.Equal(t, now, confirmer.order.AcceptedOn)
 }

@@ -1,13 +1,19 @@
 package steps_test
 
 import (
+	"bytes"
 	"context"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -19,13 +25,14 @@ import (
 )
 
 const (
-	workOrderStatusScheduled    = "scheduled"
-	checkoutReadyStatus         = "checkout_ready"
-	bookingDepositCheckoutPath  = "/service-proposals/%d/checkout-sessions"
-	paymentIntentPath           = "/payment-intents/%s"
-	defaultBookingCurrency      = "ARS"
-	defaultBookingProviderEmail = "juan.plomero@example.com"
-	defaultBookingConsumerEmail = "ana@example.com"
+	workOrderStatusScheduled     = "scheduled"
+	checkoutReadyStatus          = "checkout_ready"
+	bookingDepositCheckoutPath   = "/service-proposals/%d/checkout-sessions"
+	paymentIntentPath            = "/payment-intents/%s"
+	defaultBookingCurrency       = "ARS"
+	defaultBookingProviderEmail  = "juan.plomero@example.com"
+	defaultBookingConsumerEmail  = "ana@example.com"
+	testMercadoPagoWebhookSecret = "test-mercado-pago-webhook-secret"
 )
 
 type checkoutSessionResponse struct {
@@ -398,11 +405,77 @@ func (suite *testSuite) requestCheckoutConcurrentlyTwice() error {
 }
 
 func (suite *testSuite) processApprovedPaymentForAmount(amount string) error {
-	return godog.ErrPending
+	amountCents, err := httphandler.ParseAmountToCents(amount)
+	if err != nil {
+		return err
+	}
+	if suite.lastPaymentIntentID == "" {
+		return fmt.Errorf("expected a prepared payment intent")
+	}
+	externalPaymentID := suite.checkoutClient.AddApprovedPayment(
+		suite.lastPaymentIntentID,
+		"mp-juan",
+		amountCents,
+	)
+	requestID := "bdd-mercado-pago-request"
+	timestamp := strconv.FormatInt(time.Now().UnixMilli(), 10)
+	manifest := "id:" + strings.ToLower(externalPaymentID) +
+		";request-id:" + requestID +
+		";ts:" + timestamp + ";"
+	signatureMAC := hmac.New(sha256.New, []byte(testMercadoPagoWebhookSecret))
+	if _, err := signatureMAC.Write([]byte(manifest)); err != nil {
+		return fmt.Errorf("signing fake Mercado Pago notification: %w", err)
+	}
+	signature := "ts=" + timestamp + ",v1=" + hex.EncodeToString(signatureMAC.Sum(nil))
+	body, err := json.Marshal(map[string]any{
+		"type":    "payment",
+		"user_id": "mp-juan",
+		"data": map[string]string{
+			"id": externalPaymentID,
+		},
+	})
+	if err != nil {
+		return fmt.Errorf("encoding fake Mercado Pago notification: %w", err)
+	}
+	request, err := http.NewRequest(
+		http.MethodPost,
+		suite.server.URL+"/webhooks/mercado-pago?data.id="+url.QueryEscape(externalPaymentID)+"&type=payment",
+		bytes.NewReader(body),
+	)
+	if err != nil {
+		return err
+	}
+	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set("X-Request-Id", requestID)
+	request.Header.Set("X-Signature", signature)
+	response, err := http.DefaultClient.Do(request)
+	if err != nil {
+		return fmt.Errorf("sending fake Mercado Pago notification: %w", err)
+	}
+	defer response.Body.Close()
+	responseBody, err := io.ReadAll(response.Body)
+	if err != nil {
+		return fmt.Errorf("reading Mercado Pago notification response: %w", err)
+	}
+	suite.lastStatus = response.StatusCode
+	suite.lastBody = responseBody
+	if response.StatusCode != http.StatusOK {
+		return fmt.Errorf(
+			"expected Mercado Pago notification status 200, got %d with body %s",
+			response.StatusCode,
+			responseBody,
+		)
+	}
+	return nil
 }
 
 func (suite *testSuite) processApprovedPayment() error {
-	return godog.ErrPending
+	if suite.lastCheckoutResponse.Pricing.AmountDueNowCents <= 0 {
+		return fmt.Errorf("expected checkout pricing before approving payment")
+	}
+	return suite.processApprovedPaymentForAmount(
+		fmt.Sprintf("%.2f", float64(suite.lastCheckoutResponse.Pricing.AmountDueNowCents)/100),
+	)
 }
 
 func (suite *testSuite) processProcessingPayment() error {

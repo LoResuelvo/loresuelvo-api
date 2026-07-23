@@ -3,6 +3,7 @@ package repositories
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/payment"
@@ -105,6 +106,79 @@ func (repository *PaymentIntentRepository) SaveCheckoutReady(ctx context.Context
 	}
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("committing checkout-ready payment intent transaction: %w", err)
+	}
+	return nil
+}
+
+func (repository *PaymentIntentRepository) FindByID(ctx context.Context, id string) (*payment.Intent, error) {
+	var intent payment.Intent
+	err := repository.db.QueryRowContext(
+		ctx,
+		`SELECT
+			id,
+			service_proposal_id,
+			purpose,
+			currency,
+			seller_amount_cents,
+			platform_fee_cents,
+			total_amount_cents,
+			status,
+			created_on,
+			updated_on
+		FROM payment_intents
+		WHERE id = $1`,
+		id,
+	).Scan(
+		&intent.ID,
+		&intent.ServiceProposalID,
+		&intent.Purpose,
+		&intent.Currency,
+		&intent.SellerAmountCents,
+		&intent.PlatformFeeCents,
+		&intent.TotalAmountCents,
+		&intent.Status,
+		&intent.CreatedOn,
+		&intent.UpdatedOn,
+	)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, payment.ErrIntentDoesNotExist
+	}
+	if err != nil {
+		return nil, fmt.Errorf("finding payment intent: %w", err)
+	}
+	return &intent, nil
+}
+
+func (repository *PaymentIntentRepository) markPaidWithTx(
+	ctx context.Context,
+	tx *sql.Tx,
+	intent *payment.Intent,
+) error {
+	if tx == nil {
+		return fmt.Errorf("marking payment intent paid: transaction is required")
+	}
+	if intent == nil || intent.Status != payment.StatusPaid {
+		return fmt.Errorf("marking payment intent paid: paid intent is required")
+	}
+	result, err := tx.ExecContext(
+		ctx,
+		`UPDATE payment_intents
+		SET status = $1, updated_on = $2
+		WHERE id = $3 AND status = $4`,
+		intent.Status,
+		intent.UpdatedOn,
+		intent.ID,
+		payment.StatusCheckoutReady,
+	)
+	if err != nil {
+		return fmt.Errorf("marking payment intent paid: %w", err)
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("checking paid payment intent update: %w", err)
+	}
+	if affected != 1 {
+		return fmt.Errorf("marking payment intent paid: unexpected current status")
 	}
 	return nil
 }

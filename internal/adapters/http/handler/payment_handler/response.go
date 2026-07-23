@@ -29,6 +29,18 @@ type bookingTermsResponse struct {
 	BookingPaymentDeadline       time.Time `json:"booking_payment_deadline"`
 }
 
+type paymentIntentResponse struct {
+	ID     string `json:"id"`
+	Status string `json:"status"`
+}
+
+func paymentIntentResponseFromDomain(intent *payment.Intent) paymentIntentResponse {
+	return paymentIntentResponse{
+		ID:     intent.ID,
+		Status: string(intent.Status),
+	}
+}
+
 func checkoutSessionResponseFromDomain(intent *payment.Intent) checkoutSessionResponse {
 	return checkoutSessionResponse{
 		PaymentIntentID: intent.ID,

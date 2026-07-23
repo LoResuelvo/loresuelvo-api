@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/consumer"
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/payment"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/provider"
 	serviceproposal "github.com/LoResuelvo/loresuelvo-api/internal/domain/service_proposal"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/user"
@@ -18,10 +19,19 @@ import (
 type WorkOrderRepository struct {
 	db                        *sql.DB
 	serviceProposalRepository *ServiceProposalRepository
+	paymentIntentRepository   *PaymentIntentRepository
 }
 
-func NewWorkOrderRepository(db *sql.DB, serviceProposalRepository *ServiceProposalRepository) *WorkOrderRepository {
-	return &WorkOrderRepository{db: db, serviceProposalRepository: serviceProposalRepository}
+func NewWorkOrderRepository(
+	db *sql.DB,
+	serviceProposalRepository *ServiceProposalRepository,
+	paymentIntentRepository ...*PaymentIntentRepository,
+) *WorkOrderRepository {
+	repository := &WorkOrderRepository{db: db, serviceProposalRepository: serviceProposalRepository}
+	if len(paymentIntentRepository) > 0 {
+		repository.paymentIntentRepository = paymentIntentRepository[0]
+	}
+	return repository
 }
 
 func (r *WorkOrderRepository) Save(ctx context.Context, order *workorder.WorkOrder) (*workorder.WorkOrder, error) {
@@ -82,6 +92,42 @@ func (r *WorkOrderRepository) FindByServiceProposalID(ctx context.Context, servi
 	order.ServiceProposal = foundProposal
 
 	return &order, nil
+}
+
+func (r *WorkOrderRepository) ConfirmPaidBooking(
+	ctx context.Context,
+	intent *payment.Intent,
+	order *workorder.WorkOrder,
+) (*workorder.WorkOrder, error) {
+	if r.paymentIntentRepository == nil {
+		return nil, fmt.Errorf("confirming paid booking: payment intent repository is required")
+	}
+	if intent == nil || order == nil {
+		return nil, fmt.Errorf("confirming paid booking: payment intent and work order are required")
+	}
+	proposal, ok := order.ServiceProposal.(*serviceproposal.ServiceProposal)
+	if !ok || proposal == nil {
+		return nil, fmt.Errorf("confirming paid booking: service proposal is required")
+	}
+
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, fmt.Errorf("beginning paid booking transaction: %w", err)
+	}
+	if err := r.paymentIntentRepository.markPaidWithTx(ctx, tx, intent); err != nil {
+		return nil, rollbackWorkOrderTx(tx, err)
+	}
+	if err := r.serviceProposalRepository.updateAcceptedWithTx(ctx, tx, proposal); err != nil {
+		return nil, rollbackWorkOrderTx(tx, err)
+	}
+	savedOrder, err := r.saveWithTx(ctx, tx, order)
+	if err != nil {
+		return nil, rollbackWorkOrderTx(tx, err)
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, fmt.Errorf("committing paid booking transaction: %w", err)
+	}
+	return savedOrder, nil
 }
 
 func (r *WorkOrderRepository) FindByUserID(ctx context.Context, userID int, viewerRole string) ([]readmodel.WorkOrderSummary, error) {

@@ -242,11 +242,14 @@ func newTestSuite(tb testing.TB, database *sql.DB) *testSuite {
 	)
 	require.NoError(tb, err, "could not initialize test credential cipher")
 	checkoutClient := paymentmercadopago.NewFakeCheckoutClient()
+	webhookVerifier, err := paymentmercadopago.NewWebhookVerifier("test-mercado-pago-webhook-secret")
+	require.NoError(tb, err, "could not initialize test webhook verifier")
 	dependencies := bootstrap.NewDependenciesWithPaymentAccountAdapters(
 		database,
 		chatbot,
 		mercadopago.NewFakeOAuthClient(),
 		checkoutClient,
+		webhookVerifier,
 		credentialCipher,
 		cryptography.NewSecureSecretGenerator(),
 		payment_account_handler.Config{
