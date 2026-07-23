@@ -61,7 +61,10 @@ func (client *CheckoutClient) CreateCheckout(
 		checkoutRequest.SellerAmountCents <= 0 ||
 		checkoutRequest.PlatformFeeCents < 0 ||
 		checkoutRequest.TotalAmountCents != checkoutRequest.SellerAmountCents+checkoutRequest.PlatformFeeCents ||
-		strings.TrimSpace(checkoutRequest.PayerEmail) == "" {
+		strings.TrimSpace(checkoutRequest.PayerEmail) == "" ||
+		checkoutRequest.StartsOn.IsZero() ||
+		checkoutRequest.ExpiresOn.IsZero() ||
+		!checkoutRequest.ExpiresOn.After(checkoutRequest.StartsOn) {
 		return payment.ExternalCheckout{}, fmt.Errorf("creating Mercado Pago preference: invalid checkout request")
 	}
 	request := preference.Request{
@@ -82,10 +85,13 @@ func (client *CheckoutClient) CreateCheckout(
 		PaymentMethods: &preference.PaymentMethodsRequest{
 			ExcludedPaymentTypes: []preference.ExcludedPaymentTypeRequest{{ID: "ticket"}},
 		},
-		ExternalReference: checkoutRequest.ExternalReference,
-		NotificationURL:   client.config.NotificationURL,
-		MarketplaceFee:    sdkAmountFromCents(checkoutRequest.PlatformFeeCents),
-		BinaryMode:        false,
+		ExternalReference:  checkoutRequest.ExternalReference,
+		NotificationURL:    client.config.NotificationURL,
+		MarketplaceFee:     sdkAmountFromCents(checkoutRequest.PlatformFeeCents),
+		BinaryMode:         false,
+		Expires:            true,
+		ExpirationDateFrom: &checkoutRequest.StartsOn,
+		ExpirationDateTo:   &checkoutRequest.ExpiresOn,
 	}
 	preferenceClient, err := client.preferenceClientFactory(accessToken)
 	if err != nil {

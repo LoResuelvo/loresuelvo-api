@@ -50,10 +50,7 @@ func TestPaymentIntentRepositoryPersistsCheckoutReadyIntentAndSession(t *testing
 	intent, err := payment.NewBookingDepositIntent(
 		"f69bfe31-ce5d-4f85-a8c5-643ca2dcaa36",
 		proposal.ID,
-		"ARS",
-		2000000,
-		100000,
-		2100000,
+		proposal.BookingTerms,
 		now,
 	)
 	require.NoError(t, err)
@@ -62,6 +59,7 @@ func TestPaymentIntentRepositoryPersistsCheckoutReadyIntentAndSession(t *testing
 	require.NoError(t, intent.MarkCheckoutReady(
 		"mp-preference-42",
 		"https://www.mercadopago.com.ar/checkout/v1/redirect?pref_id=mp-preference-42",
+		now.Add(30*time.Minute),
 		now.Add(time.Second),
 	))
 
@@ -82,13 +80,15 @@ func TestPaymentIntentRepositoryPersistsCheckoutReadyIntentAndSession(t *testing
 	assert.Equal(t, intent.TotalAmountCents, storedTotal)
 
 	var storedIntentID, storedPreferenceID, storedCheckoutURL string
+	var storedExpiresOn time.Time
 	require.NoError(t, testContext.database.QueryRow(
-		`SELECT payment_intent_id, external_preference_id, checkout_url
+		`SELECT payment_intent_id, external_preference_id, checkout_url, expires_on
 		FROM payment_checkout_sessions
 		WHERE payment_intent_id = $1`,
 		intent.ID,
-	).Scan(&storedIntentID, &storedPreferenceID, &storedCheckoutURL))
+	).Scan(&storedIntentID, &storedPreferenceID, &storedCheckoutURL, &storedExpiresOn))
 	assert.Equal(t, intent.ID, storedIntentID)
 	assert.Equal(t, intent.CheckoutSession.ExternalID, storedPreferenceID)
 	assert.Equal(t, intent.CheckoutSession.URL, storedCheckoutURL)
+	assert.True(t, intent.CheckoutSession.ExpiresOn.Equal(storedExpiresOn))
 }

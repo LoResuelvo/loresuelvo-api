@@ -4,15 +4,13 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/clock"
 	serviceproposal "github.com/LoResuelvo/loresuelvo-api/internal/domain/service_proposal"
 )
 
-type BookingCheckout struct {
-	Intent  *Intent
-	Pricing serviceproposal.BookingTerms
-}
+const bookingCheckoutValidity = 30 * time.Minute
 
 type Service struct {
 	intentRepository      IntentRepository
@@ -47,7 +45,7 @@ func NewService(
 	}
 }
 
-func (service *Service) StartBookingCheckout(ctx context.Context, authID string, proposalID int) (*BookingCheckout, error) {
+func (service *Service) StartBookingCheckout(ctx context.Context, authID string, proposalID int) (*Intent, error) {
 	foundUser, err := service.userFinder.FindByAuthID(authID)
 	if err != nil {
 		return nil, ErrOnlyProposalRecipientCanCheckout
@@ -85,14 +83,19 @@ func (service *Service) StartBookingCheckout(ctx context.Context, authID string,
 		return nil, fmt.Errorf("decrypting provider payment credential: decrypted credential is empty")
 	}
 
-	now := service.clock.Now()
+	now := service.clock.Now().UTC()
+	expiresOn := now.Add(bookingCheckoutValidity)
+	bookingPaymentDeadline := proposal.BookingTerms.BookingPaymentDeadline().UTC()
+	if bookingPaymentDeadline.Before(expiresOn) {
+		expiresOn = bookingPaymentDeadline
+	}
+	if !expiresOn.After(now) {
+		return nil, ErrInvalidCheckoutSession
+	}
 	intent, err := NewBookingDepositIntent(
 		service.idGenerator(),
 		proposal.ID,
-		proposal.BookingTerms.Currency(),
-		proposal.BookingTerms.DepositCents(),
-		proposal.BookingTerms.PlatformFeeDueNowCents(),
-		proposal.BookingTerms.AmountDueNowCents(),
+		proposal.BookingTerms,
 		now,
 	)
 	if err != nil {
@@ -109,16 +112,23 @@ func (service *Service) StartBookingCheckout(ctx context.Context, authID string,
 		PlatformFeeCents:  intent.PlatformFeeCents,
 		TotalAmountCents:  intent.TotalAmountCents,
 		PayerEmail:        foundUser.Email(),
+		StartsOn:          now,
+		ExpiresOn:         expiresOn,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("creating external checkout: %w", err)
 	}
-	if err := intent.MarkCheckoutReady(externalCheckout.ID, externalCheckout.URL, service.clock.Now()); err != nil {
+	if err := intent.MarkCheckoutReady(
+		externalCheckout.ID,
+		externalCheckout.URL,
+		expiresOn,
+		service.clock.Now(),
+	); err != nil {
 		return nil, err
 	}
 	if err := service.intentRepository.SaveCheckoutReady(ctx, intent); err != nil {
 		return nil, err
 	}
 
-	return &BookingCheckout{Intent: intent, Pricing: proposal.BookingTerms}, nil
+	return intent, nil
 }

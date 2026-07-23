@@ -11,7 +11,7 @@ type checkoutSessionResponse struct {
 	PaymentIntentID string               `json:"payment_intent_id"`
 	Status          string               `json:"status"`
 	CheckoutURL     string               `json:"checkout_url"`
-	ExpiresOn       *time.Time           `json:"expires_on,omitempty"`
+	ExpiresOn       time.Time            `json:"expires_on"`
 	Pricing         bookingTermsResponse `json:"pricing"`
 }
 
@@ -29,12 +29,13 @@ type bookingTermsResponse struct {
 	BookingPaymentDeadline       time.Time `json:"booking_payment_deadline"`
 }
 
-func checkoutSessionResponseFromDomain(checkout *payment.BookingCheckout) checkoutSessionResponse {
+func checkoutSessionResponseFromDomain(intent *payment.Intent) checkoutSessionResponse {
 	return checkoutSessionResponse{
-		PaymentIntentID: checkout.Intent.ID,
-		Status:          string(checkout.Intent.Status),
-		CheckoutURL:     checkout.Intent.CheckoutSession.URL,
-		Pricing:         bookingTermsResponseFromDomain(checkout.Pricing),
+		PaymentIntentID: intent.ID,
+		Status:          string(intent.Status),
+		CheckoutURL:     intent.CheckoutSession.URL,
+		ExpiresOn:       intent.CheckoutSession.ExpiresOn,
+		Pricing:         bookingTermsResponseFromDomain(intent.BookingTerms),
 	}
 }
 

@@ -2,6 +2,7 @@ package payment
 
 import (
 	"context"
+	"time"
 
 	paymentaccount "github.com/LoResuelvo/loresuelvo-api/internal/domain/payment_account"
 	serviceproposal "github.com/LoResuelvo/loresuelvo-api/internal/domain/service_proposal"
@@ -41,6 +42,8 @@ type CheckoutRequest struct {
 	PlatformFeeCents  int64
 	TotalAmountCents  int64
 	PayerEmail        string
+	StartsOn          time.Time
+	ExpiresOn         time.Time
 }
 
 type ExternalCheckout struct {

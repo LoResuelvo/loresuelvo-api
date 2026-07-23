@@ -46,13 +46,16 @@ CREATE TABLE payment_checkout_sessions (
     processor VARCHAR(50) NOT NULL,
     external_preference_id VARCHAR(255) NOT NULL,
     checkout_url TEXT NOT NULL,
+    expires_on TIMESTAMPTZ NOT NULL,
     created_on TIMESTAMPTZ NOT NULL,
     CONSTRAINT payment_checkout_sessions_processor_check
         CHECK (processor = 'mercado_pago'),
     CONSTRAINT payment_checkout_sessions_external_preference_unique
         UNIQUE (processor, external_preference_id),
     CONSTRAINT payment_checkout_sessions_url_not_empty_check
-        CHECK (length(btrim(checkout_url)) > 0)
+        CHECK (length(btrim(checkout_url)) > 0),
+    CONSTRAINT payment_checkout_sessions_expiration_check
+        CHECK (expires_on > created_on)
 );
 
 CREATE INDEX payment_checkout_sessions_intent_id_idx

@@ -89,13 +89,15 @@ func (repository *PaymentIntentRepository) SaveCheckoutReady(ctx context.Context
 			processor,
 			external_preference_id,
 			checkout_url,
+			expires_on,
 			created_on
 		)
-		VALUES ($1, $2, $3, $4, $5)`,
+		VALUES ($1, $2, $3, $4, $5, $6)`,
 		intent.ID,
 		mercadoPagoProcessor,
 		intent.CheckoutSession.ExternalID,
 		intent.CheckoutSession.URL,
+		intent.CheckoutSession.ExpiresOn,
 		intent.CheckoutSession.CreatedOn,
 	)
 	if err != nil {

@@ -33,14 +33,14 @@ func (handler *PaymentHandler) StartBookingCheckout(context *gin.Context) {
 		httphandler.RespondError(context, http.StatusBadRequest, err.Error())
 		return
 	}
-	checkout, err := handler.service.StartBookingCheckout(context.Request.Context(), authID, proposalID)
+	intent, err := handler.service.StartBookingCheckout(context.Request.Context(), authID, proposalID)
 	if err != nil {
 		handleStartBookingCheckoutError(context, err)
 		return
 	}
 
-	context.Header("Location", fmt.Sprintf("/payment-intents/%s", checkout.Intent.ID))
-	context.JSON(http.StatusCreated, checkoutSessionResponseFromDomain(checkout))
+	context.Header("Location", fmt.Sprintf("/payment-intents/%s", intent.ID))
+	context.JSON(http.StatusCreated, checkoutSessionResponseFromDomain(intent))
 }
 
 func handleStartBookingCheckoutError(context *gin.Context, err error) {
