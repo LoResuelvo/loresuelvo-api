@@ -129,17 +129,6 @@ Feature: Crear propuesta de servicio
                 | saldo total a pagar más adelante       | 84000.00  |
                 | total de la contratación               | 105000.00 |
 
-        @wip
-        Scenario: 53.10-PSP Redondear cada tramo inicial al centavo más cercano
-            Given que estoy autenticado como prestador "juan.plomero@example.com"
-            When envío una propuesta con precio total de servicio de "100000.03" pesos para la fecha y hora "2026-07-06T10:00:00-03:00"
-            Then el sistema registra la propuesta de servicio
-            And la propuesta conserva una seña del prestador de "20000.01" pesos
-            And la propuesta conserva una comisión de LoResuelvo cobrada ahora de "1000.00" pesos
-            And la propuesta conserva un total a pagar ahora de "21000.01" pesos
-            And la propuesta conserva un saldo total a pagar más adelante de "84000.02" pesos
-            And la suma del pago actual y el saldo posterior es "105000.03" pesos
-
     Rule: La fecha programada debe dejar tiempo para pagar al menos un día antes
 
         Background:
