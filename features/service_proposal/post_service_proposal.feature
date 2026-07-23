@@ -134,7 +134,6 @@ Feature: Crear propuesta de servicio
         Background:
             Given que existe un chat activo entre el consumidor "ana@example.com" y el prestador "juan.plomero@example.com"
 
-        @wip
         Scenario Outline: 53.12-PSP Rechazar una propuesta que <caso>
             Given que estoy autenticado como prestador "juan.plomero@example.com"
             When intento enviar una propuesta con precio total de servicio de "100000.00" pesos para la fecha y hora "<fecha y hora programada>"
