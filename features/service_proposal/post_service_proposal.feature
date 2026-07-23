@@ -113,7 +113,6 @@ Feature: Crear propuesta de servicio
         Background:
             Given que existe un chat activo entre el consumidor "ana@example.com" y el prestador "juan.plomero@example.com"
 
-        @wip
         Scenario: 53.9-PSP Calcular la seña y la comisión de la propuesta
             Given que estoy autenticado como prestador "juan.plomero@example.com"
             When envío una propuesta con precio total de servicio de "100000.00" pesos para la fecha y hora "2026-07-06T10:00:00-03:00"
