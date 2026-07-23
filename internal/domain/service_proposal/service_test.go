@@ -133,11 +133,19 @@ func validSavedServiceProposal() *serviceproposal.ServiceProposal {
 		Provider:     &provider.Provider{BaseUser: user.RehydrateBaseUser(validProviderID, "", "", "", "", "", nil)},
 		Consumer:     &consumer.Consumer{BaseUser: user.RehydrateBaseUser(validConsumerID, "", "", "", "", "", nil)},
 		Conversation: validConversation,
-		Amount:       validServiceAmount,
+		BookingTerms: validBookingTerms(),
 		ScheduledOn:  validServiceScheduledOn,
 		Description:  validServiceDescription,
 		Status:       serviceproposal.StatusPending,
 	}
+}
+
+func validBookingTerms() serviceproposal.BookingTerms {
+	terms, err := serviceproposal.NewBookingPolicy().Calculate(validServiceAmount)
+	if err != nil {
+		panic(err)
+	}
+	return terms
 }
 
 func (env *serviceProposalTestEnv) newService() *serviceproposal.Service {
@@ -151,6 +159,7 @@ func (env *serviceProposalTestEnv) newService() *serviceproposal.Service {
 		env.fileURLResolver,
 		env.paymentAccountRepo,
 		paymentaccount.PaymentProvider("mercado_pago"),
+		serviceproposal.NewBookingPolicy(),
 		env.clock,
 	)
 }
@@ -200,6 +209,23 @@ func TestCreateServiceProposalReturnsPaymentAccountLookupError(t *testing.T) {
 
 func TestCreateServiceProposal(t *testing.T) {
 	env := setupServiceProposalTest(t)
+	resetMocks(&env.serviceRepo.Mock)
+	env.serviceRepo.
+		On("Save", mock.MatchedBy(func(proposal *serviceproposal.ServiceProposal) bool {
+			terms := proposal.BookingTerms
+			return terms.Currency() == "ARS" &&
+				terms.ServiceTotalCents() == validServiceAmount &&
+				terms.DepositCents() == 200 &&
+				terms.RemainingServiceBalanceCents() == 800 &&
+				terms.PlatformFeeTotalCents() == 500000 &&
+				terms.PlatformFeeDueNowCents() == 100000 &&
+				terms.RemainingPlatformFeeCents() == 400000 &&
+				terms.AmountDueNowCents() == 100200 &&
+				terms.RemainingAmountDueCents() == 400800 &&
+				terms.ContractTotalCents() == 501000
+		})).
+		Return(validSavedServiceProposal(), nil).
+		Once()
 	service := env.newService()
 
 	serviceProposal, err := service.CreateServiceProposal(
@@ -211,8 +237,9 @@ func TestCreateServiceProposal(t *testing.T) {
 		validServiceDescription,
 	)
 
-	assert.NoError(t, err)
-	assert.NotNil(t, serviceProposal)
+	require.NoError(t, err)
+	require.NotNil(t, serviceProposal)
+	env.serviceRepo.AssertExpectations(t)
 }
 
 func TestAcceptServiceProposalCreatesScheduledWorkOrder(t *testing.T) {
@@ -440,7 +467,8 @@ func TestGetServiceProposalsWithoutServiceProposals(t *testing.T) {
 	paymentAccountRepo := new(MockPaymentAccountRepository)
 	service := serviceproposal.NewService(
 		serviceRepo, workOrderRepo, userRepo, conversationRepo, notificationRepo,
-		nil, fileURLResolver, paymentAccountRepo, paymentaccount.PaymentProvider("mercado_pago"), clock,
+		nil, fileURLResolver, paymentAccountRepo, paymentaccount.PaymentProvider("mercado_pago"),
+		serviceproposal.NewBookingPolicy(), clock,
 	)
 
 	serviceProposals, err := service.GetServiceProposals(t.Context(), validProviderAuth0ID)
@@ -453,14 +481,14 @@ func TestGetServiceProposalsWithoutServiceProposals(t *testing.T) {
 func TestConsumerGetsPendingServiceProposal(t *testing.T) {
 	env := setupServiceProposalTest(t)
 	expectedProposal := &serviceproposal.ServiceProposal{
-		ID:          1,
-		Provider:    &provider.Provider{BaseUser: user.RehydrateBaseUser(validProviderID, "", "", "Juan", "Gomez", provider.Role, &filedomain.Image{FileID: "provider-photo"})},
-		Consumer:    &consumer.Consumer{BaseUser: user.RehydrateBaseUser(validConsumerID, "", "", "", "", consumer.Role, nil)},
-		Amount:      validServiceAmount,
-		ScheduledOn: validServiceScheduledOn,
-		Description: validServiceDescription,
-		Status:      serviceproposal.StatusPending,
-		CreatedOn:   time.Now(),
+		ID:           1,
+		Provider:     &provider.Provider{BaseUser: user.RehydrateBaseUser(validProviderID, "", "", "Juan", "Gomez", provider.Role, &filedomain.Image{FileID: "provider-photo"})},
+		Consumer:     &consumer.Consumer{BaseUser: user.RehydrateBaseUser(validConsumerID, "", "", "", "", consumer.Role, nil)},
+		BookingTerms: validBookingTerms(),
+		ScheduledOn:  validServiceScheduledOn,
+		Description:  validServiceDescription,
+		Status:       serviceproposal.StatusPending,
+		CreatedOn:    time.Now(),
 		Conversation: &conversation.WorkConversation{
 			BaseConversation: conversation.RehydrateBaseConversation(10, conversation.TypeWork, "", time.Time{}, nil),
 		},

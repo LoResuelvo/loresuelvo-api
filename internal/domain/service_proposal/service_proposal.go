@@ -24,15 +24,15 @@ type ServiceProposal struct {
 	Provider     *provider.Provider
 	Consumer     *consumer.Consumer
 	Conversation conversation.Conversation
-	Amount       int64
 	ScheduledOn  time.Time
 	Description  string
 	Status       Status
 	CreatedOn    time.Time
+	BookingTerms BookingTerms
 }
 
-func NewServiceProposal(provider *provider.Provider, consumer *consumer.Consumer, conversation conversation.Conversation, amount int64, scheduledOn time.Time, description string, clock clock.Clock) (*ServiceProposal, error) {
-	if err := validateParameters(amount, scheduledOn, clock); err != nil {
+func NewServiceProposal(provider *provider.Provider, consumer *consumer.Consumer, conversation conversation.Conversation, scheduledOn time.Time, description string, bookingTerms BookingTerms, clock clock.Clock) (*ServiceProposal, error) {
+	if err := validateParameters(scheduledOn, clock); err != nil {
 		return nil, err
 	}
 
@@ -44,10 +44,10 @@ func NewServiceProposal(provider *provider.Provider, consumer *consumer.Consumer
 		Provider:     provider,
 		Consumer:     consumer,
 		Conversation: conversation,
-		Amount:       amount,
 		ScheduledOn:  scheduledOn,
 		Description:  description,
 		Status:       StatusPending,
+		BookingTerms: bookingTerms,
 	}, nil
 }
 
@@ -97,7 +97,7 @@ func (sp *ServiceProposal) ServiceProposalID() int {
 }
 
 func (sp *ServiceProposal) ServiceProposalAmount() int64 {
-	return sp.Amount
+	return sp.BookingTerms.ServiceTotalCents()
 }
 
 func (sp *ServiceProposal) ServiceProposalScheduledOn() time.Time {
@@ -126,11 +126,7 @@ func (sp *ServiceProposal) CounterpartFor(authID string) (user.User, error) {
 	return nil, ErrOnlyParticipantCanView
 }
 
-func validateParameters(amount int64, scheduledOn time.Time, clock clock.Clock) error {
-	if amount <= 0 {
-		return ErrInvalidAmount
-	}
-
+func validateParameters(scheduledOn time.Time, clock clock.Clock) error {
 	if scheduledOn.Before(clock.Now()) {
 		return ErrInvalidScheduledOn
 	}

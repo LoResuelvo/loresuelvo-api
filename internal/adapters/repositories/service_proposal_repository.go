@@ -45,18 +45,26 @@ func (r *ServiceProposalRepository) Save(serviceProposal *serviceproposal.Servic
 			provider_id,
 			conversation_id,
 			amount_cents,
+			currency,
+			deposit_cents,
+			platform_fee_total_cents,
+			platform_fee_due_now_cents,
 			scheduled_on,
 			description,
 			status,
 			created_on,
 			updated_on
 		)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW())
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW(), NOW())
 		RETURNING id`,
 		serviceProposal.Consumer.ID(),
 		serviceProposal.Provider.ID(),
 		serviceProposal.Conversation.ID(),
-		serviceProposal.Amount,
+		serviceProposal.BookingTerms.ServiceTotalCents(),
+		serviceProposal.BookingTerms.Currency(),
+		serviceProposal.BookingTerms.DepositCents(),
+		serviceProposal.BookingTerms.PlatformFeeTotalCents(),
+		serviceProposal.BookingTerms.PlatformFeeDueNowCents(),
 		serviceProposal.ScheduledOn,
 		serviceProposal.Description,
 		serviceProposal.Status,
@@ -70,15 +78,24 @@ func (r *ServiceProposalRepository) Save(serviceProposal *serviceproposal.Servic
 
 func (r *ServiceProposalRepository) FindByID(ctx context.Context, id int) (*serviceproposal.ServiceProposal, error) {
 	var (
-		proposal   serviceproposal.ServiceProposal
-		consumerID int
-		providerID int
+		proposal               serviceproposal.ServiceProposal
+		consumerID             int
+		providerID             int
+		currency               string
+		depositCents           int64
+		platformFeeTotalCents  int64
+		platformFeeDueNowCents int64
+		serviceTotalCents      int64
 	)
 	err := r.db.QueryRowContext(
 		ctx,
 		`SELECT
 			sp.id,
 			sp.amount_cents,
+			sp.currency,
+			sp.deposit_cents,
+			sp.platform_fee_total_cents,
+			sp.platform_fee_due_now_cents,
 			sp.scheduled_on,
 			sp.description,
 			sp.status,
@@ -90,7 +107,11 @@ func (r *ServiceProposalRepository) FindByID(ctx context.Context, id int) (*serv
 		id,
 	).Scan(
 		&proposal.ID,
-		&proposal.Amount,
+		&serviceTotalCents,
+		&currency,
+		&depositCents,
+		&platformFeeTotalCents,
+		&platformFeeDueNowCents,
 		&proposal.ScheduledOn,
 		&proposal.Description,
 		&proposal.Status,
@@ -103,6 +124,16 @@ func (r *ServiceProposalRepository) FindByID(ctx context.Context, id int) (*serv
 			return nil, serviceproposal.ErrDoesNotExist
 		}
 		return nil, fmt.Errorf("finding service proposal by id: %w", err)
+	}
+	proposal.BookingTerms, err = serviceproposal.NewBookingTerms(
+		currency,
+		serviceTotalCents,
+		depositCents,
+		platformFeeTotalCents,
+		platformFeeDueNowCents,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("rehydrating booking terms for service proposal %d: %w", proposal.ID, err)
 	}
 
 	proposal.Consumer = &consumer.Consumer{BaseUser: user.RehydrateBaseUser(consumerID, "", "", "", "", consumer.Role, nil)}
@@ -150,6 +181,10 @@ func (r *ServiceProposalRepository) FindByUserID(ctx context.Context, userID int
 		`SELECT
 			sp.id,
 			sp.amount_cents,
+			sp.currency,
+			sp.deposit_cents,
+			sp.platform_fee_total_cents,
+			sp.platform_fee_due_now_cents,
 			sp.scheduled_on,
 			sp.description,
 			sp.status,
@@ -191,6 +226,11 @@ func (r *ServiceProposalRepository) FindByUserID(ctx context.Context, userID int
 	for rows.Next() {
 		var (
 			proposal                   serviceproposal.ServiceProposal
+			currency                   string
+			depositCents               int64
+			platformFeeTotalCents      int64
+			platformFeeDueNowCents     int64
+			serviceTotalCents          int64
 			conversationID             int
 			conversationType           string
 			conversationStatus         string
@@ -211,7 +251,11 @@ func (r *ServiceProposalRepository) FindByUserID(ctx context.Context, userID int
 
 		err := rows.Scan(
 			&proposal.ID,
-			&proposal.Amount,
+			&serviceTotalCents,
+			&currency,
+			&depositCents,
+			&platformFeeTotalCents,
+			&platformFeeDueNowCents,
 			&proposal.ScheduledOn,
 			&proposal.Description,
 			&proposal.Status,
@@ -240,6 +284,16 @@ func (r *ServiceProposalRepository) FindByUserID(ctx context.Context, userID int
 		}
 		if conversationType != conversation.TypeWork {
 			return nil, fmt.Errorf("scanning service proposal by user id: unsupported conversation type %q", conversationType)
+		}
+		proposal.BookingTerms, err = serviceproposal.NewBookingTerms(
+			currency,
+			serviceTotalCents,
+			depositCents,
+			platformFeeTotalCents,
+			platformFeeDueNowCents,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("rehydrating booking terms for service proposal %d: %w", proposal.ID, err)
 		}
 
 		consumerUser := user.RehydrateBaseUser(consumerID, consumerAuthID, consumerEmail, consumerName, consumerSurname, consumer.Role, imageFromPersistence(consumerProfilePhotoFileID.String, ""))

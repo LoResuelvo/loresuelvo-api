@@ -101,9 +101,9 @@ func TestServiceProposalRepositorySavesAcceptanceWithWorkOrderAtomically(t *test
 		&provider.Provider{BaseUser: user.RehydrateBaseUser(providerID, "", "", "", "", "", nil)},
 		&consumer.Consumer{BaseUser: user.RehydrateBaseUser(consumerID, "", "", "", "", "", nil)},
 		activeConversation,
-		1500050,
 		time.Now().Add(24*time.Hour).UTC().Truncate(time.Microsecond),
 		"Reparacion de perdida de agua.",
+		bookingTermsForAmount(t, 1500050),
 		clockadapter.NewSystemClock(),
 	)
 	require.NoError(t, err)
@@ -179,9 +179,9 @@ func TestServiceProposalRepositoryCanSave(t *testing.T) {
 		&provider.Provider{BaseUser: user.RehydrateBaseUser(providerID, "", "", "", "", "", nil)},
 		&consumer.Consumer{BaseUser: user.RehydrateBaseUser(consumerID, "", "", "", "", "", nil)},
 		activeConversation,
-		1500050,
 		scheduledOn,
 		"Reparacion de perdida de agua en cocina con materiales incluidos.",
+		bookingTermsForAmount(t, 1500050),
 		clockadapter.NewSystemClock(),
 	)
 	require.NoError(t, err)
@@ -194,18 +194,34 @@ func TestServiceProposalRepositoryCanSave(t *testing.T) {
 	assert.Equal(t, consumerID, savedProposal.Consumer.ID())
 	assert.Equal(t, providerID, savedProposal.Provider.ID())
 	assert.Equal(t, activeConversation.ID(), savedProposal.Conversation.ID())
-	assert.Equal(t, proposalToSave.Amount, savedProposal.Amount)
+	assert.Equal(t, proposalToSave.ServiceProposalAmount(), savedProposal.ServiceProposalAmount())
+	assertBookingTermsEqual(t, proposalToSave.BookingTerms, savedProposal.BookingTerms)
 	assert.Equal(t, proposalToSave.ScheduledOn, savedProposal.ScheduledOn)
 	assert.Equal(t, proposalToSave.Description, savedProposal.Description)
 	assert.Equal(t, serviceproposal.StatusPending, savedProposal.Status)
 
 	var storedConsumerID, storedProviderID, storedConversationID int
 	var storedAmount int64
+	var storedCurrency string
+	var storedDepositCents int64
+	var storedPlatformFeeTotalCents int64
+	var storedPlatformFeeDueNowCents int64
 	var storedScheduledOn time.Time
 	var storedDescription string
 	var storedStatus serviceproposal.Status
 	err = testContext.database.QueryRow(
-		`SELECT consumer_id, provider_id, conversation_id, amount_cents, scheduled_on, description, status
+		`SELECT
+			consumer_id,
+			provider_id,
+			conversation_id,
+			amount_cents,
+			currency,
+			deposit_cents,
+			platform_fee_total_cents,
+			platform_fee_due_now_cents,
+			scheduled_on,
+			description,
+			status
 		FROM service_proposals
 		WHERE id = $1`,
 		savedProposal.ID,
@@ -214,6 +230,10 @@ func TestServiceProposalRepositoryCanSave(t *testing.T) {
 		&storedProviderID,
 		&storedConversationID,
 		&storedAmount,
+		&storedCurrency,
+		&storedDepositCents,
+		&storedPlatformFeeTotalCents,
+		&storedPlatformFeeDueNowCents,
 		&storedScheduledOn,
 		&storedDescription,
 		&storedStatus,
@@ -222,10 +242,18 @@ func TestServiceProposalRepositoryCanSave(t *testing.T) {
 	assert.Equal(t, consumerID, storedConsumerID)
 	assert.Equal(t, providerID, storedProviderID)
 	assert.Equal(t, activeConversation.ID(), storedConversationID)
-	assert.Equal(t, proposalToSave.Amount, storedAmount)
+	assert.Equal(t, proposalToSave.ServiceProposalAmount(), storedAmount)
+	assert.Equal(t, proposalToSave.BookingTerms.Currency(), storedCurrency)
+	assert.Equal(t, proposalToSave.BookingTerms.DepositCents(), storedDepositCents)
+	assert.Equal(t, proposalToSave.BookingTerms.PlatformFeeTotalCents(), storedPlatformFeeTotalCents)
+	assert.Equal(t, proposalToSave.BookingTerms.PlatformFeeDueNowCents(), storedPlatformFeeDueNowCents)
 	assert.Equal(t, proposalToSave.ScheduledOn, storedScheduledOn.UTC())
 	assert.Equal(t, proposalToSave.Description, storedDescription)
 	assert.Equal(t, proposalToSave.Status, storedStatus)
+
+	foundProposal, err := testContext.serviceProposalRepository.FindByID(context.Background(), savedProposal.ID)
+	require.NoError(t, err)
+	assertBookingTermsEqual(t, proposalToSave.BookingTerms, foundProposal.BookingTerms)
 }
 
 func TestServiceProposalRepositoryFindsPendingProposalForConsumer(t *testing.T) {
@@ -248,9 +276,9 @@ func TestServiceProposalRepositoryFindsPendingProposalForConsumer(t *testing.T) 
 		&provider.Provider{BaseUser: user.RehydrateBaseUser(providerID, "", "", "", "", "", nil)},
 		&consumer.Consumer{BaseUser: user.RehydrateBaseUser(consumerID, "", "", "", "", "", nil)},
 		activeConversation,
-		1500050,
 		time.Now().Add(24*time.Hour).UTC().Truncate(time.Microsecond),
 		"Reparacion de perdida de agua en cocina con materiales incluidos.",
+		bookingTermsForAmount(t, 1500050),
 		clockadapter.NewSystemClock(),
 	)
 	require.NoError(t, err)
@@ -269,7 +297,33 @@ func TestServiceProposalRepositoryFindsPendingProposalForConsumer(t *testing.T) 
 	assert.Equal(t, "Plomeria", found[0].Provider.Category.Name)
 	assert.Equal(t, activeConversation.ID(), found[0].Conversation.ID())
 	assert.Equal(t, serviceproposal.StatusPending, found[0].Status)
-	assert.Equal(t, expected.Amount, found[0].Amount)
+	assert.Equal(t, expected.ServiceProposalAmount(), found[0].ServiceProposalAmount())
+	assertBookingTermsEqual(t, expected.BookingTerms, found[0].BookingTerms)
 	assert.Equal(t, expected.ScheduledOn, found[0].ScheduledOn.UTC())
 	assert.Equal(t, expected.Description, found[0].Description)
+}
+
+func assertBookingTermsEqual(
+	t *testing.T,
+	expected serviceproposal.BookingTerms,
+	actual serviceproposal.BookingTerms,
+) {
+	t.Helper()
+	assert.Equal(t, expected.Currency(), actual.Currency())
+	assert.Equal(t, expected.ServiceTotalCents(), actual.ServiceTotalCents())
+	assert.Equal(t, expected.DepositCents(), actual.DepositCents())
+	assert.Equal(t, expected.RemainingServiceBalanceCents(), actual.RemainingServiceBalanceCents())
+	assert.Equal(t, expected.PlatformFeeTotalCents(), actual.PlatformFeeTotalCents())
+	assert.Equal(t, expected.PlatformFeeDueNowCents(), actual.PlatformFeeDueNowCents())
+	assert.Equal(t, expected.RemainingPlatformFeeCents(), actual.RemainingPlatformFeeCents())
+	assert.Equal(t, expected.AmountDueNowCents(), actual.AmountDueNowCents())
+	assert.Equal(t, expected.RemainingAmountDueCents(), actual.RemainingAmountDueCents())
+	assert.Equal(t, expected.ContractTotalCents(), actual.ContractTotalCents())
+}
+
+func bookingTermsForAmount(t *testing.T, amountCents int64) serviceproposal.BookingTerms {
+	t.Helper()
+	terms, err := serviceproposal.NewBookingPolicy().Calculate(amountCents)
+	require.NoError(t, err)
+	return terms
 }

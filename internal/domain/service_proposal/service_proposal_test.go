@@ -14,21 +14,10 @@ import (
 )
 
 var (
-	invalidServiceAmount      int64 = -100
-	invalidServiceScheduledOn       = time.Now().Add(-time.Hour)
-	validProvider                   = &provider.Provider{BaseUser: user.RehydrateBaseUser(validProviderID, "", "", "", "", "", nil)}
-	validConsumer                   = &consumer.Consumer{BaseUser: user.RehydrateBaseUser(validConsumerID, "", "", "", "", "", nil)}
+	invalidServiceScheduledOn = time.Now().Add(-time.Hour)
+	validProvider             = &provider.Provider{BaseUser: user.RehydrateBaseUser(validProviderID, "", "", "", "", "", nil)}
+	validConsumer             = &consumer.Consumer{BaseUser: user.RehydrateBaseUser(validConsumerID, "", "", "", "", "", nil)}
 )
-
-func TestInvalidAmount(t *testing.T) {
-	clock := new(MockClock)
-	serviceProposal, err := serviceproposal.NewServiceProposal(
-		validProvider, validConsumer, validConversation, invalidServiceAmount,
-		validServiceScheduledOn, validServiceDescription, clock)
-
-	assert.Error(t, err)
-	assert.Nil(t, serviceProposal)
-}
 
 func TestInvalidTime(t *testing.T) {
 	clock := new(MockClock)
@@ -37,8 +26,8 @@ func TestInvalidTime(t *testing.T) {
 		Return(time.Now())
 
 	serviceProposal, err := serviceproposal.NewServiceProposal(
-		validProvider, validConsumer, validConversation, validServiceAmount,
-		invalidServiceScheduledOn, validServiceDescription, clock)
+		validProvider, validConsumer, validConversation,
+		invalidServiceScheduledOn, validServiceDescription, validBookingTerms(), clock)
 
 	assert.Error(t, err)
 	assert.Nil(t, serviceProposal)
@@ -53,8 +42,8 @@ func TestConversationMustBeAccepted(t *testing.T) {
 	pendingConversation := &conversation.WorkConversation{BaseConversation: conversation.NewBaseConversation(conversation.TypeWork, conversation.StatusPending)}
 
 	serviceProposal, err := serviceproposal.NewServiceProposal(
-		validProvider, validConsumer, pendingConversation, validServiceAmount,
-		validServiceScheduledOn, validServiceDescription, clock)
+		validProvider, validConsumer, pendingConversation,
+		validServiceScheduledOn, validServiceDescription, validBookingTerms(), clock)
 
 	assert.Error(t, err)
 	assert.Nil(t, serviceProposal)
@@ -65,8 +54,8 @@ func TestShouldCreateAsPending(t *testing.T) {
 	clock.On("Now").Return(time.Now())
 
 	serviceProposal, err := serviceproposal.NewServiceProposal(
-		validProvider, validConsumer, validConversation, validServiceAmount,
-		validServiceScheduledOn, validServiceDescription, clock)
+		validProvider, validConsumer, validConversation,
+		validServiceScheduledOn, validServiceDescription, validBookingTerms(), clock)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, serviceProposal)
@@ -121,8 +110,8 @@ func TestShouldCreateANotification(t *testing.T) {
 	}
 
 	serviceProposal, _ := serviceproposal.NewServiceProposal(
-		validProvider, validConsumer, validConversation, validServiceAmount,
-		validServiceScheduledOn, validServiceDescription, clock)
+		validProvider, validConsumer, validConversation,
+		validServiceScheduledOn, validServiceDescription, validBookingTerms(), clock)
 
 	notification := serviceProposal.CreateReceivedNotification(clock)
 

@@ -26,10 +26,11 @@ type Service struct {
 	fileURLResolver          FileURLResolver
 	paymentAccountRepository PaymentAccountRepository
 	paymentProvider          paymentaccount.PaymentProvider
+	bookingPolicy            BookingPolicy
 	clock                    clock.Clock
 }
 
-func NewService(serviceRepo ServiceProposalRepository, workOrderRepo WorkOrderRepository, userRepo UserRepository, conversationRepo ConversationRepository, notificationRepo NotificationRepository, notificator notification.Notificator, fileURLResolver FileURLResolver, paymentAccountRepository PaymentAccountRepository, paymentProvider paymentaccount.PaymentProvider, clock clock.Clock) *Service {
+func NewService(serviceRepo ServiceProposalRepository, workOrderRepo WorkOrderRepository, userRepo UserRepository, conversationRepo ConversationRepository, notificationRepo NotificationRepository, notificator notification.Notificator, fileURLResolver FileURLResolver, paymentAccountRepository PaymentAccountRepository, paymentProvider paymentaccount.PaymentProvider, bookingPolicy BookingPolicy, clock clock.Clock) *Service {
 	return &Service{
 		repository:               serviceRepo,
 		workOrderRepository:      workOrderRepo,
@@ -40,6 +41,7 @@ func NewService(serviceRepo ServiceProposalRepository, workOrderRepo WorkOrderRe
 		fileURLResolver:          fileURLResolver,
 		paymentAccountRepository: paymentAccountRepository,
 		paymentProvider:          paymentProvider,
+		bookingPolicy:            bookingPolicy,
 		clock:                    clock,
 	}
 }
@@ -61,7 +63,12 @@ func (s *Service) CreateServiceProposal(ctx context.Context, auth0ID string, con
 		return nil, ErrPaymentAccountConnectionRequired
 	}
 
-	serviceProposal, err := NewServiceProposal(provider, consumer, conversation, amount, scheduledOn, description, s.clock)
+	bookingTerms, err := s.bookingPolicy.Calculate(amount)
+	if err != nil {
+		return nil, err
+	}
+
+	serviceProposal, err := NewServiceProposal(provider, consumer, conversation, scheduledOn, description, bookingTerms, s.clock)
 	if err != nil {
 		return nil, err
 	}

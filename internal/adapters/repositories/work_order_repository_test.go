@@ -44,6 +44,10 @@ func TestWorkOrderRepositoryFindsOnlyOrdersScheduledInsideWindow(t *testing.T) {
 	assert.Equal(t, insideOrder.ID, orders[0].ID)
 	assert.Equal(t, consumerID, orders[0].ConsumerID())
 	assert.Equal(t, providerID, orders[0].ProviderID())
+	assert.Equal(t, int64(1500050), orders[0].Amount())
+	proposal, ok := orders[0].ServiceProposal.(*serviceproposal.ServiceProposal)
+	require.True(t, ok)
+	assertBookingTermsEqual(t, bookingTermsForAmount(t, 1500050), proposal.BookingTerms)
 	assert.Equal(t, from.Add(time.Hour), orders[0].ScheduledOn().UTC())
 }
 
@@ -60,9 +64,9 @@ func saveScheduledWorkOrderAt(
 		&provider.Provider{BaseUser: user.RehydrateBaseUser(providerID, "", "", "", "", "", nil)},
 		&consumer.Consumer{BaseUser: user.RehydrateBaseUser(consumerID, "", "", "", "", "", nil)},
 		activeConversation,
-		1500050,
 		scheduledOn,
 		"Urgent work order repository test.",
+		bookingTermsForAmount(t, 1500050),
 		clockadapter.NewSystemClock(),
 	)
 	require.NoError(t, err)

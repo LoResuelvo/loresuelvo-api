@@ -179,6 +179,7 @@ func NewDependenciesWithPaymentAccountAdapters(
 		fileService,
 		persistence.PaymentAccountRepository,
 		paymentAccountOAuthConnector.Provider(),
+		serviceproposal.NewBookingPolicy(),
 		systemClock)
 	workOrderService := workorder.NewService(
 		persistence.WorkOrderRepository,

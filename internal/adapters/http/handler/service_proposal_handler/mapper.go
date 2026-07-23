@@ -8,11 +8,12 @@ import (
 
 func serviceProposalCreationResponseFromDomain(proposal *serviceproposal.ServiceProposal) serviceProposalCreationResponse {
 	response := serviceProposalCreationResponse{
-		ID:          proposal.ID,
-		AmountCents: proposal.Amount,
-		ScheduledOn: proposal.ScheduledOn,
-		Description: proposal.Description,
-		Status:      string(proposal.Status),
+		ID:           proposal.ID,
+		AmountCents:  proposal.BookingTerms.ServiceTotalCents(),
+		ScheduledOn:  proposal.ScheduledOn,
+		Description:  proposal.Description,
+		Status:       string(proposal.Status),
+		BookingTerms: bookingTermsResponseFromDomain(proposal.BookingTerms),
 	}
 
 	if proposal.Provider != nil {
@@ -64,13 +65,29 @@ func serviceProposalSummaryResponsesFromDomain(proposals []*serviceproposal.Serv
 		responses = append(responses, serviceProposalSummaryResponse{
 			ID:             proposal.ID,
 			ConversationID: proposal.Conversation.ID(),
-			AmountCents:    proposal.Amount,
+			AmountCents:    proposal.BookingTerms.ServiceTotalCents(),
 			ScheduledOn:    proposal.ScheduledOn,
 			Description:    proposal.Description,
 			Status:         string(proposal.Status),
 			CreatedOn:      proposal.CreatedOn,
 			Counterpart:    counterpartResponse,
+			BookingTerms:   bookingTermsResponseFromDomain(proposal.BookingTerms),
 		})
 	}
 	return responses, nil
+}
+
+func bookingTermsResponseFromDomain(terms serviceproposal.BookingTerms) bookingTermsResponse {
+	return bookingTermsResponse{
+		Currency:                     terms.Currency(),
+		ServiceTotalCents:            terms.ServiceTotalCents(),
+		DepositCents:                 terms.DepositCents(),
+		RemainingServiceBalanceCents: terms.RemainingServiceBalanceCents(),
+		PlatformFeeTotalCents:        terms.PlatformFeeTotalCents(),
+		PlatformFeeDueNowCents:       terms.PlatformFeeDueNowCents(),
+		RemainingPlatformFeeCents:    terms.RemainingPlatformFeeCents(),
+		AmountDueNowCents:            terms.AmountDueNowCents(),
+		RemainingAmountDueCents:      terms.RemainingAmountDueCents(),
+		ContractTotalCents:           terms.ContractTotalCents(),
+	}
 }

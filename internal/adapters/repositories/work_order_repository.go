@@ -158,6 +158,10 @@ func (r *WorkOrderRepository) FindScheduledBetween(ctx context.Context, from tim
 			wo.id,
 			wo.service_proposal_id,
 			sp.amount_cents,
+			sp.currency,
+			sp.deposit_cents,
+			sp.platform_fee_total_cents,
+			sp.platform_fee_due_now_cents,
 			sp.scheduled_on,
 			sp.description,
 			wo.status,
@@ -181,10 +185,16 @@ func (r *WorkOrderRepository) FindScheduledBetween(ctx context.Context, from tim
 		var order workorder.WorkOrder
 		var proposal serviceproposal.ServiceProposal
 		var consumerID, providerID int
+		var serviceTotalCents, depositCents, platformFeeTotalCents, platformFeeDueNowCents int64
+		var currency string
 		if err := rows.Scan(
 			&order.ID,
 			&proposal.ID,
-			&proposal.Amount,
+			&serviceTotalCents,
+			&currency,
+			&depositCents,
+			&platformFeeTotalCents,
+			&platformFeeDueNowCents,
 			&proposal.ScheduledOn,
 			&proposal.Description,
 			&order.Status,
@@ -193,6 +203,16 @@ func (r *WorkOrderRepository) FindScheduledBetween(ctx context.Context, from tim
 			&providerID,
 		); err != nil {
 			return nil, fmt.Errorf("scanning work orders scheduled between: %w", err)
+		}
+		proposal.BookingTerms, err = serviceproposal.NewBookingTerms(
+			currency,
+			serviceTotalCents,
+			depositCents,
+			platformFeeTotalCents,
+			platformFeeDueNowCents,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("rehydrating booking terms for service proposal %d: %w", proposal.ID, err)
 		}
 		proposal.Consumer = &consumer.Consumer{BaseUser: user.RehydrateBaseUser(consumerID, "", "", "", "", consumer.Role, nil)}
 		proposal.Provider = &provider.Provider{BaseUser: user.RehydrateBaseUser(providerID, "", "", "", "", provider.Role, nil)}
