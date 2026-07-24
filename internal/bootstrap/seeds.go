@@ -291,39 +291,17 @@ func upsertSeedProviderUser(ctx context.Context, tx *sql.Tx, seed providerSeed) 
 }
 
 func upsertSeedProvider(ctx context.Context, tx *sql.Tx, userID, categoryID int) error {
-	var providerID int
-	err := tx.QueryRowContext(
+	_, err := tx.ExecContext(
 		ctx,
-		`SELECT id FROM providers WHERE user_id = $1 ORDER BY id ASC LIMIT 1`,
+		`INSERT INTO providers (user_id, category_id)
+		VALUES ($1, $2)
+		ON CONFLICT (user_id) DO UPDATE
+		SET category_id = EXCLUDED.category_id`,
 		userID,
-	).Scan(&providerID)
-	if errors.Is(err, sql.ErrNoRows) {
-		_, err = tx.ExecContext(
-			ctx,
-			`INSERT INTO providers (user_id, category_id)
-			VALUES ($1, $2)`,
-			userID,
-			categoryID,
-		)
-		if err != nil {
-			return fmt.Errorf("inserting provider seed for user %d: %w", userID, err)
-		}
-		return nil
-	}
-	if err != nil {
-		return fmt.Errorf("finding provider seed for user %d: %w", userID, err)
-	}
-
-	_, err = tx.ExecContext(
-		ctx,
-		`UPDATE providers
-		SET category_id = $2
-		WHERE id = $1`,
-		providerID,
 		categoryID,
 	)
 	if err != nil {
-		return fmt.Errorf("updating provider seed %d: %w", providerID, err)
+		return fmt.Errorf("seeding provider for user %d: %w", userID, err)
 	}
 
 	return nil
