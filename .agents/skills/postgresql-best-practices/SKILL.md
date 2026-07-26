@@ -1,6 +1,6 @@
 ---
 name: postgresql-best-practices
-description: Use when writing repository implementations, migrations, or database queries. Ensures proper use of pgx, migrations, connection pooling, and transaction patterns with this project's PostgreSQL 16 setup.
+description: Use when writing or reviewing repository implementations, units of work, migrations, database transactions, or PostgreSQL queries. Enforces collection-like repositories, generic persistence operations, no business decisions in SQL, and proper database/sql transaction patterns for PostgreSQL 16.
 ---
 
 # PostgreSQL Best Practices
@@ -34,11 +34,69 @@ Uses PostgreSQL 16 through Go `database/sql` with the pgx stdlib driver (`sql.Op
 - Use transactions (`*sql.Tx`) for operations spanning multiple tables.
 - Close `sql.Rows` explicitly after iteration.
 - SQL belongs in the repository that owns the table. Avoid duplicating table SQL across repositories.
-- For atomic multi-table writes, the coordinating repository starts the transaction and delegates table-specific SQL to unexported helpers, e.g. `userRepository.saveWithTx(tx, user)` or `messageRepository.saveWithTx(tx, ...)`.
+- Let one repository write multiple tables only when those tables persist one aggregate.
 
 ```go
 row := db.QueryRowContext(ctx, "SELECT id FROM users WHERE auth_id = $1", authID)
 ```
+
+## Repository Semantics
+
+Treat a repository as an in-memory collection abstraction for domain objects.
+
+- Prefer `Save`, `FindByID`, `FindBy...`, `Delete`, `Exists`, and collection-oriented queries.
+- Persist the state supplied by the domain object; do not decide its next state.
+- Keep names independent of business outcomes.
+- Do not expose separate methods for each domain transition.
+
+```go
+// Good
+intent.MarkRejected(payment, now)
+err := intentRepository.Save(ctx, intent)
+
+// Bad
+err := intentRepository.SaveRejected(ctx, intent)
+err := intentRepository.RejectPayment(ctx, intent.ID)
+```
+
+Reject repository APIs such as:
+
+- `SaveAccepted`, `SaveRejected`, `SaveProcessing`
+- `ConfirmPaidBooking`, `CompleteCheckout`
+- `ApproveProposal`, `CancelOrder`
+- methods whose SQL changes state based on a business precondition
+
+Named queries may describe selection criteria, such as `FindLatestByProposalIDAndPurpose`; they must not imply executing a workflow.
+
+## Database Boundary
+
+- Use foreign keys, uniqueness, nullability, and basic checks for structural integrity.
+- Do not encode domain workflows in triggers, stored procedures, status-specific updates, or conditional persistence methods.
+- Do not use SQL such as `UPDATE ... WHERE status = 'pending'` as the implementation of a domain transition. Let the domain object validate the transition, then persist its resulting state.
+- Translate database constraint failures into domain/persistence errors without turning the database into the policy owner.
+- Keep locks in a dedicated lock adapter when locking is a reusable technical concern; do not hide advisory-lock orchestration inside an entity repository.
+
+## Atomic Work Across Aggregates
+
+Use a generic Unit of Work when a use case changes multiple aggregates:
+
+```go
+err := unitOfWork.Execute(ctx, func(store TransactionalStore) error {
+	if err := store.SaveIntent(ctx, intent); err != nil {
+		return err
+	}
+	if err := store.SaveServiceProposal(ctx, proposal); err != nil {
+		return err
+	}
+	return store.SaveWorkOrder(ctx, order)
+})
+```
+
+- Keep the business sequence in the domain/application service.
+- Keep `TransactionalStore` methods generic.
+- Implement each store method by delegating to an unexported table-owner helper such as `saveWithTx`.
+- Never expose `*sql.Tx` through a domain port.
+- Do not name the Unit of Work method after a workflow such as `ConfirmPaidBooking`.
 
 ## JSON Handling
 
