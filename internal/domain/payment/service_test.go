@@ -243,6 +243,106 @@ func TestStartBookingCheckoutCreatesReadyIntentWithFrozenProposalPricing(t *test
 	assert.Equal(t, serviceproposal.StatusPending, proposal.Status)
 }
 
+func TestStartBookingCheckoutEnforcesBookingPaymentDeadline(t *testing.T) {
+	scheduledOn := time.Date(2026, time.July, 6, 13, 0, 0, 0, time.UTC)
+	terms, err := serviceproposal.NewBookingPolicy().Calculate(10000000, scheduledOn)
+	require.NoError(t, err)
+	deadline := terms.BookingPaymentDeadline()
+
+	tests := []struct {
+		name      string
+		now       time.Time
+		wantError bool
+	}{
+		{
+			name: "before deadline",
+			now:  deadline.Add(-time.Nanosecond),
+		},
+		{
+			name:      "exactly at deadline",
+			now:       deadline,
+			wantError: true,
+		},
+		{
+			name:      "after deadline",
+			now:       deadline.Add(time.Nanosecond),
+			wantError: true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			proposalConsumer := &consumer.Consumer{BaseUser: user.RehydrateBaseUser(
+				10,
+				"auth0|consumer",
+				"ana@example.com",
+				"Ana",
+				"Pérez",
+				consumer.Role,
+				nil,
+			)}
+			proposalProvider := &provider.Provider{BaseUser: user.RehydrateBaseUser(
+				20,
+				"auth0|provider",
+				"juan@example.com",
+				"Juan",
+				"Gómez",
+				provider.Role,
+				nil,
+			)}
+			proposal := &serviceproposal.ServiceProposal{
+				ID:           42,
+				Consumer:     proposalConsumer,
+				Provider:     proposalProvider,
+				Status:       serviceproposal.StatusPending,
+				BookingTerms: terms,
+			}
+			account, err := paymentaccount.NewPaymentAccount(
+				proposalProvider.ID(),
+				paymentaccount.PaymentProvider("mercado_pago"),
+				"mp-provider",
+				[]byte("encrypted-access-token"),
+				nil,
+				deadline.Add(24*time.Hour),
+			)
+			require.NoError(t, err)
+			intentRepository := &intentRepositoryStub{}
+			checkoutGateway := &checkoutGatewayStub{}
+			service := payment.NewService(
+				intentRepository,
+				proposalFinderStub{proposal: proposal},
+				userFinderStub{found: proposalConsumer},
+				paymentAccountFinderStub{account: account},
+				credentialDecryptorStub{},
+				checkoutGateway,
+				checkoutGateway,
+				nil,
+				nil,
+				func() string { return "f69bfe31-ce5d-4f85-a8c5-643ca2dcaa36" },
+				clockStub{now: test.now},
+			)
+
+			intent, err := service.StartBookingCheckout(
+				context.Background(),
+				"auth0|consumer",
+				proposal.ID,
+			)
+
+			if test.wantError {
+				assert.ErrorIs(t, err, payment.ErrBookingPaymentDeadlineReached)
+				assert.Nil(t, intent)
+				assert.Nil(t, intentRepository.saved)
+				assert.Empty(t, checkoutGateway.accessToken)
+				return
+			}
+			require.NoError(t, err)
+			require.NotNil(t, intent)
+			require.NotNil(t, intent.CheckoutSession)
+			assert.Equal(t, deadline, intent.CheckoutSession.ExpiresOn)
+		})
+	}
+}
+
 func TestProcessApprovedPaymentConfirmsPaidBooking(t *testing.T) {
 	now := time.Date(2026, time.July, 4, 13, 0, 0, 0, time.UTC)
 	scheduledOn := now.Add(48 * time.Hour)

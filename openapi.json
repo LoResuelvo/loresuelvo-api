@@ -2627,11 +2627,18 @@
                         }
                     },
                     "409": {
-                        "description": "The proposal is not pending or the provider has no connected payment account.",
+                        "description": "The proposal is not pending, its booking-payment deadline was reached, or the provider has no connected payment account.",
                         "content": {
                             "application/json": {
                                 "schema": {
                                     "$ref": "#/components/schemas/ErrorResponse"
+                                },
+                                "examples": {
+                                    "bookingPaymentDeadlineReached": {
+                                        "value": {
+                                            "error": "Booking payment deadline has been reached"
+                                        }
+                                    }
                                 }
                             }
                         }

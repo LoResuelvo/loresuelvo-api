@@ -75,6 +75,12 @@ func (service *Service) StartBookingCheckout(ctx context.Context, authID string,
 		return nil, fmt.Errorf("starting booking checkout: service proposal provider is required")
 	}
 
+	now := service.clock.Now().UTC()
+	bookingPaymentDeadline := proposal.BookingTerms.BookingPaymentDeadline().UTC()
+	if !now.Before(bookingPaymentDeadline) {
+		return nil, ErrBookingPaymentDeadlineReached
+	}
+
 	account, err := service.paymentAccountFinder.FindByProviderID(
 		ctx,
 		proposal.Provider.ID(),
@@ -94,14 +100,9 @@ func (service *Service) StartBookingCheckout(ctx context.Context, authID string,
 		return nil, fmt.Errorf("decrypting provider payment credential: decrypted credential is empty")
 	}
 
-	now := service.clock.Now().UTC()
 	expiresOn := now.Add(bookingCheckoutValidity)
-	bookingPaymentDeadline := proposal.BookingTerms.BookingPaymentDeadline().UTC()
 	if bookingPaymentDeadline.Before(expiresOn) {
 		expiresOn = bookingPaymentDeadline
-	}
-	if !expiresOn.After(now) {
-		return nil, ErrInvalidCheckoutSession
 	}
 	intent, err := NewBookingDepositIntent(
 		service.idGenerator(),

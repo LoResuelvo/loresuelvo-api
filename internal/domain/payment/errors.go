@@ -9,5 +9,6 @@ var (
 	ErrOnlyProposalRecipientCanCheckout = errors.New("Only the service proposal recipient can start checkout")
 	ErrOnlyProposalRecipientCanView     = errors.New("Only the service proposal recipient can view the payment intent")
 	ErrProposalNotPending               = errors.New("Only pending service proposals can start checkout")
+	ErrBookingPaymentDeadlineReached    = errors.New("Booking payment deadline has been reached")
 	ErrIntentDoesNotExist               = errors.New("Payment intent does not exist")
 )

@@ -122,7 +122,6 @@ Feature: Contratar un servicio mediante el pago de una seña
             Then el sistema rechaza pagar una propuesta de servicio rechazada
             And el sistema no registra una orden de trabajo para la propuesta
 
-        @wip
         Scenario: 21.15-CSP Rechazar el checkout al alcanzar el límite de pago
             Given que existe una propuesta de servicio pendiente de "juan.plomero@example.com" para "ana@example.com" programada para "2026-07-06T10:00:00-03:00"
             And que la fecha y hora actual del sistema es "2026-07-05T10:00:00-03:00"

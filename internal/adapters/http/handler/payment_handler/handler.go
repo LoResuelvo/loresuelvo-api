@@ -146,6 +146,7 @@ func handleStartBookingCheckoutError(context *gin.Context, err error) {
 	case errors.Is(err, payment.ErrOnlyProposalRecipientCanCheckout):
 		httphandler.RespondError(context, http.StatusForbidden, err.Error())
 	case errors.Is(err, payment.ErrProposalNotPending),
+		errors.Is(err, payment.ErrBookingPaymentDeadlineReached),
 		errors.Is(err, paymentaccount.ErrConnectionNotFound):
 		httphandler.RespondError(context, http.StatusConflict, err.Error())
 	default:
