@@ -64,7 +64,6 @@ Feature: Contratar un servicio mediante el pago de una seña
             When el sistema procesa una notificación válida de Mercado Pago y verifica un pago aprobado para esa seña
             Then el prestador "juan.plomero@example.com" recibe en tiempo real la notificación de propuesta de servicio aceptada
 
-        @wip
         Scenario: 21.6-CSP Mantener pendiente la propuesta mientras el pago está en proceso
             Given que "ana@example.com" inició el checkout de la seña de una propuesta pendiente de "juan.plomero@example.com"
             When el sistema procesa una notificación válida de Mercado Pago y verifica un pago en proceso para esa seña

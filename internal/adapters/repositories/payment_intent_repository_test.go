@@ -19,7 +19,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestPaymentIntentRepositoryPersistsCheckoutReadyIntentAndSession(t *testing.T) {
+func TestPaymentIntentRepositoryPersistsCheckoutReadySessionAndProcessingStatus(t *testing.T) {
 	testContext := newServiceProposalRepositoryTest(t)
 	consumerID := savedConsumerIDWithData(t, jobRequestRepositoryTestContext{
 		userRepository: testContext.userRepository,
@@ -93,6 +93,23 @@ func TestPaymentIntentRepositoryPersistsCheckoutReadyIntentAndSession(t *testing
 	assert.Equal(t, intent.CheckoutSession.ExternalID, storedPreferenceID)
 	assert.Equal(t, intent.CheckoutSession.URL, storedCheckoutURL)
 	assert.True(t, intent.CheckoutSession.ExpiresOn.Equal(storedExpiresOn))
+
+	processingPayment := payment.ExternalPayment{
+		ID:                "processing-payment",
+		SellerAccountID:   "mp-provider",
+		ExternalReference: intent.ID,
+		Status:            payment.ExternalPaymentStatusProcessing,
+		Currency:          intent.Currency,
+		AmountCents:       intent.TotalAmountCents,
+	}
+	require.NoError(t, intent.MarkProcessing(processingPayment, now.Add(2*time.Second)))
+	require.NoError(t, repository.SaveProcessing(t.Context(), intent))
+	require.NoError(t, repository.SaveProcessing(t.Context(), intent))
+	require.NoError(t, testContext.database.QueryRow(
+		`SELECT status FROM payment_intents WHERE id = $1`,
+		intent.ID,
+	).Scan(&storedStatus))
+	assert.Equal(t, payment.StatusProcessing, storedStatus)
 }
 
 func TestPaidBookingConfirmationAtomicallyMarksIntentAndAcceptsProposalWithOneWorkOrder(t *testing.T) {
@@ -140,6 +157,15 @@ func TestPaidBookingConfirmationAtomicallyMarksIntentAndAcceptsProposalWithOneWo
 		now.Add(-30*time.Second),
 	))
 	require.NoError(t, paymentIntentRepository.SaveCheckoutReady(t.Context(), intent))
+	require.NoError(t, intent.MarkProcessing(payment.ExternalPayment{
+		ID:                "123456",
+		SellerAccountID:   "987654",
+		ExternalReference: intent.ID,
+		Status:            payment.ExternalPaymentStatusProcessing,
+		Currency:          intent.Currency,
+		AmountCents:       intent.TotalAmountCents,
+	}, now.Add(-time.Second)))
+	require.NoError(t, paymentIntentRepository.SaveProcessing(t.Context(), intent))
 	require.NoError(t, intent.MarkPaid(payment.ExternalPayment{
 		ID:                "123456",
 		SellerAccountID:   "987654",

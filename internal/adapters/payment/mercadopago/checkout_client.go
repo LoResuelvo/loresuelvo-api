@@ -162,10 +162,19 @@ func (client *CheckoutClient) GetPayment(
 		ID:                strconv.Itoa(response.ID),
 		SellerAccountID:   strconv.FormatInt(response.CollectorID, 10),
 		ExternalReference: response.ExternalReference,
-		Status:            payment.ExternalPaymentStatus(response.Status),
+		Status:            externalPaymentStatus(response.Status),
 		Currency:          response.CurrencyID,
 		AmountCents:       amountCents,
 	}, nil
+}
+
+func externalPaymentStatus(status string) payment.ExternalPaymentStatus {
+	switch status {
+	case "pending", "in_process":
+		return payment.ExternalPaymentStatusProcessing
+	default:
+		return payment.ExternalPaymentStatus(status)
+	}
 }
 
 func sdkAmountFromCents(cents int64) float64 {

@@ -47,6 +47,33 @@ func (client *FakeCheckoutClient) AddApprovedPayment(
 	sellerAccountID string,
 	amountCents int64,
 ) string {
+	return client.addPayment(
+		externalReference,
+		sellerAccountID,
+		amountCents,
+		payment.ExternalPaymentStatusApproved,
+	)
+}
+
+func (client *FakeCheckoutClient) AddProcessingPayment(
+	externalReference,
+	sellerAccountID string,
+	amountCents int64,
+) string {
+	return client.addPayment(
+		externalReference,
+		sellerAccountID,
+		amountCents,
+		payment.ExternalPaymentStatusProcessing,
+	)
+}
+
+func (client *FakeCheckoutClient) addPayment(
+	externalReference,
+	sellerAccountID string,
+	amountCents int64,
+	status payment.ExternalPaymentStatus,
+) string {
 	client.mu.Lock()
 	defer client.mu.Unlock()
 	externalPaymentID := "fake-payment-" + externalReference
@@ -54,7 +81,7 @@ func (client *FakeCheckoutClient) AddApprovedPayment(
 		ID:                externalPaymentID,
 		SellerAccountID:   sellerAccountID,
 		ExternalReference: externalReference,
-		Status:            payment.ExternalPaymentStatusApproved,
+		Status:            status,
 		Currency:          "ARS",
 		AmountCents:       amountCents,
 	}

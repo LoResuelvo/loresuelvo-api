@@ -201,6 +201,15 @@ func (service *Service) ProcessPaymentNotification(
 		return err
 	}
 	now := service.clock.Now().UTC()
+	if externalPayment.Status == ExternalPaymentStatusProcessing {
+		if err := intent.MarkProcessing(externalPayment, now); err != nil {
+			return err
+		}
+		if err := service.intentRepository.SaveProcessing(ctx, intent); err != nil {
+			return fmt.Errorf("saving processing payment intent: %w", err)
+		}
+		return nil
+	}
 	if err := intent.MarkPaid(externalPayment, now); err != nil {
 		return err
 	}

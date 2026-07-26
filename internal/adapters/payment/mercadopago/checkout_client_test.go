@@ -160,3 +160,36 @@ func TestCheckoutClientGetsVerifiedPaymentWithSellerCredential(t *testing.T) {
 	assert.Equal(t, "ARS", externalPayment.Currency)
 	assert.Equal(t, int64(2100000), externalPayment.AmountCents)
 }
+
+func TestCheckoutClientMapsMercadoPagoPendingStatusesToProcessing(t *testing.T) {
+	for _, mercadoPagoStatus := range []string{"pending", "in_process"} {
+		t.Run(mercadoPagoStatus, func(t *testing.T) {
+			client, err := NewCheckoutClient(Config{
+				SuccessURL:      "https://app.loresuelvo.test/payments/success",
+				PendingURL:      "https://app.loresuelvo.test/payments/pending",
+				FailureURL:      "https://app.loresuelvo.test/payments/failure",
+				NotificationURL: "https://api.loresuelvo.test/webhooks/mercado-pago",
+			})
+			require.NoError(t, err)
+			client.paymentClientFactory = func(string) (paymentGetter, error) {
+				return &paymentGetterStub{response: &mercadopagopayment.Response{
+					ID:                123456,
+					CollectorID:       987654,
+					ExternalReference: "f69bfe31-ce5d-4f85-a8c5-643ca2dcaa36",
+					Status:            mercadoPagoStatus,
+					CurrencyID:        "ARS",
+					TransactionAmount: 21000,
+				}}, nil
+			}
+
+			externalPayment, err := client.GetPayment(
+				context.Background(),
+				"seller-token",
+				"123456",
+			)
+
+			require.NoError(t, err)
+			assert.Equal(t, payment.ExternalPaymentStatusProcessing, externalPayment.Status)
+		})
+	}
+}

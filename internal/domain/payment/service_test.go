@@ -20,6 +20,7 @@ import (
 type intentRepositoryStub struct {
 	saved              *payment.Intent
 	checkoutReadySaved *payment.Intent
+	processingSaved    *payment.Intent
 	found              *payment.Intent
 }
 
@@ -37,6 +38,11 @@ func (repository *intentRepositoryStub) Save(_ context.Context, intent *payment.
 
 func (repository *intentRepositoryStub) SaveCheckoutReady(_ context.Context, intent *payment.Intent) error {
 	repository.checkoutReadySaved = intent
+	return nil
+}
+
+func (repository *intentRepositoryStub) SaveProcessing(_ context.Context, intent *payment.Intent) error {
+	repository.processingSaved = intent
 	return nil
 }
 
@@ -319,4 +325,88 @@ func TestProcessApprovedPaymentConfirmsPaidBooking(t *testing.T) {
 	require.NotNil(t, notificator.notification)
 	assert.Equal(t, 99, notificator.notification.ID)
 	assert.Equal(t, confirmer.notification.Type, notificator.notification.Type)
+}
+
+func TestProcessProcessingPaymentOnlyUpdatesIntent(t *testing.T) {
+	now := time.Date(2026, time.July, 4, 13, 0, 0, 0, time.UTC)
+	scheduledOn := now.Add(48 * time.Hour)
+	terms, err := serviceproposal.NewBookingPolicy().Calculate(10000000, scheduledOn)
+	require.NoError(t, err)
+	proposalConsumer := &consumer.Consumer{BaseUser: user.RehydrateBaseUser(
+		10, "auth0|consumer", "ana@example.com", "Ana", "Pérez", consumer.Role, nil,
+	)}
+	proposalProvider := &provider.Provider{BaseUser: user.RehydrateBaseUser(
+		20, "auth0|provider", "juan@example.com", "Juan", "Gómez", provider.Role, nil,
+	)}
+	proposal := &serviceproposal.ServiceProposal{
+		ID:           42,
+		Consumer:     proposalConsumer,
+		Provider:     proposalProvider,
+		Status:       serviceproposal.StatusPending,
+		ScheduledOn:  scheduledOn,
+		BookingTerms: terms,
+	}
+	intent, err := payment.NewBookingDepositIntent(
+		"f69bfe31-ce5d-4f85-a8c5-643ca2dcaa36",
+		proposal.ID,
+		terms,
+		now.Add(-time.Minute),
+	)
+	require.NoError(t, err)
+	require.NoError(t, intent.MarkCheckoutReady(
+		"mp-preference-42",
+		"https://www.mercadopago.com.ar/checkout/v1/redirect?pref_id=mp-preference-42",
+		now.Add(29*time.Minute),
+		now.Add(-30*time.Second),
+	))
+	account, err := paymentaccount.NewPaymentAccount(
+		proposalProvider.ID(),
+		paymentaccount.PaymentProvider("mercado_pago"),
+		"mp-provider",
+		[]byte("encrypted-access-token"),
+		nil,
+		now.Add(24*time.Hour),
+	)
+	require.NoError(t, err)
+	intentRepository := &intentRepositoryStub{found: intent}
+	gateway := &checkoutGatewayStub{payment: payment.ExternalPayment{
+		ID:                "123456",
+		SellerAccountID:   "mp-provider",
+		ExternalReference: intent.ID,
+		Status:            payment.ExternalPaymentStatusProcessing,
+		Currency:          "ARS",
+		AmountCents:       intent.TotalAmountCents,
+	}}
+	confirmer := &paidBookingConfirmerStub{}
+	notificator := &notificatorStub{}
+	service := payment.NewService(
+		intentRepository,
+		proposalFinderStub{proposal: proposal},
+		userFinderStub{},
+		paymentAccountFinderStub{account: account},
+		credentialDecryptorStub{},
+		gateway,
+		gateway,
+		confirmer,
+		notificator,
+		func() string { return "unused" },
+		clockStub{now: now},
+	)
+
+	err = service.ProcessPaymentNotification(context.Background(), payment.PaymentNotification{
+		ExternalPaymentID: "123456",
+		SellerAccountID:   "mp-provider",
+	})
+
+	require.NoError(t, err)
+	require.NoError(t, service.ProcessPaymentNotification(context.Background(), payment.PaymentNotification{
+		ExternalPaymentID: "123456",
+		SellerAccountID:   "mp-provider",
+	}))
+	assert.Equal(t, payment.StatusProcessing, intent.Status)
+	assert.Same(t, intent, intentRepository.processingSaved)
+	assert.Equal(t, serviceproposal.StatusPending, proposal.Status)
+	assert.Nil(t, confirmer.order)
+	assert.Nil(t, confirmer.notification)
+	assert.Nil(t, notificator.notification)
 }

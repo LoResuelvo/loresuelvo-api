@@ -378,6 +378,10 @@ func (suite *testSuite) processApprovedPaymentForAmount(amount string) error {
 		"mp-juan",
 		amountCents,
 	)
+	return suite.sendMercadoPagoPaymentNotification(externalPaymentID)
+}
+
+func (suite *testSuite) sendMercadoPagoPaymentNotification(externalPaymentID string) error {
 	requestID := "bdd-mercado-pago-request"
 	timestamp := strconv.FormatInt(time.Now().UnixMilli(), 10)
 	manifest := "id:" + strings.ToLower(externalPaymentID) +
@@ -440,7 +444,16 @@ func (suite *testSuite) processApprovedPayment() error {
 }
 
 func (suite *testSuite) processProcessingPayment() error {
-	return godog.ErrPending
+	if suite.lastPaymentIntentID == "" ||
+		suite.lastCheckoutResponse.Pricing.AmountDueNowCents <= 0 {
+		return fmt.Errorf("expected checkout pricing and payment intent before processing payment")
+	}
+	externalPaymentID := suite.checkoutClient.AddProcessingPayment(
+		suite.lastPaymentIntentID,
+		"mp-juan",
+		suite.lastCheckoutResponse.Pricing.AmountDueNowCents,
+	)
+	return suite.sendMercadoPagoPaymentNotification(externalPaymentID)
 }
 
 func (suite *testSuite) processSameApprovedPaymentNotificationTwice() error {

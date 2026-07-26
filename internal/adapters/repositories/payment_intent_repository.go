@@ -149,6 +149,34 @@ func (repository *PaymentIntentRepository) FindByID(ctx context.Context, id stri
 	return &intent, nil
 }
 
+func (repository *PaymentIntentRepository) SaveProcessing(ctx context.Context, intent *payment.Intent) error {
+	if intent == nil || intent.Status != payment.StatusProcessing {
+		return fmt.Errorf("saving processing payment intent: processing intent is required")
+	}
+	result, err := repository.db.ExecContext(
+		ctx,
+		`UPDATE payment_intents
+		SET status = $1, updated_on = $2
+		WHERE id = $3 AND status IN ($4, $5)`,
+		intent.Status,
+		intent.UpdatedOn,
+		intent.ID,
+		payment.StatusCheckoutReady,
+		payment.StatusProcessing,
+	)
+	if err != nil {
+		return fmt.Errorf("saving processing payment intent: %w", err)
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("checking processing payment intent update: %w", err)
+	}
+	if affected != 1 {
+		return fmt.Errorf("saving processing payment intent: unexpected current status")
+	}
+	return nil
+}
+
 func (repository *PaymentIntentRepository) markPaidWithTx(
 	ctx context.Context,
 	tx *sql.Tx,
@@ -164,11 +192,12 @@ func (repository *PaymentIntentRepository) markPaidWithTx(
 		ctx,
 		`UPDATE payment_intents
 		SET status = $1, updated_on = $2
-		WHERE id = $3 AND status = $4`,
+		WHERE id = $3 AND status IN ($4, $5)`,
 		intent.Status,
 		intent.UpdatedOn,
 		intent.ID,
 		payment.StatusCheckoutReady,
+		payment.StatusProcessing,
 	)
 	if err != nil {
 		return fmt.Errorf("marking payment intent paid: %w", err)
