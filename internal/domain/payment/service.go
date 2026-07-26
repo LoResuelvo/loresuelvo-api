@@ -210,6 +210,15 @@ func (service *Service) ProcessPaymentNotification(
 		}
 		return nil
 	}
+	if externalPayment.Status == ExternalPaymentStatusRejected {
+		if err := intent.MarkRejected(externalPayment, now); err != nil {
+			return err
+		}
+		if err := service.intentRepository.SaveRejected(ctx, intent); err != nil {
+			return fmt.Errorf("saving rejected payment intent: %w", err)
+		}
+		return nil
+	}
 	if err := intent.MarkPaid(externalPayment, now); err != nil {
 		return err
 	}

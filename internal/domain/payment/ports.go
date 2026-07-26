@@ -15,6 +15,7 @@ type IntentRepository interface {
 	Save(ctx context.Context, intent *Intent) error
 	SaveCheckoutReady(ctx context.Context, intent *Intent) error
 	SaveProcessing(ctx context.Context, intent *Intent) error
+	SaveRejected(ctx context.Context, intent *Intent) error
 	FindByID(ctx context.Context, id string) (*Intent, error)
 }
 
@@ -84,6 +85,7 @@ type ExternalPaymentStatus string
 const (
 	ExternalPaymentStatusApproved   ExternalPaymentStatus = "approved"
 	ExternalPaymentStatusProcessing ExternalPaymentStatus = "processing"
+	ExternalPaymentStatusRejected   ExternalPaymentStatus = "rejected"
 )
 
 type ExternalPayment struct {

@@ -19,7 +19,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestPaymentIntentRepositoryPersistsCheckoutReadySessionAndProcessingStatus(t *testing.T) {
+func TestPaymentIntentRepositoryPersistsCheckoutReadyProcessingAndRejectedStatus(t *testing.T) {
 	testContext := newServiceProposalRepositoryTest(t)
 	consumerID := savedConsumerIDWithData(t, jobRequestRepositoryTestContext{
 		userRepository: testContext.userRepository,
@@ -110,6 +110,17 @@ func TestPaymentIntentRepositoryPersistsCheckoutReadySessionAndProcessingStatus(
 		intent.ID,
 	).Scan(&storedStatus))
 	assert.Equal(t, payment.StatusProcessing, storedStatus)
+
+	rejectedPayment := processingPayment
+	rejectedPayment.Status = payment.ExternalPaymentStatusRejected
+	require.NoError(t, intent.MarkRejected(rejectedPayment, now.Add(3*time.Second)))
+	require.NoError(t, repository.SaveRejected(t.Context(), intent))
+	require.NoError(t, repository.SaveRejected(t.Context(), intent))
+	require.NoError(t, testContext.database.QueryRow(
+		`SELECT status FROM payment_intents WHERE id = $1`,
+		intent.ID,
+	).Scan(&storedStatus))
+	assert.Equal(t, payment.StatusRejected, storedStatus)
 }
 
 func TestPaidBookingConfirmationAtomicallyMarksIntentAndAcceptsProposalWithOneWorkOrder(t *testing.T) {

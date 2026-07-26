@@ -19,6 +19,7 @@ const (
 	StatusCheckoutReady    IntentStatus = "checkout_ready"
 	StatusProcessing       IntentStatus = "processing"
 	StatusPaid             IntentStatus = "paid"
+	StatusRejected         IntentStatus = "rejected"
 )
 
 type Intent struct {
@@ -130,6 +131,25 @@ func (intent *Intent) MarkProcessing(externalPayment ExternalPayment, now time.T
 	}
 
 	intent.Status = StatusProcessing
+	intent.UpdatedOn = now.UTC()
+	return nil
+}
+
+func (intent *Intent) MarkRejected(externalPayment ExternalPayment, now time.Time) error {
+	if intent == nil ||
+		(intent.Status != StatusCheckoutReady &&
+			intent.Status != StatusProcessing &&
+			intent.Status != StatusRejected) ||
+		strings.TrimSpace(externalPayment.ID) == "" ||
+		externalPayment.Status != ExternalPaymentStatusRejected ||
+		externalPayment.ExternalReference != intent.ID ||
+		externalPayment.Currency != intent.Currency ||
+		externalPayment.AmountCents != intent.TotalAmountCents ||
+		now.IsZero() {
+		return ErrInvalidExternalPayment
+	}
+
+	intent.Status = StatusRejected
 	intent.UpdatedOn = now.UTC()
 	return nil
 }

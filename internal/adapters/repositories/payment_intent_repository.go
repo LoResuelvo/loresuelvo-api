@@ -177,6 +177,35 @@ func (repository *PaymentIntentRepository) SaveProcessing(ctx context.Context, i
 	return nil
 }
 
+func (repository *PaymentIntentRepository) SaveRejected(ctx context.Context, intent *payment.Intent) error {
+	if intent == nil || intent.Status != payment.StatusRejected {
+		return fmt.Errorf("saving rejected payment intent: rejected intent is required")
+	}
+	result, err := repository.db.ExecContext(
+		ctx,
+		`UPDATE payment_intents
+		SET status = $1, updated_on = $2
+		WHERE id = $3 AND status IN ($4, $5, $6)`,
+		intent.Status,
+		intent.UpdatedOn,
+		intent.ID,
+		payment.StatusCheckoutReady,
+		payment.StatusProcessing,
+		payment.StatusRejected,
+	)
+	if err != nil {
+		return fmt.Errorf("saving rejected payment intent: %w", err)
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("checking rejected payment intent update: %w", err)
+	}
+	if affected != 1 {
+		return fmt.Errorf("saving rejected payment intent: unexpected current status")
+	}
+	return nil
+}
+
 func (repository *PaymentIntentRepository) markPaidWithTx(
 	ctx context.Context,
 	tx *sql.Tx,

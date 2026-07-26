@@ -71,7 +71,6 @@ Feature: Contratar un servicio mediante el pago de una seña
             And la propuesta de servicio permanece pendiente
             And el sistema no registra una orden de trabajo para la propuesta
 
-        @wip
         Scenario: 21.7-CSP Permitir reintentar después de un pago rechazado
             Given que existe una propuesta de servicio pendiente de "juan.plomero@example.com" para "ana@example.com" con un intento de pago rechazado
             And que estoy autenticado como consumidor "ana@example.com"

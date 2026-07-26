@@ -19,6 +19,7 @@ import (
 
 	httphandler "github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/repositories"
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/payment"
 	serviceproposal "github.com/LoResuelvo/loresuelvo-api/internal/domain/service_proposal"
 	workorder "github.com/LoResuelvo/loresuelvo-api/internal/domain/work_order"
 	"github.com/cucumber/godog"
@@ -194,7 +195,18 @@ func (suite *testSuite) startCheckoutForPreparedProposal() error {
 }
 
 func (suite *testSuite) thereIsPendingProposalWithRejectedPayment(providerEmail, consumerEmail string) error {
-	return godog.ErrPending
+	if err := suite.consumerStartedCheckoutForPendingProposal(consumerEmail, providerEmail); err != nil {
+		return err
+	}
+	externalPaymentID := suite.checkoutClient.AddRejectedPayment(
+		suite.lastPaymentIntentID,
+		"mp-juan",
+		suite.lastCheckoutResponse.Pricing.AmountDueNowCents,
+	)
+	if err := suite.sendMercadoPagoPaymentNotification(externalPaymentID); err != nil {
+		return err
+	}
+	return suite.paymentIntentCanBeReadWithStatus(string(payment.StatusRejected))
 }
 
 func (suite *testSuite) thereIsAcceptedServiceProposal(providerEmail, consumerEmail string) error {

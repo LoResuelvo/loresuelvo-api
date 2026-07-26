@@ -68,6 +68,19 @@ func (client *FakeCheckoutClient) AddProcessingPayment(
 	)
 }
 
+func (client *FakeCheckoutClient) AddRejectedPayment(
+	externalReference,
+	sellerAccountID string,
+	amountCents int64,
+) string {
+	return client.addPayment(
+		externalReference,
+		sellerAccountID,
+		amountCents,
+		payment.ExternalPaymentStatusRejected,
+	)
+}
+
 func (client *FakeCheckoutClient) addPayment(
 	externalReference,
 	sellerAccountID string,
