@@ -1,0 +1,87 @@
+post:
+  tags:
+    - Payments
+  operationId: startServiceProposalCheckout
+  summary: Start booking-deposit checkout
+  description: |
+    Creates a Mercado Pago Checkout Pro session for the authenticated consumer
+    to pay the booking deposit of a pending service proposal. Creating checkout
+    does not accept the proposal or create a work order. Those changes happen
+    only after Mercado Pago reports an approved payment and the API verifies it.
+  security:
+    - BearerAuth: []
+  parameters:
+    - name: serviceProposalId
+      in: path
+      required: true
+      schema:
+        type: integer
+        minimum: 1
+  responses:
+    '201':
+      description: Payment intent and checkout session created.
+      headers:
+        Location:
+          description: URI of the created payment intent.
+          schema:
+            type: string
+            example: /payment-intents/f69bfe31-ce5d-4f85-a8c5-643ca2dcaa36
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/CheckoutSession'
+          examples:
+            created:
+              value:
+                payment_intent_id: f69bfe31-ce5d-4f85-a8c5-643ca2dcaa36
+                status: checkout_ready
+                checkout_url: https://www.mercadopago.com.ar/checkout/v1/redirect?pref_id=123
+                expires_on: '2026-07-04T13:30:00Z'
+                pricing:
+                  currency: ARS
+                  service_total_cents: 10000000
+                  deposit_cents: 2000000
+                  remaining_service_balance_cents: 8000000
+                  platform_fee_total_cents: 500000
+                  platform_fee_due_now_cents: 100000
+                  remaining_platform_fee_cents: 400000
+                  amount_due_now_cents: 2100000
+                  remaining_amount_due_cents: 8400000
+                  contract_total_cents: 10500000
+                  booking_payment_deadline: '2026-07-05T13:00:00Z'
+    '400':
+      description: The service proposal identifier is invalid.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    '401':
+      description: Missing or invalid authentication.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/AuthErrorResponse'
+    '403':
+      description: The authenticated user is not the proposal's recipient consumer.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    '404':
+      description: The service proposal does not exist.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    '409':
+      description: The proposal is not pending or the provider has no connected payment account.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    '500':
+      description: The checkout session could not be created.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'

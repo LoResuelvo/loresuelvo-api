@@ -306,45 +306,6 @@ func (suite *testSuite) requestPreparedProposalCheckout() error {
 	return nil
 }
 
-// requestServiceProposalAcceptance remains only as fixture support for older
-// WorkOrder scenarios until their setup is migrated with the payment
-// implementation. It is not registered as a step for the booking flow.
-func (suite *testSuite) requestServiceProposalAcceptance(proposalID int) error {
-	if proposalID == 0 {
-		return fmt.Errorf("expected a prepared service proposal before accepting it")
-	}
-	request, err := http.NewRequest(
-		http.MethodPost,
-		fmt.Sprintf("%s/service-proposals/%d/accept", suite.server.URL, proposalID),
-		nil,
-	)
-	if err != nil {
-		return err
-	}
-	if suite.currentAuth0ID != "" {
-		request.Header.Set("Authorization", "Bearer "+suite.tokenBuilder.BuildToken(suite.currentAuth0ID, nil))
-	}
-	response, err := http.DefaultClient.Do(request)
-	if err != nil {
-		return fmt.Errorf("API connection failed: %w", err)
-	}
-	defer response.Body.Close()
-	body, err := io.ReadAll(response.Body)
-	if err != nil {
-		return fmt.Errorf("reading service proposal acceptance response: %w", err)
-	}
-	suite.lastStatus = response.StatusCode
-	suite.lastBody = body
-	if response.StatusCode == http.StatusCreated {
-		var order workOrderResponse
-		if err := json.Unmarshal(body, &order); err != nil {
-			return fmt.Errorf("decoding service proposal acceptance response: %w", err)
-		}
-		suite.workOrdersByServiceProposalID[proposalID] = []workOrderResponse{order}
-	}
-	return nil
-}
-
 func (suite *testSuite) performCheckoutRequest(proposalID int) (checkoutHTTPResponse, error) {
 	if proposalID == 0 {
 		return checkoutHTTPResponse{}, fmt.Errorf("expected a prepared service proposal before requesting checkout")

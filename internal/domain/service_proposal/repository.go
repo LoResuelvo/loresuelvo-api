@@ -9,7 +9,6 @@ import (
 	paymentaccount "github.com/LoResuelvo/loresuelvo-api/internal/domain/payment_account"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/provider"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/user"
-	workorder "github.com/LoResuelvo/loresuelvo-api/internal/domain/work_order"
 )
 
 type ConversationRepository interface {
@@ -20,10 +19,6 @@ type ServiceProposalRepository interface {
 	Save(serviceProposal *ServiceProposal) (*ServiceProposal, error)
 	FindByID(ctx context.Context, id int) (*ServiceProposal, error)
 	FindByUserID(ctx context.Context, userID int) ([]*ServiceProposal, error)
-}
-
-type WorkOrderRepository interface {
-	Save(ctx context.Context, workOrder *workorder.WorkOrder) (*workorder.WorkOrder, error)
 }
 
 type UserRepository interface {

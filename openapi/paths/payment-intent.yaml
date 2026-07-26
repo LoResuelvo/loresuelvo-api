@@ -1,0 +1,49 @@
+get:
+  tags:
+    - Payments
+  operationId: getPaymentIntent
+  summary: Get a booking payment intent
+  description: |
+    Returns the status last verified by the API. A browser redirect from Mercado
+    Pago does not change this status; payment updates are accepted only through
+    the signed Mercado Pago webhook.
+  security:
+    - BearerAuth: []
+  parameters:
+    - name: paymentIntentId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+  responses:
+    '200':
+      description: Current payment intent status.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/PaymentIntent'
+    '401':
+      description: Missing or invalid authentication.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/AuthErrorResponse'
+    '403':
+      description: The authenticated user is not the proposal's recipient consumer.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    '404':
+      description: The payment intent does not exist.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    '500':
+      description: The payment intent could not be retrieved.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'

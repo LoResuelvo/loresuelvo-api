@@ -201,7 +201,6 @@ func NewDependenciesWithPaymentAccountAdapters(
 	)
 	servicePorposalService := serviceproposal.NewService(
 		persistence.ServiceProposalRepository,
-		persistence.WorkOrderRepository,
 		persistence.UserRepository,
 		persistence.ConversationRepository,
 		persistence.NotificationRepository,

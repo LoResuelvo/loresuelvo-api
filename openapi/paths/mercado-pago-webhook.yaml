@@ -1,0 +1,76 @@
+post:
+  tags:
+    - Payments
+  operationId: processMercadoPagoWebhook
+  summary: Process a Mercado Pago payment notification
+  description: |
+    Public server-to-server callback used by Mercado Pago. The API validates the
+    webhook signature and retrieves the payment directly from Mercado Pago before
+    changing internal state. An approved matching payment accepts the proposal
+    and atomically creates its scheduled work order.
+  security: []
+  parameters:
+    - name: data.id
+      in: query
+      required: true
+      schema:
+        type: string
+    - name: X-Signature
+      in: header
+      required: true
+      schema:
+        type: string
+    - name: X-Request-Id
+      in: header
+      required: true
+      schema:
+        type: string
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          type: object
+          required:
+            - type
+            - user_id
+            - data
+          properties:
+            type:
+              type: string
+              const: payment
+            user_id:
+              oneOf:
+                - type: string
+                - type: integer
+                  minimum: 1
+            data:
+              type: object
+              required:
+                - id
+              properties:
+                id:
+                  type: string
+              additionalProperties: true
+          additionalProperties: true
+  responses:
+    '200':
+      description: The verified payment notification was processed.
+    '400':
+      description: The notification payload or query parameters are invalid.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    '401':
+      description: The webhook signature is missing or invalid.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    '500':
+      description: The verified payment could not be processed.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'

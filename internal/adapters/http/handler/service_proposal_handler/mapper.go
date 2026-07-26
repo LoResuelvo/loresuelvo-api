@@ -3,7 +3,6 @@ package service_proposal_handler
 import (
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/provider"
 	serviceproposal "github.com/LoResuelvo/loresuelvo-api/internal/domain/service_proposal"
-	workorder "github.com/LoResuelvo/loresuelvo-api/internal/domain/work_order"
 )
 
 func serviceProposalCreationResponseFromDomain(proposal *serviceproposal.ServiceProposal) serviceProposalCreationResponse {
@@ -27,20 +26,6 @@ func serviceProposalCreationResponseFromDomain(proposal *serviceproposal.Service
 	}
 
 	return response
-}
-
-func workOrderResponseFromDomain(order *workorder.WorkOrder) workOrderResponse {
-	return workOrderResponse{
-		ID:                order.ID,
-		ServiceProposalID: order.ServiceProposalID(),
-		ConsumerID:        order.ConsumerID(),
-		ProviderID:        order.ProviderID(),
-		AmountCents:       order.Amount(),
-		ScheduledOn:       order.ScheduledOn(),
-		Description:       order.Description(),
-		Status:            string(order.Status),
-		AcceptedOn:        order.AcceptedOn,
-	}
 }
 
 func serviceProposalSummaryResponsesFromDomain(proposals []*serviceproposal.ServiceProposal, viewerAuthID string) ([]serviceProposalSummaryResponse, error) {

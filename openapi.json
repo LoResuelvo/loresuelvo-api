@@ -41,6 +41,10 @@
             "description": "Provider payment account connection endpoints."
         },
         {
+            "name": "Payments",
+            "description": "Booking checkout and verified payment processing endpoints."
+        },
+        {
             "name": "Files",
             "description": "File upload endpoints."
         },
@@ -2515,14 +2519,14 @@
                 }
             }
         },
-        "/service-proposals/{serviceProposalId}/accept": {
+        "/service-proposals/{serviceProposalId}/checkout-sessions": {
             "post": {
                 "tags": [
-                    "ServiceProposals"
+                    "Payments"
                 ],
-                "operationId": "acceptServiceProposal",
-                "summary": "Accept a service proposal",
-                "description": "Accepts a pending service proposal and atomically creates its scheduled work order.\nThe API then stores an acceptance notification for the provider and publishes it\nthrough the realtime WebSocket channel when the provider is connected.\n",
+                "operationId": "startServiceProposalCheckout",
+                "summary": "Start booking-deposit checkout",
+                "description": "Creates a Mercado Pago Checkout Pro session for the authenticated consumer\nto pay the booking deposit of a pending service proposal. Creating checkout\ndoes not accept the proposal or create a work order. Those changes happen\nonly after Mercado Pago reports an approved payment and the API verifies it.\n",
                 "security": [
                     {
                         "BearerAuth": []
@@ -2541,20 +2545,43 @@
                 ],
                 "responses": {
                     "201": {
-                        "description": "Service proposal accepted and work order created.",
+                        "description": "Payment intent and checkout session created.",
                         "headers": {
                             "Location": {
-                                "description": "URI of the created work order.",
+                                "description": "URI of the created payment intent.",
                                 "schema": {
                                     "type": "string",
-                                    "example": "/work-orders/42"
+                                    "example": "/payment-intents/f69bfe31-ce5d-4f85-a8c5-643ca2dcaa36"
                                 }
                             }
                         },
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/WorkOrder"
+                                    "$ref": "#/components/schemas/CheckoutSession"
+                                },
+                                "examples": {
+                                    "created": {
+                                        "value": {
+                                            "payment_intent_id": "f69bfe31-ce5d-4f85-a8c5-643ca2dcaa36",
+                                            "status": "checkout_ready",
+                                            "checkout_url": "https://www.mercadopago.com.ar/checkout/v1/redirect?pref_id=123",
+                                            "expires_on": "2026-07-04T13:30:00Z",
+                                            "pricing": {
+                                                "currency": "ARS",
+                                                "service_total_cents": 10000000,
+                                                "deposit_cents": 2000000,
+                                                "remaining_service_balance_cents": 8000000,
+                                                "platform_fee_total_cents": 500000,
+                                                "platform_fee_due_now_cents": 100000,
+                                                "remaining_platform_fee_cents": 400000,
+                                                "amount_due_now_cents": 2100000,
+                                                "remaining_amount_due_cents": 8400000,
+                                                "contract_total_cents": 10500000,
+                                                "booking_payment_deadline": "2026-07-05T13:00:00Z"
+                                            }
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -2600,7 +2627,7 @@
                         }
                     },
                     "409": {
-                        "description": "The service proposal is not pending or has expired.",
+                        "description": "The proposal is not pending or the provider has no connected payment account.",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -2610,7 +2637,202 @@
                         }
                     },
                     "500": {
-                        "description": "The service proposal could not be accepted.",
+                        "description": "The checkout session could not be created.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/payment-intents/{paymentIntentId}": {
+            "get": {
+                "tags": [
+                    "Payments"
+                ],
+                "operationId": "getPaymentIntent",
+                "summary": "Get a booking payment intent",
+                "description": "Returns the status last verified by the API. A browser redirect from Mercado\nPago does not change this status; payment updates are accepted only through\nthe signed Mercado Pago webhook.\n",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "name": "paymentIntentId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Current payment intent status.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PaymentIntent"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AuthErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "The authenticated user is not the proposal's recipient consumer.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "The payment intent does not exist.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "The payment intent could not be retrieved.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/webhooks/mercado-pago": {
+            "post": {
+                "tags": [
+                    "Payments"
+                ],
+                "operationId": "processMercadoPagoWebhook",
+                "summary": "Process a Mercado Pago payment notification",
+                "description": "Public server-to-server callback used by Mercado Pago. The API validates the\nwebhook signature and retrieves the payment directly from Mercado Pago before\nchanging internal state. An approved matching payment accepts the proposal\nand atomically creates its scheduled work order.\n",
+                "security": [],
+                "parameters": [
+                    {
+                        "name": "data.id",
+                        "in": "query",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "X-Signature",
+                        "in": "header",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "X-Request-Id",
+                        "in": "header",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "required": [
+                                    "type",
+                                    "user_id",
+                                    "data"
+                                ],
+                                "properties": {
+                                    "type": {
+                                        "type": "string",
+                                        "const": "payment"
+                                    },
+                                    "user_id": {
+                                        "oneOf": [
+                                            {
+                                                "type": "string"
+                                            },
+                                            {
+                                                "type": "integer",
+                                                "minimum": 1
+                                            }
+                                        ]
+                                    },
+                                    "data": {
+                                        "type": "object",
+                                        "required": [
+                                            "id"
+                                        ],
+                                        "properties": {
+                                            "id": {
+                                                "type": "string"
+                                            }
+                                        },
+                                        "additionalProperties": true
+                                    }
+                                },
+                                "additionalProperties": true
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "The verified payment notification was processed."
+                    },
+                    "400": {
+                        "description": "The notification payload or query parameters are invalid.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "The webhook signature is missing or invalid.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "The verified payment could not be processed.",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -3481,6 +3703,66 @@
                     "can_send_service_proposals": {
                         "type": "boolean",
                         "description": "Whether LoResuelvo allows the provider to send service proposals."
+                    }
+                },
+                "additionalProperties": false
+            },
+            "CheckoutSession": {
+                "type": "object",
+                "required": [
+                    "payment_intent_id",
+                    "status",
+                    "checkout_url",
+                    "expires_on",
+                    "pricing"
+                ],
+                "properties": {
+                    "payment_intent_id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "Internal payment intent that tracks this booking deposit."
+                    },
+                    "status": {
+                        "type": "string",
+                        "enum": [
+                            "checkout_ready"
+                        ]
+                    },
+                    "checkout_url": {
+                        "type": "string",
+                        "format": "uri",
+                        "description": "Mercado Pago Checkout Pro URL to which the frontend redirects the consumer."
+                    },
+                    "expires_on": {
+                        "type": "string",
+                        "format": "date-time",
+                        "description": "Checkout expiration, capped by the proposal booking-payment deadline."
+                    },
+                    "pricing": {
+                        "$ref": "#/components/schemas/BookingTerms"
+                    }
+                },
+                "additionalProperties": false
+            },
+            "PaymentIntent": {
+                "type": "object",
+                "required": [
+                    "id",
+                    "status"
+                ],
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "status": {
+                        "type": "string",
+                        "description": "Current result of the verified booking-deposit payment flow.",
+                        "enum": [
+                            "requires_checkout",
+                            "checkout_ready",
+                            "paid"
+                        ]
                     }
                 },
                 "additionalProperties": false

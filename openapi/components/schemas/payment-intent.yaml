@@ -1,0 +1,16 @@
+type: object
+required:
+  - id
+  - status
+properties:
+  id:
+    type: string
+    format: uuid
+  status:
+    type: string
+    description: Current result of the verified booking-deposit payment flow.
+    enum:
+      - requires_checkout
+      - checkout_ready
+      - paid
+additionalProperties: false

@@ -159,7 +159,6 @@ func (router *Router) registerChatbotRoutes(engine *gin.Engine, authMiddleware g
 func (router *Router) registerServiceProposalRoutes(engine *gin.Engine, authMiddleware gin.HandlerFunc) {
 	engine.POST("/service-proposals", authMiddleware, router.serviceProposalHandler.CreateServiceProposal)
 	engine.GET("/service-proposals", authMiddleware, router.serviceProposalHandler.GetServiceProposals)
-	engine.POST("/service-proposals/:serviceProposalID/accept", authMiddleware, router.serviceProposalHandler.AcceptServiceProposal)
 	engine.POST("/service-proposals/:serviceProposalID/checkout-sessions", authMiddleware, router.paymentHandler.StartBookingCheckout)
 }
 

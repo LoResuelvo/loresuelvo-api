@@ -1,6 +1,7 @@
 package steps_test
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -9,7 +10,9 @@ import (
 	"time"
 
 	httphandler "github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler"
+	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/repositories"
 	serviceproposal "github.com/LoResuelvo/loresuelvo-api/internal/domain/service_proposal"
+	workorder "github.com/LoResuelvo/loresuelvo-api/internal/domain/work_order"
 	"github.com/cucumber/godog"
 )
 
@@ -107,8 +110,23 @@ func (suite *testSuite) createScheduledWorkOrderFixture(providerEmail, consumerE
 		return err
 	}
 
-	suite.currentAuth0ID = auth0IDForConsumerEmail(consumerEmail)
-	if err := suite.requestServiceProposalAcceptance(suite.lastServiceProposalID); err != nil {
+	proposal, err := repositories.NewServiceProposalRepository(suite.database).
+		FindByID(context.Background(), suite.lastServiceProposalID)
+	if err != nil {
+		return fmt.Errorf("finding service proposal for work order fixture: %w", err)
+	}
+	acceptedOn := suite.clock.Now()
+	if err := proposal.Accept(proposal.Consumer.ID(), acceptedOn); err != nil {
+		return fmt.Errorf("accepting service proposal for work order fixture: %w", err)
+	}
+	order, err := workorder.New(proposal, acceptedOn)
+	if err != nil {
+		return fmt.Errorf("creating scheduled work order fixture: %w", err)
+	}
+	if _, err := suite.workOrderRepository.Save(context.Background(), order); err != nil {
+		return fmt.Errorf("saving scheduled work order fixture: %w", err)
+	}
+	if err := suite.serviceProposalHasStatus(suite.lastServiceProposalID, serviceproposal.StatusAccepted); err != nil {
 		return err
 	}
 	return suite.systemRegistersOneScheduledWorkOrder()

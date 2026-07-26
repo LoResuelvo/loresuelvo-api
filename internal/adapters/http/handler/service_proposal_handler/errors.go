@@ -33,17 +33,3 @@ func handleCreateServiceProposalError(c *gin.Context, err error) {
 
 	httphandler.RespondError(c, http.StatusInternalServerError, err.Error())
 }
-
-func handleAcceptServiceProposalError(c *gin.Context, err error) {
-	switch {
-	case errors.Is(err, serviceproposal.ErrDoesNotExist):
-		httphandler.RespondError(c, http.StatusNotFound, err.Error())
-	case errors.Is(err, serviceproposal.ErrOnlyRecipientCanAccept):
-		httphandler.RespondError(c, http.StatusForbidden, err.Error())
-	case errors.Is(err, serviceproposal.ErrOnlyPendingCanBeAccepted),
-		errors.Is(err, serviceproposal.ErrServiceProposalExpired):
-		httphandler.RespondError(c, http.StatusConflict, err.Error())
-	default:
-		httphandler.RespondError(c, http.StatusInternalServerError, "Could not accept service proposal")
-	}
-}
