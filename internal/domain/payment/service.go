@@ -2,6 +2,7 @@ package payment
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -9,10 +10,16 @@ import (
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/clock"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/notification"
 	serviceproposal "github.com/LoResuelvo/loresuelvo-api/internal/domain/service_proposal"
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/user"
 	workorder "github.com/LoResuelvo/loresuelvo-api/internal/domain/work_order"
 )
 
 const bookingCheckoutValidity = 30 * time.Minute
+
+type BookingCheckoutResult struct {
+	Intent  *Intent
+	Created bool
+}
 
 type Service struct {
 	intentRepository      IntentRepository
@@ -56,7 +63,11 @@ func NewService(
 	}
 }
 
-func (service *Service) StartBookingCheckout(ctx context.Context, authID string, proposalID int) (*Intent, error) {
+func (service *Service) StartBookingCheckout(
+	ctx context.Context,
+	authID string,
+	proposalID int,
+) (*BookingCheckoutResult, error) {
 	foundUser, err := service.userFinder.FindByAuthID(authID)
 	if err != nil {
 		return nil, ErrOnlyProposalRecipientCanCheckout
@@ -75,12 +86,66 @@ func (service *Service) StartBookingCheckout(ctx context.Context, authID string,
 		return nil, fmt.Errorf("starting booking checkout: service proposal provider is required")
 	}
 
-	now := service.clock.Now().UTC()
 	bookingPaymentDeadline := proposal.BookingTerms.BookingPaymentDeadline().UTC()
-	if !now.Before(bookingPaymentDeadline) {
+	if !service.clock.Now().UTC().Before(bookingPaymentDeadline) {
 		return nil, ErrBookingPaymentDeadlineReached
 	}
 
+	var result *BookingCheckoutResult
+	err = service.intentRepository.WithinBookingCheckoutLock(ctx, proposalID, func() error {
+		now := service.clock.Now().UTC()
+		if !now.Before(bookingPaymentDeadline) {
+			return ErrBookingPaymentDeadlineReached
+		}
+		activeIntent, findErr := service.intentRepository.FindActiveBookingCheckout(ctx, proposalID)
+		switch {
+		case findErr == nil && (activeIntent == nil || activeIntent.CheckoutSession == nil):
+			return ErrInvalidCheckoutSession
+		case findErr == nil && activeIntent.Status == StatusProcessing:
+			activeIntent.BookingTerms = proposal.BookingTerms
+			result = &BookingCheckoutResult{Intent: activeIntent}
+			return nil
+		case findErr == nil && activeIntent.CheckoutSession.ExpiresOn.After(now):
+			activeIntent.BookingTerms = proposal.BookingTerms
+			result = &BookingCheckoutResult{Intent: activeIntent}
+			return nil
+		case findErr == nil:
+			if expireErr := activeIntent.Expire(now); expireErr != nil {
+				return expireErr
+			}
+			if expireErr := service.intentRepository.SaveExpired(ctx, activeIntent); expireErr != nil {
+				return expireErr
+			}
+		case !errors.Is(findErr, ErrIntentDoesNotExist):
+			return findErr
+		}
+
+		createdIntent, createErr := service.createBookingCheckout(
+			ctx,
+			foundUser,
+			proposal,
+			now,
+			bookingPaymentDeadline,
+		)
+		if createErr != nil {
+			return createErr
+		}
+		result = &BookingCheckoutResult{Intent: createdIntent, Created: true}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+func (service *Service) createBookingCheckout(
+	ctx context.Context,
+	foundUser user.User,
+	proposal *serviceproposal.ServiceProposal,
+	now time.Time,
+	bookingPaymentDeadline time.Time,
+) (*Intent, error) {
 	account, err := service.paymentAccountFinder.FindByProviderID(
 		ctx,
 		proposal.Provider.ID(),

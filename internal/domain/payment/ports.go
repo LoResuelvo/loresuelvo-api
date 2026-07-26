@@ -12,11 +12,14 @@ import (
 )
 
 type IntentRepository interface {
+	WithinBookingCheckoutLock(ctx context.Context, serviceProposalID int, operation func() error) error
 	Save(ctx context.Context, intent *Intent) error
 	SaveCheckoutReady(ctx context.Context, intent *Intent) error
 	SaveProcessing(ctx context.Context, intent *Intent) error
 	SaveRejected(ctx context.Context, intent *Intent) error
+	SaveExpired(ctx context.Context, intent *Intent) error
 	FindByID(ctx context.Context, id string) (*Intent, error)
+	FindActiveBookingCheckout(ctx context.Context, serviceProposalID int) (*Intent, error)
 }
 
 type ServiceProposalFinder interface {

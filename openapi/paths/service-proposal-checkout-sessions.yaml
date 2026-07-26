@@ -18,6 +18,18 @@ post:
         type: integer
         minimum: 1
   responses:
+    '200':
+      description: An active checkout session already exists and is returned unchanged.
+      headers:
+        Location:
+          description: URI of the existing payment intent.
+          schema:
+            type: string
+            example: /payment-intents/f69bfe31-ce5d-4f85-a8c5-643ca2dcaa36
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/CheckoutSession'
     '201':
       description: Payment intent and checkout session created.
       headers:

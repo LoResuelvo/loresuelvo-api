@@ -22,11 +22,33 @@ type intentRepositoryStub struct {
 	checkoutReadySaved *payment.Intent
 	processingSaved    *payment.Intent
 	rejectedSaved      *payment.Intent
+	expiredSaved       *payment.Intent
 	found              *payment.Intent
+}
+
+func (repository *intentRepositoryStub) WithinBookingCheckoutLock(
+	_ context.Context,
+	_ int,
+	operation func() error,
+) error {
+	return operation()
 }
 
 func (repository *intentRepositoryStub) FindByID(context.Context, string) (*payment.Intent, error) {
 	if repository.found == nil {
+		return nil, payment.ErrIntentDoesNotExist
+	}
+	return repository.found, nil
+}
+
+func (repository *intentRepositoryStub) FindActiveBookingCheckout(
+	context.Context,
+	int,
+) (*payment.Intent, error) {
+	if repository.found == nil ||
+		repository.found.CheckoutSession == nil ||
+		(repository.found.Status != payment.StatusCheckoutReady &&
+			repository.found.Status != payment.StatusProcessing) {
 		return nil, payment.ErrIntentDoesNotExist
 	}
 	return repository.found, nil
@@ -49,6 +71,11 @@ func (repository *intentRepositoryStub) SaveProcessing(_ context.Context, intent
 
 func (repository *intentRepositoryStub) SaveRejected(_ context.Context, intent *payment.Intent) error {
 	repository.rejectedSaved = intent
+	return nil
+}
+
+func (repository *intentRepositoryStub) SaveExpired(_ context.Context, intent *payment.Intent) error {
+	repository.expiredSaved = intent
 	return nil
 }
 
@@ -98,6 +125,7 @@ type checkoutGatewayStub struct {
 	accessToken string
 	request     payment.CheckoutRequest
 	payment     payment.ExternalPayment
+	createCalls int
 }
 
 func (gateway *checkoutGatewayStub) Provider() paymentaccount.PaymentProvider {
@@ -109,6 +137,7 @@ func (gateway *checkoutGatewayStub) CreateCheckout(
 	accessToken string,
 	request payment.CheckoutRequest,
 ) (payment.ExternalCheckout, error) {
+	gateway.createCalls++
 	gateway.accessToken = accessToken
 	gateway.request = request
 	return payment.ExternalCheckout{
@@ -223,9 +252,11 @@ func TestStartBookingCheckoutCreatesReadyIntentWithFrozenProposalPricing(t *test
 		clockStub{now: now},
 	)
 
-	intent, err := service.StartBookingCheckout(context.Background(), "auth0|consumer", proposal.ID)
+	result, err := service.StartBookingCheckout(context.Background(), "auth0|consumer", proposal.ID)
 
 	require.NoError(t, err)
+	assert.True(t, result.Created)
+	intent := result.Intent
 	require.NotNil(t, intent)
 	assert.Equal(t, payment.StatusCheckoutReady, intent.Status)
 	assert.Equal(t, terms, intent.BookingTerms)
@@ -241,6 +272,18 @@ func TestStartBookingCheckoutCreatesReadyIntentWithFrozenProposalPricing(t *test
 	require.NotNil(t, intent.CheckoutSession)
 	assert.Equal(t, checkoutGateway.request.ExpiresOn, intent.CheckoutSession.ExpiresOn)
 	assert.Equal(t, serviceproposal.StatusPending, proposal.Status)
+
+	intentRepository.found = intent
+	reusedResult, err := service.StartBookingCheckout(
+		context.Background(),
+		"auth0|consumer",
+		proposal.ID,
+	)
+	require.NoError(t, err)
+	assert.False(t, reusedResult.Created)
+	assert.Equal(t, intent.ID, reusedResult.Intent.ID)
+	assert.Equal(t, intent.CheckoutSession.URL, reusedResult.Intent.CheckoutSession.URL)
+	assert.Equal(t, 1, checkoutGateway.createCalls)
 }
 
 func TestStartBookingCheckoutEnforcesBookingPaymentDeadline(t *testing.T) {
@@ -322,7 +365,7 @@ func TestStartBookingCheckoutEnforcesBookingPaymentDeadline(t *testing.T) {
 				clockStub{now: test.now},
 			)
 
-			intent, err := service.StartBookingCheckout(
+			result, err := service.StartBookingCheckout(
 				context.Background(),
 				"auth0|consumer",
 				proposal.ID,
@@ -330,12 +373,13 @@ func TestStartBookingCheckoutEnforcesBookingPaymentDeadline(t *testing.T) {
 
 			if test.wantError {
 				assert.ErrorIs(t, err, payment.ErrBookingPaymentDeadlineReached)
-				assert.Nil(t, intent)
+				assert.Nil(t, result)
 				assert.Nil(t, intentRepository.saved)
 				assert.Empty(t, checkoutGateway.accessToken)
 				return
 			}
 			require.NoError(t, err)
+			intent := result.Intent
 			require.NotNil(t, intent)
 			require.NotNil(t, intent.CheckoutSession)
 			assert.Equal(t, deadline, intent.CheckoutSession.ExpiresOn)

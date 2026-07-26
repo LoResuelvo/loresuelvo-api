@@ -137,7 +137,6 @@ Feature: Contratar un servicio mediante el pago de una seña
             Given que existe una propuesta de servicio pendiente de "juan.plomero@example.com" para "ana@example.com" por "100000.00" programada para "2026-07-06T10:00:00-03:00"
             And que estoy autenticado como consumidor "ana@example.com"
 
-        @wip
         Scenario: 21.18-CSP Evitar sesiones activas duplicadas
             When solicito concurrentemente dos veces pagar la seña de la propuesta
             Then el sistema conserva un único intento de pago activo para la propuesta

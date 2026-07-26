@@ -20,6 +20,7 @@ const (
 	StatusProcessing       IntentStatus = "processing"
 	StatusPaid             IntentStatus = "paid"
 	StatusRejected         IntentStatus = "rejected"
+	StatusExpired          IntentStatus = "expired"
 )
 
 type Intent struct {
@@ -150,6 +151,20 @@ func (intent *Intent) MarkRejected(externalPayment ExternalPayment, now time.Tim
 	}
 
 	intent.Status = StatusRejected
+	intent.UpdatedOn = now.UTC()
+	return nil
+}
+
+func (intent *Intent) Expire(now time.Time) error {
+	if intent == nil ||
+		intent.Status != StatusCheckoutReady ||
+		intent.CheckoutSession == nil ||
+		now.IsZero() ||
+		now.Before(intent.CheckoutSession.ExpiresOn) {
+		return ErrInvalidCheckoutSession
+	}
+
+	intent.Status = StatusExpired
 	intent.UpdatedOn = now.UTC()
 	return nil
 }

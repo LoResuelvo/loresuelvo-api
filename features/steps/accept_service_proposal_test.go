@@ -772,16 +772,48 @@ func (suite *testSuite) systemRejectsCheckoutAfterBookingDeadline() error {
 }
 
 func (suite *testSuite) systemKeepsOneActivePaymentIntent() error {
-	return godog.ErrPending
+	count, err := suite.paymentIntentRepository.CountActiveBookingIntents(
+		context.Background(),
+		suite.lastServiceProposalID,
+	)
+	if err != nil {
+		return err
+	}
+	if count != 1 {
+		return fmt.Errorf("expected one active payment intent, got %d", count)
+	}
+	return nil
 }
 
 func (suite *testSuite) systemKeepsOneActiveCheckoutSession() error {
-	return godog.ErrPending
+	count, err := suite.paymentIntentRepository.CountActiveCheckoutSessions(
+		context.Background(),
+		suite.lastServiceProposalID,
+		suite.clock.Now(),
+	)
+	if err != nil {
+		return err
+	}
+	if count != 1 {
+		return fmt.Errorf("expected one active checkout session, got %d", count)
+	}
+	return nil
 }
 
 func (suite *testSuite) concurrentRequestsReturnSameCheckoutURL() error {
 	if len(suite.concurrentCheckoutResponses) != 2 {
 		return fmt.Errorf("expected exactly two concurrent checkout responses")
+	}
+	statusCounts := map[int]int{}
+	for _, response := range suite.concurrentCheckoutResponses {
+		statusCounts[response.Status]++
+	}
+	if statusCounts[http.StatusCreated] != 1 || statusCounts[http.StatusOK] != 1 {
+		return fmt.Errorf(
+			"expected one created and one reused checkout response, got statuses %d and %d",
+			suite.concurrentCheckoutResponses[0].Status,
+			suite.concurrentCheckoutResponses[1].Status,
+		)
 	}
 	first := suite.concurrentCheckoutResponses[0].Value
 	second := suite.concurrentCheckoutResponses[1].Value
