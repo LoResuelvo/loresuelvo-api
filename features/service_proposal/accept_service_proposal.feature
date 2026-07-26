@@ -58,7 +58,6 @@ Feature: Contratar un servicio mediante el pago de una seña
             And la orden de trabajo queda vinculada a la propuesta aceptada
             And la orden de trabajo conserva el consumidor, el prestador, el precio del servicio, la fecha y hora y la descripción acordados
 
-        @wip
         Scenario: 21.5-CSP Notificar al prestador después de aprobar la seña
             Given que "ana@example.com" inició el checkout de la seña de una propuesta pendiente de "juan.plomero@example.com"
             And que el prestador "juan.plomero@example.com" está disponible para recibir mensajes en tiempo real

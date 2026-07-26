@@ -196,6 +196,7 @@ func NewDependenciesWithPaymentAccountAdapters(
 		paymentGateway,
 		paymentGateway,
 		persistence.WorkOrderRepository,
+		notificator,
 		uuid.NewString,
 		systemClock,
 	)

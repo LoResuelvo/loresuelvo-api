@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/consumer"
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/notification"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/payment"
 	paymentaccount "github.com/LoResuelvo/loresuelvo-api/internal/domain/payment_account"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/provider"
@@ -113,18 +114,38 @@ func (gateway *checkoutGatewayStub) GetPayment(
 }
 
 type paidBookingConfirmerStub struct {
-	intent *payment.Intent
-	order  *workorder.WorkOrder
+	intent       *payment.Intent
+	order        *workorder.WorkOrder
+	notification *notification.Notification
 }
 
 func (confirmer *paidBookingConfirmerStub) ConfirmPaidBooking(
 	_ context.Context,
 	intent *payment.Intent,
 	order *workorder.WorkOrder,
-) (*workorder.WorkOrder, error) {
+	acceptedNotification *notification.Notification,
+) (*payment.PaidBookingConfirmation, error) {
 	confirmer.intent = intent
 	confirmer.order = order
-	return order, nil
+	confirmer.notification = acceptedNotification
+	savedNotification := *acceptedNotification
+	savedNotification.ID = 99
+	return &payment.PaidBookingConfirmation{
+		WorkOrder:    order,
+		Notification: &savedNotification,
+	}, nil
+}
+
+type notificatorStub struct {
+	notification *notification.Notification
+}
+
+func (notificator *notificatorStub) Notify(
+	_ context.Context,
+	savedNotification *notification.Notification,
+) error {
+	notificator.notification = savedNotification
+	return nil
 }
 
 type clockStub struct {
@@ -184,6 +205,7 @@ func TestStartBookingCheckoutCreatesReadyIntentWithFrozenProposalPricing(t *test
 		credentialDecryptorStub{},
 		checkoutGateway,
 		checkoutGateway,
+		nil,
 		nil,
 		func() string { return "f69bfe31-ce5d-4f85-a8c5-643ca2dcaa36" },
 		clockStub{now: now},
@@ -261,6 +283,7 @@ func TestProcessApprovedPaymentConfirmsPaidBooking(t *testing.T) {
 		AmountCents:       intent.TotalAmountCents,
 	}}
 	confirmer := &paidBookingConfirmerStub{}
+	notificator := &notificatorStub{}
 	service := payment.NewService(
 		intentRepository,
 		proposalFinderStub{proposal: proposal},
@@ -270,6 +293,7 @@ func TestProcessApprovedPaymentConfirmsPaidBooking(t *testing.T) {
 		gateway,
 		gateway,
 		confirmer,
+		notificator,
 		func() string { return "unused" },
 		clockStub{now: now},
 	)
@@ -287,4 +311,12 @@ func TestProcessApprovedPaymentConfirmsPaidBooking(t *testing.T) {
 	assert.Equal(t, proposal.ID, confirmer.order.ServiceProposalID())
 	assert.Equal(t, workorder.StatusScheduled, confirmer.order.Status)
 	assert.Equal(t, now, confirmer.order.AcceptedOn)
+	require.NotNil(t, confirmer.notification)
+	assert.Equal(t, proposalProvider.ID(), confirmer.notification.UserID)
+	assert.Equal(t, notification.TypeServiceProposalAccepted, confirmer.notification.Type)
+	assert.Equal(t, notification.ResourceServiceProposal, confirmer.notification.ResourceType)
+	assert.Equal(t, proposal.ID, confirmer.notification.ResourceID)
+	require.NotNil(t, notificator.notification)
+	assert.Equal(t, 99, notificator.notification.ID)
+	assert.Equal(t, confirmer.notification.Type, notificator.notification.Type)
 }

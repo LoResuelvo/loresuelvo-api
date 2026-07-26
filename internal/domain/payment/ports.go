@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/notification"
 	paymentaccount "github.com/LoResuelvo/loresuelvo-api/internal/domain/payment_account"
 	serviceproposal "github.com/LoResuelvo/loresuelvo-api/internal/domain/service_proposal"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/user"
@@ -48,7 +49,17 @@ type Gateway interface {
 }
 
 type PaidBookingConfirmer interface {
-	ConfirmPaidBooking(ctx context.Context, intent *Intent, order *workorder.WorkOrder) (*workorder.WorkOrder, error)
+	ConfirmPaidBooking(
+		ctx context.Context,
+		intent *Intent,
+		order *workorder.WorkOrder,
+		acceptedNotification *notification.Notification,
+	) (*PaidBookingConfirmation, error)
+}
+
+type PaidBookingConfirmation struct {
+	WorkOrder    *workorder.WorkOrder
+	Notification *notification.Notification
 }
 
 type CheckoutRequest struct {

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/clock"
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/notification"
 	serviceproposal "github.com/LoResuelvo/loresuelvo-api/internal/domain/service_proposal"
 	workorder "github.com/LoResuelvo/loresuelvo-api/internal/domain/work_order"
 )
@@ -22,6 +23,7 @@ type Service struct {
 	checkoutGateway       CheckoutGateway
 	paymentVerifier       PaymentVerifier
 	paidBookingConfirmer  PaidBookingConfirmer
+	notificator           notification.Notificator
 	idGenerator           IDGenerator
 	clock                 clock.Clock
 }
@@ -35,6 +37,7 @@ func NewService(
 	checkoutGateway CheckoutGateway,
 	paymentVerifier PaymentVerifier,
 	paidBookingConfirmer PaidBookingConfirmer,
+	notificator notification.Notificator,
 	idGenerator IDGenerator,
 	clock clock.Clock,
 ) *Service {
@@ -47,6 +50,7 @@ func NewService(
 		checkoutGateway:       checkoutGateway,
 		paymentVerifier:       paymentVerifier,
 		paidBookingConfirmer:  paidBookingConfirmer,
+		notificator:           notificator,
 		idGenerator:           idGenerator,
 		clock:                 clock,
 	}
@@ -211,8 +215,22 @@ func (service *Service) ProcessPaymentNotification(
 	if err != nil {
 		return err
 	}
-	if _, err := service.paidBookingConfirmer.ConfirmPaidBooking(ctx, intent, order); err != nil {
+	acceptedNotification := proposal.CreateAcceptedNotification(service.clock)
+	confirmation, err := service.paidBookingConfirmer.ConfirmPaidBooking(
+		ctx,
+		intent,
+		order,
+		acceptedNotification,
+	)
+	if err != nil {
 		return err
+	}
+	if confirmation == nil || confirmation.Notification == nil {
+		return fmt.Errorf("processing approved payment: persisted notification is required")
+	}
+
+	if err := service.notificator.Notify(ctx, confirmation.Notification); err != nil {
+		return fmt.Errorf("notifying provider about accepted service proposal: %w", err)
 	}
 	return nil
 }

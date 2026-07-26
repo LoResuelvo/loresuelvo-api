@@ -12,6 +12,10 @@ type NotificationRepository struct {
 	db *sql.DB
 }
 
+type notificationQueryRower interface {
+	QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row
+}
+
 func NewNotificationRepository(db *sql.DB) *NotificationRepository {
 	return &NotificationRepository{
 		db: db,
@@ -19,12 +23,28 @@ func NewNotificationRepository(db *sql.DB) *NotificationRepository {
 }
 
 func (repository *NotificationRepository) Save(ctx context.Context, notification *notification.Notification) (*notification.Notification, error) {
+	return repository.save(ctx, repository.db, notification)
+}
+
+func (repository *NotificationRepository) saveWithTx(
+	ctx context.Context,
+	tx *sql.Tx,
+	notification *notification.Notification,
+) (*notification.Notification, error) {
+	return repository.save(ctx, tx, notification)
+}
+
+func (repository *NotificationRepository) save(
+	ctx context.Context,
+	queryRower notificationQueryRower,
+	notification *notification.Notification,
+) (*notification.Notification, error) {
 	if notification == nil {
 		return nil, fmt.Errorf("saving notification: notification is required")
 	}
 
 	saved := *notification
-	err := repository.db.QueryRowContext(
+	err := queryRower.QueryRowContext(
 		ctx,
 		`INSERT INTO notifications (
 			user_id,

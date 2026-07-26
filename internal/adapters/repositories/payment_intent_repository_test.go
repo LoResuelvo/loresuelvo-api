@@ -9,6 +9,7 @@ import (
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/repositories"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/consumer"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/conversation"
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/notification"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/payment"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/provider"
 	serviceproposal "github.com/LoResuelvo/loresuelvo-api/internal/domain/service_proposal"
@@ -150,19 +151,24 @@ func TestPaidBookingConfirmationAtomicallyMarksIntentAndAcceptsProposalWithOneWo
 	require.NoError(t, proposal.Accept(consumerID, now))
 	order, err := workorder.New(proposal, now)
 	require.NoError(t, err)
+	acceptedNotification := proposal.CreateAcceptedNotification(clockadapter.NewSystemClock())
+	notificationRepository := repositories.NewNotificationRepository(testContext.database)
 	repository := repositories.NewWorkOrderRepository(
 		testContext.database,
 		testContext.serviceProposalRepository,
 		paymentIntentRepository,
+		notificationRepository,
 	)
 
-	savedOrder, err := repository.ConfirmPaidBooking(t.Context(), intent, order)
+	confirmation, err := repository.ConfirmPaidBooking(t.Context(), intent, order, acceptedNotification)
 
 	require.NoError(t, err)
-	assert.NotZero(t, savedOrder.ID)
+	require.NotNil(t, confirmation)
+	assert.NotZero(t, confirmation.WorkOrder.ID)
+	assert.NotZero(t, confirmation.Notification.ID)
 	var storedIntentStatus payment.IntentStatus
 	var storedProposalStatus serviceproposal.Status
-	var workOrderCount int
+	var workOrderCount, notificationCount int
 	require.NoError(t, testContext.database.QueryRow(
 		`SELECT status FROM payment_intents WHERE id = $1`,
 		intent.ID,
@@ -175,7 +181,16 @@ func TestPaidBookingConfirmationAtomicallyMarksIntentAndAcceptsProposalWithOneWo
 		`SELECT COUNT(*) FROM work_orders WHERE service_proposal_id = $1`,
 		proposal.ID,
 	).Scan(&workOrderCount))
+	require.NoError(t, testContext.database.QueryRow(
+		`SELECT COUNT(*) FROM notifications
+		WHERE user_id = $1 AND type = $2 AND resource_type = $3 AND resource_id = $4`,
+		providerID,
+		notification.TypeServiceProposalAccepted,
+		notification.ResourceServiceProposal,
+		proposal.ID,
+	).Scan(&notificationCount))
 	assert.Equal(t, payment.StatusPaid, storedIntentStatus)
 	assert.Equal(t, serviceproposal.StatusAccepted, storedProposalStatus)
 	assert.Equal(t, 1, workOrderCount)
+	assert.Equal(t, 1, notificationCount)
 }
