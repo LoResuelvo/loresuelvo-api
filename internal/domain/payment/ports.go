@@ -12,14 +12,13 @@ import (
 )
 
 type IntentRepository interface {
-	WithinBookingCheckoutLock(ctx context.Context, serviceProposalID int, operation func() error) error
 	Save(ctx context.Context, intent *Intent) error
-	SaveCheckoutReady(ctx context.Context, intent *Intent) error
-	SaveProcessing(ctx context.Context, intent *Intent) error
-	SaveRejected(ctx context.Context, intent *Intent) error
-	SaveExpired(ctx context.Context, intent *Intent) error
 	FindByID(ctx context.Context, id string) (*Intent, error)
-	FindActiveBookingCheckout(ctx context.Context, serviceProposalID int) (*Intent, error)
+	FindLatestByProposalIDAndPurpose(
+		ctx context.Context,
+		serviceProposalID int,
+		purpose Purpose,
+	) (*Intent, error)
 }
 
 type ServiceProposalFinder interface {
@@ -35,14 +34,34 @@ type PaymentAccountFinder interface {
 	FindByExternalAccountID(ctx context.Context, externalAccountID string, paymentProvider paymentaccount.PaymentProvider) (*paymentaccount.PaymentAccount, error)
 }
 
-type PaymentTransactionRegistry interface {
-	WithinPaymentLock(
+type TransactionRepository interface {
+	Save(ctx context.Context, transaction *Transaction) error
+	FindByExternalID(
 		ctx context.Context,
 		processor paymentaccount.PaymentProvider,
 		externalPaymentID string,
-		operation func() error,
-	) error
-	Exists(ctx context.Context, processor paymentaccount.PaymentProvider, externalPaymentID string) (bool, error)
+	) (*Transaction, error)
+}
+
+type LockKey struct {
+	Namespace int
+	Resource  string
+}
+
+type LockManager interface {
+	WithinLock(ctx context.Context, key LockKey, operation func() error) error
+}
+
+type TransactionalStore interface {
+	SaveIntent(ctx context.Context, intent *Intent) error
+	SaveTransaction(ctx context.Context, transaction *Transaction) error
+	SaveServiceProposal(ctx context.Context, proposal *serviceproposal.ServiceProposal) error
+	SaveWorkOrder(ctx context.Context, order *workorder.WorkOrder) error
+	SaveNotification(ctx context.Context, notification *notification.Notification) error
+}
+
+type UnitOfWork interface {
+	Execute(ctx context.Context, operation func(TransactionalStore) error) error
 }
 
 type CredentialDecryptor interface {
@@ -61,22 +80,6 @@ type PaymentVerifier interface {
 type Gateway interface {
 	CheckoutGateway
 	PaymentVerifier
-}
-
-type PaidBookingConfirmer interface {
-	ConfirmPaidBooking(
-		ctx context.Context,
-		transaction *Transaction,
-		intent *Intent,
-		order *workorder.WorkOrder,
-		acceptedNotification *notification.Notification,
-	) (*PaidBookingConfirmation, error)
-}
-
-type PaidBookingConfirmation struct {
-	AlreadyProcessed bool
-	WorkOrder        *workorder.WorkOrder
-	Notification     *notification.Notification
 }
 
 type CheckoutRequest struct {

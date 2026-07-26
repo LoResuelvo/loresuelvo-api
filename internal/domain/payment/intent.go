@@ -168,3 +168,28 @@ func (intent *Intent) Expire(now time.Time) error {
 	intent.UpdatedOn = now.UTC()
 	return nil
 }
+
+func (intent *Intent) PrepareCheckout(now time.Time) (bool, error) {
+	if intent == nil {
+		return false, nil
+	}
+	if intent.CheckoutSession == nil {
+		if intent.Status == StatusRejected || intent.Status == StatusExpired {
+			return false, nil
+		}
+		return false, ErrInvalidCheckoutSession
+	}
+	if intent.Status == StatusProcessing {
+		return true, nil
+	}
+	if intent.Status != StatusCheckoutReady {
+		return false, nil
+	}
+	if intent.CheckoutSession.ExpiresOn.After(now) {
+		return true, nil
+	}
+	if err := intent.Expire(now); err != nil {
+		return false, err
+	}
+	return false, nil
+}

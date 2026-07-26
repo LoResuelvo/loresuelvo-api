@@ -12,4 +12,6 @@ var (
 	ErrBookingPaymentDeadlineReached    = errors.New("Booking payment deadline has been reached")
 	ErrIntentDoesNotExist               = errors.New("Payment intent does not exist")
 	ErrInvalidPaymentTransaction        = errors.New("Payment transaction is invalid")
+	ErrInvalidServiceProposal           = errors.New("Service proposal is invalid")
+	ErrTransactionDoesNotExist          = errors.New("Payment transaction does not exist")
 )

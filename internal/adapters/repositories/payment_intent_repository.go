@@ -5,13 +5,11 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"time"
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/payment"
 )
 
 const mercadoPagoProcessor = "mercado_pago"
-const bookingCheckoutAdvisoryLockNamespace = 2118
 
 type PaymentIntentRepository struct {
 	db *sql.DB
@@ -21,40 +19,35 @@ func NewPaymentIntentRepository(db *sql.DB) *PaymentIntentRepository {
 	return &PaymentIntentRepository{db: db}
 }
 
-func (repository *PaymentIntentRepository) WithinBookingCheckoutLock(
-	ctx context.Context,
-	serviceProposalID int,
-	operation func() error,
-) error {
-	if serviceProposalID <= 0 || operation == nil {
-		return fmt.Errorf("locking booking checkout: service proposal and operation are required")
-	}
-	tx, err := repository.db.BeginTx(ctx, nil)
-	if err != nil {
-		return fmt.Errorf("beginning booking checkout lock transaction: %w", err)
-	}
-	if _, err := tx.ExecContext(
-		ctx,
-		`SELECT pg_advisory_xact_lock($1, $2)`,
-		bookingCheckoutAdvisoryLockNamespace,
-		serviceProposalID,
-	); err != nil {
-		return rollbackPaymentIntentTx(tx, fmt.Errorf("locking booking checkout: %w", err))
-	}
-	if err := operation(); err != nil {
-		return rollbackPaymentIntentTx(tx, err)
-	}
-	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("committing booking checkout lock transaction: %w", err)
-	}
-	return nil
-}
-
 func (repository *PaymentIntentRepository) Save(ctx context.Context, intent *payment.Intent) error {
 	if intent == nil {
 		return fmt.Errorf("saving payment intent: payment intent is required")
 	}
-	_, err := repository.db.ExecContext(
+	tx, err := repository.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("beginning payment intent transaction: %w", err)
+	}
+	if err := repository.saveWithTx(ctx, tx, intent); err != nil {
+		return rollbackPaymentIntentTx(tx, err)
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("committing payment intent transaction: %w", err)
+	}
+	return nil
+}
+
+func (repository *PaymentIntentRepository) saveWithTx(
+	ctx context.Context,
+	tx *sql.Tx,
+	intent *payment.Intent,
+) error {
+	if tx == nil {
+		return fmt.Errorf("saving payment intent: transaction is required")
+	}
+	if intent == nil {
+		return fmt.Errorf("saving payment intent: payment intent is required")
+	}
+	_, err := tx.ExecContext(
 		ctx,
 		`INSERT INTO payment_intents (
 			id,
@@ -68,7 +61,16 @@ func (repository *PaymentIntentRepository) Save(ctx context.Context, intent *pay
 			created_on,
 			updated_on
 		)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+		ON CONFLICT (id) DO UPDATE SET
+			service_proposal_id = EXCLUDED.service_proposal_id,
+			purpose = EXCLUDED.purpose,
+			currency = EXCLUDED.currency,
+			seller_amount_cents = EXCLUDED.seller_amount_cents,
+			platform_fee_cents = EXCLUDED.platform_fee_cents,
+			total_amount_cents = EXCLUDED.total_amount_cents,
+			status = EXCLUDED.status,
+			updated_on = EXCLUDED.updated_on`,
 		intent.ID,
 		intent.ServiceProposalID,
 		intent.Purpose,
@@ -83,36 +85,8 @@ func (repository *PaymentIntentRepository) Save(ctx context.Context, intent *pay
 	if err != nil {
 		return fmt.Errorf("saving payment intent: %w", err)
 	}
-	return nil
-}
-
-func (repository *PaymentIntentRepository) SaveCheckoutReady(ctx context.Context, intent *payment.Intent) error {
-	if intent == nil || intent.CheckoutSession == nil || intent.Status != payment.StatusCheckoutReady {
-		return fmt.Errorf("saving checkout-ready payment intent: ready intent and checkout session are required")
-	}
-	tx, err := repository.db.BeginTx(ctx, nil)
-	if err != nil {
-		return fmt.Errorf("beginning checkout-ready payment intent transaction: %w", err)
-	}
-	result, err := tx.ExecContext(
-		ctx,
-		`UPDATE payment_intents
-		SET status = $1, updated_on = $2
-		WHERE id = $3 AND status = $4`,
-		intent.Status,
-		intent.UpdatedOn,
-		intent.ID,
-		payment.StatusRequiresCheckout,
-	)
-	if err != nil {
-		return rollbackPaymentIntentTx(tx, fmt.Errorf("updating checkout-ready payment intent: %w", err))
-	}
-	affected, err := result.RowsAffected()
-	if err != nil {
-		return rollbackPaymentIntentTx(tx, fmt.Errorf("checking checkout-ready payment intent update: %w", err))
-	}
-	if affected != 1 {
-		return rollbackPaymentIntentTx(tx, fmt.Errorf("updating checkout-ready payment intent: unexpected current status"))
+	if intent.CheckoutSession == nil {
+		return nil
 	}
 	_, err = tx.ExecContext(
 		ctx,
@@ -124,7 +98,10 @@ func (repository *PaymentIntentRepository) SaveCheckoutReady(ctx context.Context
 			expires_on,
 			created_on
 		)
-		VALUES ($1, $2, $3, $4, $5, $6)`,
+		VALUES ($1, $2, $3, $4, $5, $6)
+		ON CONFLICT (processor, external_preference_id) DO UPDATE SET
+			checkout_url = EXCLUDED.checkout_url,
+			expires_on = EXCLUDED.expires_on`,
 		intent.ID,
 		mercadoPagoProcessor,
 		intent.CheckoutSession.ExternalID,
@@ -133,59 +110,42 @@ func (repository *PaymentIntentRepository) SaveCheckoutReady(ctx context.Context
 		intent.CheckoutSession.CreatedOn,
 	)
 	if err != nil {
-		return rollbackPaymentIntentTx(tx, fmt.Errorf("saving payment checkout session: %w", err))
-	}
-	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("committing checkout-ready payment intent transaction: %w", err)
+		return fmt.Errorf("saving payment checkout session: %w", err)
 	}
 	return nil
 }
 
 func (repository *PaymentIntentRepository) FindByID(ctx context.Context, id string) (*payment.Intent, error) {
-	var intent payment.Intent
-	err := repository.db.QueryRowContext(
+	return repository.findOne(
 		ctx,
-		`SELECT
-			id,
-			service_proposal_id,
-			purpose,
-			currency,
-			seller_amount_cents,
-			platform_fee_cents,
-			total_amount_cents,
-			status,
-			created_on,
-			updated_on
-		FROM payment_intents
-		WHERE id = $1`,
+		`WHERE pi.id = $1`,
 		id,
-	).Scan(
-		&intent.ID,
-		&intent.ServiceProposalID,
-		&intent.Purpose,
-		&intent.Currency,
-		&intent.SellerAmountCents,
-		&intent.PlatformFeeCents,
-		&intent.TotalAmountCents,
-		&intent.Status,
-		&intent.CreatedOn,
-		&intent.UpdatedOn,
 	)
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil, payment.ErrIntentDoesNotExist
-	}
-	if err != nil {
-		return nil, fmt.Errorf("finding payment intent: %w", err)
-	}
-	return &intent, nil
 }
 
-func (repository *PaymentIntentRepository) FindActiveBookingCheckout(
+func (repository *PaymentIntentRepository) FindLatestByProposalIDAndPurpose(
 	ctx context.Context,
 	serviceProposalID int,
+	purpose payment.Purpose,
+) (*payment.Intent, error) {
+	return repository.findOne(
+		ctx,
+		`WHERE pi.service_proposal_id = $1 AND pi.purpose = $2
+		ORDER BY pi.created_on DESC
+		LIMIT 1`,
+		serviceProposalID,
+		purpose,
+	)
+}
+
+func (repository *PaymentIntentRepository) findOne(
+	ctx context.Context,
+	clause string,
+	arguments ...any,
 ) (*payment.Intent, error) {
 	var intent payment.Intent
-	var checkoutSession payment.CheckoutSession
+	var externalID, checkoutURL sql.NullString
+	var expiresOn, checkoutCreatedOn sql.NullTime
 	err := repository.db.QueryRowContext(
 		ctx,
 		`SELECT
@@ -204,17 +164,9 @@ func (repository *PaymentIntentRepository) FindActiveBookingCheckout(
 			pcs.expires_on,
 			pcs.created_on
 		FROM payment_intents pi
-		INNER JOIN payment_checkout_sessions pcs
-			ON pcs.payment_intent_id = pi.id
-		WHERE pi.service_proposal_id = $1
-			AND pi.purpose = $2
-			AND pi.status IN ($3, $4)
-		ORDER BY pi.created_on DESC
-		LIMIT 1`,
-		serviceProposalID,
-		payment.PurposeBookingDeposit,
-		payment.StatusCheckoutReady,
-		payment.StatusProcessing,
+		LEFT JOIN payment_checkout_sessions pcs ON pcs.payment_intent_id = pi.id
+		`+clause,
+		arguments...,
 	).Scan(
 		&intent.ID,
 		&intent.ServiceProposalID,
@@ -226,190 +178,26 @@ func (repository *PaymentIntentRepository) FindActiveBookingCheckout(
 		&intent.Status,
 		&intent.CreatedOn,
 		&intent.UpdatedOn,
-		&checkoutSession.ExternalID,
-		&checkoutSession.URL,
-		&checkoutSession.ExpiresOn,
-		&checkoutSession.CreatedOn,
+		&externalID,
+		&checkoutURL,
+		&expiresOn,
+		&checkoutCreatedOn,
 	)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, payment.ErrIntentDoesNotExist
 	}
 	if err != nil {
-		return nil, fmt.Errorf("finding active booking checkout: %w", err)
+		return nil, fmt.Errorf("finding payment intent: %w", err)
 	}
-	intent.CheckoutSession = &checkoutSession
+	if externalID.Valid && checkoutURL.Valid && expiresOn.Valid && checkoutCreatedOn.Valid {
+		intent.CheckoutSession = &payment.CheckoutSession{
+			ExternalID: externalID.String,
+			URL:        checkoutURL.String,
+			ExpiresOn:  expiresOn.Time,
+			CreatedOn:  checkoutCreatedOn.Time,
+		}
+	}
 	return &intent, nil
-}
-
-func (repository *PaymentIntentRepository) SaveProcessing(ctx context.Context, intent *payment.Intent) error {
-	if intent == nil || intent.Status != payment.StatusProcessing {
-		return fmt.Errorf("saving processing payment intent: processing intent is required")
-	}
-	result, err := repository.db.ExecContext(
-		ctx,
-		`UPDATE payment_intents
-		SET status = $1, updated_on = $2
-		WHERE id = $3 AND status IN ($4, $5)`,
-		intent.Status,
-		intent.UpdatedOn,
-		intent.ID,
-		payment.StatusCheckoutReady,
-		payment.StatusProcessing,
-	)
-	if err != nil {
-		return fmt.Errorf("saving processing payment intent: %w", err)
-	}
-	affected, err := result.RowsAffected()
-	if err != nil {
-		return fmt.Errorf("checking processing payment intent update: %w", err)
-	}
-	if affected != 1 {
-		return fmt.Errorf("saving processing payment intent: unexpected current status")
-	}
-	return nil
-}
-
-func (repository *PaymentIntentRepository) SaveRejected(ctx context.Context, intent *payment.Intent) error {
-	if intent == nil || intent.Status != payment.StatusRejected {
-		return fmt.Errorf("saving rejected payment intent: rejected intent is required")
-	}
-	result, err := repository.db.ExecContext(
-		ctx,
-		`UPDATE payment_intents
-		SET status = $1, updated_on = $2
-		WHERE id = $3 AND status IN ($4, $5, $6)`,
-		intent.Status,
-		intent.UpdatedOn,
-		intent.ID,
-		payment.StatusCheckoutReady,
-		payment.StatusProcessing,
-		payment.StatusRejected,
-	)
-	if err != nil {
-		return fmt.Errorf("saving rejected payment intent: %w", err)
-	}
-	affected, err := result.RowsAffected()
-	if err != nil {
-		return fmt.Errorf("checking rejected payment intent update: %w", err)
-	}
-	if affected != 1 {
-		return fmt.Errorf("saving rejected payment intent: unexpected current status")
-	}
-	return nil
-}
-
-func (repository *PaymentIntentRepository) SaveExpired(ctx context.Context, intent *payment.Intent) error {
-	if intent == nil || intent.Status != payment.StatusExpired {
-		return fmt.Errorf("saving expired payment intent: expired intent is required")
-	}
-	result, err := repository.db.ExecContext(
-		ctx,
-		`UPDATE payment_intents
-		SET status = $1, updated_on = $2
-		WHERE id = $3 AND status = $4`,
-		intent.Status,
-		intent.UpdatedOn,
-		intent.ID,
-		payment.StatusCheckoutReady,
-	)
-	if err != nil {
-		return fmt.Errorf("saving expired payment intent: %w", err)
-	}
-	affected, err := result.RowsAffected()
-	if err != nil {
-		return fmt.Errorf("checking expired payment intent update: %w", err)
-	}
-	if affected != 1 {
-		return fmt.Errorf("saving expired payment intent: unexpected current status")
-	}
-	return nil
-}
-
-func (repository *PaymentIntentRepository) CountActiveBookingIntents(
-	ctx context.Context,
-	serviceProposalID int,
-) (int, error) {
-	var count int
-	err := repository.db.QueryRowContext(
-		ctx,
-		`SELECT COUNT(*)
-		FROM payment_intents
-		WHERE service_proposal_id = $1
-			AND purpose = $2
-			AND status IN ($3, $4, $5, $6)`,
-		serviceProposalID,
-		payment.PurposeBookingDeposit,
-		payment.StatusRequiresCheckout,
-		payment.StatusCheckoutReady,
-		payment.StatusProcessing,
-		payment.StatusPaid,
-	).Scan(&count)
-	if err != nil {
-		return 0, fmt.Errorf("counting active booking payment intents: %w", err)
-	}
-	return count, nil
-}
-
-func (repository *PaymentIntentRepository) CountActiveCheckoutSessions(
-	ctx context.Context,
-	serviceProposalID int,
-	now time.Time,
-) (int, error) {
-	var count int
-	err := repository.db.QueryRowContext(
-		ctx,
-		`SELECT COUNT(*)
-		FROM payment_checkout_sessions pcs
-		INNER JOIN payment_intents pi ON pi.id = pcs.payment_intent_id
-		WHERE pi.service_proposal_id = $1
-			AND pi.purpose = $2
-			AND pi.status IN ($3, $4)
-			AND pcs.expires_on > $5`,
-		serviceProposalID,
-		payment.PurposeBookingDeposit,
-		payment.StatusCheckoutReady,
-		payment.StatusProcessing,
-		now.UTC(),
-	).Scan(&count)
-	if err != nil {
-		return 0, fmt.Errorf("counting active payment checkout sessions: %w", err)
-	}
-	return count, nil
-}
-
-func (repository *PaymentIntentRepository) markPaidWithTx(
-	ctx context.Context,
-	tx *sql.Tx,
-	intent *payment.Intent,
-) error {
-	if tx == nil {
-		return fmt.Errorf("marking payment intent paid: transaction is required")
-	}
-	if intent == nil || intent.Status != payment.StatusPaid {
-		return fmt.Errorf("marking payment intent paid: paid intent is required")
-	}
-	result, err := tx.ExecContext(
-		ctx,
-		`UPDATE payment_intents
-		SET status = $1, updated_on = $2
-		WHERE id = $3 AND status IN ($4, $5)`,
-		intent.Status,
-		intent.UpdatedOn,
-		intent.ID,
-		payment.StatusCheckoutReady,
-		payment.StatusProcessing,
-	)
-	if err != nil {
-		return fmt.Errorf("marking payment intent paid: %w", err)
-	}
-	affected, err := result.RowsAffected()
-	if err != nil {
-		return fmt.Errorf("checking paid payment intent update: %w", err)
-	}
-	if affected != 1 {
-		return fmt.Errorf("marking payment intent paid: unexpected current status")
-	}
-	return nil
 }
 
 func (repository *PaymentIntentRepository) DeleteAll() error {

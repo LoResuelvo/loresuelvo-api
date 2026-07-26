@@ -44,7 +44,7 @@ func newServiceProposalRepositoryTest(t *testing.T) serviceProposalRepositoryTes
 	userRepository := repositories.NewUserRepository(database)
 	messageRepository := repositories.NewMessageRepository(database, repositories.NewMessageImageRepository(database))
 	serviceProposalRepository := repositories.NewServiceProposalRepository(database)
-	workOrderRepository := repositories.NewWorkOrderRepository(database, serviceProposalRepository, nil, nil, nil)
+	workOrderRepository := repositories.NewWorkOrderRepository(database, serviceProposalRepository)
 
 	return serviceProposalRepositoryTestContext{
 		database:                  database,
@@ -81,7 +81,7 @@ func cleanServiceProposalRepositoryTestDatabase(t *testing.T, database *sql.DB) 
 	require.NoError(t, err, "could not clean categories")
 }
 
-func TestServiceProposalRepositorySavesAcceptanceWithWorkOrderAtomically(t *testing.T) {
+func TestWorkOrderRepositoryDoesNotPersistServiceProposalTransitions(t *testing.T) {
 	testContext := newServiceProposalRepositoryTest(t)
 	consumerID := savedConsumerIDWithData(t, jobRequestRepositoryTestContext{
 		userRepository: testContext.userRepository,
@@ -128,7 +128,7 @@ func TestServiceProposalRepositorySavesAcceptanceWithWorkOrderAtomically(t *test
 		"SELECT status FROM service_proposals WHERE id = $1",
 		proposal.ID,
 	).Scan(&storedProposalStatus))
-	assert.Equal(t, serviceproposal.StatusAccepted, storedProposalStatus)
+	assert.Equal(t, serviceproposal.StatusPending, storedProposalStatus)
 
 	var storedProposalID int
 	var storedStatus workorder.Status

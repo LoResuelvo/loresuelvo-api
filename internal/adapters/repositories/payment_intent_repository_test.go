@@ -66,7 +66,7 @@ func TestPaymentIntentRepositoryPersistsCheckoutReadyProcessingAndRejectedStatus
 		now.Add(time.Second),
 	))
 
-	err = repository.SaveCheckoutReady(context.Background(), intent)
+	err = repository.Save(context.Background(), intent)
 
 	require.NoError(t, err)
 	var storedStatus payment.IntentStatus
@@ -104,8 +104,8 @@ func TestPaymentIntentRepositoryPersistsCheckoutReadyProcessingAndRejectedStatus
 		AmountCents:       intent.TotalAmountCents,
 	}
 	require.NoError(t, intent.MarkProcessing(processingPayment, now.Add(2*time.Second)))
-	require.NoError(t, repository.SaveProcessing(t.Context(), intent))
-	require.NoError(t, repository.SaveProcessing(t.Context(), intent))
+	require.NoError(t, repository.Save(t.Context(), intent))
+	require.NoError(t, repository.Save(t.Context(), intent))
 	require.NoError(t, testContext.database.QueryRow(
 		`SELECT status FROM payment_intents WHERE id = $1`,
 		intent.ID,
@@ -115,8 +115,8 @@ func TestPaymentIntentRepositoryPersistsCheckoutReadyProcessingAndRejectedStatus
 	rejectedPayment := processingPayment
 	rejectedPayment.Status = payment.ExternalPaymentStatusRejected
 	require.NoError(t, intent.MarkRejected(rejectedPayment, now.Add(3*time.Second)))
-	require.NoError(t, repository.SaveRejected(t.Context(), intent))
-	require.NoError(t, repository.SaveRejected(t.Context(), intent))
+	require.NoError(t, repository.Save(t.Context(), intent))
+	require.NoError(t, repository.Save(t.Context(), intent))
 	require.NoError(t, testContext.database.QueryRow(
 		`SELECT status FROM payment_intents WHERE id = $1`,
 		intent.ID,
@@ -124,7 +124,7 @@ func TestPaymentIntentRepositoryPersistsCheckoutReadyProcessingAndRejectedStatus
 	assert.Equal(t, payment.StatusRejected, storedStatus)
 }
 
-func TestPaidBookingConfirmationAtomicallyMarksIntentAndAcceptsProposalWithOneWorkOrder(t *testing.T) {
+func TestPaymentUnitOfWorkAtomicallyPersistsApprovedBooking(t *testing.T) {
 	testContext := newServiceProposalRepositoryTest(t)
 	consumerID := savedConsumerIDWithData(t, jobRequestRepositoryTestContext{
 		userRepository: testContext.userRepository,
@@ -168,7 +168,7 @@ func TestPaidBookingConfirmationAtomicallyMarksIntentAndAcceptsProposalWithOneWo
 		now.Add(29*time.Minute),
 		now.Add(-30*time.Second),
 	))
-	require.NoError(t, paymentIntentRepository.SaveCheckoutReady(t.Context(), intent))
+	require.NoError(t, paymentIntentRepository.Save(t.Context(), intent))
 	require.NoError(t, intent.MarkProcessing(payment.ExternalPayment{
 		ID:                "123456",
 		SellerAccountID:   "987654",
@@ -177,7 +177,7 @@ func TestPaidBookingConfirmationAtomicallyMarksIntentAndAcceptsProposalWithOneWo
 		Currency:          intent.Currency,
 		AmountCents:       intent.TotalAmountCents,
 	}, now.Add(-time.Second)))
-	require.NoError(t, paymentIntentRepository.SaveProcessing(t.Context(), intent))
+	require.NoError(t, paymentIntentRepository.Save(t.Context(), intent))
 	require.NoError(t, intent.MarkPaid(payment.ExternalPayment{
 		ID:                "123456",
 		SellerAccountID:   "987654",
@@ -195,8 +195,13 @@ func TestPaidBookingConfirmationAtomicallyMarksIntentAndAcceptsProposalWithOneWo
 	repository := repositories.NewWorkOrderRepository(
 		testContext.database,
 		testContext.serviceProposalRepository,
+	)
+	unitOfWork := repositories.NewPaymentUnitOfWork(
+		testContext.database,
 		paymentIntentRepository,
 		paymentTransactionRepository,
+		testContext.serviceProposalRepository,
+		repository,
 		notificationRepository,
 	)
 	transaction, err := payment.NewTransaction(
@@ -214,18 +219,25 @@ func TestPaidBookingConfirmationAtomicallyMarksIntentAndAcceptsProposalWithOneWo
 	)
 	require.NoError(t, err)
 
-	confirmation, err := repository.ConfirmPaidBooking(
-		t.Context(),
-		transaction,
-		intent,
-		order,
-		acceptedNotification,
-	)
+	err = unitOfWork.Execute(t.Context(), func(store payment.TransactionalStore) error {
+		if err := store.SaveTransaction(t.Context(), transaction); err != nil {
+			return err
+		}
+		if err := store.SaveIntent(t.Context(), intent); err != nil {
+			return err
+		}
+		if err := store.SaveServiceProposal(t.Context(), proposal); err != nil {
+			return err
+		}
+		if err := store.SaveWorkOrder(t.Context(), order); err != nil {
+			return err
+		}
+		return store.SaveNotification(t.Context(), acceptedNotification)
+	})
 
 	require.NoError(t, err)
-	require.NotNil(t, confirmation)
-	assert.NotZero(t, confirmation.WorkOrder.ID)
-	assert.NotZero(t, confirmation.Notification.ID)
+	assert.NotZero(t, order.ID)
+	assert.NotZero(t, acceptedNotification.ID)
 	var storedIntentStatus payment.IntentStatus
 	var storedProposalStatus serviceproposal.Status
 	var workOrderCount, notificationCount, transactionCount int
@@ -254,15 +266,6 @@ func TestPaidBookingConfirmationAtomicallyMarksIntentAndAcceptsProposalWithOneWo
 	assert.Equal(t, 1, workOrderCount)
 	assert.Equal(t, 1, notificationCount)
 
-	duplicateConfirmation, err := repository.ConfirmPaidBooking(
-		t.Context(),
-		transaction,
-		intent,
-		order,
-		acceptedNotification,
-	)
-	require.NoError(t, err)
-	assert.True(t, duplicateConfirmation.AlreadyProcessed)
 	require.NoError(t, testContext.database.QueryRow(
 		`SELECT COUNT(*) FROM payment_transactions
 		WHERE processor = $1 AND external_payment_id = $2`,

@@ -23,43 +23,47 @@ type BookingCheckoutResult struct {
 
 type Service struct {
 	intentRepository      IntentRepository
+	transactionRepository TransactionRepository
 	serviceProposalFinder ServiceProposalFinder
 	userFinder            UserFinder
 	paymentAccountFinder  PaymentAccountFinder
-	transactionRegistry   PaymentTransactionRegistry
+	lockManager           LockManager
+	unitOfWork            UnitOfWork
 	credentialDecryptor   CredentialDecryptor
 	checkoutGateway       CheckoutGateway
 	paymentVerifier       PaymentVerifier
-	paidBookingConfirmer  PaidBookingConfirmer
 	notificator           notification.Notificator
 	idGenerator           IDGenerator
 	clock                 clock.Clock
+	checkoutPolicy        BookingCheckoutPolicy
 }
 
 func NewService(
 	intentRepository IntentRepository,
+	transactionRepository TransactionRepository,
 	serviceProposalFinder ServiceProposalFinder,
 	userFinder UserFinder,
 	paymentAccountFinder PaymentAccountFinder,
-	transactionRegistry PaymentTransactionRegistry,
+	lockManager LockManager,
+	unitOfWork UnitOfWork,
 	credentialDecryptor CredentialDecryptor,
 	checkoutGateway CheckoutGateway,
 	paymentVerifier PaymentVerifier,
-	paidBookingConfirmer PaidBookingConfirmer,
 	notificator notification.Notificator,
 	idGenerator IDGenerator,
 	clock clock.Clock,
 ) *Service {
 	return &Service{
 		intentRepository:      intentRepository,
+		transactionRepository: transactionRepository,
 		serviceProposalFinder: serviceProposalFinder,
 		userFinder:            userFinder,
 		paymentAccountFinder:  paymentAccountFinder,
-		transactionRegistry:   transactionRegistry,
+		lockManager:           lockManager,
+		unitOfWork:            unitOfWork,
 		credentialDecryptor:   credentialDecryptor,
 		checkoutGateway:       checkoutGateway,
 		paymentVerifier:       paymentVerifier,
-		paidBookingConfirmer:  paidBookingConfirmer,
 		notificator:           notificator,
 		idGenerator:           idGenerator,
 		clock:                 clock,
@@ -79,61 +83,45 @@ func (service *Service) StartBookingCheckout(
 	if err != nil {
 		return nil, err
 	}
-	if proposal.Consumer.ID() != foundUser.ID() {
-		return nil, ErrOnlyProposalRecipientCanCheckout
-	}
-	if proposal.Status != serviceproposal.StatusPending {
-		return nil, ErrProposalNotPending
-	}
-	if proposal.Provider == nil {
-		return nil, fmt.Errorf("starting booking checkout: service proposal provider is required")
-	}
-
-	bookingPaymentDeadline := proposal.BookingTerms.BookingPaymentDeadline().UTC()
-	if !service.clock.Now().UTC().Before(bookingPaymentDeadline) {
-		return nil, ErrBookingPaymentDeadlineReached
+	if err := service.checkoutPolicy.Authorize(proposal, foundUser.ID(), service.clock.Now()); err != nil {
+		return nil, err
 	}
 
 	var result *BookingCheckoutResult
-	err = service.intentRepository.WithinBookingCheckoutLock(ctx, proposalID, func() error {
+	err = service.lockManager.WithinLock(ctx, BookingCheckoutLockKey(proposalID), func() error {
 		now := service.clock.Now().UTC()
-		if !now.Before(bookingPaymentDeadline) {
-			return ErrBookingPaymentDeadlineReached
+		if err := service.checkoutPolicy.Authorize(proposal, foundUser.ID(), now); err != nil {
+			return err
 		}
-		activeIntent, findErr := service.intentRepository.FindActiveBookingCheckout(ctx, proposalID)
-		switch {
-		case findErr == nil && (activeIntent == nil || activeIntent.CheckoutSession == nil):
-			return ErrInvalidCheckoutSession
-		case findErr == nil && activeIntent.Status == StatusProcessing:
-			activeIntent.BookingTerms = proposal.BookingTerms
-			result = &BookingCheckoutResult{Intent: activeIntent}
-			return nil
-		case findErr == nil && activeIntent.CheckoutSession.ExpiresOn.After(now):
-			activeIntent.BookingTerms = proposal.BookingTerms
-			result = &BookingCheckoutResult{Intent: activeIntent}
-			return nil
-		case findErr == nil:
-			if expireErr := activeIntent.Expire(now); expireErr != nil {
-				return expireErr
+		intent, findErr := service.intentRepository.FindLatestByProposalIDAndPurpose(
+			ctx,
+			proposalID,
+			PurposeBookingDeposit,
+		)
+		if findErr == nil {
+			reuse, prepareErr := intent.PrepareCheckout(now)
+			if prepareErr != nil {
+				return prepareErr
 			}
-			if expireErr := service.intentRepository.SaveExpired(ctx, activeIntent); expireErr != nil {
-				return expireErr
+			if reuse {
+				intent.BookingTerms = proposal.BookingTerms
+				result = &BookingCheckoutResult{Intent: intent}
+				return nil
 			}
-		case !errors.Is(findErr, ErrIntentDoesNotExist):
+			if intent.Status == StatusExpired {
+				if saveErr := service.intentRepository.Save(ctx, intent); saveErr != nil {
+					return saveErr
+				}
+			}
+		} else if !errors.Is(findErr, ErrIntentDoesNotExist) {
 			return findErr
 		}
 
-		createdIntent, createErr := service.createBookingCheckout(
-			ctx,
-			foundUser,
-			proposal,
-			now,
-			bookingPaymentDeadline,
-		)
+		created, createErr := service.createBookingCheckout(ctx, foundUser, proposal, now)
 		if createErr != nil {
 			return createErr
 		}
-		result = &BookingCheckoutResult{Intent: createdIntent, Created: true}
+		result = &BookingCheckoutResult{Intent: created, Created: true}
 		return nil
 	})
 	if err != nil {
@@ -147,7 +135,6 @@ func (service *Service) createBookingCheckout(
 	foundUser user.User,
 	proposal *serviceproposal.ServiceProposal,
 	now time.Time,
-	bookingPaymentDeadline time.Time,
 ) (*Intent, error) {
 	account, err := service.paymentAccountFinder.FindByProviderID(
 		ctx,
@@ -168,23 +155,14 @@ func (service *Service) createBookingCheckout(
 		return nil, fmt.Errorf("decrypting provider payment credential: decrypted credential is empty")
 	}
 
-	expiresOn := now.Add(bookingCheckoutValidity)
-	if bookingPaymentDeadline.Before(expiresOn) {
-		expiresOn = bookingPaymentDeadline
-	}
-	intent, err := NewBookingDepositIntent(
-		service.idGenerator(),
-		proposal.ID,
-		proposal.BookingTerms,
-		now,
-	)
+	intent, err := NewBookingDepositIntent(service.idGenerator(), proposal.ID, proposal.BookingTerms, now)
 	if err != nil {
 		return nil, err
 	}
 	if err := service.intentRepository.Save(ctx, intent); err != nil {
 		return nil, err
 	}
-
+	expiresOn := service.checkoutPolicy.Expiration(proposal.BookingTerms, now, bookingCheckoutValidity)
 	externalCheckout, err := service.checkoutGateway.CreateCheckout(ctx, accessToken, CheckoutRequest{
 		ExternalReference: intent.ID,
 		Currency:          intent.Currency,
@@ -206,10 +184,9 @@ func (service *Service) createBookingCheckout(
 	); err != nil {
 		return nil, err
 	}
-	if err := service.intentRepository.SaveCheckoutReady(ctx, intent); err != nil {
+	if err := service.intentRepository.Save(ctx, intent); err != nil {
 		return nil, err
 	}
-
 	return intent, nil
 }
 
@@ -234,15 +211,15 @@ func (service *Service) GetIntent(ctx context.Context, authID, intentID string) 
 
 func (service *Service) ProcessPaymentNotification(
 	ctx context.Context,
-	notification PaymentNotification,
+	event PaymentNotification,
 ) error {
-	if strings.TrimSpace(notification.ExternalPaymentID) == "" ||
-		strings.TrimSpace(notification.SellerAccountID) == "" {
+	if strings.TrimSpace(event.ExternalPaymentID) == "" ||
+		strings.TrimSpace(event.SellerAccountID) == "" {
 		return ErrInvalidExternalPayment
 	}
 	account, err := service.paymentAccountFinder.FindByExternalAccountID(
 		ctx,
-		notification.SellerAccountID,
+		event.SellerAccountID,
 		service.checkoutGateway.Provider(),
 	)
 	if err != nil {
@@ -252,93 +229,72 @@ func (service *Service) ProcessPaymentNotification(
 	if err != nil {
 		return fmt.Errorf("decrypting notified payment credential: %w", err)
 	}
-	externalPayment, err := service.paymentVerifier.GetPayment(
-		ctx,
-		accessToken,
-		notification.ExternalPaymentID,
-	)
+	external, err := service.paymentVerifier.GetPayment(ctx, accessToken, event.ExternalPaymentID)
 	if err != nil {
 		return fmt.Errorf("verifying external payment: %w", err)
 	}
-	if externalPayment.ID != notification.ExternalPaymentID ||
-		externalPayment.SellerAccountID != notification.SellerAccountID {
+	verified, err := NewVerifiedPayment(external)
+	if err != nil {
+		return err
+	}
+	if verified.ExternalID() != event.ExternalPaymentID ||
+		verified.SellerAccountID() != event.SellerAccountID {
 		return ErrInvalidExternalPayment
 	}
 
-	if externalPayment.Status == ExternalPaymentStatusApproved {
-		if service.transactionRegistry == nil {
-			return fmt.Errorf("processing approved payment: payment transaction registry is required")
-		}
-		return service.transactionRegistry.WithinPaymentLock(
-			ctx,
-			service.checkoutGateway.Provider(),
-			externalPayment.ID,
-			func() error {
-				return service.processApprovedPayment(ctx, externalPayment)
-			},
-		)
-	}
-
-	intent, err := service.intentRepository.FindByID(ctx, externalPayment.ExternalReference)
-	if err != nil {
-		return err
-	}
-	now := service.clock.Now().UTC()
-	if externalPayment.Status == ExternalPaymentStatusProcessing {
-		if err := intent.MarkProcessing(externalPayment, now); err != nil {
-			return err
-		}
-		if err := service.intentRepository.SaveProcessing(ctx, intent); err != nil {
-			return fmt.Errorf("saving processing payment intent: %w", err)
-		}
-		return nil
-	}
-	if externalPayment.Status == ExternalPaymentStatusRejected {
-		if err := intent.MarkRejected(externalPayment, now); err != nil {
-			return err
-		}
-		if err := service.intentRepository.SaveRejected(ctx, intent); err != nil {
-			return fmt.Errorf("saving rejected payment intent: %w", err)
-		}
-		return nil
-	}
-	return ErrInvalidExternalPayment
+	return service.lockManager.WithinLock(
+		ctx,
+		ExternalPaymentLockKey(service.checkoutGateway.Provider(), verified.ExternalID()),
+		func() error {
+			return service.applyVerifiedPayment(ctx, verified)
+		},
+	)
 }
 
-func (service *Service) processApprovedPayment(ctx context.Context, externalPayment ExternalPayment) error {
-	alreadyProcessed, err := service.transactionRegistry.Exists(
+func (service *Service) applyVerifiedPayment(ctx context.Context, verified VerifiedPayment) error {
+	_, err := service.transactionRepository.FindByExternalID(
 		ctx,
 		service.checkoutGateway.Provider(),
-		externalPayment.ID,
+		verified.ExternalID(),
 	)
-	if err != nil {
-		return fmt.Errorf("checking processed external payment: %w", err)
-	}
-	if alreadyProcessed {
+	if err == nil {
 		return nil
 	}
+	if !errors.Is(err, ErrTransactionDoesNotExist) {
+		return fmt.Errorf("finding external payment transaction: %w", err)
+	}
+	intent, err := service.intentRepository.FindByID(ctx, verified.IntentID())
+	if err != nil {
+		return err
+	}
+	outcome, err := verified.ApplyTo(intent, service.checkoutGateway.Provider(), service.clock.Now().UTC())
+	if err != nil {
+		return err
+	}
+	return outcome.Accept(&paymentOutcomePersistence{service: service, ctx: ctx})
+}
 
-	now := service.clock.Now().UTC()
-	transaction, err := NewTransaction(
-		externalPayment.ExternalReference,
-		service.checkoutGateway.Provider(),
-		externalPayment,
-		now,
+type paymentOutcomePersistence struct {
+	service *Service
+	ctx     context.Context
+}
+
+func (persistence *paymentOutcomePersistence) VisitIntentUpdated(outcome IntentUpdated) error {
+	if err := persistence.service.intentRepository.Save(persistence.ctx, outcome.Intent); err != nil {
+		return fmt.Errorf("saving updated payment intent: %w", err)
+	}
+	return nil
+}
+
+func (persistence *paymentOutcomePersistence) VisitBookingApproved(outcome BookingApproved) error {
+	proposal, err := persistence.service.serviceProposalFinder.FindByID(
+		persistence.ctx,
+		outcome.Intent.ServiceProposalID,
 	)
 	if err != nil {
 		return err
 	}
-	intent, err := service.intentRepository.FindByID(ctx, externalPayment.ExternalReference)
-	if err != nil {
-		return err
-	}
-	if err := intent.MarkPaid(externalPayment, now); err != nil {
-		return err
-	}
-	proposal, err := service.serviceProposalFinder.FindByID(ctx, intent.ServiceProposalID)
-	if err != nil {
-		return err
-	}
+	now := persistence.service.clock.Now().UTC()
 	if err := proposal.Accept(proposal.Consumer.ID(), now); err != nil {
 		return err
 	}
@@ -346,28 +302,29 @@ func (service *Service) processApprovedPayment(ctx context.Context, externalPaym
 	if err != nil {
 		return err
 	}
-	acceptedNotification := proposal.CreateAcceptedNotification(service.clock)
-	confirmation, err := service.paidBookingConfirmer.ConfirmPaidBooking(
-		ctx,
-		transaction,
-		intent,
-		order,
-		acceptedNotification,
+	acceptedNotification := proposal.CreateAcceptedNotification(persistence.service.clock)
+	err = persistence.service.unitOfWork.Execute(
+		persistence.ctx,
+		func(store TransactionalStore) error {
+			if err := store.SaveTransaction(persistence.ctx, outcome.Transaction); err != nil {
+				return err
+			}
+			if err := store.SaveIntent(persistence.ctx, outcome.Intent); err != nil {
+				return err
+			}
+			if err := store.SaveServiceProposal(persistence.ctx, proposal); err != nil {
+				return err
+			}
+			if err := store.SaveWorkOrder(persistence.ctx, order); err != nil {
+				return err
+			}
+			return store.SaveNotification(persistence.ctx, acceptedNotification)
+		},
 	)
 	if err != nil {
 		return err
 	}
-	if confirmation == nil {
-		return fmt.Errorf("processing approved payment: confirmation result is required")
-	}
-	if confirmation.AlreadyProcessed {
-		return nil
-	}
-	if confirmation.Notification == nil {
-		return fmt.Errorf("processing approved payment: persisted notification is required")
-	}
-
-	if err := service.notificator.Notify(ctx, confirmation.Notification); err != nil {
+	if err := persistence.service.notificator.Notify(persistence.ctx, acceptedNotification); err != nil {
 		return fmt.Errorf("notifying provider about accepted service proposal: %w", err)
 	}
 	return nil

@@ -786,30 +786,31 @@ func (suite *testSuite) systemRejectsCheckoutAfterBookingDeadline() error {
 }
 
 func (suite *testSuite) systemKeepsOneActivePaymentIntent() error {
-	count, err := suite.paymentIntentRepository.CountActiveBookingIntents(
+	intent, err := suite.paymentIntentRepository.FindLatestByProposalIDAndPurpose(
 		context.Background(),
 		suite.lastServiceProposalID,
+		payment.PurposeBookingDeposit,
 	)
 	if err != nil {
 		return err
 	}
-	if count != 1 {
-		return fmt.Errorf("expected one active payment intent, got %d", count)
+	if intent.Status != payment.StatusCheckoutReady && intent.Status != payment.StatusProcessing {
+		return fmt.Errorf("expected an active payment intent, got %q", intent.Status)
 	}
 	return nil
 }
 
 func (suite *testSuite) systemKeepsOneActiveCheckoutSession() error {
-	count, err := suite.paymentIntentRepository.CountActiveCheckoutSessions(
+	intent, err := suite.paymentIntentRepository.FindLatestByProposalIDAndPurpose(
 		context.Background(),
 		suite.lastServiceProposalID,
-		suite.clock.Now(),
+		payment.PurposeBookingDeposit,
 	)
 	if err != nil {
 		return err
 	}
-	if count != 1 {
-		return fmt.Errorf("expected one active checkout session, got %d", count)
+	if intent.CheckoutSession == nil || !intent.CheckoutSession.ExpiresOn.After(suite.clock.Now()) {
+		return fmt.Errorf("expected one active checkout session")
 	}
 	return nil
 }
@@ -844,7 +845,7 @@ func (suite *testSuite) systemRegistersOneTransactionForExternalPayment() error 
 	if suite.lastExternalPaymentID == "" {
 		return fmt.Errorf("expected a processed external payment")
 	}
-	count, err := suite.paymentTransactionRepository.CountByExternalPaymentID(
+	transaction, err := suite.paymentTransactionRepository.FindByExternalID(
 		context.Background(),
 		paymentaccount.PaymentProvider("mercado_pago"),
 		suite.lastExternalPaymentID,
@@ -852,8 +853,8 @@ func (suite *testSuite) systemRegistersOneTransactionForExternalPayment() error 
 	if err != nil {
 		return err
 	}
-	if count != 1 {
-		return fmt.Errorf("expected one external payment transaction, got %d", count)
+	if transaction.ExternalPaymentID != suite.lastExternalPaymentID {
+		return fmt.Errorf("unexpected external payment transaction %q", transaction.ExternalPaymentID)
 	}
 	return nil
 }

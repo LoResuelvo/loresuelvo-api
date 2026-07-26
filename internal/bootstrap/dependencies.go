@@ -22,6 +22,7 @@ import (
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/test_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/user_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/work_order_handler"
+	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/locking"
 	notificationadapter "github.com/LoResuelvo/loresuelvo-api/internal/adapters/notification"
 	mercadopagopayment "github.com/LoResuelvo/loresuelvo-api/internal/adapters/payment/mercadopago"
 	paymentaccountadapter "github.com/LoResuelvo/loresuelvo-api/internal/adapters/payment_account"
@@ -189,14 +190,15 @@ func NewDependenciesWithPaymentAccountAdapters(
 	)
 	paymentService := payment.NewService(
 		persistence.PaymentIntentRepository,
+		persistence.PaymentTransactionRepository,
 		persistence.ServiceProposalRepository,
 		persistence.UserRepository,
 		persistence.PaymentAccountRepository,
-		persistence.PaymentTransactionRepository,
+		locking.NewPostgresAdvisoryLock(database),
+		persistence.PaymentUnitOfWork,
 		credentialProtector,
 		paymentGateway,
 		paymentGateway,
-		persistence.WorkOrderRepository,
 		notificator,
 		uuid.NewString,
 		systemClock,

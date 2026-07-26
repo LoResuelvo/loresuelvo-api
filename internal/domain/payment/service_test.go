@@ -26,14 +26,6 @@ type intentRepositoryStub struct {
 	found              *payment.Intent
 }
 
-func (repository *intentRepositoryStub) WithinBookingCheckoutLock(
-	_ context.Context,
-	_ int,
-	operation func() error,
-) error {
-	return operation()
-}
-
 func (repository *intentRepositoryStub) FindByID(context.Context, string) (*payment.Intent, error) {
 	if repository.found == nil {
 		return nil, payment.ErrIntentDoesNotExist
@@ -41,14 +33,12 @@ func (repository *intentRepositoryStub) FindByID(context.Context, string) (*paym
 	return repository.found, nil
 }
 
-func (repository *intentRepositoryStub) FindActiveBookingCheckout(
+func (repository *intentRepositoryStub) FindLatestByProposalIDAndPurpose(
 	context.Context,
 	int,
+	payment.Purpose,
 ) (*payment.Intent, error) {
-	if repository.found == nil ||
-		repository.found.CheckoutSession == nil ||
-		(repository.found.Status != payment.StatusCheckoutReady &&
-			repository.found.Status != payment.StatusProcessing) {
+	if repository.found == nil {
 		return nil, payment.ErrIntentDoesNotExist
 	}
 	return repository.found, nil
@@ -56,26 +46,16 @@ func (repository *intentRepositoryStub) FindActiveBookingCheckout(
 
 func (repository *intentRepositoryStub) Save(_ context.Context, intent *payment.Intent) error {
 	repository.saved = intent
-	return nil
-}
-
-func (repository *intentRepositoryStub) SaveCheckoutReady(_ context.Context, intent *payment.Intent) error {
-	repository.checkoutReadySaved = intent
-	return nil
-}
-
-func (repository *intentRepositoryStub) SaveProcessing(_ context.Context, intent *payment.Intent) error {
-	repository.processingSaved = intent
-	return nil
-}
-
-func (repository *intentRepositoryStub) SaveRejected(_ context.Context, intent *payment.Intent) error {
-	repository.rejectedSaved = intent
-	return nil
-}
-
-func (repository *intentRepositoryStub) SaveExpired(_ context.Context, intent *payment.Intent) error {
-	repository.expiredSaved = intent
+	switch intent.Status {
+	case payment.StatusCheckoutReady:
+		repository.checkoutReadySaved = intent
+	case payment.StatusProcessing:
+		repository.processingSaved = intent
+	case payment.StatusRejected:
+		repository.rejectedSaved = intent
+	case payment.StatusExpired:
+		repository.expiredSaved = intent
+	}
 	return nil
 }
 
@@ -121,25 +101,37 @@ func (credentialDecryptorStub) Decrypt([]byte) (string, error) {
 	return "seller-access-token", nil
 }
 
-type paymentTransactionRegistryStub struct {
-	exists bool
-}
+type lockManagerStub struct{}
 
-func (registry *paymentTransactionRegistryStub) WithinPaymentLock(
+func (lockManagerStub) WithinLock(
 	_ context.Context,
-	_ paymentaccount.PaymentProvider,
-	_ string,
+	_ payment.LockKey,
 	operation func() error,
 ) error {
 	return operation()
 }
 
-func (registry *paymentTransactionRegistryStub) Exists(
+type transactionRepositoryStub struct {
+	found *payment.Transaction
+}
+
+func (repository *transactionRepositoryStub) FindByExternalID(
 	context.Context,
 	paymentaccount.PaymentProvider,
 	string,
-) (bool, error) {
-	return registry.exists, nil
+) (*payment.Transaction, error) {
+	if repository.found == nil {
+		return nil, payment.ErrTransactionDoesNotExist
+	}
+	return repository.found, nil
+}
+
+func (repository *transactionRepositoryStub) Save(
+	_ context.Context,
+	transaction *payment.Transaction,
+) error {
+	repository.found = transaction
+	return nil
 }
 
 type checkoutGatewayStub struct {
@@ -175,32 +167,57 @@ func (gateway *checkoutGatewayStub) GetPayment(
 	return gateway.payment, nil
 }
 
-type paidBookingConfirmerStub struct {
+type unitOfWorkStub struct {
 	transaction  *payment.Transaction
 	intent       *payment.Intent
+	proposal     *serviceproposal.ServiceProposal
 	order        *workorder.WorkOrder
 	notification *notification.Notification
 	calls        int
 }
 
-func (confirmer *paidBookingConfirmerStub) ConfirmPaidBooking(
+func (unit *unitOfWorkStub) Execute(
+	ctx context.Context,
+	operation func(payment.TransactionalStore) error,
+) error {
+	unit.calls++
+	return operation(&transactionalStoreStub{unit: unit})
+}
+
+type transactionalStoreStub struct {
+	unit *unitOfWorkStub
+}
+
+func (store *transactionalStoreStub) SaveTransaction(_ context.Context, value *payment.Transaction) error {
+	store.unit.transaction = value
+	return nil
+}
+
+func (store *transactionalStoreStub) SaveIntent(_ context.Context, value *payment.Intent) error {
+	store.unit.intent = value
+	return nil
+}
+
+func (store *transactionalStoreStub) SaveServiceProposal(
 	_ context.Context,
-	transaction *payment.Transaction,
-	intent *payment.Intent,
-	order *workorder.WorkOrder,
-	acceptedNotification *notification.Notification,
-) (*payment.PaidBookingConfirmation, error) {
-	confirmer.calls++
-	confirmer.transaction = transaction
-	confirmer.intent = intent
-	confirmer.order = order
-	confirmer.notification = acceptedNotification
-	savedNotification := *acceptedNotification
-	savedNotification.ID = 99
-	return &payment.PaidBookingConfirmation{
-		WorkOrder:    order,
-		Notification: &savedNotification,
-	}, nil
+	value *serviceproposal.ServiceProposal,
+) error {
+	store.unit.proposal = value
+	return nil
+}
+
+func (store *transactionalStoreStub) SaveWorkOrder(_ context.Context, value *workorder.WorkOrder) error {
+	store.unit.order = value
+	return nil
+}
+
+func (store *transactionalStoreStub) SaveNotification(
+	_ context.Context,
+	value *notification.Notification,
+) error {
+	value.ID = 99
+	store.unit.notification = value
+	return nil
 }
 
 type notificatorStub struct {
@@ -268,14 +285,15 @@ func TestStartBookingCheckoutCreatesReadyIntentWithFrozenProposalPricing(t *test
 	checkoutGateway := &checkoutGatewayStub{}
 	service := payment.NewService(
 		intentRepository,
+		&transactionRepositoryStub{},
 		proposalFinderStub{proposal: proposal},
 		userFinderStub{found: proposalConsumer},
 		paymentAccountFinderStub{account: account},
-		nil,
+		lockManagerStub{},
+		&unitOfWorkStub{},
 		credentialDecryptorStub{},
 		checkoutGateway,
 		checkoutGateway,
-		nil,
 		nil,
 		func() string { return "f69bfe31-ce5d-4f85-a8c5-643ca2dcaa36" },
 		clockStub{now: now},
@@ -382,14 +400,15 @@ func TestStartBookingCheckoutEnforcesBookingPaymentDeadline(t *testing.T) {
 			checkoutGateway := &checkoutGatewayStub{}
 			service := payment.NewService(
 				intentRepository,
+				&transactionRepositoryStub{},
 				proposalFinderStub{proposal: proposal},
 				userFinderStub{found: proposalConsumer},
 				paymentAccountFinderStub{account: account},
-				nil,
+				lockManagerStub{},
+				&unitOfWorkStub{},
 				credentialDecryptorStub{},
 				checkoutGateway,
 				checkoutGateway,
-				nil,
 				nil,
 				func() string { return "f69bfe31-ce5d-4f85-a8c5-643ca2dcaa36" },
 				clockStub{now: test.now},
@@ -468,19 +487,20 @@ func TestProcessApprovedPaymentConfirmsPaidBooking(t *testing.T) {
 		Currency:          "ARS",
 		AmountCents:       intent.TotalAmountCents,
 	}}
-	confirmer := &paidBookingConfirmerStub{}
+	unitOfWork := &unitOfWorkStub{}
 	notificator := &notificatorStub{}
-	transactionRegistry := &paymentTransactionRegistryStub{}
+	transactionRepository := &transactionRepositoryStub{}
 	service := payment.NewService(
 		intentRepository,
+		transactionRepository,
 		proposalFinderStub{proposal: proposal},
 		userFinderStub{},
 		paymentAccountFinderStub{account: account},
-		transactionRegistry,
+		lockManagerStub{},
+		unitOfWork,
 		credentialDecryptorStub{},
 		gateway,
 		gateway,
-		confirmer,
 		notificator,
 		func() string { return "unused" },
 		clockStub{now: now},
@@ -494,28 +514,28 @@ func TestProcessApprovedPaymentConfirmsPaidBooking(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, payment.StatusPaid, intent.Status)
 	assert.Equal(t, serviceproposal.StatusAccepted, proposal.Status)
-	require.NotNil(t, confirmer.transaction)
-	assert.Equal(t, gateway.payment.ID, confirmer.transaction.ExternalPaymentID)
-	assert.Same(t, intent, confirmer.intent)
-	require.NotNil(t, confirmer.order)
-	assert.Equal(t, proposal.ID, confirmer.order.ServiceProposalID())
-	assert.Equal(t, workorder.StatusScheduled, confirmer.order.Status)
-	assert.Equal(t, now, confirmer.order.AcceptedOn)
-	require.NotNil(t, confirmer.notification)
-	assert.Equal(t, proposalProvider.ID(), confirmer.notification.UserID)
-	assert.Equal(t, notification.TypeServiceProposalAccepted, confirmer.notification.Type)
-	assert.Equal(t, notification.ResourceServiceProposal, confirmer.notification.ResourceType)
-	assert.Equal(t, proposal.ID, confirmer.notification.ResourceID)
+	require.NotNil(t, unitOfWork.transaction)
+	assert.Equal(t, gateway.payment.ID, unitOfWork.transaction.ExternalPaymentID)
+	assert.Same(t, intent, unitOfWork.intent)
+	require.NotNil(t, unitOfWork.order)
+	assert.Equal(t, proposal.ID, unitOfWork.order.ServiceProposalID())
+	assert.Equal(t, workorder.StatusScheduled, unitOfWork.order.Status)
+	assert.Equal(t, now, unitOfWork.order.AcceptedOn)
+	require.NotNil(t, unitOfWork.notification)
+	assert.Equal(t, proposalProvider.ID(), unitOfWork.notification.UserID)
+	assert.Equal(t, notification.TypeServiceProposalAccepted, unitOfWork.notification.Type)
+	assert.Equal(t, notification.ResourceServiceProposal, unitOfWork.notification.ResourceType)
+	assert.Equal(t, proposal.ID, unitOfWork.notification.ResourceID)
 	require.NotNil(t, notificator.notification)
 	assert.Equal(t, 99, notificator.notification.ID)
-	assert.Equal(t, confirmer.notification.Type, notificator.notification.Type)
+	assert.Equal(t, unitOfWork.notification.Type, notificator.notification.Type)
 
-	transactionRegistry.exists = true
+	transactionRepository.found = unitOfWork.transaction
 	require.NoError(t, service.ProcessPaymentNotification(context.Background(), payment.PaymentNotification{
 		ExternalPaymentID: "123456",
 		SellerAccountID:   "mp-provider",
 	}))
-	assert.Equal(t, 1, confirmer.calls)
+	assert.Equal(t, 1, unitOfWork.calls)
 	assert.Equal(t, 1, notificator.calls)
 }
 
@@ -569,18 +589,19 @@ func TestProcessProcessingPaymentOnlyUpdatesIntent(t *testing.T) {
 		Currency:          "ARS",
 		AmountCents:       intent.TotalAmountCents,
 	}}
-	confirmer := &paidBookingConfirmerStub{}
+	unitOfWork := &unitOfWorkStub{}
 	notificator := &notificatorStub{}
 	service := payment.NewService(
 		intentRepository,
+		&transactionRepositoryStub{},
 		proposalFinderStub{proposal: proposal},
 		userFinderStub{},
 		paymentAccountFinderStub{account: account},
-		nil,
+		lockManagerStub{},
+		unitOfWork,
 		credentialDecryptorStub{},
 		gateway,
 		gateway,
-		confirmer,
 		notificator,
 		func() string { return "unused" },
 		clockStub{now: now},
@@ -599,8 +620,8 @@ func TestProcessProcessingPaymentOnlyUpdatesIntent(t *testing.T) {
 	assert.Equal(t, payment.StatusProcessing, intent.Status)
 	assert.Same(t, intent, intentRepository.processingSaved)
 	assert.Equal(t, serviceproposal.StatusPending, proposal.Status)
-	assert.Nil(t, confirmer.order)
-	assert.Nil(t, confirmer.notification)
+	assert.Nil(t, unitOfWork.order)
+	assert.Nil(t, unitOfWork.notification)
 	assert.Nil(t, notificator.notification)
 }
 
@@ -654,18 +675,19 @@ func TestProcessRejectedPaymentOnlyUpdatesIntent(t *testing.T) {
 		Currency:          "ARS",
 		AmountCents:       intent.TotalAmountCents,
 	}}
-	confirmer := &paidBookingConfirmerStub{}
+	unitOfWork := &unitOfWorkStub{}
 	notificator := &notificatorStub{}
 	service := payment.NewService(
 		intentRepository,
+		&transactionRepositoryStub{},
 		proposalFinderStub{proposal: proposal},
 		userFinderStub{},
 		paymentAccountFinderStub{account: account},
-		nil,
+		lockManagerStub{},
+		unitOfWork,
 		credentialDecryptorStub{},
 		gateway,
 		gateway,
-		confirmer,
 		notificator,
 		func() string { return "unused" },
 		clockStub{now: now},
@@ -684,7 +706,7 @@ func TestProcessRejectedPaymentOnlyUpdatesIntent(t *testing.T) {
 	assert.Equal(t, payment.StatusRejected, intent.Status)
 	assert.Same(t, intent, intentRepository.rejectedSaved)
 	assert.Equal(t, serviceproposal.StatusPending, proposal.Status)
-	assert.Nil(t, confirmer.order)
-	assert.Nil(t, confirmer.notification)
+	assert.Nil(t, unitOfWork.order)
+	assert.Nil(t, unitOfWork.notification)
 	assert.Nil(t, notificator.notification)
 }

@@ -147,36 +147,35 @@ func (r *ServiceProposalRepository) FindByID(ctx context.Context, id int) (*serv
 	return &proposal, nil
 }
 
-func (r *ServiceProposalRepository) updateAcceptedWithTx(
+func (r *ServiceProposalRepository) saveWithTx(
 	ctx context.Context,
 	tx *sql.Tx,
 	proposal *serviceproposal.ServiceProposal,
 ) error {
 	if tx == nil {
-		return fmt.Errorf("updating accepted service proposal: transaction is required")
+		return fmt.Errorf("saving service proposal: transaction is required")
 	}
 	if proposal == nil {
-		return fmt.Errorf("updating accepted service proposal: service proposal is required")
+		return fmt.Errorf("saving service proposal: service proposal is required")
 	}
 
 	result, err := tx.ExecContext(
 		ctx,
 		`UPDATE service_proposals
 		SET status = $1, updated_on = NOW()
-		WHERE id = $2 AND status = $3`,
+		WHERE id = $2`,
 		proposal.Status,
 		proposal.ID,
-		serviceproposal.StatusPending,
 	)
 	if err != nil {
-		return fmt.Errorf("updating accepted service proposal: %w", err)
+		return fmt.Errorf("saving service proposal: %w", err)
 	}
 	affected, err := result.RowsAffected()
 	if err != nil {
-		return fmt.Errorf("checking accepted service proposal update: %w", err)
+		return fmt.Errorf("checking saved service proposal: %w", err)
 	}
 	if affected != 1 {
-		return serviceproposal.ErrOnlyPendingCanBeAccepted
+		return serviceproposal.ErrDoesNotExist
 	}
 	return nil
 }
