@@ -85,7 +85,6 @@ Feature: Contratar un servicio mediante el pago de una seña
             
     Rule: Solo el consumidor destinatario puede iniciar el pago
 
-        @wip
         Scenario: 21.10-CSP Rechazar el checkout solicitado por otro consumidor
             Given que existe una propuesta de servicio pendiente de "juan.plomero@example.com" para "ana@example.com"
             And que estoy autenticado como consumidor "carla@example.com"
@@ -94,7 +93,6 @@ Feature: Contratar un servicio mediante el pago de una seña
             And la propuesta de servicio permanece pendiente
             And el sistema no registra una orden de trabajo para la propuesta
 
-        @wip
         Scenario: 21.11-CSP Rechazar el checkout solicitado por el prestador
             Given que existe una propuesta de servicio pendiente de "juan.plomero@example.com" para "ana@example.com"
             And que estoy autenticado como prestador "juan.plomero@example.com"
@@ -103,7 +101,6 @@ Feature: Contratar un servicio mediante el pago de una seña
             And la propuesta de servicio permanece pendiente
             And el sistema no registra una orden de trabajo para la propuesta
 
-        @wip
         Scenario: 21.12-CSP Rechazar el checkout sin una sesión válida
             Given que existe una propuesta de servicio pendiente de "juan.plomero@example.com" para "ana@example.com"
             And que no tengo una sesión válida
@@ -114,7 +111,6 @@ Feature: Contratar un servicio mediante el pago de una seña
 
     Rule: Solo las propuestas pendientes y dentro del límite de pago admiten checkout
 
-        @wip
         Scenario: 21.13-CSP Rechazar el checkout de una propuesta ya aceptada
             Given que existe una propuesta de servicio aceptada de "juan.plomero@example.com" para "ana@example.com"
             And que estoy autenticado como consumidor "ana@example.com"
@@ -122,7 +118,6 @@ Feature: Contratar un servicio mediante el pago de una seña
             Then el sistema rechaza pagar una propuesta de servicio ya aceptada
             And el sistema conserva una única orden de trabajo para la propuesta
 
-        @wip
         Scenario: 21.14-CSP Rechazar el checkout de una propuesta rechazada
             Given que existe una propuesta de servicio rechazada de "juan.plomero@example.com" para "ana@example.com"
             And que estoy autenticado como consumidor "ana@example.com"
