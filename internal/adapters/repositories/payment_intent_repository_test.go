@@ -11,6 +11,7 @@ import (
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/conversation"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/notification"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/payment"
+	paymentaccount "github.com/LoResuelvo/loresuelvo-api/internal/domain/payment_account"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/provider"
 	serviceproposal "github.com/LoResuelvo/loresuelvo-api/internal/domain/service_proposal"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/user"
@@ -190,14 +191,36 @@ func TestPaidBookingConfirmationAtomicallyMarksIntentAndAcceptsProposalWithOneWo
 	require.NoError(t, err)
 	acceptedNotification := proposal.CreateAcceptedNotification(clockadapter.NewSystemClock())
 	notificationRepository := repositories.NewNotificationRepository(testContext.database)
+	paymentTransactionRepository := repositories.NewPaymentTransactionRepository(testContext.database)
 	repository := repositories.NewWorkOrderRepository(
 		testContext.database,
 		testContext.serviceProposalRepository,
 		paymentIntentRepository,
+		paymentTransactionRepository,
 		notificationRepository,
 	)
+	transaction, err := payment.NewTransaction(
+		intent.ID,
+		paymentaccount.PaymentProvider("mercado_pago"),
+		payment.ExternalPayment{
+			ID:                "123456",
+			SellerAccountID:   "987654",
+			ExternalReference: intent.ID,
+			Status:            payment.ExternalPaymentStatusApproved,
+			Currency:          intent.Currency,
+			AmountCents:       intent.TotalAmountCents,
+		},
+		now,
+	)
+	require.NoError(t, err)
 
-	confirmation, err := repository.ConfirmPaidBooking(t.Context(), intent, order, acceptedNotification)
+	confirmation, err := repository.ConfirmPaidBooking(
+		t.Context(),
+		transaction,
+		intent,
+		order,
+		acceptedNotification,
+	)
 
 	require.NoError(t, err)
 	require.NotNil(t, confirmation)
@@ -205,7 +228,7 @@ func TestPaidBookingConfirmationAtomicallyMarksIntentAndAcceptsProposalWithOneWo
 	assert.NotZero(t, confirmation.Notification.ID)
 	var storedIntentStatus payment.IntentStatus
 	var storedProposalStatus serviceproposal.Status
-	var workOrderCount, notificationCount int
+	var workOrderCount, notificationCount, transactionCount int
 	require.NoError(t, testContext.database.QueryRow(
 		`SELECT status FROM payment_intents WHERE id = $1`,
 		intent.ID,
@@ -228,6 +251,37 @@ func TestPaidBookingConfirmationAtomicallyMarksIntentAndAcceptsProposalWithOneWo
 	).Scan(&notificationCount))
 	assert.Equal(t, payment.StatusPaid, storedIntentStatus)
 	assert.Equal(t, serviceproposal.StatusAccepted, storedProposalStatus)
+	assert.Equal(t, 1, workOrderCount)
+	assert.Equal(t, 1, notificationCount)
+
+	duplicateConfirmation, err := repository.ConfirmPaidBooking(
+		t.Context(),
+		transaction,
+		intent,
+		order,
+		acceptedNotification,
+	)
+	require.NoError(t, err)
+	assert.True(t, duplicateConfirmation.AlreadyProcessed)
+	require.NoError(t, testContext.database.QueryRow(
+		`SELECT COUNT(*) FROM payment_transactions
+		WHERE processor = $1 AND external_payment_id = $2`,
+		paymentaccount.PaymentProvider("mercado_pago"),
+		transaction.ExternalPaymentID,
+	).Scan(&transactionCount))
+	require.NoError(t, testContext.database.QueryRow(
+		`SELECT COUNT(*) FROM work_orders WHERE service_proposal_id = $1`,
+		proposal.ID,
+	).Scan(&workOrderCount))
+	require.NoError(t, testContext.database.QueryRow(
+		`SELECT COUNT(*) FROM notifications
+		WHERE user_id = $1 AND type = $2 AND resource_type = $3 AND resource_id = $4`,
+		providerID,
+		notification.TypeServiceProposalAccepted,
+		notification.ResourceServiceProposal,
+		proposal.ID,
+	).Scan(&notificationCount))
+	assert.Equal(t, 1, transactionCount)
 	assert.Equal(t, 1, workOrderCount)
 	assert.Equal(t, 1, notificationCount)
 }

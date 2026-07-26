@@ -35,6 +35,16 @@ type PaymentAccountFinder interface {
 	FindByExternalAccountID(ctx context.Context, externalAccountID string, paymentProvider paymentaccount.PaymentProvider) (*paymentaccount.PaymentAccount, error)
 }
 
+type PaymentTransactionRegistry interface {
+	WithinPaymentLock(
+		ctx context.Context,
+		processor paymentaccount.PaymentProvider,
+		externalPaymentID string,
+		operation func() error,
+	) error
+	Exists(ctx context.Context, processor paymentaccount.PaymentProvider, externalPaymentID string) (bool, error)
+}
+
 type CredentialDecryptor interface {
 	Decrypt(ciphertext []byte) (string, error)
 }
@@ -56,6 +66,7 @@ type Gateway interface {
 type PaidBookingConfirmer interface {
 	ConfirmPaidBooking(
 		ctx context.Context,
+		transaction *Transaction,
 		intent *Intent,
 		order *workorder.WorkOrder,
 		acceptedNotification *notification.Notification,
@@ -63,8 +74,9 @@ type PaidBookingConfirmer interface {
 }
 
 type PaidBookingConfirmation struct {
-	WorkOrder    *workorder.WorkOrder
-	Notification *notification.Notification
+	AlreadyProcessed bool
+	WorkOrder        *workorder.WorkOrder
+	Notification     *notification.Notification
 }
 
 type CheckoutRequest struct {

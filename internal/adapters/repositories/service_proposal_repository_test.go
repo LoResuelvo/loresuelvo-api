@@ -44,7 +44,7 @@ func newServiceProposalRepositoryTest(t *testing.T) serviceProposalRepositoryTes
 	userRepository := repositories.NewUserRepository(database)
 	messageRepository := repositories.NewMessageRepository(database, repositories.NewMessageImageRepository(database))
 	serviceProposalRepository := repositories.NewServiceProposalRepository(database)
-	workOrderRepository := repositories.NewWorkOrderRepository(database, serviceProposalRepository, nil, nil)
+	workOrderRepository := repositories.NewWorkOrderRepository(database, serviceProposalRepository, nil, nil, nil)
 
 	return serviceProposalRepositoryTestContext{
 		database:                  database,

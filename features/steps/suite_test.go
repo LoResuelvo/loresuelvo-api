@@ -29,24 +29,25 @@ import (
 )
 
 type testSuite struct {
-	server                   *httptest.Server
-	database                 *sql.DB
-	categoryRepository       *repositories.CategoryRepository
-	conversationRepository   *repositories.ConversationRepository
-	messageRepository        *repositories.MessageRepository
-	jobRequestRepository     *repositories.JobRequestRepository
-	userRepository           *repositories.UserRepository
-	fileRepository           *repositories.FileRepository
-	notificationRepository   *repositories.NotificationRepository
-	workOrderRepository      *repositories.WorkOrderRepository
-	paymentAccountRepository *repositories.PaymentAccountRepository
-	paymentIntentRepository  *repositories.PaymentIntentRepository
-	urgentWorkOrderScheduler *scheduler.Scheduler
-	auth0Validator           *validator.Validator
-	tokenBuilder             *auth0.TokenBuilder
-	chatbot                  *chatbotadapter.FakeChatbot
-	clock                    *clockadapter.SystemClock
-	checkoutClient           *paymentmercadopago.FakeCheckoutClient
+	server                       *httptest.Server
+	database                     *sql.DB
+	categoryRepository           *repositories.CategoryRepository
+	conversationRepository       *repositories.ConversationRepository
+	messageRepository            *repositories.MessageRepository
+	jobRequestRepository         *repositories.JobRequestRepository
+	userRepository               *repositories.UserRepository
+	fileRepository               *repositories.FileRepository
+	notificationRepository       *repositories.NotificationRepository
+	workOrderRepository          *repositories.WorkOrderRepository
+	paymentAccountRepository     *repositories.PaymentAccountRepository
+	paymentIntentRepository      *repositories.PaymentIntentRepository
+	paymentTransactionRepository *repositories.PaymentTransactionRepository
+	urgentWorkOrderScheduler     *scheduler.Scheduler
+	auth0Validator               *validator.Validator
+	tokenBuilder                 *auth0.TokenBuilder
+	chatbot                      *chatbotadapter.FakeChatbot
+	clock                        *clockadapter.SystemClock
+	checkoutClient               *paymentmercadopago.FakeCheckoutClient
 
 	lastStatus                              int
 	lastBody                                []byte
@@ -90,6 +91,7 @@ type testSuite struct {
 	workOrdersByServiceProposalID           map[int][]workOrderResponse
 	lastMercadoPagoOAuthState               string
 	lastPaymentIntentID                     string
+	lastExternalPaymentID                   string
 	previousPaymentIntentID                 string
 	lastCheckoutResponse                    checkoutSessionResponse
 	concurrentCheckoutResponses             []checkoutHTTPResponse
@@ -219,6 +221,7 @@ func (s *testSuite) cleanup() error {
 	s.workOrdersByServiceProposalID = map[int][]workOrderResponse{}
 	s.lastMercadoPagoOAuthState = ""
 	s.lastPaymentIntentID = ""
+	s.lastExternalPaymentID = ""
 	s.previousPaymentIntentID = ""
 	s.lastCheckoutResponse = checkoutSessionResponse{}
 	s.concurrentCheckoutResponses = nil
@@ -271,24 +274,25 @@ func newTestSuite(tb testing.TB, database *sql.DB) *testSuite {
 	})
 
 	return &testSuite{
-		server:                   server,
-		database:                 database,
-		categoryRepository:       dependencies.Persistence.CategoryRepository,
-		conversationRepository:   dependencies.Persistence.ConversationRepository,
-		messageRepository:        dependencies.Persistence.MessageRepository,
-		jobRequestRepository:     dependencies.Persistence.JobRequestRepository,
-		userRepository:           dependencies.Persistence.UserRepository,
-		fileRepository:           dependencies.Persistence.FileRepository,
-		notificationRepository:   dependencies.Persistence.NotificationRepository,
-		workOrderRepository:      dependencies.Persistence.WorkOrderRepository,
-		paymentAccountRepository: dependencies.Persistence.PaymentAccountRepository,
-		paymentIntentRepository:  dependencies.Persistence.PaymentIntentRepository,
-		urgentWorkOrderScheduler: dependencies.UrgentWorkOrderScheduler,
-		auth0Validator:           auth0Validator,
-		tokenBuilder:             tokenBuilder,
-		chatbot:                  chatbot,
-		clock:                    dependencies.Clock,
-		checkoutClient:           checkoutClient,
+		server:                       server,
+		database:                     database,
+		categoryRepository:           dependencies.Persistence.CategoryRepository,
+		conversationRepository:       dependencies.Persistence.ConversationRepository,
+		messageRepository:            dependencies.Persistence.MessageRepository,
+		jobRequestRepository:         dependencies.Persistence.JobRequestRepository,
+		userRepository:               dependencies.Persistence.UserRepository,
+		fileRepository:               dependencies.Persistence.FileRepository,
+		notificationRepository:       dependencies.Persistence.NotificationRepository,
+		workOrderRepository:          dependencies.Persistence.WorkOrderRepository,
+		paymentAccountRepository:     dependencies.Persistence.PaymentAccountRepository,
+		paymentIntentRepository:      dependencies.Persistence.PaymentIntentRepository,
+		paymentTransactionRepository: dependencies.Persistence.PaymentTransactionRepository,
+		urgentWorkOrderScheduler:     dependencies.UrgentWorkOrderScheduler,
+		auth0Validator:               auth0Validator,
+		tokenBuilder:                 tokenBuilder,
+		chatbot:                      chatbot,
+		clock:                        dependencies.Clock,
+		checkoutClient:               checkoutClient,
 
 		categoryIDsByName:                  map[string]int{},
 		participantRolesByFullName:         map[string]string{},

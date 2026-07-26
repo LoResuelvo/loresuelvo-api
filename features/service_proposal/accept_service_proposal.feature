@@ -148,7 +148,6 @@ Feature: Contratar un servicio mediante el pago de una seña
         Background:
             Given que existe una propuesta de servicio pendiente de "juan.plomero@example.com" para "ana@example.com" por "100000.00" programada para "2026-07-06T10:00:00-03:00"
 
-        @wip
         Scenario: 21.20-CSP Procesar una sola vez una notificación duplicada
             Given que inicié el checkout de la seña de la propuesta
             When el sistema procesa dos veces la misma notificación válida de Mercado Pago y verifica el pago aprobado

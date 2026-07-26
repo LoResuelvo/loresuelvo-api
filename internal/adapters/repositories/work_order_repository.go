@@ -18,23 +18,26 @@ import (
 )
 
 type WorkOrderRepository struct {
-	db                        *sql.DB
-	serviceProposalRepository *ServiceProposalRepository
-	paymentIntentRepository   *PaymentIntentRepository
-	notificationRepository    *NotificationRepository
+	db                           *sql.DB
+	serviceProposalRepository    *ServiceProposalRepository
+	paymentIntentRepository      *PaymentIntentRepository
+	paymentTransactionRepository *PaymentTransactionRepository
+	notificationRepository       *NotificationRepository
 }
 
 func NewWorkOrderRepository(
 	db *sql.DB,
 	serviceProposalRepository *ServiceProposalRepository,
 	paymentIntentRepository *PaymentIntentRepository,
+	paymentTransactionRepository *PaymentTransactionRepository,
 	notificationRepository *NotificationRepository,
 ) *WorkOrderRepository {
 	return &WorkOrderRepository{
-		db:                        db,
-		serviceProposalRepository: serviceProposalRepository,
-		paymentIntentRepository:   paymentIntentRepository,
-		notificationRepository:    notificationRepository,
+		db:                           db,
+		serviceProposalRepository:    serviceProposalRepository,
+		paymentIntentRepository:      paymentIntentRepository,
+		paymentTransactionRepository: paymentTransactionRepository,
+		notificationRepository:       notificationRepository,
 	}
 }
 
@@ -100,6 +103,7 @@ func (r *WorkOrderRepository) FindByServiceProposalID(ctx context.Context, servi
 
 func (r *WorkOrderRepository) ConfirmPaidBooking(
 	ctx context.Context,
+	transaction *payment.Transaction,
 	intent *payment.Intent,
 	order *workorder.WorkOrder,
 	acceptedNotification *notification.Notification,
@@ -110,8 +114,11 @@ func (r *WorkOrderRepository) ConfirmPaidBooking(
 	if r.notificationRepository == nil {
 		return nil, fmt.Errorf("confirming paid booking: notification repository is required")
 	}
-	if intent == nil || order == nil || acceptedNotification == nil {
-		return nil, fmt.Errorf("confirming paid booking: payment intent, work order, and notification are required")
+	if r.paymentTransactionRepository == nil {
+		return nil, fmt.Errorf("confirming paid booking: payment transaction repository is required")
+	}
+	if transaction == nil || intent == nil || order == nil || acceptedNotification == nil {
+		return nil, fmt.Errorf("confirming paid booking: transaction, payment intent, work order, and notification are required")
 	}
 	proposal, ok := order.ServiceProposal.(*serviceproposal.ServiceProposal)
 	if !ok || proposal == nil {
@@ -121,6 +128,16 @@ func (r *WorkOrderRepository) ConfirmPaidBooking(
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, fmt.Errorf("beginning paid booking transaction: %w", err)
+	}
+	savedTransaction, err := r.paymentTransactionRepository.saveWithTx(ctx, tx, transaction)
+	if err != nil {
+		return nil, rollbackWorkOrderTx(tx, err)
+	}
+	if !savedTransaction {
+		if err := tx.Commit(); err != nil {
+			return nil, fmt.Errorf("committing duplicate paid booking transaction: %w", err)
+		}
+		return &payment.PaidBookingConfirmation{AlreadyProcessed: true}, nil
 	}
 	if err := r.paymentIntentRepository.markPaidWithTx(ctx, tx, intent); err != nil {
 		return nil, rollbackWorkOrderTx(tx, err)

@@ -26,6 +26,7 @@ type Service struct {
 	serviceProposalFinder ServiceProposalFinder
 	userFinder            UserFinder
 	paymentAccountFinder  PaymentAccountFinder
+	transactionRegistry   PaymentTransactionRegistry
 	credentialDecryptor   CredentialDecryptor
 	checkoutGateway       CheckoutGateway
 	paymentVerifier       PaymentVerifier
@@ -40,6 +41,7 @@ func NewService(
 	serviceProposalFinder ServiceProposalFinder,
 	userFinder UserFinder,
 	paymentAccountFinder PaymentAccountFinder,
+	transactionRegistry PaymentTransactionRegistry,
 	credentialDecryptor CredentialDecryptor,
 	checkoutGateway CheckoutGateway,
 	paymentVerifier PaymentVerifier,
@@ -53,6 +55,7 @@ func NewService(
 		serviceProposalFinder: serviceProposalFinder,
 		userFinder:            userFinder,
 		paymentAccountFinder:  paymentAccountFinder,
+		transactionRegistry:   transactionRegistry,
 		credentialDecryptor:   credentialDecryptor,
 		checkoutGateway:       checkoutGateway,
 		paymentVerifier:       paymentVerifier,
@@ -262,6 +265,20 @@ func (service *Service) ProcessPaymentNotification(
 		return ErrInvalidExternalPayment
 	}
 
+	if externalPayment.Status == ExternalPaymentStatusApproved {
+		if service.transactionRegistry == nil {
+			return fmt.Errorf("processing approved payment: payment transaction registry is required")
+		}
+		return service.transactionRegistry.WithinPaymentLock(
+			ctx,
+			service.checkoutGateway.Provider(),
+			externalPayment.ID,
+			func() error {
+				return service.processApprovedPayment(ctx, externalPayment)
+			},
+		)
+	}
+
 	intent, err := service.intentRepository.FindByID(ctx, externalPayment.ExternalReference)
 	if err != nil {
 		return err
@@ -285,6 +302,36 @@ func (service *Service) ProcessPaymentNotification(
 		}
 		return nil
 	}
+	return ErrInvalidExternalPayment
+}
+
+func (service *Service) processApprovedPayment(ctx context.Context, externalPayment ExternalPayment) error {
+	alreadyProcessed, err := service.transactionRegistry.Exists(
+		ctx,
+		service.checkoutGateway.Provider(),
+		externalPayment.ID,
+	)
+	if err != nil {
+		return fmt.Errorf("checking processed external payment: %w", err)
+	}
+	if alreadyProcessed {
+		return nil
+	}
+
+	now := service.clock.Now().UTC()
+	transaction, err := NewTransaction(
+		externalPayment.ExternalReference,
+		service.checkoutGateway.Provider(),
+		externalPayment,
+		now,
+	)
+	if err != nil {
+		return err
+	}
+	intent, err := service.intentRepository.FindByID(ctx, externalPayment.ExternalReference)
+	if err != nil {
+		return err
+	}
 	if err := intent.MarkPaid(externalPayment, now); err != nil {
 		return err
 	}
@@ -302,6 +349,7 @@ func (service *Service) ProcessPaymentNotification(
 	acceptedNotification := proposal.CreateAcceptedNotification(service.clock)
 	confirmation, err := service.paidBookingConfirmer.ConfirmPaidBooking(
 		ctx,
+		transaction,
 		intent,
 		order,
 		acceptedNotification,
@@ -309,7 +357,13 @@ func (service *Service) ProcessPaymentNotification(
 	if err != nil {
 		return err
 	}
-	if confirmation == nil || confirmation.Notification == nil {
+	if confirmation == nil {
+		return fmt.Errorf("processing approved payment: confirmation result is required")
+	}
+	if confirmation.AlreadyProcessed {
+		return nil
+	}
+	if confirmation.Notification == nil {
 		return fmt.Errorf("processing approved payment: persisted notification is required")
 	}
 

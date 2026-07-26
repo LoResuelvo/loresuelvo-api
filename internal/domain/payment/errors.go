@@ -11,4 +11,5 @@ var (
 	ErrProposalNotPending               = errors.New("Only pending service proposals can start checkout")
 	ErrBookingPaymentDeadlineReached    = errors.New("Booking payment deadline has been reached")
 	ErrIntentDoesNotExist               = errors.New("Payment intent does not exist")
+	ErrInvalidPaymentTransaction        = errors.New("Payment transaction is invalid")
 )

@@ -20,6 +20,7 @@ import (
 	httphandler "github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/repositories"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/payment"
+	paymentaccount "github.com/LoResuelvo/loresuelvo-api/internal/domain/payment_account"
 	serviceproposal "github.com/LoResuelvo/loresuelvo-api/internal/domain/service_proposal"
 	workorder "github.com/LoResuelvo/loresuelvo-api/internal/domain/work_order"
 	"github.com/cucumber/godog"
@@ -394,6 +395,7 @@ func (suite *testSuite) processApprovedPaymentForAmount(amount string) error {
 }
 
 func (suite *testSuite) sendMercadoPagoPaymentNotification(externalPaymentID string) error {
+	suite.lastExternalPaymentID = externalPaymentID
 	requestID := "bdd-mercado-pago-request"
 	timestamp := strconv.FormatInt(time.Now().UnixMilli(), 10)
 	manifest := "id:" + strings.ToLower(externalPaymentID) +
@@ -469,7 +471,19 @@ func (suite *testSuite) processProcessingPayment() error {
 }
 
 func (suite *testSuite) processSameApprovedPaymentNotificationTwice() error {
-	return godog.ErrPending
+	if suite.lastPaymentIntentID == "" ||
+		suite.lastCheckoutResponse.Pricing.AmountDueNowCents <= 0 {
+		return fmt.Errorf("expected checkout pricing and payment intent before approving payment")
+	}
+	externalPaymentID := suite.checkoutClient.AddApprovedPayment(
+		suite.lastPaymentIntentID,
+		"mp-juan",
+		suite.lastCheckoutResponse.Pricing.AmountDueNowCents,
+	)
+	if err := suite.sendMercadoPagoPaymentNotification(externalPaymentID); err != nil {
+		return err
+	}
+	return suite.sendMercadoPagoPaymentNotification(externalPaymentID)
 }
 
 func (suite *testSuite) processPaymentApprovedOn(approvedOn string) error {
@@ -827,7 +841,21 @@ func (suite *testSuite) concurrentRequestsReturnSameCheckoutURL() error {
 }
 
 func (suite *testSuite) systemRegistersOneTransactionForExternalPayment() error {
-	return godog.ErrPending
+	if suite.lastExternalPaymentID == "" {
+		return fmt.Errorf("expected a processed external payment")
+	}
+	count, err := suite.paymentTransactionRepository.CountByExternalPaymentID(
+		context.Background(),
+		paymentaccount.PaymentProvider("mercado_pago"),
+		suite.lastExternalPaymentID,
+	)
+	if err != nil {
+		return err
+	}
+	if count != 1 {
+		return fmt.Errorf("expected one external payment transaction, got %d", count)
+	}
+	return nil
 }
 
 func (suite *testSuite) systemRegistersPaymentIncident(expected string) error {

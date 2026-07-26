@@ -192,6 +192,7 @@ func NewDependenciesWithPaymentAccountAdapters(
 		persistence.ServiceProposalRepository,
 		persistence.UserRepository,
 		persistence.PaymentAccountRepository,
+		persistence.PaymentTransactionRepository,
 		credentialProtector,
 		paymentGateway,
 		paymentGateway,

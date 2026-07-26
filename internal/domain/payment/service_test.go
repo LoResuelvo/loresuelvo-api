@@ -121,6 +121,27 @@ func (credentialDecryptorStub) Decrypt([]byte) (string, error) {
 	return "seller-access-token", nil
 }
 
+type paymentTransactionRegistryStub struct {
+	exists bool
+}
+
+func (registry *paymentTransactionRegistryStub) WithinPaymentLock(
+	_ context.Context,
+	_ paymentaccount.PaymentProvider,
+	_ string,
+	operation func() error,
+) error {
+	return operation()
+}
+
+func (registry *paymentTransactionRegistryStub) Exists(
+	context.Context,
+	paymentaccount.PaymentProvider,
+	string,
+) (bool, error) {
+	return registry.exists, nil
+}
+
 type checkoutGatewayStub struct {
 	accessToken string
 	request     payment.CheckoutRequest
@@ -155,17 +176,22 @@ func (gateway *checkoutGatewayStub) GetPayment(
 }
 
 type paidBookingConfirmerStub struct {
+	transaction  *payment.Transaction
 	intent       *payment.Intent
 	order        *workorder.WorkOrder
 	notification *notification.Notification
+	calls        int
 }
 
 func (confirmer *paidBookingConfirmerStub) ConfirmPaidBooking(
 	_ context.Context,
+	transaction *payment.Transaction,
 	intent *payment.Intent,
 	order *workorder.WorkOrder,
 	acceptedNotification *notification.Notification,
 ) (*payment.PaidBookingConfirmation, error) {
+	confirmer.calls++
+	confirmer.transaction = transaction
 	confirmer.intent = intent
 	confirmer.order = order
 	confirmer.notification = acceptedNotification
@@ -179,12 +205,14 @@ func (confirmer *paidBookingConfirmerStub) ConfirmPaidBooking(
 
 type notificatorStub struct {
 	notification *notification.Notification
+	calls        int
 }
 
 func (notificator *notificatorStub) Notify(
 	_ context.Context,
 	savedNotification *notification.Notification,
 ) error {
+	notificator.calls++
 	notificator.notification = savedNotification
 	return nil
 }
@@ -243,6 +271,7 @@ func TestStartBookingCheckoutCreatesReadyIntentWithFrozenProposalPricing(t *test
 		proposalFinderStub{proposal: proposal},
 		userFinderStub{found: proposalConsumer},
 		paymentAccountFinderStub{account: account},
+		nil,
 		credentialDecryptorStub{},
 		checkoutGateway,
 		checkoutGateway,
@@ -356,6 +385,7 @@ func TestStartBookingCheckoutEnforcesBookingPaymentDeadline(t *testing.T) {
 				proposalFinderStub{proposal: proposal},
 				userFinderStub{found: proposalConsumer},
 				paymentAccountFinderStub{account: account},
+				nil,
 				credentialDecryptorStub{},
 				checkoutGateway,
 				checkoutGateway,
@@ -440,11 +470,13 @@ func TestProcessApprovedPaymentConfirmsPaidBooking(t *testing.T) {
 	}}
 	confirmer := &paidBookingConfirmerStub{}
 	notificator := &notificatorStub{}
+	transactionRegistry := &paymentTransactionRegistryStub{}
 	service := payment.NewService(
 		intentRepository,
 		proposalFinderStub{proposal: proposal},
 		userFinderStub{},
 		paymentAccountFinderStub{account: account},
+		transactionRegistry,
 		credentialDecryptorStub{},
 		gateway,
 		gateway,
@@ -462,6 +494,8 @@ func TestProcessApprovedPaymentConfirmsPaidBooking(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, payment.StatusPaid, intent.Status)
 	assert.Equal(t, serviceproposal.StatusAccepted, proposal.Status)
+	require.NotNil(t, confirmer.transaction)
+	assert.Equal(t, gateway.payment.ID, confirmer.transaction.ExternalPaymentID)
 	assert.Same(t, intent, confirmer.intent)
 	require.NotNil(t, confirmer.order)
 	assert.Equal(t, proposal.ID, confirmer.order.ServiceProposalID())
@@ -475,6 +509,14 @@ func TestProcessApprovedPaymentConfirmsPaidBooking(t *testing.T) {
 	require.NotNil(t, notificator.notification)
 	assert.Equal(t, 99, notificator.notification.ID)
 	assert.Equal(t, confirmer.notification.Type, notificator.notification.Type)
+
+	transactionRegistry.exists = true
+	require.NoError(t, service.ProcessPaymentNotification(context.Background(), payment.PaymentNotification{
+		ExternalPaymentID: "123456",
+		SellerAccountID:   "mp-provider",
+	}))
+	assert.Equal(t, 1, confirmer.calls)
+	assert.Equal(t, 1, notificator.calls)
 }
 
 func TestProcessProcessingPaymentOnlyUpdatesIntent(t *testing.T) {
@@ -534,6 +576,7 @@ func TestProcessProcessingPaymentOnlyUpdatesIntent(t *testing.T) {
 		proposalFinderStub{proposal: proposal},
 		userFinderStub{},
 		paymentAccountFinderStub{account: account},
+		nil,
 		credentialDecryptorStub{},
 		gateway,
 		gateway,
@@ -618,6 +661,7 @@ func TestProcessRejectedPaymentOnlyUpdatesIntent(t *testing.T) {
 		proposalFinderStub{proposal: proposal},
 		userFinderStub{},
 		paymentAccountFinderStub{account: account},
+		nil,
 		credentialDecryptorStub{},
 		gateway,
 		gateway,
