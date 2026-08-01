@@ -11,6 +11,7 @@ import (
 
 	httphandler "github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/repositories"
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/payment"
 	serviceproposal "github.com/LoResuelvo/loresuelvo-api/internal/domain/service_proposal"
 	workorder "github.com/LoResuelvo/loresuelvo-api/internal/domain/work_order"
 	"github.com/cucumber/godog"
@@ -123,7 +124,21 @@ func (suite *testSuite) createScheduledWorkOrderFixture(providerEmail, consumerE
 	if err != nil {
 		return fmt.Errorf("creating scheduled work order fixture: %w", err)
 	}
-	if _, err := suite.workOrderRepository.Save(context.Background(), order); err != nil {
+	unitOfWork := repositories.NewPaymentUnitOfWork(
+		suite.database,
+		suite.paymentIntentRepository,
+		suite.paymentTransactionRepository,
+		repositories.NewServiceProposalRepository(suite.database),
+		suite.workOrderRepository,
+		suite.notificationRepository,
+	)
+	ctx := context.Background()
+	if err := unitOfWork.Execute(ctx, func(store payment.TransactionalStore) error {
+		if err := store.SaveServiceProposal(ctx, proposal); err != nil {
+			return err
+		}
+		return store.SaveWorkOrder(ctx, order)
+	}); err != nil {
 		return fmt.Errorf("saving scheduled work order fixture: %w", err)
 	}
 	if err := suite.serviceProposalHasStatus(suite.lastServiceProposalID, serviceproposal.StatusAccepted); err != nil {
