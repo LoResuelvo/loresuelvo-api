@@ -33,7 +33,6 @@ Feature: Completar el pago del servicio
 
     Rule: El código de confirmación se habilita únicamente con un pago aprobado y verificado
 
-        @wip
         Scenario: 27.2-CPS Habilitar el código después de aprobar el pago total del saldo
             Given que "ana@example.com" inició el checkout del saldo de la orden de trabajo
             When el sistema procesa una notificación válida de Mercado Pago y verifica un pago aprobado por "84000.00" pesos argentinos para ese saldo
