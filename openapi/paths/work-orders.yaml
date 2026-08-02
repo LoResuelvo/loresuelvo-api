@@ -6,7 +6,7 @@ get:
     - BearerAuth: []
   responses:
     '200':
-      description: Scheduled work orders involving the authenticated user, ordered by scheduled service date ascending. The array is empty when there are no work orders.
+      description: Work orders involving the authenticated user, ordered by scheduled service date ascending. The array is empty when there are no work orders.
       content:
         application/json:
           schema:

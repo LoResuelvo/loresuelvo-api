@@ -42,7 +42,7 @@
         },
         {
             "name": "Payments",
-            "description": "Booking checkout and verified payment processing endpoints."
+            "description": "Checkout and verified payment processing endpoints."
         },
         {
             "name": "Files",
@@ -2760,7 +2760,7 @@
                 ],
                 "operationId": "processMercadoPagoWebhook",
                 "summary": "Process a Mercado Pago payment notification",
-                "description": "Public server-to-server callback used by Mercado Pago. The API validates the\nwebhook signature and retrieves the payment directly from Mercado Pago before\nchanging internal state. An approved matching payment accepts the proposal\nand atomically creates its scheduled work order.\n",
+                "description": "Public server-to-server callback used by Mercado Pago. The API validates the\nwebhook signature and retrieves the payment directly from Mercado Pago before\nchanging internal state. An approved matching booking payment accepts the\nproposal and atomically creates its scheduled work order. An approved\nservice-balance payment atomically marks the work order as paid and issues\nits completion authorization. Repeated delivery of the same verified\nexternal payment is idempotent and does not duplicate transactions, work\norders, or completion authorization codes.\n",
                 "security": [],
                 "parameters": [
                     {
@@ -2835,7 +2835,7 @@
                 },
                 "responses": {
                     "200": {
-                        "description": "The verified payment notification was processed."
+                        "description": "The verified payment notification was processed or had already been processed."
                     },
                     "400": {
                         "description": "The notification payload or query parameters are invalid.",
@@ -2883,7 +2883,7 @@
                 ],
                 "responses": {
                     "200": {
-                        "description": "Scheduled work orders involving the authenticated user, ordered by scheduled service date ascending. The array is empty when there are no work orders.",
+                        "description": "Work orders involving the authenticated user, ordered by scheduled service date ascending. The array is empty when there are no work orders.",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -2933,6 +2933,246 @@
                     },
                     "500": {
                         "description": "Work orders could not be retrieved",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/work-orders/{workOrderId}/checkout-sessions": {
+            "post": {
+                "tags": [
+                    "Payments"
+                ],
+                "operationId": "startWorkOrderBalanceCheckout",
+                "summary": "Start service-balance checkout",
+                "description": "Creates a Mercado Pago Checkout Pro session for the authenticated consumer\nto pay the immutable service balance and remaining platform fee of a\nscheduled work order. Creating checkout does not mark the work order as\nfully paid and does not expose a completion confirmation code. When the\nprevious balance-payment intent was rejected, a new intent and checkout\nsession are created while preserving the immutable pending amounts. When\nan active checkout already exists, concurrent and repeated requests reuse\nthe same payment intent and checkout URL.\n",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "name": "workOrderId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "An active service-balance checkout session already exists and is returned unchanged.",
+                        "headers": {
+                            "Location": {
+                                "description": "URI of the existing payment intent.",
+                                "schema": {
+                                    "type": "string",
+                                    "example": "/payment-intents/83b4dd7d-6d1c-4e9e-b3e5-7be31b264540"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ServiceBalanceCheckoutSession"
+                                }
+                            }
+                        }
+                    },
+                    "201": {
+                        "description": "Service-balance payment intent and checkout session created.",
+                        "headers": {
+                            "Location": {
+                                "description": "URI of the created payment intent.",
+                                "schema": {
+                                    "type": "string",
+                                    "example": "/payment-intents/83b4dd7d-6d1c-4e9e-b3e5-7be31b264540"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ServiceBalanceCheckoutSession"
+                                },
+                                "examples": {
+                                    "created": {
+                                        "value": {
+                                            "payment_intent_id": "83b4dd7d-6d1c-4e9e-b3e5-7be31b264540",
+                                            "status": "checkout_ready",
+                                            "checkout_url": "https://www.mercadopago.com.ar/checkout/v1/redirect?pref_id=456",
+                                            "expires_on": "2026-07-06T13:30:00Z",
+                                            "pricing": {
+                                                "currency": "ARS",
+                                                "remaining_service_balance_cents": 8000000,
+                                                "remaining_platform_fee_cents": 400000,
+                                                "amount_due_now_cents": 8400000
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "The work order identifier is invalid.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AuthErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "The authenticated user is not the work order's consumer.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "The work order does not exist.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "The work order is already fully paid, is not yet eligible for balance payment, or the provider has no connected payment account.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "The checkout session could not be created.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/work-orders/{workOrderId}/confirmation-code": {
+            "get": {
+                "tags": [
+                    "WorkOrders"
+                ],
+                "operationId": "getWorkOrderConfirmationCode",
+                "summary": "Get the fully paid work order confirmation code",
+                "description": "Returns the four-digit confirmation code only to the consumer who owns the\nwork order and only after Mercado Pago has verified the full service-balance\npayment. This operation does not confirm that the service was performed.\n",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "name": "workOrderId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Confirmation code available to the work order consumer.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/WorkOrderConfirmationCode"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "The work order identifier is invalid.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AuthErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "The authenticated user is not the work order's consumer.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "The work order does not exist.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "The full service-balance payment has not been approved and verified yet.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "The confirmation code could not be retrieved.",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -3770,6 +4010,92 @@
                 },
                 "additionalProperties": false
             },
+            "ServiceBalanceCheckoutSession": {
+                "type": "object",
+                "required": [
+                    "payment_intent_id",
+                    "status",
+                    "checkout_url",
+                    "expires_on",
+                    "pricing"
+                ],
+                "properties": {
+                    "payment_intent_id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "Internal payment intent that tracks this service-balance payment."
+                    },
+                    "status": {
+                        "type": "string",
+                        "enum": [
+                            "checkout_ready"
+                        ]
+                    },
+                    "checkout_url": {
+                        "type": "string",
+                        "format": "uri",
+                        "description": "Mercado Pago Checkout Pro URL to which the frontend redirects the consumer."
+                    },
+                    "expires_on": {
+                        "type": "string",
+                        "format": "date-time",
+                        "description": "Checkout expiration instant."
+                    },
+                    "pricing": {
+                        "$ref": "#/components/schemas/ServiceBalancePricing"
+                    }
+                },
+                "additionalProperties": false
+            },
+            "ServiceBalancePricing": {
+                "type": "object",
+                "description": "Immutable amounts due when completing payment for a scheduled service. All amounts use the smallest currency unit.",
+                "required": [
+                    "currency",
+                    "remaining_service_balance_cents",
+                    "remaining_platform_fee_cents",
+                    "amount_due_now_cents"
+                ],
+                "properties": {
+                    "currency": {
+                        "type": "string",
+                        "enum": [
+                            "ARS"
+                        ]
+                    },
+                    "remaining_service_balance_cents": {
+                        "type": "integer",
+                        "format": "int64",
+                        "minimum": 1
+                    },
+                    "remaining_platform_fee_cents": {
+                        "type": "integer",
+                        "format": "int64",
+                        "minimum": 0
+                    },
+                    "amount_due_now_cents": {
+                        "type": "integer",
+                        "format": "int64",
+                        "minimum": 1
+                    }
+                },
+                "additionalProperties": false
+            },
+            "WorkOrderConfirmationCode": {
+                "type": "object",
+                "description": "Consumer-visible credential used later to authorize confirmation that the service was performed.",
+                "required": [
+                    "confirmation_code"
+                ],
+                "properties": {
+                    "confirmation_code": {
+                        "type": "string",
+                        "pattern": "^[0-9]{4}$",
+                        "example": "0042"
+                    }
+                },
+                "additionalProperties": false
+            },
             "PaymentIntent": {
                 "type": "object",
                 "required": [
@@ -3783,11 +4109,13 @@
                     },
                     "status": {
                         "type": "string",
-                        "description": "Current result of the verified booking-deposit payment flow.",
+                        "description": "Current result of the verified payment flow.",
                         "enum": [
                             "requires_checkout",
                             "checkout_ready",
-                            "paid"
+                            "processing",
+                            "paid",
+                            "rejected"
                         ]
                     }
                 },
@@ -4410,7 +4738,7 @@
             },
             "WorkOrderSummary": {
                 "type": "object",
-                "description": "Scheduled work order item returned for the authenticated user.",
+                "description": "Work order item returned for the authenticated user.",
                 "required": [
                     "id",
                     "service_proposal_id",
@@ -4446,7 +4774,8 @@
                     "status": {
                         "type": "string",
                         "enum": [
-                            "scheduled"
+                            "scheduled",
+                            "paid"
                         ]
                     },
                     "accepted_on": {

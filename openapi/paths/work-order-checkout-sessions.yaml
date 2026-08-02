@@ -1,0 +1,96 @@
+post:
+  tags:
+    - Payments
+  operationId: startWorkOrderBalanceCheckout
+  summary: Start service-balance checkout
+  description: |
+    Creates a Mercado Pago Checkout Pro session for the authenticated consumer
+    to pay the immutable service balance and remaining platform fee of a
+    scheduled work order. Creating checkout does not mark the work order as
+    fully paid and does not expose a completion confirmation code. When the
+    previous balance-payment intent was rejected, a new intent and checkout
+    session are created while preserving the immutable pending amounts. When
+    an active checkout already exists, concurrent and repeated requests reuse
+    the same payment intent and checkout URL.
+  security:
+    - BearerAuth: []
+  parameters:
+    - name: workOrderId
+      in: path
+      required: true
+      schema:
+        type: integer
+        minimum: 1
+  responses:
+    '200':
+      description: An active service-balance checkout session already exists and is returned unchanged.
+      headers:
+        Location:
+          description: URI of the existing payment intent.
+          schema:
+            type: string
+            example: /payment-intents/83b4dd7d-6d1c-4e9e-b3e5-7be31b264540
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ServiceBalanceCheckoutSession'
+    '201':
+      description: Service-balance payment intent and checkout session created.
+      headers:
+        Location:
+          description: URI of the created payment intent.
+          schema:
+            type: string
+            example: /payment-intents/83b4dd7d-6d1c-4e9e-b3e5-7be31b264540
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ServiceBalanceCheckoutSession'
+          examples:
+            created:
+              value:
+                payment_intent_id: 83b4dd7d-6d1c-4e9e-b3e5-7be31b264540
+                status: checkout_ready
+                checkout_url: https://www.mercadopago.com.ar/checkout/v1/redirect?pref_id=456
+                expires_on: '2026-07-06T13:30:00Z'
+                pricing:
+                  currency: ARS
+                  remaining_service_balance_cents: 8000000
+                  remaining_platform_fee_cents: 400000
+                  amount_due_now_cents: 8400000
+    '400':
+      description: The work order identifier is invalid.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    '401':
+      description: Missing or invalid authentication.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/AuthErrorResponse'
+    '403':
+      description: The authenticated user is not the work order's consumer.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    '404':
+      description: The work order does not exist.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    '409':
+      description: The work order is already fully paid, is not yet eligible for balance payment, or the provider has no connected payment account.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    '500':
+      description: The checkout session could not be created.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'

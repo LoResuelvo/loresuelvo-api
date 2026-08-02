@@ -1,0 +1,27 @@
+type: object
+required:
+  - payment_intent_id
+  - status
+  - checkout_url
+  - expires_on
+  - pricing
+properties:
+  payment_intent_id:
+    type: string
+    format: uuid
+    description: Internal payment intent that tracks this service-balance payment.
+  status:
+    type: string
+    enum:
+      - checkout_ready
+  checkout_url:
+    type: string
+    format: uri
+    description: Mercado Pago Checkout Pro URL to which the frontend redirects the consumer.
+  expires_on:
+    type: string
+    format: date-time
+    description: Checkout expiration instant.
+  pricing:
+    $ref: '#/components/schemas/ServiceBalancePricing'
+additionalProperties: false

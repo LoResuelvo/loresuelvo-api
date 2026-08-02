@@ -8,9 +8,11 @@ properties:
     format: uuid
   status:
     type: string
-    description: Current result of the verified booking-deposit payment flow.
+    description: Current result of the verified payment flow.
     enum:
       - requires_checkout
       - checkout_ready
+      - processing
       - paid
+      - rejected
 additionalProperties: false

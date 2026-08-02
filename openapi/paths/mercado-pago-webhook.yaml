@@ -6,8 +6,12 @@ post:
   description: |
     Public server-to-server callback used by Mercado Pago. The API validates the
     webhook signature and retrieves the payment directly from Mercado Pago before
-    changing internal state. An approved matching payment accepts the proposal
-    and atomically creates its scheduled work order.
+    changing internal state. An approved matching booking payment accepts the
+    proposal and atomically creates its scheduled work order. An approved
+    service-balance payment atomically marks the work order as paid and issues
+    its completion authorization. Repeated delivery of the same verified
+    external payment is idempotent and does not duplicate transactions, work
+    orders, or completion authorization codes.
   security: []
   parameters:
     - name: data.id
@@ -55,7 +59,7 @@ post:
           additionalProperties: true
   responses:
     '200':
-      description: The verified payment notification was processed.
+      description: The verified payment notification was processed or had already been processed.
     '400':
       description: The notification payload or query parameters are invalid.
       content:

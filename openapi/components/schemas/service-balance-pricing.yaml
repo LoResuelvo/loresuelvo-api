@@ -1,0 +1,25 @@
+type: object
+description: Immutable amounts due when completing payment for a scheduled service. All amounts use the smallest currency unit.
+required:
+  - currency
+  - remaining_service_balance_cents
+  - remaining_platform_fee_cents
+  - amount_due_now_cents
+properties:
+  currency:
+    type: string
+    enum:
+      - ARS
+  remaining_service_balance_cents:
+    type: integer
+    format: int64
+    minimum: 1
+  remaining_platform_fee_cents:
+    type: integer
+    format: int64
+    minimum: 0
+  amount_due_now_cents:
+    type: integer
+    format: int64
+    minimum: 1
+additionalProperties: false
