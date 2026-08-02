@@ -54,7 +54,6 @@ Feature: Completar el pago del servicio
                 | en proceso   | processing   |
                 | rechazado    | rejected     |
 
-        @wip
         Scenario: 27.4-CPS Permitir reintentar después de rechazar el pago del saldo
             Given que la orden de trabajo tiene un intento de pago del saldo rechazado
             And que estoy autenticado como consumidor "ana@example.com"
