@@ -570,8 +570,10 @@ func (suite *testSuite) checkoutResponseIncludesPricingBreakdown(table *godog.Ta
 	actual := map[string]int64{
 		"precio total del servicio":            response.Pricing.ServiceTotalCents,
 		"seña del prestador":                   response.Pricing.DepositCents,
+		"saldo del servicio":                   response.Pricing.RemainingServiceBalanceCents,
 		"comisión total de LoResuelvo":         response.Pricing.PlatformFeeTotalCents,
 		"comisión de LoResuelvo cobrada ahora": response.Pricing.PlatformFeeDueNowCents,
+		"comisión de LoResuelvo pendiente":     response.Pricing.RemainingPlatformFeeCents,
 		"total a pagar ahora":                  response.Pricing.AmountDueNowCents,
 		"saldo total a pagar más adelante":     response.Pricing.RemainingAmountDueCents,
 	}
