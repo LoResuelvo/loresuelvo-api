@@ -65,7 +65,6 @@ Feature: Completar el pago del servicio
 
     Rule: Solo el consumidor de la orden puede completar el pago y consultar el código
 
-        @wip
         Scenario Outline: 27.5-CPS Rechazar el pago solicitado por <actor>
             Given que estoy autenticado como <rol> "<correo>"
             When intento completar el pago de la orden de trabajo

@@ -3,6 +3,7 @@ package steps_test
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -22,10 +23,12 @@ func registerCompleteServicePaymentSteps(sc *godog.ScenarioContext, suite *testS
 	sc.Step(`^que la orden de trabajo tiene un intento de pago del saldo rechazado$`, suite.workOrderHasRejectedServiceBalanceIntent)
 	sc.Step(`^solicito completar el pago de la orden de trabajo$`, suite.requestServiceBalanceCheckout)
 	sc.Step(`^solicito nuevamente completar el pago de la orden de trabajo$`, suite.requestServiceBalanceCheckoutAgain)
+	sc.Step(`^intento completar el pago de la orden de trabajo$`, suite.requestServiceBalanceCheckout)
 	sc.Step(`^el sistema procesa una notificación válida de Mercado Pago y verifica un pago aprobado por "([^"]*)" pesos argentinos para ese saldo$`, suite.processApprovedServiceBalancePayment)
 	sc.Step(`^el sistema procesa una notificación válida de Mercado Pago y verifica un pago (en proceso|rechazado) para ese saldo$`, suite.processNonApprovedServiceBalancePayment)
 	sc.Step(`^el sistema entrega una URL para completar el checkout del saldo$`, suite.systemReturnsServiceBalanceCheckoutURL)
 	sc.Step(`^el sistema entrega una URL para completar un nuevo checkout del saldo$`, suite.systemReturnsNewServiceBalanceCheckoutURL)
+	sc.Step(`^el sistema deniega el pago del saldo$`, suite.systemDeniesServiceBalancePayment)
 	sc.Step(`^la respuesta identifica el intento de pago del saldo en estado "([^"]*)"$`, suite.responseIdentifiesServiceBalanceIntentWithStatus)
 	sc.Step(`^la respuesta identifica un nuevo intento de pago del saldo en estado "([^"]*)"$`, suite.responseIdentifiesNewServiceBalanceIntentWithStatus)
 	sc.Step(`^el intento de pago del saldo puede consultarse en estado "([^"]*)"$`, suite.serviceBalanceIntentCanBeReadWithStatus)
@@ -96,6 +99,24 @@ func (suite *testSuite) systemReturnsServiceBalanceCheckoutURL() error {
 
 func (suite *testSuite) systemReturnsNewServiceBalanceCheckoutURL() error {
 	return suite.assertCheckoutURL(true)
+}
+
+func (suite *testSuite) systemDeniesServiceBalancePayment() error {
+	if err := suite.lastResponseShouldHaveStatusCode(http.StatusForbidden); err != nil {
+		return err
+	}
+	if err := suite.lastResponseShouldHaveError(); err != nil {
+		return err
+	}
+	_, err := suite.paymentIntentRepository.FindLatestByProposalIDAndPurpose(
+		context.Background(),
+		suite.lastServiceProposalID,
+		payment.PurposeServiceBalance,
+	)
+	if !errors.Is(err, payment.ErrIntentDoesNotExist) {
+		return fmt.Errorf("expected denied checkout not to create a service balance intent, got %v", err)
+	}
+	return nil
 }
 
 func (suite *testSuite) responseIdentifiesServiceBalanceIntentWithStatus(expected string) error {
@@ -205,27 +226,53 @@ func (suite *testSuite) workOrderIsNotFullyPaid() error {
 }
 
 func (suite *testSuite) workOrderKeepsPendingBalance() error {
-	if err := suite.workOrderIsNotFullyPaid(); err != nil {
-		return err
-	}
 	order, err := suite.persistedWorkOrderForLastServiceProposal()
 	if err != nil {
 		return err
 	}
-	intent, err := suite.paymentIntentRepository.FindByID(context.Background(), suite.lastPaymentIntentID)
+	if order.Status != workorder.StatusScheduled {
+		return fmt.Errorf("expected work order status %q, got %q", workorder.StatusScheduled, order.Status)
+	}
+	if order.RemainingServiceBalance() <= 0 ||
+		order.RemainingPlatformFee() <= 0 ||
+		order.RemainingAmountDue() <= 0 {
+		return fmt.Errorf("expected work order to preserve a positive pending balance")
+	}
+	intent, err := suite.paymentIntentRepository.FindLatestByProposalIDAndPurpose(
+		context.Background(),
+		suite.lastServiceProposalID,
+		payment.PurposeServiceBalance,
+	)
+	if errors.Is(err, payment.ErrIntentDoesNotExist) {
+		return nil
+	}
 	if err != nil {
 		return err
+	}
+	if intent.Status == payment.StatusPaid {
+		return fmt.Errorf("expected service balance payment to remain unpaid")
 	}
 	if intent.SellerAmountCents != order.RemainingServiceBalance() ||
 		intent.PlatformFeeCents != order.RemainingPlatformFee() ||
 		intent.TotalAmountCents != order.RemainingAmountDue() {
-		return fmt.Errorf("expected retry to preserve the work order pending balance")
+		return fmt.Errorf("expected service balance intent to preserve the work order pending balance")
 	}
 	return nil
 }
 
 func (suite *testSuite) confirmationCodeIsNotAvailable() error {
-	status, body, err := suite.getWorkOrderConfirmationCode()
+	order, err := suite.persistedWorkOrderForLastServiceProposal()
+	if err != nil {
+		return err
+	}
+	if order.CompletionAuthorization != nil {
+		return fmt.Errorf("expected work order not to own a completion authorization")
+	}
+	consumer, err := suite.userRepository.FindByID(context.Background(), order.ConsumerID())
+	if err != nil {
+		return fmt.Errorf("finding work order consumer: %w", err)
+	}
+	status, body, err := suite.getWorkOrderConfirmationCodeAs(consumer.AuthID())
 	if err != nil {
 		return err
 	}
@@ -266,6 +313,10 @@ func (suite *testSuite) consumerCanGetWorkOrderConfirmationCode() error {
 }
 
 func (suite *testSuite) getWorkOrderConfirmationCode() (int, []byte, error) {
+	return suite.getWorkOrderConfirmationCodeAs(suite.currentAuth0ID)
+}
+
+func (suite *testSuite) getWorkOrderConfirmationCodeAs(auth0ID string) (int, []byte, error) {
 	order, err := suite.persistedWorkOrderForLastServiceProposal()
 	if err != nil {
 		return 0, nil, err
@@ -278,8 +329,8 @@ func (suite *testSuite) getWorkOrderConfirmationCode() (int, []byte, error) {
 	if err != nil {
 		return 0, nil, err
 	}
-	if suite.currentAuth0ID != "" {
-		request.Header.Set("Authorization", "Bearer "+suite.tokenBuilder.BuildToken(suite.currentAuth0ID, nil))
+	if auth0ID != "" {
+		request.Header.Set("Authorization", "Bearer "+suite.tokenBuilder.BuildToken(auth0ID, nil))
 	}
 	response, err := http.DefaultClient.Do(request)
 	if err != nil {
