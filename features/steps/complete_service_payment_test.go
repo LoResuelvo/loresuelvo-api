@@ -21,6 +21,7 @@ func registerCompleteServicePaymentSteps(sc *godog.ScenarioContext, suite *testS
 	sc.Step(`^que "([^"]*)" inició el checkout del saldo de la orden de trabajo$`, suite.consumerStartedServiceBalanceCheckout)
 	sc.Step(`^solicito completar el pago de la orden de trabajo$`, suite.requestServiceBalanceCheckout)
 	sc.Step(`^el sistema procesa una notificación válida de Mercado Pago y verifica un pago aprobado por "([^"]*)" pesos argentinos para ese saldo$`, suite.processApprovedServiceBalancePayment)
+	sc.Step(`^el sistema procesa una notificación válida de Mercado Pago y verifica un pago (en proceso|rechazado) para ese saldo$`, suite.processNonApprovedServiceBalancePayment)
 	sc.Step(`^el sistema entrega una URL para completar el checkout del saldo$`, suite.systemReturnsServiceBalanceCheckoutURL)
 	sc.Step(`^la respuesta identifica el intento de pago del saldo en estado "([^"]*)"$`, suite.responseIdentifiesServiceBalanceIntentWithStatus)
 	sc.Step(`^el intento de pago del saldo puede consultarse en estado "([^"]*)"$`, suite.serviceBalanceIntentCanBeReadWithStatus)
@@ -89,6 +90,30 @@ func (suite *testSuite) responseIdentifiesServiceBalanceIntentWithStatus(expecte
 
 func (suite *testSuite) processApprovedServiceBalancePayment(amount string) error {
 	return suite.processApprovedPaymentForAmount(amount)
+}
+
+func (suite *testSuite) processNonApprovedServiceBalancePayment(result string) error {
+	if suite.lastPaymentIntentID == "" || suite.lastCheckoutResponse.Pricing.AmountDueNowCents <= 0 {
+		return fmt.Errorf("expected service balance checkout before processing payment")
+	}
+	var externalPaymentID string
+	switch result {
+	case "en proceso":
+		externalPaymentID = suite.checkoutClient.AddProcessingPayment(
+			suite.lastPaymentIntentID,
+			"mp-juan",
+			suite.lastCheckoutResponse.Pricing.AmountDueNowCents,
+		)
+	case "rechazado":
+		externalPaymentID = suite.checkoutClient.AddRejectedPayment(
+			suite.lastPaymentIntentID,
+			"mp-juan",
+			suite.lastCheckoutResponse.Pricing.AmountDueNowCents,
+		)
+	default:
+		return fmt.Errorf("unsupported service balance payment result %q", result)
+	}
+	return suite.sendMercadoPagoPaymentNotification(externalPaymentID)
 }
 
 func (suite *testSuite) serviceBalanceIntentCanBeReadWithStatus(expected string) error {
@@ -205,8 +230,20 @@ func (suite *testSuite) serviceIsNotYetConfirmedAsPerformed() error {
 	if err != nil {
 		return err
 	}
-	if order.Status != workorder.StatusPaid {
-		return fmt.Errorf("expected paid but unconfirmed work order status %q, got %q", workorder.StatusPaid, order.Status)
+	intent, err := suite.paymentIntentRepository.FindLatestByProposalIDAndPurpose(
+		context.Background(),
+		suite.lastServiceProposalID,
+		payment.PurposeServiceBalance,
+	)
+	if err != nil {
+		return err
+	}
+	expectedStatus := workorder.StatusScheduled
+	if intent.Status == payment.StatusPaid {
+		expectedStatus = workorder.StatusPaid
+	}
+	if order.Status != expectedStatus {
+		return fmt.Errorf("expected unconfirmed work order status %q, got %q", expectedStatus, order.Status)
 	}
 	return nil
 }

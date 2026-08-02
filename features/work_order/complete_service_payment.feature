@@ -41,7 +41,6 @@ Feature: Completar el pago del servicio
             And el consumidor puede consultar un código de confirmación vinculado a la orden de trabajo
             And el servicio todavía no queda confirmado como realizado
 
-        @wip
         Scenario Outline: 27.3-CPS Mantener el código inaccesible cuando el pago resulta <resultado>
             Given que "ana@example.com" inició el checkout del saldo de la orden de trabajo
             When el sistema procesa una notificación válida de Mercado Pago y verifica un pago <resultado> para ese saldo
