@@ -725,9 +725,10 @@ func TestProcessApprovedServiceBalanceAtomicallyPaysWorkOrderAndIssuesConfirmati
 		AmountCents:       intent.TotalAmountCents,
 	}}
 	unitOfWork := &unitOfWorkStub{}
+	transactionRepository := &transactionRepositoryStub{}
 	service := payment.NewService(
 		&intentRepositoryStub{found: intent},
-		&transactionRepositoryStub{},
+		transactionRepository,
 		proposalFinderStub{proposal: proposal},
 		workOrderFinderStub{order: order},
 		userFinderStub{},
@@ -760,6 +761,18 @@ func TestProcessApprovedServiceBalanceAtomicallyPaysWorkOrderAndIssuesConfirmati
 	require.NotNil(t, order.CompletionAuthorization)
 	assert.Equal(t, []byte("encrypted:0042"), order.CompletionAuthorization.CodeCiphertext())
 	assert.Equal(t, now, order.CompletionAuthorization.IssuedOn())
+
+	firstCiphertext := append([]byte(nil), order.CompletionAuthorization.CodeCiphertext()...)
+	firstIssuedOn := order.CompletionAuthorization.IssuedOn()
+	transactionRepository.found = unitOfWork.transaction
+	require.NoError(t, service.ProcessPaymentNotification(t.Context(), payment.PaymentNotification{
+		ExternalPaymentID: gateway.payment.ID,
+		SellerAccountID:   gateway.payment.SellerAccountID,
+	}))
+	assert.Equal(t, 1, unitOfWork.calls)
+	require.NotNil(t, order.CompletionAuthorization)
+	assert.Equal(t, firstCiphertext, order.CompletionAuthorization.CodeCiphertext())
+	assert.Equal(t, firstIssuedOn, order.CompletionAuthorization.IssuedOn())
 }
 
 func TestProcessProcessingPaymentOnlyUpdatesIntent(t *testing.T) {

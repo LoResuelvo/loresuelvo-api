@@ -858,6 +858,13 @@ func (suite *testSuite) systemRegistersOneTransactionForExternalPayment() error 
 	if transaction.ExternalPaymentID != suite.lastExternalPaymentID {
 		return fmt.Errorf("unexpected external payment transaction %q", transaction.ExternalPaymentID)
 	}
+	if suite.previousPaymentTransactionID != 0 && transaction.ID != suite.previousPaymentTransactionID {
+		return fmt.Errorf(
+			"expected external payment transaction id to remain %d, got %d",
+			suite.previousPaymentTransactionID,
+			transaction.ID,
+		)
+	}
 	return nil
 }
 

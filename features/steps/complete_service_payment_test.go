@@ -10,6 +10,7 @@ import (
 	"sync"
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/payment"
+	paymentaccount "github.com/LoResuelvo/loresuelvo-api/internal/domain/payment_account"
 	workorder "github.com/LoResuelvo/loresuelvo-api/internal/domain/work_order"
 	"github.com/cucumber/godog"
 )
@@ -30,6 +31,7 @@ func registerCompleteServicePaymentSteps(sc *godog.ScenarioContext, suite *testS
 	sc.Step(`^solicito concurrentemente dos veces completar el pago de la orden de trabajo$`, suite.requestServiceBalanceCheckoutConcurrentlyTwice)
 	sc.Step(`^el sistema procesa una notificación válida de Mercado Pago y verifica un pago aprobado por "([^"]*)" pesos argentinos para ese saldo$`, suite.processApprovedServiceBalancePayment)
 	sc.Step(`^el sistema procesa una notificación válida de Mercado Pago y verifica un pago (en proceso|rechazado) para ese saldo$`, suite.processNonApprovedServiceBalancePayment)
+	sc.Step(`^el sistema procesa dos veces la misma notificación válida de Mercado Pago y verifica el pago aprobado del saldo$`, suite.processSameApprovedServiceBalanceNotificationTwice)
 	sc.Step(`^el sistema entrega una URL para completar el checkout del saldo$`, suite.systemReturnsServiceBalanceCheckoutURL)
 	sc.Step(`^el sistema entrega una URL para completar un nuevo checkout del saldo$`, suite.systemReturnsNewServiceBalanceCheckoutURL)
 	sc.Step(`^el sistema deniega el pago del saldo$`, suite.systemDeniesServiceBalancePayment)
@@ -50,6 +52,7 @@ func registerCompleteServicePaymentSteps(sc *godog.ScenarioContext, suite *testS
 	sc.Step(`^el consumidor conserva el código de confirmación de la orden de trabajo$`, suite.consumerKeepsWorkOrderConfirmationCode)
 	sc.Step(`^el sistema conserva un único intento de pago activo para el saldo$`, suite.systemKeepsOneActiveServiceBalanceIntent)
 	sc.Step(`^el sistema conserva una única sesión de checkout activa para el saldo$`, suite.systemKeepsOneActiveServiceBalanceCheckoutSession)
+	sc.Step(`^el sistema conserva un único código de confirmación para la orden de trabajo$`, suite.systemKeepsOneWorkOrderConfirmationCode)
 	sc.Step(`^el servicio todavía no queda confirmado como realizado$`, suite.serviceIsNotYetConfirmedAsPerformed)
 }
 
@@ -306,6 +309,46 @@ func (suite *testSuite) processNonApprovedServiceBalancePayment(result string) e
 	return suite.sendMercadoPagoPaymentNotification(externalPaymentID)
 }
 
+func (suite *testSuite) processSameApprovedServiceBalanceNotificationTwice() error {
+	if suite.lastPaymentIntentID == "" || suite.lastCheckoutResponse.Pricing.AmountDueNowCents <= 0 {
+		return fmt.Errorf("expected service balance checkout before approving duplicate notification")
+	}
+	externalPaymentID := suite.checkoutClient.AddApprovedPayment(
+		suite.lastPaymentIntentID,
+		"mp-juan",
+		suite.lastCheckoutResponse.Pricing.AmountDueNowCents,
+	)
+	if err := suite.sendMercadoPagoPaymentNotification(externalPaymentID); err != nil {
+		return err
+	}
+	transaction, err := suite.paymentTransactionRepository.FindByExternalID(
+		context.Background(),
+		paymentaccount.PaymentProvider("mercado_pago"),
+		externalPaymentID,
+	)
+	if err != nil {
+		return err
+	}
+	suite.previousPaymentTransactionID = transaction.ID
+	order, err := suite.persistedWorkOrderForLastServiceProposal()
+	if err != nil {
+		return err
+	}
+	if order.CompletionAuthorization == nil {
+		return fmt.Errorf("expected completion authorization after first approved notification")
+	}
+	suite.previousConfirmationCiphertext = append(
+		[]byte(nil),
+		order.CompletionAuthorization.CodeCiphertext()...,
+	)
+	suite.currentAuth0ID = auth0IDForConsumerEmail("ana@example.com")
+	if err := suite.consumerCanGetWorkOrderConfirmationCode(); err != nil {
+		return err
+	}
+	suite.previousConfirmationCode = suite.lastConfirmationCode
+	return suite.sendMercadoPagoPaymentNotification(externalPaymentID)
+}
+
 func (suite *testSuite) serviceBalanceIntentCanBeReadWithStatus(expected string) error {
 	return suite.paymentIntentCanBeReadWithStatus(expected)
 }
@@ -523,6 +566,29 @@ func (suite *testSuite) systemKeepsOneActiveServiceBalanceCheckoutSession() erro
 	}
 	if suite.checkoutClient.RequestCount() != 1 {
 		return fmt.Errorf("expected exactly one external checkout request, got %d", suite.checkoutClient.RequestCount())
+	}
+	return nil
+}
+
+func (suite *testSuite) systemKeepsOneWorkOrderConfirmationCode() error {
+	if len(suite.previousConfirmationCiphertext) == 0 || suite.previousConfirmationCode == "" {
+		return fmt.Errorf("expected confirmation authorization captured after first notification")
+	}
+	order, err := suite.persistedWorkOrderForLastServiceProposal()
+	if err != nil {
+		return err
+	}
+	if order.CompletionAuthorization == nil {
+		return fmt.Errorf("expected work order completion authorization")
+	}
+	if string(order.CompletionAuthorization.CodeCiphertext()) != string(suite.previousConfirmationCiphertext) {
+		return fmt.Errorf("expected duplicate notification to preserve the encrypted confirmation code")
+	}
+	if err := suite.consumerCanGetWorkOrderConfirmationCode(); err != nil {
+		return err
+	}
+	if suite.lastConfirmationCode != suite.previousConfirmationCode {
+		return fmt.Errorf("expected duplicate notification to preserve the consumer confirmation code")
 	}
 	return nil
 }
