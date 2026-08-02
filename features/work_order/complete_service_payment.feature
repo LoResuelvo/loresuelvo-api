@@ -112,7 +112,6 @@ Feature: Completar el pago del servicio
             And el sistema no registra una sesión de checkout del saldo
             And el código de confirmación todavía no está disponible
 
-        @wip
         Scenario: 27.10-CPS Evitar un segundo cobro después de completar el pago
             Given que el pago aprobado del saldo habilitó el código de confirmación de la orden de trabajo
             And que estoy autenticado como consumidor "ana@example.com"
