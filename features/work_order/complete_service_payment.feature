@@ -77,7 +77,6 @@ Feature: Completar el pago del servicio
                 | otro consumidor    | consumidor  | carla@example.com          |
                 | el prestador       | prestador   | juan.plomero@example.com   |
 
-        @wip
         Scenario: 27.6-CPS Rechazar el pago sin una sesión válida
             Given que no tengo una sesión válida
             When intento completar el pago de la orden de trabajo

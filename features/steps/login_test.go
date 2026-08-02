@@ -208,10 +208,10 @@ func (suite *testSuite) profileIncludesCategory(categoryName string) error {
 }
 
 func (suite *testSuite) systemDeniesAccess() error {
-	if suite.lastStatus != http.StatusUnauthorized && suite.lastStatus != http.StatusForbidden {
-		return fmt.Errorf("expected access to be denied, got status %d with body %s", suite.lastStatus, string(suite.lastBody))
+	if err := suite.lastResponseShouldHaveStatusCode(http.StatusUnauthorized); err != nil {
+		return err
 	}
-	return nil
+	return suite.lastResponseShouldHaveError()
 }
 
 func (suite *testSuite) systemReportsUserNotFound() error {
