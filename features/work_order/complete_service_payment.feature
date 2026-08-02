@@ -18,7 +18,6 @@ Feature: Completar el pago del servicio
 
     Rule: Completar el pago cobra únicamente el saldo acordado
 
-        @wip
         Scenario: 27.1-CPS Iniciar el checkout del saldo de una orden programada
             Given que estoy autenticado como consumidor "ana@example.com"
             When solicito completar el pago de la orden de trabajo
