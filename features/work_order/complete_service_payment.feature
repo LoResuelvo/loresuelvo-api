@@ -123,7 +123,6 @@ Feature: Completar el pago del servicio
 
     Rule: El checkout y la confirmación externa del saldo son idempotentes
 
-        @wip
         Scenario: 27.11-CPS Evitar checkouts activos duplicados ante solicitudes concurrentes
             Given que estoy autenticado como consumidor "ana@example.com"
             When solicito concurrentemente dos veces completar el pago de la orden de trabajo
