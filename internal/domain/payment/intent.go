@@ -6,11 +6,15 @@ import (
 	"time"
 
 	serviceproposal "github.com/LoResuelvo/loresuelvo-api/internal/domain/service_proposal"
+	workorder "github.com/LoResuelvo/loresuelvo-api/internal/domain/work_order"
 )
 
 type Purpose string
 
-const PurposeBookingDeposit Purpose = "booking_deposit"
+const (
+	PurposeBookingDeposit Purpose = "booking_deposit"
+	PurposeServiceBalance Purpose = "service_balance"
+)
 
 type IntentStatus string
 
@@ -72,6 +76,35 @@ func NewBookingDepositIntent(
 		TotalAmountCents:  bookingTerms.AmountDueNowCents(),
 		Status:            StatusRequiresCheckout,
 		BookingTerms:      bookingTerms,
+		CreatedOn:         now,
+		UpdatedOn:         now,
+	}, nil
+}
+
+func NewServiceBalanceIntent(id string, order *workorder.WorkOrder, now time.Time) (*Intent, error) {
+	if strings.TrimSpace(id) == "" ||
+		order == nil ||
+		order.ID <= 0 ||
+		order.ServiceProposal == nil ||
+		order.ServiceProposalID() <= 0 ||
+		strings.TrimSpace(order.Currency()) == "" ||
+		order.RemainingServiceBalance() <= 0 ||
+		order.RemainingPlatformFee() < 0 ||
+		order.RemainingAmountDue() != order.RemainingServiceBalance()+order.RemainingPlatformFee() ||
+		now.IsZero() {
+		return nil, ErrInvalidIntent
+	}
+
+	now = now.UTC()
+	return &Intent{
+		ID:                id,
+		ServiceProposalID: order.ServiceProposalID(),
+		Purpose:           PurposeServiceBalance,
+		Currency:          order.Currency(),
+		SellerAmountCents: order.RemainingServiceBalance(),
+		PlatformFeeCents:  order.RemainingPlatformFee(),
+		TotalAmountCents:  order.RemainingAmountDue(),
+		Status:            StatusRequiresCheckout,
 		CreatedOn:         now,
 		UpdatedOn:         now,
 	}, nil

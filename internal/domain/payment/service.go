@@ -14,9 +14,9 @@ import (
 	workorder "github.com/LoResuelvo/loresuelvo-api/internal/domain/work_order"
 )
 
-const bookingCheckoutValidity = 30 * time.Minute
+const checkoutValidity = 30 * time.Minute
 
-type BookingCheckoutResult struct {
+type CheckoutResult struct {
 	Intent  *Intent
 	Created bool
 }
@@ -25,6 +25,7 @@ type Service struct {
 	intentRepository      IntentRepository
 	transactionRepository TransactionRepository
 	serviceProposalFinder ServiceProposalFinder
+	workOrderFinder       WorkOrderFinder
 	userFinder            UserFinder
 	paymentAccountFinder  PaymentAccountFinder
 	lockManager           LockManager
@@ -36,12 +37,14 @@ type Service struct {
 	idGenerator           IDGenerator
 	clock                 clock.Clock
 	checkoutPolicy        BookingCheckoutPolicy
+	serviceBalancePolicy  ServiceBalanceCheckoutPolicy
 }
 
 func NewService(
 	intentRepository IntentRepository,
 	transactionRepository TransactionRepository,
 	serviceProposalFinder ServiceProposalFinder,
+	workOrderFinder WorkOrderFinder,
 	userFinder UserFinder,
 	paymentAccountFinder PaymentAccountFinder,
 	lockManager LockManager,
@@ -57,6 +60,7 @@ func NewService(
 		intentRepository:      intentRepository,
 		transactionRepository: transactionRepository,
 		serviceProposalFinder: serviceProposalFinder,
+		workOrderFinder:       workOrderFinder,
 		userFinder:            userFinder,
 		paymentAccountFinder:  paymentAccountFinder,
 		lockManager:           lockManager,
@@ -74,7 +78,7 @@ func (service *Service) StartBookingCheckout(
 	ctx context.Context,
 	authID string,
 	proposalID int,
-) (*BookingCheckoutResult, error) {
+) (*CheckoutResult, error) {
 	foundUser, err := service.userFinder.FindByAuthID(authID)
 	if err != nil {
 		return nil, ErrOnlyProposalRecipientCanCheckout
@@ -87,7 +91,7 @@ func (service *Service) StartBookingCheckout(
 		return nil, err
 	}
 
-	var result *BookingCheckoutResult
+	var result *CheckoutResult
 	err = service.lockManager.WithinLock(ctx, BookingCheckoutLockKey(proposalID), func() error {
 		now := service.clock.Now().UTC()
 		if err := service.checkoutPolicy.Authorize(proposal, foundUser.ID(), now); err != nil {
@@ -105,7 +109,7 @@ func (service *Service) StartBookingCheckout(
 			}
 			if reuse {
 				intent.BookingTerms = proposal.BookingTerms
-				result = &BookingCheckoutResult{Intent: intent}
+				result = &CheckoutResult{Intent: intent}
 				return nil
 			}
 			if intent.Status == StatusExpired {
@@ -121,7 +125,7 @@ func (service *Service) StartBookingCheckout(
 		if createErr != nil {
 			return createErr
 		}
-		result = &BookingCheckoutResult{Intent: created, Created: true}
+		result = &CheckoutResult{Intent: created, Created: true}
 		return nil
 	})
 	if err != nil {
@@ -130,22 +134,73 @@ func (service *Service) StartBookingCheckout(
 	return result, nil
 }
 
+func (service *Service) StartServiceBalanceCheckout(
+	ctx context.Context,
+	authID string,
+	workOrderID int,
+) (*CheckoutResult, error) {
+	foundUser, err := service.userFinder.FindByAuthID(authID)
+	if err != nil {
+		return nil, ErrOnlyWorkOrderConsumerCanCheckout
+	}
+	order, err := service.workOrderFinder.FindByID(ctx, workOrderID)
+	if err != nil {
+		return nil, err
+	}
+	now := service.clock.Now().UTC()
+	if err := service.serviceBalancePolicy.Authorize(order, foundUser.ID(), now); err != nil {
+		return nil, err
+	}
+	intent, err := NewServiceBalanceIntent(service.idGenerator(), order, now)
+	if err != nil {
+		return nil, err
+	}
+	created, err := service.createCheckout(
+		ctx,
+		foundUser,
+		order.ProviderID(),
+		intent,
+		now,
+		now.Add(checkoutValidity),
+	)
+	if err != nil {
+		return nil, err
+	}
+	return &CheckoutResult{Intent: created, Created: true}, nil
+}
+
 func (service *Service) createBookingCheckout(
 	ctx context.Context,
 	foundUser user.User,
 	proposal *serviceproposal.ServiceProposal,
 	now time.Time,
 ) (*Intent, error) {
+	intent, err := NewBookingDepositIntent(service.idGenerator(), proposal.ID, proposal.BookingTerms, now)
+	if err != nil {
+		return nil, err
+	}
+	expiresOn := service.checkoutPolicy.Expiration(proposal.BookingTerms, now, checkoutValidity)
+	return service.createCheckout(ctx, foundUser, proposal.Provider.ID(), intent, now, expiresOn)
+}
+
+func (service *Service) createCheckout(
+	ctx context.Context,
+	foundUser user.User,
+	providerID int,
+	intent *Intent,
+	now time.Time,
+	expiresOn time.Time,
+) (*Intent, error) {
 	account, err := service.paymentAccountFinder.FindByProviderID(
 		ctx,
-		proposal.Provider.ID(),
+		providerID,
 		service.checkoutGateway.Provider(),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("finding provider payment account: %w", err)
 	}
 	if !account.CanReceivePayments() {
-		return nil, fmt.Errorf("starting booking checkout: provider payment account cannot receive payments")
+		return nil, fmt.Errorf("starting checkout: provider payment account cannot receive payments")
 	}
 	accessToken, err := service.credentialDecryptor.Decrypt(account.AccessTokenCiphertext())
 	if err != nil {
@@ -154,17 +209,12 @@ func (service *Service) createBookingCheckout(
 	if strings.TrimSpace(accessToken) == "" {
 		return nil, fmt.Errorf("decrypting provider payment credential: decrypted credential is empty")
 	}
-
-	intent, err := NewBookingDepositIntent(service.idGenerator(), proposal.ID, proposal.BookingTerms, now)
-	if err != nil {
-		return nil, err
-	}
 	if err := service.intentRepository.Save(ctx, intent); err != nil {
 		return nil, err
 	}
-	expiresOn := service.checkoutPolicy.Expiration(proposal.BookingTerms, now, bookingCheckoutValidity)
 	externalCheckout, err := service.checkoutGateway.CreateCheckout(ctx, accessToken, CheckoutRequest{
 		ExternalReference: intent.ID,
+		Purpose:           intent.Purpose,
 		Currency:          intent.Currency,
 		SellerAmountCents: intent.SellerAmountCents,
 		PlatformFeeCents:  intent.PlatformFeeCents,

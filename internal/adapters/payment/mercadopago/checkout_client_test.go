@@ -73,6 +73,7 @@ func TestCheckoutClientCreatesMarketplacePreferenceAndReturnsInitPoint(t *testin
 
 	checkout, err := client.CreateCheckout(context.Background(), "seller-access-token", payment.CheckoutRequest{
 		ExternalReference: "payment-intent-123",
+		Purpose:           payment.PurposeBookingDeposit,
 		Currency:          "ARS",
 		SellerAmountCents: 2000000,
 		PlatformFeeCents:  100000,
@@ -91,6 +92,7 @@ func TestCheckoutClientCreatesMarketplacePreferenceAndReturnsInitPoint(t *testin
 	assert.False(t, creator.request.BinaryMode)
 	require.Len(t, creator.request.Items, 1)
 	assert.Equal(t, "payment-intent-123", creator.request.Items[0].ID)
+	assert.Equal(t, "Service booking deposit", creator.request.Items[0].Title)
 	assert.Equal(t, "service", creator.request.Items[0].Type)
 	assert.Equal(t, "ARS", creator.request.Items[0].CurrencyID)
 	assert.Equal(t, float64(21000), creator.request.Items[0].UnitPrice)
@@ -109,6 +111,38 @@ func TestCheckoutClientCreatesMarketplacePreferenceAndReturnsInitPoint(t *testin
 	assert.Equal(t, startsOn, *creator.request.ExpirationDateFrom)
 	require.NotNil(t, creator.request.ExpirationDateTo)
 	assert.Equal(t, expiresOn, *creator.request.ExpirationDateTo)
+}
+
+func TestCheckoutClientDescribesServiceBalancePreference(t *testing.T) {
+	now := time.Date(2026, time.July, 6, 13, 0, 0, 0, time.UTC)
+	client, err := NewCheckoutClient(Config{
+		SuccessURL:      "https://app.loresuelvo.test/payments/success",
+		PendingURL:      "https://app.loresuelvo.test/payments/pending",
+		FailureURL:      "https://app.loresuelvo.test/payments/failure",
+		NotificationURL: "https://api.loresuelvo.test/webhooks/mercado-pago",
+	})
+	require.NoError(t, err)
+	creator := &preferenceCreatorStub{response: &preference.Response{
+		ID:        "preference-balance",
+		InitPoint: "https://www.mercadopago.com.ar/checkout/v1/redirect?pref_id=preference-balance",
+	}}
+	client.preferenceClientFactory = func(string) (preferenceCreator, error) { return creator, nil }
+
+	_, err = client.CreateCheckout(t.Context(), "seller-access-token", payment.CheckoutRequest{
+		ExternalReference: "balance-intent-123",
+		Purpose:           payment.PurposeServiceBalance,
+		Currency:          "ARS",
+		SellerAmountCents: 8000000,
+		PlatformFeeCents:  400000,
+		TotalAmountCents:  8400000,
+		PayerEmail:        "ana@example.com",
+		StartsOn:          now,
+		ExpiresOn:         now.Add(30 * time.Minute),
+	})
+
+	require.NoError(t, err)
+	require.Len(t, creator.request.Items, 1)
+	assert.Equal(t, "Service balance", creator.request.Items[0].Title)
 }
 
 func TestSDKAmountFromCentsPreservesCentPrecisionAtAdapterBoundary(t *testing.T) {

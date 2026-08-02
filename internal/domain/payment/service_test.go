@@ -67,6 +67,14 @@ func (finder proposalFinderStub) FindByID(_ context.Context, _ int) (*servicepro
 	return finder.proposal, nil
 }
 
+type workOrderFinderStub struct {
+	order *workorder.WorkOrder
+}
+
+func (finder workOrderFinderStub) FindByID(_ context.Context, _ int) (*workorder.WorkOrder, error) {
+	return finder.order, nil
+}
+
 type userFinderStub struct {
 	found user.User
 }
@@ -242,6 +250,96 @@ func (clock clockStub) Now() time.Time {
 	return clock.now
 }
 
+func TestStartServiceBalanceCheckoutCreatesReadyIntentWithFrozenRemainingPricing(t *testing.T) {
+	now := time.Date(2026, time.July, 6, 13, 0, 0, 0, time.UTC)
+	terms, err := serviceproposal.NewBookingPolicy().Calculate(10000000, now)
+	require.NoError(t, err)
+	proposalConsumer := &consumer.Consumer{BaseUser: user.RehydrateBaseUser(
+		10,
+		"auth0|consumer",
+		"ana@example.com",
+		"Ana",
+		"Pérez",
+		consumer.Role,
+		nil,
+	)}
+	proposalProvider := &provider.Provider{BaseUser: user.RehydrateBaseUser(
+		20,
+		"auth0|provider",
+		"juan@example.com",
+		"Juan",
+		"Gómez",
+		provider.Role,
+		nil,
+	)}
+	proposal := &serviceproposal.ServiceProposal{
+		ID:           42,
+		Consumer:     proposalConsumer,
+		Provider:     proposalProvider,
+		Status:       serviceproposal.StatusAccepted,
+		ScheduledOn:  now,
+		BookingTerms: terms,
+	}
+	order := &workorder.WorkOrder{
+		ID:              84,
+		ServiceProposal: proposal,
+		Status:          workorder.StatusScheduled,
+		AcceptedOn:      now.Add(-48 * time.Hour),
+	}
+	account, err := paymentaccount.NewPaymentAccount(
+		proposalProvider.ID(),
+		paymentaccount.PaymentProvider("mercado_pago"),
+		"mp-provider",
+		[]byte("encrypted-access-token"),
+		nil,
+		now.Add(24*time.Hour),
+	)
+	require.NoError(t, err)
+	intentRepository := &intentRepositoryStub{}
+	checkoutGateway := &checkoutGatewayStub{}
+	service := payment.NewService(
+		intentRepository,
+		&transactionRepositoryStub{},
+		proposalFinderStub{proposal: proposal},
+		workOrderFinderStub{order: order},
+		userFinderStub{found: proposalConsumer},
+		paymentAccountFinderStub{account: account},
+		lockManagerStub{},
+		&unitOfWorkStub{},
+		credentialDecryptorStub{},
+		checkoutGateway,
+		checkoutGateway,
+		nil,
+		func() string { return "83b4dd7d-6d1c-4e9e-b3e5-7be31b264540" },
+		clockStub{now: now},
+	)
+
+	result, err := service.StartServiceBalanceCheckout(t.Context(), "auth0|consumer", order.ID)
+
+	require.NoError(t, err)
+	assert.True(t, result.Created)
+	intent := result.Intent
+	require.NotNil(t, intent)
+	assert.Equal(t, payment.PurposeServiceBalance, intent.Purpose)
+	assert.Equal(t, payment.StatusCheckoutReady, intent.Status)
+	assert.Equal(t, proposal.ID, intent.ServiceProposalID)
+	assert.Equal(t, terms.Currency(), intent.Currency)
+	assert.Equal(t, terms.RemainingServiceBalanceCents(), intent.SellerAmountCents)
+	assert.Equal(t, terms.RemainingPlatformFeeCents(), intent.PlatformFeeCents)
+	assert.Equal(t, terms.RemainingAmountDueCents(), intent.TotalAmountCents)
+	assert.Same(t, intent, intentRepository.checkoutReadySaved)
+	assert.Equal(t, payment.PurposeServiceBalance, checkoutGateway.request.Purpose)
+	assert.Equal(t, terms.RemainingServiceBalanceCents(), checkoutGateway.request.SellerAmountCents)
+	assert.Equal(t, terms.RemainingPlatformFeeCents(), checkoutGateway.request.PlatformFeeCents)
+	assert.Equal(t, terms.RemainingAmountDueCents(), checkoutGateway.request.TotalAmountCents)
+	assert.Equal(t, proposalConsumer.Email(), checkoutGateway.request.PayerEmail)
+	assert.Equal(t, now, checkoutGateway.request.StartsOn)
+	assert.Equal(t, now.Add(30*time.Minute), checkoutGateway.request.ExpiresOn)
+	require.NotNil(t, intent.CheckoutSession)
+	assert.Equal(t, checkoutGateway.request.ExpiresOn, intent.CheckoutSession.ExpiresOn)
+	assert.Equal(t, workorder.StatusScheduled, order.Status)
+}
+
 func TestStartBookingCheckoutCreatesReadyIntentWithFrozenProposalPricing(t *testing.T) {
 	now := time.Date(2026, time.July, 4, 13, 0, 0, 0, time.UTC)
 	scheduledOn := now.Add(48 * time.Hour)
@@ -287,6 +385,7 @@ func TestStartBookingCheckoutCreatesReadyIntentWithFrozenProposalPricing(t *test
 		intentRepository,
 		&transactionRepositoryStub{},
 		proposalFinderStub{proposal: proposal},
+		nil,
 		userFinderStub{found: proposalConsumer},
 		paymentAccountFinderStub{account: account},
 		lockManagerStub{},
@@ -402,6 +501,7 @@ func TestStartBookingCheckoutEnforcesBookingPaymentDeadline(t *testing.T) {
 				intentRepository,
 				&transactionRepositoryStub{},
 				proposalFinderStub{proposal: proposal},
+				nil,
 				userFinderStub{found: proposalConsumer},
 				paymentAccountFinderStub{account: account},
 				lockManagerStub{},
@@ -494,6 +594,7 @@ func TestProcessApprovedPaymentConfirmsPaidBooking(t *testing.T) {
 		intentRepository,
 		transactionRepository,
 		proposalFinderStub{proposal: proposal},
+		nil,
 		userFinderStub{},
 		paymentAccountFinderStub{account: account},
 		lockManagerStub{},
@@ -595,6 +696,7 @@ func TestProcessProcessingPaymentOnlyUpdatesIntent(t *testing.T) {
 		intentRepository,
 		&transactionRepositoryStub{},
 		proposalFinderStub{proposal: proposal},
+		nil,
 		userFinderStub{},
 		paymentAccountFinderStub{account: account},
 		lockManagerStub{},
@@ -681,6 +783,7 @@ func TestProcessRejectedPaymentOnlyUpdatesIntent(t *testing.T) {
 		intentRepository,
 		&transactionRepositoryStub{},
 		proposalFinderStub{proposal: proposal},
+		nil,
 		userFinderStub{},
 		paymentAccountFinderStub{account: account},
 		lockManagerStub{},

@@ -34,6 +34,21 @@ type paymentIntentResponse struct {
 	Status string `json:"status"`
 }
 
+type serviceBalanceCheckoutResponse struct {
+	PaymentIntentID string                        `json:"payment_intent_id"`
+	Status          string                        `json:"status"`
+	CheckoutURL     string                        `json:"checkout_url"`
+	ExpiresOn       time.Time                     `json:"expires_on"`
+	Pricing         serviceBalancePricingResponse `json:"pricing"`
+}
+
+type serviceBalancePricingResponse struct {
+	Currency                     string `json:"currency"`
+	RemainingServiceBalanceCents int64  `json:"remaining_service_balance_cents"`
+	RemainingPlatformFeeCents    int64  `json:"remaining_platform_fee_cents"`
+	AmountDueNowCents            int64  `json:"amount_due_now_cents"`
+}
+
 func paymentIntentResponseFromDomain(intent *payment.Intent) paymentIntentResponse {
 	return paymentIntentResponse{
 		ID:     intent.ID,
@@ -48,6 +63,21 @@ func checkoutSessionResponseFromDomain(intent *payment.Intent) checkoutSessionRe
 		CheckoutURL:     intent.CheckoutSession.URL,
 		ExpiresOn:       intent.CheckoutSession.ExpiresOn,
 		Pricing:         bookingTermsResponseFromDomain(intent.BookingTerms),
+	}
+}
+
+func serviceBalanceCheckoutResponseFromDomain(intent *payment.Intent) serviceBalanceCheckoutResponse {
+	return serviceBalanceCheckoutResponse{
+		PaymentIntentID: intent.ID,
+		Status:          string(intent.Status),
+		CheckoutURL:     intent.CheckoutSession.URL,
+		ExpiresOn:       intent.CheckoutSession.ExpiresOn,
+		Pricing: serviceBalancePricingResponse{
+			Currency:                     intent.Currency,
+			RemainingServiceBalanceCents: intent.SellerAmountCents,
+			RemainingPlatformFeeCents:    intent.PlatformFeeCents,
+			AmountDueNowCents:            intent.TotalAmountCents,
+		},
 	}
 }
 

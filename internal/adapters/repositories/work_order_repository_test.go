@@ -49,6 +49,14 @@ func TestWorkOrderRepositoryFindsOnlyOrdersScheduledInsideWindow(t *testing.T) {
 	require.True(t, ok)
 	assertBookingTermsEqual(t, bookingTermsForAmount(t, 1500050, from.Add(time.Hour)), proposal.BookingTerms)
 	assert.Equal(t, from.Add(time.Hour), orders[0].ScheduledOn().UTC())
+
+	foundByID, err := testContext.workOrderRepository.FindByID(t.Context(), insideOrder.ID)
+	require.NoError(t, err)
+	assert.Equal(t, insideOrder.ID, foundByID.ID)
+	assert.Equal(t, insideOrder.ServiceProposalID(), foundByID.ServiceProposalID())
+	assert.Equal(t, consumerID, foundByID.ConsumerID())
+	assert.Equal(t, providerID, foundByID.ProviderID())
+	assert.Equal(t, insideOrder.RemainingAmountDue(), foundByID.RemainingAmountDue())
 }
 
 func saveScheduledWorkOrderAt(

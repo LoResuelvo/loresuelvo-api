@@ -25,6 +25,10 @@ type ServiceProposalFinder interface {
 	FindByID(ctx context.Context, id int) (*serviceproposal.ServiceProposal, error)
 }
 
+type WorkOrderFinder interface {
+	FindByID(ctx context.Context, id int) (*workorder.WorkOrder, error)
+}
+
 type UserFinder interface {
 	FindByAuthID(authID string) (user.User, error)
 }
@@ -84,6 +88,7 @@ type Gateway interface {
 
 type CheckoutRequest struct {
 	ExternalReference string
+	Purpose           Purpose
 	Currency          string
 	SellerAmountCents int64
 	PlatformFeeCents  int64

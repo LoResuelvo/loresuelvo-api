@@ -12,6 +12,10 @@ const StatusScheduled Status = "scheduled"
 type ServiceProposal interface {
 	ServiceProposalID() int
 	ServiceProposalAmount() int64
+	ServiceProposalCurrency() string
+	ServiceProposalRemainingServiceBalance() int64
+	ServiceProposalRemainingPlatformFee() int64
+	ServiceProposalRemainingAmountDue() int64
 	ServiceProposalScheduledOn() time.Time
 	ServiceProposalDescription() string
 	ConsumerID() int
@@ -43,6 +47,22 @@ func (wo *WorkOrder) ServiceProposalID() int {
 
 func (wo *WorkOrder) Amount() int64 {
 	return wo.ServiceProposal.ServiceProposalAmount()
+}
+
+func (wo *WorkOrder) Currency() string {
+	return wo.ServiceProposal.ServiceProposalCurrency()
+}
+
+func (wo *WorkOrder) RemainingServiceBalance() int64 {
+	return wo.ServiceProposal.ServiceProposalRemainingServiceBalance()
+}
+
+func (wo *WorkOrder) RemainingPlatformFee() int64 {
+	return wo.ServiceProposal.ServiceProposalRemainingPlatformFee()
+}
+
+func (wo *WorkOrder) RemainingAmountDue() int64 {
+	return wo.ServiceProposal.ServiceProposalRemainingAmountDue()
 }
 
 func (wo *WorkOrder) ScheduledOn() time.Time {

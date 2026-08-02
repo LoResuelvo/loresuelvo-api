@@ -192,6 +192,7 @@ func NewDependenciesWithPaymentAccountAdapters(
 		persistence.PaymentIntentRepository,
 		persistence.PaymentTransactionRepository,
 		persistence.ServiceProposalRepository,
+		persistence.WorkOrderRepository,
 		persistence.UserRepository,
 		persistence.PaymentAccountRepository,
 		locking.NewPostgresAdvisoryLock(database),

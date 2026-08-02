@@ -4,11 +4,45 @@ import (
 	"testing"
 	"time"
 
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/consumer"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/payment"
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/provider"
 	serviceproposal "github.com/LoResuelvo/loresuelvo-api/internal/domain/service_proposal"
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/user"
+	workorder "github.com/LoResuelvo/loresuelvo-api/internal/domain/work_order"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestServiceBalanceIntentUsesWorkOrderRemainingAmounts(t *testing.T) {
+	createdOn := time.Date(2026, time.July, 6, 13, 0, 0, 0, time.UTC)
+	terms, err := serviceproposal.NewBookingPolicy().Calculate(10000000, createdOn)
+	require.NoError(t, err)
+	proposal := &serviceproposal.ServiceProposal{
+		ID:           42,
+		Consumer:     &consumer.Consumer{BaseUser: user.RehydrateBaseUser(10, "", "", "", "", consumer.Role, nil)},
+		Provider:     &provider.Provider{BaseUser: user.RehydrateBaseUser(20, "", "", "", "", provider.Role, nil)},
+		BookingTerms: terms,
+	}
+	order := &workorder.WorkOrder{ID: 84, ServiceProposal: proposal, Status: workorder.StatusScheduled}
+
+	intent, err := payment.NewServiceBalanceIntent(
+		"83b4dd7d-6d1c-4e9e-b3e5-7be31b264540",
+		order,
+		createdOn,
+	)
+
+	require.NoError(t, err)
+	assert.Equal(t, payment.PurposeServiceBalance, intent.Purpose)
+	assert.Equal(t, proposal.ID, intent.ServiceProposalID)
+	assert.Equal(t, terms.Currency(), intent.Currency)
+	assert.Equal(t, terms.RemainingServiceBalanceCents(), intent.SellerAmountCents)
+	assert.Equal(t, terms.RemainingPlatformFeeCents(), intent.PlatformFeeCents)
+	assert.Equal(t, terms.RemainingAmountDueCents(), intent.TotalAmountCents)
+	assert.Equal(t, payment.StatusRequiresCheckout, intent.Status)
+	assert.Equal(t, createdOn, intent.CreatedOn)
+	assert.Equal(t, createdOn, intent.UpdatedOn)
+}
 
 func TestBookingDepositIntentBecomesCheckoutReady(t *testing.T) {
 	createdOn := time.Date(2026, time.July, 4, 13, 0, 0, 0, time.UTC)

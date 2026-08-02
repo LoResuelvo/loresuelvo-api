@@ -102,6 +102,22 @@ func (sp *ServiceProposal) ServiceProposalAmount() int64 {
 	return sp.BookingTerms.ServiceTotalCents()
 }
 
+func (sp *ServiceProposal) ServiceProposalCurrency() string {
+	return sp.BookingTerms.Currency()
+}
+
+func (sp *ServiceProposal) ServiceProposalRemainingServiceBalance() int64 {
+	return sp.BookingTerms.RemainingServiceBalanceCents()
+}
+
+func (sp *ServiceProposal) ServiceProposalRemainingPlatformFee() int64 {
+	return sp.BookingTerms.RemainingPlatformFeeCents()
+}
+
+func (sp *ServiceProposal) ServiceProposalRemainingAmountDue() int64 {
+	return sp.BookingTerms.RemainingAmountDueCents()
+}
+
 func (sp *ServiceProposal) ServiceProposalScheduledOn() time.Time {
 	return sp.ScheduledOn
 }

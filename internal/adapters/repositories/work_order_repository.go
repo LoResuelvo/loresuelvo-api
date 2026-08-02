@@ -50,6 +50,18 @@ func (r *WorkOrderRepository) Save(ctx context.Context, order *workorder.WorkOrd
 }
 
 func (r *WorkOrderRepository) FindByServiceProposalID(ctx context.Context, serviceProposalID int) (*workorder.WorkOrder, error) {
+	return r.findOne(ctx, `WHERE wo.service_proposal_id = $1`, serviceProposalID)
+}
+
+func (r *WorkOrderRepository) FindByID(ctx context.Context, id int) (*workorder.WorkOrder, error) {
+	return r.findOne(ctx, `WHERE wo.id = $1`, id)
+}
+
+func (r *WorkOrderRepository) findOne(
+	ctx context.Context,
+	clause string,
+	argument int,
+) (*workorder.WorkOrder, error) {
 	var (
 		order    workorder.WorkOrder
 		proposal serviceproposal.ServiceProposal
@@ -58,8 +70,8 @@ func (r *WorkOrderRepository) FindByServiceProposalID(ctx context.Context, servi
 		ctx,
 		`SELECT wo.id, wo.service_proposal_id, wo.status, wo.accepted_on
 		FROM work_orders wo
-		WHERE wo.service_proposal_id = $1`,
-		serviceProposalID,
+		`+clause,
+		argument,
 	).Scan(
 		&order.ID,
 		&proposal.ID,
@@ -70,7 +82,7 @@ func (r *WorkOrderRepository) FindByServiceProposalID(ctx context.Context, servi
 		return nil, workorder.ErrDoesNotExist
 	}
 	if err != nil {
-		return nil, fmt.Errorf("finding work order by service proposal id: %w", err)
+		return nil, fmt.Errorf("finding work order: %w", err)
 	}
 	foundProposal, err := r.serviceProposalRepository.FindByID(ctx, proposal.ID)
 	if err != nil {

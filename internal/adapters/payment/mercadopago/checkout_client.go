@@ -76,6 +76,7 @@ func (client *CheckoutClient) CreateCheckout(
 ) (payment.ExternalCheckout, error) {
 	if strings.TrimSpace(accessToken) == "" ||
 		strings.TrimSpace(checkoutRequest.ExternalReference) == "" ||
+		!validCheckoutPurpose(checkoutRequest.Purpose) ||
 		checkoutRequest.Currency != "ARS" ||
 		checkoutRequest.SellerAmountCents <= 0 ||
 		checkoutRequest.PlatformFeeCents < 0 ||
@@ -89,7 +90,7 @@ func (client *CheckoutClient) CreateCheckout(
 	request := preference.Request{
 		Items: []preference.ItemRequest{{
 			ID:         checkoutRequest.ExternalReference,
-			Title:      "Service booking deposit",
+			Title:      checkoutTitle(checkoutRequest.Purpose),
 			Type:       "service",
 			CurrencyID: checkoutRequest.Currency,
 			Quantity:   1,
@@ -129,6 +130,17 @@ func (client *CheckoutClient) CreateCheckout(
 		ID:  preferenceResponse.ID,
 		URL: preferenceResponse.InitPoint,
 	}, nil
+}
+
+func validCheckoutPurpose(purpose payment.Purpose) bool {
+	return purpose == payment.PurposeBookingDeposit || purpose == payment.PurposeServiceBalance
+}
+
+func checkoutTitle(purpose payment.Purpose) string {
+	if purpose == payment.PurposeServiceBalance {
+		return "Service balance"
+	}
+	return "Service booking deposit"
 }
 
 func (client *CheckoutClient) GetPayment(

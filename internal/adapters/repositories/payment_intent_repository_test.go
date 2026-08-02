@@ -124,6 +124,51 @@ func TestPaymentIntentRepositoryPersistsCheckoutReadyProcessingAndRejectedStatus
 	assert.Equal(t, payment.StatusRejected, storedStatus)
 }
 
+func TestPaymentIntentRepositoryPersistsServiceBalancePurposeAndAmounts(t *testing.T) {
+	testContext := newServiceProposalRepositoryTest(t)
+	consumerID := savedConsumerIDWithData(t, jobRequestRepositoryTestContext{
+		userRepository: testContext.userRepository,
+	}, "auth0|balance-consumer", "balance.consumer@example.com", "Ana", "Perez")
+	providerID := savedProviderIDWithData(t, jobRequestRepositoryTestContext{
+		database:           testContext.database,
+		userRepository:     testContext.userRepository,
+		categoryRepository: testContext.categoryRepository,
+	}, "auth0|balance-provider", "balance.provider@example.com", "Juan", "Gomez", "Plomeria")
+	activeConversation, err := conversation.NewPendingConversation(consumerID, providerID)
+	require.NoError(t, err)
+	require.NoError(t, activeConversation.Activate())
+	activeConversation, err = testContext.conversationRepository.SaveConversation(t.Context(), activeConversation)
+	require.NoError(t, err)
+	now := time.Now().UTC().Truncate(time.Microsecond)
+	order := saveScheduledWorkOrderAt(
+		t,
+		testContext,
+		activeConversation,
+		consumerID,
+		providerID,
+		now.Add(48*time.Hour),
+	)
+	intent, err := payment.NewServiceBalanceIntent(
+		"83b4dd7d-6d1c-4e9e-b3e5-7be31b264540",
+		order,
+		now,
+	)
+	require.NoError(t, err)
+	repository := repositories.NewPaymentIntentRepository(testContext.database)
+	require.NoError(t, repository.Save(t.Context(), intent))
+
+	found, err := repository.FindByID(t.Context(), intent.ID)
+
+	require.NoError(t, err)
+	assert.Equal(t, payment.PurposeServiceBalance, found.Purpose)
+	assert.Equal(t, order.ServiceProposalID(), found.ServiceProposalID)
+	assert.Equal(t, order.Currency(), found.Currency)
+	assert.Equal(t, order.RemainingServiceBalance(), found.SellerAmountCents)
+	assert.Equal(t, order.RemainingPlatformFee(), found.PlatformFeeCents)
+	assert.Equal(t, order.RemainingAmountDue(), found.TotalAmountCents)
+	assert.Equal(t, payment.StatusRequiresCheckout, found.Status)
+}
+
 func TestPaymentUnitOfWorkAtomicallyPersistsApprovedBooking(t *testing.T) {
 	testContext := newServiceProposalRepositoryTest(t)
 	consumerID := savedConsumerIDWithData(t, jobRequestRepositoryTestContext{

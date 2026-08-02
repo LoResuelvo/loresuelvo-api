@@ -12,6 +12,7 @@ import (
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/payment"
 	paymentaccount "github.com/LoResuelvo/loresuelvo-api/internal/domain/payment_account"
 	serviceproposal "github.com/LoResuelvo/loresuelvo-api/internal/domain/service_proposal"
+	workorder "github.com/LoResuelvo/loresuelvo-api/internal/domain/work_order"
 	"github.com/gin-gonic/gin"
 )
 
@@ -54,6 +55,34 @@ func (handler *PaymentHandler) StartBookingCheckout(context *gin.Context) {
 		status = http.StatusCreated
 	}
 	context.JSON(status, checkoutSessionResponseFromDomain(intent))
+}
+
+func (handler *PaymentHandler) StartServiceBalanceCheckout(context *gin.Context) {
+	authID, ok := httphandler.GetAuthenticatedUserID(context)
+	if !ok {
+		return
+	}
+	workOrderID, err := httphandler.PositiveIDFromString(
+		context.Param("workOrderID"),
+		"work order id",
+	)
+	if err != nil {
+		httphandler.RespondError(context, http.StatusBadRequest, err.Error())
+		return
+	}
+	result, err := handler.service.StartServiceBalanceCheckout(
+		context.Request.Context(),
+		authID,
+		workOrderID,
+	)
+	if err != nil {
+		handleStartServiceBalanceCheckoutError(context, err)
+		return
+	}
+
+	intent := result.Intent
+	context.Header("Location", fmt.Sprintf("/payment-intents/%s", intent.ID))
+	context.JSON(http.StatusCreated, serviceBalanceCheckoutResponseFromDomain(intent))
 }
 
 func (handler *PaymentHandler) GetIntent(context *gin.Context) {
@@ -156,5 +185,20 @@ func handleStartBookingCheckoutError(context *gin.Context, err error) {
 		httphandler.RespondError(context, http.StatusConflict, err.Error())
 	default:
 		httphandler.RespondError(context, http.StatusInternalServerError, "Could not start booking checkout")
+	}
+}
+
+func handleStartServiceBalanceCheckoutError(context *gin.Context, err error) {
+	switch {
+	case errors.Is(err, workorder.ErrDoesNotExist):
+		httphandler.RespondError(context, http.StatusNotFound, err.Error())
+	case errors.Is(err, payment.ErrOnlyWorkOrderConsumerCanCheckout):
+		httphandler.RespondError(context, http.StatusForbidden, err.Error())
+	case errors.Is(err, payment.ErrWorkOrderNotScheduled),
+		errors.Is(err, payment.ErrServiceBalancePaymentNotAvailable),
+		errors.Is(err, paymentaccount.ErrConnectionNotFound):
+		httphandler.RespondError(context, http.StatusConflict, err.Error())
+	default:
+		httphandler.RespondError(context, http.StatusInternalServerError, "Could not start service balance checkout")
 	}
 }
