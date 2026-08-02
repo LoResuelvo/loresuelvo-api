@@ -358,6 +358,14 @@ func TestStartServiceBalanceCheckoutCreatesReadyIntentWithFrozenRemainingPricing
 	require.NotNil(t, intent.CheckoutSession)
 	assert.Equal(t, checkoutGateway.request.ExpiresOn, intent.CheckoutSession.ExpiresOn)
 	assert.Equal(t, workorder.StatusScheduled, order.Status)
+
+	intentRepository.found = intent
+	reusedResult, err := service.StartServiceBalanceCheckout(t.Context(), "auth0|consumer", order.ID)
+	require.NoError(t, err)
+	assert.False(t, reusedResult.Created)
+	assert.Equal(t, intent.ID, reusedResult.Intent.ID)
+	assert.Equal(t, intent.CheckoutSession.URL, reusedResult.Intent.CheckoutSession.URL)
+	assert.Equal(t, 1, checkoutGateway.createCalls)
 }
 
 func TestStartBookingCheckoutCreatesReadyIntentWithFrozenProposalPricing(t *testing.T) {

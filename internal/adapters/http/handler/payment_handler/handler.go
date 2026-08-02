@@ -82,7 +82,11 @@ func (handler *PaymentHandler) StartServiceBalanceCheckout(context *gin.Context)
 
 	intent := result.Intent
 	context.Header("Location", fmt.Sprintf("/payment-intents/%s", intent.ID))
-	context.JSON(http.StatusCreated, serviceBalanceCheckoutResponseFromDomain(intent))
+	status := http.StatusOK
+	if result.Created {
+		status = http.StatusCreated
+	}
+	context.JSON(status, serviceBalanceCheckoutResponseFromDomain(intent))
 }
 
 func (handler *PaymentHandler) GetIntent(context *gin.Context) {

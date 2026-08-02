@@ -7,14 +7,22 @@ import (
 )
 
 const (
-	bookingCheckoutLockNamespace = 2118
-	externalPaymentLockNamespace = 2120
+	bookingCheckoutLockNamespace        = 2118
+	serviceBalanceCheckoutLockNamespace = 2119
+	externalPaymentLockNamespace        = 2120
 )
 
 func BookingCheckoutLockKey(serviceProposalID int) LockKey {
 	return LockKey{
 		Namespace: bookingCheckoutLockNamespace,
 		Resource:  fmt.Sprintf("%d", serviceProposalID),
+	}
+}
+
+func ServiceBalanceCheckoutLockKey(workOrderID int) LockKey {
+	return LockKey{
+		Namespace: serviceBalanceCheckoutLockNamespace,
+		Resource:  fmt.Sprintf("%d", workOrderID),
 	}
 }
 

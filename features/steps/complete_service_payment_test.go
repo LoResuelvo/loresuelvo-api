@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"sync"
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/payment"
 	workorder "github.com/LoResuelvo/loresuelvo-api/internal/domain/work_order"
@@ -26,6 +27,7 @@ func registerCompleteServicePaymentSteps(sc *godog.ScenarioContext, suite *testS
 	sc.Step(`^solicito nuevamente completar el pago de la orden de trabajo$`, suite.requestServiceBalanceCheckoutAgain)
 	sc.Step(`^intento completar el pago de la orden de trabajo$`, suite.requestServiceBalanceCheckout)
 	sc.Step(`^intento consultar el código de confirmación de la orden de trabajo$`, suite.tryToGetWorkOrderConfirmationCode)
+	sc.Step(`^solicito concurrentemente dos veces completar el pago de la orden de trabajo$`, suite.requestServiceBalanceCheckoutConcurrentlyTwice)
 	sc.Step(`^el sistema procesa una notificación válida de Mercado Pago y verifica un pago aprobado por "([^"]*)" pesos argentinos para ese saldo$`, suite.processApprovedServiceBalancePayment)
 	sc.Step(`^el sistema procesa una notificación válida de Mercado Pago y verifica un pago (en proceso|rechazado) para ese saldo$`, suite.processNonApprovedServiceBalancePayment)
 	sc.Step(`^el sistema entrega una URL para completar el checkout del saldo$`, suite.systemReturnsServiceBalanceCheckoutURL)
@@ -46,6 +48,8 @@ func registerCompleteServicePaymentSteps(sc *godog.ScenarioContext, suite *testS
 	sc.Step(`^el sistema no registra un nuevo intento de pago del saldo$`, suite.systemDoesNotRegisterNewServiceBalanceIntent)
 	sc.Step(`^el sistema no registra una nueva sesión de checkout del saldo$`, suite.systemDoesNotRegisterNewServiceBalanceCheckoutSession)
 	sc.Step(`^el consumidor conserva el código de confirmación de la orden de trabajo$`, suite.consumerKeepsWorkOrderConfirmationCode)
+	sc.Step(`^el sistema conserva un único intento de pago activo para el saldo$`, suite.systemKeepsOneActiveServiceBalanceIntent)
+	sc.Step(`^el sistema conserva una única sesión de checkout activa para el saldo$`, suite.systemKeepsOneActiveServiceBalanceCheckoutSession)
 	sc.Step(`^el servicio todavía no queda confirmado como realizado$`, suite.serviceIsNotYetConfirmedAsPerformed)
 }
 
@@ -94,28 +98,77 @@ func (suite *testSuite) requestServiceBalanceCheckout() error {
 	if err != nil {
 		return err
 	}
+	response, err := suite.performServiceBalanceCheckoutRequest(order.ID)
+	if err != nil {
+		return err
+	}
+	suite.lastStatus = response.Status
+	suite.lastBody = response.Body
+	return nil
+}
+
+func (suite *testSuite) performServiceBalanceCheckoutRequest(workOrderID int) (checkoutHTTPResponse, error) {
 	request, err := http.NewRequest(
 		http.MethodPost,
-		suite.server.URL+fmt.Sprintf(serviceBalanceCheckoutPath, order.ID),
+		suite.server.URL+fmt.Sprintf(serviceBalanceCheckoutPath, workOrderID),
 		nil,
 	)
 	if err != nil {
-		return err
+		return checkoutHTTPResponse{}, err
 	}
 	if suite.currentAuth0ID != "" {
 		request.Header.Set("Authorization", "Bearer "+suite.tokenBuilder.BuildToken(suite.currentAuth0ID, nil))
 	}
 	response, err := http.DefaultClient.Do(request)
 	if err != nil {
-		return fmt.Errorf("API connection failed: %w", err)
+		return checkoutHTTPResponse{}, fmt.Errorf("API connection failed: %w", err)
 	}
 	defer response.Body.Close()
 	responseBody, err := io.ReadAll(response.Body)
 	if err != nil {
-		return fmt.Errorf("reading service balance checkout response: %w", err)
+		return checkoutHTTPResponse{}, fmt.Errorf("reading service balance checkout response: %w", err)
 	}
-	suite.lastStatus = response.StatusCode
-	suite.lastBody = responseBody
+	result := checkoutHTTPResponse{Status: response.StatusCode, Body: responseBody}
+	if response.StatusCode == http.StatusCreated || response.StatusCode == http.StatusOK {
+		result.Value, err = checkoutSessionResponseFromBody(responseBody)
+		if err != nil {
+			return checkoutHTTPResponse{}, err
+		}
+	}
+	return result, nil
+}
+
+func (suite *testSuite) requestServiceBalanceCheckoutConcurrentlyTwice() error {
+	order, err := suite.persistedWorkOrderForLastServiceProposal()
+	if err != nil {
+		return err
+	}
+	results := make([]checkoutHTTPResponse, 2)
+	errorsByRequest := make([]error, 2)
+	var waitGroup sync.WaitGroup
+	waitGroup.Add(len(results))
+	for index := range results {
+		go func(index int) {
+			defer waitGroup.Done()
+			results[index], errorsByRequest[index] = suite.performServiceBalanceCheckoutRequest(order.ID)
+		}(index)
+	}
+	waitGroup.Wait()
+	for index, requestErr := range errorsByRequest {
+		if requestErr != nil {
+			return fmt.Errorf("service balance checkout request %d failed: %w", index+1, requestErr)
+		}
+		if results[index].Status != http.StatusCreated && results[index].Status != http.StatusOK {
+			return fmt.Errorf(
+				"service balance checkout request %d returned status %d with body %s",
+				index+1,
+				results[index].Status,
+				results[index].Body,
+			)
+		}
+	}
+	suite.concurrentCheckoutResponses = results
+	suite.rememberCheckoutResponse(results[0].Value)
 	return nil
 }
 
@@ -432,6 +485,44 @@ func (suite *testSuite) consumerKeepsWorkOrderConfirmationCode() error {
 	}
 	if suite.lastConfirmationCode != suite.previousConfirmationCode {
 		return fmt.Errorf("expected consumer confirmation code to remain unchanged")
+	}
+	return nil
+}
+
+func (suite *testSuite) systemKeepsOneActiveServiceBalanceIntent() error {
+	intent, err := suite.paymentIntentRepository.FindLatestByProposalIDAndPurpose(
+		context.Background(),
+		suite.lastServiceProposalID,
+		payment.PurposeServiceBalance,
+	)
+	if err != nil {
+		return err
+	}
+	if intent.Status != payment.StatusCheckoutReady && intent.Status != payment.StatusProcessing {
+		return fmt.Errorf("expected an active service balance intent, got %q", intent.Status)
+	}
+	if len(suite.concurrentCheckoutResponses) != 2 ||
+		intent.ID != suite.concurrentCheckoutResponses[0].Value.PaymentIntentID ||
+		intent.ID != suite.concurrentCheckoutResponses[1].Value.PaymentIntentID {
+		return fmt.Errorf("expected both concurrent responses to reference the persisted service balance intent")
+	}
+	return nil
+}
+
+func (suite *testSuite) systemKeepsOneActiveServiceBalanceCheckoutSession() error {
+	intent, err := suite.paymentIntentRepository.FindLatestByProposalIDAndPurpose(
+		context.Background(),
+		suite.lastServiceProposalID,
+		payment.PurposeServiceBalance,
+	)
+	if err != nil {
+		return err
+	}
+	if intent.CheckoutSession == nil || !intent.CheckoutSession.ExpiresOn.After(suite.clock.Now()) {
+		return fmt.Errorf("expected one active service balance checkout session")
+	}
+	if suite.checkoutClient.RequestCount() != 1 {
+		return fmt.Errorf("expected exactly one external checkout request, got %d", suite.checkoutClient.RequestCount())
 	}
 	return nil
 }

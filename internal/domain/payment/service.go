@@ -154,22 +154,62 @@ func (service *Service) StartServiceBalanceCheckout(
 	if err := service.serviceBalancePolicy.Authorize(order, foundUser.ID(), now); err != nil {
 		return nil, err
 	}
-	intent, err := NewServiceBalanceIntent(service.idGenerator(), order, now)
+
+	var result *CheckoutResult
+	err = service.lockManager.WithinLock(ctx, ServiceBalanceCheckoutLockKey(workOrderID), func() error {
+		lockedOrder, findOrderErr := service.workOrderFinder.FindByID(ctx, workOrderID)
+		if findOrderErr != nil {
+			return findOrderErr
+		}
+		now = service.clock.Now().UTC()
+		if authorizeErr := service.serviceBalancePolicy.Authorize(lockedOrder, foundUser.ID(), now); authorizeErr != nil {
+			return authorizeErr
+		}
+		intent, findIntentErr := service.intentRepository.FindLatestByProposalIDAndPurpose(
+			ctx,
+			lockedOrder.ServiceProposalID(),
+			PurposeServiceBalance,
+		)
+		if findIntentErr == nil {
+			reuse, prepareErr := intent.PrepareCheckout(now)
+			if prepareErr != nil {
+				return prepareErr
+			}
+			if reuse {
+				result = &CheckoutResult{Intent: intent}
+				return nil
+			}
+			if intent.Status == StatusExpired {
+				if saveErr := service.intentRepository.Save(ctx, intent); saveErr != nil {
+					return saveErr
+				}
+			}
+		} else if !errors.Is(findIntentErr, ErrIntentDoesNotExist) {
+			return findIntentErr
+		}
+
+		intent, createIntentErr := NewServiceBalanceIntent(service.idGenerator(), lockedOrder, now)
+		if createIntentErr != nil {
+			return createIntentErr
+		}
+		created, createCheckoutErr := service.createCheckout(
+			ctx,
+			foundUser,
+			lockedOrder.ProviderID(),
+			intent,
+			now,
+			now.Add(checkoutValidity),
+		)
+		if createCheckoutErr != nil {
+			return createCheckoutErr
+		}
+		result = &CheckoutResult{Intent: created, Created: true}
+		return nil
+	})
 	if err != nil {
 		return nil, err
 	}
-	created, err := service.createCheckout(
-		ctx,
-		foundUser,
-		order.ProviderID(),
-		intent,
-		now,
-		now.Add(checkoutValidity),
-	)
-	if err != nil {
-		return nil, err
-	}
-	return &CheckoutResult{Intent: created, Created: true}, nil
+	return result, nil
 }
 
 func (service *Service) createBookingCheckout(
