@@ -21,14 +21,18 @@ const (
 func registerCompleteServicePaymentSteps(sc *godog.ScenarioContext, suite *testSuite) {
 	sc.Step(`^que "([^"]*)" inició el checkout del saldo de la orden de trabajo$`, suite.consumerStartedServiceBalanceCheckout)
 	sc.Step(`^que la orden de trabajo tiene un intento de pago del saldo rechazado$`, suite.workOrderHasRejectedServiceBalanceIntent)
+	sc.Step(`^que el pago aprobado del saldo habilitó el código de confirmación de la orden de trabajo$`, suite.approvedServiceBalancePaymentEnabledConfirmationCode)
 	sc.Step(`^solicito completar el pago de la orden de trabajo$`, suite.requestServiceBalanceCheckout)
 	sc.Step(`^solicito nuevamente completar el pago de la orden de trabajo$`, suite.requestServiceBalanceCheckoutAgain)
 	sc.Step(`^intento completar el pago de la orden de trabajo$`, suite.requestServiceBalanceCheckout)
+	sc.Step(`^intento consultar el código de confirmación de la orden de trabajo$`, suite.tryToGetWorkOrderConfirmationCode)
 	sc.Step(`^el sistema procesa una notificación válida de Mercado Pago y verifica un pago aprobado por "([^"]*)" pesos argentinos para ese saldo$`, suite.processApprovedServiceBalancePayment)
 	sc.Step(`^el sistema procesa una notificación válida de Mercado Pago y verifica un pago (en proceso|rechazado) para ese saldo$`, suite.processNonApprovedServiceBalancePayment)
 	sc.Step(`^el sistema entrega una URL para completar el checkout del saldo$`, suite.systemReturnsServiceBalanceCheckoutURL)
 	sc.Step(`^el sistema entrega una URL para completar un nuevo checkout del saldo$`, suite.systemReturnsNewServiceBalanceCheckoutURL)
 	sc.Step(`^el sistema deniega el pago del saldo$`, suite.systemDeniesServiceBalancePayment)
+	sc.Step(`^el sistema deniega la consulta del código de confirmación$`, suite.systemDeniesConfirmationCodeQuery)
+	sc.Step(`^el sistema rechaza el pago porque todavía no llegó la fecha y hora programadas$`, suite.systemRejectsServiceBalancePaymentBeforeScheduledTime)
 	sc.Step(`^la respuesta identifica el intento de pago del saldo en estado "([^"]*)"$`, suite.responseIdentifiesServiceBalanceIntentWithStatus)
 	sc.Step(`^la respuesta identifica un nuevo intento de pago del saldo en estado "([^"]*)"$`, suite.responseIdentifiesNewServiceBalanceIntentWithStatus)
 	sc.Step(`^el intento de pago del saldo puede consultarse en estado "([^"]*)"$`, suite.serviceBalanceIntentCanBeReadWithStatus)
@@ -37,6 +41,7 @@ func registerCompleteServicePaymentSteps(sc *godog.ScenarioContext, suite *testS
 	sc.Step(`^la orden de trabajo conserva el saldo pendiente$`, suite.workOrderKeepsPendingBalance)
 	sc.Step(`^el consumidor puede consultar un código de confirmación vinculado a la orden de trabajo$`, suite.consumerCanGetWorkOrderConfirmationCode)
 	sc.Step(`^el código de confirmación todavía no está disponible$`, suite.confirmationCodeIsNotAvailable)
+	sc.Step(`^el sistema no registra una sesión de checkout del saldo$`, suite.systemDoesNotRegisterServiceBalanceCheckoutSession)
 	sc.Step(`^el servicio todavía no queda confirmado como realizado$`, suite.serviceIsNotYetConfirmedAsPerformed)
 }
 
@@ -48,6 +53,21 @@ func (suite *testSuite) workOrderHasRejectedServiceBalanceIntent() error {
 		return err
 	}
 	return suite.serviceBalanceIntentCanBeReadWithStatus(string(payment.StatusRejected))
+}
+
+func (suite *testSuite) approvedServiceBalancePaymentEnabledConfirmationCode() error {
+	if err := suite.consumerStartedServiceBalanceCheckout("ana@example.com"); err != nil {
+		return err
+	}
+	externalPaymentID := suite.checkoutClient.AddApprovedPayment(
+		suite.lastPaymentIntentID,
+		"mp-juan",
+		suite.lastCheckoutResponse.Pricing.AmountDueNowCents,
+	)
+	if err := suite.sendMercadoPagoPaymentNotification(externalPaymentID); err != nil {
+		return err
+	}
+	return suite.workOrderIsFullyPaid()
 }
 
 func (suite *testSuite) consumerStartedServiceBalanceCheckout(consumerEmail string) error {
@@ -115,6 +135,24 @@ func (suite *testSuite) systemDeniesServiceBalancePayment() error {
 	)
 	if !errors.Is(err, payment.ErrIntentDoesNotExist) {
 		return fmt.Errorf("expected denied checkout not to create a service balance intent, got %v", err)
+	}
+	return nil
+}
+
+func (suite *testSuite) systemRejectsServiceBalancePaymentBeforeScheduledTime() error {
+	if err := suite.lastResponseShouldHaveStatusCode(http.StatusConflict); err != nil {
+		return err
+	}
+	var response registrationResponse
+	if err := json.Unmarshal(suite.lastBody, &response); err != nil {
+		return fmt.Errorf("decoding service balance checkout error response: %w", err)
+	}
+	if response.Error != payment.ErrServiceBalancePaymentNotAvailable.Error() {
+		return fmt.Errorf(
+			"expected service balance availability error %q, got %q",
+			payment.ErrServiceBalancePaymentNotAvailable,
+			response.Error,
+		)
 	}
 	return nil
 }
@@ -280,6 +318,49 @@ func (suite *testSuite) confirmationCodeIsNotAvailable() error {
 		return fmt.Errorf("expected unavailable confirmation code status 409, got %d with body %s", status, body)
 	}
 	return nil
+}
+
+func (suite *testSuite) tryToGetWorkOrderConfirmationCode() error {
+	status, body, err := suite.getWorkOrderConfirmationCode()
+	if err != nil {
+		return err
+	}
+	suite.lastStatus = status
+	suite.lastBody = body
+	return nil
+}
+
+func (suite *testSuite) systemDeniesConfirmationCodeQuery() error {
+	if err := suite.lastResponseShouldHaveStatusCode(http.StatusForbidden); err != nil {
+		return err
+	}
+	var response registrationResponse
+	if err := json.Unmarshal(suite.lastBody, &response); err != nil {
+		return fmt.Errorf("decoding confirmation code error response: %w", err)
+	}
+	if response.Error != workorder.ErrOnlyConsumerCanViewConfirmationCode.Error() {
+		return fmt.Errorf(
+			"expected confirmation code ownership error %q, got %q",
+			workorder.ErrOnlyConsumerCanViewConfirmationCode,
+			response.Error,
+		)
+	}
+	return nil
+}
+
+func (suite *testSuite) systemDoesNotRegisterServiceBalanceCheckoutSession() error {
+	_, err := suite.paymentIntentRepository.FindLatestByProposalIDAndPurpose(
+		context.Background(),
+		suite.lastServiceProposalID,
+		payment.PurposeServiceBalance,
+	)
+	if errors.Is(err, payment.ErrIntentDoesNotExist) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	return fmt.Errorf("expected no service balance checkout session to be persisted")
 }
 
 func (suite *testSuite) consumerCanGetWorkOrderConfirmationCode() error {

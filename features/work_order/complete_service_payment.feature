@@ -84,7 +84,6 @@ Feature: Completar el pago del servicio
             And la orden de trabajo conserva el saldo pendiente
             And el código de confirmación todavía no está disponible
 
-        @wip
         Scenario Outline: 27.7-CPS Impedir que <actor> consulte el código de confirmación
             Given que el pago aprobado del saldo habilitó el código de confirmación de la orden de trabajo
             And que estoy autenticado como <rol> "<correo>"
@@ -96,7 +95,6 @@ Feature: Completar el pago del servicio
                 | otro consumidor    | consumidor  | carla@example.com          |
                 | el prestador       | prestador   | juan.plomero@example.com   |
 
-        @wip
         Scenario: 27.8-CPS Rechazar la consulta del código sin una sesión válida
             Given que el pago aprobado del saldo habilitó el código de confirmación de la orden de trabajo
             And que no tengo una sesión válida
@@ -105,7 +103,6 @@ Feature: Completar el pago del servicio
 
     Rule: El saldo se paga a partir de la fecha y hora acordadas y una sola vez
 
-        @wip
         Scenario: 27.9-CPS Rechazar el pago antes de la fecha y hora programadas
             Given que la fecha y hora actual del sistema es "2026-07-06T09:59:59-03:00"
             And que estoy autenticado como consumidor "ana@example.com"
