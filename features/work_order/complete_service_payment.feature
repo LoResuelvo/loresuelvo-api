@@ -130,7 +130,6 @@ Feature: Completar el pago del servicio
             And el sistema conserva una única sesión de checkout activa para el saldo
             And ambas solicitudes obtienen la misma URL de checkout
 
-        @wip
         Scenario: 27.12-CPS Procesar una sola vez una notificación de pago duplicada
             Given que "ana@example.com" inició el checkout del saldo de la orden de trabajo
             When el sistema procesa dos veces la misma notificación válida de Mercado Pago y verifica el pago aprobado del saldo
