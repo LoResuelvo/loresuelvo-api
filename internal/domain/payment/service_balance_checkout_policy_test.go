@@ -34,5 +34,10 @@ func TestServiceBalanceCheckoutPolicyAuthorizesOnlyEligibleConsumerAtScheduledTi
 	nonScheduled := *order
 	nonScheduled.Status = workorder.Status("completed")
 	assert.ErrorIs(t, policy.Authorize(&nonScheduled, 10, scheduledOn), payment.ErrWorkOrderNotScheduled)
+
+	fullyPaid := *order
+	fullyPaid.Status = workorder.StatusPaid
+	assert.ErrorIs(t, policy.Authorize(&fullyPaid, 10, scheduledOn), payment.ErrWorkOrderAlreadyFullyPaid)
+	assert.ErrorIs(t, policy.Authorize(&fullyPaid, 11, scheduledOn), payment.ErrOnlyWorkOrderConsumerCanCheckout)
 	assert.NoError(t, policy.Authorize(order, 10, scheduledOn))
 }

@@ -115,6 +115,12 @@ func (client *FakeCheckoutClient) GetPayment(
 	return externalPayment, nil
 }
 
+func (client *FakeCheckoutClient) RequestCount() int {
+	client.mu.Lock()
+	defer client.mu.Unlock()
+	return len(client.requests)
+}
+
 func (client *FakeCheckoutClient) Reset() {
 	client.mu.Lock()
 	defer client.mu.Unlock()

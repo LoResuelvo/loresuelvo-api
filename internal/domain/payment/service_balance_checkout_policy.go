@@ -19,6 +19,9 @@ func (ServiceBalanceCheckoutPolicy) Authorize(
 	if consumerID <= 0 || order.ConsumerID() != consumerID {
 		return ErrOnlyWorkOrderConsumerCanCheckout
 	}
+	if order.Status == workorder.StatusPaid {
+		return ErrWorkOrderAlreadyFullyPaid
+	}
 	if order.Status != workorder.StatusScheduled {
 		return ErrWorkOrderNotScheduled
 	}

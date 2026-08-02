@@ -194,7 +194,8 @@ func handleStartServiceBalanceCheckoutError(context *gin.Context, err error) {
 		httphandler.RespondError(context, http.StatusNotFound, err.Error())
 	case errors.Is(err, payment.ErrOnlyWorkOrderConsumerCanCheckout):
 		httphandler.RespondError(context, http.StatusForbidden, err.Error())
-	case errors.Is(err, payment.ErrWorkOrderNotScheduled),
+	case errors.Is(err, payment.ErrWorkOrderAlreadyFullyPaid),
+		errors.Is(err, payment.ErrWorkOrderNotScheduled),
 		errors.Is(err, payment.ErrServiceBalancePaymentNotAvailable),
 		errors.Is(err, paymentaccount.ErrConnectionNotFound):
 		httphandler.RespondError(context, http.StatusConflict, err.Error())

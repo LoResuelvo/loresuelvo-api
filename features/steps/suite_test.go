@@ -93,6 +93,9 @@ type testSuite struct {
 	lastPaymentIntentID                     string
 	lastExternalPaymentID                   string
 	previousPaymentIntentID                 string
+	previousCheckoutRequestCount            int
+	lastConfirmationCode                    string
+	previousConfirmationCode                string
 	lastCheckoutResponse                    checkoutSessionResponse
 	concurrentCheckoutResponses             []checkoutHTTPResponse
 	lastBookingTermsProposalID              int
@@ -224,6 +227,9 @@ func (s *testSuite) cleanup() error {
 	s.lastPaymentIntentID = ""
 	s.lastExternalPaymentID = ""
 	s.previousPaymentIntentID = ""
+	s.previousCheckoutRequestCount = 0
+	s.lastConfirmationCode = ""
+	s.previousConfirmationCode = ""
 	s.lastCheckoutResponse = checkoutSessionResponse{}
 	s.concurrentCheckoutResponses = nil
 	s.lastBookingTermsProposalID = 0

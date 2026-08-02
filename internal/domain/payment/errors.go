@@ -16,6 +16,7 @@ var (
 	ErrTransactionDoesNotExist           = errors.New("Payment transaction does not exist")
 	ErrInvalidWorkOrder                  = errors.New("Work order is invalid")
 	ErrOnlyWorkOrderConsumerCanCheckout  = errors.New("Only the work order consumer can start checkout")
+	ErrWorkOrderAlreadyFullyPaid         = errors.New("Work order is already fully paid")
 	ErrWorkOrderNotScheduled             = errors.New("Only scheduled work orders can start balance checkout")
 	ErrServiceBalancePaymentNotAvailable = errors.New("Service balance payment is not available before the scheduled time")
 )
