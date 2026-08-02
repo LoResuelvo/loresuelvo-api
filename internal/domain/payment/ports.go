@@ -27,6 +27,7 @@ type ServiceProposalFinder interface {
 
 type WorkOrderFinder interface {
 	FindByID(ctx context.Context, id int) (*workorder.WorkOrder, error)
+	FindByServiceProposalID(ctx context.Context, serviceProposalID int) (*workorder.WorkOrder, error)
 }
 
 type UserFinder interface {
@@ -68,8 +69,13 @@ type UnitOfWork interface {
 	Execute(ctx context.Context, operation func(TransactionalStore) error) error
 }
 
-type CredentialDecryptor interface {
+type SecretProtector interface {
+	Encrypt(plaintext string) ([]byte, error)
 	Decrypt(ciphertext []byte) (string, error)
+}
+
+type ConfirmationCodeGenerator interface {
+	Generate() (workorder.ConfirmationCode, error)
 }
 
 type CheckoutGateway interface {

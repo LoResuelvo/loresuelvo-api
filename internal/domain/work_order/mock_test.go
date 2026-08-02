@@ -16,6 +16,14 @@ import (
 
 type readerMock struct{ mock.Mock }
 
+func (m *readerMock) FindByID(ctx context.Context, id int) (*workorder.WorkOrder, error) {
+	args := m.Called(ctx, id)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*workorder.WorkOrder), args.Error(1)
+}
+
 func (m *readerMock) FindByUserID(ctx context.Context, userID int, role string) ([]readmodel.WorkOrderSummary, error) {
 	args := m.Called(ctx, userID, role)
 	return args.Get(0).([]readmodel.WorkOrderSummary), args.Error(1)
@@ -49,8 +57,27 @@ type clockMock struct{ mock.Mock }
 
 func (m *clockMock) Now() time.Time { return m.Called().Get(0).(time.Time) }
 
+type userRepositoryMock struct{ mock.Mock }
+
+func (m *userRepositoryMock) FindByAuthID(auth0ID string) (user.User, error) {
+	args := m.Called(auth0ID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(user.User), args.Error(1)
+}
+
+type confirmationCodeDecryptorMock struct{ mock.Mock }
+
+func (m *confirmationCodeDecryptorMock) Decrypt(ciphertext []byte) (string, error) {
+	args := m.Called(ciphertext)
+	return args.String(0), args.Error(1)
+}
+
 type workOrderServiceTestEnv struct {
 	reader      *readerMock
+	users       *userRepositoryMock
+	decryptor   *confirmationCodeDecryptorMock
 	repository  *notificationRepositoryMock
 	notificator *notificatorMock
 	clock       *clockMock
@@ -59,6 +86,8 @@ type workOrderServiceTestEnv struct {
 
 func setupWorkOrderServiceTest(now time.Time) *workOrderServiceTestEnv {
 	reader := new(readerMock)
+	users := new(userRepositoryMock)
+	decryptor := new(confirmationCodeDecryptorMock)
 	repository := new(notificationRepositoryMock)
 	notificator := new(notificatorMock)
 	clock := new(clockMock)
@@ -66,10 +95,12 @@ func setupWorkOrderServiceTest(now time.Time) *workOrderServiceTestEnv {
 
 	return &workOrderServiceTestEnv{
 		reader:      reader,
+		users:       users,
+		decryptor:   decryptor,
 		repository:  repository,
 		notificator: notificator,
 		clock:       clock,
-		service:     workorder.NewService(reader, nil, nil, repository, notificator, clock),
+		service:     workorder.NewService(reader, users, nil, decryptor, repository, notificator, clock),
 	}
 }
 

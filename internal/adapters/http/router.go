@@ -169,6 +169,7 @@ func (router *Router) registerPaymentRoutes(engine *gin.Engine, authMiddleware g
 
 func (router *Router) registerWorkOrderRoutes(engine *gin.Engine, authMiddleware gin.HandlerFunc) {
 	engine.GET("/work-orders", authMiddleware, router.workOrderHandler.GetWorkOrders)
+	engine.GET("/work-orders/:workOrderID/confirmation-code", authMiddleware, router.workOrderHandler.GetConfirmationCode)
 	engine.POST("/work-orders/:workOrderID/checkout-sessions", authMiddleware, router.paymentHandler.StartServiceBalanceCheckout)
 }
 

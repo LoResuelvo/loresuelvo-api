@@ -63,12 +63,15 @@ func (r *WorkOrderRepository) findOne(
 	argument int,
 ) (*workorder.WorkOrder, error) {
 	var (
-		order    workorder.WorkOrder
-		proposal serviceproposal.ServiceProposal
+		order              workorder.WorkOrder
+		proposal           serviceproposal.ServiceProposal
+		codeCiphertext     []byte
+		completionIssuedOn sql.NullTime
 	)
 	err := r.db.QueryRowContext(
 		ctx,
-		`SELECT wo.id, wo.service_proposal_id, wo.status, wo.accepted_on
+		`SELECT wo.id, wo.service_proposal_id, wo.status, wo.accepted_on,
+			wo.completion_code_ciphertext, wo.fully_paid_on
 		FROM work_orders wo
 		`+clause,
 		argument,
@@ -77,6 +80,8 @@ func (r *WorkOrderRepository) findOne(
 		&proposal.ID,
 		&order.Status,
 		&order.AcceptedOn,
+		&codeCiphertext,
+		&completionIssuedOn,
 	)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, workorder.ErrDoesNotExist
@@ -89,6 +94,15 @@ func (r *WorkOrderRepository) findOne(
 		return nil, fmt.Errorf("hydrating work order service proposal: %w", err)
 	}
 	order.ServiceProposal = foundProposal
+	if completionIssuedOn.Valid {
+		order.CompletionAuthorization, err = workorder.NewCompletionAuthorization(
+			codeCiphertext,
+			completionIssuedOn.Time,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("rehydrating work order completion authorization: %w", err)
+		}
+	}
 
 	return &order, nil
 }
@@ -181,9 +195,11 @@ func (r *WorkOrderRepository) FindScheduledBetween(ctx context.Context, from tim
 		FROM work_orders wo
 		INNER JOIN service_proposals sp ON sp.id = wo.service_proposal_id
 		WHERE sp.scheduled_on >= $1 AND sp.scheduled_on < $2
+			AND wo.status = $3
 		ORDER BY sp.scheduled_on ASC, wo.id ASC`,
 		from,
 		to,
+		workorder.StatusScheduled,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("finding work orders scheduled between: %w", err)
@@ -250,24 +266,62 @@ func (r *WorkOrderRepository) saveWithTx(ctx context.Context, tx *sql.Tx, order 
 	}
 
 	saved := *order
-	err := tx.QueryRowContext(
-		ctx,
-		`INSERT INTO work_orders (
+	codeCiphertext, fullyPaidOn := workOrderCompletionAuthorizationValues(order)
+	if order.ID <= 0 {
+		err := tx.QueryRowContext(
+			ctx,
+			`INSERT INTO work_orders (
 			service_proposal_id,
 			status,
 			accepted_on,
+			completion_code_ciphertext,
+			fully_paid_on,
 			updated_on
 		)
-		VALUES ($1, $2, $3, NOW())
+		VALUES ($1, $2, $3, $4, $5, NOW())
 		RETURNING id`,
-		order.ServiceProposal.ServiceProposalID(),
+			order.ServiceProposal.ServiceProposalID(),
+			order.Status,
+			order.AcceptedOn,
+			codeCiphertext,
+			fullyPaidOn,
+		).Scan(&saved.ID)
+		if err != nil {
+			return nil, fmt.Errorf("saving work order: %w", err)
+		}
+		return &saved, nil
+	}
+
+	err := tx.QueryRowContext(
+		ctx,
+		`UPDATE work_orders
+		SET status = $1,
+			completion_code_ciphertext = $2,
+			fully_paid_on = $3,
+			updated_on = NOW()
+		WHERE id = $4 AND service_proposal_id = $5
+		RETURNING id`,
 		order.Status,
-		order.AcceptedOn,
+		codeCiphertext,
+		fullyPaidOn,
+		order.ID,
+		order.ServiceProposal.ServiceProposalID(),
 	).Scan(&saved.ID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, workorder.ErrDoesNotExist
+	}
 	if err != nil {
-		return nil, fmt.Errorf("saving work order: %w", err)
+		return nil, fmt.Errorf("updating work order: %w", err)
 	}
 	return &saved, nil
+}
+
+func workOrderCompletionAuthorizationValues(order *workorder.WorkOrder) ([]byte, *time.Time) {
+	if order == nil || order.CompletionAuthorization == nil {
+		return nil, nil
+	}
+	issuedOn := order.CompletionAuthorization.IssuedOn()
+	return order.CompletionAuthorization.CodeCiphertext(), &issuedOn
 }
 
 func rollbackWorkOrderTx(tx *sql.Tx, cause error) error {

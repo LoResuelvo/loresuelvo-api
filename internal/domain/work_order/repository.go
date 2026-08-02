@@ -10,8 +10,13 @@ import (
 )
 
 type Reader interface {
+	FindByID(ctx context.Context, id int) (*WorkOrder, error)
 	FindByUserID(ctx context.Context, userID int, viewerRole string) ([]readmodel.WorkOrderSummary, error)
 	FindScheduledBetween(ctx context.Context, from time.Time, to time.Time) ([]*WorkOrder, error)
+}
+
+type ConfirmationCodeDecryptor interface {
+	Decrypt(ciphertext []byte) (string, error)
 }
 
 type NotificationRepository interface {

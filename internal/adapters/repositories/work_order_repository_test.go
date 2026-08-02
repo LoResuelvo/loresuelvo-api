@@ -57,6 +57,21 @@ func TestWorkOrderRepositoryFindsOnlyOrdersScheduledInsideWindow(t *testing.T) {
 	assert.Equal(t, consumerID, foundByID.ConsumerID())
 	assert.Equal(t, providerID, foundByID.ProviderID())
 	assert.Equal(t, insideOrder.RemainingAmountDue(), foundByID.RemainingAmountDue())
+
+	issuedOn := from.Add(2 * time.Hour)
+	authorization, err := workorder.NewCompletionAuthorization([]byte("encrypted-confirmation-code"), issuedOn)
+	require.NoError(t, err)
+	require.NoError(t, insideOrder.CompletePayment(authorization))
+	updated, err := testContext.workOrderRepository.Save(t.Context(), insideOrder)
+	require.NoError(t, err)
+	assert.Equal(t, insideOrder.ID, updated.ID)
+
+	fullyPaid, err := testContext.workOrderRepository.FindByID(t.Context(), insideOrder.ID)
+	require.NoError(t, err)
+	assert.Equal(t, workorder.StatusPaid, fullyPaid.Status)
+	require.NotNil(t, fullyPaid.CompletionAuthorization)
+	assert.Equal(t, []byte("encrypted-confirmation-code"), fullyPaid.CompletionAuthorization.CodeCiphertext())
+	assert.Equal(t, issuedOn, fullyPaid.CompletionAuthorization.IssuedOn())
 }
 
 func saveScheduledWorkOrderAt(

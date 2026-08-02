@@ -202,6 +202,7 @@ func NewDependenciesWithPaymentAccountAdapters(
 		paymentGateway,
 		notificator,
 		uuid.NewString,
+		cryptography.NewSecureConfirmationCodeGenerator(),
 		systemClock,
 	)
 	servicePorposalService := serviceproposal.NewService(
@@ -219,6 +220,7 @@ func NewDependenciesWithPaymentAccountAdapters(
 		persistence.WorkOrderRepository,
 		persistence.UserRepository,
 		fileService,
+		credentialProtector,
 		persistence.NotificationRepository,
 		notificator,
 		systemClock,

@@ -75,6 +75,10 @@ func (finder workOrderFinderStub) FindByID(_ context.Context, _ int) (*workorder
 	return finder.order, nil
 }
 
+func (finder workOrderFinderStub) FindByServiceProposalID(_ context.Context, _ int) (*workorder.WorkOrder, error) {
+	return finder.order, nil
+}
+
 type userFinderStub struct {
 	found user.User
 }
@@ -105,8 +109,23 @@ func (finder paymentAccountFinderStub) FindByProviderID(
 
 type credentialDecryptorStub struct{}
 
+func (credentialDecryptorStub) Encrypt(plaintext string) ([]byte, error) {
+	return []byte("encrypted:" + plaintext), nil
+}
+
 func (credentialDecryptorStub) Decrypt([]byte) (string, error) {
 	return "seller-access-token", nil
+}
+
+type confirmationCodeGeneratorStub struct {
+	code workorder.ConfirmationCode
+}
+
+func (generator confirmationCodeGeneratorStub) Generate() (workorder.ConfirmationCode, error) {
+	if generator.code.String() == "" {
+		return workorder.NewConfirmationCode("0042")
+	}
+	return generator.code, nil
 }
 
 type lockManagerStub struct{}
@@ -311,6 +330,7 @@ func TestStartServiceBalanceCheckoutCreatesReadyIntentWithFrozenRemainingPricing
 		checkoutGateway,
 		nil,
 		func() string { return "83b4dd7d-6d1c-4e9e-b3e5-7be31b264540" },
+		confirmationCodeGeneratorStub{},
 		clockStub{now: now},
 	)
 
@@ -395,6 +415,7 @@ func TestStartBookingCheckoutCreatesReadyIntentWithFrozenProposalPricing(t *test
 		checkoutGateway,
 		nil,
 		func() string { return "f69bfe31-ce5d-4f85-a8c5-643ca2dcaa36" },
+		confirmationCodeGeneratorStub{},
 		clockStub{now: now},
 	)
 
@@ -511,6 +532,7 @@ func TestStartBookingCheckoutEnforcesBookingPaymentDeadline(t *testing.T) {
 				checkoutGateway,
 				nil,
 				func() string { return "f69bfe31-ce5d-4f85-a8c5-643ca2dcaa36" },
+				confirmationCodeGeneratorStub{},
 				clockStub{now: test.now},
 			)
 
@@ -604,6 +626,7 @@ func TestProcessApprovedPaymentConfirmsPaidBooking(t *testing.T) {
 		gateway,
 		notificator,
 		func() string { return "unused" },
+		confirmationCodeGeneratorStub{},
 		clockStub{now: now},
 	)
 
@@ -638,6 +661,97 @@ func TestProcessApprovedPaymentConfirmsPaidBooking(t *testing.T) {
 	}))
 	assert.Equal(t, 1, unitOfWork.calls)
 	assert.Equal(t, 1, notificator.calls)
+}
+
+func TestProcessApprovedServiceBalanceAtomicallyPaysWorkOrderAndIssuesConfirmationAuthorization(t *testing.T) {
+	now := time.Date(2026, time.July, 6, 13, 5, 0, 0, time.UTC)
+	terms, err := serviceproposal.NewBookingPolicy().Calculate(10000000, now.Add(-5*time.Minute))
+	require.NoError(t, err)
+	proposalConsumer := &consumer.Consumer{BaseUser: user.RehydrateBaseUser(
+		10, "auth0|consumer", "ana@example.com", "Ana", "Pérez", consumer.Role, nil,
+	)}
+	proposalProvider := &provider.Provider{BaseUser: user.RehydrateBaseUser(
+		20, "auth0|provider", "juan@example.com", "Juan", "Gómez", provider.Role, nil,
+	)}
+	proposal := &serviceproposal.ServiceProposal{
+		ID:           42,
+		Consumer:     proposalConsumer,
+		Provider:     proposalProvider,
+		Status:       serviceproposal.StatusAccepted,
+		ScheduledOn:  now.Add(-5 * time.Minute),
+		BookingTerms: terms,
+	}
+	order := &workorder.WorkOrder{
+		ID:              84,
+		ServiceProposal: proposal,
+		Status:          workorder.StatusScheduled,
+		AcceptedOn:      now.Add(-48 * time.Hour),
+	}
+	intent, err := payment.NewServiceBalanceIntent(
+		"83b4dd7d-6d1c-4e9e-b3e5-7be31b264540",
+		order,
+		now.Add(-time.Minute),
+	)
+	require.NoError(t, err)
+	require.NoError(t, intent.MarkCheckoutReady(
+		"mp-preference-balance",
+		"https://www.mercadopago.com.ar/checkout/v1/redirect?pref_id=mp-preference-balance",
+		now.Add(29*time.Minute),
+		now.Add(-30*time.Second),
+	))
+	account, err := paymentaccount.NewPaymentAccount(
+		proposalProvider.ID(),
+		paymentaccount.PaymentProvider("mercado_pago"),
+		"mp-provider",
+		[]byte("encrypted-access-token"),
+		nil,
+		now.Add(24*time.Hour),
+	)
+	require.NoError(t, err)
+	gateway := &checkoutGatewayStub{payment: payment.ExternalPayment{
+		ID:                "balance-payment-123",
+		SellerAccountID:   "mp-provider",
+		ExternalReference: intent.ID,
+		Status:            payment.ExternalPaymentStatusApproved,
+		Currency:          intent.Currency,
+		AmountCents:       intent.TotalAmountCents,
+	}}
+	unitOfWork := &unitOfWorkStub{}
+	service := payment.NewService(
+		&intentRepositoryStub{found: intent},
+		&transactionRepositoryStub{},
+		proposalFinderStub{proposal: proposal},
+		workOrderFinderStub{order: order},
+		userFinderStub{},
+		paymentAccountFinderStub{account: account},
+		lockManagerStub{},
+		unitOfWork,
+		credentialDecryptorStub{},
+		gateway,
+		gateway,
+		&notificatorStub{},
+		func() string { return "unused" },
+		confirmationCodeGeneratorStub{},
+		clockStub{now: now},
+	)
+
+	err = service.ProcessPaymentNotification(t.Context(), payment.PaymentNotification{
+		ExternalPaymentID: gateway.payment.ID,
+		SellerAccountID:   gateway.payment.SellerAccountID,
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, payment.StatusPaid, intent.Status)
+	require.NotNil(t, unitOfWork.transaction)
+	assert.Equal(t, gateway.payment.ID, unitOfWork.transaction.ExternalPaymentID)
+	assert.Same(t, intent, unitOfWork.intent)
+	assert.Same(t, order, unitOfWork.order)
+	assert.Nil(t, unitOfWork.proposal)
+	assert.Nil(t, unitOfWork.notification)
+	assert.Equal(t, workorder.StatusPaid, order.Status)
+	require.NotNil(t, order.CompletionAuthorization)
+	assert.Equal(t, []byte("encrypted:0042"), order.CompletionAuthorization.CodeCiphertext())
+	assert.Equal(t, now, order.CompletionAuthorization.IssuedOn())
 }
 
 func TestProcessProcessingPaymentOnlyUpdatesIntent(t *testing.T) {
@@ -706,6 +820,7 @@ func TestProcessProcessingPaymentOnlyUpdatesIntent(t *testing.T) {
 		gateway,
 		notificator,
 		func() string { return "unused" },
+		confirmationCodeGeneratorStub{},
 		clockStub{now: now},
 	)
 
@@ -793,6 +908,7 @@ func TestProcessRejectedPaymentOnlyUpdatesIntent(t *testing.T) {
 		gateway,
 		notificator,
 		func() string { return "unused" },
+		confirmationCodeGeneratorStub{},
 		clockStub{now: now},
 	)
 

@@ -20,6 +20,7 @@ type PaymentOutcome interface {
 type PaymentOutcomeVisitor interface {
 	VisitIntentUpdated(IntentUpdated) error
 	VisitBookingApproved(BookingApproved) error
+	VisitServiceBalanceApproved(ServiceBalanceApproved) error
 }
 
 type IntentUpdated struct {
@@ -37,6 +38,15 @@ type BookingApproved struct {
 
 func (outcome BookingApproved) Accept(visitor PaymentOutcomeVisitor) error {
 	return visitor.VisitBookingApproved(outcome)
+}
+
+type ServiceBalanceApproved struct {
+	Intent      *Intent
+	Transaction *Transaction
+}
+
+func (outcome ServiceBalanceApproved) Accept(visitor PaymentOutcomeVisitor) error {
+	return visitor.VisitServiceBalanceApproved(outcome)
 }
 
 type processingPayment struct{ payment ExternalPayment }
@@ -93,12 +103,19 @@ func (payment approvedPayment) ApplyTo(
 	processor paymentaccount.PaymentProvider,
 	now time.Time,
 ) (PaymentOutcome, error) {
+	if intent == nil ||
+		(intent.Purpose != PurposeBookingDeposit && intent.Purpose != PurposeServiceBalance) {
+		return nil, ErrInvalidIntent
+	}
 	if err := intent.MarkPaid(payment.payment, now); err != nil {
 		return nil, err
 	}
 	transaction, err := NewTransaction(intent.ID, processor, payment.payment, now)
 	if err != nil {
 		return nil, err
+	}
+	if intent.Purpose == PurposeServiceBalance {
+		return ServiceBalanceApproved{Intent: intent, Transaction: transaction}, nil
 	}
 	return BookingApproved{Intent: intent, Transaction: transaction}, nil
 }
