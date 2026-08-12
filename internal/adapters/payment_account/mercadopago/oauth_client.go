@@ -26,19 +26,22 @@ type OAuthClient struct {
 	httpClient *http.Client
 }
 
-func NewOAuthClient(config Config) *OAuthClient {
-	return &OAuthClient{
-		config:     config,
-		httpClient: &http.Client{Timeout: 10 * time.Second},
-	}
-}
-
-func NewOAuthClientFromEnv() (*OAuthClient, error) {
-	config := NewConfigFromEnv()
+func NewOAuthClient(config Config) (*OAuthClient, error) {
 	if err := config.Validate(); err != nil {
 		return nil, err
 	}
-	return NewOAuthClient(config), nil
+	return &OAuthClient{
+		config:     config,
+		httpClient: &http.Client{Timeout: 10 * time.Second},
+	}, nil
+}
+
+func NewOAuthClientFromEnv() (*OAuthClient, error) {
+	config, err := NewConfigFromEnv()
+	if err != nil {
+		return nil, err
+	}
+	return NewOAuthClient(config)
 }
 
 func (client *OAuthClient) Provider() paymentaccount.PaymentProvider {
@@ -74,13 +77,22 @@ func (client *OAuthClient) ExchangeAuthorizationCode(ctx context.Context, code, 
 	if client.config.ClientID == "" || client.config.ClientSecret == "" || client.config.RedirectURI == "" || client.config.APIBaseURL == "" {
 		return paymentaccount.OAuthCredentials{}, ErrInvalidOAuthConfiguration
 	}
-	payload, err := json.Marshal(map[string]string{
-		"client_id":     client.config.ClientID,
-		"client_secret": client.config.ClientSecret,
-		"grant_type":    "authorization_code",
-		"code":          code,
-		"redirect_uri":  client.config.RedirectURI,
-		"code_verifier": codeVerifier,
+	payload, err := json.Marshal(struct {
+		ClientID     string `json:"client_id"`
+		ClientSecret string `json:"client_secret"`
+		GrantType    string `json:"grant_type"`
+		Code         string `json:"code"`
+		RedirectURI  string `json:"redirect_uri"`
+		CodeVerifier string `json:"code_verifier"`
+		TestToken    bool   `json:"test_token"`
+	}{
+		ClientID:     client.config.ClientID,
+		ClientSecret: client.config.ClientSecret,
+		GrantType:    "authorization_code",
+		Code:         code,
+		RedirectURI:  client.config.RedirectURI,
+		CodeVerifier: codeVerifier,
+		TestToken:    client.config.Environment.IsSandbox(),
 	})
 	if err != nil {
 		return paymentaccount.OAuthCredentials{}, fmt.Errorf("encoding Mercado Pago token request: %w", err)

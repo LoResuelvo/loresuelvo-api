@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 
+	sharedmercadopago "github.com/LoResuelvo/loresuelvo-api/internal/adapters/mercadopago"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/payment"
 	paymentaccount "github.com/LoResuelvo/loresuelvo-api/internal/domain/payment_account"
 	mercadopagoconfig "github.com/mercadopago/sdk-go/pkg/config"
@@ -46,7 +47,11 @@ func NewCheckoutClient(config Config) (*CheckoutClient, error) {
 }
 
 func NewCheckoutClientFromEnv() (*CheckoutClient, error) {
-	return NewCheckoutClient(NewConfigFromEnv())
+	config, err := NewConfigFromEnv()
+	if err != nil {
+		return nil, err
+	}
+	return NewCheckoutClient(config)
 }
 
 func (client *CheckoutClient) Provider() paymentaccount.PaymentProvider {
@@ -121,15 +126,24 @@ func (client *CheckoutClient) CreateCheckout(
 	if err != nil {
 		return payment.ExternalCheckout{}, fmt.Errorf("creating Mercado Pago preference with SDK: %w", err)
 	}
-	if preferenceResponse == nil ||
-		strings.TrimSpace(preferenceResponse.ID) == "" ||
-		strings.TrimSpace(preferenceResponse.InitPoint) == "" {
+	if preferenceResponse == nil || strings.TrimSpace(preferenceResponse.ID) == "" {
+		return payment.ExternalCheckout{}, fmt.Errorf("decoding Mercado Pago preference response: required checkout data is missing")
+	}
+	checkoutURL := checkoutURLForEnvironment(client.config.Environment, preferenceResponse)
+	if strings.TrimSpace(checkoutURL) == "" {
 		return payment.ExternalCheckout{}, fmt.Errorf("decoding Mercado Pago preference response: required checkout data is missing")
 	}
 	return payment.ExternalCheckout{
 		ID:  preferenceResponse.ID,
-		URL: preferenceResponse.InitPoint,
+		URL: checkoutURL,
 	}, nil
+}
+
+func checkoutURLForEnvironment(environment sharedmercadopago.Environment, response *preference.Response) string {
+	if environment.IsSandbox() {
+		return response.SandboxInitPoint
+	}
+	return response.InitPoint
 }
 
 func validCheckoutPurpose(purpose payment.Purpose) bool {

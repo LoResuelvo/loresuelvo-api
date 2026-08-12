@@ -30,6 +30,7 @@ services:
       STORAGE_ACCESS_KEY_ID: "loresuelvo-local"
       STORAGE_SECRET_ACCESS_KEY: "loresuelvo-local-secret"
       STORAGE_PRESIGN_EXPIRATION_SECONDS: "600"
+      MERCADO_PAGO_ENVIRONMENT: "${MERCADO_PAGO_ENVIRONMENT:-sandbox}"
       MERCADO_PAGO_CLIENT_ID: "${MERCADO_PAGO_CLIENT_ID:-local-mercado-pago-app-id}"
       MERCADO_PAGO_CLIENT_SECRET: "${MERCADO_PAGO_CLIENT_SECRET:-local-mercado-pago-client-secret}"
       MERCADO_PAGO_REDIRECT_URI: "${MERCADO_PAGO_REDIRECT_URI:-http://localhost:8080/oauth/payment-accounts/callback}"

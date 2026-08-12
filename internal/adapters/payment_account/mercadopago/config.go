@@ -5,6 +5,8 @@ import (
 	"net/url"
 	"os"
 	"strings"
+
+	sharedmercadopago "github.com/LoResuelvo/loresuelvo-api/internal/adapters/mercadopago"
 )
 
 const (
@@ -13,6 +15,7 @@ const (
 )
 
 type Config struct {
+	Environment          sharedmercadopago.Environment
 	ClientID             string
 	ClientSecret         string
 	RedirectURI          string
@@ -21,6 +24,9 @@ type Config struct {
 }
 
 func (config Config) Validate() error {
+	if err := config.Environment.Validate(); err != nil {
+		return fmt.Errorf("%w: %w", ErrInvalidOAuthConfiguration, err)
+	}
 	requiredValues := []string{
 		config.ClientID,
 		config.ClientSecret,
@@ -46,14 +52,19 @@ func (config Config) Validate() error {
 	return nil
 }
 
-func NewConfigFromEnv() Config {
+func NewConfigFromEnv() (Config, error) {
+	environment, err := sharedmercadopago.EnvironmentFromEnv()
+	if err != nil {
+		return Config{}, fmt.Errorf("%w: %w", ErrInvalidOAuthConfiguration, err)
+	}
 	return Config{
+		Environment:          environment,
 		ClientID:             strings.TrimSpace(os.Getenv("MERCADO_PAGO_CLIENT_ID")),
 		ClientSecret:         strings.TrimSpace(os.Getenv("MERCADO_PAGO_CLIENT_SECRET")),
 		RedirectURI:          strings.TrimSpace(os.Getenv("MERCADO_PAGO_REDIRECT_URI")),
 		AuthorizationBaseURL: envOrDefault("MERCADO_PAGO_AUTHORIZATION_BASE_URL", defaultAuthorizationBaseURL),
 		APIBaseURL:           envOrDefault("MERCADO_PAGO_API_BASE_URL", defaultAPIBaseURL),
-	}
+	}, nil
 }
 
 func envOrDefault(key, fallback string) string {

@@ -38,6 +38,7 @@ jobs:
             CHATBOT_PROVIDER=${{ secrets.CHATBOT_PROVIDER }}
             CHATBOT_API_KEY=${{ secrets.CHATBOT_API_KEY_PROD }}
             CHATBOT_MODEL=${{ secrets.CHATBOT_MODEL }}
+            MERCADO_PAGO_ENVIRONMENT=production
             MERCADO_PAGO_CLIENT_ID=${{ secrets.MERCADO_PAGO_CLIENT_ID_PROD }}
             MERCADO_PAGO_CLIENT_SECRET=${{ secrets.MERCADO_PAGO_CLIENT_SECRET_PROD }}
             MERCADO_PAGO_REDIRECT_URI=${{ secrets.MERCADO_PAGO_REDIRECT_URI_PROD }}

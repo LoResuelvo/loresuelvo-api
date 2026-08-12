@@ -24,6 +24,7 @@ func TestNewOAuthConnectorFromEnvBuildsConfiguredOAuthConnector(t *testing.T) {
 	t.Setenv("MERCADO_PAGO_CLIENT_ID", "app-id")
 	t.Setenv("MERCADO_PAGO_CLIENT_SECRET", "app-secret")
 	t.Setenv("MERCADO_PAGO_REDIRECT_URI", "https://api.loresuelvo.test/oauth/payment-accounts/callback")
+	t.Setenv("MERCADO_PAGO_ENVIRONMENT", "sandbox")
 
 	oauthConnector, err := NewOAuthConnectorFromEnv()
 

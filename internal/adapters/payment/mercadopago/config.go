@@ -6,27 +6,38 @@ import (
 	"net/url"
 	"os"
 	"strings"
+
+	sharedmercadopago "github.com/LoResuelvo/loresuelvo-api/internal/adapters/mercadopago"
 )
 
 var ErrInvalidCheckoutConfiguration = errors.New("Mercado Pago checkout configuration is incomplete")
 
 type Config struct {
+	Environment     sharedmercadopago.Environment
 	SuccessURL      string
 	PendingURL      string
 	FailureURL      string
 	NotificationURL string
 }
 
-func NewConfigFromEnv() Config {
+func NewConfigFromEnv() (Config, error) {
+	environment, err := sharedmercadopago.EnvironmentFromEnv()
+	if err != nil {
+		return Config{}, fmt.Errorf("%w: %w", ErrInvalidCheckoutConfiguration, err)
+	}
 	return Config{
+		Environment:     environment,
 		SuccessURL:      strings.TrimSpace(os.Getenv("PAYMENT_CHECKOUT_SUCCESS_URL")),
 		PendingURL:      strings.TrimSpace(os.Getenv("PAYMENT_CHECKOUT_PENDING_URL")),
 		FailureURL:      strings.TrimSpace(os.Getenv("PAYMENT_CHECKOUT_FAILURE_URL")),
 		NotificationURL: strings.TrimSpace(os.Getenv("MERCADO_PAGO_NOTIFICATION_URL")),
-	}
+	}, nil
 }
 
 func (config Config) Validate() error {
+	if err := config.Environment.Validate(); err != nil {
+		return fmt.Errorf("%w: %w", ErrInvalidCheckoutConfiguration, err)
+	}
 	publicHTTPSURLs := []string{
 		config.SuccessURL,
 		config.PendingURL,
