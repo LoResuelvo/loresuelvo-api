@@ -1,4 +1,4 @@
-.PHONY: up dev-proxy down clean build bash lint test openapi swagger swagger-down spec gherkin test-all-once migrate-up migrate-down migrate-test-up migrate-test-down storage storage-console storage-reset seed-assets-local
+.PHONY: up dev-proxy down clean build bash lint lint-ci test test-ci openapi swagger swagger-down spec gherkin test-all-once migrate-up migrate-down migrate-test-up migrate-test-down storage storage-console storage-reset seed-assets-local
 
 # Nombre del servicio del compose
 SERVICE = api-dev
@@ -47,11 +47,24 @@ bash:
 lint:
 	docker compose exec -e GOFLAGS="-buildvcs=false" $(SERVICE) golangci-lint run
 
+# CI uses one-off containers so the API and development database do not need to
+# remain running while tests and lint execute.
+lint-ci:
+	docker compose run --rm --no-deps \
+		-e GOFLAGS="-buildvcs=false" \
+		$(SERVICE) golangci-lint run
+
 test:
 	@docker compose run --rm minio-clean-tests >/dev/null 2>&1
 	docker compose exec \
 		-e GOFLAGS="-buildvcs=false" \
 		$(SERVICE) sh -c 'export STORAGE_PUBLIC_BUCKET="$$TEST_STORAGE_PUBLIC_BUCKET"; export STORAGE_PRIVATE_BUCKET="$$TEST_STORAGE_PRIVATE_BUCKET"; export STORAGE_PUBLIC_BASE_URL="$$TEST_STORAGE_PUBLIC_BASE_URL"; migrate -path db/migrations -database "$$TEST_DATABASE_URL" up && go test -p 1 -v ./...'; status=$$?; docker compose run --rm minio-clean-tests >/dev/null 2>&1; exit $$status
+
+test-ci:
+	@docker compose run --rm minio-clean-tests >/dev/null 2>&1
+	docker compose run --rm --no-deps \
+		-e GOFLAGS="-buildvcs=false" \
+		$(SERVICE) sh -c 'export STORAGE_PUBLIC_BUCKET="$$TEST_STORAGE_PUBLIC_BUCKET"; export STORAGE_PRIVATE_BUCKET="$$TEST_STORAGE_PRIVATE_BUCKET"; export STORAGE_PUBLIC_BASE_URL="$$TEST_STORAGE_PUBLIC_BASE_URL"; migrate -path db/migrations -database "$$TEST_DATABASE_URL" up && go test -count=1 -p 1 -v ./...'; status=$$?; docker compose run --rm minio-clean-tests >/dev/null 2>&1; exit $$status
 
 test-all-once:
 	@docker compose run --rm minio-clean-tests >/dev/null 2>&1

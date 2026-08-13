@@ -24,5 +24,13 @@ jobs:
       - name: Crear archivo .env de prueba
         run: cp .env.example .env
 
-      - name: Ejecutar Linter y Pruebas (Todo en uno)
-        run: docker compose up -d --wait && make test-all-once
+      - name: Iniciar dependencias de prueba
+        run: |
+          docker compose up -d --wait test-db minio
+          docker compose run --rm --no-deps minio-init
+
+      - name: Ejecutar pruebas
+        run: make test-ci
+
+      - name: Ejecutar linter
+        run: make lint-ci
