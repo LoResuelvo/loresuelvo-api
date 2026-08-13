@@ -1,10 +1,14 @@
-.PHONY: up down clean build bash lint test openapi swagger swagger-down spec gherkin test-all-once migrate-up migrate-down migrate-test-up migrate-test-down storage storage-console storage-reset seed-assets-local
+.PHONY: up dev-proxy down clean build bash lint test openapi swagger swagger-down spec gherkin test-all-once migrate-up migrate-down migrate-test-up migrate-test-down storage storage-console storage-reset seed-assets-local
 
 # Nombre del servicio del compose
 SERVICE = api-dev
 
 up:
 	docker compose up -d $(SERVICE)
+
+dev-proxy:
+	docker compose up -d nginx-dev
+	@echo "Development gateway: $${DEV_PUBLIC_URL:-http://localhost:$${NGINX_DEV_PORT:-8082}}"
 
 storage:
 	docker compose up -d minio minio-init

@@ -13,7 +13,7 @@ services:
       DATABASE_URL: "postgres://postgres:example@dev-db:5432/loresuelvo?sslmode=disable"
       TEST_DATABASE_URL: "postgres://postgres:example@test-db:5432/loresuelvo_test?sslmode=disable"
       ENVIRONMENT: "${ENVIRONMENT:-dev}"
-      CORS_ALLOWED_ORIGINS: "http://localhost:8081,http://localhost:3000"
+      CORS_ALLOWED_ORIGINS: "${CORS_ALLOWED_ORIGINS:-http://localhost:8081,http://localhost:3000,http://localhost:8082}"
       SEEDS_ENABLED: "${SEEDS_ENABLED:-false}"
       SEEDS_FILE: "${SEEDS_FILE:-seeds/default.yaml}"
       MINIO_API_PORT: "${MINIO_API_PORT:-9000}"
@@ -33,14 +33,14 @@ services:
       MERCADO_PAGO_ENVIRONMENT: "${MERCADO_PAGO_ENVIRONMENT:-sandbox}"
       MERCADO_PAGO_CLIENT_ID: "${MERCADO_PAGO_CLIENT_ID:-local-mercado-pago-app-id}"
       MERCADO_PAGO_CLIENT_SECRET: "${MERCADO_PAGO_CLIENT_SECRET:-local-mercado-pago-client-secret}"
-      MERCADO_PAGO_REDIRECT_URI: "${MERCADO_PAGO_REDIRECT_URI:-http://localhost:8080/oauth/payment-accounts/callback}"
+      MERCADO_PAGO_REDIRECT_URI: "${MERCADO_PAGO_REDIRECT_URI:-${DEV_PUBLIC_URL:-http://localhost:8082}/oauth/payment-accounts/callback}"
       PAYMENT_ACCOUNT_PROVIDER: "${PAYMENT_ACCOUNT_PROVIDER:-mercado_pago}"
-      PAYMENT_ACCOUNT_CONNECTION_SUCCESS_URL: "${PAYMENT_ACCOUNT_CONNECTION_SUCCESS_URL:-http://localhost:3000/provider/register/mercado-pago?result=success}"
-      PAYMENT_ACCOUNT_CONNECTION_CANCELLED_URL: "${PAYMENT_ACCOUNT_CONNECTION_CANCELLED_URL:-http://localhost:3000/provider/register/mercado-pago?result=cancelled}"
-      PAYMENT_CHECKOUT_SUCCESS_URL: "${PAYMENT_CHECKOUT_SUCCESS_URL:-https://frontend.loresuelvo.test/payments/success}"
-      PAYMENT_CHECKOUT_PENDING_URL: "${PAYMENT_CHECKOUT_PENDING_URL:-https://frontend.loresuelvo.test/payments/pending}"
-      PAYMENT_CHECKOUT_FAILURE_URL: "${PAYMENT_CHECKOUT_FAILURE_URL:-https://frontend.loresuelvo.test/payments/failure}"
-      MERCADO_PAGO_NOTIFICATION_URL: "${MERCADO_PAGO_NOTIFICATION_URL:-https://api.loresuelvo.test/webhooks/mercado-pago}"
+      PAYMENT_ACCOUNT_CONNECTION_SUCCESS_URL: "${PAYMENT_ACCOUNT_CONNECTION_SUCCESS_URL:-${DEV_PUBLIC_URL:-http://localhost:8082}/provider/register/mercado-pago?result=success}"
+      PAYMENT_ACCOUNT_CONNECTION_CANCELLED_URL: "${PAYMENT_ACCOUNT_CONNECTION_CANCELLED_URL:-${DEV_PUBLIC_URL:-http://localhost:8082}/provider/register/mercado-pago?result=cancelled}"
+      PAYMENT_CHECKOUT_SUCCESS_URL: "${PAYMENT_CHECKOUT_SUCCESS_URL:-${DEV_PUBLIC_URL:-http://localhost:8082}/payments/success}"
+      PAYMENT_CHECKOUT_PENDING_URL: "${PAYMENT_CHECKOUT_PENDING_URL:-${DEV_PUBLIC_URL:-http://localhost:8082}/payments/pending}"
+      PAYMENT_CHECKOUT_FAILURE_URL: "${PAYMENT_CHECKOUT_FAILURE_URL:-${DEV_PUBLIC_URL:-http://localhost:8082}/payments/failure}"
+      MERCADO_PAGO_NOTIFICATION_URL: "${MERCADO_PAGO_NOTIFICATION_URL:-${DEV_PUBLIC_URL:-http://localhost:8082}/webhooks/mercado-pago?source_news=webhooks}"
       MERCADO_PAGO_WEBHOOK_SECRET: "${MERCADO_PAGO_WEBHOOK_SECRET:-local-mercado-pago-webhook-secret}"
       # Local-only 32-byte AES key encoded as base64. Override outside local development.
       PAYMENT_ACCOUNT_CREDENTIAL_ENCRYPTION_KEY: "${PAYMENT_ACCOUNT_CREDENTIAL_ENCRYPTION_KEY:-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=}"
@@ -59,6 +59,24 @@ services:
       default:
         aliases:
           - api.localhost
+
+  nginx-dev:
+    image: nginx:1.27-alpine
+    ports:
+      - "${NGINX_DEV_PORT:-8082}:80"
+    environment:
+      DEV_API_UPSTREAM: "api-dev:8080"
+      DEV_WEB_UPSTREAM: "host.docker.internal:${DEV_WEB_PORT:-3000}"
+      # Only substitute our upstream variables, preserving Nginx variables
+      # such as $host and $scheme in the generated configuration.
+      NGINX_ENVSUBST_FILTER: "^DEV_(API|WEB)_UPSTREAM$"
+    volumes:
+      - ./nginx/dev.conf.template:/etc/nginx/templates/default.conf.template:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      - api-dev
+    restart: unless-stopped
 
   swagger-ui:
     image: swaggerapi/swagger-ui:v5.17.14

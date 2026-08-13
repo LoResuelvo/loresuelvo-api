@@ -39,6 +39,10 @@ func NewCheckoutClient(config Config) (*CheckoutClient, error) {
 	if err := config.Validate(); err != nil {
 		return nil, err
 	}
+	config, err := config.withWebhookNotificationURL()
+	if err != nil {
+		return nil, err
+	}
 	return &CheckoutClient{
 		config:                  config,
 		preferenceClientFactory: newSDKPreferenceClient,

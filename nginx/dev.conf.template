@@ -1,0 +1,75 @@
+map $http_upgrade $connection_upgrade {
+    default upgrade;
+    ''      close;
+}
+
+# TLS is normally terminated by the tunnel. Only preserve the recognized HTTPS
+# value; otherwise report the scheme used to reach this proxy.
+map $http_x_forwarded_proto $forwarded_proto {
+    default  $scheme;
+    ~^https$ https;
+}
+
+upstream dev_api {
+    server ${DEV_API_UPSTREAM};
+}
+
+upstream dev_web {
+    server ${DEV_WEB_UPSTREAM};
+}
+
+server {
+    listen 80;
+    server_name _;
+    proxy_buffer_size       128k;
+    proxy_buffers           4 256k;
+    proxy_busy_buffers_size 256k;
+    
+    client_max_body_size 20m;
+
+    proxy_http_version 1.1;
+    proxy_set_header Host $http_host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Host $http_host;
+    proxy_set_header X-Forwarded-Proto $forwarded_proto;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection $connection_upgrade;
+
+    # Public callbacks must reach the API when a single tunnel is shared with
+    # the frontend. Keep these prefixes ahead of the frontend fallback.
+    location = /api {
+        proxy_pass http://dev_api/;
+    }
+
+    # Never publish the unauthenticated clock/test controls through a tunnel.
+    location = /api/test {
+        return 404;
+    }
+
+    location ^~ /api/test/ {
+        return 404;
+    }
+
+    location ^~ /api/ {
+        rewrite ^/api/(.*)$ /$1 break;
+        proxy_pass http://dev_api;
+    }
+
+    location ~ ^/(categories|consumers|providers|job-requests|conversations|chatbot|service-proposals|payment-intents|work-orders|me|files|ws-tickets)(/|$) {
+        proxy_pass http://dev_api;
+    }
+
+    location ~ ^/(oauth|webhooks)(/|$) {
+        proxy_pass http://dev_api;
+    }
+
+    location = /ws {
+        proxy_pass http://dev_api;
+    }
+
+    # Browser routes, including Mercado Pago return URLs, go to the web app.
+    location / {
+        proxy_pass http://dev_web;
+    }
+}

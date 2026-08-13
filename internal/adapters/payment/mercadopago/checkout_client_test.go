@@ -105,7 +105,7 @@ func TestCheckoutClientCreatesMarketplacePreferenceAndReturnsProductionInitPoint
 	assert.Equal(t, "https://app.loresuelvo.test/payments/success", creator.request.BackURLs.Success)
 	assert.Equal(t, "https://app.loresuelvo.test/payments/pending", creator.request.BackURLs.Pending)
 	assert.Equal(t, "https://app.loresuelvo.test/payments/failure", creator.request.BackURLs.Failure)
-	assert.Equal(t, "https://api.loresuelvo.test/webhooks/mercado-pago", creator.request.NotificationURL)
+	assert.Equal(t, "https://api.loresuelvo.test/webhooks/mercado-pago?source_news=webhooks", creator.request.NotificationURL)
 	require.NotNil(t, creator.request.PaymentMethods)
 	require.Len(t, creator.request.PaymentMethods.ExcludedPaymentTypes, 1)
 	assert.Equal(t, "ticket", creator.request.PaymentMethods.ExcludedPaymentTypes[0].ID)
@@ -114,6 +114,40 @@ func TestCheckoutClientCreatesMarketplacePreferenceAndReturnsProductionInitPoint
 	assert.Equal(t, startsOn, *creator.request.ExpirationDateFrom)
 	require.NotNil(t, creator.request.ExpirationDateTo)
 	assert.Equal(t, expiresOn, *creator.request.ExpirationDateTo)
+}
+
+func TestCheckoutClientForcesWebhookNotificationSource(t *testing.T) {
+	for _, testCase := range []struct {
+		name     string
+		inputURL string
+		wantURL  string
+	}{
+		{
+			name:     "source is absent",
+			inputURL: "https://api.loresuelvo.test/webhooks/mercado-pago",
+			wantURL:  "https://api.loresuelvo.test/webhooks/mercado-pago?source_news=webhooks",
+		},
+		{
+			name:     "IPN source is configured",
+			inputURL: "https://api.loresuelvo.test/webhooks/mercado-pago?source_news=ipn",
+			wantURL:  "https://api.loresuelvo.test/webhooks/mercado-pago?source_news=webhooks",
+		},
+		{
+			name:     "other query parameters are present",
+			inputURL: "https://api.loresuelvo.test/webhooks/mercado-pago?seller=123",
+			wantURL:  "https://api.loresuelvo.test/webhooks/mercado-pago?seller=123&source_news=webhooks",
+		},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			config := validCheckoutConfig(sharedmercadopago.EnvironmentProduction)
+			config.NotificationURL = testCase.inputURL
+
+			client, err := NewCheckoutClient(config)
+
+			require.NoError(t, err)
+			assert.Equal(t, testCase.wantURL, client.config.NotificationURL)
+		})
+	}
 }
 
 func TestCheckoutClientDescribesServiceBalancePreference(t *testing.T) {

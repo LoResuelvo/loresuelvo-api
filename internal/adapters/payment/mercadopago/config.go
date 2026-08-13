@@ -12,6 +12,8 @@ import (
 
 var ErrInvalidCheckoutConfiguration = errors.New("Mercado Pago checkout configuration is incomplete")
 
+const webhookNotificationSource = "webhooks"
+
 type Config struct {
 	Environment     sharedmercadopago.Environment
 	SuccessURL      string
@@ -51,4 +53,16 @@ func (config Config) Validate() error {
 		}
 	}
 	return nil
+}
+
+func (config Config) withWebhookNotificationURL() (Config, error) {
+	notificationURL, err := url.ParseRequestURI(strings.TrimSpace(config.NotificationURL))
+	if err != nil {
+		return Config{}, fmt.Errorf("%w: notification URL is invalid", ErrInvalidCheckoutConfiguration)
+	}
+	query := notificationURL.Query()
+	query.Set("source_news", webhookNotificationSource)
+	notificationURL.RawQuery = query.Encode()
+	config.NotificationURL = notificationURL.String()
+	return config, nil
 }
