@@ -1,7 +1,7 @@
 Feature: Completar el pago del servicio
     Como consumidor
     quiero completar el pago del servicio realizado
-    para saldar el importe acordado y habilitar la confirmación de su realización
+    para saldar el importe acordado
 
     Background:
         Given que la fecha y hora actual del sistema es "2026-07-04T10:00:00-03:00"
@@ -29,24 +29,21 @@ Feature: Completar el pago del servicio
                 | comisión de LoResuelvo pendiente           | 4000.00  |
                 | total a pagar ahora                        | 84000.00 |
             And la orden de trabajo todavía no queda pagada por completo
-            And el código de confirmación todavía no está disponible
 
-    Rule: El código de confirmación se habilita únicamente con un pago aprobado y verificado
+    Rule: El pago aprobado y verificado completa el saldo de la orden
 
-        Scenario: 27.2-CPS Habilitar el código después de aprobar el pago total del saldo
+        Scenario: 27.2-CPS Marcar la orden como pagada después de aprobar el saldo
             Given que "ana@example.com" inició el checkout del saldo de la orden de trabajo
             When el sistema procesa una notificación válida de Mercado Pago y verifica un pago aprobado por "84000.00" pesos argentinos para ese saldo
             Then el intento de pago del saldo puede consultarse en estado "paid"
             And la orden de trabajo queda pagada por completo
-            And el consumidor puede consultar un código de confirmación vinculado a la orden de trabajo
             And el servicio todavía no queda confirmado como realizado
 
-        Scenario Outline: 27.3-CPS Mantener el código inaccesible cuando el pago resulta <resultado>
+        Scenario Outline: 27.3-CPS Mantener la orden sin pagar cuando el pago resulta <resultado>
             Given que "ana@example.com" inició el checkout del saldo de la orden de trabajo
             When el sistema procesa una notificación válida de Mercado Pago y verifica un pago <resultado> para ese saldo
             Then el intento de pago del saldo puede consultarse en estado "<estado>"
             And la orden de trabajo todavía no queda pagada por completo
-            And el código de confirmación todavía no está disponible
             And el servicio todavía no queda confirmado como realizado
 
             Examples:
@@ -61,16 +58,14 @@ Feature: Completar el pago del servicio
             Then el sistema entrega una URL para completar un nuevo checkout del saldo
             And la respuesta identifica un nuevo intento de pago del saldo en estado "checkout_ready"
             And la orden de trabajo conserva el saldo pendiente
-            And el código de confirmación todavía no está disponible
 
-    Rule: Solo el consumidor de la orden puede completar el pago y consultar el código
+    Rule: Solo el consumidor de la orden puede completar el pago
 
         Scenario Outline: 27.5-CPS Rechazar el pago solicitado por <actor>
             Given que estoy autenticado como <rol> "<correo>"
             When intento completar el pago de la orden de trabajo
             Then el sistema deniega el pago del saldo
             And la orden de trabajo conserva el saldo pendiente
-            And el código de confirmación todavía no está disponible
 
             Examples:
                 | actor              | rol         | correo                     |
@@ -82,24 +77,6 @@ Feature: Completar el pago del servicio
             When intento completar el pago de la orden de trabajo
             Then el sistema deniega el acceso
             And la orden de trabajo conserva el saldo pendiente
-            And el código de confirmación todavía no está disponible
-
-        Scenario Outline: 27.7-CPS Impedir que <actor> consulte el código de confirmación
-            Given que el pago aprobado del saldo habilitó el código de confirmación de la orden de trabajo
-            And que estoy autenticado como <rol> "<correo>"
-            When intento consultar el código de confirmación de la orden de trabajo
-            Then el sistema deniega la consulta del código de confirmación
-
-            Examples:
-                | actor              | rol         | correo                     |
-                | otro consumidor    | consumidor  | carla@example.com          |
-                | el prestador       | prestador   | juan.plomero@example.com   |
-
-        Scenario: 27.8-CPS Rechazar la consulta del código sin una sesión válida
-            Given que el pago aprobado del saldo habilitó el código de confirmación de la orden de trabajo
-            And que no tengo una sesión válida
-            When intento consultar el código de confirmación de la orden de trabajo
-            Then el sistema deniega el acceso
 
     Rule: El saldo se paga a partir de la fecha y hora acordadas y una sola vez
 
@@ -110,18 +87,16 @@ Feature: Completar el pago del servicio
             Then el sistema rechaza el pago porque todavía no llegó la fecha y hora programadas
             And la orden de trabajo conserva el saldo pendiente
             And el sistema no registra una sesión de checkout del saldo
-            And el código de confirmación todavía no está disponible
 
         Scenario: 27.10-CPS Evitar un segundo cobro después de completar el pago
-            Given que el pago aprobado del saldo habilitó el código de confirmación de la orden de trabajo
+            Given que el pago aprobado del saldo dejó la orden de trabajo pagada por completo
             And que estoy autenticado como consumidor "ana@example.com"
             When solicito nuevamente completar el pago de la orden de trabajo
             Then el sistema informa que la orden de trabajo ya está pagada por completo
             And el sistema no registra un nuevo intento de pago del saldo
             And el sistema no registra una nueva sesión de checkout del saldo
-            And el consumidor conserva el código de confirmación de la orden de trabajo
 
-    Rule: El checkout y la confirmación externa del saldo son idempotentes
+    Rule: El checkout y la notificación externa del saldo son idempotentes
 
         Scenario: 27.11-CPS Evitar checkouts activos duplicados ante solicitudes concurrentes
             Given que estoy autenticado como consumidor "ana@example.com"
@@ -135,5 +110,4 @@ Feature: Completar el pago del servicio
             When el sistema procesa dos veces la misma notificación válida de Mercado Pago y verifica el pago aprobado del saldo
             Then el sistema registra una única transacción para el pago externo
             And la orden de trabajo queda pagada por completo
-            And el sistema conserva un único código de confirmación para la orden de trabajo
             And el servicio todavía no queda confirmado como realizado

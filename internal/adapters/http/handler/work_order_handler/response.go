@@ -21,7 +21,3 @@ type workOrderCounterpartResponse struct {
 	CategoryName    string `json:"category_name,omitempty"`
 	ProfilePhotoURL string `json:"profile_photo_url,omitempty"`
 }
-
-type confirmationCodeResponse struct {
-	ConfirmationCode string `json:"confirmation_code"`
-}

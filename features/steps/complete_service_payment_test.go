@@ -16,18 +16,16 @@ import (
 )
 
 const (
-	serviceBalanceCheckoutPath    = "/work-orders/%d/checkout-sessions"
-	workOrderConfirmationCodePath = "/work-orders/%d/confirmation-code"
+	serviceBalanceCheckoutPath = "/work-orders/%d/checkout-sessions"
 )
 
 func registerCompleteServicePaymentSteps(sc *godog.ScenarioContext, suite *testSuite) {
 	sc.Step(`^que "([^"]*)" inició el checkout del saldo de la orden de trabajo$`, suite.consumerStartedServiceBalanceCheckout)
 	sc.Step(`^que la orden de trabajo tiene un intento de pago del saldo rechazado$`, suite.workOrderHasRejectedServiceBalanceIntent)
-	sc.Step(`^que el pago aprobado del saldo habilitó el código de confirmación de la orden de trabajo$`, suite.approvedServiceBalancePaymentEnabledConfirmationCode)
+	sc.Step(`^que el pago aprobado del saldo dejó la orden de trabajo pagada por completo$`, suite.approvedServiceBalancePaymentPaidWorkOrder)
 	sc.Step(`^solicito completar el pago de la orden de trabajo$`, suite.requestServiceBalanceCheckout)
 	sc.Step(`^solicito nuevamente completar el pago de la orden de trabajo$`, suite.requestServiceBalanceCheckoutAgain)
 	sc.Step(`^intento completar el pago de la orden de trabajo$`, suite.requestServiceBalanceCheckout)
-	sc.Step(`^intento consultar el código de confirmación de la orden de trabajo$`, suite.tryToGetWorkOrderConfirmationCode)
 	sc.Step(`^solicito concurrentemente dos veces completar el pago de la orden de trabajo$`, suite.requestServiceBalanceCheckoutConcurrentlyTwice)
 	sc.Step(`^el sistema procesa una notificación válida de Mercado Pago y verifica un pago aprobado por "([^"]*)" pesos argentinos para ese saldo$`, suite.processApprovedServiceBalancePayment)
 	sc.Step(`^el sistema procesa una notificación válida de Mercado Pago y verifica un pago (en proceso|rechazado) para ese saldo$`, suite.processNonApprovedServiceBalancePayment)
@@ -35,7 +33,6 @@ func registerCompleteServicePaymentSteps(sc *godog.ScenarioContext, suite *testS
 	sc.Step(`^el sistema entrega una URL para completar el checkout del saldo$`, suite.systemReturnsServiceBalanceCheckoutURL)
 	sc.Step(`^el sistema entrega una URL para completar un nuevo checkout del saldo$`, suite.systemReturnsNewServiceBalanceCheckoutURL)
 	sc.Step(`^el sistema deniega el pago del saldo$`, suite.systemDeniesServiceBalancePayment)
-	sc.Step(`^el sistema deniega la consulta del código de confirmación$`, suite.systemDeniesConfirmationCodeQuery)
 	sc.Step(`^el sistema rechaza el pago porque todavía no llegó la fecha y hora programadas$`, suite.systemRejectsServiceBalancePaymentBeforeScheduledTime)
 	sc.Step(`^el sistema informa que la orden de trabajo ya está pagada por completo$`, suite.systemReportsWorkOrderAlreadyFullyPaid)
 	sc.Step(`^la respuesta identifica el intento de pago del saldo en estado "([^"]*)"$`, suite.responseIdentifiesServiceBalanceIntentWithStatus)
@@ -44,15 +41,11 @@ func registerCompleteServicePaymentSteps(sc *godog.ScenarioContext, suite *testS
 	sc.Step(`^la orden de trabajo queda pagada por completo$`, suite.workOrderIsFullyPaid)
 	sc.Step(`^la orden de trabajo todavía no queda pagada por completo$`, suite.workOrderIsNotFullyPaid)
 	sc.Step(`^la orden de trabajo conserva el saldo pendiente$`, suite.workOrderKeepsPendingBalance)
-	sc.Step(`^el consumidor puede consultar un código de confirmación vinculado a la orden de trabajo$`, suite.consumerCanGetWorkOrderConfirmationCode)
-	sc.Step(`^el código de confirmación todavía no está disponible$`, suite.confirmationCodeIsNotAvailable)
 	sc.Step(`^el sistema no registra una sesión de checkout del saldo$`, suite.systemDoesNotRegisterServiceBalanceCheckoutSession)
 	sc.Step(`^el sistema no registra un nuevo intento de pago del saldo$`, suite.systemDoesNotRegisterNewServiceBalanceIntent)
 	sc.Step(`^el sistema no registra una nueva sesión de checkout del saldo$`, suite.systemDoesNotRegisterNewServiceBalanceCheckoutSession)
-	sc.Step(`^el consumidor conserva el código de confirmación de la orden de trabajo$`, suite.consumerKeepsWorkOrderConfirmationCode)
 	sc.Step(`^el sistema conserva un único intento de pago activo para el saldo$`, suite.systemKeepsOneActiveServiceBalanceIntent)
 	sc.Step(`^el sistema conserva una única sesión de checkout activa para el saldo$`, suite.systemKeepsOneActiveServiceBalanceCheckoutSession)
-	sc.Step(`^el sistema conserva un único código de confirmación para la orden de trabajo$`, suite.systemKeepsOneWorkOrderConfirmationCode)
 	sc.Step(`^el servicio todavía no queda confirmado como realizado$`, suite.serviceIsNotYetConfirmedAsPerformed)
 }
 
@@ -66,7 +59,7 @@ func (suite *testSuite) workOrderHasRejectedServiceBalanceIntent() error {
 	return suite.serviceBalanceIntentCanBeReadWithStatus(string(payment.StatusRejected))
 }
 
-func (suite *testSuite) approvedServiceBalancePaymentEnabledConfirmationCode() error {
+func (suite *testSuite) approvedServiceBalancePaymentPaidWorkOrder() error {
 	if err := suite.consumerStartedServiceBalanceCheckout("ana@example.com"); err != nil {
 		return err
 	}
@@ -81,10 +74,6 @@ func (suite *testSuite) approvedServiceBalancePaymentEnabledConfirmationCode() e
 	if err := suite.workOrderIsFullyPaid(); err != nil {
 		return err
 	}
-	if err := suite.consumerCanGetWorkOrderConfirmationCode(); err != nil {
-		return err
-	}
-	suite.previousConfirmationCode = suite.lastConfirmationCode
 	return nil
 }
 
@@ -330,22 +319,6 @@ func (suite *testSuite) processSameApprovedServiceBalanceNotificationTwice() err
 		return err
 	}
 	suite.previousPaymentTransactionID = transaction.ID
-	order, err := suite.persistedWorkOrderForLastServiceProposal()
-	if err != nil {
-		return err
-	}
-	if order.CompletionAuthorization == nil {
-		return fmt.Errorf("expected completion authorization after first approved notification")
-	}
-	suite.previousConfirmationCiphertext = append(
-		[]byte(nil),
-		order.CompletionAuthorization.CodeCiphertext()...,
-	)
-	suite.currentAuth0ID = auth0IDForConsumerEmail("ana@example.com")
-	if err := suite.consumerCanGetWorkOrderConfirmationCode(); err != nil {
-		return err
-	}
-	suite.previousConfirmationCode = suite.lastConfirmationCode
 	return suite.sendMercadoPagoPaymentNotification(externalPaymentID)
 }
 
@@ -360,9 +333,6 @@ func (suite *testSuite) workOrderIsFullyPaid() error {
 	}
 	if order.Status != workorder.StatusPaid {
 		return fmt.Errorf("expected work order status %q, got %q", workorder.StatusPaid, order.Status)
-	}
-	if order.CompletionAuthorization == nil {
-		return fmt.Errorf("expected fully paid work order to own a completion authorization")
 	}
 	return nil
 }
@@ -424,56 +394,6 @@ func (suite *testSuite) workOrderKeepsPendingBalance() error {
 	return nil
 }
 
-func (suite *testSuite) confirmationCodeIsNotAvailable() error {
-	order, err := suite.persistedWorkOrderForLastServiceProposal()
-	if err != nil {
-		return err
-	}
-	if order.CompletionAuthorization != nil {
-		return fmt.Errorf("expected work order not to own a completion authorization")
-	}
-	consumer, err := suite.userRepository.FindByID(context.Background(), order.ConsumerID())
-	if err != nil {
-		return fmt.Errorf("finding work order consumer: %w", err)
-	}
-	status, body, err := suite.getWorkOrderConfirmationCodeAs(consumer.AuthID())
-	if err != nil {
-		return err
-	}
-	if status != http.StatusConflict {
-		return fmt.Errorf("expected unavailable confirmation code status 409, got %d with body %s", status, body)
-	}
-	return nil
-}
-
-func (suite *testSuite) tryToGetWorkOrderConfirmationCode() error {
-	status, body, err := suite.getWorkOrderConfirmationCode()
-	if err != nil {
-		return err
-	}
-	suite.lastStatus = status
-	suite.lastBody = body
-	return nil
-}
-
-func (suite *testSuite) systemDeniesConfirmationCodeQuery() error {
-	if err := suite.lastResponseShouldHaveStatusCode(http.StatusForbidden); err != nil {
-		return err
-	}
-	var response registrationResponse
-	if err := json.Unmarshal(suite.lastBody, &response); err != nil {
-		return fmt.Errorf("decoding confirmation code error response: %w", err)
-	}
-	if response.Error != workorder.ErrOnlyConsumerCanViewConfirmationCode.Error() {
-		return fmt.Errorf(
-			"expected confirmation code ownership error %q, got %q",
-			workorder.ErrOnlyConsumerCanViewConfirmationCode,
-			response.Error,
-		)
-	}
-	return nil
-}
-
 func (suite *testSuite) systemDoesNotRegisterServiceBalanceCheckoutSession() error {
 	_, err := suite.paymentIntentRepository.FindLatestByProposalIDAndPurpose(
 		context.Background(),
@@ -519,19 +439,6 @@ func (suite *testSuite) systemDoesNotRegisterNewServiceBalanceCheckoutSession() 
 	return nil
 }
 
-func (suite *testSuite) consumerKeepsWorkOrderConfirmationCode() error {
-	if suite.previousConfirmationCode == "" {
-		return fmt.Errorf("expected confirmation code captured before retry")
-	}
-	if err := suite.consumerCanGetWorkOrderConfirmationCode(); err != nil {
-		return err
-	}
-	if suite.lastConfirmationCode != suite.previousConfirmationCode {
-		return fmt.Errorf("expected consumer confirmation code to remain unchanged")
-	}
-	return nil
-}
-
 func (suite *testSuite) systemKeepsOneActiveServiceBalanceIntent() error {
 	intent, err := suite.paymentIntentRepository.FindLatestByProposalIDAndPurpose(
 		context.Background(),
@@ -568,92 +475,6 @@ func (suite *testSuite) systemKeepsOneActiveServiceBalanceCheckoutSession() erro
 		return fmt.Errorf("expected exactly one external checkout request, got %d", suite.checkoutClient.RequestCount())
 	}
 	return nil
-}
-
-func (suite *testSuite) systemKeepsOneWorkOrderConfirmationCode() error {
-	if len(suite.previousConfirmationCiphertext) == 0 || suite.previousConfirmationCode == "" {
-		return fmt.Errorf("expected confirmation authorization captured after first notification")
-	}
-	order, err := suite.persistedWorkOrderForLastServiceProposal()
-	if err != nil {
-		return err
-	}
-	if order.CompletionAuthorization == nil {
-		return fmt.Errorf("expected work order completion authorization")
-	}
-	if string(order.CompletionAuthorization.CodeCiphertext()) != string(suite.previousConfirmationCiphertext) {
-		return fmt.Errorf("expected duplicate notification to preserve the encrypted confirmation code")
-	}
-	if err := suite.consumerCanGetWorkOrderConfirmationCode(); err != nil {
-		return err
-	}
-	if suite.lastConfirmationCode != suite.previousConfirmationCode {
-		return fmt.Errorf("expected duplicate notification to preserve the consumer confirmation code")
-	}
-	return nil
-}
-
-func (suite *testSuite) consumerCanGetWorkOrderConfirmationCode() error {
-	status, body, err := suite.getWorkOrderConfirmationCode()
-	if err != nil {
-		return err
-	}
-	if status != http.StatusOK {
-		return fmt.Errorf("expected confirmation code status 200, got %d with body %s", status, body)
-	}
-	var response struct {
-		ConfirmationCode string `json:"confirmation_code"`
-	}
-	if err := json.Unmarshal(body, &response); err != nil {
-		return fmt.Errorf("decoding work order confirmation code response: %w", err)
-	}
-	if _, err := workorder.NewConfirmationCode(response.ConfirmationCode); err != nil {
-		return fmt.Errorf("expected a four-digit work order confirmation code: %w", err)
-	}
-	order, err := suite.persistedWorkOrderForLastServiceProposal()
-	if err != nil {
-		return err
-	}
-	if order.CompletionAuthorization == nil {
-		return fmt.Errorf("expected work order completion authorization")
-	}
-	if string(order.CompletionAuthorization.CodeCiphertext()) == response.ConfirmationCode {
-		return fmt.Errorf("expected confirmation code to be encrypted at rest")
-	}
-	suite.lastConfirmationCode = response.ConfirmationCode
-	return nil
-}
-
-func (suite *testSuite) getWorkOrderConfirmationCode() (int, []byte, error) {
-	return suite.getWorkOrderConfirmationCodeAs(suite.currentAuth0ID)
-}
-
-func (suite *testSuite) getWorkOrderConfirmationCodeAs(auth0ID string) (int, []byte, error) {
-	order, err := suite.persistedWorkOrderForLastServiceProposal()
-	if err != nil {
-		return 0, nil, err
-	}
-	request, err := http.NewRequest(
-		http.MethodGet,
-		suite.server.URL+fmt.Sprintf(workOrderConfirmationCodePath, order.ID),
-		nil,
-	)
-	if err != nil {
-		return 0, nil, err
-	}
-	if auth0ID != "" {
-		request.Header.Set("Authorization", "Bearer "+suite.tokenBuilder.BuildToken(auth0ID, nil))
-	}
-	response, err := http.DefaultClient.Do(request)
-	if err != nil {
-		return 0, nil, fmt.Errorf("API connection failed: %w", err)
-	}
-	defer response.Body.Close()
-	body, err := io.ReadAll(response.Body)
-	if err != nil {
-		return 0, nil, fmt.Errorf("reading work order confirmation code response: %w", err)
-	}
-	return response.StatusCode, body, nil
 }
 
 func (suite *testSuite) serviceIsNotYetConfirmedAsPerformed() error {

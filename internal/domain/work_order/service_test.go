@@ -5,37 +5,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/LoResuelvo/loresuelvo-api/internal/domain/consumer"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/notification"
-	"github.com/LoResuelvo/loresuelvo-api/internal/domain/user"
 	workorder "github.com/LoResuelvo/loresuelvo-api/internal/domain/work_order"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
-
-func TestConsumerGetsDecryptedConfirmationCodeForFullyPaidWorkOrder(t *testing.T) {
-	now := time.Date(2026, time.July, 6, 13, 5, 0, 0, time.UTC)
-	order := workOrderFixture(84, 10, 20, now)
-	authorization, err := workorder.NewCompletionAuthorization([]byte("encrypted-code"), now)
-	require.NoError(t, err)
-	require.NoError(t, order.CompletePayment(authorization))
-	consumerUser := &consumer.Consumer{BaseUser: user.RehydrateBaseUser(
-		10, "auth0|consumer", "ana@example.com", "Ana", "Pérez", consumer.Role, nil,
-	)}
-	env := setupWorkOrderServiceTest(now)
-	env.users.On("FindByAuthID", "auth0|consumer").Return(consumerUser, nil).Once()
-	env.reader.On("FindByID", mock.Anything, order.ID).Return(order, nil).Once()
-	env.decryptor.On("Decrypt", []byte("encrypted-code")).Return("0042", nil).Once()
-
-	code, err := env.service.GetConfirmationCode(t.Context(), "auth0|consumer", order.ID)
-
-	require.NoError(t, err)
-	assert.Equal(t, "0042", code.String())
-	env.users.AssertExpectations(t)
-	env.reader.AssertExpectations(t)
-	env.decryptor.AssertExpectations(t)
-}
 
 func TestUrgentNotificationSavesAndNotifiesBothParticipants(t *testing.T) {
 	now := time.Now()

@@ -63,15 +63,12 @@ func (r *WorkOrderRepository) findOne(
 	argument int,
 ) (*workorder.WorkOrder, error) {
 	var (
-		order              workorder.WorkOrder
-		proposal           serviceproposal.ServiceProposal
-		codeCiphertext     []byte
-		completionIssuedOn sql.NullTime
+		order    workorder.WorkOrder
+		proposal serviceproposal.ServiceProposal
 	)
 	err := r.db.QueryRowContext(
 		ctx,
-		`SELECT wo.id, wo.service_proposal_id, wo.status, wo.accepted_on,
-			wo.completion_code_ciphertext, wo.fully_paid_on
+		`SELECT wo.id, wo.service_proposal_id, wo.status, wo.accepted_on
 		FROM work_orders wo
 		`+clause,
 		argument,
@@ -80,8 +77,6 @@ func (r *WorkOrderRepository) findOne(
 		&proposal.ID,
 		&order.Status,
 		&order.AcceptedOn,
-		&codeCiphertext,
-		&completionIssuedOn,
 	)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, workorder.ErrDoesNotExist
@@ -94,16 +89,6 @@ func (r *WorkOrderRepository) findOne(
 		return nil, fmt.Errorf("hydrating work order service proposal: %w", err)
 	}
 	order.ServiceProposal = foundProposal
-	if completionIssuedOn.Valid {
-		order.CompletionAuthorization, err = workorder.NewCompletionAuthorization(
-			codeCiphertext,
-			completionIssuedOn.Time,
-		)
-		if err != nil {
-			return nil, fmt.Errorf("rehydrating work order completion authorization: %w", err)
-		}
-	}
-
 	return &order, nil
 }
 
@@ -266,7 +251,6 @@ func (r *WorkOrderRepository) saveWithTx(ctx context.Context, tx *sql.Tx, order 
 	}
 
 	saved := *order
-	codeCiphertext, fullyPaidOn := workOrderCompletionAuthorizationValues(order)
 	if order.ID <= 0 {
 		err := tx.QueryRowContext(
 			ctx,
@@ -274,17 +258,13 @@ func (r *WorkOrderRepository) saveWithTx(ctx context.Context, tx *sql.Tx, order 
 			service_proposal_id,
 			status,
 			accepted_on,
-			completion_code_ciphertext,
-			fully_paid_on,
 			updated_on
 		)
-		VALUES ($1, $2, $3, $4, $5, NOW())
+		VALUES ($1, $2, $3, NOW())
 		RETURNING id`,
 			order.ServiceProposal.ServiceProposalID(),
 			order.Status,
 			order.AcceptedOn,
-			codeCiphertext,
-			fullyPaidOn,
 		).Scan(&saved.ID)
 		if err != nil {
 			return nil, fmt.Errorf("saving work order: %w", err)
@@ -296,14 +276,10 @@ func (r *WorkOrderRepository) saveWithTx(ctx context.Context, tx *sql.Tx, order 
 		ctx,
 		`UPDATE work_orders
 		SET status = $1,
-			completion_code_ciphertext = $2,
-			fully_paid_on = $3,
 			updated_on = NOW()
-		WHERE id = $4 AND service_proposal_id = $5
+		WHERE id = $2 AND service_proposal_id = $3
 		RETURNING id`,
 		order.Status,
-		codeCiphertext,
-		fullyPaidOn,
 		order.ID,
 		order.ServiceProposal.ServiceProposalID(),
 	).Scan(&saved.ID)
@@ -314,14 +290,6 @@ func (r *WorkOrderRepository) saveWithTx(ctx context.Context, tx *sql.Tx, order 
 		return nil, fmt.Errorf("updating work order: %w", err)
 	}
 	return &saved, nil
-}
-
-func workOrderCompletionAuthorizationValues(order *workorder.WorkOrder) ([]byte, *time.Time) {
-	if order == nil || order.CompletionAuthorization == nil {
-		return nil, nil
-	}
-	issuedOn := order.CompletionAuthorization.IssuedOn()
-	return order.CompletionAuthorization.CodeCiphertext(), &issuedOn
 }
 
 func rollbackWorkOrderTx(tx *sql.Tx, cause error) error {

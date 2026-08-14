@@ -69,13 +69,8 @@ type UnitOfWork interface {
 	Execute(ctx context.Context, operation func(TransactionalStore) error) error
 }
 
-type SecretProtector interface {
-	Encrypt(plaintext string) ([]byte, error)
+type CredentialDecryptor interface {
 	Decrypt(ciphertext []byte) (string, error)
-}
-
-type ConfirmationCodeGenerator interface {
-	Generate() (workorder.ConfirmationCode, error)
 }
 
 type CheckoutGateway interface {

@@ -7,11 +7,10 @@ post:
     Creates a Mercado Pago Checkout Pro session for the authenticated consumer
     to pay the immutable service balance and remaining platform fee of a
     scheduled work order. Creating checkout does not mark the work order as
-    fully paid and does not expose a completion confirmation code. When the
-    previous balance-payment intent was rejected, a new intent and checkout
-    session are created while preserving the immutable pending amounts. When
-    an active checkout already exists, concurrent and repeated requests reuse
-    the same payment intent and checkout URL.
+    fully paid. When the previous balance-payment intent was rejected, a new
+    intent and checkout session are created while preserving the immutable
+    pending amounts. When an active checkout already exists, concurrent and
+    repeated requests reuse the same payment intent and checkout URL.
   security:
     - BearerAuth: []
   parameters:

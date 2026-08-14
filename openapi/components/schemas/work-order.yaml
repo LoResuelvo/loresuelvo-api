@@ -37,6 +37,7 @@ properties:
     type: string
     enum:
       - scheduled
+      - paid
   accepted_on:
     type: string
     format: date-time

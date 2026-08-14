@@ -109,23 +109,8 @@ func (finder paymentAccountFinderStub) FindByProviderID(
 
 type credentialDecryptorStub struct{}
 
-func (credentialDecryptorStub) Encrypt(plaintext string) ([]byte, error) {
-	return []byte("encrypted:" + plaintext), nil
-}
-
 func (credentialDecryptorStub) Decrypt([]byte) (string, error) {
 	return "seller-access-token", nil
-}
-
-type confirmationCodeGeneratorStub struct {
-	code workorder.ConfirmationCode
-}
-
-func (generator confirmationCodeGeneratorStub) Generate() (workorder.ConfirmationCode, error) {
-	if generator.code.String() == "" {
-		return workorder.NewConfirmationCode("0042")
-	}
-	return generator.code, nil
 }
 
 type lockManagerStub struct{}
@@ -330,7 +315,6 @@ func TestStartServiceBalanceCheckoutCreatesReadyIntentWithFrozenRemainingPricing
 		checkoutGateway,
 		nil,
 		func() string { return "83b4dd7d-6d1c-4e9e-b3e5-7be31b264540" },
-		confirmationCodeGeneratorStub{},
 		clockStub{now: now},
 	)
 
@@ -423,7 +407,6 @@ func TestStartBookingCheckoutCreatesReadyIntentWithFrozenProposalPricing(t *test
 		checkoutGateway,
 		nil,
 		func() string { return "f69bfe31-ce5d-4f85-a8c5-643ca2dcaa36" },
-		confirmationCodeGeneratorStub{},
 		clockStub{now: now},
 	)
 
@@ -540,7 +523,6 @@ func TestStartBookingCheckoutEnforcesBookingPaymentDeadline(t *testing.T) {
 				checkoutGateway,
 				nil,
 				func() string { return "f69bfe31-ce5d-4f85-a8c5-643ca2dcaa36" },
-				confirmationCodeGeneratorStub{},
 				clockStub{now: test.now},
 			)
 
@@ -634,7 +616,6 @@ func TestProcessApprovedPaymentConfirmsPaidBooking(t *testing.T) {
 		gateway,
 		notificator,
 		func() string { return "unused" },
-		confirmationCodeGeneratorStub{},
 		clockStub{now: now},
 	)
 
@@ -671,7 +652,7 @@ func TestProcessApprovedPaymentConfirmsPaidBooking(t *testing.T) {
 	assert.Equal(t, 1, notificator.calls)
 }
 
-func TestProcessApprovedServiceBalanceAtomicallyPaysWorkOrderAndIssuesConfirmationAuthorization(t *testing.T) {
+func TestProcessApprovedServiceBalanceAtomicallyPaysWorkOrder(t *testing.T) {
 	now := time.Date(2026, time.July, 6, 13, 5, 0, 0, time.UTC)
 	terms, err := serviceproposal.NewBookingPolicy().Calculate(10000000, now.Add(-5*time.Minute))
 	require.NoError(t, err)
@@ -740,7 +721,6 @@ func TestProcessApprovedServiceBalanceAtomicallyPaysWorkOrderAndIssuesConfirmati
 		gateway,
 		&notificatorStub{},
 		func() string { return "unused" },
-		confirmationCodeGeneratorStub{},
 		clockStub{now: now},
 	)
 
@@ -758,21 +738,14 @@ func TestProcessApprovedServiceBalanceAtomicallyPaysWorkOrderAndIssuesConfirmati
 	assert.Nil(t, unitOfWork.proposal)
 	assert.Nil(t, unitOfWork.notification)
 	assert.Equal(t, workorder.StatusPaid, order.Status)
-	require.NotNil(t, order.CompletionAuthorization)
-	assert.Equal(t, []byte("encrypted:0042"), order.CompletionAuthorization.CodeCiphertext())
-	assert.Equal(t, now, order.CompletionAuthorization.IssuedOn())
 
-	firstCiphertext := append([]byte(nil), order.CompletionAuthorization.CodeCiphertext()...)
-	firstIssuedOn := order.CompletionAuthorization.IssuedOn()
 	transactionRepository.found = unitOfWork.transaction
 	require.NoError(t, service.ProcessPaymentNotification(t.Context(), payment.PaymentNotification{
 		ExternalPaymentID: gateway.payment.ID,
 		SellerAccountID:   gateway.payment.SellerAccountID,
 	}))
 	assert.Equal(t, 1, unitOfWork.calls)
-	require.NotNil(t, order.CompletionAuthorization)
-	assert.Equal(t, firstCiphertext, order.CompletionAuthorization.CodeCiphertext())
-	assert.Equal(t, firstIssuedOn, order.CompletionAuthorization.IssuedOn())
+	assert.Equal(t, workorder.StatusPaid, order.Status)
 }
 
 func TestProcessProcessingPaymentOnlyUpdatesIntent(t *testing.T) {
@@ -841,7 +814,6 @@ func TestProcessProcessingPaymentOnlyUpdatesIntent(t *testing.T) {
 		gateway,
 		notificator,
 		func() string { return "unused" },
-		confirmationCodeGeneratorStub{},
 		clockStub{now: now},
 	)
 
@@ -929,7 +901,6 @@ func TestProcessRejectedPaymentOnlyUpdatesIntent(t *testing.T) {
 		gateway,
 		notificator,
 		func() string { return "unused" },
-		confirmationCodeGeneratorStub{},
 		clockStub{now: now},
 	)
 

@@ -22,23 +22,22 @@ type CheckoutResult struct {
 }
 
 type Service struct {
-	intentRepository          IntentRepository
-	transactionRepository     TransactionRepository
-	serviceProposalFinder     ServiceProposalFinder
-	workOrderFinder           WorkOrderFinder
-	userFinder                UserFinder
-	paymentAccountFinder      PaymentAccountFinder
-	lockManager               LockManager
-	unitOfWork                UnitOfWork
-	secretProtector           SecretProtector
-	checkoutGateway           CheckoutGateway
-	paymentVerifier           PaymentVerifier
-	notificator               notification.Notificator
-	idGenerator               IDGenerator
-	confirmationCodeGenerator ConfirmationCodeGenerator
-	clock                     clock.Clock
-	checkoutPolicy            BookingCheckoutPolicy
-	serviceBalancePolicy      ServiceBalanceCheckoutPolicy
+	intentRepository      IntentRepository
+	transactionRepository TransactionRepository
+	serviceProposalFinder ServiceProposalFinder
+	workOrderFinder       WorkOrderFinder
+	userFinder            UserFinder
+	paymentAccountFinder  PaymentAccountFinder
+	lockManager           LockManager
+	unitOfWork            UnitOfWork
+	credentialDecryptor   CredentialDecryptor
+	checkoutGateway       CheckoutGateway
+	paymentVerifier       PaymentVerifier
+	notificator           notification.Notificator
+	idGenerator           IDGenerator
+	clock                 clock.Clock
+	checkoutPolicy        BookingCheckoutPolicy
+	serviceBalancePolicy  ServiceBalanceCheckoutPolicy
 }
 
 func NewService(
@@ -50,30 +49,28 @@ func NewService(
 	paymentAccountFinder PaymentAccountFinder,
 	lockManager LockManager,
 	unitOfWork UnitOfWork,
-	secretProtector SecretProtector,
+	credentialDecryptor CredentialDecryptor,
 	checkoutGateway CheckoutGateway,
 	paymentVerifier PaymentVerifier,
 	notificator notification.Notificator,
 	idGenerator IDGenerator,
-	confirmationCodeGenerator ConfirmationCodeGenerator,
 	clock clock.Clock,
 ) *Service {
 	return &Service{
-		intentRepository:          intentRepository,
-		transactionRepository:     transactionRepository,
-		serviceProposalFinder:     serviceProposalFinder,
-		workOrderFinder:           workOrderFinder,
-		userFinder:                userFinder,
-		paymentAccountFinder:      paymentAccountFinder,
-		lockManager:               lockManager,
-		unitOfWork:                unitOfWork,
-		secretProtector:           secretProtector,
-		checkoutGateway:           checkoutGateway,
-		paymentVerifier:           paymentVerifier,
-		notificator:               notificator,
-		idGenerator:               idGenerator,
-		confirmationCodeGenerator: confirmationCodeGenerator,
-		clock:                     clock,
+		intentRepository:      intentRepository,
+		transactionRepository: transactionRepository,
+		serviceProposalFinder: serviceProposalFinder,
+		workOrderFinder:       workOrderFinder,
+		userFinder:            userFinder,
+		paymentAccountFinder:  paymentAccountFinder,
+		lockManager:           lockManager,
+		unitOfWork:            unitOfWork,
+		credentialDecryptor:   credentialDecryptor,
+		checkoutGateway:       checkoutGateway,
+		paymentVerifier:       paymentVerifier,
+		notificator:           notificator,
+		idGenerator:           idGenerator,
+		clock:                 clock,
 	}
 }
 
@@ -245,7 +242,7 @@ func (service *Service) createCheckout(
 	if !account.CanReceivePayments() {
 		return nil, fmt.Errorf("starting checkout: provider payment account cannot receive payments")
 	}
-	accessToken, err := service.secretProtector.Decrypt(account.AccessTokenCiphertext())
+	accessToken, err := service.credentialDecryptor.Decrypt(account.AccessTokenCiphertext())
 	if err != nil {
 		return nil, fmt.Errorf("decrypting provider payment credential: %w", err)
 	}
@@ -318,7 +315,7 @@ func (service *Service) ProcessPaymentNotification(
 	if err != nil {
 		return fmt.Errorf("finding notified payment account: %w", err)
 	}
-	accessToken, err := service.secretProtector.Decrypt(account.AccessTokenCiphertext())
+	accessToken, err := service.credentialDecryptor.Decrypt(account.AccessTokenCiphertext())
 	if err != nil {
 		return fmt.Errorf("decrypting notified payment credential: %w", err)
 	}
@@ -431,20 +428,7 @@ func (persistence *paymentOutcomePersistence) VisitServiceBalanceApproved(outcom
 	if err != nil {
 		return err
 	}
-	code, err := persistence.service.confirmationCodeGenerator.Generate()
-	if err != nil {
-		return fmt.Errorf("generating work order confirmation code: %w", err)
-	}
-	codeCiphertext, err := persistence.service.secretProtector.Encrypt(code.String())
-	if err != nil {
-		return fmt.Errorf("encrypting work order confirmation code: %w", err)
-	}
-	issuedOn := persistence.service.clock.Now().UTC()
-	authorization, err := workorder.NewCompletionAuthorization(codeCiphertext, issuedOn)
-	if err != nil {
-		return err
-	}
-	if err := order.CompletePayment(authorization); err != nil {
+	if err := order.MarkPaid(); err != nil {
 		return err
 	}
 	return persistence.service.unitOfWork.Execute(

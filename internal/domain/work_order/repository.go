@@ -15,10 +15,6 @@ type Reader interface {
 	FindScheduledBetween(ctx context.Context, from time.Time, to time.Time) ([]*WorkOrder, error)
 }
 
-type ConfirmationCodeDecryptor interface {
-	Decrypt(ciphertext []byte) (string, error)
-}
-
 type NotificationRepository interface {
 	Save(ctx context.Context, notification *notification.Notification) (*notification.Notification, error)
 }

@@ -26,11 +26,10 @@ type ServiceProposal interface {
 }
 
 type WorkOrder struct {
-	ID                      int
-	ServiceProposal         ServiceProposal
-	Status                  Status
-	AcceptedOn              time.Time
-	CompletionAuthorization *CompletionAuthorization
+	ID              int
+	ServiceProposal ServiceProposal
+	Status          Status
+	AcceptedOn      time.Time
 }
 
 func New(serviceProposal ServiceProposal, acceptedOn time.Time) (*WorkOrder, error) {
@@ -85,30 +84,13 @@ func (wo *WorkOrder) ProviderID() int {
 	return wo.ServiceProposal.ProviderID()
 }
 
-func (wo *WorkOrder) CompletePayment(authorization *CompletionAuthorization) error {
+func (wo *WorkOrder) MarkPaid() error {
 	if wo == nil ||
 		wo.ID <= 0 ||
 		wo.ServiceProposal == nil ||
 		wo.Status != StatusScheduled {
 		return ErrWorkOrderNotEligibleForFullPayment
 	}
-	if !authorization.valid() {
-		return ErrInvalidCompletionAuthorization
-	}
 	wo.Status = StatusPaid
-	wo.CompletionAuthorization = authorization
 	return nil
-}
-
-func (wo *WorkOrder) ConfirmationAuthorizationFor(consumerID int) (*CompletionAuthorization, error) {
-	if wo == nil || wo.ServiceProposal == nil || consumerID <= 0 || wo.ConsumerID() != consumerID {
-		return nil, ErrOnlyConsumerCanViewConfirmationCode
-	}
-	if wo.Status != StatusPaid || wo.CompletionAuthorization == nil {
-		return nil, ErrConfirmationCodeNotAvailable
-	}
-	if !wo.CompletionAuthorization.valid() {
-		return nil, ErrInvalidCompletionAuthorization
-	}
-	return wo.CompletionAuthorization, nil
 }

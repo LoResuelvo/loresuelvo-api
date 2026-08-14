@@ -8,10 +8,9 @@ post:
     webhook signature and retrieves the payment directly from Mercado Pago before
     changing internal state. An approved matching booking payment accepts the
     proposal and atomically creates its scheduled work order. An approved
-    service-balance payment atomically marks the work order as paid and issues
-    its completion authorization. Repeated delivery of the same verified
-    external payment is idempotent and does not duplicate transactions, work
-    orders, or completion authorization codes.
+    service-balance payment atomically marks the work order as paid. Repeated
+    delivery of the same verified external payment is idempotent and does not
+    duplicate transactions or work orders.
   security: []
   parameters:
     - name: data.id

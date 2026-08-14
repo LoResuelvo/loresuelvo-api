@@ -67,17 +67,9 @@ func (m *userRepositoryMock) FindByAuthID(auth0ID string) (user.User, error) {
 	return args.Get(0).(user.User), args.Error(1)
 }
 
-type confirmationCodeDecryptorMock struct{ mock.Mock }
-
-func (m *confirmationCodeDecryptorMock) Decrypt(ciphertext []byte) (string, error) {
-	args := m.Called(ciphertext)
-	return args.String(0), args.Error(1)
-}
-
 type workOrderServiceTestEnv struct {
 	reader      *readerMock
 	users       *userRepositoryMock
-	decryptor   *confirmationCodeDecryptorMock
 	repository  *notificationRepositoryMock
 	notificator *notificatorMock
 	clock       *clockMock
@@ -87,7 +79,6 @@ type workOrderServiceTestEnv struct {
 func setupWorkOrderServiceTest(now time.Time) *workOrderServiceTestEnv {
 	reader := new(readerMock)
 	users := new(userRepositoryMock)
-	decryptor := new(confirmationCodeDecryptorMock)
 	repository := new(notificationRepositoryMock)
 	notificator := new(notificatorMock)
 	clock := new(clockMock)
@@ -96,11 +87,10 @@ func setupWorkOrderServiceTest(now time.Time) *workOrderServiceTestEnv {
 	return &workOrderServiceTestEnv{
 		reader:      reader,
 		users:       users,
-		decryptor:   decryptor,
 		repository:  repository,
 		notificator: notificator,
 		clock:       clock,
-		service:     workorder.NewService(reader, users, nil, decryptor, repository, notificator, clock),
+		service:     workorder.NewService(reader, users, nil, repository, notificator, clock),
 	}
 }
 

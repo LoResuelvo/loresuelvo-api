@@ -2760,7 +2760,7 @@
                 ],
                 "operationId": "processMercadoPagoWebhook",
                 "summary": "Process a Mercado Pago payment notification",
-                "description": "Public server-to-server callback used by Mercado Pago. The API validates the\nwebhook signature and retrieves the payment directly from Mercado Pago before\nchanging internal state. An approved matching booking payment accepts the\nproposal and atomically creates its scheduled work order. An approved\nservice-balance payment atomically marks the work order as paid and issues\nits completion authorization. Repeated delivery of the same verified\nexternal payment is idempotent and does not duplicate transactions, work\norders, or completion authorization codes.\n",
+                "description": "Public server-to-server callback used by Mercado Pago. The API validates the\nwebhook signature and retrieves the payment directly from Mercado Pago before\nchanging internal state. An approved matching booking payment accepts the\nproposal and atomically creates its scheduled work order. An approved\nservice-balance payment atomically marks the work order as paid. Repeated\ndelivery of the same verified external payment is idempotent and does not\nduplicate transactions or work orders.\n",
                 "security": [],
                 "parameters": [
                     {
@@ -2951,7 +2951,7 @@
                 ],
                 "operationId": "startWorkOrderBalanceCheckout",
                 "summary": "Start service-balance checkout",
-                "description": "Creates a Mercado Pago Checkout Pro session for the authenticated consumer\nto pay the immutable service balance and remaining platform fee of a\nscheduled work order. Creating checkout does not mark the work order as\nfully paid and does not expose a completion confirmation code. When the\nprevious balance-payment intent was rejected, a new intent and checkout\nsession are created while preserving the immutable pending amounts. When\nan active checkout already exists, concurrent and repeated requests reuse\nthe same payment intent and checkout URL.\n",
+                "description": "Creates a Mercado Pago Checkout Pro session for the authenticated consumer\nto pay the immutable service balance and remaining platform fee of a\nscheduled work order. Creating checkout does not mark the work order as\nfully paid. When the previous balance-payment intent was rejected, a new\nintent and checkout session are created while preserving the immutable\npending amounts. When an active checkout already exists, concurrent and\nrepeated requests reuse the same payment intent and checkout URL.\n",
                 "security": [
                     {
                         "BearerAuth": []
@@ -3075,104 +3075,6 @@
                     },
                     "500": {
                         "description": "The checkout session could not be created.",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/ErrorResponse"
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        "/work-orders/{workOrderId}/confirmation-code": {
-            "get": {
-                "tags": [
-                    "WorkOrders"
-                ],
-                "operationId": "getWorkOrderConfirmationCode",
-                "summary": "Get the fully paid work order confirmation code",
-                "description": "Returns the four-digit confirmation code only to the consumer who owns the\nwork order and only after Mercado Pago has verified the full service-balance\npayment. This operation does not confirm that the service was performed.\n",
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "parameters": [
-                    {
-                        "name": "workOrderId",
-                        "in": "path",
-                        "required": true,
-                        "schema": {
-                            "type": "integer",
-                            "minimum": 1
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "Confirmation code available to the work order consumer.",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/WorkOrderConfirmationCode"
-                                }
-                            }
-                        }
-                    },
-                    "400": {
-                        "description": "The work order identifier is invalid.",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/ErrorResponse"
-                                }
-                            }
-                        }
-                    },
-                    "401": {
-                        "description": "Missing or invalid authentication.",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/AuthErrorResponse"
-                                }
-                            }
-                        }
-                    },
-                    "403": {
-                        "description": "The authenticated user is not the work order's consumer.",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/ErrorResponse"
-                                }
-                            }
-                        }
-                    },
-                    "404": {
-                        "description": "The work order does not exist.",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/ErrorResponse"
-                                }
-                            }
-                        }
-                    },
-                    "409": {
-                        "description": "The full service-balance payment has not been approved and verified yet.",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/ErrorResponse"
-                                }
-                            }
-                        }
-                    },
-                    "500": {
-                        "description": "The confirmation code could not be retrieved.",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -4081,21 +3983,6 @@
                 },
                 "additionalProperties": false
             },
-            "WorkOrderConfirmationCode": {
-                "type": "object",
-                "description": "Consumer-visible credential used later to authorize confirmation that the service was performed.",
-                "required": [
-                    "confirmation_code"
-                ],
-                "properties": {
-                    "confirmation_code": {
-                        "type": "string",
-                        "pattern": "^[0-9]{4}$",
-                        "example": "0042"
-                    }
-                },
-                "additionalProperties": false
-            },
             "PaymentIntent": {
                 "type": "object",
                 "required": [
@@ -4726,7 +4613,8 @@
                     "status": {
                         "type": "string",
                         "enum": [
-                            "scheduled"
+                            "scheduled",
+                            "paid"
                         ]
                     },
                     "accepted_on": {

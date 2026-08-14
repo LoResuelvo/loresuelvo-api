@@ -84,8 +84,6 @@ paths:
     $ref: ./paths/work-orders.yaml
   /work-orders/{workOrderId}/checkout-sessions:
     $ref: ./paths/work-order-checkout-sessions.yaml
-  /work-orders/{workOrderId}/confirmation-code:
-    $ref: ./paths/work-order-confirmation-code.yaml
   /conversations/{conversationId}:
     $ref: ./paths/conversation-by-id.yaml
   /conversations/{conversationId}/messages:
@@ -218,8 +216,6 @@ components:
       $ref: ./components/schemas/service-balance-checkout-session.yaml
     ServiceBalancePricing:
       $ref: ./components/schemas/service-balance-pricing.yaml
-    WorkOrderConfirmationCode:
-      $ref: ./components/schemas/work-order-confirmation-code.yaml
     PaymentIntent:
       $ref: ./components/schemas/payment-intent.yaml
     PresignFileRequest:

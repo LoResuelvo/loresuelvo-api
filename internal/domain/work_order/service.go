@@ -12,61 +12,30 @@ import (
 )
 
 type Service struct {
-	reader                    Reader
-	userRepository            UserRepository
-	fileURLResolver           FileURLResolver
-	confirmationCodeDecryptor ConfirmationCodeDecryptor
-	clock                     clock.Clock
-	notificator               notification.Notificator
-	notificationRepository    NotificationRepository
+	reader                 Reader
+	userRepository         UserRepository
+	fileURLResolver        FileURLResolver
+	clock                  clock.Clock
+	notificator            notification.Notificator
+	notificationRepository NotificationRepository
 }
 
 func NewService(
 	reader Reader,
 	userRepository UserRepository,
 	fileURLResolver FileURLResolver,
-	confirmationCodeDecryptor ConfirmationCodeDecryptor,
 	notificationRepository NotificationRepository,
 	notificator notification.Notificator,
 	clock clock.Clock,
 ) *Service {
 	return &Service{
-		reader:                    reader,
-		userRepository:            userRepository,
-		fileURLResolver:           fileURLResolver,
-		confirmationCodeDecryptor: confirmationCodeDecryptor,
-		notificationRepository:    notificationRepository,
-		notificator:               notificator,
-		clock:                     clock,
+		reader:                 reader,
+		userRepository:         userRepository,
+		fileURLResolver:        fileURLResolver,
+		notificationRepository: notificationRepository,
+		notificator:            notificator,
+		clock:                  clock,
 	}
-}
-
-func (s *Service) GetConfirmationCode(
-	ctx context.Context,
-	auth0ID string,
-	workOrderID int,
-) (ConfirmationCode, error) {
-	foundUser, err := s.userRepository.FindByAuthID(auth0ID)
-	if err != nil {
-		return ConfirmationCode{}, ErrOnlyConsumerCanViewConfirmationCode
-	}
-	order, err := s.reader.FindByID(ctx, workOrderID)
-	if err != nil {
-		return ConfirmationCode{}, err
-	}
-	authorization, err := order.ConfirmationAuthorizationFor(foundUser.ID())
-	if err != nil {
-		return ConfirmationCode{}, err
-	}
-	plaintext, err := s.confirmationCodeDecryptor.Decrypt(authorization.CodeCiphertext())
-	if err != nil {
-		return ConfirmationCode{}, fmt.Errorf("decrypting work order confirmation code: %w", err)
-	}
-	code, err := NewConfirmationCode(plaintext)
-	if err != nil {
-		return ConfirmationCode{}, fmt.Errorf("rehydrating work order confirmation code: %w", err)
-	}
-	return code, nil
 }
 
 func (s *Service) GetWorkOrders(ctx context.Context, auth0ID string) ([]readmodel.WorkOrderSummary, error) {
