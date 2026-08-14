@@ -6,6 +6,7 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    environment: staging
     steps:
       - name: Deploy via SSH a Staging
         uses: appleboy/ssh-action@master
@@ -19,7 +20,8 @@ jobs:
             git fetch --tags --force
             git checkout ${{ github.ref_name }}
 
-            cat > .env <<EOF
+            cat config/staging.conf > .env
+            cat >> .env <<EOF
             DATABASE_URL=${{ secrets.DATABASE_URL_STAGING }}
             AUTH0_DOMAIN=${{ secrets.AUTH0_DOMAIN_STAGING }}
             AUTH0_AUDIENCE=${{ secrets.AUTH0_AUDIENCE_STAGING }}
@@ -37,19 +39,10 @@ jobs:
             CHATBOT_PROVIDER=${{ secrets.CHATBOT_PROVIDER }}
             CHATBOT_API_KEY=${{ secrets.CHATBOT_API_KEY_STAGING }}
             CHATBOT_MODEL=${{ secrets.CHATBOT_MODEL }}
-            MERCADO_PAGO_ENVIRONMENT=sandbox
-            MERCADO_PAGO_CLIENT_ID=${{ secrets.MERCADO_PAGO_CLIENT_ID_STAGING }}
-            MERCADO_PAGO_CLIENT_SECRET=${{ secrets.MERCADO_PAGO_CLIENT_SECRET_STAGING }}
-            MERCADO_PAGO_REDIRECT_URI=${{ secrets.MERCADO_PAGO_REDIRECT_URI_STAGING }}
-            PAYMENT_ACCOUNT_PROVIDER=${{ secrets.PAYMENT_ACCOUNT_PROVIDER_STAGING }}
-            PAYMENT_ACCOUNT_CONNECTION_SUCCESS_URL=${{ secrets.PAYMENT_ACCOUNT_CONNECTION_SUCCESS_URL_STAGING }}
-            PAYMENT_ACCOUNT_CONNECTION_CANCELLED_URL=${{ secrets.PAYMENT_ACCOUNT_CONNECTION_CANCELLED_URL_STAGING }}
-            PAYMENT_ACCOUNT_CREDENTIAL_ENCRYPTION_KEY=${{ secrets.PAYMENT_ACCOUNT_CREDENTIAL_ENCRYPTION_KEY_STAGING }}
-            PAYMENT_CHECKOUT_SUCCESS_URL=${{ secrets.PAYMENT_CHECKOUT_SUCCESS_URL_STAGING }}
-            PAYMENT_CHECKOUT_PENDING_URL=${{ secrets.PAYMENT_CHECKOUT_PENDING_URL_STAGING }}
-            PAYMENT_CHECKOUT_FAILURE_URL=${{ secrets.PAYMENT_CHECKOUT_FAILURE_URL_STAGING }}
-            MERCADO_PAGO_NOTIFICATION_URL=${{ secrets.MERCADO_PAGO_NOTIFICATION_URL_STAGING }}
-            MERCADO_PAGO_WEBHOOK_SECRET=${{ secrets.MERCADO_PAGO_WEBHOOK_SECRET_STAGING }}
+            MERCADO_PAGO_CLIENT_ID=${{ secrets.MERCADO_PAGO_CLIENT_ID }}
+            MERCADO_PAGO_CLIENT_SECRET=${{ secrets.MERCADO_PAGO_CLIENT_SECRET }}
+            PAYMENT_ACCOUNT_CREDENTIAL_ENCRYPTION_KEY=${{ secrets.PAYMENT_ACCOUNT_CREDENTIAL_ENCRYPTION_KEY }}
+            MERCADO_PAGO_WEBHOOK_SECRET=${{ secrets.MERCADO_PAGO_WEBHOOK_SECRET }}
             SEEDS_ENABLED=${{ secrets.SEEDS_ENABLED }}
             SEEDS_FILE=seeds/providers-100.yaml
             EOF
