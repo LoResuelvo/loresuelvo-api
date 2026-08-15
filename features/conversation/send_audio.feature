@@ -150,14 +150,12 @@ Feature: 50.1 Enviar audios por el chat
 
     Rule: Los audios son privados para los participantes del chat
 
-    @wip
     Scenario: 50.1.15-EAC Rechazar el acceso de un consumidor ajeno al audio
         Given que el consumidor "ana@example.com" envió el audio "ruido-bomba.webm" en el chat con el prestador "juan.plomero@example.com"
         And que estoy autenticado como consumidor "carla@example.com"
         When intento acceder al audio "ruido-bomba.webm" adjunto al mensaje
         Then el sistema me indica que no puedo acceder a ese audio
 
-    @wip
     Scenario: 50.1.16-EAC Rechazar el acceso de un prestador ajeno al audio
         Given que el consumidor "ana@example.com" envió el audio "ruido-bomba.webm" en el chat con el prestador "juan.plomero@example.com"
         And que estoy autenticado como prestador "pedro.plomero@example.com"
