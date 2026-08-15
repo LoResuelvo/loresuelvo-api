@@ -49,8 +49,12 @@ type confirmedAudioResponse struct {
 }
 
 func registerSendAudioSteps(sc *godog.ScenarioContext, suite *testSuite) {
+	sc.Step(`^que existe una conversación pendiente entre el consumidor "([^"]*)" y el prestador "([^"]*)"$`, suite.thereIsPendingConversationBetweenConsumerAndProviderWithoutInitialMessage)
+	sc.Step(`^que el consumidor "([^"]*)" ya alcanzó el límite de mensajes permitido en esa conversación pendiente$`, suite.consumerHasReachedPendingConversationMessageLimit)
 	sc.Step(`^intento enviar únicamente el audio "([^"]*)" en la conversación pendiente con la consumidora "([^"]*)"$`, suite.trySendAudioOnlyMessageInPendingConversationWithConsumer)
+	sc.Step(`^intento enviar únicamente el audio "([^"]*)" en la conversación pendiente con el prestador "([^"]*)"$`, suite.trySendAudioOnlyMessageInPendingConversationWithProvider)
 	sc.Step(`^el sistema rechaza el mensaje porque el prestador debe aceptar la solicitud de trabajo antes de responder$`, suite.systemRejectsProviderAudioInPendingConversation)
+	sc.Step(`^el sistema rechaza el mensaje porque se alcanzó el límite de mensajes de la conversación pendiente$`, suite.systemRejectsConsumerAudioInPendingConversation)
 	sc.Step(`^el sistema no asocia el audio a ningún mensaje$`, suite.systemDoesNotAssociateAudioWithAnyMessage)
 	sc.Step(`^envío únicamente el audio "([^"]*)" en el chat con la consumidora "([^"]*)"$`, suite.sendAudioOnlyMessageInChatWithConsumer)
 	sc.Step(`^el mensaje fue enviado por el prestador "([^"]*)"$`, suite.audioMessageWasSentBy)
@@ -103,6 +107,35 @@ func (suite *testSuite) uploadAndConfirmMessageAudio(name, durationText string) 
 		return err
 	}
 	return suite.confirmMessageAudio(suite.currentAuth0ID, *upload, fixture)
+}
+
+func (suite *testSuite) thereIsPendingConversationBetweenConsumerAndProviderWithoutInitialMessage(consumerEmail, providerEmail string) error {
+	return suite.createPendingConversationBetweenConsumerAndProvider(consumerEmail, providerEmail, "")
+}
+
+func (suite *testSuite) consumerHasReachedPendingConversationMessageLimit(consumerEmail string) error {
+	if suite.lastConversationID == 0 {
+		return fmt.Errorf("expected a prepared pending conversation before reaching the message limit")
+	}
+	if _, err := suite.userRepository.FindIDByEmail(consumerEmail); err != nil {
+		return err
+	}
+
+	previousAuth0ID := suite.currentAuth0ID
+	suite.currentAuth0ID = auth0IDForConsumerEmail(consumerEmail)
+	defer func() { suite.currentAuth0ID = previousAuth0ID }()
+
+	for messageNumber := 1; messageNumber <= conversation.PendingConsumerMessageLimit; messageNumber++ {
+		if err := suite.requestSendMessageToPreparedConversation(sendMessageRequest{
+			Content: fmt.Sprintf("Mensaje previo %d", messageNumber),
+		}); err != nil {
+			return err
+		}
+		if err := suite.lastResponseShouldHaveStatusCode(http.StatusCreated); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (suite *testSuite) putMessageAudioObject(upload presignFileResponse, data []byte) error {
@@ -177,6 +210,10 @@ func (suite *testSuite) sendAudioOnlyMessageInPendingConversationWithProvider(au
 
 func (suite *testSuite) trySendAudioOnlyMessageInPendingConversationWithConsumer(audioName, consumerFullName string) error {
 	return suite.sendAudioOnlyMessageInChatWithParticipant(audioName, consumerFullName, participantRoleConsumer)
+}
+
+func (suite *testSuite) trySendAudioOnlyMessageInPendingConversationWithProvider(audioName, providerFullName string) error {
+	return suite.sendAudioOnlyMessageInChatWithParticipant(audioName, providerFullName, participantRoleProvider)
 }
 
 func (suite *testSuite) sendAudioOnlyMessageInChatWithParticipant(audioName, participantFullName, participantRole string) error {
@@ -258,6 +295,13 @@ func (suite *testSuite) systemRejectsProviderAudioInPendingConversation() error 
 		return err
 	}
 	return suite.lastErrorResponseShouldSay(conversation.ErrPendingConversationRequiresAcceptance.Error())
+}
+
+func (suite *testSuite) systemRejectsConsumerAudioInPendingConversation() error {
+	if err := suite.lastResponseShouldHaveStatusCode(http.StatusConflict); err != nil {
+		return err
+	}
+	return suite.lastErrorResponseShouldSay(conversation.ErrPendingConversationMessageLimitReached.Error())
 }
 
 func (suite *testSuite) systemDoesNotAssociateAudioWithAnyMessage() error {

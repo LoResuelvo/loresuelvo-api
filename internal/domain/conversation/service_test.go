@@ -1105,6 +1105,24 @@ func TestSendMessageRejectsConsumerMessageWhenPendingLimitWasReached(t *testing.
 	assert.False(t, repo.updateCalled)
 }
 
+func TestSendMessageRejectsConsumerAudioWhenPendingLimitWasReached(t *testing.T) {
+	repo := &conversationRepositoryMock{
+		foundResult: conversationFixture(),
+		countResult: conversation.PendingConsumerMessageLimit,
+	}
+	consumerIDFinder := &consumerIDFinderMock{consumerID: 10}
+	providerIDFinder := &providerIDFinderMock{err: errors.New("provider not found")}
+
+	service := conversation.NewService(repo, newUserRepositoryMock(consumerIDFinder, providerIDFinder), &conversationReaderMock{}, &messagePublisherMock{}, &chatbotMock{}, nil, &fileURLResolverMock{}, fixedClock{now: time.Now().UTC()})
+
+	sentMessage, err := service.SendMessage(context.Background(), "auth0|consumer", 1, "", nil, "audio-file-id")
+
+	assert.ErrorIs(t, err, conversation.ErrPendingConversationMessageLimitReached)
+	assert.Nil(t, sentMessage)
+	assert.True(t, repo.countCalled)
+	assert.False(t, repo.updateCalled)
+}
+
 func TestSendMessageRejectsAuthenticatedUserThatIsNotParticipant(t *testing.T) {
 	repo := &conversationRepositoryMock{foundResult: conversationFixture()}
 	consumerIDFinder := &consumerIDFinderMock{consumerID: 999}
