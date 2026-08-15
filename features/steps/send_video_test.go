@@ -21,11 +21,14 @@ import (
 const (
 	conversationMessageVideoPurpose = "conversation_message_video"
 	conversationMessageVideoMIME    = "video/mp4"
+	invalidMessageVideoContent      = "not-a-valid-mp4-video"
 )
 
 type messageVideoFixture struct {
 	FileID          string
 	Key             string
+	UploadURL       string
+	Headers         map[string]string
 	OriginalName    string
 	MimeType        string
 	SizeBytes       int
@@ -57,6 +60,13 @@ func registerSendVideoSteps(sc *godog.ScenarioContext, suite *testSuite) {
 	sc.Step(`^envío únicamente el video "([^"]*)" en el chat con el prestador "([^"]*)"$`, suite.sendVideoOnlyMessageInChatWithProvider)
 	sc.Step(`^intento enviar únicamente el video "([^"]*)" en el chat con el prestador "([^"]*)"$`, suite.sendVideoOnlyMessageInChatWithProvider)
 	sc.Step(`^intento enviar únicamente el archivo "([^"]*)" como video en el chat con el prestador "([^"]*)"$`, suite.sendVideoOnlyMessageInChatWithProvider)
+	sc.Step(`^intento acceder al video "([^"]*)" adjunto al mensaje$`, suite.tryAccessMessageVideo)
+	sc.Step(`^el sistema me indica que no puedo acceder a ese video$`, suite.systemReportsMessageVideoAccessDenied)
+	sc.Step(`^intento cargar el video "([^"]*)" con formato ([^,]+), codec de video ([^,]+) y codec de audio ([^"]+) para un mensaje del chat$`, suite.tryUploadUnsupportedMessageVideo)
+	sc.Step(`^el sistema rechaza la carga porque el video no usa MP4 con H\.264 y AAC opcional$`, suite.systemRejectsUnsupportedMessageVideo)
+	sc.Step(`^que solicité cargar "([^"]*)" como video MP4 con H\.264$`, suite.requestedMessageVideoUpload)
+	sc.Step(`^intento confirmar un archivo cuyo contenido no corresponde a un video MP4 válido$`, suite.tryConfirmInvalidMessageVideo)
+	sc.Step(`^el sistema rechaza la confirmación porque el contenido del video no es válido$`, suite.systemRejectsUnsupportedMessageVideo)
 	sc.Step(`^envío el video "([^"]*)" en el chat con la consumidora "([^"]*)" acompañado del texto:$`, suite.sendVideoWithTextInChatWithConsumer)
 	sc.Step(`^envío el video "([^"]*)" en la conversación pendiente con el prestador "([^"]*)" acompañado del texto:$`, suite.sendVideoWithTextInPendingConversationWithProvider)
 	sc.Step(`^intento enviar únicamente el video "([^"]*)" en la conversación pendiente con la consumidora "([^"]*)"$`, suite.trySendVideoOnlyMessageInPendingConversationWithConsumer)
@@ -158,6 +168,17 @@ func (suite *testSuite) systemAllowsProviderToAccessAttachedVideo() error {
 	return nil
 }
 
+func (suite *testSuite) tryAccessMessageVideo(videoName string) error {
+	if _, err := suite.messageVideoFixture(videoName); err != nil {
+		return err
+	}
+	return suite.requestConversationByID(suite.lastConversationID)
+}
+
+func (suite *testSuite) systemReportsMessageVideoAccessDenied() error {
+	return suite.lastResponseShouldHaveStatusCode(http.StatusForbidden)
+}
+
 func (suite *testSuite) videoInConversationDetail(detail conversationDetailResponse, videoName string) (*messageVideoResponse, error) {
 	if strings.TrimSpace(videoName) == "" {
 		return nil, fmt.Errorf("expected a video name before checking conversation detail")
@@ -226,20 +247,9 @@ func (suite *testSuite) uploadMessageVideoWithOptions(authID, name, durationText
 	}
 
 	videoData := testMP4Video(durationSeconds, withAudio)
-	upload, err := suite.requestProfilePhotoPresign(authID, presignFileRequest{
-		OriginalName: name,
-		MimeType:     conversationMessageVideoMIME,
-		SizeBytes:    len(videoData),
-		Purpose:      conversationMessageVideoPurpose,
-	})
+	upload, err := suite.requestMessageVideoPresign(authID, name, conversationMessageVideoMIME, len(videoData))
 	if err != nil {
 		return err
-	}
-	if err := suite.lastResponseShouldHaveStatusCode(http.StatusOK); err != nil {
-		return err
-	}
-	if upload.FileID == "" || upload.Key == "" || upload.UploadURL == "" {
-		return fmt.Errorf("expected presign response for video %q to include file_id, key and upload_url, got body %s", name, string(suite.lastBody))
 	}
 
 	if err := suite.putMessageVideoObject(*upload, videoData); err != nil {
@@ -248,6 +258,8 @@ func (suite *testSuite) uploadMessageVideoWithOptions(authID, name, durationText
 	fixture := messageVideoFixture{
 		FileID:          upload.FileID,
 		Key:             upload.Key,
+		UploadURL:       upload.UploadURL,
+		Headers:         upload.Headers,
 		OriginalName:    name,
 		MimeType:        conversationMessageVideoMIME,
 		SizeBytes:       len(videoData),
@@ -264,24 +276,13 @@ func (suite *testSuite) uploadMessageVideoWithOptions(authID, name, durationText
 		return nil
 	}
 
-	resp, err := suite.postJSONWithAuth(authID, "/files/"+upload.FileID+"/confirm", confirmFileRequest{
-		Key:       upload.Key,
-		MimeType:  fixture.MimeType,
-		SizeBytes: fixture.SizeBytes,
-	})
-	if err != nil {
+	if err := suite.confirmMessageVideoUpload(authID, fixture); err != nil {
 		return err
 	}
-	defer resp.Body.Close()
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return fmt.Errorf("failed to read video confirmation response: %w", err)
-	}
-	suite.lastStatus = resp.StatusCode
-	suite.lastBody = body
 	if err := suite.lastResponseShouldHaveStatusCode(http.StatusOK); err != nil {
 		return err
 	}
+	body := suite.lastBody
 	var response confirmedFileResponse
 	if err := json.Unmarshal(body, &response); err != nil {
 		return fmt.Errorf("failed to parse video confirmation response: %w", err)
@@ -294,6 +295,141 @@ func (suite *testSuite) uploadMessageVideoWithOptions(authID, name, durationText
 		return fmt.Errorf("video confirmation response does not match fixture %q: %s", fixture.OriginalName, string(body))
 	}
 	return nil
+}
+
+func (suite *testSuite) requestMessageVideoPresign(authID, name, mimeType string, sizeBytes int) (*presignFileResponse, error) {
+	upload, err := suite.requestProfilePhotoPresign(authID, presignFileRequest{
+		OriginalName: name,
+		MimeType:     mimeType,
+		SizeBytes:    sizeBytes,
+		Purpose:      conversationMessageVideoPurpose,
+	})
+	if err != nil {
+		return nil, err
+	}
+	if err := suite.lastResponseShouldHaveStatusCode(http.StatusOK); err != nil {
+		return nil, err
+	}
+	if upload.FileID == "" || upload.Key == "" || upload.UploadURL == "" {
+		return nil, fmt.Errorf("expected presign response for video %q to include file_id, key and upload_url, got body %s", name, string(suite.lastBody))
+	}
+	return upload, nil
+}
+
+func (suite *testSuite) confirmMessageVideoUpload(authID string, fixture messageVideoFixture) error {
+	resp, err := suite.postJSONWithAuth(authID, "/files/"+fixture.FileID+"/confirm", confirmFileRequest{
+		Key:       fixture.Key,
+		MimeType:  fixture.MimeType,
+		SizeBytes: fixture.SizeBytes,
+	})
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("failed to read video confirmation response: %w", err)
+	}
+	suite.lastStatus = resp.StatusCode
+	suite.lastBody = body
+	return nil
+}
+
+func (suite *testSuite) tryUploadUnsupportedMessageVideo(name, format, videoCodec, audioCodec string) error {
+	mimeType := "video/" + strings.ToLower(strings.TrimSpace(format))
+	if !strings.EqualFold(strings.TrimSpace(format), "MP4") {
+		_, err := suite.requestProfilePhotoPresign(suite.currentAuth0ID, presignFileRequest{
+			OriginalName: name,
+			MimeType:     mimeType,
+			SizeBytes:    1024,
+			Purpose:      conversationMessageVideoPurpose,
+		})
+		return err
+	}
+
+	videoData := testMP4VideoWithCodecs(18, videoCodec, audioCodec)
+	upload, err := suite.requestMessageVideoPresign(suite.currentAuth0ID, name, mimeType, len(videoData))
+	if err != nil {
+		return err
+	}
+	fixture := messageVideoFixture{
+		FileID:          upload.FileID,
+		Key:             upload.Key,
+		UploadURL:       upload.UploadURL,
+		Headers:         upload.Headers,
+		OriginalName:    name,
+		MimeType:        mimeType,
+		SizeBytes:       len(videoData),
+		VideoCodec:      parsedVideoCodec(videoCodec),
+		AudioCodec:      parsedAudioCodec(audioCodec),
+		DurationSeconds: 18,
+		Width:           1080,
+		Height:          1920,
+	}
+	suite.messageVideosByName[name] = fixture
+	suite.lastAttemptedMessageVideoName = name
+	if err := suite.putMessageVideoObject(*upload, videoData); err != nil {
+		return err
+	}
+	return suite.confirmMessageVideoUpload(suite.currentAuth0ID, fixture)
+}
+
+func (suite *testSuite) requestedMessageVideoUpload(name string) error {
+	invalidData := []byte(invalidMessageVideoContent)
+	upload, err := suite.requestMessageVideoPresign(suite.currentAuth0ID, name, conversationMessageVideoMIME, len(invalidData))
+	if err != nil {
+		return err
+	}
+	suite.messageVideosByName[name] = messageVideoFixture{
+		FileID:       upload.FileID,
+		Key:          upload.Key,
+		UploadURL:    upload.UploadURL,
+		Headers:      upload.Headers,
+		OriginalName: name,
+		MimeType:     conversationMessageVideoMIME,
+		SizeBytes:    len(invalidData),
+	}
+	suite.lastAttemptedMessageVideoName = name
+	return nil
+}
+
+func (suite *testSuite) tryConfirmInvalidMessageVideo() error {
+	fixture, err := suite.messageVideoFixture(suite.lastAttemptedMessageVideoName)
+	if err != nil {
+		return err
+	}
+	if err := suite.putMessageVideoObject(presignFileResponse{
+		FileID:    fixture.FileID,
+		Key:       fixture.Key,
+		UploadURL: fixture.UploadURL,
+		Headers:   fixture.Headers,
+	}, []byte(invalidMessageVideoContent)); err != nil {
+		return err
+	}
+	return suite.confirmMessageVideoUpload(suite.currentAuth0ID, fixture)
+}
+
+func (suite *testSuite) systemRejectsUnsupportedMessageVideo() error {
+	if err := suite.lastResponseShouldHaveStatusCode(http.StatusBadRequest); err != nil {
+		return err
+	}
+	return suite.lastErrorResponseShouldSay(filedomain.ErrUnsupportedMessageVideo.Error())
+}
+
+func parsedVideoCodec(codec string) string {
+	switch strings.ToLower(strings.TrimSpace(codec)) {
+	case "h.264", "h264":
+		return "h264"
+	case "hevc":
+		return "hvc1"
+	default:
+		return strings.ToLower(strings.TrimSpace(codec))
+	}
+}
+
+func parsedAudioCodec(codec string) string {
+	return strings.ToLower(strings.TrimSpace(codec))
 }
 
 func (suite *testSuite) uploadedAndConfirmedVideoFileForOtherPurpose(name string) error {
@@ -704,13 +840,21 @@ func (suite *testSuite) conversationDetailAfterRejectedMessage() (conversationDe
 }
 
 func testMP4Video(durationSeconds int, withAudio bool) []byte {
+	audioCodec := ""
+	if withAudio {
+		audioCodec = "AAC"
+	}
+	return testMP4VideoWithCodecs(durationSeconds, "H.264", audioCodec)
+}
+
+func testMP4VideoWithCodecs(durationSeconds int, videoCodec, audioCodec string) []byte {
 	mvhd := make([]byte, 20)
 	binary.BigEndian.PutUint32(mvhd[12:16], 1000)
 	binary.BigEndian.PutUint32(mvhd[16:20], uint32(durationSeconds*1000))
 	videoTkhd := make([]byte, 84)
 	binary.BigEndian.PutUint32(videoTkhd[76:80], uint32(1080)<<16)
 	binary.BigEndian.PutUint32(videoTkhd[80:84], uint32(1920)<<16)
-	videoStsd := append(make([]byte, 8), testMP4Box("avc1", videoSampleEntry())...)
+	videoStsd := append(make([]byte, 8), testMP4Box(videoSampleEntryType(videoCodec), videoSampleEntry())...)
 	videoTrack := testMP4Box("trak",
 		testMP4Box("tkhd", videoTkhd),
 		testMP4Box("mdia",
@@ -719,13 +863,35 @@ func testMP4Video(durationSeconds int, withAudio bool) []byte {
 		),
 	)
 	moovPayload := append(testMP4Box("mvhd", mvhd), videoTrack...)
-	if withAudio {
-		audioStsd := append(make([]byte, 8), testMP4Box("mp4a")...)
+	if strings.TrimSpace(audioCodec) != "" {
+		audioStsd := append(make([]byte, 8), testMP4Box(audioSampleEntryType(audioCodec))...)
 		moovPayload = append(moovPayload, testMP4Box("trak", testMP4Box("mdia", testMP4Box("hdlr", append(make([]byte, 8), []byte("soun")...)), testMP4Box("minf", testMP4Box("stbl", testMP4Box("stsd", audioStsd)))))...)
 	}
 	ftyp := append([]byte("isom"), make([]byte, 4)...)
 	ftyp = append(ftyp, []byte("isommp42")...)
 	return append(testMP4Box("ftyp", ftyp), append(testMP4Box("moov", moovPayload), testMP4Box("mdat", []byte{0})...)...)
+}
+
+func videoSampleEntryType(codec string) string {
+	switch strings.ToLower(strings.TrimSpace(codec)) {
+	case "h.264", "h264":
+		return "avc1"
+	case "hevc":
+		return "hvc1"
+	default:
+		return "xxxx"
+	}
+}
+
+func audioSampleEntryType(codec string) string {
+	switch strings.ToLower(strings.TrimSpace(codec)) {
+	case "aac":
+		return "mp4a"
+	case "opus":
+		return "Opus"
+	default:
+		return "xxxx"
+	}
 }
 
 func videoSampleEntry() []byte {
