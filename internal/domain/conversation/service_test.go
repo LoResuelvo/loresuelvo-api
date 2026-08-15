@@ -1023,6 +1023,23 @@ func TestSendMessageAddsProviderMessageForParticipantProvider(t *testing.T) {
 	assert.Equal(t, 1, sentMessage.ConversationID)
 }
 
+func TestSendMessageAddsProviderAudioForParticipantProvider(t *testing.T) {
+	repo := &conversationRepositoryMock{foundResult: activeConversationFixture()}
+	publisher := &messagePublisherMock{}
+	service := conversation.NewService(repo, newUserRepositoryMock(&consumerIDFinderMock{err: errors.New("consumer not found")}, &providerIDFinderMock{providerID: 20}), &conversationReaderMock{}, publisher, &chatbotMock{}, nil, &fileURLResolverMock{}, fixedClock{now: time.Now().UTC()})
+
+	sentMessage, err := service.SendMessage(context.Background(), "auth0|provider", 1, "", nil, "audio-file-id")
+
+	require.NoError(t, err)
+	require.NotNil(t, sentMessage)
+	require.NotNil(t, sentMessage.Audio)
+	assert.Equal(t, conversation.SenderProvider, repo.savedMessage.SenderRole)
+	assert.Empty(t, sentMessage.Content)
+	assert.Empty(t, sentMessage.Images)
+	assert.Equal(t, "audio-file-id", sentMessage.Audio.FileID)
+	assert.Equal(t, sentMessage.Audio, publisher.publishedMessage.Audio)
+}
+
 func TestSendMessageRejectsProviderMessageInPendingConversation(t *testing.T) {
 	repo := &conversationRepositoryMock{foundResult: conversationFixture()}
 	consumerIDFinder := &consumerIDFinderMock{err: errors.New("consumer not found")}

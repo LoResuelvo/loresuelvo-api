@@ -48,6 +48,8 @@ type confirmedAudioResponse struct {
 }
 
 func registerSendAudioSteps(sc *godog.ScenarioContext, suite *testSuite) {
+	sc.Step(`^envío únicamente el audio "([^"]*)" en el chat con la consumidora "([^"]*)"$`, suite.sendAudioOnlyMessageInChatWithConsumer)
+	sc.Step(`^el mensaje fue enviado por el prestador "([^"]*)"$`, suite.audioMessageWasSentBy)
 	sc.Step(`^que cargué y confirmé el audio "([^"]*)" de ([0-9]+) segundos$`, suite.uploadAndConfirmMessageAudio)
 	sc.Step(`^envío únicamente el audio "([^"]*)" en el chat con el prestador "([^"]*)"$`, suite.sendAudioOnlyMessageInChatWithProvider)
 	sc.Step(`^el sistema registra el mensaje de audio "([^"]*)" en el chat$`, suite.systemRegistersAudioMessage)
@@ -156,7 +158,15 @@ func (suite *testSuite) confirmMessageAudio(authID string, upload presignFileRes
 }
 
 func (suite *testSuite) sendAudioOnlyMessageInChatWithProvider(audioName, providerFullName string) error {
-	if err := suite.ensureKnownParticipantFullName(providerFullName, participantRoleProvider); err != nil {
+	return suite.sendAudioOnlyMessageInChatWithParticipant(audioName, providerFullName, participantRoleProvider)
+}
+
+func (suite *testSuite) sendAudioOnlyMessageInChatWithConsumer(audioName, consumerFullName string) error {
+	return suite.sendAudioOnlyMessageInChatWithParticipant(audioName, consumerFullName, participantRoleConsumer)
+}
+
+func (suite *testSuite) sendAudioOnlyMessageInChatWithParticipant(audioName, participantFullName, participantRole string) error {
+	if err := suite.ensureKnownParticipantFullName(participantFullName, participantRole); err != nil {
 		return err
 	}
 	fixture, ok := suite.messageAudiosByName[audioName]
