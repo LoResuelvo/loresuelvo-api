@@ -42,7 +42,6 @@ Feature: 50.1 Enviar audios por el chat
         When envío únicamente el audio "detalle-perdida.webm" en la conversación pendiente con el prestador "Juan Gómez"
         Then el sistema registra el mensaje de audio "detalle-perdida.webm" en la conversación pendiente
 
-    @wip
     Scenario: 50.1.4-EAC Rechazar audio del prestador en un chat pendiente
         Given que existe una conversación pendiente entre el consumidor "ana@example.com" y el prestador "juan.plomero@example.com" con el mensaje inicial:
             """
