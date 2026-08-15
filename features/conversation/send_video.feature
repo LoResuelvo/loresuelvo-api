@@ -93,7 +93,6 @@ Feature: 50.2 Enviar videos por el chat
 
     Rule: La contraparte puede recibir y consultar los videos del chat
 
-    @wip
     Scenario: 50.2.8-EVC La contraparte consulta un mensaje con video
         Given que el consumidor "ana@example.com" envió el video "perdida-canilla.mp4" en el chat con el prestador "juan.plomero@example.com"
         And que estoy autenticado como prestador "juan.plomero@example.com"
@@ -102,7 +101,6 @@ Feature: 50.2 Enviar videos por el chat
         And el detalle muestra la duración, dimensiones, formato MP4 y codecs del video
         And el sistema permite al prestador acceder al video adjunto
 
-    @wip
     Scenario: 50.2.9-EVC La contraparte recibe en tiempo real un mensaje con video
         Given que existe un chat activo entre el consumidor "ana@example.com" y el prestador "juan.plomero@example.com"
         And que el prestador "juan.plomero@example.com" está disponible para recibir mensajes en tiempo real
@@ -112,7 +110,6 @@ Feature: 50.2 Enviar videos por el chat
         Then el prestador "juan.plomero@example.com" recibe en tiempo real el mensaje con el video "perdida-canilla.mp4"
         And el evento recibido incluye los metadatos y el acceso al video
 
-    @wip
     Scenario: 50.2.10-EVC Mostrar un último mensaje con video en el listado de conversaciones
         Given que estoy autenticado como consumidor "ana@example.com"
         And que tengo un chat activo con el prestador "juan.plomero@example.com" cuyo último mensaje contiene el video "perdida-canilla.mp4" de 18 segundos
