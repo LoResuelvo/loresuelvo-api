@@ -70,7 +70,6 @@ Feature: 50.2 Enviar videos por el chat
 
     Rule: El video solo puede combinarse con texto
 
-    @wip
     Scenario: 50.2.6-EVC Rechazar un mensaje que combina video con texto e imágenes
         Given que existe un chat activo entre el consumidor "ana@example.com" y el prestador "juan.plomero@example.com"
         And que estoy autenticado como consumidor "ana@example.com"
@@ -83,7 +82,6 @@ Feature: 50.2 Enviar videos por el chat
         Then el sistema rechaza el mensaje porque el video no puede enviarse con imágenes
         And el sistema no asocia el video ni la imagen a ningún mensaje
 
-    @wip
     Scenario: 50.2.7-EVC Rechazar un mensaje que combina video con audio
         Given que existe un chat activo entre el consumidor "ana@example.com" y el prestador "juan.plomero@example.com"
         And que estoy autenticado como consumidor "ana@example.com"
