@@ -12,7 +12,6 @@ Feature: 50.1 Enviar audios por el chat
 
     Rule: Los participantes pueden enviar un único audio en el chat de trabajo
 
-    @wip
     Scenario: 50.1.1-EAC Consumidor envía un audio en un chat activo
         Given que existe un chat activo entre el consumidor "ana@example.com" y el prestador "juan.plomero@example.com"
         And que estoy autenticado como consumidor "ana@example.com"
