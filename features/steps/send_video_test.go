@@ -53,11 +53,17 @@ func registerSendVideoSteps(sc *godog.ScenarioContext, suite *testSuite) {
 	sc.Step(`^envío el video "([^"]*)" en la conversación pendiente con el prestador "([^"]*)" acompañado del texto:$`, suite.sendVideoWithTextInPendingConversationWithProvider)
 	sc.Step(`^intento enviar únicamente el video "([^"]*)" en la conversación pendiente con la consumidora "([^"]*)"$`, suite.trySendVideoOnlyMessageInPendingConversationWithConsumer)
 	sc.Step(`^intento enviar únicamente el video "([^"]*)" en la conversación pendiente con el prestador "([^"]*)"$`, suite.trySendVideoOnlyMessageInPendingConversationWithProvider)
+	sc.Step(`^intento enviar el video "([^"]*)" junto con la imagen "([^"]*)" y el texto:$`, suite.trySendVideoWithImageAndText)
+	sc.Step(`^intento enviar el video "([^"]*)" junto con el audio "([^"]*)"$`, suite.trySendVideoWithAudio)
 	sc.Step(`^el sistema registra el mensaje con el video "([^"]*)" en el chat$`, suite.systemRegistersMessageWithVideo)
 	sc.Step(`^el sistema registra el mensaje con el video "([^"]*)" y el texto enviado$`, suite.systemRegistersMessageWithVideoAndText)
 	sc.Step(`^el sistema registra el mensaje con el video "([^"]*)" y el texto enviado en la conversación pendiente$`, suite.systemRegistersMessageWithVideoAndTextInPendingConversation)
 	sc.Step(`^el video queda asociado al mensaje enviado$`, suite.videoRemainsAssociatedWithSentMessage)
 	sc.Step(`^el sistema no asocia el video a ningún mensaje$`, suite.systemDoesNotAssociateVideoWithAnyMessage)
+	sc.Step(`^el sistema rechaza el mensaje porque el video no puede enviarse con imágenes$`, suite.systemRejectsVideoCombinedWithImages)
+	sc.Step(`^el sistema rechaza el mensaje porque el audio debe enviarse sin texto, imágenes ni video$`, suite.systemRejectsVideoCombinedWithAudio)
+	sc.Step(`^el sistema no asocia el video ni la imagen a ningún mensaje$`, suite.systemDoesNotAssociateVideoOrImageWithAnyMessage)
+	sc.Step(`^el sistema no asocia el video ni el audio a ningún mensaje$`, suite.systemDoesNotAssociateVideoOrAudioWithAnyMessage)
 }
 
 func (suite *testSuite) uploadAndConfirmMessageVideoWithoutAudio(name, durationText string) error {
@@ -233,6 +239,41 @@ func (suite *testSuite) trySendVideoOnlyMessageInPendingConversationWithParticip
 	return suite.requestSendMessageToPreparedConversation(sendMessageRequest{VideoFileID: videoFileID})
 }
 
+func (suite *testSuite) trySendVideoWithImageAndText(videoName, imageName string, text *godog.DocString) error {
+	videoFileID, err := suite.messageVideoFileID(videoName)
+	if err != nil {
+		return err
+	}
+	imageFileIDs, err := suite.messageImageFileIDs([]string{imageName})
+	if err != nil {
+		return err
+	}
+	suite.lastAttemptedMessageImageNames = []string{imageName}
+	suite.lastAttemptedMessageVideoContent = normalizeDocString(text)
+	return suite.requestSendMessageToPreparedConversation(sendMessageRequest{
+		Content:      suite.lastAttemptedMessageVideoContent,
+		ImageFileIDs: imageFileIDs,
+		VideoFileID:  videoFileID,
+	})
+}
+
+func (suite *testSuite) trySendVideoWithAudio(videoName, audioName string) error {
+	videoFileID, err := suite.messageVideoFileID(videoName)
+	if err != nil {
+		return err
+	}
+	audioFileID, err := suite.messageAudioFileID(audioName)
+	if err != nil {
+		return err
+	}
+	suite.lastAttemptedMessageImageNames = nil
+	suite.lastAttemptedMessageVideoContent = ""
+	return suite.requestSendMessageToPreparedConversation(sendMessageRequest{
+		AudioFileID: audioFileID,
+		VideoFileID: videoFileID,
+	})
+}
+
 func (suite *testSuite) messageVideoFixture(name string) (messageVideoFixture, error) {
 	fixture, ok := suite.messageVideosByName[name]
 	if !ok {
@@ -381,6 +422,83 @@ func (suite *testSuite) systemDoesNotAssociateVideoWithAnyMessage() error {
 		}
 	}
 	return nil
+}
+
+func (suite *testSuite) systemRejectsVideoCombinedWithImages() error {
+	if err := suite.lastResponseShouldHaveStatusCode(http.StatusBadRequest); err != nil {
+		return err
+	}
+	return suite.lastErrorResponseShouldSay(conversation.ErrMessageVideoCannotIncludeImages.Error())
+}
+
+func (suite *testSuite) systemRejectsVideoCombinedWithAudio() error {
+	if err := suite.lastResponseShouldHaveStatusCode(http.StatusBadRequest); err != nil {
+		return err
+	}
+	return suite.lastErrorResponseShouldSay(conversation.ErrMessageAudioMustBeExclusive.Error())
+}
+
+func (suite *testSuite) systemDoesNotAssociateVideoOrImageWithAnyMessage() error {
+	videoFixture, err := suite.messageVideoFixture(suite.lastAttemptedMessageVideoName)
+	if err != nil {
+		return err
+	}
+	if len(suite.lastAttemptedMessageImageNames) == 0 {
+		return fmt.Errorf("expected an attempted image alongside video %q", videoFixture.OriginalName)
+	}
+	imageFixture, ok := suite.messageImagesByName[suite.lastAttemptedMessageImageNames[0]]
+	if !ok {
+		return fmt.Errorf("expected attempted image fixture %q to exist", suite.lastAttemptedMessageImageNames[0])
+	}
+	detail, err := suite.conversationDetailAfterRejectedMessage()
+	if err != nil {
+		return err
+	}
+	for _, message := range detail.Messages {
+		if message.Video != nil && message.Video.ID == videoFixture.FileID {
+			return fmt.Errorf("expected video %q not to be associated with a message, found message %d", videoFixture.OriginalName, message.ID)
+		}
+		for _, image := range message.Images {
+			if image.ID == imageFixture.FileID {
+				return fmt.Errorf("expected image %q not to be associated with a message, found message %d", imageFixture.OriginalName, message.ID)
+			}
+		}
+	}
+	return nil
+}
+
+func (suite *testSuite) systemDoesNotAssociateVideoOrAudioWithAnyMessage() error {
+	videoFixture, err := suite.messageVideoFixture(suite.lastAttemptedMessageVideoName)
+	if err != nil {
+		return err
+	}
+	audioFixture, ok := suite.messageAudiosByName[suite.lastAttemptedMessageAudioName]
+	if !ok {
+		return fmt.Errorf("expected attempted audio fixture %q to exist", suite.lastAttemptedMessageAudioName)
+	}
+	detail, err := suite.conversationDetailAfterRejectedMessage()
+	if err != nil {
+		return err
+	}
+	for _, message := range detail.Messages {
+		if message.Video != nil && message.Video.ID == videoFixture.FileID {
+			return fmt.Errorf("expected video %q not to be associated with a message, found message %d", videoFixture.OriginalName, message.ID)
+		}
+		if message.Audio != nil && message.Audio.ID == audioFixture.FileID {
+			return fmt.Errorf("expected audio %q not to be associated with a message, found message %d", audioFixture.OriginalName, message.ID)
+		}
+	}
+	return nil
+}
+
+func (suite *testSuite) conversationDetailAfterRejectedMessage() (conversationDetailResponse, error) {
+	if err := suite.requestConversationByID(suite.lastConversationID); err != nil {
+		return conversationDetailResponse{}, err
+	}
+	if err := suite.lastResponseShouldHaveStatusCode(http.StatusOK); err != nil {
+		return conversationDetailResponse{}, err
+	}
+	return suite.conversationDetailResponseFromLastBody()
 }
 
 func testMP4Video(durationSeconds int, withAudio bool) []byte {
