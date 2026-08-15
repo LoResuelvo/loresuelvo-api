@@ -1,8 +1,13 @@
 type: object
-description: Payload accepted by POST /conversations/{conversationId}/messages. The sender is inferred from the authenticated JWT subject. At least text or one image is required.
+description: Payload accepted by POST /conversations/{conversationId}/messages. The sender is inferred from the authenticated JWT subject. A message may contain text and/or images, or one confirmed audio file exclusively.
 anyOf:
 - required: [content]
 - required: [image_file_ids]
+- required: [audio_file_id]
+not:
+  anyOf:
+  - required: [audio_file_id, content]
+  - required: [audio_file_id, image_file_ids]
 properties:
   content:
     type: string
@@ -16,4 +21,8 @@ properties:
     items:
       type: string
       format: uuid
+  audio_file_id:
+    type: string
+    format: uuid
+    description: Confirmed private WebM/Opus audio file uploaded by the authenticated sender. It cannot be combined with text or images.
 additionalProperties: false

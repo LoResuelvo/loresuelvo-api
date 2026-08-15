@@ -3,7 +3,7 @@ post:
   - Conversations
   operationId: sendConversationMessage
   summary: Send a message in a conversation
-  description: Creates a text message in an existing conversation. The authenticated user must be either the consumer or provider participant; the sender role is inferred from the JWT subject.
+  description: Creates a text and/or image message, or an audio-only message, in an existing conversation. Audio must be a confirmed WebM/Opus file owned by the authenticated participant and cannot be combined with text or images. The sender role is inferred from the JWT subject.
   security:
   - BearerAuth: []
   parameters:
@@ -27,6 +27,10 @@ post:
             summary: Consumer message
             value:
               content: ¿El jueves por la mañana te queda cómodo para pasar a revisar el problema?
+          validAudioMessage:
+            summary: Consumer audio message
+            value:
+              audio_file_id: 4af47f1b-97b6-4b32-baa0-b95d6077f919
   responses:
     '201':
       description: Message created successfully.
@@ -49,7 +53,7 @@ post:
                 content: ¿El jueves por la mañana te queda cómodo para pasar a revisar el problema?
                 created_on: '2026-05-31T12:00:00Z'
     '400':
-      description: The conversation id path parameter is not a positive integer, the request body is invalid, or the message content is empty after trimming.
+      description: The conversation id path parameter is not a positive integer, the request body is invalid, the message content is empty after trimming, or the audio is unavailable or combined with text/images.
       content:
         application/json:
           schema:

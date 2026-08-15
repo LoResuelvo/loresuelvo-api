@@ -1080,7 +1080,7 @@
                 ],
                 "operationId": "presignFileUpload",
                 "summary": "Request a file upload URL",
-                "description": "Creates a pending file record and returns a direct upload URL. For provider profile photos, only JPG/JPEG and PNG images up to 5 MB are accepted.",
+                "description": "Creates a pending file record and returns a direct upload URL. Conversation audio must be WebM with Opus, no larger than 5 MiB; the server validates the object contents and duration during confirmation, up to 300 seconds.",
                 "security": [
                     {
                         "BearerAuth": []
@@ -3243,7 +3243,7 @@
                 ],
                 "operationId": "sendConversationMessage",
                 "summary": "Send a message in a conversation",
-                "description": "Creates a text message in an existing conversation. The authenticated user must be either the consumer or provider participant; the sender role is inferred from the JWT subject.",
+                "description": "Creates a text and/or image message, or an audio-only message, in an existing conversation. Audio must be a confirmed WebM/Opus file owned by the authenticated participant and cannot be combined with text or images. The sender role is inferred from the JWT subject.",
                 "security": [
                     {
                         "BearerAuth": []
@@ -3275,6 +3275,12 @@
                                     "summary": "Consumer message",
                                     "value": {
                                         "content": "¿El jueves por la mañana te queda cómodo para pasar a revisar el problema?"
+                                    }
+                                },
+                                "validAudioMessage": {
+                                    "summary": "Consumer audio message",
+                                    "value": {
+                                        "audio_file_id": "4af47f1b-97b6-4b32-baa0-b95d6077f919"
                                     }
                                 }
                             }
@@ -3313,7 +3319,7 @@
                         }
                     },
                     "400": {
-                        "description": "The conversation id path parameter is not a positive integer, the request body is invalid, or the message content is empty after trimming.",
+                        "description": "The conversation id path parameter is not a positive integer, the request body is invalid, the message content is empty after trimming, or the audio is unavailable or combined with text/images.",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -4025,7 +4031,7 @@
                     },
                     "mime_type": {
                         "type": "string",
-                        "description": "File MIME type. Profile photos accept image/jpeg, image/png, and image/webp.",
+                        "description": "File MIME type. Profile photos accept image/jpeg, image/png, and image/webp; conversation audio accepts audio/webm.",
                         "example": "image/jpeg"
                     },
                     "size_bytes": {
@@ -4038,7 +4044,8 @@
                         "type": "string",
                         "description": "Intended business use for the file.",
                         "enum": [
-                            "profile_photo"
+                            "profile_photo",
+                            "conversation_message_audio"
                         ],
                         "example": "profile_photo"
                     }
@@ -4134,6 +4141,24 @@
                         "type": "string",
                         "description": "Original file name selected by the user.",
                         "example": "foto-perfil.jpg"
+                    },
+                    "mime_type": {
+                        "type": "string",
+                        "description": "Validated MIME type. Present for confirmed conversation audio.",
+                        "example": "audio/webm"
+                    },
+                    "codec": {
+                        "type": "string",
+                        "description": "Validated audio codec. Present for confirmed conversation audio.",
+                        "example": "opus"
+                    },
+                    "duration_seconds": {
+                        "type": "integer",
+                        "format": "int32",
+                        "minimum": 1,
+                        "maximum": 300,
+                        "description": "Validated audio duration in whole seconds. Present for confirmed conversation audio.",
+                        "example": 18
                     }
                 },
                 "additionalProperties": false
@@ -4160,6 +4185,62 @@
                     "original_name": {
                         "type": "string",
                         "description": "Original image name supplied by the sender."
+                    }
+                },
+                "additionalProperties": false
+            },
+            "MessageAudio": {
+                "type": "object",
+                "description": "Confirmed private audio attached to a conversation message. The URL is scoped to an authorized conversation participant.",
+                "required": [
+                    "id",
+                    "url",
+                    "original_name",
+                    "mime_type",
+                    "codec",
+                    "duration_seconds"
+                ],
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "Confirmed audio file identifier.",
+                        "example": "4af47f1b-97b6-4b32-baa0-b95d6077f919"
+                    },
+                    "url": {
+                        "type": "string",
+                        "format": "uri",
+                        "description": "Private, time-limited URL for the authorized participant.",
+                        "example": "https://storage.example.com/private/audio.webm?signature=..."
+                    },
+                    "original_name": {
+                        "type": "string",
+                        "description": "Original audio file name selected by the user.",
+                        "example": "ruido-bomba.webm"
+                    },
+                    "mime_type": {
+                        "type": "string",
+                        "description": "Validated audio MIME type.",
+                        "enum": [
+                            "audio/webm"
+                        ],
+                        "example": "audio/webm"
+                    },
+                    "codec": {
+                        "type": "string",
+                        "description": "Validated audio codec.",
+                        "enum": [
+                            "opus"
+                        ],
+                        "example": "opus"
+                    },
+                    "duration_seconds": {
+                        "type": "integer",
+                        "format": "int32",
+                        "minimum": 1,
+                        "maximum": 300,
+                        "description": "Validated duration rounded up to whole seconds.",
+                        "example": 18
                     }
                 },
                 "additionalProperties": false
@@ -4339,7 +4420,7 @@
             },
             "SendMessageRequest": {
                 "type": "object",
-                "description": "Payload accepted by POST /conversations/{conversationId}/messages. The sender is inferred from the authenticated JWT subject. At least text or one image is required.",
+                "description": "Payload accepted by POST /conversations/{conversationId}/messages. The sender is inferred from the authenticated JWT subject. A message may contain text and/or images, or one confirmed audio file exclusively.",
                 "anyOf": [
                     {
                         "required": [
@@ -4350,8 +4431,29 @@
                         "required": [
                             "image_file_ids"
                         ]
+                    },
+                    {
+                        "required": [
+                            "audio_file_id"
+                        ]
                     }
                 ],
+                "not": {
+                    "anyOf": [
+                        {
+                            "required": [
+                                "audio_file_id",
+                                "content"
+                            ]
+                        },
+                        {
+                            "required": [
+                                "audio_file_id",
+                                "image_file_ids"
+                            ]
+                        }
+                    ]
+                },
                 "properties": {
                     "content": {
                         "type": "string",
@@ -4367,6 +4469,11 @@
                             "type": "string",
                             "format": "uuid"
                         }
+                    },
+                    "audio_file_id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "Confirmed private WebM/Opus audio file uploaded by the authenticated sender. It cannot be combined with text or images."
                     }
                 },
                 "additionalProperties": false
@@ -4959,6 +5066,9 @@
                             "$ref": "#/components/schemas/MessageImage"
                         }
                     },
+                    "audio": {
+                        "$ref": "#/components/schemas/MessageAudio"
+                    },
                     "created_on": {
                         "type": "string",
                         "format": "date-time",
@@ -5115,6 +5225,9 @@
                         "description": "Message text preview.",
                         "example": "Hola Juan, necesito reparar una pérdida de agua en la cocina. ¿Podrías ayudarme esta semana?"
                     },
+                    "audio": {
+                        "$ref": "#/components/schemas/MessageAudio"
+                    },
                     "created_on": {
                         "type": "string",
                         "format": "date-time",
@@ -5228,6 +5341,9 @@
                         "items": {
                             "$ref": "#/components/schemas/MessageImage"
                         }
+                    },
+                    "audio": {
+                        "$ref": "#/components/schemas/MessageAudio"
                     },
                     "created_on": {
                         "type": "string",

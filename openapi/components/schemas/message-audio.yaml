@@ -1,0 +1,44 @@
+type: object
+description: Confirmed private audio attached to a conversation message. The URL is scoped to an authorized conversation participant.
+required:
+- id
+- url
+- original_name
+- mime_type
+- codec
+- duration_seconds
+properties:
+  id:
+    type: string
+    format: uuid
+    description: Confirmed audio file identifier.
+    example: 4af47f1b-97b6-4b32-baa0-b95d6077f919
+  url:
+    type: string
+    format: uri
+    description: Private, time-limited URL for the authorized participant.
+    example: https://storage.example.com/private/audio.webm?signature=...
+  original_name:
+    type: string
+    description: Original audio file name selected by the user.
+    example: ruido-bomba.webm
+  mime_type:
+    type: string
+    description: Validated audio MIME type.
+    enum:
+    - audio/webm
+    example: audio/webm
+  codec:
+    type: string
+    description: Validated audio codec.
+    enum:
+    - opus
+    example: opus
+  duration_seconds:
+    type: integer
+    format: int32
+    minimum: 1
+    maximum: 300
+    description: Validated duration rounded up to whole seconds.
+    example: 18
+additionalProperties: false

@@ -228,6 +228,8 @@ components:
       $ref: ./components/schemas/file-response.yaml
     MessageImage:
       $ref: ./components/schemas/message-image.yaml
+    MessageAudio:
+      $ref: ./components/schemas/message-audio.yaml
     CreateJobRequestRequest:
       $ref: ./components/schemas/create-job-request-request.yaml
     JobRequest:

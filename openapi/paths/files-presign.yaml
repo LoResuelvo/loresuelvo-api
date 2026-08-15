@@ -3,7 +3,7 @@ post:
   - Files
   operationId: presignFileUpload
   summary: Request a file upload URL
-  description: Creates a pending file record and returns a direct upload URL. For provider profile photos, only JPG/JPEG and PNG images up to 5 MB are accepted.
+  description: Creates a pending file record and returns a direct upload URL. Conversation audio must be WebM with Opus, no larger than 5 MiB; the server validates the object contents and duration during confirmation, up to 300 seconds.
   security:
   - BearerAuth: []
   requestBody:

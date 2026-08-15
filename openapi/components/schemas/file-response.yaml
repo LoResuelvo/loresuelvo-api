@@ -17,4 +17,19 @@ properties:
     type: string
     description: Original file name selected by the user.
     example: foto-perfil.jpg
+  mime_type:
+    type: string
+    description: Validated MIME type. Present for confirmed conversation audio.
+    example: audio/webm
+  codec:
+    type: string
+    description: Validated audio codec. Present for confirmed conversation audio.
+    example: opus
+  duration_seconds:
+    type: integer
+    format: int32
+    minimum: 1
+    maximum: 300
+    description: Validated audio duration in whole seconds. Present for confirmed conversation audio.
+    example: 18
 additionalProperties: false
