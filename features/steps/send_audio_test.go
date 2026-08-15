@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/conversation"
 	"github.com/cucumber/godog"
 )
 
@@ -48,6 +49,9 @@ type confirmedAudioResponse struct {
 }
 
 func registerSendAudioSteps(sc *godog.ScenarioContext, suite *testSuite) {
+	sc.Step(`^intento enviar únicamente el audio "([^"]*)" en la conversación pendiente con la consumidora "([^"]*)"$`, suite.trySendAudioOnlyMessageInPendingConversationWithConsumer)
+	sc.Step(`^el sistema rechaza el mensaje porque el prestador debe aceptar la solicitud de trabajo antes de responder$`, suite.systemRejectsProviderAudioInPendingConversation)
+	sc.Step(`^el sistema no asocia el audio a ningún mensaje$`, suite.systemDoesNotAssociateAudioWithAnyMessage)
 	sc.Step(`^envío únicamente el audio "([^"]*)" en el chat con la consumidora "([^"]*)"$`, suite.sendAudioOnlyMessageInChatWithConsumer)
 	sc.Step(`^el mensaje fue enviado por el prestador "([^"]*)"$`, suite.audioMessageWasSentBy)
 	sc.Step(`^que cargué y confirmé el audio "([^"]*)" de ([0-9]+) segundos$`, suite.uploadAndConfirmMessageAudio)
@@ -171,6 +175,10 @@ func (suite *testSuite) sendAudioOnlyMessageInPendingConversationWithProvider(au
 	return suite.sendAudioOnlyMessageInChatWithParticipant(audioName, providerFullName, participantRoleProvider)
 }
 
+func (suite *testSuite) trySendAudioOnlyMessageInPendingConversationWithConsumer(audioName, consumerFullName string) error {
+	return suite.sendAudioOnlyMessageInChatWithParticipant(audioName, consumerFullName, participantRoleConsumer)
+}
+
 func (suite *testSuite) sendAudioOnlyMessageInChatWithParticipant(audioName, participantFullName, participantRole string) error {
 	if err := suite.ensureKnownParticipantFullName(participantFullName, participantRole); err != nil {
 		return err
@@ -241,6 +249,37 @@ func (suite *testSuite) systemRegistersAudioMessageInPendingConversation(audioNa
 	}
 	if detail.Status != "pending" {
 		return fmt.Errorf("expected conversation %d to remain pending, got %q", suite.lastConversationID, detail.Status)
+	}
+	return nil
+}
+
+func (suite *testSuite) systemRejectsProviderAudioInPendingConversation() error {
+	if err := suite.lastResponseShouldHaveStatusCode(http.StatusForbidden); err != nil {
+		return err
+	}
+	return suite.lastErrorResponseShouldSay(conversation.ErrPendingConversationRequiresAcceptance.Error())
+}
+
+func (suite *testSuite) systemDoesNotAssociateAudioWithAnyMessage() error {
+	fixture, ok := suite.messageAudiosByName[suite.lastAttemptedMessageAudioName]
+	if !ok {
+		return fmt.Errorf("expected attempted audio fixture %q to exist", suite.lastAttemptedMessageAudioName)
+	}
+	if err := suite.requestConversationByID(suite.lastConversationID); err != nil {
+		return err
+	}
+	if err := suite.lastResponseShouldHaveStatusCode(http.StatusOK); err != nil {
+		return err
+	}
+
+	detail, err := suite.conversationDetailResponseFromLastBody()
+	if err != nil {
+		return err
+	}
+	for _, message := range detail.Messages {
+		if message.Audio != nil && message.Audio.ID == fixture.FileID {
+			return fmt.Errorf("expected audio %q not to be associated with a message, found message %d", fixture.OriginalName, message.ID)
+		}
 	}
 	return nil
 }
