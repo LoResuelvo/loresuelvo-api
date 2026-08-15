@@ -82,7 +82,7 @@ func (s *Service) getWorkConversationDetail(ctx context.Context, authID string, 
 	if err != nil {
 		return nil, err
 	}
-	return s.withMessageImageURLs(ctx, detail)
+	return s.withMessageAttachmentURLs(ctx, detail)
 }
 
 func (s *Service) getChatbotConversationDetail(ctx context.Context, authID string, chatbotConversation *ChatBotConversation) (*readmodel.ConversationDetail, error) {
@@ -99,10 +99,21 @@ func (s *Service) getChatbotConversationDetail(ctx context.Context, authID strin
 	if err != nil {
 		return nil, err
 	}
-	return s.withMessageImageURLs(ctx, detail)
+	return s.withMessageAttachmentURLs(ctx, detail)
 }
 
-func (s *Service) SendMessage(ctx context.Context, authID string, conversationID int, content string, imageFileIDs []string) (*Message, error) {
+func (s *Service) SendMessage(ctx context.Context, authID string, conversationID int, content string, imageFileIDs []string, audioFileID string) (*Message, error) {
+	content = strings.TrimSpace(content)
+	audioFileID = strings.TrimSpace(audioFileID)
+	imageFileIDs = normalizeMessageImageFileIDs(imageFileIDs)
+	if audioFileID != "" && (content != "" || len(imageFileIDs) > 0) {
+		return nil, ErrMessageAudioMustBeExclusive
+	}
+
+	return s.sendParticipantMessage(ctx, authID, conversationID, content, imageFileIDs, audioFileID)
+}
+
+func (s *Service) sendParticipantMessage(ctx context.Context, authID string, conversationID int, content string, imageFileIDs []string, audioFileID string) (*Message, error) {
 	foundConversation, err := s.conversationRepository.FindByID(ctx, conversationID)
 	if err != nil {
 		return nil, err
@@ -112,11 +123,22 @@ func (s *Service) SendMessage(ctx context.Context, authID string, conversationID
 	if err != nil {
 		return nil, err
 	}
-	images, err := s.messageImagesForSender(ctx, authID, imageFileIDs)
-	if err != nil {
-		return nil, err
+	var message *Message
+	if audioFileID != "" {
+		var audio *filedomain.MessageAudio
+		audio, err = s.messageAudioForSender(ctx, authID, audioFileID)
+		if err != nil {
+			return nil, err
+		}
+		message, err = newParticipantAudioMessage(senderRole, *audio)
+	} else {
+		var images []filedomain.MessageImage
+		images, err = s.messageImagesForSender(ctx, authID, imageFileIDs)
+		if err != nil {
+			return nil, err
+		}
+		message, err = newParticipantMessage(senderRole, content, images)
 	}
-	message, err := newParticipantMessage(senderRole, content, images)
 	if err != nil {
 		return nil, err
 	}
@@ -136,6 +158,18 @@ func (s *Service) SendMessage(ctx context.Context, authID string, conversationID
 	s.messagePublisher.PublishMessage(ctx, savedConversation, authID, sentMessage)
 
 	return &sentMessage, nil
+}
+
+func normalizeMessageImageFileIDs(fileIDs []string) []string {
+	if fileIDs == nil {
+		return nil
+	}
+
+	normalized := make([]string, len(fileIDs))
+	for index, fileID := range fileIDs {
+		normalized[index] = strings.TrimSpace(fileID)
+	}
+	return normalized
 }
 
 func (s *Service) ListWorkConversations(ctx context.Context, authID string) ([]readmodel.ConversationSummary, error) {
@@ -560,6 +594,13 @@ func newParticipantMessage(senderRole, content string, images []filedomain.Messa
 	return NewProviderMessage(content, images...)
 }
 
+func newParticipantAudioMessage(senderRole string, audio filedomain.MessageAudio) (*Message, error) {
+	if senderRole == SenderConsumer {
+		return NewConsumerAudioMessage(audio)
+	}
+	return NewProviderAudioMessage(audio)
+}
+
 func (s *Service) messageImagesForSender(ctx context.Context, authID string, fileIDs []string) ([]filedomain.MessageImage, error) {
 	preparedFiles, err := s.fileService.PrepareMessageImages(ctx, authID, fileIDs)
 	if err != nil {
@@ -569,6 +610,20 @@ func (s *Service) messageImagesForSender(ctx context.Context, authID string, fil
 		return nil, fmt.Errorf("preparing message images: %w", err)
 	}
 	return preparedFiles, nil
+}
+
+func (s *Service) messageAudioForSender(ctx context.Context, authID, fileID string) (*filedomain.MessageAudio, error) {
+	preparedAudio, err := s.fileService.PrepareMessageAudio(ctx, authID, fileID)
+	if err != nil {
+		if errors.Is(err, filedomain.ErrMessageAudioNotAvailable) {
+			return nil, ErrMessageAudioNotAvailable
+		}
+		return nil, fmt.Errorf("preparing message audio: %w", err)
+	}
+	if preparedAudio == nil {
+		return nil, ErrMessageAudioNotAvailable
+	}
+	return preparedAudio, nil
 }
 
 // TODO: Jamás deberíamos devolver fmt.Errorf, siempre errores específicos de dominio
@@ -597,11 +652,15 @@ func optionalImageFileIDs(imageFileIDs [][]string) []string {
 	return imageFileIDs[0]
 }
 
-func (s *Service) withMessageImageURLs(ctx context.Context, detail *readmodel.ConversationDetail) (*readmodel.ConversationDetail, error) {
+func (s *Service) withMessageAttachmentURLs(ctx context.Context, detail *readmodel.ConversationDetail) (*readmodel.ConversationDetail, error) {
 	fileIDs := make([]string, 0)
+	audioFileIDs := make([]string, 0)
 	for _, message := range detail.Messages {
 		for _, image := range message.Images {
 			fileIDs = append(fileIDs, image.FileID)
+		}
+		if message.Audio != nil {
+			audioFileIDs = append(audioFileIDs, message.Audio.FileID)
 		}
 	}
 	resolved, err := s.fileService.ResolveMessageImages(ctx, fileIDs)
@@ -618,6 +677,21 @@ func (s *Service) withMessageImageURLs(ctx context.Context, detail *readmodel.Co
 			image.OriginalName = file.OriginalName
 			image.URL = file.URL
 		}
+	}
+	audios, err := s.fileService.ResolveMessageAudios(ctx, audioFileIDs)
+	if err != nil {
+		return nil, fmt.Errorf("resolving conversation message audios: %w", err)
+	}
+	for messageIndex := range detail.Messages {
+		audio := detail.Messages[messageIndex].Audio
+		if audio == nil {
+			continue
+		}
+		file, ok := audios[audio.FileID]
+		if !ok || file.URL == "" {
+			return nil, ErrMessageAudioNotAvailable
+		}
+		*audio = file
 	}
 	return detail, nil
 }

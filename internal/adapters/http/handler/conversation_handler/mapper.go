@@ -14,6 +14,7 @@ func sentMessageResponseFromDomain(message conversation.Message) sentMessageResp
 		SenderRole:     message.SenderRole,
 		Content:        message.Content,
 		Images:         messageImageResponsesFromDomain(message.Images),
+		Audio:          messageAudioResponseFromDomain(message.Audio),
 		CreatedOn:      message.CreatedOn,
 	}
 }
@@ -28,6 +29,7 @@ func chatbotConversationResponseFromDomain(result conversation.ChatbotConversati
 			SenderRole: message.SenderRole,
 			Content:    message.Content,
 			Images:     messageImageResponsesFromDomain(message.Images),
+			Audio:      messageAudioResponseFromDomain(message.Audio),
 			CreatedOn:  message.CreatedOn,
 		}
 		messages = append(messages, messageResponse)
@@ -70,6 +72,7 @@ func conversationDetailResponseFromDomain(foundConversation readmodel.Conversati
 			SenderRole: message.SenderRole,
 			Content:    message.Content,
 			Images:     messageImageResponsesFromDomain(message.Images),
+			Audio:      messageAudioResponseFromDomain(message.Audio),
 			CreatedOn:  message.CreatedOn,
 		})
 	}
@@ -91,6 +94,21 @@ func messageImageResponsesFromDomain(images []filedomain.MessageImage) []message
 		response = append(response, messageImageResponse{ID: image.FileID, URL: image.URL, OriginalName: image.OriginalName})
 	}
 	return response
+}
+
+func messageAudioResponseFromDomain(audio *filedomain.MessageAudio) *messageAudioResponse {
+	if audio == nil {
+		return nil
+	}
+
+	return &messageAudioResponse{
+		ID:              audio.FileID,
+		URL:             audio.URL,
+		OriginalName:    audio.OriginalName,
+		MimeType:        audio.MimeType,
+		Codec:           audio.Codec,
+		DurationSeconds: audio.DurationSeconds,
+	}
 }
 
 func workConversationDetailResponseFromDomain(detail *readmodel.WorkConversationDetail) *workConversationDetail {

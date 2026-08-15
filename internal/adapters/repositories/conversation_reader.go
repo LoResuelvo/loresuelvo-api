@@ -13,14 +13,15 @@ import (
 type ConversationReader struct {
 	db                     *sql.DB
 	messageImageRepository *MessageImageRepository
+	messageAudioRepository *MessageAudioRepository
 }
 
 func (reader *ConversationReader) FindSummariesByUserAndType(ctx context.Context, foundUser user.User, conversationType string) ([]readmodel.ConversationSummary, error) {
 	return reader.FindSummariesByParticipantIDRoleAndType(ctx, foundUser.ID(), foundUser.Role(), conversationType)
 }
 
-func NewConversationReader(db *sql.DB, messageImageRepository *MessageImageRepository) *ConversationReader {
-	return &ConversationReader{db: db, messageImageRepository: messageImageRepository}
+func NewConversationReader(db *sql.DB, messageImageRepository *MessageImageRepository, messageAudioRepository *MessageAudioRepository) *ConversationReader {
+	return &ConversationReader{db: db, messageImageRepository: messageImageRepository, messageAudioRepository: messageAudioRepository}
 }
 
 func (reader *ConversationReader) FindSummariesByParticipantIDRoleAndType(ctx context.Context, participantID int, participantRole string, conversationType string) ([]readmodel.ConversationSummary, error) {
@@ -227,7 +228,7 @@ func (reader *ConversationReader) findWorkDetailForConsumer(ctx context.Context,
 	if err != nil {
 		return nil, err
 	}
-	return reader.withMessageImages(ctx, detail)
+	return reader.withMessageAttachments(ctx, detail)
 }
 
 func (reader *ConversationReader) findWorkDetailForProvider(ctx context.Context, conversationID int) (*readmodel.ConversationDetail, error) {
@@ -268,7 +269,7 @@ func (reader *ConversationReader) findWorkDetailForProvider(ctx context.Context,
 	if err != nil {
 		return nil, err
 	}
-	return reader.withMessageImages(ctx, detail)
+	return reader.withMessageAttachments(ctx, detail)
 }
 
 func (reader *ConversationReader) findChatbotDetailByID(ctx context.Context, conversationID int) (*readmodel.ConversationDetail, error) {
@@ -309,15 +310,20 @@ func (reader *ConversationReader) findChatbotDetailByID(ctx context.Context, con
 	if err != nil {
 		return nil, err
 	}
-	return reader.withMessageImages(ctx, detail)
+	return reader.withMessageAttachments(ctx, detail)
 }
 
-func (reader *ConversationReader) withMessageImages(ctx context.Context, detail *readmodel.ConversationDetail) (*readmodel.ConversationDetail, error) {
+func (reader *ConversationReader) withMessageAttachments(ctx context.Context, detail *readmodel.ConversationDetail) (*readmodel.ConversationDetail, error) {
 	imagesByMessageID, err := reader.messageImageRepository.findByConversationID(ctx, detail.ID)
 	if err != nil {
 		return nil, err
 	}
 	attachImagesToMessageDetails(detail.Messages, imagesByMessageID)
+	audiosByMessageID, err := reader.messageAudioRepository.findByConversationID(ctx, detail.ID)
+	if err != nil {
+		return nil, err
+	}
+	attachAudiosToMessageDetails(detail.Messages, audiosByMessageID)
 	return detail, nil
 }
 

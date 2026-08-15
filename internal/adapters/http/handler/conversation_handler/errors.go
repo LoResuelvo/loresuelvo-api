@@ -31,7 +31,10 @@ func handleGetConversationError(c *gin.Context, err error) {
 }
 
 func handleSendMessageError(c *gin.Context, err error) {
-	if errors.Is(err, conversation.ErrMessageRequired) || errors.Is(err, conversation.ErrMessageImageNotAvailable) {
+	if errors.Is(err, conversation.ErrMessageRequired) ||
+		errors.Is(err, conversation.ErrMessageImageNotAvailable) ||
+		errors.Is(err, conversation.ErrMessageAudioNotAvailable) ||
+		errors.Is(err, conversation.ErrMessageAudioMustBeExclusive) {
 		httphandler.RespondError(c, http.StatusBadRequest, err.Error())
 		return
 	}

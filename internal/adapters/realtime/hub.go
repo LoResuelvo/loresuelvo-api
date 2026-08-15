@@ -210,6 +210,17 @@ func BuildMessageEvent(conversationID int, message conversation.Message) ([]byte
 	for _, image := range message.Images {
 		images = append(images, realtimeMessageImage{ID: image.FileID, URL: image.URL, OriginalName: image.OriginalName})
 	}
+	var audio *realtimeMessageAudio
+	if message.Audio != nil {
+		audio = &realtimeMessageAudio{
+			ID:              message.Audio.FileID,
+			URL:             message.Audio.URL,
+			OriginalName:    message.Audio.OriginalName,
+			MimeType:        message.Audio.MimeType,
+			Codec:           message.Audio.Codec,
+			DurationSeconds: message.Audio.DurationSeconds,
+		}
+	}
 	event := realtimeMessageEvent{
 		Type:           "conversation.message.created",
 		ConversationID: conversationID,
@@ -218,6 +229,7 @@ func BuildMessageEvent(conversationID int, message conversation.Message) ([]byte
 			SenderRole: message.SenderRole,
 			Content:    message.Content,
 			Images:     images,
+			Audio:      audio,
 			CreatedOn:  message.CreatedOn,
 		},
 	}
@@ -235,6 +247,7 @@ type realtimeEventMessage struct {
 	SenderRole string                 `json:"sender_role"`
 	Content    string                 `json:"content"`
 	Images     []realtimeMessageImage `json:"images"`
+	Audio      *realtimeMessageAudio  `json:"audio,omitempty"`
 	CreatedOn  time.Time              `json:"created_on"`
 }
 
@@ -242,4 +255,13 @@ type realtimeMessageImage struct {
 	ID           string `json:"id"`
 	URL          string `json:"url"`
 	OriginalName string `json:"original_name"`
+}
+
+type realtimeMessageAudio struct {
+	ID              string `json:"id"`
+	URL             string `json:"url"`
+	OriginalName    string `json:"original_name"`
+	MimeType        string `json:"mime_type"`
+	Codec           string `json:"codec"`
+	DurationSeconds int    `json:"duration_seconds"`
 }

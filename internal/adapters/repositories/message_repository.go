@@ -11,10 +11,11 @@ import (
 type MessageRepository struct {
 	db              *sql.DB
 	imageRepository *MessageImageRepository
+	audioRepository *MessageAudioRepository
 }
 
-func NewMessageRepository(db *sql.DB, imageRepository *MessageImageRepository) *MessageRepository {
-	return &MessageRepository{db: db, imageRepository: imageRepository}
+func NewMessageRepository(db *sql.DB, imageRepository *MessageImageRepository, audioRepository *MessageAudioRepository) *MessageRepository {
+	return &MessageRepository{db: db, imageRepository: imageRepository, audioRepository: audioRepository}
 }
 
 func (repository *MessageRepository) ExistsInConversation(conversationID int, content string) (bool, error) {
@@ -79,8 +80,15 @@ func (repository *MessageRepository) saveWithTx(ctx context.Context, tx *sql.Tx,
 		return nil, fmt.Errorf("saving message: %w", err)
 	}
 
+	if message.Audio != nil && len(message.Images) > 0 {
+		return nil, conversation.ErrMessageAudioMustBeExclusive
+	}
 	savedMessage.Images = append(savedMessage.Images, message.Images...)
 	if err := repository.imageRepository.saveWithTx(ctx, tx, savedMessage.ID, savedMessage.Images); err != nil {
+		return nil, err
+	}
+	savedMessage.Audio = message.Audio
+	if err := repository.audioRepository.saveWithTx(ctx, tx, savedMessage.ID, savedMessage.Audio); err != nil {
 		return nil, err
 	}
 
@@ -89,4 +97,8 @@ func (repository *MessageRepository) saveWithTx(ctx context.Context, tx *sql.Tx,
 
 func (repository *MessageRepository) findImagesByConversationID(ctx context.Context, conversationID int) (map[int][]persistedMessageImage, error) {
 	return repository.imageRepository.findByConversationID(ctx, conversationID)
+}
+
+func (repository *MessageRepository) findAudiosByConversationID(ctx context.Context, conversationID int) (map[int]persistedMessageAudio, error) {
+	return repository.audioRepository.findByConversationID(ctx, conversationID)
 }

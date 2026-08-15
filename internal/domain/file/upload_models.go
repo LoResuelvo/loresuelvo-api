@@ -24,7 +24,10 @@ type ConfirmRequest struct {
 }
 
 type ConfirmUploadResult struct {
-	FileID       string
-	URL          string
-	OriginalName string
+	FileID          string
+	URL             string
+	OriginalName    string
+	MimeType        string
+	Codec           string
+	DurationSeconds int
 }

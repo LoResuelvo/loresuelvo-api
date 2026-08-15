@@ -2,7 +2,9 @@ package file_test
 
 import (
 	"context"
+	"encoding/binary"
 	"errors"
+	"math"
 	"testing"
 	"time"
 
@@ -59,9 +61,22 @@ func (repo *fileRepositoryMock) DeleteAll() error { return nil }
 
 type storageMock struct {
 	metadataByObject map[string]filedomain.ObjectMetadata
+	dataByObject     map[string][]byte
 	generateErr      error
 	readErr          error
 	objectReadErr    error
+}
+
+type audioMetadataParserMock struct {
+	metadata filedomain.AudioMetadata
+	err      error
+}
+
+func (parser *audioMetadataParserMock) Parse(_ []byte) (filedomain.AudioMetadata, error) {
+	if parser.err != nil {
+		return filedomain.AudioMetadata{}, parser.err
+	}
+	return parser.metadata, nil
 }
 
 func (storage *storageMock) GenerateDownloadURL(_ context.Context, object filedomain.ObjectToDownload) (string, error) {
@@ -69,7 +84,10 @@ func (storage *storageMock) GenerateDownloadURL(_ context.Context, object filedo
 }
 
 func newStorageMock() *storageMock {
-	return &storageMock{metadataByObject: map[string]filedomain.ObjectMetadata{}}
+	return &storageMock{
+		metadataByObject: map[string]filedomain.ObjectMetadata{},
+		dataByObject:     map[string][]byte{},
+	}
 }
 
 func (storage *storageMock) GenerateUploadURL(_ context.Context, object filedomain.ObjectToUpload) (*filedomain.UploadTarget, error) {
@@ -99,6 +117,12 @@ func (storage *storageMock) ReadObject(_ context.Context, object filedomain.Obje
 	if !ok {
 		return nil, assert.AnError
 	}
+	if data, ok := storage.dataByObject[object.Bucket+"/"+object.Key]; ok {
+		if object.MaxSizeBytes > 0 && len(data) > object.MaxSizeBytes {
+			return nil, assert.AnError
+		}
+		return append([]byte(nil), data...), nil
+	}
 	data := make([]byte, metadata.SizeBytes)
 	if object.MaxSizeBytes > 0 && len(data) > object.MaxSizeBytes {
 		return nil, assert.AnError
@@ -117,7 +141,13 @@ func (fixedClock) Now() time.Time {
 }
 
 func newFileService(repo *fileRepositoryMock, storage *storageMock) *filedomain.Service {
-	return filedomain.NewService(repo, storage, "public", "private", fixedClock{})
+	return newFileServiceWithParser(repo, storage, &audioMetadataParserMock{
+		metadata: filedomain.AudioMetadata{DurationSeconds: 18, Codec: "opus"},
+	})
+}
+
+func newFileServiceWithParser(repo *fileRepositoryMock, storage *storageMock, parser filedomain.AudioMetadataParser) *filedomain.Service {
+	return filedomain.NewService(repo, storage, "public", "private", fixedClock{}, parser)
 }
 
 func TestRequestUploadCreatesPendingProfilePhoto(t *testing.T) {
@@ -395,6 +425,93 @@ func TestConfirmUploadMarksFileAsConfirmed(t *testing.T) {
 	assert.Equal(t, upload.FileID, confirmed.FileID)
 	assert.Equal(t, "https://cdn/public/"+upload.Key, confirmed.URL)
 	assert.NoError(t, service.ValidateProfilePhoto(context.Background(), "auth0|provider", upload.FileID))
+}
+
+func TestConfirmUploadConfirmsAudioFromValidatedMetadata(t *testing.T) {
+	repo := newFileRepositoryMock()
+	storage := newStorageMock()
+	service := newFileService(repo, storage)
+	audioData := testWebMOpusAudio(18)
+	upload, err := service.RequestUpload(context.Background(), filedomain.PresignRequest{
+		AuthID:       "auth0|consumer",
+		OriginalName: "ruido-bomba.webm",
+		MimeType:     "audio/webm",
+		SizeBytes:    len(audioData),
+		Purpose:      filedomain.PurposeConversationMessageAudio,
+	})
+	require.NoError(t, err)
+	storage.dataByObject["private/"+upload.Key] = audioData
+
+	confirmed, err := service.ConfirmUpload(context.Background(), filedomain.ConfirmRequest{
+		AuthID:    "auth0|consumer",
+		FileID:    upload.FileID,
+		Key:       upload.Key,
+		MimeType:  "audio/webm",
+		SizeBytes: len(audioData),
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, upload.FileID, confirmed.FileID)
+	assert.Equal(t, "audio/webm", confirmed.MimeType)
+	assert.Equal(t, "opus", confirmed.Codec)
+	assert.Equal(t, 18, confirmed.DurationSeconds)
+	assert.True(t, repo.files[upload.FileID].IsConfirmed())
+}
+
+func TestConfirmUploadRejectsAudioWithInvalidMetadata(t *testing.T) {
+	repo := newFileRepositoryMock()
+	storage := newStorageMock()
+	service := newFileServiceWithParser(repo, storage, &audioMetadataParserMock{err: filedomain.ErrUnsupportedMessageAudio})
+	audioData := []byte("not a WebM file")
+	upload, err := service.RequestUpload(context.Background(), filedomain.PresignRequest{
+		AuthID:       "auth0|consumer",
+		OriginalName: "ruido-bomba.webm",
+		MimeType:     "audio/webm",
+		SizeBytes:    len(audioData),
+		Purpose:      filedomain.PurposeConversationMessageAudio,
+	})
+	require.NoError(t, err)
+	storage.dataByObject["private/"+upload.Key] = audioData
+
+	_, err = service.ConfirmUpload(context.Background(), filedomain.ConfirmRequest{
+		AuthID:    "auth0|consumer",
+		FileID:    upload.FileID,
+		Key:       upload.Key,
+		MimeType:  "audio/webm",
+		SizeBytes: len(audioData),
+	})
+
+	assert.ErrorIs(t, err, filedomain.ErrUnsupportedMessageAudio)
+	assert.False(t, repo.files[upload.FileID].IsConfirmed())
+}
+
+func TestConfirmUploadRejectsAudioOverDurationLimit(t *testing.T) {
+	repo := newFileRepositoryMock()
+	storage := newStorageMock()
+	service := newFileServiceWithParser(repo, storage, &audioMetadataParserMock{
+		metadata: filedomain.AudioMetadata{DurationSeconds: 301, Codec: "opus"},
+	})
+	audioData := testWebMOpusAudio(301)
+	upload, err := service.RequestUpload(context.Background(), filedomain.PresignRequest{
+		AuthID:       "auth0|consumer",
+		OriginalName: "audio-extenso.webm",
+		MimeType:     "audio/webm",
+		SizeBytes:    len(audioData),
+		Purpose:      filedomain.PurposeConversationMessageAudio,
+	})
+	require.NoError(t, err)
+	storage.dataByObject["private/"+upload.Key] = audioData
+
+	_, err = service.ConfirmUpload(context.Background(), filedomain.ConfirmRequest{
+		AuthID:    "auth0|consumer",
+		FileID:    upload.FileID,
+		Key:       upload.Key,
+		MimeType:  "audio/webm",
+		SizeBytes: len(audioData),
+	})
+
+	assert.ErrorIs(t, err, filedomain.ErrUnsupportedMessageAudio)
+	assert.False(t, repo.files[upload.FileID].IsConfirmed())
 }
 
 func TestConfirmUploadRejectsUnavailableFile(t *testing.T) {
@@ -688,4 +805,65 @@ func TestResolvePublicURLsWrapsRepositoryError(t *testing.T) {
 	assert.Nil(t, urls)
 	assert.ErrorIs(t, err, expectedErr)
 	assert.ErrorContains(t, err, "finding public files")
+}
+
+func testWebMOpusAudio(durationSeconds int) []byte {
+	duration := make([]byte, 8)
+	binary.BigEndian.PutUint64(duration, math.Float64bits(float64(durationSeconds)*1000))
+
+	ebmlHeader := testEBMLElement(0x1A45DFA3,
+		testEBMLElement(0x4286, []byte{1}),
+		testEBMLElement(0x4282, []byte("webm")),
+	)
+	info := testEBMLElement(0x1549A966,
+		testEBMLElement(0x2AD7B1, []byte{0x0F, 0x42, 0x40}),
+		testEBMLElement(0x4489, duration),
+	)
+	tracks := testEBMLElement(0x1654AE6B, testEBMLElement(0xAE, testEBMLElement(0x86, []byte("A_OPUS"))))
+	segment := testEBMLElement(0x18538067, append(info, tracks...))
+	return append(ebmlHeader, segment...)
+}
+
+func testEBMLElement(id uint64, payload ...[]byte) []byte {
+	var body []byte
+	for _, part := range payload {
+		body = append(body, part...)
+	}
+	idBytes := testEBMLID(id)
+	result := make([]byte, 0, len(idBytes)+8+len(body))
+	result = append(result, idBytes...)
+	result = append(result, testEBMLSize(len(body))...)
+	result = append(result, body...)
+	return result
+}
+
+func testEBMLID(id uint64) []byte {
+	length := 1
+	for value := id; value > 0xff; value >>= 8 {
+		length++
+	}
+	result := make([]byte, length)
+	for index := length - 1; index >= 0; index-- {
+		result[index] = byte(id)
+		id >>= 8
+	}
+	return result
+}
+
+func testEBMLSize(size int) []byte {
+	for length := 1; length <= 8; length++ {
+		max := (uint64(1) << uint(7*length)) - 2
+		if uint64(size) > max {
+			continue
+		}
+		result := make([]byte, length)
+		value := uint64(size)
+		for index := length - 1; index >= 0; index-- {
+			result[index] = byte(value)
+			value >>= 8
+		}
+		result[0] |= byte(1 << uint(8-length))
+		return result
+	}
+	panic("test WebM element payload is too large")
 }

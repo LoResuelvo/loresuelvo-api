@@ -67,7 +67,7 @@ func newConversationRepositoryTest(t *testing.T) conversationRepositoryTestConte
 	cleanConversationRepositoryTestDatabase(t, database)
 
 	userRepository := repositories.NewUserRepository(database)
-	messageRepository := repositories.NewMessageRepository(database, repositories.NewMessageImageRepository(database))
+	messageRepository := repositories.NewMessageRepository(database, repositories.NewMessageImageRepository(database), repositories.NewMessageAudioRepository(database))
 	return conversationRepositoryTestContext{
 		database:               database,
 		userRepository:         userRepository,

@@ -18,6 +18,10 @@ func handleFileError(c *gin.Context, err error) {
 		httphandler.RespondError(c, http.StatusBadRequest, err.Error())
 		return
 	}
+	if errors.Is(err, filedomain.ErrUnsupportedMessageAudio) || errors.Is(err, filedomain.ErrMessageAudioNotAvailable) {
+		httphandler.RespondError(c, http.StatusBadRequest, err.Error())
+		return
+	}
 	if errors.Is(err, filedomain.ErrFileNotAvailable) {
 		httphandler.RespondError(c, http.StatusBadRequest, err.Error())
 		return

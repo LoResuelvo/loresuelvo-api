@@ -8,6 +8,10 @@ var ErrMessageRequired = errors.New("Message is required")
 
 var ErrMessageImageNotAvailable = errors.New("Message image is not available")
 
+var ErrMessageAudioNotAvailable = errors.New("Message audio is not available")
+
+var ErrMessageAudioMustBeExclusive = errors.New("Message audio must be sent without text or images")
+
 var ErrConsumerRequired = errors.New("Consumer id is required")
 
 var ErrAlreadyExists = errors.New("Conversation already exists")

@@ -19,7 +19,27 @@ func NewFileRepository(db *sql.DB) *FileRepository {
 }
 
 func (repository *FileRepository) Save(ctx context.Context, file filedomain.File) error {
-	_, err := repository.db.ExecContext(
+	tx, err := repository.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("beginning file transaction: %w", err)
+	}
+
+	if err := repository.saveFileWithTx(ctx, tx, file); err != nil {
+		return rollbackFileTx(tx, err)
+	}
+	if err := repository.syncAudioMetadataWithTx(ctx, tx, file); err != nil {
+		return rollbackFileTx(tx, err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("committing file transaction: %w", err)
+	}
+
+	return nil
+}
+
+func (repository *FileRepository) saveFileWithTx(ctx context.Context, tx *sql.Tx, file filedomain.File) error {
+	_, err := tx.ExecContext(
 		ctx,
 		`INSERT INTO files (id, key, bucket, original_name, mime_type, size_bytes, status, visibility, purpose, uploaded_by_auth_id, created_on, updated_on)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
@@ -54,10 +74,38 @@ func (repository *FileRepository) Save(ctx context.Context, file filedomain.File
 	return nil
 }
 
+func (repository *FileRepository) syncAudioMetadataWithTx(ctx context.Context, tx *sql.Tx, file filedomain.File) error {
+	if !file.IsAudio() || !file.IsConfirmed() {
+		if _, err := tx.ExecContext(ctx, `DELETE FROM file_audios WHERE file_id = $1`, file.ID); err != nil {
+			return fmt.Errorf("removing file audio metadata: %w", err)
+		}
+		return nil
+	}
+
+	if file.DurationSeconds() <= 0 || strings.TrimSpace(file.Codec()) == "" {
+		return fmt.Errorf("saving file audio metadata: %w", filedomain.ErrMessageAudioNotAvailable)
+	}
+
+	_, err := tx.ExecContext(
+		ctx,
+		`INSERT INTO file_audios (file_id, codec, duration_seconds)
+		VALUES ($1, $2, $3)
+		ON CONFLICT (file_id) DO UPDATE SET
+			codec = EXCLUDED.codec,
+			duration_seconds = EXCLUDED.duration_seconds`,
+		file.ID,
+		strings.ToLower(strings.TrimSpace(file.Codec())),
+		file.DurationSeconds(),
+	)
+	if err != nil {
+		return fmt.Errorf("saving file audio metadata: %w", err)
+	}
+
+	return nil
+}
+
 func (repository *FileRepository) FindByID(ctx context.Context, id string) (*filedomain.File, error) {
-	file, err := repository.findOne(ctx, `SELECT id, key, bucket, original_name, mime_type, size_bytes, status, visibility, purpose, uploaded_by_auth_id, created_on, updated_on
-		FROM files
-		WHERE id = $1`, id)
+	file, err := repository.findOne(ctx, fileSelectQuery+`WHERE f.id = $1`, id)
 	if err != nil {
 		return nil, fmt.Errorf("finding file by id: %w", err)
 	}
@@ -79,9 +127,7 @@ func (repository *FileRepository) FindByIDs(ctx context.Context, ids []string) (
 
 	rows, err := repository.db.QueryContext(
 		ctx,
-		`SELECT id, key, bucket, original_name, mime_type, size_bytes, status, visibility, purpose, uploaded_by_auth_id, created_on, updated_on
-		FROM files
-		WHERE id IN (`+strings.Join(placeholders, ", ")+")",
+		fileSelectQuery+`WHERE f.id IN (`+strings.Join(placeholders, ", ")+`)`,
 		args...,
 	)
 	if err != nil {
@@ -110,6 +156,13 @@ func (repository *FileRepository) findOne(ctx context.Context, query string, arg
 	return scanFile(repository.db.QueryRowContext(ctx, query, args...))
 }
 
+const fileSelectQuery = `SELECT f.id, f.key, f.bucket, f.original_name, f.mime_type, f.size_bytes,
+	fa.duration_seconds, fa.codec,
+	f.status, f.visibility, f.purpose, f.uploaded_by_auth_id, f.created_on, f.updated_on
+	FROM files f
+	LEFT JOIN file_audios fa ON fa.file_id = f.id
+	`
+
 type fileScanner interface {
 	Scan(dest ...any) error
 }
@@ -121,6 +174,8 @@ func scanFile(scanner fileScanner) (*filedomain.File, error) {
 	var originalName string
 	var mimeType string
 	var sizeBytes int
+	var durationSeconds sql.NullInt64
+	var codec sql.NullString
 	var status string
 	var visibility string
 	var purpose string
@@ -135,6 +190,8 @@ func scanFile(scanner fileScanner) (*filedomain.File, error) {
 		&originalName,
 		&mimeType,
 		&sizeBytes,
+		&durationSeconds,
+		&codec,
 		&status,
 		&visibility,
 		&purpose,
@@ -149,12 +206,32 @@ func scanFile(scanner fileScanner) (*filedomain.File, error) {
 	if err != nil {
 		return nil, fmt.Errorf("restoring file metadata: %w", err)
 	}
+	hasAudioMetadata := durationSeconds.Valid || codec.Valid
+	if hasAudioMetadata {
+		if !durationSeconds.Valid || !codec.Valid || purpose != filedomain.PurposeConversationMessageAudio || status != filedomain.StatusConfirmed {
+			return nil, fmt.Errorf("restoring file audio metadata: %w", filedomain.ErrMessageAudioNotAvailable)
+		}
+		metadata, err = filedomain.NewAudioFileMetadata(originalName, mimeType, sizeBytes, int(durationSeconds.Int64), codec.String)
+		if err != nil {
+			return nil, fmt.Errorf("restoring audio file metadata: %w", err)
+		}
+	} else if purpose == filedomain.PurposeConversationMessageAudio && status == filedomain.StatusConfirmed {
+		return nil, fmt.Errorf("restoring confirmed audio file: %w", filedomain.ErrMessageAudioNotAvailable)
+	}
 	file, err := filedomain.NewFile(id, key, bucket, *metadata, status, visibility, purpose, uploadedByAuthID, createdOn, updatedOn)
 	if err != nil {
 		return nil, fmt.Errorf("restoring file: %w", err)
 	}
 
 	return file, nil
+}
+
+func rollbackFileTx(tx *sql.Tx, cause error) error {
+	if rollbackErr := tx.Rollback(); rollbackErr != nil {
+		return fmt.Errorf("%w; additionally could not rollback file transaction: %v", cause, rollbackErr)
+	}
+
+	return cause
 }
 
 func (repository *FileRepository) DeleteAll() error {

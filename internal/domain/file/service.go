@@ -3,19 +3,21 @@ package file
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	domainclock "github.com/LoResuelvo/loresuelvo-api/internal/domain/clock"
 	"github.com/google/uuid"
 )
 
 type Service struct {
-	repository    Repository
-	storage       Storage
-	publicBucket  string
-	privateBucket string
-	clock         domainclock.Clock
-	idGenerator   func() string
-	policies      map[string]UploadPolicy
+	repository          Repository
+	storage             Storage
+	publicBucket        string
+	privateBucket       string
+	clock               domainclock.Clock
+	audioMetadataParser AudioMetadataParser
+	idGenerator         func() string
+	policies            map[string]UploadPolicy
 }
 
 type imageValidation struct {
@@ -36,15 +38,16 @@ var jobRequestImageValidation = imageValidation{
 	errorContext: "job request",
 }
 
-func NewService(repository Repository, storage Storage, publicBucket, privateBucket string, clock domainclock.Clock) *Service {
+func NewService(repository Repository, storage Storage, publicBucket, privateBucket string, clock domainclock.Clock, audioMetadataParser AudioMetadataParser) *Service {
 	return &Service{
-		repository:    repository,
-		storage:       storage,
-		publicBucket:  publicBucket,
-		privateBucket: privateBucket,
-		clock:         clock,
-		idGenerator:   uuid.NewString,
-		policies:      defaultUploadPolicies(),
+		repository:          repository,
+		storage:             storage,
+		publicBucket:        publicBucket,
+		privateBucket:       privateBucket,
+		clock:               clock,
+		audioMetadataParser: audioMetadataParser,
+		idGenerator:         uuid.NewString,
+		policies:            defaultUploadPolicies(),
 	}
 }
 
@@ -110,16 +113,65 @@ func (s *Service) ConfirmUpload(ctx context.Context, request ConfirmRequest) (*C
 		return nil, ErrFileNotAvailable
 	}
 
-	file.Confirm(s.clock.Now())
+	if file.IsAudio() {
+		if err := s.confirmAudioFile(ctx, file); err != nil {
+			return nil, err
+		}
+	} else {
+		file.Confirm(s.clock.Now())
+	}
 	if err := s.repository.Save(ctx, *file); err != nil {
 		return nil, fmt.Errorf("confirming file upload: %w", err)
 	}
 
 	return &ConfirmUploadResult{
-		FileID:       file.ID,
-		URL:          s.confirmedFileURL(*file),
-		OriginalName: file.OriginalName(),
+		FileID:          file.ID,
+		URL:             s.confirmedFileURL(*file),
+		OriginalName:    file.OriginalName(),
+		MimeType:        file.MimeType(),
+		Codec:           file.Codec(),
+		DurationSeconds: file.DurationSeconds(),
 	}, nil
+}
+
+func (s *Service) confirmAudioFile(ctx context.Context, file *File) error {
+	if file.Visibility != conversationMessageAudioPolicy.Visibility || !conversationMessageAudioPolicy.Allows(file.Metadata()) {
+		return ErrUnsupportedMessageAudio
+	}
+
+	data, err := s.storage.ReadObject(ctx, ObjectToDownload{
+		Bucket:       file.Bucket,
+		Key:          file.Key,
+		MaxSizeBytes: conversationMessageAudioPolicy.MaxSizeBytes,
+	})
+	if err != nil || len(data) == 0 || len(data) != file.SizeBytes() {
+		return ErrUnsupportedMessageAudio
+	}
+
+	if s.audioMetadataParser == nil {
+		return ErrUnsupportedMessageAudio
+	}
+	audioMetadata, err := s.audioMetadataParser.Parse(data)
+	if err != nil {
+		return ErrUnsupportedMessageAudio
+	}
+
+	metadata, err := NewAudioFileMetadata(
+		file.OriginalName(),
+		file.MimeType(),
+		file.SizeBytes(),
+		audioMetadata.DurationSeconds,
+		audioMetadata.Codec,
+	)
+	if err != nil || !conversationMessageAudioPolicy.AllowsConfirmedAudio(*metadata) {
+		return ErrUnsupportedMessageAudio
+	}
+
+	if err := file.ConfirmAudio(s.clock.Now(), audioMetadata.DurationSeconds, audioMetadata.Codec); err != nil {
+		return ErrUnsupportedMessageAudio
+	}
+
+	return nil
 }
 
 func (s *Service) confirmedFileURL(file File) string {
@@ -202,6 +254,27 @@ func (s *Service) PrepareMessageImages(ctx context.Context, authID string, fileI
 		result = append(result, resolved)
 	}
 	return result, nil
+}
+
+func (s *Service) PrepareMessageAudio(ctx context.Context, authID, fileID string) (*MessageAudio, error) {
+	fileID = normalizeFileID(fileID)
+	if fileID == "" {
+		return nil, ErrMessageAudioNotAvailable
+	}
+
+	files, err := s.repository.FindByIDs(ctx, []string{fileID})
+	if err != nil {
+		return nil, fmt.Errorf("finding message audio: %w", err)
+	}
+	if len(files) != 1 || !isValidAudioFor(files[0], authID) {
+		return nil, ErrMessageAudioNotAvailable
+	}
+
+	audio, err := s.resolveMessageAudio(ctx, files[0])
+	if err != nil {
+		return nil, fmt.Errorf("resolving message audio: %w", err)
+	}
+	return &audio, nil
 }
 
 func (s *Service) PrepareChatbotMessageImages(ctx context.Context, authID string, fileIDs []string) ([]MessageImageContent, error) {
@@ -305,12 +378,51 @@ func (s *Service) ResolveMessageImages(ctx context.Context, fileIDs []string) (m
 	return result, nil
 }
 
+func (s *Service) ResolveMessageAudios(ctx context.Context, fileIDs []string) (map[string]MessageAudio, error) {
+	uniqueFileIDs := uniqueNonEmptyFileIDs(fileIDs)
+	if len(uniqueFileIDs) == 0 {
+		return map[string]MessageAudio{}, nil
+	}
+	files, err := s.repository.FindByIDs(ctx, uniqueFileIDs)
+	if err != nil {
+		return nil, fmt.Errorf("finding message audios: %w", err)
+	}
+
+	result := make(map[string]MessageAudio, len(files))
+	for _, file := range files {
+		if !isAvailableAudio(file) {
+			continue
+		}
+		audio, err := s.resolveMessageAudio(ctx, file)
+		if err != nil {
+			return nil, err
+		}
+		result[file.ID] = audio
+	}
+	return result, nil
+}
+
 func (s *Service) resolveMessageImage(ctx context.Context, file File) (MessageImage, error) {
 	resolved, err := s.resolveImage(ctx, file)
 	if err != nil {
 		return MessageImage{}, err
 	}
 	return MessageImage{Image: resolved}, nil
+}
+
+func (s *Service) resolveMessageAudio(ctx context.Context, file File) (MessageAudio, error) {
+	url, err := s.storage.GenerateDownloadURL(ctx, ObjectToDownload{Bucket: file.Bucket, Key: file.Key})
+	if err != nil {
+		return MessageAudio{}, fmt.Errorf("generating audio download url: %w", err)
+	}
+	return MessageAudio{
+		FileID:          file.ID,
+		OriginalName:    file.OriginalName(),
+		URL:             url,
+		MimeType:        file.MimeType(),
+		Codec:           file.Codec(),
+		DurationSeconds: file.DurationSeconds(),
+	}, nil
 }
 
 func (s *Service) ResolveJobRequestImages(ctx context.Context, images []Image) ([]Image, error) {
@@ -402,6 +514,10 @@ func uniqueNonEmptyFileIDs(fileIDs []string) []string {
 	return unique
 }
 
+func normalizeFileID(fileID string) string {
+	return strings.TrimSpace(fileID)
+}
+
 func isValidProfilePhotoFor(file File, authID string) bool {
 	return isValidImageFor(file, authID, profilePhotoPolicy)
 }
@@ -424,4 +540,15 @@ func isAvailableImageForAnyPolicy(file File, policies ...UploadPolicy) bool {
 		}
 	}
 	return false
+}
+
+func isValidAudioFor(file File, authID string) bool {
+	return isAvailableAudio(file) && file.WasUploadedBy(authID)
+}
+
+func isAvailableAudio(file File) bool {
+	return file.IsConfirmed() &&
+		file.Visibility == conversationMessageAudioPolicy.Visibility &&
+		file.HasPurpose(conversationMessageAudioPolicy.Purpose) &&
+		conversationMessageAudioPolicy.AllowsConfirmedAudio(file.Metadata())
 }

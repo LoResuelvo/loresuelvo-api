@@ -36,9 +36,15 @@ func presignFileResponseFromDomain(result *filedomain.PresignUploadResult) presi
 }
 
 func fileResponseFromDomain(file *filedomain.ConfirmUploadResult) fileResponse {
-	return fileResponse{
+	response := fileResponse{
 		ID:           file.FileID,
 		URL:          file.URL,
 		OriginalName: file.OriginalName,
 	}
+	if file.Codec != "" || file.DurationSeconds > 0 {
+		response.MimeType = file.MimeType
+		response.Codec = file.Codec
+		response.DurationSeconds = file.DurationSeconds
+	}
+	return response
 }

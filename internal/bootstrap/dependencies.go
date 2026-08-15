@@ -23,6 +23,7 @@ import (
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/user_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/work_order_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/locking"
+	mediaadapter "github.com/LoResuelvo/loresuelvo-api/internal/adapters/media"
 	notificationadapter "github.com/LoResuelvo/loresuelvo-api/internal/adapters/notification"
 	mercadopagopayment "github.com/LoResuelvo/loresuelvo-api/internal/adapters/payment/mercadopago"
 	paymentaccountadapter "github.com/LoResuelvo/loresuelvo-api/internal/adapters/payment_account"
@@ -158,6 +159,7 @@ func NewDependenciesWithPaymentAccountAdapters(
 		storageComponents.PublicBucket,
 		storageComponents.PrivateBucket,
 		systemClock,
+		mediaadapter.NewWebMAudioParser(),
 	)
 	categoryService := category.NewService(persistence.CategoryRepository)
 	providerService := provider.NewService(persistence.UserRepository, persistence.CategoryRepository, fileService)

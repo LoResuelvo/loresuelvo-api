@@ -43,5 +43,6 @@ type MessageDetail struct {
 	SenderRole string
 	Content    string
 	Images     []filedomain.MessageImage
+	Audio      *filedomain.MessageAudio
 	CreatedOn  time.Time
 }

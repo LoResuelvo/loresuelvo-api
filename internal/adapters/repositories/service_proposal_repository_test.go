@@ -42,7 +42,7 @@ func newServiceProposalRepositoryTest(t *testing.T) serviceProposalRepositoryTes
 	cleanServiceProposalRepositoryTestDatabase(t, database)
 
 	userRepository := repositories.NewUserRepository(database)
-	messageRepository := repositories.NewMessageRepository(database, repositories.NewMessageImageRepository(database))
+	messageRepository := repositories.NewMessageRepository(database, repositories.NewMessageImageRepository(database), repositories.NewMessageAudioRepository(database))
 	serviceProposalRepository := repositories.NewServiceProposalRepository(database)
 	workOrderRepository := repositories.NewWorkOrderRepository(database, serviceProposalRepository)
 

@@ -56,7 +56,14 @@ func (h *ConversationHandler) SendMessage(c *gin.Context) {
 		return
 	}
 
-	sentMessage, err := h.conversationService.SendMessage(c.Request.Context(), auth0ID, conversationID, req.Content, req.ImageFileIDs)
+	sentMessage, err := h.conversationService.SendMessage(
+		c.Request.Context(),
+		auth0ID,
+		conversationID,
+		req.Content,
+		req.ImageFileIDs,
+		req.AudioFileID,
+	)
 	if err != nil {
 		handleSendMessageError(c, err)
 		return
@@ -130,7 +137,7 @@ func (h *ConversationHandler) ContinueChatbotConversation(c *gin.Context) {
 		return
 	}
 
-	var req sendMessageRequest
+	var req chatbotMessageRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		httphandler.RespondError(c, http.StatusBadRequest, err.Error())
 		return

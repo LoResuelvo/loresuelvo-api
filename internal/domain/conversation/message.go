@@ -19,6 +19,7 @@ type Message struct {
 	SenderRole     string
 	Content        string
 	Images         []filedomain.MessageImage
+	Audio          *filedomain.MessageAudio
 	CreatedOn      time.Time
 }
 
@@ -28,6 +29,14 @@ func NewConsumerMessage(content string, images ...filedomain.MessageImage) (*Mes
 
 func NewProviderMessage(content string, images ...filedomain.MessageImage) (*Message, error) {
 	return newMessage(SenderProvider, content, images)
+}
+
+func NewConsumerAudioMessage(audio filedomain.MessageAudio) (*Message, error) {
+	return newAudioMessage(SenderConsumer, audio)
+}
+
+func NewProviderAudioMessage(audio filedomain.MessageAudio) (*Message, error) {
+	return newAudioMessage(SenderProvider, audio)
 }
 
 func NewChatbotMessage(content string) (*Message, error) {
@@ -49,6 +58,20 @@ func newMessage(senderRole, content string, images []filedomain.MessageImage) (*
 		Content:    trimmedContent,
 		Images:     messageImages,
 	}, nil
+}
+
+func newAudioMessage(senderRole string, audio filedomain.MessageAudio) (*Message, error) {
+	if strings.TrimSpace(audio.FileID) == "" {
+		return nil, ErrMessageAudioNotAvailable
+	}
+	if strings.TrimSpace(audio.OriginalName) == "" || audio.DurationSeconds <= 0 || strings.TrimSpace(audio.Codec) == "" {
+		return nil, ErrMessageAudioNotAvailable
+	}
+
+	audio.FileID = strings.TrimSpace(audio.FileID)
+	audio.OriginalName = strings.TrimSpace(audio.OriginalName)
+	audio.Codec = strings.ToLower(strings.TrimSpace(audio.Codec))
+	return &Message{SenderRole: senderRole, Audio: &audio}, nil
 }
 
 func ensureMessageImages(images []filedomain.MessageImage) ([]filedomain.MessageImage, error) {

@@ -12,7 +12,10 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 )
 
-const uniqueViolationCode = "23505"
+const (
+	uniqueViolationCode     = "23505"
+	foreignKeyViolationCode = "23503"
+)
 
 type ConversationRepository struct {
 	db                *sql.DB
@@ -515,6 +518,11 @@ func (repository *ConversationRepository) findMessagesByConversationID(ctx conte
 		return nil, err
 	}
 	attachImagesToMessages(messages, imagesByMessageID)
+	audiosByMessageID, err := repository.messageRepository.findAudiosByConversationID(ctx, conversationID)
+	if err != nil {
+		return nil, err
+	}
+	attachAudiosToMessages(messages, audiosByMessageID)
 
 	return messages, nil
 }

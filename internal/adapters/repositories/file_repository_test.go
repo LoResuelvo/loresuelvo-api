@@ -53,6 +53,25 @@ func validFileEntity(t *testing.T) filedomain.File {
 	return *file
 }
 
+func validConfirmedAudioEntity(t *testing.T) filedomain.File {
+	t.Helper()
+	metadata, err := filedomain.NewFileMetadata("ruido-bomba.webm", "audio/webm", 2048)
+	require.NoError(t, err)
+	file, err := filedomain.NewPendingFile(
+		"5bf58f6e-cd57-4f7a-91cc-f17f8c3b6f67",
+		"files/2026/06/conversation_message_audio/5bf58f6e-cd57-4f7a-91cc-f17f8c3b6f67.webm",
+		"private-bucket",
+		*metadata,
+		filedomain.VisibilityPrivate,
+		filedomain.PurposeConversationMessageAudio,
+		"auth0|consumer",
+		time.Date(2026, 6, 6, 0, 0, 0, 0, time.UTC),
+	)
+	require.NoError(t, err)
+	require.NoError(t, file.ConfirmAudio(time.Date(2026, 6, 6, 0, 0, 18, 0, time.UTC), 18, "Opus"))
+	return *file
+}
+
 func TestFileRepositoryCanSaveAndFindFile(t *testing.T) {
 	repository, _ := newFileRepositoryTest(t)
 	file := validFileEntity(t)
@@ -80,6 +99,20 @@ func TestFileRepositoryCanUpdateFileStatus(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, findErr)
 	assert.Equal(t, filedomain.StatusConfirmed, found.Status)
+}
+
+func TestFileRepositoryCanPersistAndRestoreAudioMetadata(t *testing.T) {
+	repository, _ := newFileRepositoryTest(t)
+	file := validConfirmedAudioEntity(t)
+
+	require.NoError(t, repository.Save(context.Background(), file))
+	found, err := repository.FindByID(context.Background(), file.ID)
+
+	require.NoError(t, err)
+	assert.Equal(t, filedomain.StatusConfirmed, found.Status)
+	assert.Equal(t, filedomain.PurposeConversationMessageAudio, found.Purpose)
+	assert.Equal(t, "opus", found.Codec())
+	assert.Equal(t, 18, found.DurationSeconds())
 }
 
 func TestFileRepositoryCanFindFilesByIDs(t *testing.T) {

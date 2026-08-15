@@ -11,6 +11,7 @@ const (
 
 	PurposeProfilePhoto             = "profile_photo"
 	PurposeConversationMessageImage = "conversation_message_image"
+	PurposeConversationMessageAudio = "conversation_message_audio"
 	PurposeJobRequestImage          = "job_request_image"
 )
 
@@ -72,6 +73,14 @@ func (f File) SizeBytes() int {
 	return f.metadata.SizeBytes()
 }
 
+func (f File) DurationSeconds() int {
+	return f.metadata.DurationSeconds()
+}
+
+func (f File) Codec() string {
+	return f.metadata.Codec()
+}
+
 func (f File) Metadata() FileMetadata {
 	return f.metadata
 }
@@ -90,6 +99,19 @@ func (f File) WasUploadedBy(authID string) bool {
 
 func (f File) HasPurpose(purpose string) bool {
 	return f.Purpose == purpose
+}
+
+func (f File) IsAudio() bool {
+	return f.HasPurpose(PurposeConversationMessageAudio)
+}
+
+func (f *File) ConfirmAudio(updatedOn time.Time, durationSeconds int, codec string) error {
+	if err := f.metadata.SetAudioMetadata(durationSeconds, codec); err != nil {
+		return err
+	}
+
+	f.Confirm(updatedOn)
+	return nil
 }
 
 func validateFileFields(id, status, key, bucket, visibility, purpose, uploadedByAuthID string, createdOn, updatedOn time.Time) error {

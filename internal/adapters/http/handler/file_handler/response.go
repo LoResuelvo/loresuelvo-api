@@ -8,7 +8,10 @@ type presignFileResponse struct {
 }
 
 type fileResponse struct {
-	ID           string `json:"id"`
-	URL          string `json:"url,omitempty"`
-	OriginalName string `json:"original_name"`
+	ID              string `json:"id"`
+	URL             string `json:"url,omitempty"`
+	OriginalName    string `json:"original_name"`
+	MimeType        string `json:"mime_type,omitempty"`
+	Codec           string `json:"codec,omitempty"`
+	DurationSeconds int    `json:"duration_seconds,omitempty"`
 }

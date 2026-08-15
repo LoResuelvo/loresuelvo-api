@@ -67,7 +67,9 @@ type testSuite struct {
 	expectedRecentChatbotContextMessage     string
 	lastAttemptedChatbotContinuationMessage string
 	messageImagesByName                     map[string]messageImageFixture
+	messageAudiosByName                     map[string]messageAudioFixture
 	lastSentMessageID                       int
+	lastAttemptedMessageAudioName           string
 	lastAttemptedMessageImageNames          []string
 	aiJobRequestsByProvider                 map[string]jobRequestCreationResponse
 	aiSourceChatbotConversationID           int
@@ -132,6 +134,7 @@ func (s *testSuite) registerAllSteps(sc *godog.ScenarioContext) {
 	registerAcceptJobRequestSteps(sc, s)
 	registerRealtimeMessageSteps(sc, s)
 	registerAttachMessageImagesSteps(sc, s)
+	registerSendAudioSteps(sc, s)
 	registerChatbotSteps(sc, s)
 	registerChatbotContinuationSteps(sc, s)
 	registerChatbotAttachImagesSteps(sc, s)
@@ -200,7 +203,9 @@ func (s *testSuite) cleanup() error {
 	s.expectedRecentChatbotContextMessage = ""
 	s.lastAttemptedChatbotContinuationMessage = ""
 	s.messageImagesByName = map[string]messageImageFixture{}
+	s.messageAudiosByName = map[string]messageAudioFixture{}
 	s.lastSentMessageID = 0
+	s.lastAttemptedMessageAudioName = ""
 	s.lastAttemptedMessageImageNames = nil
 	s.aiJobRequestsByProvider = map[string]jobRequestCreationResponse{}
 	s.aiSourceChatbotConversationID = 0
@@ -303,6 +308,7 @@ func newTestSuite(tb testing.TB, database *sql.DB) *testSuite {
 		participantRolesByFullName:         map[string]string{},
 		realtimeConnections:                map[string]*realtimeTestConnection{},
 		messageImagesByName:                map[string]messageImageFixture{},
+		messageAudiosByName:                map[string]messageAudioFixture{},
 		aiJobRequestsByProvider:            map[string]jobRequestCreationResponse{},
 		aiWorkConversationIDsBeforeContact: map[int]int{},
 		expectedChatbotImageDescriptions:   map[string]string{},

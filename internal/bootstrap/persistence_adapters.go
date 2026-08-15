@@ -12,6 +12,7 @@ type PersistenceAdapters struct {
 	ConversationRepository         *repositories.ConversationRepository
 	MessageRepository              *repositories.MessageRepository
 	MessageImageRepository         *repositories.MessageImageRepository
+	MessageAudioRepository         *repositories.MessageAudioRepository
 	JobRequestRepository           *repositories.JobRequestRepository
 	ServiceProposalRepository      *repositories.ServiceProposalRepository
 	ConversationReader             *repositories.ConversationReader
@@ -29,10 +30,11 @@ func NewPersistenceAdapters(database *sql.DB) *PersistenceAdapters {
 	userRepository := repositories.NewUserRepository(database)
 	categoryRepository := repositories.NewCategoryRepository(database)
 	messageImageRepository := repositories.NewMessageImageRepository(database)
-	messageRepository := repositories.NewMessageRepository(database, messageImageRepository)
+	messageAudioRepository := repositories.NewMessageAudioRepository(database)
+	messageRepository := repositories.NewMessageRepository(database, messageImageRepository, messageAudioRepository)
 	conversationRepository := repositories.NewConversationRepository(database, messageRepository)
 	jobRequestRepository := repositories.NewJobRequestRepository(database)
-	conversationReader := repositories.NewConversationReader(database, messageImageRepository)
+	conversationReader := repositories.NewConversationReader(database, messageImageRepository, messageAudioRepository)
 	fileRepository := repositories.NewFileRepository(database)
 	serviceProposalRepository := repositories.NewServiceProposalRepository(database)
 	paymentIntentRepository := repositories.NewPaymentIntentRepository(database)
@@ -58,6 +60,7 @@ func NewPersistenceAdapters(database *sql.DB) *PersistenceAdapters {
 		ConversationRepository:         conversationRepository,
 		MessageRepository:              messageRepository,
 		MessageImageRepository:         messageImageRepository,
+		MessageAudioRepository:         messageAudioRepository,
 		JobRequestRepository:           jobRequestRepository,
 		ServiceProposalRepository:      serviceProposalRepository,
 		ConversationReader:             conversationReader,

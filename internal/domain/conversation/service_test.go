@@ -312,6 +312,38 @@ func (m *fileURLResolverMock) ResolveMessageImages(_ context.Context, fileIDs []
 	return files, nil
 }
 
+func (m *fileURLResolverMock) PrepareMessageAudio(_ context.Context, _ string, fileID string) (*filedomain.MessageAudio, error) {
+	if m.err != nil {
+		return nil, m.err
+	}
+	return &filedomain.MessageAudio{
+		FileID:          fileID,
+		OriginalName:    fileID + ".webm",
+		URL:             "https://files/" + fileID,
+		MimeType:        "audio/webm",
+		Codec:           "opus",
+		DurationSeconds: 18,
+	}, nil
+}
+
+func (m *fileURLResolverMock) ResolveMessageAudios(_ context.Context, fileIDs []string) (map[string]filedomain.MessageAudio, error) {
+	if m.err != nil {
+		return nil, m.err
+	}
+	audios := make(map[string]filedomain.MessageAudio, len(fileIDs))
+	for _, fileID := range fileIDs {
+		audios[fileID] = filedomain.MessageAudio{
+			FileID:          fileID,
+			OriginalName:    fileID + ".webm",
+			URL:             "https://files/" + fileID,
+			MimeType:        "audio/webm",
+			Codec:           "opus",
+			DurationSeconds: 18,
+		}
+	}
+	return audios, nil
+}
+
 func (m *fileURLResolverMock) ResolvePublicURL(ctx context.Context, fileID string) (string, error) {
 	m.resolvedFileIDs = []string{fileID}
 	urlsByFileID, err := m.ResolvePublicURLs(ctx, []string{fileID})
@@ -908,7 +940,7 @@ func TestSendMessageAddsConsumerMessageForParticipantConsumer(t *testing.T) {
 
 	service := conversation.NewService(repo, newUserRepositoryMock(consumerIDFinder, providerIDFinder), &conversationReaderMock{}, &messagePublisherMock{}, &chatbotMock{}, nil, &fileURLResolverMock{}, fixedClock{now: time.Now().UTC()})
 
-	sentMessage, err := service.SendMessage(context.Background(), "auth0|consumer", 1, "  ¿El jueves te queda cómodo?  ", nil)
+	sentMessage, err := service.SendMessage(context.Background(), "auth0|consumer", 1, "  ¿El jueves te queda cómodo?  ", nil, "")
 
 	require.NoError(t, err)
 	require.NotNil(t, sentMessage)
@@ -925,7 +957,7 @@ func TestSendMessageAddsResolvedPrivateImages(t *testing.T) {
 	fileService := &fileURLResolverMock{}
 	service := conversation.NewService(repo, newUserRepositoryMock(&consumerIDFinderMock{consumerID: 10}, &providerIDFinderMock{}), &conversationReaderMock{}, publisher, &chatbotMock{}, nil, fileService, fixedClock{now: time.Now().UTC()})
 
-	sentMessage, err := service.SendMessage(context.Background(), "auth0|consumer", 1, "", []string{"image-file-id"})
+	sentMessage, err := service.SendMessage(context.Background(), "auth0|consumer", 1, "", []string{"image-file-id"}, "")
 
 	require.NoError(t, err)
 	require.Len(t, sentMessage.Images, 1)
@@ -935,12 +967,38 @@ func TestSendMessageAddsResolvedPrivateImages(t *testing.T) {
 	assert.Equal(t, sentMessage.Images, publisher.publishedMessage.Images)
 }
 
+func TestSendMessageRejectsAudioCombinedWithTextOrImages(t *testing.T) {
+	tests := []struct {
+		name         string
+		content      string
+		imageFileIDs []string
+		audioFileID  string
+	}{
+		{name: "text", content: "mensaje", audioFileID: "audio-file-id"},
+		{name: "images", imageFileIDs: []string{"image-file-id"}, audioFileID: "audio-file-id"},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			repo := &conversationRepositoryMock{foundResult: activeConversationFixture()}
+			service := conversation.NewService(repo, newUserRepositoryMock(&consumerIDFinderMock{consumerID: 10}, &providerIDFinderMock{}), &conversationReaderMock{}, &messagePublisherMock{}, &chatbotMock{}, nil, &fileURLResolverMock{}, fixedClock{now: time.Now().UTC()})
+
+			sentMessage, err := service.SendMessage(context.Background(), "auth0|consumer", 1, test.content, test.imageFileIDs, test.audioFileID)
+
+			assert.ErrorIs(t, err, conversation.ErrMessageAudioMustBeExclusive)
+			assert.Nil(t, sentMessage)
+			assert.False(t, repo.findByIDCalled)
+			assert.False(t, repo.updateCalled)
+		})
+	}
+}
+
 func TestSendMessageRejectsUnavailableImageBeforePersistence(t *testing.T) {
 	repo := &conversationRepositoryMock{foundResult: activeConversationFixture()}
 	fileService := &fileURLResolverMock{err: filedomain.ErrMessageImageNotAvailable}
 	service := conversation.NewService(repo, newUserRepositoryMock(&consumerIDFinderMock{consumerID: 10}, &providerIDFinderMock{}), &conversationReaderMock{}, &messagePublisherMock{}, &chatbotMock{}, nil, fileService, fixedClock{now: time.Now().UTC()})
 
-	sentMessage, err := service.SendMessage(context.Background(), "auth0|consumer", 1, "Problem", []string{"image-file-id"})
+	sentMessage, err := service.SendMessage(context.Background(), "auth0|consumer", 1, "Problem", []string{"image-file-id"}, "")
 
 	assert.Nil(t, sentMessage)
 	assert.ErrorIs(t, err, conversation.ErrMessageImageNotAvailable)
@@ -954,7 +1012,7 @@ func TestSendMessageAddsProviderMessageForParticipantProvider(t *testing.T) {
 
 	service := conversation.NewService(repo, newUserRepositoryMock(consumerIDFinder, providerIDFinder), &conversationReaderMock{}, &messagePublisherMock{}, &chatbotMock{}, nil, &fileURLResolverMock{}, fixedClock{now: time.Now().UTC()})
 
-	sentMessage, err := service.SendMessage(context.Background(), "auth0|provider", 1, "Sí, puedo pasar el jueves a las 10", nil)
+	sentMessage, err := service.SendMessage(context.Background(), "auth0|provider", 1, "Sí, puedo pasar el jueves a las 10", nil, "")
 
 	require.NoError(t, err)
 	require.NotNil(t, sentMessage)
@@ -972,7 +1030,7 @@ func TestSendMessageRejectsProviderMessageInPendingConversation(t *testing.T) {
 
 	service := conversation.NewService(repo, newUserRepositoryMock(consumerIDFinder, providerIDFinder), &conversationReaderMock{}, &messagePublisherMock{}, &chatbotMock{}, nil, &fileURLResolverMock{}, fixedClock{now: time.Now().UTC()})
 
-	sentMessage, err := service.SendMessage(context.Background(), "auth0|provider", 1, "Sí, puedo pasar el jueves a las 10", nil)
+	sentMessage, err := service.SendMessage(context.Background(), "auth0|provider", 1, "Sí, puedo pasar el jueves a las 10", nil, "")
 
 	assert.ErrorIs(t, err, conversation.ErrPendingConversationRequiresAcceptance)
 	assert.Nil(t, sentMessage)
@@ -990,7 +1048,7 @@ func TestSendMessageRejectsConsumerMessageWhenPendingLimitWasReached(t *testing.
 
 	service := conversation.NewService(repo, newUserRepositoryMock(consumerIDFinder, providerIDFinder), &conversationReaderMock{}, &messagePublisherMock{}, &chatbotMock{}, nil, &fileURLResolverMock{}, fixedClock{now: time.Now().UTC()})
 
-	sentMessage, err := service.SendMessage(context.Background(), "auth0|consumer", 1, "Otro detalle", nil)
+	sentMessage, err := service.SendMessage(context.Background(), "auth0|consumer", 1, "Otro detalle", nil, "")
 
 	assert.ErrorIs(t, err, conversation.ErrPendingConversationMessageLimitReached)
 	assert.Nil(t, sentMessage)
@@ -1005,7 +1063,7 @@ func TestSendMessageRejectsAuthenticatedUserThatIsNotParticipant(t *testing.T) {
 
 	service := conversation.NewService(repo, newUserRepositoryMock(consumerIDFinder, providerIDFinder), &conversationReaderMock{}, &messagePublisherMock{}, &chatbotMock{}, nil, &fileURLResolverMock{}, fixedClock{now: time.Now().UTC()})
 
-	sentMessage, err := service.SendMessage(context.Background(), "auth0|other", 1, "Hola", nil)
+	sentMessage, err := service.SendMessage(context.Background(), "auth0|other", 1, "Hola", nil, "")
 
 	assert.ErrorIs(t, err, conversation.ErrConversationAccessDenied)
 	assert.Nil(t, sentMessage)
@@ -1020,7 +1078,7 @@ func TestSendMessageReturnsNotFoundWhenConversationDoesNotExist(t *testing.T) {
 
 	service := conversation.NewService(repo, newUserRepositoryMock(consumerIDFinder, providerIDFinder), &conversationReaderMock{}, &messagePublisherMock{}, &chatbotMock{}, nil, &fileURLResolverMock{}, fixedClock{now: time.Now().UTC()})
 
-	sentMessage, err := service.SendMessage(context.Background(), "auth0|consumer", 999, "Hola", nil)
+	sentMessage, err := service.SendMessage(context.Background(), "auth0|consumer", 999, "Hola", nil, "")
 
 	assert.ErrorIs(t, err, conversation.ErrConversationDoesNotExist)
 	assert.Nil(t, sentMessage)
@@ -1036,7 +1094,7 @@ func TestSendMessageRejectsEmptyContent(t *testing.T) {
 
 	service := conversation.NewService(repo, newUserRepositoryMock(consumerIDFinder, providerIDFinder), &conversationReaderMock{}, publisher, &chatbotMock{}, nil, &fileURLResolverMock{}, fixedClock{now: time.Now().UTC()})
 
-	sentMessage, err := service.SendMessage(context.Background(), "auth0|consumer", 1, "   ", nil)
+	sentMessage, err := service.SendMessage(context.Background(), "auth0|consumer", 1, "   ", nil, "")
 
 	assert.ErrorIs(t, err, conversation.ErrMessageRequired)
 	assert.Nil(t, sentMessage)
@@ -1053,7 +1111,7 @@ func TestSendMessagePublishesMessageAfterSuccessfulPersistence(t *testing.T) {
 
 	service := conversation.NewService(repo, newUserRepositoryMock(consumerIDFinder, providerIDFinder), &conversationReaderMock{}, publisher, &chatbotMock{}, nil, &fileURLResolverMock{}, fixedClock{now: time.Now().UTC()})
 
-	sentMessage, err := service.SendMessage(context.Background(), "auth0|consumer", 1, "Hola proveedor", nil)
+	sentMessage, err := service.SendMessage(context.Background(), "auth0|consumer", 1, "Hola proveedor", nil, "")
 
 	require.NoError(t, err)
 	require.NotNil(t, sentMessage)
@@ -1070,7 +1128,7 @@ func TestSendMessageDoesNotPublishWhenPersistFails(t *testing.T) {
 
 	service := conversation.NewService(repo, newUserRepositoryMock(consumerIDFinder, providerIDFinder), &conversationReaderMock{}, publisher, &chatbotMock{}, nil, &fileURLResolverMock{}, fixedClock{now: time.Now().UTC()})
 
-	sentMessage, err := service.SendMessage(context.Background(), "auth0|consumer", 1, "Hola", nil)
+	sentMessage, err := service.SendMessage(context.Background(), "auth0|consumer", 1, "Hola", nil, "")
 
 	assert.Error(t, err)
 	assert.Nil(t, sentMessage)

@@ -30,7 +30,7 @@ func newSavedConversationReaderFixture(t *testing.T) conversationReaderFixture {
 	require.NoError(t, err)
 
 	return conversationReaderFixture{
-		reader:                 repositories.NewConversationReader(testContext.database, repositories.NewMessageImageRepository(testContext.database)),
+		reader:                 repositories.NewConversationReader(testContext.database, repositories.NewMessageImageRepository(testContext.database), repositories.NewMessageAudioRepository(testContext.database)),
 		conversationRepository: testContext.conversationRepository,
 		consumerID:             consumerID,
 		providerID:             providerID,
@@ -81,7 +81,7 @@ func TestConversationReaderFindsProviderSummaries(t *testing.T) {
 
 func TestConversationReaderReturnsEmptySummaryLists(t *testing.T) {
 	testContext := newConversationRepositoryTest(t)
-	reader := repositories.NewConversationReader(testContext.database, repositories.NewMessageImageRepository(testContext.database))
+	reader := repositories.NewConversationReader(testContext.database, repositories.NewMessageImageRepository(testContext.database), repositories.NewMessageAudioRepository(testContext.database))
 
 	consumerSummaries, err := reader.FindSummariesByParticipantIDRoleAndType(context.Background(), 999, conversation.SenderConsumer, conversation.TypeWork)
 	require.NoError(t, err)
@@ -165,7 +165,7 @@ func TestConversationReaderReflectsSentMessageAsLatestAndDetailLastMessage(t *te
 
 func TestConversationReaderReturnsNotFoundForMissingConversationDetail(t *testing.T) {
 	testContext := newConversationRepositoryTest(t)
-	reader := repositories.NewConversationReader(testContext.database, repositories.NewMessageImageRepository(testContext.database))
+	reader := repositories.NewConversationReader(testContext.database, repositories.NewMessageImageRepository(testContext.database), repositories.NewMessageAudioRepository(testContext.database))
 
 	detail, err := reader.FindDetailByIDRoleAndType(context.Background(), 999, conversation.SenderConsumer, conversation.TypeWork)
 
@@ -175,7 +175,7 @@ func TestConversationReaderReturnsNotFoundForMissingConversationDetail(t *testin
 
 func TestConversationReaderFindsChatbotSummariesByConsumerIDAndType(t *testing.T) {
 	testContext := newConversationRepositoryTest(t)
-	reader := repositories.NewConversationReader(testContext.database, repositories.NewMessageImageRepository(testContext.database))
+	reader := repositories.NewConversationReader(testContext.database, repositories.NewMessageImageRepository(testContext.database), repositories.NewMessageAudioRepository(testContext.database))
 	consumerID, providerID := savedConversationParticipants(t, testContext)
 	otherConsumerID := savedConsumerIDForConversationWithData(t, testContext, "auth0|other-chatbot-consumer", "other.chatbot.consumer@example.com", "Diego", "Sosa")
 
@@ -215,7 +215,7 @@ func TestConversationReaderFindsChatbotSummariesByConsumerIDAndType(t *testing.T
 
 func TestConversationReaderFindsChatbotDetailByIDRoleAndType(t *testing.T) {
 	testContext := newConversationRepositoryTest(t)
-	reader := repositories.NewConversationReader(testContext.database, repositories.NewMessageImageRepository(testContext.database))
+	reader := repositories.NewConversationReader(testContext.database, repositories.NewMessageImageRepository(testContext.database), repositories.NewMessageAudioRepository(testContext.database))
 	consumerID := savedConsumerIDForConversation(t, testContext)
 	plumbingCategory, err := category.New("Plomería")
 	require.NoError(t, err)
@@ -266,7 +266,7 @@ func TestConversationReaderFindsChatbotDetailByIDRoleAndType(t *testing.T) {
 
 func TestConversationReaderReturnsEmptyChatbotSummariesForDifferentType(t *testing.T) {
 	testContext := newConversationRepositoryTest(t)
-	reader := repositories.NewConversationReader(testContext.database, repositories.NewMessageImageRepository(testContext.database))
+	reader := repositories.NewConversationReader(testContext.database, repositories.NewMessageImageRepository(testContext.database), repositories.NewMessageAudioRepository(testContext.database))
 	consumerID := savedConsumerIDForConversation(t, testContext)
 	chatbotConversation, err := conversation.NewChatbotConversation(consumerID, "Pérdida de agua en la cocina")
 	require.NoError(t, err)
