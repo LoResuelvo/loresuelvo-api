@@ -2,6 +2,7 @@ package steps_test
 
 import (
 	"bytes"
+	"context"
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
@@ -10,9 +11,12 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/conversation"
+	filedomain "github.com/LoResuelvo/loresuelvo-api/internal/domain/file"
 	"github.com/cucumber/godog"
+	"github.com/google/uuid"
 )
 
 const (
@@ -55,8 +59,11 @@ func registerSendAudioSteps(sc *godog.ScenarioContext, suite *testSuite) {
 	sc.Step(`^intento enviar únicamente el audio "([^"]*)" en la conversación pendiente con el prestador "([^"]*)"$`, suite.trySendAudioOnlyMessageInPendingConversationWithProvider)
 	sc.Step(`^el sistema rechaza el mensaje porque el prestador debe aceptar la solicitud de trabajo antes de responder$`, suite.systemRejectsProviderAudioInPendingConversation)
 	sc.Step(`^el sistema rechaza el mensaje porque se alcanzó el límite de mensajes de la conversación pendiente$`, suite.systemRejectsConsumerAudioInPendingConversation)
+	sc.Step(`^el sistema rechaza el mensaje porque el audio no está disponible$`, suite.systemRejectsAudioUnavailable)
 	sc.Step(`^el sistema no asocia el audio a ningún mensaje$`, suite.systemDoesNotAssociateAudioWithAnyMessage)
+	sc.Step(`^el sistema no asocia el archivo a ningún mensaje$`, suite.systemDoesNotAssociateFileWithAnyMessage)
 	sc.Step(`^envío únicamente el audio "([^"]*)" en el chat con la consumidora "([^"]*)"$`, suite.sendAudioOnlyMessageInChatWithConsumer)
+	sc.Step(`^intento enviar únicamente el audio "([^"]*)" en el chat con el prestador "([^"]*)"$`, suite.sendAudioOnlyMessageInChatWithProvider)
 	sc.Step(`^el mensaje fue enviado por el prestador "([^"]*)"$`, suite.audioMessageWasSentBy)
 	sc.Step(`^que cargué y confirmé el audio "([^"]*)" de ([0-9]+) segundos$`, suite.uploadAndConfirmMessageAudio)
 	sc.Step(`^intento enviar el audio "([^"]*)" junto con el texto:$`, suite.trySendAudioWithText)
@@ -65,12 +72,16 @@ func registerSendAudioSteps(sc *godog.ScenarioContext, suite *testSuite) {
 	sc.Step(`^el sistema rechaza el mensaje porque el audio debe enviarse sin texto ni imágenes$`, suite.systemRejectsAudioCombinedMessage)
 	sc.Step(`^el sistema no asocia el audio ni la imagen a ningún mensaje$`, suite.systemDoesNotAssociateAudioOrImageWithAnyMessage)
 	sc.Step(`^envío únicamente el audio "([^"]*)" en el chat con el prestador "([^"]*)"$`, suite.sendAudioOnlyMessageInChatWithProvider)
+	sc.Step(`^intento enviar únicamente el archivo "([^"]*)" como audio en el chat con el prestador "([^"]*)"$`, suite.sendAudioOnlyMessageInChatWithProvider)
 	sc.Step(`^envío únicamente el audio "([^"]*)" en la conversación pendiente con el prestador "([^"]*)"$`, suite.sendAudioOnlyMessageInPendingConversationWithProvider)
 	sc.Step(`^el sistema registra el mensaje de audio "([^"]*)" en el chat$`, suite.systemRegistersAudioMessage)
 	sc.Step(`^el sistema registra el mensaje de audio "([^"]*)" en la conversación pendiente$`, suite.systemRegistersAudioMessageInPendingConversation)
 	sc.Step(`^el mensaje fue enviado por el consumidor "([^"]*)"$`, suite.audioMessageWasSentBy)
 	sc.Step(`^el audio queda asociado al mensaje enviado$`, suite.audioRemainsAssociatedWithSentMessage)
 	sc.Step(`^que el consumidor "([^"]*)" envió el audio "([^"]*)" en el chat con el prestador "([^"]*)"$`, suite.consumerSentAudioInActiveChat)
+	sc.Step(`^que la consumidora "([^"]*)" cargó y confirmó el audio "([^"]*)"$`, suite.consumerUploadedAndConfirmedMessageAudio)
+	sc.Step(`^que cargué pero no confirmé el audio "([^"]*)"$`, suite.uploadedButDidNotConfirmMessageAudio)
+	sc.Step(`^que cargué y confirmé el archivo "([^"]*)" para otra finalidad$`, suite.uploadedAndConfirmedAudioFileForOtherPurpose)
 	sc.Step(`^el detalle incluye el mensaje de audio "([^"]*)"$`, suite.conversationDetailIncludesAudio)
 	sc.Step(`^el detalle muestra la duración, el formato WebM y el codec Opus del audio$`, suite.conversationDetailShowsAudioMetadata)
 	sc.Step(`^el sistema permite al prestador acceder al audio adjunto$`, suite.systemAllowsProviderToAccessAttachedAudio)
@@ -192,16 +203,28 @@ func (suite *testSuite) audioInConversationDetail(detail conversationDetailRespo
 }
 
 func (suite *testSuite) uploadAndConfirmMessageAudio(name, durationText string) error {
+	return suite.uploadMessageAudio(suite.currentAuth0ID, name, durationText, true)
+}
+
+func (suite *testSuite) consumerUploadedAndConfirmedMessageAudio(email, name string) error {
+	return suite.uploadMessageAudio(auth0IDForConsumerEmail(email), name, "18", true)
+}
+
+func (suite *testSuite) uploadedButDidNotConfirmMessageAudio(name string) error {
+	return suite.uploadMessageAudio(suite.currentAuth0ID, name, "18", false)
+}
+
+func (suite *testSuite) uploadMessageAudio(authID, name, durationText string, confirm bool) error {
 	durationSeconds, err := strconv.Atoi(durationText)
 	if err != nil || durationSeconds <= 0 {
 		return fmt.Errorf("expected a positive audio duration, got %q", durationText)
 	}
-	if strings.TrimSpace(suite.currentAuth0ID) == "" {
+	if strings.TrimSpace(authID) == "" {
 		return fmt.Errorf("expected an authenticated uploader before loading audio %q", name)
 	}
 
 	audioData := testWebMOpusAudio(durationSeconds)
-	upload, err := suite.requestProfilePhotoPresign(suite.currentAuth0ID, presignFileRequest{
+	upload, err := suite.requestProfilePhotoPresign(authID, presignFileRequest{
 		OriginalName: name,
 		MimeType:     conversationMessageAudioMIME,
 		SizeBytes:    len(audioData),
@@ -227,10 +250,54 @@ func (suite *testSuite) uploadAndConfirmMessageAudio(name, durationText string) 
 	}
 	suite.messageAudiosByName[name] = fixture
 
+	if !confirm {
+		return nil
+	}
 	if err := suite.putMessageAudioObject(*upload, audioData); err != nil {
 		return err
 	}
-	return suite.confirmMessageAudio(suite.currentAuth0ID, *upload, fixture)
+	return suite.confirmMessageAudio(authID, *upload, fixture)
+}
+
+func (suite *testSuite) uploadedAndConfirmedAudioFileForOtherPurpose(name string) error {
+	if strings.TrimSpace(suite.currentAuth0ID) == "" {
+		return fmt.Errorf("expected an authenticated uploader before loading audio file %q", name)
+	}
+
+	metadata, err := filedomain.NewAudioFileMetadata(name, conversationMessageAudioMIME, 1024, 18, conversationMessageAudioCodec)
+	if err != nil {
+		return fmt.Errorf("creating other-purpose audio fixture: %w", err)
+	}
+	now := time.Now().UTC()
+	fileID := uuid.NewString()
+	file, err := filedomain.NewFile(
+		fileID,
+		"profile-photo/"+fileID+"/"+name,
+		"loresuelvo-public-test",
+		*metadata,
+		filedomain.StatusConfirmed,
+		filedomain.VisibilityPublic,
+		filedomain.PurposeProfilePhoto,
+		suite.currentAuth0ID,
+		now,
+		now,
+	)
+	if err != nil {
+		return fmt.Errorf("creating confirmed other-purpose file fixture: %w", err)
+	}
+	if err := suite.fileRepository.Save(context.Background(), *file); err != nil {
+		return fmt.Errorf("saving confirmed other-purpose file fixture: %w", err)
+	}
+
+	suite.messageAudiosByName[name] = messageAudioFixture{
+		FileID:          fileID,
+		OriginalName:    name,
+		MimeType:        conversationMessageAudioMIME,
+		Codec:           conversationMessageAudioCodec,
+		SizeBytes:       1024,
+		DurationSeconds: 18,
+	}
+	return nil
 }
 
 func (suite *testSuite) thereIsPendingConversationBetweenConsumerAndProviderWithoutInitialMessage(consumerEmail, providerEmail string) error {
@@ -481,6 +548,13 @@ func (suite *testSuite) systemRejectsConsumerAudioInPendingConversation() error 
 	return suite.lastErrorResponseShouldSay(conversation.ErrPendingConversationMessageLimitReached.Error())
 }
 
+func (suite *testSuite) systemRejectsAudioUnavailable() error {
+	if err := suite.lastResponseShouldHaveStatusCode(http.StatusBadRequest); err != nil {
+		return err
+	}
+	return suite.lastErrorResponseShouldSay(conversation.ErrMessageAudioNotAvailable.Error())
+}
+
 func (suite *testSuite) systemRejectsAudioCombinedMessage() error {
 	if err := suite.lastResponseShouldHaveStatusCode(http.StatusBadRequest); err != nil {
 		return err
@@ -510,6 +584,10 @@ func (suite *testSuite) systemDoesNotAssociateAudioWithAnyMessage() error {
 		}
 	}
 	return nil
+}
+
+func (suite *testSuite) systemDoesNotAssociateFileWithAnyMessage() error {
+	return suite.systemDoesNotAssociateAudioWithAnyMessage()
 }
 
 func (suite *testSuite) systemDoesNotAssociateAudioOrImageWithAnyMessage() error {
