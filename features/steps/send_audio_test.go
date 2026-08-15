@@ -23,10 +23,13 @@ const (
 	conversationMessageAudioPurpose = "conversation_message_audio"
 	conversationMessageAudioMIME    = "audio/webm"
 	conversationMessageAudioCodec   = "opus"
+	maxConversationMessageAudioSize = 5 * 1024 * 1024
+	oversizedConversationAudioSize  = 6 * 1024 * 1024
 )
 
 type messageAudioFixture struct {
 	FileID          string
+	Key             string
 	OriginalName    string
 	MimeType        string
 	Codec           string
@@ -84,6 +87,14 @@ func registerSendAudioSteps(sc *godog.ScenarioContext, suite *testSuite) {
 	sc.Step(`^que cargué y confirmé el archivo "([^"]*)" para otra finalidad$`, suite.uploadedAndConfirmedAudioFileForOtherPurpose)
 	sc.Step(`^intento acceder al audio "([^"]*)" adjunto al mensaje$`, suite.tryAccessMessageAudio)
 	sc.Step(`^el sistema me indica que no puedo acceder a ese audio$`, suite.systemReportsMessageAudioAccessDenied)
+	sc.Step(`^intento cargar el audio "([^"]*)" con formato MP4 y codec AAC para un mensaje del chat$`, suite.tryUploadUnsupportedMessageAudio)
+	sc.Step(`^el sistema rechaza la carga porque el audio no usa el formato WebM con codec Opus$`, suite.systemRejectsUnsupportedMessageAudio)
+	sc.Step(`^intento cargar un audio WebM con codec Opus de 6 MiB para un mensaje del chat$`, suite.tryUploadOversizedMessageAudio)
+	sc.Step(`^el sistema rechaza la carga porque el audio supera el máximo de 5 MiB$`, suite.systemRejectsOversizedMessageAudio)
+	sc.Step(`^que cargué el audio WebM con codec Opus "([^"]*)" de ([0-9]+) segundos$`, suite.uploadedMessageAudioWithoutConfirming)
+	sc.Step(`^intento confirmar el audio para un mensaje del chat$`, suite.tryConfirmLastMessageAudio)
+	sc.Step(`^el sistema rechaza la confirmación porque el audio supera el máximo de 300 segundos$`, suite.systemRejectsAudioOverDuration)
+	sc.Step(`^que cargué y confirmé el audio WebM con codec Opus "([^"]*)" de 5 MiB y 300 segundos$`, suite.uploadAndConfirmLimitMessageAudio)
 	sc.Step(`^el detalle incluye el mensaje de audio "([^"]*)"$`, suite.conversationDetailIncludesAudio)
 	sc.Step(`^el detalle muestra la duración, el formato WebM y el codec Opus del audio$`, suite.conversationDetailShowsAudioMetadata)
 	sc.Step(`^el sistema permite al prestador acceder al audio adjunto$`, suite.systemAllowsProviderToAccessAttachedAudio)
@@ -228,6 +239,19 @@ func (suite *testSuite) uploadedButDidNotConfirmMessageAudio(name string) error 
 }
 
 func (suite *testSuite) uploadMessageAudio(authID, name, durationText string, confirm bool) error {
+	return suite.uploadMessageAudioWithOptions(authID, name, durationText, confirm, 0, confirm)
+}
+
+func (suite *testSuite) uploadedMessageAudioWithoutConfirming(name, durationText string) error {
+	suite.lastAttemptedMessageAudioName = name
+	return suite.uploadMessageAudioWithOptions(suite.currentAuth0ID, name, durationText, false, 0, true)
+}
+
+func (suite *testSuite) uploadAndConfirmLimitMessageAudio(name string) error {
+	return suite.uploadMessageAudioWithOptions(suite.currentAuth0ID, name, "300", true, maxConversationMessageAudioSize, true)
+}
+
+func (suite *testSuite) uploadMessageAudioWithOptions(authID, name, durationText string, confirm bool, requestedSizeBytes int, putObject bool) error {
 	durationSeconds, err := strconv.Atoi(durationText)
 	if err != nil || durationSeconds <= 0 {
 		return fmt.Errorf("expected a positive audio duration, got %q", durationText)
@@ -237,6 +261,12 @@ func (suite *testSuite) uploadMessageAudio(authID, name, durationText string, co
 	}
 
 	audioData := testWebMOpusAudio(durationSeconds)
+	if requestedSizeBytes > 0 {
+		if len(audioData) > requestedSizeBytes {
+			return fmt.Errorf("generated audio fixture %q is larger than requested size %d", name, requestedSizeBytes)
+		}
+		audioData = append(audioData, make([]byte, requestedSizeBytes-len(audioData))...)
+	}
 	upload, err := suite.requestProfilePhotoPresign(authID, presignFileRequest{
 		OriginalName: name,
 		MimeType:     conversationMessageAudioMIME,
@@ -255,6 +285,7 @@ func (suite *testSuite) uploadMessageAudio(authID, name, durationText string, co
 
 	fixture := messageAudioFixture{
 		FileID:          upload.FileID,
+		Key:             upload.Key,
 		OriginalName:    name,
 		MimeType:        conversationMessageAudioMIME,
 		Codec:           conversationMessageAudioCodec,
@@ -263,13 +294,79 @@ func (suite *testSuite) uploadMessageAudio(authID, name, durationText string, co
 	}
 	suite.messageAudiosByName[name] = fixture
 
+	if putObject {
+		if err := suite.putMessageAudioObject(*upload, audioData); err != nil {
+			return err
+		}
+	}
 	if !confirm {
 		return nil
 	}
-	if err := suite.putMessageAudioObject(*upload, audioData); err != nil {
-		return err
+	if !putObject {
+		return fmt.Errorf("audio fixture %q must be uploaded before confirmation", name)
 	}
 	return suite.confirmMessageAudio(authID, *upload, fixture)
+}
+
+func (suite *testSuite) tryUploadUnsupportedMessageAudio(name string) error {
+	_, err := suite.requestProfilePhotoPresign(suite.currentAuth0ID, presignFileRequest{
+		OriginalName: name,
+		MimeType:     "audio/mp4",
+		SizeBytes:    1024,
+		Purpose:      conversationMessageAudioPurpose,
+	})
+	return err
+}
+
+func (suite *testSuite) tryUploadOversizedMessageAudio() error {
+	_, err := suite.requestProfilePhotoPresign(suite.currentAuth0ID, presignFileRequest{
+		OriginalName: "audio-grande.webm",
+		MimeType:     conversationMessageAudioMIME,
+		SizeBytes:    oversizedConversationAudioSize,
+		Purpose:      conversationMessageAudioPurpose,
+	})
+	return err
+}
+
+func (suite *testSuite) tryConfirmLastMessageAudio() error {
+	name := suite.lastAttemptedMessageAudioName
+	fixture, ok := suite.messageAudiosByName[name]
+	if !ok {
+		return fmt.Errorf("expected audio fixture %q to exist before confirmation", name)
+	}
+
+	resp, err := suite.postJSONWithAuth(suite.currentAuth0ID, "/files/"+fixture.FileID+"/confirm", confirmFileRequest{
+		Key:       fixture.Key,
+		MimeType:  fixture.MimeType,
+		SizeBytes: fixture.SizeBytes,
+	})
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("failed to read audio confirmation response: %w", err)
+	}
+	suite.lastStatus = resp.StatusCode
+	suite.lastBody = body
+	return nil
+}
+
+func (suite *testSuite) systemRejectsUnsupportedMessageAudio() error {
+	if err := suite.lastResponseShouldHaveStatusCode(http.StatusBadRequest); err != nil {
+		return err
+	}
+	return suite.lastErrorResponseShouldSay(filedomain.ErrUnsupportedMessageAudio.Error())
+}
+
+func (suite *testSuite) systemRejectsOversizedMessageAudio() error {
+	return suite.systemRejectsUnsupportedMessageAudio()
+}
+
+func (suite *testSuite) systemRejectsAudioOverDuration() error {
+	return suite.systemRejectsUnsupportedMessageAudio()
 }
 
 func (suite *testSuite) uploadedAndConfirmedAudioFileForOtherPurpose(name string) error {
