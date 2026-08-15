@@ -1,0 +1,42 @@
+type: object
+description: Metadata for a confirmed video file.
+required:
+- video_codec
+- duration_seconds
+- width
+- height
+properties:
+  video_codec:
+    type: string
+    description: Validated video codec.
+    enum:
+    - h264
+    example: h264
+  audio_codec:
+    type: string
+    description: Optional validated audio codec for the audio track embedded in the video.
+    enum:
+    - aac
+    example: aac
+  duration_seconds:
+    type: integer
+    format: int32
+    minimum: 1
+    maximum: 120
+    description: Validated video duration in whole seconds.
+    example: 24
+  width:
+    type: integer
+    format: int32
+    minimum: 1
+    maximum: 1920
+    description: Validated video width in pixels.
+    example: 1080
+  height:
+    type: integer
+    format: int32
+    minimum: 1
+    maximum: 1920
+    description: Validated video height in pixels.
+    example: 1920
+additionalProperties: false

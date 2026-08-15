@@ -1,0 +1,20 @@
+type: object
+description: Metadata for a confirmed standalone audio file.
+required:
+- codec
+- duration_seconds
+properties:
+  codec:
+    type: string
+    description: Validated audio codec.
+    enum:
+    - opus
+    example: opus
+  duration_seconds:
+    type: integer
+    format: int32
+    minimum: 1
+    maximum: 300
+    description: Validated audio duration in whole seconds.
+    example: 18
+additionalProperties: false

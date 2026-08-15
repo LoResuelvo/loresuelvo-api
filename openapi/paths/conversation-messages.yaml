@@ -3,7 +3,7 @@ post:
   - Conversations
   operationId: sendConversationMessage
   summary: Send a message in a conversation
-  description: Creates a text and/or image message, or an audio-only message, in an existing conversation. Audio must be a confirmed WebM/Opus file owned by the authenticated participant and cannot be combined with text or images. The sender role is inferred from the JWT subject.
+  description: Creates a text and/or image message, an audio-only message, or a message with one video and optional text in an existing conversation. Audio must be a confirmed WebM/Opus file owned by the authenticated participant. Video must be a confirmed MP4/H.264 file owned by the authenticated participant, may contain AAC audio, may be combined with text, and cannot be combined with images or audio. Videos are limited to 120 seconds. The sender role is inferred from the JWT subject.
   security:
   - BearerAuth: []
   parameters:
@@ -31,6 +31,11 @@ post:
             summary: Consumer audio message
             value:
               audio_file_id: 4af47f1b-97b6-4b32-baa0-b95d6077f919
+          validVideoMessage:
+            summary: Provider video message with text
+            value:
+              video_file_id: 4af47f1b-97b6-4b32-baa0-b95d6077f919
+              content: Te muestro cómo quedaría realizada la reparación.
   responses:
     '201':
       description: Message created successfully.
@@ -53,7 +58,7 @@ post:
                 content: ¿El jueves por la mañana te queda cómodo para pasar a revisar el problema?
                 created_on: '2026-05-31T12:00:00Z'
     '400':
-      description: The conversation id path parameter is not a positive integer, the request body is invalid, the message content is empty after trimming, or the audio is unavailable or combined with text/images.
+      description: The conversation id path parameter is not a positive integer, the request body is invalid, the message content is empty after trimming, or the audio/video is unavailable or combined with an unsupported message part.
       content:
         application/json:
           schema:

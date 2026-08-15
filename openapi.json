@@ -1080,7 +1080,7 @@
                 ],
                 "operationId": "presignFileUpload",
                 "summary": "Request a file upload URL",
-                "description": "Creates a pending file record and returns a direct upload URL. Conversation audio must be WebM with Opus, no larger than 5 MiB; the server validates the object contents and duration during confirmation, up to 300 seconds.",
+                "description": "Creates a pending file record and returns a direct upload URL. Conversation audio must be WebM with Opus, no larger than 5 MiB and 300 seconds. Conversation video must be MP4 with H.264 and optional AAC audio, no larger than 50 MiB; the server validates the object contents, codecs, dimensions, and duration during confirmation, up to 120 seconds.",
                 "security": [
                     {
                         "BearerAuth": []
@@ -3243,7 +3243,7 @@
                 ],
                 "operationId": "sendConversationMessage",
                 "summary": "Send a message in a conversation",
-                "description": "Creates a text and/or image message, or an audio-only message, in an existing conversation. Audio must be a confirmed WebM/Opus file owned by the authenticated participant and cannot be combined with text or images. The sender role is inferred from the JWT subject.",
+                "description": "Creates a text and/or image message, an audio-only message, or a message with one video and optional text in an existing conversation. Audio must be a confirmed WebM/Opus file owned by the authenticated participant. Video must be a confirmed MP4/H.264 file owned by the authenticated participant, may contain AAC audio, may be combined with text, and cannot be combined with images or audio. Videos are limited to 120 seconds. The sender role is inferred from the JWT subject.",
                 "security": [
                     {
                         "BearerAuth": []
@@ -3282,6 +3282,13 @@
                                     "value": {
                                         "audio_file_id": "4af47f1b-97b6-4b32-baa0-b95d6077f919"
                                     }
+                                },
+                                "validVideoMessage": {
+                                    "summary": "Provider video message with text",
+                                    "value": {
+                                        "video_file_id": "4af47f1b-97b6-4b32-baa0-b95d6077f919",
+                                        "content": "Te muestro cómo quedaría realizada la reparación."
+                                    }
                                 }
                             }
                         }
@@ -3319,7 +3326,7 @@
                         }
                     },
                     "400": {
-                        "description": "The conversation id path parameter is not a positive integer, the request body is invalid, the message content is empty after trimming, or the audio is unavailable or combined with text/images.",
+                        "description": "The conversation id path parameter is not a positive integer, the request body is invalid, the message content is empty after trimming, or the audio/video is unavailable or combined with an unsupported message part.",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -4031,7 +4038,7 @@
                     },
                     "mime_type": {
                         "type": "string",
-                        "description": "File MIME type. Profile photos accept image/jpeg, image/png, and image/webp; conversation audio accepts audio/webm.",
+                        "description": "File MIME type. Profile photos accept image/jpeg, image/png, and image/webp; conversation audio accepts audio/webm; conversation videos accept video/mp4.",
                         "example": "image/jpeg"
                     },
                     "size_bytes": {
@@ -4045,7 +4052,8 @@
                         "description": "Intended business use for the file.",
                         "enum": [
                             "profile_photo",
-                            "conversation_message_audio"
+                            "conversation_message_audio",
+                            "conversation_message_video"
                         ],
                         "example": "profile_photo"
                     }
@@ -4118,11 +4126,41 @@
                 },
                 "additionalProperties": false
             },
+            "FileAudioMetadata": {
+                "type": "object",
+                "description": "Metadata for a confirmed standalone audio file.",
+                "required": [
+                    "codec",
+                    "duration_seconds"
+                ],
+                "properties": {
+                    "codec": {
+                        "type": "string",
+                        "description": "Validated audio codec.",
+                        "enum": [
+                            "opus"
+                        ],
+                        "example": "opus"
+                    },
+                    "duration_seconds": {
+                        "type": "integer",
+                        "format": "int32",
+                        "minimum": 1,
+                        "maximum": 300,
+                        "description": "Validated audio duration in whole seconds.",
+                        "example": 18
+                    }
+                },
+                "additionalProperties": false
+            },
             "FileResponse": {
                 "type": "object",
+                "description": "Confirmed file returned by the upload confirmation endpoint. Common file metadata is exposed at the top level, while media-specific metadata is nested under the matching variant.",
                 "required": [
                     "id",
-                    "original_name"
+                    "original_name",
+                    "mime_type",
+                    "type"
                 ],
                 "properties": {
                     "id": {
@@ -4144,21 +4182,133 @@
                     },
                     "mime_type": {
                         "type": "string",
-                        "description": "Validated MIME type. Present for confirmed conversation audio.",
-                        "example": "audio/webm"
+                        "description": "Validated MIME type of the confirmed file.",
+                        "example": "video/mp4"
                     },
-                    "codec": {
+                    "type": {
                         "type": "string",
-                        "description": "Validated audio codec. Present for confirmed conversation audio.",
-                        "example": "opus"
+                        "description": "Media variant represented by the response.",
+                        "enum": [
+                            "image",
+                            "audio",
+                            "video"
+                        ],
+                        "example": "video"
+                    },
+                    "audio": {
+                        "$ref": "#/components/schemas/FileAudioMetadata"
+                    },
+                    "video": {
+                        "$ref": "#/components/schemas/FileVideoMetadata"
+                    }
+                },
+                "oneOf": [
+                    {
+                        "title": "Confirmed image file",
+                        "properties": {
+                            "type": {
+                                "const": "image"
+                            }
+                        },
+                        "not": {
+                            "anyOf": [
+                                {
+                                    "required": [
+                                        "audio"
+                                    ]
+                                },
+                                {
+                                    "required": [
+                                        "video"
+                                    ]
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        "title": "Confirmed audio file",
+                        "required": [
+                            "audio"
+                        ],
+                        "properties": {
+                            "type": {
+                                "const": "audio"
+                            }
+                        },
+                        "not": {
+                            "required": [
+                                "video"
+                            ]
+                        }
+                    },
+                    {
+                        "title": "Confirmed video file",
+                        "required": [
+                            "video"
+                        ],
+                        "properties": {
+                            "type": {
+                                "const": "video"
+                            }
+                        },
+                        "not": {
+                            "required": [
+                                "audio"
+                            ]
+                        }
+                    }
+                ],
+                "additionalProperties": false
+            },
+            "FileVideoMetadata": {
+                "type": "object",
+                "description": "Metadata for a confirmed video file.",
+                "required": [
+                    "video_codec",
+                    "duration_seconds",
+                    "width",
+                    "height"
+                ],
+                "properties": {
+                    "video_codec": {
+                        "type": "string",
+                        "description": "Validated video codec.",
+                        "enum": [
+                            "h264"
+                        ],
+                        "example": "h264"
+                    },
+                    "audio_codec": {
+                        "type": "string",
+                        "description": "Optional validated audio codec for the audio track embedded in the video.",
+                        "enum": [
+                            "aac"
+                        ],
+                        "example": "aac"
                     },
                     "duration_seconds": {
                         "type": "integer",
                         "format": "int32",
                         "minimum": 1,
-                        "maximum": 300,
-                        "description": "Validated audio duration in whole seconds. Present for confirmed conversation audio.",
-                        "example": 18
+                        "maximum": 120,
+                        "description": "Validated video duration in whole seconds.",
+                        "example": 24
+                    },
+                    "width": {
+                        "type": "integer",
+                        "format": "int32",
+                        "minimum": 1,
+                        "maximum": 1920,
+                        "description": "Validated video width in pixels.",
+                        "example": 1080
+                    },
+                    "height": {
+                        "type": "integer",
+                        "format": "int32",
+                        "minimum": 1,
+                        "maximum": 1920,
+                        "description": "Validated video height in pixels.",
+                        "example": 1920
                     }
                 },
                 "additionalProperties": false
@@ -4241,6 +4391,88 @@
                         "maximum": 300,
                         "description": "Validated duration rounded up to whole seconds.",
                         "example": 18
+                    }
+                },
+                "additionalProperties": false
+            },
+            "MessageVideo": {
+                "type": "object",
+                "description": "Confirmed private video attached to a conversation message. The URL is scoped to an authorized conversation participant.",
+                "required": [
+                    "id",
+                    "url",
+                    "original_name",
+                    "mime_type",
+                    "video_codec",
+                    "duration_seconds",
+                    "width",
+                    "height"
+                ],
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "Confirmed video file identifier.",
+                        "example": "4af47f1b-97b6-4b32-baa0-b95d6077f919"
+                    },
+                    "url": {
+                        "type": "string",
+                        "format": "uri",
+                        "description": "Private, time-limited URL for the authorized participant.",
+                        "example": "https://storage.example.com/private/video.mp4?signature=..."
+                    },
+                    "original_name": {
+                        "type": "string",
+                        "description": "Original video file name selected by the user.",
+                        "example": "perdida-canilla.mp4"
+                    },
+                    "mime_type": {
+                        "type": "string",
+                        "description": "Validated video MIME type.",
+                        "enum": [
+                            "video/mp4"
+                        ],
+                        "example": "video/mp4"
+                    },
+                    "video_codec": {
+                        "type": "string",
+                        "description": "Validated video codec.",
+                        "enum": [
+                            "h264"
+                        ],
+                        "example": "h264"
+                    },
+                    "audio_codec": {
+                        "type": "string",
+                        "description": "Optional validated audio codec included in the video.",
+                        "enum": [
+                            "aac"
+                        ],
+                        "example": "aac"
+                    },
+                    "duration_seconds": {
+                        "type": "integer",
+                        "format": "int32",
+                        "minimum": 1,
+                        "maximum": 120,
+                        "description": "Validated duration rounded up to whole seconds.",
+                        "example": 24
+                    },
+                    "width": {
+                        "type": "integer",
+                        "format": "int32",
+                        "minimum": 1,
+                        "maximum": 1920,
+                        "description": "Validated video width in pixels.",
+                        "example": 1080
+                    },
+                    "height": {
+                        "type": "integer",
+                        "format": "int32",
+                        "minimum": 1,
+                        "maximum": 1920,
+                        "description": "Validated video height in pixels.",
+                        "example": 1920
                     }
                 },
                 "additionalProperties": false
@@ -4420,7 +4652,7 @@
             },
             "SendMessageRequest": {
                 "type": "object",
-                "description": "Payload accepted by POST /conversations/{conversationId}/messages. The sender is inferred from the authenticated JWT subject. A message may contain text and/or images, or one confirmed audio file exclusively.",
+                "description": "Payload accepted by POST /conversations/{conversationId}/messages. The sender is inferred from the authenticated JWT subject. A message may contain text and/or images, one confirmed audio file exclusively, or one confirmed video with optional text. Videos cannot be combined with images or audio.",
                 "anyOf": [
                     {
                         "required": [
@@ -4436,6 +4668,11 @@
                         "required": [
                             "audio_file_id"
                         ]
+                    },
+                    {
+                        "required": [
+                            "video_file_id"
+                        ]
                     }
                 ],
                 "not": {
@@ -4449,6 +4686,18 @@
                         {
                             "required": [
                                 "audio_file_id",
+                                "image_file_ids"
+                            ]
+                        },
+                        {
+                            "required": [
+                                "audio_file_id",
+                                "video_file_id"
+                            ]
+                        },
+                        {
+                            "required": [
+                                "video_file_id",
                                 "image_file_ids"
                             ]
                         }
@@ -4473,7 +4722,12 @@
                     "audio_file_id": {
                         "type": "string",
                         "format": "uuid",
-                        "description": "Confirmed private WebM/Opus audio file uploaded by the authenticated sender. It cannot be combined with text or images."
+                        "description": "Confirmed private WebM/Opus audio file uploaded by the authenticated sender. It cannot be combined with text, images, or video."
+                    },
+                    "video_file_id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "Confirmed private MP4 video file uploaded by the authenticated sender. The video must use H.264, may contain AAC audio, may be combined with text, and cannot be combined with images or audio. Videos are limited to 120 seconds and 1920×1920 pixels."
                     }
                 },
                 "additionalProperties": false
@@ -5069,6 +5323,9 @@
                     "audio": {
                         "$ref": "#/components/schemas/MessageAudio"
                     },
+                    "video": {
+                        "$ref": "#/components/schemas/MessageVideo"
+                    },
                     "created_on": {
                         "type": "string",
                         "format": "date-time",
@@ -5228,6 +5485,9 @@
                     "audio": {
                         "$ref": "#/components/schemas/MessageAudio"
                     },
+                    "video": {
+                        "$ref": "#/components/schemas/MessageVideo"
+                    },
                     "created_on": {
                         "type": "string",
                         "format": "date-time",
@@ -5344,6 +5604,9 @@
                     },
                     "audio": {
                         "$ref": "#/components/schemas/MessageAudio"
+                    },
+                    "video": {
+                        "$ref": "#/components/schemas/MessageVideo"
                     },
                     "created_on": {
                         "type": "string",

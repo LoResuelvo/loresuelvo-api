@@ -224,12 +224,18 @@ components:
       $ref: ./components/schemas/presign-file-response.yaml
     ConfirmFileRequest:
       $ref: ./components/schemas/confirm-file-request.yaml
+    FileAudioMetadata:
+      $ref: ./components/schemas/file-audio-metadata.yaml
     FileResponse:
       $ref: ./components/schemas/file-response.yaml
+    FileVideoMetadata:
+      $ref: ./components/schemas/file-video-metadata.yaml
     MessageImage:
       $ref: ./components/schemas/message-image.yaml
     MessageAudio:
       $ref: ./components/schemas/message-audio.yaml
+    MessageVideo:
+      $ref: ./components/schemas/message-video.yaml
     CreateJobRequestRequest:
       $ref: ./components/schemas/create-job-request-request.yaml
     JobRequest:

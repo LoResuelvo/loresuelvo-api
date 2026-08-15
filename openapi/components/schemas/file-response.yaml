@@ -1,7 +1,10 @@
 type: object
+description: Confirmed file returned by the upload confirmation endpoint. Common file metadata is exposed at the top level, while media-specific metadata is nested under the matching variant.
 required:
 - id
 - original_name
+- mime_type
+- type
 properties:
   id:
     type: string
@@ -19,17 +22,47 @@ properties:
     example: foto-perfil.jpg
   mime_type:
     type: string
-    description: Validated MIME type. Present for confirmed conversation audio.
-    example: audio/webm
-  codec:
+    description: Validated MIME type of the confirmed file.
+    example: video/mp4
+  type:
     type: string
-    description: Validated audio codec. Present for confirmed conversation audio.
-    example: opus
-  duration_seconds:
-    type: integer
-    format: int32
-    minimum: 1
-    maximum: 300
-    description: Validated audio duration in whole seconds. Present for confirmed conversation audio.
-    example: 18
+    description: Media variant represented by the response.
+    enum:
+    - image
+    - audio
+    - video
+    example: video
+  audio:
+    $ref: '#/components/schemas/FileAudioMetadata'
+  video:
+    $ref: '#/components/schemas/FileVideoMetadata'
+oneOf:
+- title: Confirmed image file
+  properties:
+    type:
+      const: image
+  not:
+    anyOf:
+    - required:
+      - audio
+    - required:
+      - video
+- title: Confirmed audio file
+  required:
+  - audio
+  properties:
+    type:
+      const: audio
+  not:
+    required:
+    - video
+- title: Confirmed video file
+  required:
+  - video
+  properties:
+    type:
+      const: video
+  not:
+    required:
+    - audio
 additionalProperties: false

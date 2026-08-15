@@ -25,6 +25,8 @@ properties:
     example: Hola Juan, necesito reparar una pérdida de agua en la cocina. ¿Podrías ayudarme esta semana?
   audio:
     $ref: '#/components/schemas/MessageAudio'
+  video:
+    $ref: '#/components/schemas/MessageVideo'
   created_on:
     type: string
     format: date-time

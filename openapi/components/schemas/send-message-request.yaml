@@ -1,13 +1,16 @@
 type: object
-description: Payload accepted by POST /conversations/{conversationId}/messages. The sender is inferred from the authenticated JWT subject. A message may contain text and/or images, or one confirmed audio file exclusively.
+description: Payload accepted by POST /conversations/{conversationId}/messages. The sender is inferred from the authenticated JWT subject. A message may contain text and/or images, one confirmed audio file exclusively, or one confirmed video with optional text. Videos cannot be combined with images or audio.
 anyOf:
 - required: [content]
 - required: [image_file_ids]
 - required: [audio_file_id]
+- required: [video_file_id]
 not:
   anyOf:
   - required: [audio_file_id, content]
   - required: [audio_file_id, image_file_ids]
+  - required: [audio_file_id, video_file_id]
+  - required: [video_file_id, image_file_ids]
 properties:
   content:
     type: string
@@ -24,5 +27,9 @@ properties:
   audio_file_id:
     type: string
     format: uuid
-    description: Confirmed private WebM/Opus audio file uploaded by the authenticated sender. It cannot be combined with text or images.
+    description: Confirmed private WebM/Opus audio file uploaded by the authenticated sender. It cannot be combined with text, images, or video.
+  video_file_id:
+    type: string
+    format: uuid
+    description: Confirmed private MP4 video file uploaded by the authenticated sender. The video must use H.264, may contain AAC audio, may be combined with text, and cannot be combined with images or audio. Videos are limited to 120 seconds and 1920×1920 pixels.
 additionalProperties: false

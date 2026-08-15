@@ -30,6 +30,8 @@ properties:
       $ref: '#/components/schemas/MessageImage'
   audio:
     $ref: '#/components/schemas/MessageAudio'
+  video:
+    $ref: '#/components/schemas/MessageVideo'
   created_on:
     type: string
     format: date-time
