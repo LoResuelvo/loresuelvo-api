@@ -75,7 +75,7 @@ func registerSendAudioSteps(sc *godog.ScenarioContext, suite *testSuite) {
 	sc.Step(`^que el consumidor "([^"]*)" envió el audio "([^"]*)" en el chat con el prestador "([^"]*)"$`, suite.consumerSentAudioInActiveChat)
 	sc.Step(`^que la consumidora "([^"]*)" cargó y confirmó el audio "([^"]*)"$`, suite.consumerUploadedAndConfirmedMessageAudio)
 	sc.Step(`^que cargué pero no confirmé el audio "([^"]*)"$`, suite.uploadedButDidNotConfirmMessageAudio)
-	sc.Step(`^que cargué y confirmé el archivo "([^"]*)" para otra finalidad$`, suite.uploadedAndConfirmedAudioFileForOtherPurpose)
+	sc.Step(`^que cargué y confirmé el archivo "([^"]+\.webm)" para otra finalidad$`, suite.uploadedAndConfirmedAudioFileForOtherPurpose)
 	sc.Step(`^intento acceder al audio "([^"]*)" adjunto al mensaje$`, suite.tryAccessMessageAudio)
 	sc.Step(`^el sistema me indica que no puedo acceder a ese audio$`, suite.systemReportsMessageAudioAccessDenied)
 	sc.Step(`^intento cargar el audio "([^"]*)" con formato MP4 y codec AAC para un mensaje del chat$`, suite.tryUploadUnsupportedMessageAudio)
@@ -688,6 +688,9 @@ func (suite *testSuite) systemDoesNotAssociateAudioWithAnyMessage() error {
 }
 
 func (suite *testSuite) systemDoesNotAssociateFileWithAnyMessage() error {
+	if suite.lastAttemptedMessageVideoName != "" {
+		return suite.systemDoesNotAssociateVideoWithAnyMessage()
+	}
 	return suite.systemDoesNotAssociateAudioWithAnyMessage()
 }
 

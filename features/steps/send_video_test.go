@@ -10,9 +10,12 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/conversation"
+	filedomain "github.com/LoResuelvo/loresuelvo-api/internal/domain/file"
 	"github.com/cucumber/godog"
+	"github.com/google/uuid"
 )
 
 const (
@@ -48,7 +51,12 @@ type messageVideoResponse struct {
 func registerSendVideoSteps(sc *godog.ScenarioContext, suite *testSuite) {
 	sc.Step(`^que cargué y confirmé el video sin audio "([^"]*)" de ([0-9]+) segundos$`, suite.uploadAndConfirmMessageVideoWithoutAudio)
 	sc.Step(`^que cargué y confirmé el video "([^"]*)" de ([0-9]+) segundos$`, suite.uploadAndConfirmMessageVideo)
+	sc.Step(`^que cargué pero no confirmé el video "([^"]*)"$`, suite.uploadedButDidNotConfirmMessageVideo)
+	sc.Step(`^que la consumidora "([^"]*)" cargó y confirmó el video "([^"]*)"$`, suite.consumerUploadedAndConfirmedMessageVideo)
+	sc.Step(`^que cargué y confirmé el archivo "([^"]+\.mp4)" para otra finalidad$`, suite.uploadedAndConfirmedVideoFileForOtherPurpose)
 	sc.Step(`^envío únicamente el video "([^"]*)" en el chat con el prestador "([^"]*)"$`, suite.sendVideoOnlyMessageInChatWithProvider)
+	sc.Step(`^intento enviar únicamente el video "([^"]*)" en el chat con el prestador "([^"]*)"$`, suite.sendVideoOnlyMessageInChatWithProvider)
+	sc.Step(`^intento enviar únicamente el archivo "([^"]*)" como video en el chat con el prestador "([^"]*)"$`, suite.sendVideoOnlyMessageInChatWithProvider)
 	sc.Step(`^envío el video "([^"]*)" en el chat con la consumidora "([^"]*)" acompañado del texto:$`, suite.sendVideoWithTextInChatWithConsumer)
 	sc.Step(`^envío el video "([^"]*)" en la conversación pendiente con el prestador "([^"]*)" acompañado del texto:$`, suite.sendVideoWithTextInPendingConversationWithProvider)
 	sc.Step(`^intento enviar únicamente el video "([^"]*)" en la conversación pendiente con la consumidora "([^"]*)"$`, suite.trySendVideoOnlyMessageInPendingConversationWithConsumer)
@@ -60,6 +68,7 @@ func registerSendVideoSteps(sc *godog.ScenarioContext, suite *testSuite) {
 	sc.Step(`^el sistema registra el mensaje con el video "([^"]*)" y el texto enviado en la conversación pendiente$`, suite.systemRegistersMessageWithVideoAndTextInPendingConversation)
 	sc.Step(`^el video queda asociado al mensaje enviado$`, suite.videoRemainsAssociatedWithSentMessage)
 	sc.Step(`^el sistema no asocia el video a ningún mensaje$`, suite.systemDoesNotAssociateVideoWithAnyMessage)
+	sc.Step(`^el sistema rechaza el mensaje porque el video no está disponible$`, suite.systemRejectsVideoUnavailable)
 	sc.Step(`^el sistema rechaza el mensaje porque el video no puede enviarse con imágenes$`, suite.systemRejectsVideoCombinedWithImages)
 	sc.Step(`^el sistema rechaza el mensaje porque el audio debe enviarse sin texto, imágenes ni video$`, suite.systemRejectsVideoCombinedWithAudio)
 	sc.Step(`^el sistema no asocia el video ni la imagen a ningún mensaje$`, suite.systemDoesNotAssociateVideoOrImageWithAnyMessage)
@@ -195,7 +204,19 @@ func (suite *testSuite) uploadAndConfirmMessageVideo(name, durationText string) 
 	return suite.uploadMessageVideo(suite.currentAuth0ID, name, durationText, true)
 }
 
+func (suite *testSuite) consumerUploadedAndConfirmedMessageVideo(email, name string) error {
+	return suite.uploadMessageVideo(auth0IDForConsumerEmail(email), name, "18", true)
+}
+
+func (suite *testSuite) uploadedButDidNotConfirmMessageVideo(name string) error {
+	return suite.uploadMessageVideoWithOptions(suite.currentAuth0ID, name, "18", true, false)
+}
+
 func (suite *testSuite) uploadMessageVideo(authID, name, durationText string, withAudio bool) error {
+	return suite.uploadMessageVideoWithOptions(authID, name, durationText, withAudio, true)
+}
+
+func (suite *testSuite) uploadMessageVideoWithOptions(authID, name, durationText string, withAudio, confirm bool) error {
 	durationSeconds, err := strconv.Atoi(durationText)
 	if err != nil || durationSeconds <= 0 {
 		return fmt.Errorf("expected a positive video duration, got %q", durationText)
@@ -239,6 +260,9 @@ func (suite *testSuite) uploadMessageVideo(authID, name, durationText string, wi
 		fixture.AudioCodec = "aac"
 	}
 	suite.messageVideosByName[name] = fixture
+	if !confirm {
+		return nil
+	}
 
 	resp, err := suite.postJSONWithAuth(authID, "/files/"+upload.FileID+"/confirm", confirmFileRequest{
 		Key:       upload.Key,
@@ -268,6 +292,56 @@ func (suite *testSuite) uploadMessageVideo(authID, name, durationText string, wi
 	video := response.Video
 	if video.VideoCodec != fixture.VideoCodec || video.AudioCodec != fixture.AudioCodec || video.DurationSeconds != fixture.DurationSeconds || video.Width != fixture.Width || video.Height != fixture.Height {
 		return fmt.Errorf("video confirmation response does not match fixture %q: %s", fixture.OriginalName, string(body))
+	}
+	return nil
+}
+
+func (suite *testSuite) uploadedAndConfirmedVideoFileForOtherPurpose(name string) error {
+	if strings.TrimSpace(suite.currentAuth0ID) == "" {
+		return fmt.Errorf("expected an authenticated uploader before loading video file %q", name)
+	}
+
+	metadata, err := filedomain.NewVideoFileMetadata(name, conversationMessageVideoMIME, 1024, filedomain.VideoMetadata{
+		DurationSeconds: 18,
+		VideoCodec:      "h264",
+		AudioCodec:      "aac",
+		Width:           1080,
+		Height:          1920,
+	})
+	if err != nil {
+		return fmt.Errorf("creating other-purpose video fixture: %w", err)
+	}
+	now := time.Now().UTC()
+	fileID := uuid.NewString()
+	file, err := filedomain.NewFile(
+		fileID,
+		"profile-photo/"+fileID+"/"+name,
+		"loresuelvo-private-test",
+		*metadata,
+		filedomain.StatusConfirmed,
+		filedomain.VisibilityPrivate,
+		filedomain.PurposeProfilePhoto,
+		suite.currentAuth0ID,
+		now,
+		now,
+	)
+	if err != nil {
+		return fmt.Errorf("creating confirmed other-purpose video fixture: %w", err)
+	}
+	if err := suite.fileRepository.Save(context.Background(), *file); err != nil {
+		return fmt.Errorf("saving confirmed other-purpose video fixture: %w", err)
+	}
+
+	suite.messageVideosByName[name] = messageVideoFixture{
+		FileID:          fileID,
+		OriginalName:    name,
+		MimeType:        conversationMessageVideoMIME,
+		SizeBytes:       1024,
+		VideoCodec:      "h264",
+		AudioCodec:      "aac",
+		DurationSeconds: 18,
+		Width:           1080,
+		Height:          1920,
 	}
 	return nil
 }
@@ -543,6 +617,13 @@ func (suite *testSuite) systemDoesNotAssociateVideoWithAnyMessage() error {
 		}
 	}
 	return nil
+}
+
+func (suite *testSuite) systemRejectsVideoUnavailable() error {
+	if err := suite.lastResponseShouldHaveStatusCode(http.StatusBadRequest); err != nil {
+		return err
+	}
+	return suite.lastErrorResponseShouldSay(conversation.ErrMessageVideoNotAvailable.Error())
 }
 
 func (suite *testSuite) systemRejectsVideoCombinedWithImages() error {
