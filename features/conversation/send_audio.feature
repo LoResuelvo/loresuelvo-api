@@ -124,7 +124,6 @@ Feature: 50.1 Enviar audios por el chat
 
     Rule: Solo pueden enviarse audios confirmados y pertenecientes al remitente
 
-    @wip
     Scenario: 50.1.12-EAC Rechazar un audio que todavía no fue confirmado
         Given que existe un chat activo entre el consumidor "ana@example.com" y el prestador "juan.plomero@example.com"
         And que estoy autenticado como consumidor "ana@example.com"
@@ -133,7 +132,6 @@ Feature: 50.1 Enviar audios por el chat
         Then el sistema rechaza el mensaje porque el audio no está disponible
         And el sistema no asocia el audio a ningún mensaje
 
-    @wip
     Scenario: 50.1.13-EAC Rechazar un audio cargado por otro usuario
         Given que existe un chat activo entre el consumidor "ana@example.com" y el prestador "juan.plomero@example.com"
         And que la consumidora "carla@example.com" cargó y confirmó el audio "audio-ajeno.webm"
@@ -142,7 +140,6 @@ Feature: 50.1 Enviar audios por el chat
         Then el sistema rechaza el mensaje porque el audio no está disponible
         And el sistema no asocia el audio a ningún mensaje
 
-    @wip
     Scenario: 50.1.14-EAC Rechazar un archivo cargado para otra finalidad
         Given que existe un chat activo entre el consumidor "ana@example.com" y el prestador "juan.plomero@example.com"
         And que estoy autenticado como consumidor "ana@example.com"
