@@ -773,12 +773,16 @@ func (s *Service) ensureMessageAllowedInCurrentConversationState(ctx context.Con
 func (s *Service) withCounterpartProfilePhotoURLs(ctx context.Context, summaries []readmodel.ConversationSummary) ([]readmodel.ConversationSummary, error) {
 	fileIDs := make([]string, 0, len(summaries))
 	audioFileIDs := make([]string, 0, len(summaries))
+	videoFileIDs := make([]string, 0, len(summaries))
 	for i := range summaries {
 		if summaries[i].Work != nil {
 			fileIDs = append(fileIDs, summaries[i].Work.Counterpart.ProfilePhotoFileID)
 		}
 		if summaries[i].LastMessage != nil && summaries[i].LastMessage.Audio != nil {
 			audioFileIDs = append(audioFileIDs, summaries[i].LastMessage.Audio.FileID)
+		}
+		if summaries[i].LastMessage != nil && summaries[i].LastMessage.Video != nil {
+			videoFileIDs = append(videoFileIDs, summaries[i].LastMessage.Video.FileID)
 		}
 	}
 	urlsByFileID, err := s.fileService.ResolvePublicURLs(ctx, fileIDs)
@@ -806,6 +810,22 @@ func (s *Service) withCounterpartProfilePhotoURLs(ctx context.Context, summaries
 			return nil, ErrMessageAudioNotAvailable
 		}
 		*audio = resolved
+	}
+
+	videosByFileID, err := s.fileService.ResolveMessageVideos(ctx, videoFileIDs)
+	if err != nil {
+		return nil, fmt.Errorf("resolving conversation summary message videos: %w", err)
+	}
+	for i := range summaries {
+		if summaries[i].LastMessage == nil || summaries[i].LastMessage.Video == nil {
+			continue
+		}
+		video := summaries[i].LastMessage.Video
+		resolved, ok := videosByFileID[video.FileID]
+		if !ok || resolved.URL == "" {
+			return nil, ErrMessageVideoNotAvailable
+		}
+		*video = resolved
 	}
 
 	return summaries, nil

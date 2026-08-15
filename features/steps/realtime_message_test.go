@@ -34,6 +34,7 @@ type realtimeEventMessage struct {
 	Content    string                 `json:"content"`
 	Images     []messageImageResponse `json:"images"`
 	Audio      *messageAudioResponse  `json:"audio,omitempty"`
+	Video      *messageVideoResponse  `json:"video,omitempty"`
 	CreatedOn  time.Time              `json:"created_on"`
 }
 
@@ -53,6 +54,8 @@ func registerRealtimeMessageSteps(sc *godog.ScenarioContext, suite *testSuite) {
 	sc.Step(`^el prestador "([^"]*)" recibe en tiempo real el mensaje:$`, suite.providerReceivesRealtimeMessage)
 	sc.Step(`^el prestador "([^"]*)" recibe en tiempo real el mensaje de audio "([^"]*)"$`, suite.providerReceivesRealtimeAudioMessage)
 	sc.Step(`^el evento recibido incluye la duración y el acceso al audio$`, suite.realtimeAudioEventIncludesDurationAndAccess)
+	sc.Step(`^el prestador "([^"]*)" recibe en tiempo real el mensaje con el video "([^"]*)"$`, suite.providerReceivesRealtimeVideoMessage)
+	sc.Step(`^el evento recibido incluye los metadatos y el acceso al video$`, suite.realtimeVideoEventIncludesMetadataAndAccess)
 	sc.Step(`^el consumidor "([^"]*)" no recibe mensajes en tiempo real$`, suite.consumerDoesNotReceiveRealtimeMessages)
 	sc.Step(`^el prestador "([^"]*)" no recibe mensajes en tiempo real$`, suite.providerDoesNotReceiveRealtimeMessages)
 }
@@ -216,6 +219,73 @@ func (suite *testSuite) realtimeAudioEventIncludesDurationAndAccess() error {
 	}
 	if strings.TrimSpace(audio.URL) == "" {
 		return fmt.Errorf("expected realtime audio %q to include an access URL", audio.OriginalName)
+	}
+
+	return nil
+}
+
+func (suite *testSuite) providerReceivesRealtimeVideoMessage(email, videoName string) error {
+	connection, err := suite.realtimeConnectionForEmail(email)
+	if err != nil {
+		return err
+	}
+
+	event, err := connection.readMessageEvent(realtimeMessageTimeout)
+	if err != nil {
+		return err
+	}
+	fixture, ok := suite.messageVideosByName[videoName]
+	if !ok {
+		return fmt.Errorf("expected video fixture %q to exist", videoName)
+	}
+
+	if event.Type != "conversation.message.created" {
+		return fmt.Errorf("expected realtime event type %q, got %q", "conversation.message.created", event.Type)
+	}
+	if event.ConversationID != suite.lastConversationID {
+		return fmt.Errorf("expected realtime conversation id %d, got %d", suite.lastConversationID, event.ConversationID)
+	}
+	if event.Message.ID == 0 {
+		return fmt.Errorf("expected realtime video message id to be present")
+	}
+	if event.Message.SenderRole != participantRoleConsumer {
+		return fmt.Errorf("expected realtime video sender role %q, got %q", participantRoleConsumer, event.Message.SenderRole)
+	}
+	if event.Message.Content != "" {
+		return fmt.Errorf("expected realtime video-only message content to be empty, got %q", event.Message.Content)
+	}
+	if event.Message.Video == nil {
+		return fmt.Errorf("expected realtime event to include video %q", videoName)
+	}
+	if event.Message.Video.ID != fixture.FileID || event.Message.Video.OriginalName != fixture.OriginalName {
+		return fmt.Errorf("expected realtime video %q with id %q, got id %q and name %q", videoName, fixture.FileID, event.Message.Video.ID, event.Message.Video.OriginalName)
+	}
+	if event.Message.CreatedOn.IsZero() {
+		return fmt.Errorf("expected realtime video message created_on to be present")
+	}
+
+	suite.lastRealtimeEvent = &event
+	return nil
+}
+
+func (suite *testSuite) realtimeVideoEventIncludesMetadataAndAccess() error {
+	if suite.lastRealtimeEvent == nil || suite.lastRealtimeEvent.Message.Video == nil {
+		return fmt.Errorf("expected a received realtime video event before checking its metadata")
+	}
+
+	video := suite.lastRealtimeEvent.Message.Video
+	fixture, ok := suite.messageVideosByName[video.OriginalName]
+	if !ok {
+		return fmt.Errorf("expected video fixture %q to exist", video.OriginalName)
+	}
+	if video.DurationSeconds != fixture.DurationSeconds || video.Width != fixture.Width || video.Height != fixture.Height {
+		return fmt.Errorf("expected realtime video duration %d seconds and dimensions %dx%d, got duration %d and dimensions %dx%d", fixture.DurationSeconds, fixture.Width, fixture.Height, video.DurationSeconds, video.Width, video.Height)
+	}
+	if video.MimeType != fixture.MimeType || video.VideoCodec != fixture.VideoCodec || video.AudioCodec != fixture.AudioCodec {
+		return fmt.Errorf("expected realtime video format %q, video codec %q and audio codec %q, got format %q, video codec %q and audio codec %q", fixture.MimeType, fixture.VideoCodec, fixture.AudioCodec, video.MimeType, video.VideoCodec, video.AudioCodec)
+	}
+	if strings.TrimSpace(video.URL) == "" {
+		return fmt.Errorf("expected realtime video %q to include an access URL", video.OriginalName)
 	}
 
 	return nil

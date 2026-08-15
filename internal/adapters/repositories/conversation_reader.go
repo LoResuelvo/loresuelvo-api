@@ -73,6 +73,14 @@ func (reader *ConversationReader) findWorkSummariesByConsumerID(ctx context.Cont
 			lm.audio_mime_type,
 			lm.audio_codec,
 			lm.audio_duration_seconds,
+			lm.video_file_id,
+			lm.video_original_name,
+			lm.video_mime_type,
+			lm.video_codec,
+			lm.video_audio_codec,
+			lm.video_duration_seconds,
+			lm.video_width,
+			lm.video_height,
 			c.updated_on
 		FROM conversations c
 		INNER JOIN work_conversations wc ON wc.conversation_id = c.id
@@ -89,11 +97,22 @@ func (reader *ConversationReader) findWorkSummariesByConsumerID(ctx context.Cont
 				f.original_name AS audio_original_name,
 				f.mime_type AS audio_mime_type,
 				fa.codec AS audio_codec,
-				fa.duration_seconds AS audio_duration_seconds
+				fa.duration_seconds AS audio_duration_seconds,
+				mv.file_id::text AS video_file_id,
+				vf.original_name AS video_original_name,
+				vf.mime_type AS video_mime_type,
+				fv.video_codec AS video_codec,
+				fv.audio_codec AS video_audio_codec,
+				fv.duration_seconds AS video_duration_seconds,
+				fv.width AS video_width,
+				fv.height AS video_height
 			FROM messages m
 			LEFT JOIN message_audios ma ON ma.message_id = m.id
 			LEFT JOIN files f ON f.id = ma.file_id
 			LEFT JOIN file_audios fa ON fa.file_id = ma.file_id
+			LEFT JOIN message_videos mv ON mv.message_id = m.id
+			LEFT JOIN files vf ON vf.id = mv.file_id
+			LEFT JOIN file_videos fv ON fv.file_id = mv.file_id
 			WHERE m.conversation_id = c.id
 			ORDER BY m.created_on DESC, m.id DESC
 			LIMIT 1
@@ -133,6 +152,14 @@ func (reader *ConversationReader) findWorkSummariesByProviderID(ctx context.Cont
 			lm.audio_mime_type,
 			lm.audio_codec,
 			lm.audio_duration_seconds,
+			lm.video_file_id,
+			lm.video_original_name,
+			lm.video_mime_type,
+			lm.video_codec,
+			lm.video_audio_codec,
+			lm.video_duration_seconds,
+			lm.video_width,
+			lm.video_height,
 			c.updated_on
 		FROM conversations c
 		INNER JOIN work_conversations wc ON wc.conversation_id = c.id
@@ -148,11 +175,22 @@ func (reader *ConversationReader) findWorkSummariesByProviderID(ctx context.Cont
 				f.original_name AS audio_original_name,
 				f.mime_type AS audio_mime_type,
 				fa.codec AS audio_codec,
-				fa.duration_seconds AS audio_duration_seconds
+				fa.duration_seconds AS audio_duration_seconds,
+				mv.file_id::text AS video_file_id,
+				vf.original_name AS video_original_name,
+				vf.mime_type AS video_mime_type,
+				fv.video_codec AS video_codec,
+				fv.audio_codec AS video_audio_codec,
+				fv.duration_seconds AS video_duration_seconds,
+				fv.width AS video_width,
+				fv.height AS video_height
 			FROM messages m
 			LEFT JOIN message_audios ma ON ma.message_id = m.id
 			LEFT JOIN files f ON f.id = ma.file_id
 			LEFT JOIN file_audios fa ON fa.file_id = ma.file_id
+			LEFT JOIN message_videos mv ON mv.message_id = m.id
+			LEFT JOIN files vf ON vf.id = mv.file_id
+			LEFT JOIN file_videos fv ON fv.file_id = mv.file_id
 			WHERE m.conversation_id = c.id
 			ORDER BY m.created_on DESC, m.id DESC
 			LIMIT 1
@@ -422,6 +460,14 @@ func scanWorkConversationSummaries(rows *sql.Rows, counterpartRole string) ([]re
 		var lastMessageAudioMimeType sql.NullString
 		var lastMessageAudioCodec sql.NullString
 		var lastMessageAudioDurationSeconds sql.NullInt64
+		var lastMessageVideoFileID sql.NullString
+		var lastMessageVideoOriginalName sql.NullString
+		var lastMessageVideoMimeType sql.NullString
+		var lastMessageVideoCodec sql.NullString
+		var lastMessageVideoAudioCodec sql.NullString
+		var lastMessageVideoDurationSeconds sql.NullInt64
+		var lastMessageVideoWidth sql.NullInt64
+		var lastMessageVideoHeight sql.NullInt64
 
 		if err := rows.Scan(
 			&summary.ID,
@@ -441,6 +487,14 @@ func scanWorkConversationSummaries(rows *sql.Rows, counterpartRole string) ([]re
 			&lastMessageAudioMimeType,
 			&lastMessageAudioCodec,
 			&lastMessageAudioDurationSeconds,
+			&lastMessageVideoFileID,
+			&lastMessageVideoOriginalName,
+			&lastMessageVideoMimeType,
+			&lastMessageVideoCodec,
+			&lastMessageVideoAudioCodec,
+			&lastMessageVideoDurationSeconds,
+			&lastMessageVideoWidth,
+			&lastMessageVideoHeight,
 			&summary.UpdatedOn,
 		); err != nil {
 			return nil, fmt.Errorf("scanning work conversation summary: %w", err)
@@ -448,17 +502,27 @@ func scanWorkConversationSummaries(rows *sql.Rows, counterpartRole string) ([]re
 
 		counterpart.Role = counterpartRole
 		summary.Work = &readmodel.WorkConversationSummary{Counterpart: counterpart}
-		setSummaryLastMessageWithAudio(
+		setSummaryLastMessageWithAttachments(
 			&summary,
 			lastMessageID,
 			lastMessageSenderRole,
 			lastMessageContent,
 			lastMessageCreatedOn,
-			lastMessageAudioFileID,
-			lastMessageAudioOriginalName,
-			lastMessageAudioMimeType,
-			lastMessageAudioCodec,
-			lastMessageAudioDurationSeconds,
+			summaryMessageAttachments{
+				audioFileID:          lastMessageAudioFileID,
+				audioOriginalName:    lastMessageAudioOriginalName,
+				audioMimeType:        lastMessageAudioMimeType,
+				audioCodec:           lastMessageAudioCodec,
+				audioDurationSeconds: lastMessageAudioDurationSeconds,
+				videoFileID:          lastMessageVideoFileID,
+				videoOriginalName:    lastMessageVideoOriginalName,
+				videoMimeType:        lastMessageVideoMimeType,
+				videoCodec:           lastMessageVideoCodec,
+				videoAudioCodec:      lastMessageVideoAudioCodec,
+				videoDurationSeconds: lastMessageVideoDurationSeconds,
+				videoWidth:           lastMessageVideoWidth,
+				videoHeight:          lastMessageVideoHeight,
+			},
 		)
 		summaries = append(summaries, summary)
 	}
@@ -471,20 +535,32 @@ func scanWorkConversationSummaries(rows *sql.Rows, counterpartRole string) ([]re
 }
 
 func setSummaryLastMessage(summary *readmodel.ConversationSummary, id sql.NullInt64, senderRole sql.NullString, content sql.NullString, createdOn sql.NullTime) {
-	setSummaryLastMessageWithAudio(summary, id, senderRole, content, createdOn, sql.NullString{}, sql.NullString{}, sql.NullString{}, sql.NullString{}, sql.NullInt64{})
+	setSummaryLastMessageWithAttachments(summary, id, senderRole, content, createdOn, summaryMessageAttachments{})
 }
 
-func setSummaryLastMessageWithAudio(
+type summaryMessageAttachments struct {
+	audioFileID          sql.NullString
+	audioOriginalName    sql.NullString
+	audioMimeType        sql.NullString
+	audioCodec           sql.NullString
+	audioDurationSeconds sql.NullInt64
+	videoFileID          sql.NullString
+	videoOriginalName    sql.NullString
+	videoMimeType        sql.NullString
+	videoCodec           sql.NullString
+	videoAudioCodec      sql.NullString
+	videoDurationSeconds sql.NullInt64
+	videoWidth           sql.NullInt64
+	videoHeight          sql.NullInt64
+}
+
+func setSummaryLastMessageWithAttachments(
 	summary *readmodel.ConversationSummary,
 	id sql.NullInt64,
 	senderRole sql.NullString,
 	content sql.NullString,
 	createdOn sql.NullTime,
-	audioFileID sql.NullString,
-	audioOriginalName sql.NullString,
-	audioMimeType sql.NullString,
-	audioCodec sql.NullString,
-	audioDurationSeconds sql.NullInt64,
+	attachments summaryMessageAttachments,
 ) {
 	if !id.Valid {
 		return
@@ -494,8 +570,26 @@ func setSummaryLastMessageWithAudio(
 		ID:         int(id.Int64),
 		SenderRole: senderRole.String,
 		Content:    content.String,
-		Audio:      summaryMessageAudio(audioFileID, audioOriginalName, audioMimeType, audioCodec, audioDurationSeconds),
+		Audio:      summaryMessageAudio(attachments.audioFileID, attachments.audioOriginalName, attachments.audioMimeType, attachments.audioCodec, attachments.audioDurationSeconds),
+		Video:      summaryMessageVideo(attachments.videoFileID, attachments.videoOriginalName, attachments.videoMimeType, attachments.videoCodec, attachments.videoAudioCodec, attachments.videoDurationSeconds, attachments.videoWidth, attachments.videoHeight),
 		CreatedOn:  createdOn.Time,
+	}
+}
+
+func summaryMessageVideo(fileID, originalName, mimeType, videoCodec, audioCodec sql.NullString, durationSeconds, width, height sql.NullInt64) *filedomain.MessageVideo {
+	if !fileID.Valid {
+		return nil
+	}
+
+	return &filedomain.MessageVideo{
+		FileID:          fileID.String,
+		OriginalName:    originalName.String,
+		MimeType:        mimeType.String,
+		VideoCodec:      videoCodec.String,
+		AudioCodec:      audioCodec.String,
+		DurationSeconds: int(durationSeconds.Int64),
+		Width:           int(width.Int64),
+		Height:          int(height.Int64),
 	}
 }
 

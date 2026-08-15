@@ -39,5 +39,6 @@ type MessageSummary struct {
 	SenderRole string
 	Content    string
 	Audio      *filedomain.MessageAudio
+	Video      *filedomain.MessageVideo
 	CreatedOn  time.Time
 }

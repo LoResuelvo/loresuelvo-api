@@ -64,6 +64,127 @@ func registerSendVideoSteps(sc *godog.ScenarioContext, suite *testSuite) {
 	sc.Step(`^el sistema rechaza el mensaje porque el audio debe enviarse sin texto, imágenes ni video$`, suite.systemRejectsVideoCombinedWithAudio)
 	sc.Step(`^el sistema no asocia el video ni la imagen a ningún mensaje$`, suite.systemDoesNotAssociateVideoOrImageWithAnyMessage)
 	sc.Step(`^el sistema no asocia el video ni el audio a ningún mensaje$`, suite.systemDoesNotAssociateVideoOrAudioWithAnyMessage)
+	sc.Step(`^que el consumidor "([^"]*)" envió el video "([^"]*)" en el chat con el prestador "([^"]*)"$`, suite.consumerSentVideoInActiveChat)
+	sc.Step(`^el detalle incluye el mensaje con el video "([^"]*)"$`, suite.conversationDetailIncludesVideo)
+	sc.Step(`^el detalle muestra la duración, dimensiones, formato MP4 y codecs del video$`, suite.conversationDetailShowsVideoMetadata)
+	sc.Step(`^el sistema permite al prestador acceder al video adjunto$`, suite.systemAllowsProviderToAccessAttachedVideo)
+	sc.Step(`^que tengo un chat activo con el prestador "([^"]*)" cuyo último mensaje contiene el video "([^"]*)" de ([0-9]+) segundos$`, suite.consumerHasActiveChatWithLastVideo)
+}
+
+func (suite *testSuite) consumerSentVideoInActiveChat(consumerEmail, videoName, providerEmail string) error {
+	if err := suite.thereIsActiveChatBetweenConsumerAndProvider(consumerEmail, providerEmail); err != nil {
+		return err
+	}
+	suite.currentAuth0ID = auth0IDForConsumerEmail(consumerEmail)
+	if err := suite.uploadAndConfirmMessageVideo(videoName, "18"); err != nil {
+		return err
+	}
+	videoFileID, err := suite.messageVideoFileID(videoName)
+	if err != nil {
+		return err
+	}
+	suite.lastAttemptedMessageImageNames = nil
+	suite.lastAttemptedMessageVideoContent = ""
+	if err := suite.requestSendMessageToPreparedConversation(sendMessageRequest{VideoFileID: videoFileID}); err != nil {
+		return err
+	}
+	return suite.systemRegistersMessageWithVideo(videoName)
+}
+
+func (suite *testSuite) conversationDetailIncludesVideo(videoName string) error {
+	if err := suite.lastResponseShouldHaveStatusCode(http.StatusOK); err != nil {
+		return err
+	}
+	detail, err := suite.conversationDetailResponseFromLastBody()
+	if err != nil {
+		return err
+	}
+	video, err := suite.videoInConversationDetail(detail, videoName)
+	if err != nil {
+		return err
+	}
+	if video.ID == "" || video.OriginalName != videoName {
+		return fmt.Errorf("expected conversation detail to include video %q, got %+v", videoName, video)
+	}
+	return nil
+}
+
+func (suite *testSuite) conversationDetailShowsVideoMetadata() error {
+	detail, err := suite.conversationDetailResponseFromLastBody()
+	if err != nil {
+		return err
+	}
+	video, err := suite.videoInConversationDetail(detail, suite.lastAttemptedMessageVideoName)
+	if err != nil {
+		return err
+	}
+	fixture, err := suite.messageVideoFixture(suite.lastAttemptedMessageVideoName)
+	if err != nil {
+		return err
+	}
+	if video.DurationSeconds != fixture.DurationSeconds || video.Width != fixture.Width || video.Height != fixture.Height || video.MimeType != fixture.MimeType || video.VideoCodec != fixture.VideoCodec || video.AudioCodec != fixture.AudioCodec {
+		return fmt.Errorf("video %q metadata does not match fixture: got %+v", suite.lastAttemptedMessageVideoName, video)
+	}
+	return nil
+}
+
+func (suite *testSuite) systemAllowsProviderToAccessAttachedVideo() error {
+	if err := suite.lastResponseShouldHaveStatusCode(http.StatusOK); err != nil {
+		return err
+	}
+	if suite.currentAuth0ID == "" {
+		return fmt.Errorf("expected an authenticated provider before checking video access")
+	}
+	detail, err := suite.conversationDetailResponseFromLastBody()
+	if err != nil {
+		return err
+	}
+	video, err := suite.videoInConversationDetail(detail, suite.lastAttemptedMessageVideoName)
+	if err != nil {
+		return err
+	}
+	if strings.TrimSpace(video.URL) == "" {
+		return fmt.Errorf("expected provider to receive an access URL for video %q", video.OriginalName)
+	}
+	return nil
+}
+
+func (suite *testSuite) videoInConversationDetail(detail conversationDetailResponse, videoName string) (*messageVideoResponse, error) {
+	if strings.TrimSpace(videoName) == "" {
+		return nil, fmt.Errorf("expected a video name before checking conversation detail")
+	}
+	for _, message := range detail.Messages {
+		if message.Video != nil && message.Video.OriginalName == videoName {
+			return message.Video, nil
+		}
+	}
+	return nil, fmt.Errorf("expected conversation detail to include video %q", videoName)
+}
+
+func (suite *testSuite) consumerHasActiveChatWithLastVideo(providerEmail, videoName, durationText string) error {
+	consumer, err := suite.userRepository.FindByAuthID(suite.currentAuth0ID)
+	if err != nil {
+		return fmt.Errorf("finding authenticated consumer for video summary fixture: %w", err)
+	}
+	if consumer.Role() != participantRoleConsumer {
+		return fmt.Errorf("expected authenticated participant to be a consumer, got role %q", consumer.Role())
+	}
+	if err := suite.thereIsActiveChatBetweenConsumerAndProvider(consumer.Email(), providerEmail); err != nil {
+		return err
+	}
+	if err := suite.uploadAndConfirmMessageVideo(videoName, durationText); err != nil {
+		return err
+	}
+	videoFileID, err := suite.messageVideoFileID(videoName)
+	if err != nil {
+		return err
+	}
+	suite.lastAttemptedMessageImageNames = nil
+	suite.lastAttemptedMessageVideoContent = ""
+	if err := suite.requestSendMessageToPreparedConversation(sendMessageRequest{VideoFileID: videoFileID}); err != nil {
+		return err
+	}
+	return suite.systemRegistersMessageWithVideo(videoName)
 }
 
 func (suite *testSuite) uploadAndConfirmMessageVideoWithoutAudio(name, durationText string) error {

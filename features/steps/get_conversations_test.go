@@ -24,6 +24,7 @@ type conversationLastMessageSummaryResponse struct {
 	SenderRole string                `json:"sender_role"`
 	Content    string                `json:"content"`
 	Audio      *messageAudioResponse `json:"audio,omitempty"`
+	Video      *messageVideoResponse `json:"video,omitempty"`
 	CreatedOn  string                `json:"created_on"`
 }
 
@@ -35,7 +36,8 @@ func registerGetConversationsSteps(sc *godog.ScenarioContext, suite *testSuite) 
 	sc.Step(`^el sistema muestra una conversación pendiente con el consumidor "([^"]*)"$`, suite.systemShowsPendingConversationWithConsumer)
 	sc.Step(`^el último mensaje de la conversación es$`, suite.conversationLastMessageIs)
 	sc.Step(`^el último mensaje de esa conversación se identifica como un mensaje de audio$`, suite.lastConversationMessageIsAudio)
-	sc.Step(`^el último mensaje informa una duración de ([0-9]+) segundos$`, suite.lastConversationAudioDurationIs)
+	sc.Step(`^el último mensaje de esa conversación se identifica como un mensaje con video$`, suite.lastConversationMessageIsVideo)
+	sc.Step(`^el último mensaje informa una duración de ([0-9]+) segundos$`, suite.lastConversationMessageDurationIs)
 }
 
 func (suite *testSuite) requestMyConversations() error {
@@ -162,7 +164,28 @@ func (suite *testSuite) lastConversationMessageIsAudio() error {
 	return nil
 }
 
-func (suite *testSuite) lastConversationAudioDurationIs(durationText string) error {
+func (suite *testSuite) lastConversationMessageIsVideo() error {
+	summaries, err := suite.conversationSummaryResponsesShouldHaveStatusCode(http.StatusOK)
+	if err != nil {
+		return err
+	}
+	if len(summaries) != 1 {
+		return fmt.Errorf("expected exactly one conversation before checking its video last message, got %d with body %s", len(summaries), string(suite.lastBody))
+	}
+	lastMessage := summaries[0].LastMessage
+	if lastMessage == nil || lastMessage.Video == nil {
+		return fmt.Errorf("expected last_message to identify a video message, got body %s", string(suite.lastBody))
+	}
+	if lastMessage.ID == 0 || lastMessage.Video.ID == "" {
+		return fmt.Errorf("expected video last_message to include message and file identifiers, got body %s", string(suite.lastBody))
+	}
+	if suite.lastAttemptedMessageVideoName != "" && lastMessage.Video.OriginalName != suite.lastAttemptedMessageVideoName {
+		return fmt.Errorf("expected last video %q, got %q", suite.lastAttemptedMessageVideoName, lastMessage.Video.OriginalName)
+	}
+	return nil
+}
+
+func (suite *testSuite) lastConversationMessageDurationIs(durationText string) error {
 	expectedDuration, err := strconv.Atoi(durationText)
 	if err != nil || expectedDuration <= 0 {
 		return fmt.Errorf("expected a positive audio duration, got %q", durationText)
@@ -171,13 +194,22 @@ func (suite *testSuite) lastConversationAudioDurationIs(durationText string) err
 	if err != nil {
 		return err
 	}
-	if len(summaries) != 1 || summaries[0].LastMessage == nil || summaries[0].LastMessage.Audio == nil {
-		return fmt.Errorf("expected one conversation with an audio last message, got body %s", string(suite.lastBody))
+	if len(summaries) != 1 || summaries[0].LastMessage == nil {
+		return fmt.Errorf("expected one conversation with an audio or video last message, got body %s", string(suite.lastBody))
 	}
-	if summaries[0].LastMessage.Audio.DurationSeconds != expectedDuration {
-		return fmt.Errorf("expected last audio duration %d seconds, got %d", expectedDuration, summaries[0].LastMessage.Audio.DurationSeconds)
+	if summaries[0].LastMessage.Audio != nil {
+		if summaries[0].LastMessage.Audio.DurationSeconds != expectedDuration {
+			return fmt.Errorf("expected last audio duration %d seconds, got %d", expectedDuration, summaries[0].LastMessage.Audio.DurationSeconds)
+		}
+		return nil
 	}
-	return nil
+	if summaries[0].LastMessage.Video != nil {
+		if summaries[0].LastMessage.Video.DurationSeconds != expectedDuration {
+			return fmt.Errorf("expected last video duration %d seconds, got %d", expectedDuration, summaries[0].LastMessage.Video.DurationSeconds)
+		}
+		return nil
+	}
+	return fmt.Errorf("expected last_message to include audio or video metadata, got body %s", string(suite.lastBody))
 }
 
 func (suite *testSuite) conversationSummaryResponsesShouldHaveStatusCode(statusCode int) ([]conversationSummaryResponse, error) {

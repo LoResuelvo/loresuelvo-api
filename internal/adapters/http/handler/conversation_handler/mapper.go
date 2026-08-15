@@ -279,6 +279,7 @@ func conversationLastMessageResponseFromDomain(message *readmodel.MessageSummary
 		SenderRole: message.SenderRole,
 		Content:    message.Content,
 		Audio:      messageAudioResponseFromDomain(message.Audio),
+		Video:      messageVideoResponseFromDomain(message.Video),
 		CreatedOn:  message.CreatedOn,
 	}
 }

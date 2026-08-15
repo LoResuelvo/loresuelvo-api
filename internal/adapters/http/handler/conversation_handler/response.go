@@ -112,6 +112,7 @@ type conversationLastMessageResponse struct {
 	SenderRole string                `json:"sender_role"`
 	Content    string                `json:"content"`
 	Audio      *messageAudioResponse `json:"audio,omitempty"`
+	Video      *messageVideoResponse `json:"video,omitempty"`
 	CreatedOn  time.Time             `json:"created_on"`
 }
 
