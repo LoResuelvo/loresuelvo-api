@@ -35,7 +35,6 @@ Feature: 50.2 Enviar videos por el chat
 
     Rule: Los mensajes con video respetan el estado del chat de trabajo
 
-    @wip
     Scenario: 50.2.3-EVC Consumidor envía un video acompañado de texto en un chat pendiente
         Given que existe una conversación pendiente entre el consumidor "ana@example.com" y el prestador "juan.plomero@example.com" con el mensaje inicial:
             """
@@ -49,7 +48,6 @@ Feature: 50.2 Enviar videos por el chat
             """
         Then el sistema registra el mensaje con el video "detalle-perdida.mp4" y el texto enviado en la conversación pendiente
 
-    @wip
     Scenario: 50.2.4-EVC Rechazar video del prestador en un chat pendiente
         Given que existe una conversación pendiente entre el consumidor "ana@example.com" y el prestador "juan.plomero@example.com" con el mensaje inicial:
             """
@@ -61,7 +59,6 @@ Feature: 50.2 Enviar videos por el chat
         Then el sistema rechaza el mensaje porque el prestador debe aceptar la solicitud de trabajo antes de responder
         And el sistema no asocia el video a ningún mensaje
 
-    @wip
     Scenario: 50.2.5-EVC Contabilizar el video para el límite de mensajes del consumidor en un chat pendiente
         Given que existe una conversación pendiente entre el consumidor "ana@example.com" y el prestador "juan.plomero@example.com"
         And que el consumidor "ana@example.com" ya alcanzó el límite de mensajes permitido en esa conversación pendiente
