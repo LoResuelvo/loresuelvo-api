@@ -55,6 +55,16 @@ services:
         condition: service_healthy
       minio-init:
         condition: service_completed_successfully
+      migrate:
+        condition: service_completed_successfully
+      seed-assets:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/ >/dev/null"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+      start_period: 2s
     networks:
       default:
         aliases:
@@ -75,7 +85,8 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:
-      - api-dev
+      api-dev:
+        condition: service_healthy
     restart: unless-stopped
 
   swagger-ui:
@@ -133,6 +144,48 @@ services:
       default:
         aliases:
           - minio-init.localhost
+
+  migrate:
+    image: migrate/migrate:v4.18.3
+    depends_on:
+      dev-db:
+        condition: service_healthy
+    volumes:
+      - ./db/migrations:/migrations:ro
+    command:
+      - -path
+      - /migrations
+      - -database
+      - postgres://postgres:example@dev-db:5432/loresuelvo?sslmode=disable
+      - up
+
+  seed-assets:
+    image: quay.io/minio/mc:latest
+    depends_on:
+      minio-init:
+        condition: service_completed_successfully
+    environment:
+      MINIO_ROOT_USER: "loresuelvo-local"
+      MINIO_ROOT_PASSWORD: "loresuelvo-local-secret"
+      MINIO_API_PORT: "${MINIO_API_PORT:-9000}"
+      STORAGE_PUBLIC_BUCKET: "loresuelvo-public-local"
+      SEEDS_ENABLED: "${SEEDS_ENABLED:-false}"
+    volumes:
+      - ./scripts/minio:/minio-init:ro
+      - ./seeds/assets:/seed-assets:ro
+      - ./seeds:/seed-manifest:ro
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        if [ "$$SEEDS_ENABLED" != "true" ]; then
+          echo "Provider seed assets disabled"
+          exit 0
+        fi
+        exec /bin/sh /minio-init/upload-seed-assets.sh
+    networks:
+      default:
+        aliases:
+          - seed-assets.localhost
 
   minio-clean-tests:
     image: quay.io/minio/mc:latest

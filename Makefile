@@ -1,4 +1,4 @@
-.PHONY: up dev-proxy down clean build bash lint lint-ci test test-ci openapi swagger swagger-down spec gherkin test-all-once migrate-up migrate-down migrate-test-up migrate-test-down storage storage-console storage-reset seed-assets-local
+.PHONY: up dev-proxy down clean build bash lint lint-ci test test-ci openapi swagger swagger-down spec gherkin test-all-once migrate-up migrate-down migrate-test-up migrate-test-down storage storage-console storage-reset seed-assets-local generate-provider-seeds
 
 # Nombre del servicio del compose
 SERVICE = api-dev
@@ -27,6 +27,13 @@ storage-reset:
 seed-assets-local:
 	docker compose up -d minio minio-init
 	docker compose run --rm --entrypoint /bin/sh minio-init /minio-init/upload-seed-assets.sh
+
+generate-provider-seeds:
+	python3 scripts/generate_provider_seed.py \
+		--count 100 \
+		--output seeds/providers-100.yaml \
+		--manifest seeds/providers-100-assets.tsv \
+		--assets-dir seeds/assets/provider_profile_photo
 
 down:
 	docker compose down

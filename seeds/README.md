@@ -17,18 +17,21 @@ The generated YAML uses the existing seed format consumed by `SEEDS_FILE`.
 The TSV manifest maps a reusable local WebP asset to each provider-specific
 public object key.
 
-## Local MinIO upload
+## Local development
 
-```bash
-make seed-assets-local
-```
+`make up` runs the development initialization in dependency order: it waits
+for PostgreSQL, applies all migrations, creates the MinIO buckets, uploads the
+seed assets when seeds are enabled, and only then starts the API. The API
+applies the YAML seed synchronously before opening port 8080.
 
-Then start the API with:
+The default local configuration uses:
 
 ```bash
 SEEDS_ENABLED=true
 SEEDS_FILE=seeds/providers-100.yaml
 ```
+
+To upload only the assets manually, use `make seed-assets-local`.
 
 ## Production S3/R2 upload
 

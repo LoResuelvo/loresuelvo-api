@@ -21,7 +21,9 @@ func main() {
 	}
 	defer database.Close()
 
-	bootstrap.StartDefaultDataSeederFromEnv(ctx, database)
+	if err := bootstrap.SeedDefaultDataFromEnv(ctx, database); err != nil {
+		panic(err)
+	}
 
 	dependencies, err := bootstrap.NewDependencies(database)
 	if err != nil {
