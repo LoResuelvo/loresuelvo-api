@@ -12,7 +12,6 @@ Feature: 50.2 Enviar videos por el chat
 
     Rule: Los participantes pueden enviar un único video solo o acompañado de texto
 
-    @wip
     Scenario: 50.2.1-EVC Consumidor envía únicamente un video en un chat activo
         Given que existe un chat activo entre el consumidor "ana@example.com" y el prestador "juan.plomero@example.com"
         And que estoy autenticado como consumidor "ana@example.com"
@@ -22,7 +21,6 @@ Feature: 50.2 Enviar videos por el chat
         And el mensaje fue enviado por el consumidor "Ana Pérez"
         And el video queda asociado al mensaje enviado
 
-    @wip
     Scenario: 50.2.2-EVC Prestador envía un video acompañado de texto en un chat activo
         Given que existe un chat activo entre el consumidor "ana@example.com" y el prestador "juan.plomero@example.com"
         And que estoy autenticado como prestador "juan.plomero@example.com"
