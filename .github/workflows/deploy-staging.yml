@@ -22,29 +22,14 @@ jobs:
 
             cat config/staging.conf > .env
             cat >> .env <<EOF
-            DATABASE_URL=${{ secrets.DATABASE_URL_STAGING }}
-            AUTH0_DOMAIN=${{ secrets.AUTH0_DOMAIN_STAGING }}
-            AUTH0_AUDIENCE=${{ secrets.AUTH0_AUDIENCE_STAGING }}
-            ENVIRONMENT=staging
-            CORS_ALLOWED_ORIGINS=${{ secrets.CORS_ALLOWED_ORIGINS_STAGING }}
-            STORAGE_PROVIDER=${{ secrets.STORAGE_PROVIDER }}
-            STORAGE_ENDPOINT=${{ secrets.STORAGE_ENDPOINT }}
-            STORAGE_REGION=${{ secrets.STORAGE_REGION }}
-            STORAGE_ACCESS_KEY_ID=${{ secrets.STORAGE_ACCESS_KEY_ID_STAGING }}
-            STORAGE_SECRET_ACCESS_KEY=${{ secrets.STORAGE_SECRET_ACCESS_KEY_STAGING }}
-            STORAGE_PUBLIC_BUCKET=${{ secrets.STORAGE_PUBLIC_BUCKET_STAGING }}
-            STORAGE_PRIVATE_BUCKET=${{ secrets.STORAGE_PRIVATE_BUCKET_STAGING }}
-            STORAGE_PUBLIC_BASE_URL=${{ secrets.STORAGE_PUBLIC_BASE_URL_STAGING }}
-            STORAGE_PRESIGN_EXPIRATION_SECONDS=${{ secrets.STORAGE_PRESIGN_EXPIRATION_SECONDS }}
-            CHATBOT_PROVIDER=${{ secrets.CHATBOT_PROVIDER }}
-            CHATBOT_API_KEY=${{ secrets.CHATBOT_API_KEY_STAGING }}
-            CHATBOT_MODEL=${{ secrets.CHATBOT_MODEL }}
+            DATABASE_URL=${{ secrets.DATABASE_URL }}
+            STORAGE_ACCESS_KEY_ID=${{ secrets.STORAGE_ACCESS_KEY_ID }}
+            STORAGE_SECRET_ACCESS_KEY=${{ secrets.STORAGE_SECRET_ACCESS_KEY }}
+            CHATBOT_API_KEY=${{ secrets.CHATBOT_API_KEY }}
             MERCADO_PAGO_CLIENT_ID=${{ secrets.MERCADO_PAGO_CLIENT_ID }}
             MERCADO_PAGO_CLIENT_SECRET=${{ secrets.MERCADO_PAGO_CLIENT_SECRET }}
             PAYMENT_ACCOUNT_CREDENTIAL_ENCRYPTION_KEY=${{ secrets.PAYMENT_ACCOUNT_CREDENTIAL_ENCRYPTION_KEY }}
             MERCADO_PAGO_WEBHOOK_SECRET=${{ secrets.MERCADO_PAGO_WEBHOOK_SECRET }}
-            SEEDS_ENABLED=${{ secrets.SEEDS_ENABLED }}
-            SEEDS_FILE=seeds/providers-100.yaml
             EOF
             chmod 600 .env
             if grep -E '^[A-Z_]+=$' .env; then
