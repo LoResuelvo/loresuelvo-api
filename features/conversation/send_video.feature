@@ -145,7 +145,6 @@ Feature: 50.2 Enviar videos por el chat
 
     Rule: Los videos son privados para los participantes del chat
 
-    @wip
     Scenario Outline: 50.2.14-EVC Rechazar el acceso de un <rol> ajeno al video
         Given que el consumidor "ana@example.com" envió el video "perdida-canilla.mp4" en el chat con el prestador "juan.plomero@example.com"
         And que estoy autenticado como <rol> "<correo>"
@@ -159,7 +158,6 @@ Feature: 50.2 Enviar videos por el chat
 
     Rule: Los videos deben usar MP4 con H.264 y AAC opcional, no superar 50 MiB, 120 segundos ni resolución Full HD
 
-    @wip
     Scenario Outline: 50.2.15-EVC Rechazar un formato o codec de video no soportado
         Given que estoy autenticado como consumidor "ana@example.com"
         When intento cargar el video "<archivo>" con formato <formato>, codec de video <video_codec> y codec de audio <audio_codec> para un mensaje del chat
@@ -171,7 +169,6 @@ Feature: 50.2 Enviar videos por el chat
             | grabacion-hevc.mp4 | MP4     | HEVC        | AAC         |
             | grabacion-opus.mp4 | MP4     | H.264       | Opus        |
 
-    @wip
     Scenario: 50.2.16-EVC Rechazar un archivo cuyo contenido no es un video válido
         Given que estoy autenticado como consumidor "ana@example.com"
         And que solicité cargar "contenido-invalido.mp4" como video MP4 con H.264
