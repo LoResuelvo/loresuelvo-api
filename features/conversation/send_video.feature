@@ -175,27 +175,23 @@ Feature: 50.2 Enviar videos por el chat
         When intento confirmar un archivo cuyo contenido no corresponde a un video MP4 válido
         Then el sistema rechaza la confirmación porque el contenido del video no es válido
 
-    @wip
     Scenario: 50.2.17-EVC Rechazar un video que supera el tamaño máximo permitido
         Given que estoy autenticado como consumidor "ana@example.com"
         When intento cargar un video MP4 con H.264 de 51 MiB para un mensaje del chat
         Then el sistema rechaza la carga porque el video supera el máximo de 50 MiB
 
-    @wip
     Scenario: 50.2.18-EVC Rechazar un video que supera la duración máxima permitida
         Given que estoy autenticado como consumidor "ana@example.com"
         And que cargué el video MP4 con H.264 "video-extenso.mp4" de 121 segundos
         When intento confirmar el video para un mensaje del chat
         Then el sistema rechaza la confirmación porque el video supera el máximo de 120 segundos
 
-    @wip
     Scenario: 50.2.19-EVC Rechazar un video que supera la resolución máxima permitida
         Given que estoy autenticado como consumidor "ana@example.com"
         And que cargué el video MP4 con H.264 "video-4k.mp4" con resolución 3840 por 2160
         When intento confirmar el video para un mensaje del chat
         Then el sistema rechaza la confirmación porque el video supera la resolución Full HD
 
-    @wip
     Scenario: 50.2.20-EVC Aceptar un video que cumple exactamente los límites permitidos
         Given que existe un chat activo entre el consumidor "ana@example.com" y el prestador "juan.plomero@example.com"
         And que estoy autenticado como consumidor "ana@example.com"
