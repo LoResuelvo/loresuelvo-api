@@ -53,7 +53,6 @@ Feature: 50.1 Enviar audios por el chat
         Then el sistema rechaza el mensaje porque el prestador debe aceptar la solicitud de trabajo antes de responder
         And el sistema no asocia el audio a ningún mensaje
 
-    @wip
     Scenario: 50.1.5-EAC Contabilizar el audio para el límite de mensajes del consumidor en un chat pendiente
         Given que existe una conversación pendiente entre el consumidor "ana@example.com" y el prestador "juan.plomero@example.com"
         And que el consumidor "ana@example.com" ya alcanzó el límite de mensajes permitido en esa conversación pendiente
