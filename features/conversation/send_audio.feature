@@ -21,7 +21,6 @@ Feature: 50.1 Enviar audios por el chat
         And el mensaje fue enviado por el consumidor "Ana Pérez"
         And el audio queda asociado al mensaje enviado
 
-    @wip
     Scenario: 50.1.2-EAC Prestador envía un audio en un chat activo
         Given que existe un chat activo entre el consumidor "ana@example.com" y el prestador "juan.plomero@example.com"
         And que estoy autenticado como prestador "juan.plomero@example.com"
