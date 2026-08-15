@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/cucumber/godog"
@@ -19,10 +20,11 @@ type conversationSummaryResponse struct {
 }
 
 type conversationLastMessageSummaryResponse struct {
-	ID         int    `json:"id"`
-	SenderRole string `json:"sender_role"`
-	Content    string `json:"content"`
-	CreatedOn  string `json:"created_on"`
+	ID         int                   `json:"id"`
+	SenderRole string                `json:"sender_role"`
+	Content    string                `json:"content"`
+	Audio      *messageAudioResponse `json:"audio,omitempty"`
+	CreatedOn  string                `json:"created_on"`
 }
 
 func registerGetConversationsSteps(sc *godog.ScenarioContext, suite *testSuite) {
@@ -32,6 +34,8 @@ func registerGetConversationsSteps(sc *godog.ScenarioContext, suite *testSuite) 
 	sc.Step(`^el sistema muestra solamente la conversación con el prestador "([^"]*)"$`, suite.systemShowsOnlyConversationWithProvider)
 	sc.Step(`^el sistema muestra una conversación pendiente con el consumidor "([^"]*)"$`, suite.systemShowsPendingConversationWithConsumer)
 	sc.Step(`^el último mensaje de la conversación es$`, suite.conversationLastMessageIs)
+	sc.Step(`^el último mensaje de esa conversación se identifica como un mensaje de audio$`, suite.lastConversationMessageIsAudio)
+	sc.Step(`^el último mensaje informa una duración de ([0-9]+) segundos$`, suite.lastConversationAudioDurationIs)
 }
 
 func (suite *testSuite) requestMyConversations() error {
@@ -138,6 +142,41 @@ func (suite *testSuite) conversationLastMessageIs(message *godog.DocString) erro
 		return fmt.Errorf("expected last message %q, got %q", expectedContent, summaries[0].LastMessage.Content)
 	}
 
+	return nil
+}
+
+func (suite *testSuite) lastConversationMessageIsAudio() error {
+	summaries, err := suite.conversationSummaryResponsesShouldHaveStatusCode(http.StatusOK)
+	if err != nil {
+		return err
+	}
+	if len(summaries) != 1 {
+		return fmt.Errorf("expected exactly one conversation before checking its audio last message, got %d with body %s", len(summaries), string(suite.lastBody))
+	}
+	if summaries[0].LastMessage == nil || summaries[0].LastMessage.Audio == nil {
+		return fmt.Errorf("expected last_message to identify an audio message, got body %s", string(suite.lastBody))
+	}
+	if summaries[0].LastMessage.ID == 0 || summaries[0].LastMessage.Audio.ID == "" {
+		return fmt.Errorf("expected audio last_message to include message and file identifiers, got body %s", string(suite.lastBody))
+	}
+	return nil
+}
+
+func (suite *testSuite) lastConversationAudioDurationIs(durationText string) error {
+	expectedDuration, err := strconv.Atoi(durationText)
+	if err != nil || expectedDuration <= 0 {
+		return fmt.Errorf("expected a positive audio duration, got %q", durationText)
+	}
+	summaries, err := suite.conversationSummaryResponsesShouldHaveStatusCode(http.StatusOK)
+	if err != nil {
+		return err
+	}
+	if len(summaries) != 1 || summaries[0].LastMessage == nil || summaries[0].LastMessage.Audio == nil {
+		return fmt.Errorf("expected one conversation with an audio last message, got body %s", string(suite.lastBody))
+	}
+	if summaries[0].LastMessage.Audio.DurationSeconds != expectedDuration {
+		return fmt.Errorf("expected last audio duration %d seconds, got %d", expectedDuration, summaries[0].LastMessage.Audio.DurationSeconds)
+	}
 	return nil
 }
 

@@ -2,16 +2,20 @@ package repositories_test
 
 import (
 	"context"
+	"database/sql"
 	"testing"
+	"time"
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/repositories"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/category"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/conversation"
+	filedomain "github.com/LoResuelvo/loresuelvo-api/internal/domain/file"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 type conversationReaderFixture struct {
+	database               *sql.DB
 	reader                 *repositories.ConversationReader
 	conversationRepository *repositories.ConversationRepository
 	consumerID             int
@@ -30,6 +34,7 @@ func newSavedConversationReaderFixture(t *testing.T) conversationReaderFixture {
 	require.NoError(t, err)
 
 	return conversationReaderFixture{
+		database:               testContext.database,
 		reader:                 repositories.NewConversationReader(testContext.database, repositories.NewMessageImageRepository(testContext.database), repositories.NewMessageAudioRepository(testContext.database)),
 		conversationRepository: testContext.conversationRepository,
 		consumerID:             consumerID,
@@ -161,6 +166,49 @@ func TestConversationReaderReflectsSentMessageAsLatestAndDetailLastMessage(t *te
 	assert.Equal(t, conversation.SenderProvider, detail.Messages[1].SenderRole)
 	assert.Equal(t, sentMessage.Content, detail.Messages[1].Content)
 	assert.Equal(t, sentMessage.CreatedOn, detail.UpdatedOn)
+}
+
+func TestConversationReaderIncludesAudioMetadataInLatestWorkMessageSummary(t *testing.T) {
+	fixture := newSavedConversationReaderFixture(t)
+	metadata, err := filedomain.NewAudioFileMetadata("ruido-bomba.webm", "audio/webm", 1024, 18, "opus")
+	require.NoError(t, err)
+	audioFile, err := filedomain.NewFile(
+		"00000000-0000-0000-0000-000000000001",
+		"conversation/audio/ruido-bomba.webm",
+		"private",
+		*metadata,
+		filedomain.StatusConfirmed,
+		filedomain.VisibilityPrivate,
+		filedomain.PurposeConversationMessageAudio,
+		"auth0|conversation-consumer",
+		time.Now().UTC(),
+		time.Now().UTC(),
+	)
+	require.NoError(t, err)
+	require.NoError(t, repositories.NewFileRepository(fixture.database).Save(context.Background(), *audioFile))
+
+	audioMessage, err := conversation.NewConsumerAudioMessage(filedomain.MessageAudio{
+		FileID:          audioFile.ID,
+		OriginalName:    audioFile.OriginalName(),
+		MimeType:        audioFile.MimeType(),
+		Codec:           audioFile.Codec(),
+		DurationSeconds: audioFile.DurationSeconds(),
+	})
+	require.NoError(t, err)
+	fixture.savedConversation.AddMessage(*audioMessage)
+	_, err = fixture.conversationRepository.SaveConversation(context.Background(), fixture.savedConversation)
+	require.NoError(t, err)
+
+	summaries, err := fixture.reader.FindSummariesByParticipantIDRoleAndType(context.Background(), fixture.consumerID, conversation.SenderConsumer, conversation.TypeWork)
+	require.NoError(t, err)
+	require.Len(t, summaries, 1)
+	require.NotNil(t, summaries[0].LastMessage)
+	require.NotNil(t, summaries[0].LastMessage.Audio)
+	assert.Equal(t, audioFile.ID, summaries[0].LastMessage.Audio.FileID)
+	assert.Equal(t, audioFile.OriginalName(), summaries[0].LastMessage.Audio.OriginalName)
+	assert.Equal(t, audioFile.MimeType(), summaries[0].LastMessage.Audio.MimeType)
+	assert.Equal(t, audioFile.Codec(), summaries[0].LastMessage.Audio.Codec)
+	assert.Equal(t, audioFile.DurationSeconds(), summaries[0].LastMessage.Audio.DurationSeconds)
 }
 
 func TestConversationReaderReturnsNotFoundForMissingConversationDetail(t *testing.T) {

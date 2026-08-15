@@ -70,6 +70,125 @@ func registerSendAudioSteps(sc *godog.ScenarioContext, suite *testSuite) {
 	sc.Step(`^el sistema registra el mensaje de audio "([^"]*)" en la conversación pendiente$`, suite.systemRegistersAudioMessageInPendingConversation)
 	sc.Step(`^el mensaje fue enviado por el consumidor "([^"]*)"$`, suite.audioMessageWasSentBy)
 	sc.Step(`^el audio queda asociado al mensaje enviado$`, suite.audioRemainsAssociatedWithSentMessage)
+	sc.Step(`^que el consumidor "([^"]*)" envió el audio "([^"]*)" en el chat con el prestador "([^"]*)"$`, suite.consumerSentAudioInActiveChat)
+	sc.Step(`^el detalle incluye el mensaje de audio "([^"]*)"$`, suite.conversationDetailIncludesAudio)
+	sc.Step(`^el detalle muestra la duración, el formato WebM y el codec Opus del audio$`, suite.conversationDetailShowsAudioMetadata)
+	sc.Step(`^el sistema permite al prestador acceder al audio adjunto$`, suite.systemAllowsProviderToAccessAttachedAudio)
+	sc.Step(`^que tengo un chat activo con el prestador "([^"]*)" cuyo último mensaje es el audio "([^"]*)" de ([0-9]+) segundos$`, suite.consumerHasActiveChatWithLastAudio)
+}
+
+func (suite *testSuite) consumerSentAudioInActiveChat(consumerEmail, audioName, providerEmail string) error {
+	if err := suite.thereIsActiveChatBetweenConsumerAndProvider(consumerEmail, providerEmail); err != nil {
+		return err
+	}
+	suite.currentAuth0ID = auth0IDForConsumerEmail(consumerEmail)
+	if err := suite.uploadAndConfirmMessageAudio(audioName, "18"); err != nil {
+		return err
+	}
+	audioFileID, err := suite.messageAudioFileID(audioName)
+	if err != nil {
+		return err
+	}
+	suite.lastAttemptedMessageImageNames = nil
+	if err := suite.requestSendMessageToPreparedConversation(sendMessageRequest{AudioFileID: audioFileID}); err != nil {
+		return err
+	}
+	return suite.systemRegistersAudioMessage(audioName)
+}
+
+func (suite *testSuite) consumerHasActiveChatWithLastAudio(providerEmail, audioName, durationText string) error {
+	consumer, err := suite.userRepository.FindByAuthID(suite.currentAuth0ID)
+	if err != nil {
+		return fmt.Errorf("finding authenticated consumer for audio summary fixture: %w", err)
+	}
+	if consumer.Role() != participantRoleConsumer {
+		return fmt.Errorf("expected authenticated participant to be a consumer, got role %q", consumer.Role())
+	}
+	if err := suite.thereIsActiveChatBetweenConsumerAndProvider(consumer.Email(), providerEmail); err != nil {
+		return err
+	}
+	if err := suite.uploadAndConfirmMessageAudio(audioName, durationText); err != nil {
+		return err
+	}
+	audioFileID, err := suite.messageAudioFileID(audioName)
+	if err != nil {
+		return err
+	}
+	suite.lastAttemptedMessageImageNames = nil
+	if err := suite.requestSendMessageToPreparedConversation(sendMessageRequest{AudioFileID: audioFileID}); err != nil {
+		return err
+	}
+	return suite.systemRegistersAudioMessage(audioName)
+}
+
+func (suite *testSuite) conversationDetailIncludesAudio(audioName string) error {
+	if err := suite.lastResponseShouldHaveStatusCode(http.StatusOK); err != nil {
+		return err
+	}
+	detail, err := suite.conversationDetailResponseFromLastBody()
+	if err != nil {
+		return err
+	}
+	audio, err := suite.audioInConversationDetail(detail, audioName)
+	if err != nil {
+		return err
+	}
+	if audio.ID == "" || audio.OriginalName != audioName {
+		return fmt.Errorf("expected conversation detail to include audio %q, got %+v", audioName, audio)
+	}
+	return nil
+}
+
+func (suite *testSuite) conversationDetailShowsAudioMetadata() error {
+	detail, err := suite.conversationDetailResponseFromLastBody()
+	if err != nil {
+		return err
+	}
+	audio, err := suite.audioInConversationDetail(detail, suite.lastAttemptedMessageAudioName)
+	if err != nil {
+		return err
+	}
+	fixture, ok := suite.messageAudiosByName[suite.lastAttemptedMessageAudioName]
+	if !ok {
+		return fmt.Errorf("expected audio fixture %q to exist", suite.lastAttemptedMessageAudioName)
+	}
+	if audio.DurationSeconds != fixture.DurationSeconds || audio.MimeType != fixture.MimeType || audio.Codec != fixture.Codec {
+		return fmt.Errorf("audio %q metadata does not match fixture", suite.lastAttemptedMessageAudioName)
+	}
+	return nil
+}
+
+func (suite *testSuite) systemAllowsProviderToAccessAttachedAudio() error {
+	if err := suite.lastResponseShouldHaveStatusCode(http.StatusOK); err != nil {
+		return err
+	}
+	if suite.currentAuth0ID == "" {
+		return fmt.Errorf("expected an authenticated provider before checking audio access")
+	}
+	detail, err := suite.conversationDetailResponseFromLastBody()
+	if err != nil {
+		return err
+	}
+	audio, err := suite.audioInConversationDetail(detail, suite.lastAttemptedMessageAudioName)
+	if err != nil {
+		return err
+	}
+	if strings.TrimSpace(audio.URL) == "" {
+		return fmt.Errorf("expected provider to receive an access URL for audio %q", audio.OriginalName)
+	}
+	return nil
+}
+
+func (suite *testSuite) audioInConversationDetail(detail conversationDetailResponse, audioName string) (*messageAudioResponse, error) {
+	if strings.TrimSpace(audioName) == "" {
+		return nil, fmt.Errorf("expected an audio name before checking conversation detail")
+	}
+	for _, message := range detail.Messages {
+		if message.Audio != nil && message.Audio.OriginalName == audioName {
+			return message.Audio, nil
+		}
+	}
+	return nil, fmt.Errorf("expected conversation detail to include audio %q", audioName)
 }
 
 func (suite *testSuite) uploadAndConfirmMessageAudio(name, durationText string) error {

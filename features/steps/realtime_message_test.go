@@ -33,6 +33,7 @@ type realtimeEventMessage struct {
 	SenderRole string                 `json:"sender_role"`
 	Content    string                 `json:"content"`
 	Images     []messageImageResponse `json:"images"`
+	Audio      *messageAudioResponse  `json:"audio,omitempty"`
 	CreatedOn  time.Time              `json:"created_on"`
 }
 
@@ -50,6 +51,8 @@ func registerRealtimeMessageSteps(sc *godog.ScenarioContext, suite *testSuite) {
 	sc.Step(`^envío un mensaje en el chat con el consumidor "([^"]*)":$`, suite.sendMessageInChatWithConsumer)
 	sc.Step(`^el consumidor "([^"]*)" recibe en tiempo real el mensaje:$`, suite.consumerReceivesRealtimeMessage)
 	sc.Step(`^el prestador "([^"]*)" recibe en tiempo real el mensaje:$`, suite.providerReceivesRealtimeMessage)
+	sc.Step(`^el prestador "([^"]*)" recibe en tiempo real el mensaje de audio "([^"]*)"$`, suite.providerReceivesRealtimeAudioMessage)
+	sc.Step(`^el evento recibido incluye la duración y el acceso al audio$`, suite.realtimeAudioEventIncludesDurationAndAccess)
 	sc.Step(`^el consumidor "([^"]*)" no recibe mensajes en tiempo real$`, suite.consumerDoesNotReceiveRealtimeMessages)
 	sc.Step(`^el prestador "([^"]*)" no recibe mensajes en tiempo real$`, suite.providerDoesNotReceiveRealtimeMessages)
 }
@@ -145,6 +148,74 @@ func (suite *testSuite) participantReceivesRealtimeMessage(email string, message
 	}
 	if event.Message.CreatedOn.IsZero() {
 		return fmt.Errorf("expected realtime message created_on to be present")
+	}
+	suite.lastRealtimeEvent = &event
+
+	return nil
+}
+
+func (suite *testSuite) providerReceivesRealtimeAudioMessage(email, audioName string) error {
+	connection, err := suite.realtimeConnectionForEmail(email)
+	if err != nil {
+		return err
+	}
+
+	event, err := connection.readMessageEvent(realtimeMessageTimeout)
+	if err != nil {
+		return err
+	}
+	fixture, ok := suite.messageAudiosByName[audioName]
+	if !ok {
+		return fmt.Errorf("expected audio fixture %q to exist", audioName)
+	}
+
+	if event.Type != "conversation.message.created" {
+		return fmt.Errorf("expected realtime event type %q, got %q", "conversation.message.created", event.Type)
+	}
+	if event.ConversationID != suite.lastConversationID {
+		return fmt.Errorf("expected realtime conversation id %d, got %d", suite.lastConversationID, event.ConversationID)
+	}
+	if event.Message.ID == 0 {
+		return fmt.Errorf("expected realtime audio message id to be present")
+	}
+	if event.Message.SenderRole != participantRoleConsumer {
+		return fmt.Errorf("expected realtime audio sender role %q, got %q", participantRoleConsumer, event.Message.SenderRole)
+	}
+	if event.Message.Content != "" {
+		return fmt.Errorf("expected realtime audio message content to be empty, got %q", event.Message.Content)
+	}
+	if event.Message.Audio == nil {
+		return fmt.Errorf("expected realtime event to include audio %q", audioName)
+	}
+	if event.Message.Audio.ID != fixture.FileID || event.Message.Audio.OriginalName != fixture.OriginalName {
+		return fmt.Errorf("expected realtime audio %q with id %q, got id %q and name %q", audioName, fixture.FileID, event.Message.Audio.ID, event.Message.Audio.OriginalName)
+	}
+	if event.Message.CreatedOn.IsZero() {
+		return fmt.Errorf("expected realtime audio message created_on to be present")
+	}
+
+	suite.lastRealtimeEvent = &event
+	return nil
+}
+
+func (suite *testSuite) realtimeAudioEventIncludesDurationAndAccess() error {
+	if suite.lastRealtimeEvent == nil || suite.lastRealtimeEvent.Message.Audio == nil {
+		return fmt.Errorf("expected a received realtime audio event before checking its metadata")
+	}
+
+	audio := suite.lastRealtimeEvent.Message.Audio
+	fixture, ok := suite.messageAudiosByName[audio.OriginalName]
+	if !ok {
+		return fmt.Errorf("expected audio fixture %q to exist", audio.OriginalName)
+	}
+	if audio.DurationSeconds != fixture.DurationSeconds {
+		return fmt.Errorf("expected realtime audio duration %d seconds, got %d", fixture.DurationSeconds, audio.DurationSeconds)
+	}
+	if audio.MimeType != fixture.MimeType || audio.Codec != fixture.Codec {
+		return fmt.Errorf("expected realtime audio format %q and codec %q, got format %q and codec %q", fixture.MimeType, fixture.Codec, audio.MimeType, audio.Codec)
+	}
+	if strings.TrimSpace(audio.URL) == "" {
+		return fmt.Errorf("expected realtime audio %q to include an access URL", audio.OriginalName)
 	}
 
 	return nil

@@ -1,6 +1,10 @@
 package readmodel
 
-import "time"
+import (
+	"time"
+
+	filedomain "github.com/LoResuelvo/loresuelvo-api/internal/domain/file"
+)
 
 type ConversationSummary struct {
 	ID          int
@@ -34,5 +38,6 @@ type MessageSummary struct {
 	ID         int
 	SenderRole string
 	Content    string
+	Audio      *filedomain.MessageAudio
 	CreatedOn  time.Time
 }

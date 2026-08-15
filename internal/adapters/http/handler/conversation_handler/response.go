@@ -94,10 +94,11 @@ type conversationCounterpartResponse struct {
 }
 
 type conversationLastMessageResponse struct {
-	ID         int       `json:"id"`
-	SenderRole string    `json:"sender_role"`
-	Content    string    `json:"content"`
-	CreatedOn  time.Time `json:"created_on"`
+	ID         int                   `json:"id"`
+	SenderRole string                `json:"sender_role"`
+	Content    string                `json:"content"`
+	Audio      *messageAudioResponse `json:"audio,omitempty"`
+	CreatedOn  time.Time             `json:"created_on"`
 }
 
 type providerSummaryResponse struct {

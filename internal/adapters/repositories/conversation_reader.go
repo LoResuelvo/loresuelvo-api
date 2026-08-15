@@ -7,6 +7,7 @@ import (
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/conversation"
 	readmodel "github.com/LoResuelvo/loresuelvo-api/internal/domain/conversation/read_model"
+	filedomain "github.com/LoResuelvo/loresuelvo-api/internal/domain/file"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/user"
 )
 
@@ -62,6 +63,11 @@ func (reader *ConversationReader) findWorkSummariesByConsumerID(ctx context.Cont
 			lm.sender_role,
 			lm.content,
 			lm.created_on,
+			lm.audio_file_id,
+			lm.audio_original_name,
+			lm.audio_mime_type,
+			lm.audio_codec,
+			lm.audio_duration_seconds,
 			c.updated_on
 		FROM conversations c
 		INNER JOIN work_conversations wc ON wc.conversation_id = c.id
@@ -69,8 +75,20 @@ func (reader *ConversationReader) findWorkSummariesByConsumerID(ctx context.Cont
 		INNER JOIN users u ON u.id = p.user_id
 		LEFT JOIN categories cat ON cat.id = p.category_id
 		LEFT JOIN LATERAL (
-			SELECT m.id, m.sender_role, m.content, m.created_on
+			SELECT
+				m.id,
+				m.sender_role,
+				m.content,
+				m.created_on,
+				ma.file_id::text AS audio_file_id,
+				f.original_name AS audio_original_name,
+				f.mime_type AS audio_mime_type,
+				fa.codec AS audio_codec,
+				fa.duration_seconds AS audio_duration_seconds
 			FROM messages m
+			LEFT JOIN message_audios ma ON ma.message_id = m.id
+			LEFT JOIN files f ON f.id = ma.file_id
+			LEFT JOIN file_audios fa ON fa.file_id = ma.file_id
 			WHERE m.conversation_id = c.id
 			ORDER BY m.created_on DESC, m.id DESC
 			LIMIT 1
@@ -105,14 +123,31 @@ func (reader *ConversationReader) findWorkSummariesByProviderID(ctx context.Cont
 			lm.sender_role,
 			lm.content,
 			lm.created_on,
+			lm.audio_file_id,
+			lm.audio_original_name,
+			lm.audio_mime_type,
+			lm.audio_codec,
+			lm.audio_duration_seconds,
 			c.updated_on
 		FROM conversations c
 		INNER JOIN work_conversations wc ON wc.conversation_id = c.id
 		INNER JOIN consumers consumer ON consumer.user_id = wc.consumer_id
 		INNER JOIN users u ON u.id = consumer.user_id
 		LEFT JOIN LATERAL (
-			SELECT m.id, m.sender_role, m.content, m.created_on
+			SELECT
+				m.id,
+				m.sender_role,
+				m.content,
+				m.created_on,
+				ma.file_id::text AS audio_file_id,
+				f.original_name AS audio_original_name,
+				f.mime_type AS audio_mime_type,
+				fa.codec AS audio_codec,
+				fa.duration_seconds AS audio_duration_seconds
 			FROM messages m
+			LEFT JOIN message_audios ma ON ma.message_id = m.id
+			LEFT JOIN files f ON f.id = ma.file_id
+			LEFT JOIN file_audios fa ON fa.file_id = ma.file_id
 			WHERE m.conversation_id = c.id
 			ORDER BY m.created_on DESC, m.id DESC
 			LIMIT 1
@@ -372,6 +407,11 @@ func scanWorkConversationSummaries(rows *sql.Rows, counterpartRole string) ([]re
 		var lastMessageSenderRole sql.NullString
 		var lastMessageContent sql.NullString
 		var lastMessageCreatedOn sql.NullTime
+		var lastMessageAudioFileID sql.NullString
+		var lastMessageAudioOriginalName sql.NullString
+		var lastMessageAudioMimeType sql.NullString
+		var lastMessageAudioCodec sql.NullString
+		var lastMessageAudioDurationSeconds sql.NullInt64
 
 		if err := rows.Scan(
 			&summary.ID,
@@ -386,6 +426,11 @@ func scanWorkConversationSummaries(rows *sql.Rows, counterpartRole string) ([]re
 			&lastMessageSenderRole,
 			&lastMessageContent,
 			&lastMessageCreatedOn,
+			&lastMessageAudioFileID,
+			&lastMessageAudioOriginalName,
+			&lastMessageAudioMimeType,
+			&lastMessageAudioCodec,
+			&lastMessageAudioDurationSeconds,
 			&summary.UpdatedOn,
 		); err != nil {
 			return nil, fmt.Errorf("scanning work conversation summary: %w", err)
@@ -393,7 +438,18 @@ func scanWorkConversationSummaries(rows *sql.Rows, counterpartRole string) ([]re
 
 		counterpart.Role = counterpartRole
 		summary.Work = &readmodel.WorkConversationSummary{Counterpart: counterpart}
-		setSummaryLastMessage(&summary, lastMessageID, lastMessageSenderRole, lastMessageContent, lastMessageCreatedOn)
+		setSummaryLastMessageWithAudio(
+			&summary,
+			lastMessageID,
+			lastMessageSenderRole,
+			lastMessageContent,
+			lastMessageCreatedOn,
+			lastMessageAudioFileID,
+			lastMessageAudioOriginalName,
+			lastMessageAudioMimeType,
+			lastMessageAudioCodec,
+			lastMessageAudioDurationSeconds,
+		)
 		summaries = append(summaries, summary)
 	}
 
@@ -405,6 +461,21 @@ func scanWorkConversationSummaries(rows *sql.Rows, counterpartRole string) ([]re
 }
 
 func setSummaryLastMessage(summary *readmodel.ConversationSummary, id sql.NullInt64, senderRole sql.NullString, content sql.NullString, createdOn sql.NullTime) {
+	setSummaryLastMessageWithAudio(summary, id, senderRole, content, createdOn, sql.NullString{}, sql.NullString{}, sql.NullString{}, sql.NullString{}, sql.NullInt64{})
+}
+
+func setSummaryLastMessageWithAudio(
+	summary *readmodel.ConversationSummary,
+	id sql.NullInt64,
+	senderRole sql.NullString,
+	content sql.NullString,
+	createdOn sql.NullTime,
+	audioFileID sql.NullString,
+	audioOriginalName sql.NullString,
+	audioMimeType sql.NullString,
+	audioCodec sql.NullString,
+	audioDurationSeconds sql.NullInt64,
+) {
 	if !id.Valid {
 		return
 	}
@@ -413,7 +484,22 @@ func setSummaryLastMessage(summary *readmodel.ConversationSummary, id sql.NullIn
 		ID:         int(id.Int64),
 		SenderRole: senderRole.String,
 		Content:    content.String,
+		Audio:      summaryMessageAudio(audioFileID, audioOriginalName, audioMimeType, audioCodec, audioDurationSeconds),
 		CreatedOn:  createdOn.Time,
+	}
+}
+
+func summaryMessageAudio(fileID, originalName, mimeType, codec sql.NullString, durationSeconds sql.NullInt64) *filedomain.MessageAudio {
+	if !fileID.Valid {
+		return nil
+	}
+
+	return &filedomain.MessageAudio{
+		FileID:          fileID.String,
+		OriginalName:    originalName.String,
+		MimeType:        mimeType.String,
+		Codec:           codec.String,
+		DurationSeconds: int(durationSeconds.Int64),
 	}
 }
 

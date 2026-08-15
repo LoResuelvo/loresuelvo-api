@@ -257,6 +257,7 @@ func conversationLastMessageResponseFromDomain(message *readmodel.MessageSummary
 		ID:         message.ID,
 		SenderRole: message.SenderRole,
 		Content:    message.Content,
+		Audio:      messageAudioResponseFromDomain(message.Audio),
 		CreatedOn:  message.CreatedOn,
 	}
 }

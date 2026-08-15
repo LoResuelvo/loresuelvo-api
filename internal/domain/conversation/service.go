@@ -718,11 +718,14 @@ func (s *Service) ensureMessageAllowedInCurrentConversationState(ctx context.Con
 
 func (s *Service) withCounterpartProfilePhotoURLs(ctx context.Context, summaries []readmodel.ConversationSummary) ([]readmodel.ConversationSummary, error) {
 	fileIDs := make([]string, 0, len(summaries))
+	audioFileIDs := make([]string, 0, len(summaries))
 	for i := range summaries {
-		if summaries[i].Work == nil {
-			continue
+		if summaries[i].Work != nil {
+			fileIDs = append(fileIDs, summaries[i].Work.Counterpart.ProfilePhotoFileID)
 		}
-		fileIDs = append(fileIDs, summaries[i].Work.Counterpart.ProfilePhotoFileID)
+		if summaries[i].LastMessage != nil && summaries[i].LastMessage.Audio != nil {
+			audioFileIDs = append(audioFileIDs, summaries[i].LastMessage.Audio.FileID)
+		}
 	}
 	urlsByFileID, err := s.fileService.ResolvePublicURLs(ctx, fileIDs)
 	if err != nil {
@@ -733,6 +736,22 @@ func (s *Service) withCounterpartProfilePhotoURLs(ctx context.Context, summaries
 			continue
 		}
 		summaries[i].Work.Counterpart.ProfilePhotoURL = urlsByFileID[summaries[i].Work.Counterpart.ProfilePhotoFileID]
+	}
+
+	audiosByFileID, err := s.fileService.ResolveMessageAudios(ctx, audioFileIDs)
+	if err != nil {
+		return nil, fmt.Errorf("resolving conversation summary message audios: %w", err)
+	}
+	for i := range summaries {
+		if summaries[i].LastMessage == nil || summaries[i].LastMessage.Audio == nil {
+			continue
+		}
+		audio := summaries[i].LastMessage.Audio
+		resolved, ok := audiosByFileID[audio.FileID]
+		if !ok || resolved.URL == "" {
+			return nil, ErrMessageAudioNotAvailable
+		}
+		*audio = resolved
 	}
 
 	return summaries, nil

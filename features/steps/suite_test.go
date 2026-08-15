@@ -60,6 +60,7 @@ type testSuite struct {
 	providerProfilePhotoFileID              string
 	consumerProfilePhotoFileID              string
 	realtimeConnections                     map[string]*realtimeTestConnection
+	lastRealtimeEvent                       *realtimeMessageEvent
 	chatbotConversationIDs                  []int
 	chatbotConversationStatuses             []string
 	lastChatbotRecommendedCategoryName      string
@@ -190,6 +191,7 @@ func (s *testSuite) cleanup() error {
 	s.categoryIDsByName = map[string]int{}
 	s.participantRolesByFullName = map[string]string{}
 	s.realtimeConnections = map[string]*realtimeTestConnection{}
+	s.lastRealtimeEvent = nil
 	s.lastWorkRequestProviderID = 0
 	s.lastProviderProfileID = 0
 	s.lastJobRequestID = 0

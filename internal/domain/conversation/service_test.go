@@ -1249,6 +1249,47 @@ func TestListReturnsConversationSummariesForConsumer(t *testing.T) {
 	assert.Equal(t, "Hola", summaries[0].LastMessage.Content)
 }
 
+func TestListResolvesAudioInLatestWorkMessageSummary(t *testing.T) {
+	now := time.Now()
+	consumerIDFinder := &consumerIDFinderMock{consumerID: 10}
+	providerIDFinder := &providerIDFinderMock{err: errors.New("provider not found")}
+	conversationReader := &conversationReaderMock{
+		consumerSummaries: []readmodel.ConversationSummary{{
+			ID:     1,
+			Type:   conversation.TypeWork,
+			Status: conversation.StatusActive,
+			Work: &readmodel.WorkConversationSummary{Counterpart: readmodel.ConversationParticipant{
+				ID:                 20,
+				Role:               conversation.SenderProvider,
+				Name:               "Juan",
+				Surname:            "Gómez",
+				ProfilePhotoFileID: "provider-photo-file-id",
+			}},
+			LastMessage: &readmodel.MessageSummary{
+				ID:         2,
+				SenderRole: conversation.SenderConsumer,
+				Audio:      &filedomain.MessageAudio{FileID: "summary-audio-file-id"},
+				CreatedOn:  now,
+			},
+			UpdatedOn: now,
+		}},
+	}
+
+	fileURLResolver := &fileURLResolverMock{urlsByFileID: map[string]string{"provider-photo-file-id": "https://cdn/provider.jpg"}}
+	service := conversation.NewService(&conversationRepositoryMock{}, newUserRepositoryMock(consumerIDFinder, providerIDFinder), conversationReader, nil, &chatbotMock{}, nil, fileURLResolver, fixedClock{now: now})
+
+	summaries, err := service.ListWorkConversations(context.Background(), "auth0|consumer")
+
+	require.NoError(t, err)
+	require.Len(t, summaries, 1)
+	require.NotNil(t, summaries[0].LastMessage)
+	require.NotNil(t, summaries[0].LastMessage.Audio)
+	assert.Equal(t, "https://files/summary-audio-file-id", summaries[0].LastMessage.Audio.URL)
+	assert.Equal(t, "audio/webm", summaries[0].LastMessage.Audio.MimeType)
+	assert.Equal(t, "opus", summaries[0].LastMessage.Audio.Codec)
+	assert.Equal(t, 18, summaries[0].LastMessage.Audio.DurationSeconds)
+}
+
 func TestListReturnsConversationSummariesForProvider(t *testing.T) {
 	now := time.Now()
 	repo := &conversationRepositoryMock{}
