@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/conversation"
 	"github.com/cucumber/godog"
 )
 
@@ -49,9 +50,14 @@ func registerSendVideoSteps(sc *godog.ScenarioContext, suite *testSuite) {
 	sc.Step(`^que cargué y confirmé el video "([^"]*)" de ([0-9]+) segundos$`, suite.uploadAndConfirmMessageVideo)
 	sc.Step(`^envío únicamente el video "([^"]*)" en el chat con el prestador "([^"]*)"$`, suite.sendVideoOnlyMessageInChatWithProvider)
 	sc.Step(`^envío el video "([^"]*)" en el chat con la consumidora "([^"]*)" acompañado del texto:$`, suite.sendVideoWithTextInChatWithConsumer)
+	sc.Step(`^envío el video "([^"]*)" en la conversación pendiente con el prestador "([^"]*)" acompañado del texto:$`, suite.sendVideoWithTextInPendingConversationWithProvider)
+	sc.Step(`^intento enviar únicamente el video "([^"]*)" en la conversación pendiente con la consumidora "([^"]*)"$`, suite.trySendVideoOnlyMessageInPendingConversationWithConsumer)
+	sc.Step(`^intento enviar únicamente el video "([^"]*)" en la conversación pendiente con el prestador "([^"]*)"$`, suite.trySendVideoOnlyMessageInPendingConversationWithProvider)
 	sc.Step(`^el sistema registra el mensaje con el video "([^"]*)" en el chat$`, suite.systemRegistersMessageWithVideo)
 	sc.Step(`^el sistema registra el mensaje con el video "([^"]*)" y el texto enviado$`, suite.systemRegistersMessageWithVideoAndText)
+	sc.Step(`^el sistema registra el mensaje con el video "([^"]*)" y el texto enviado en la conversación pendiente$`, suite.systemRegistersMessageWithVideoAndTextInPendingConversation)
 	sc.Step(`^el video queda asociado al mensaje enviado$`, suite.videoRemainsAssociatedWithSentMessage)
+	sc.Step(`^el sistema no asocia el video a ningún mensaje$`, suite.systemDoesNotAssociateVideoWithAnyMessage)
 }
 
 func (suite *testSuite) uploadAndConfirmMessageVideoWithoutAudio(name, durationText string) error {
@@ -169,13 +175,12 @@ func (suite *testSuite) sendVideoOnlyMessageInChatWithProvider(videoName, provid
 	if err := suite.ensureKnownParticipantFullName(providerFullName, participantRoleProvider); err != nil {
 		return err
 	}
-	fixture, err := suite.messageVideoFixture(videoName)
+	videoFileID, err := suite.messageVideoFileID(videoName)
 	if err != nil {
 		return err
 	}
-	suite.lastAttemptedMessageVideoName = videoName
 	suite.lastAttemptedMessageVideoContent = ""
-	return suite.requestSendMessageToPreparedConversation(sendMessageRequest{VideoFileID: fixture.FileID})
+	return suite.requestSendMessageToPreparedConversation(sendMessageRequest{VideoFileID: videoFileID})
 }
 
 func (suite *testSuite) sendVideoWithTextInChatWithConsumer(videoName, consumerFullName string, text *godog.DocString) error {
@@ -192,12 +197,57 @@ func (suite *testSuite) sendVideoWithTextInChatWithConsumer(videoName, consumerF
 	return suite.requestSendMessageToPreparedConversation(sendMessageRequest{Content: content, VideoFileID: fixture.FileID})
 }
 
+func (suite *testSuite) sendVideoWithTextInPendingConversationWithProvider(videoName, providerFullName string, text *godog.DocString) error {
+	if err := suite.ensureKnownParticipantFullName(providerFullName, participantRoleProvider); err != nil {
+		return err
+	}
+	videoFileID, err := suite.messageVideoFileID(videoName)
+	if err != nil {
+		return err
+	}
+	content := normalizeDocString(text)
+	suite.lastAttemptedMessageVideoContent = content
+	return suite.requestSendMessageToPreparedConversation(sendMessageRequest{
+		Content:     content,
+		VideoFileID: videoFileID,
+	})
+}
+
+func (suite *testSuite) trySendVideoOnlyMessageInPendingConversationWithConsumer(videoName, consumerFullName string) error {
+	return suite.trySendVideoOnlyMessageInPendingConversationWithParticipant(videoName, consumerFullName, participantRoleConsumer)
+}
+
+func (suite *testSuite) trySendVideoOnlyMessageInPendingConversationWithProvider(videoName, providerFullName string) error {
+	return suite.trySendVideoOnlyMessageInPendingConversationWithParticipant(videoName, providerFullName, participantRoleProvider)
+}
+
+func (suite *testSuite) trySendVideoOnlyMessageInPendingConversationWithParticipant(videoName, participantFullName, participantRole string) error {
+	if err := suite.ensureKnownParticipantFullName(participantFullName, participantRole); err != nil {
+		return err
+	}
+	videoFileID, err := suite.messageVideoFileID(videoName)
+	if err != nil {
+		return err
+	}
+	suite.lastAttemptedMessageVideoContent = ""
+	return suite.requestSendMessageToPreparedConversation(sendMessageRequest{VideoFileID: videoFileID})
+}
+
 func (suite *testSuite) messageVideoFixture(name string) (messageVideoFixture, error) {
 	fixture, ok := suite.messageVideosByName[name]
 	if !ok {
 		return messageVideoFixture{}, fmt.Errorf("expected video fixture %q to exist", name)
 	}
 	return fixture, nil
+}
+
+func (suite *testSuite) messageVideoFileID(name string) (string, error) {
+	fixture, err := suite.messageVideoFixture(name)
+	if err != nil {
+		return "", err
+	}
+	suite.lastAttemptedMessageVideoName = name
+	return fixture.FileID, nil
 }
 
 func (suite *testSuite) systemRegistersMessageWithVideo(videoName string) error {
@@ -248,6 +298,37 @@ func (suite *testSuite) systemRegistersMessageWithVideoAndText(videoName string)
 	return nil
 }
 
+func (suite *testSuite) systemRegistersMessageWithVideoAndTextInPendingConversation(videoName string) error {
+	if err := suite.systemRegistersMessageWithVideoAndText(videoName); err != nil {
+		return err
+	}
+
+	foundConversation, err := suite.conversationRepository.FindByID(context.Background(), suite.lastConversationID)
+	if err != nil {
+		return fmt.Errorf("finding pending conversation after sending video: %w", err)
+	}
+	if foundConversation.Status() != conversation.StatusPending {
+		return fmt.Errorf("expected conversation %d to remain pending, got %q", suite.lastConversationID, foundConversation.Status())
+	}
+
+	lastMessage, ok := foundConversation.LastMessage()
+	if !ok || lastMessage.ID != suite.lastSentMessageID {
+		return fmt.Errorf("expected sent video message %d to remain the last message in conversation %d", suite.lastSentMessageID, suite.lastConversationID)
+	}
+	if lastMessage.Content != suite.lastAttemptedMessageVideoContent {
+		return fmt.Errorf("expected persisted video message content %q, got %q", suite.lastAttemptedMessageVideoContent, lastMessage.Content)
+	}
+	fixture, err := suite.messageVideoFixture(videoName)
+	if err != nil {
+		return err
+	}
+	if lastMessage.Video == nil || lastMessage.Video.FileID != fixture.FileID {
+		return fmt.Errorf("expected persisted video %q to remain associated with message %d", fixture.OriginalName, lastMessage.ID)
+	}
+
+	return nil
+}
+
 func (suite *testSuite) assertMessageVideo(video *messageVideoResponse, expectedName string) error {
 	fixture, err := suite.messageVideoFixture(expectedName)
 	if err != nil {
@@ -274,6 +355,30 @@ func (suite *testSuite) videoRemainsAssociatedWithSentMessage() error {
 	lastMessage, ok := foundConversation.LastMessage()
 	if !ok || lastMessage.ID != suite.lastSentMessageID || lastMessage.Video == nil || lastMessage.Video.FileID != fixture.FileID {
 		return fmt.Errorf("expected video %q to remain associated with sent message %d", fixture.OriginalName, suite.lastSentMessageID)
+	}
+	return nil
+}
+
+func (suite *testSuite) systemDoesNotAssociateVideoWithAnyMessage() error {
+	fixture, err := suite.messageVideoFixture(suite.lastAttemptedMessageVideoName)
+	if err != nil {
+		return err
+	}
+	if err := suite.requestConversationByID(suite.lastConversationID); err != nil {
+		return err
+	}
+	if err := suite.lastResponseShouldHaveStatusCode(http.StatusOK); err != nil {
+		return err
+	}
+
+	detail, err := suite.conversationDetailResponseFromLastBody()
+	if err != nil {
+		return err
+	}
+	for _, message := range detail.Messages {
+		if message.Video != nil && message.Video.ID == fixture.FileID {
+			return fmt.Errorf("expected video %q not to be associated with a message, found message %d", fixture.OriginalName, message.ID)
+		}
 	}
 	return nil
 }

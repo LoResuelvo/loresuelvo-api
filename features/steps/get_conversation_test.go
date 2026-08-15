@@ -32,6 +32,7 @@ type conversationMessageResponse struct {
 	Content    string                 `json:"content"`
 	Images     []messageImageResponse `json:"images"`
 	Audio      *messageAudioResponse  `json:"audio,omitempty"`
+	Video      *messageVideoResponse  `json:"video,omitempty"`
 	CreatedOn  time.Time              `json:"created_on"`
 }
 
