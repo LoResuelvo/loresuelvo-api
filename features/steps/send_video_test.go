@@ -22,6 +22,8 @@ const (
 	conversationMessageVideoPurpose = "conversation_message_video"
 	conversationMessageVideoMIME    = "video/mp4"
 	invalidMessageVideoContent      = "not-a-valid-mp4-video"
+	maxConversationMessageVideoSize = 50 * 1024 * 1024
+	oversizedConversationVideoSize  = 51 * 1024 * 1024
 )
 
 type messageVideoFixture struct {
@@ -67,6 +69,14 @@ func registerSendVideoSteps(sc *godog.ScenarioContext, suite *testSuite) {
 	sc.Step(`^que solicité cargar "([^"]*)" como video MP4 con H\.264$`, suite.requestedMessageVideoUpload)
 	sc.Step(`^intento confirmar un archivo cuyo contenido no corresponde a un video MP4 válido$`, suite.tryConfirmInvalidMessageVideo)
 	sc.Step(`^el sistema rechaza la confirmación porque el contenido del video no es válido$`, suite.systemRejectsUnsupportedMessageVideo)
+	sc.Step(`^intento cargar un video MP4 con H\.264 de ([0-9]+) MiB para un mensaje del chat$`, suite.tryUploadOversizedMessageVideo)
+	sc.Step(`^el sistema rechaza la carga porque el video supera el máximo de 50 MiB$`, suite.systemRejectsOversizedMessageVideo)
+	sc.Step(`^que cargué el video MP4 con H\.264 "([^"]*)" de ([0-9]+) segundos$`, suite.uploadedMessageVideoWithoutConfirming)
+	sc.Step(`^intento confirmar el video para un mensaje del chat$`, suite.tryConfirmLastMessageVideo)
+	sc.Step(`^el sistema rechaza la confirmación porque el video supera el máximo de 120 segundos$`, suite.systemRejectsVideoOverDuration)
+	sc.Step(`^que cargué el video MP4 con H\.264 "([^"]*)" con resolución ([0-9]+) por ([0-9]+)$`, suite.uploadedMessageVideoWithResolutionWithoutConfirming)
+	sc.Step(`^el sistema rechaza la confirmación porque el video supera la resolución Full HD$`, suite.systemRejectsVideoOverResolution)
+	sc.Step(`^que cargué y confirmé el video MP4 con H\.264 y AAC "([^"]*)" de ([0-9]+) MiB, ([0-9]+) segundos y resolución ([0-9]+) por ([0-9]+)$`, suite.uploadAndConfirmLimitMessageVideo)
 	sc.Step(`^envío el video "([^"]*)" en el chat con la consumidora "([^"]*)" acompañado del texto:$`, suite.sendVideoWithTextInChatWithConsumer)
 	sc.Step(`^envío el video "([^"]*)" en la conversación pendiente con el prestador "([^"]*)" acompañado del texto:$`, suite.sendVideoWithTextInPendingConversationWithProvider)
 	sc.Step(`^intento enviar únicamente el video "([^"]*)" en la conversación pendiente con la consumidora "([^"]*)"$`, suite.trySendVideoOnlyMessageInPendingConversationWithConsumer)
@@ -233,6 +243,56 @@ func (suite *testSuite) uploadedButDidNotConfirmMessageVideo(name string) error 
 	return suite.uploadMessageVideoWithOptions(suite.currentAuth0ID, name, "18", true, false)
 }
 
+func (suite *testSuite) uploadedMessageVideoWithoutConfirming(name, durationText string) error {
+	suite.lastAttemptedMessageVideoName = name
+	return suite.uploadMessageVideoWithOptions(suite.currentAuth0ID, name, durationText, false, false)
+}
+
+func (suite *testSuite) uploadedMessageVideoWithResolutionWithoutConfirming(name, widthText, heightText string) error {
+	width, err := strconv.Atoi(widthText)
+	if err != nil || width <= 0 {
+		return fmt.Errorf("expected a positive video width, got %q", widthText)
+	}
+	height, err := strconv.Atoi(heightText)
+	if err != nil || height <= 0 {
+		return fmt.Errorf("expected a positive video height, got %q", heightText)
+	}
+
+	suite.lastAttemptedMessageVideoName = name
+	videoData := testMP4VideoWithCodecsAndDimensions(18, "H.264", "", width, height)
+	return suite.uploadMessageVideoData(suite.currentAuth0ID, name, videoData, "h264", "", 18, width, height, false)
+}
+
+func (suite *testSuite) uploadAndConfirmLimitMessageVideo(name, sizeMiBText, durationText, widthText, heightText string) error {
+	sizeMiB, err := strconv.Atoi(sizeMiBText)
+	if err != nil || sizeMiB <= 0 {
+		return fmt.Errorf("expected a positive video size in MiB, got %q", sizeMiBText)
+	}
+	durationSeconds, err := strconv.Atoi(durationText)
+	if err != nil || durationSeconds <= 0 {
+		return fmt.Errorf("expected a positive video duration, got %q", durationText)
+	}
+	width, err := strconv.Atoi(widthText)
+	if err != nil || width <= 0 {
+		return fmt.Errorf("expected a positive video width, got %q", widthText)
+	}
+	height, err := strconv.Atoi(heightText)
+	if err != nil || height <= 0 {
+		return fmt.Errorf("expected a positive video height, got %q", heightText)
+	}
+
+	requestedSizeBytes := sizeMiB * 1024 * 1024
+	if requestedSizeBytes != maxConversationMessageVideoSize {
+		return fmt.Errorf("expected the limit video fixture to be exactly %d bytes, got %d", maxConversationMessageVideoSize, requestedSizeBytes)
+	}
+	videoData := testMP4VideoWithCodecsAndDimensions(durationSeconds, "H.264", "AAC", width, height)
+	if len(videoData) > requestedSizeBytes {
+		return fmt.Errorf("generated video fixture %q is larger than requested size %d", name, requestedSizeBytes)
+	}
+	videoData = append(videoData, make([]byte, requestedSizeBytes-len(videoData))...)
+	return suite.uploadMessageVideoData(suite.currentAuth0ID, name, videoData, "h264", "aac", durationSeconds, width, height, true)
+}
+
 func (suite *testSuite) uploadMessageVideo(authID, name, durationText string, withAudio bool) error {
 	return suite.uploadMessageVideoWithOptions(authID, name, durationText, withAudio, true)
 }
@@ -246,12 +306,26 @@ func (suite *testSuite) uploadMessageVideoWithOptions(authID, name, durationText
 		return fmt.Errorf("expected an authenticated uploader before loading video %q", name)
 	}
 
-	videoData := testMP4Video(durationSeconds, withAudio)
+	audioCodec := ""
+	if withAudio {
+		audioCodec = "AAC"
+	}
+	videoData := testMP4VideoWithCodecsAndDimensions(durationSeconds, "H.264", audioCodec, 1080, 1920)
+	return suite.uploadMessageVideoData(authID, name, videoData, "h264", parsedAudioCodec(audioCodec), durationSeconds, 1080, 1920, confirm)
+}
+
+func (suite *testSuite) uploadMessageVideoData(authID, name string, videoData []byte, videoCodec, audioCodec string, durationSeconds, width, height int, confirm bool) error {
+	if strings.TrimSpace(authID) == "" {
+		return fmt.Errorf("expected an authenticated uploader before loading video %q", name)
+	}
+	if len(videoData) == 0 {
+		return fmt.Errorf("expected video fixture %q to contain data", name)
+	}
+
 	upload, err := suite.requestMessageVideoPresign(authID, name, conversationMessageVideoMIME, len(videoData))
 	if err != nil {
 		return err
 	}
-
 	if err := suite.putMessageVideoObject(*upload, videoData); err != nil {
 		return err
 	}
@@ -263,13 +337,11 @@ func (suite *testSuite) uploadMessageVideoWithOptions(authID, name, durationText
 		OriginalName:    name,
 		MimeType:        conversationMessageVideoMIME,
 		SizeBytes:       len(videoData),
-		VideoCodec:      "h264",
+		VideoCodec:      videoCodec,
+		AudioCodec:      audioCodec,
 		DurationSeconds: durationSeconds,
-		Width:           1080,
-		Height:          1920,
-	}
-	if withAudio {
-		fixture.AudioCodec = "aac"
+		Width:           width,
+		Height:          height,
 	}
 	suite.messageVideosByName[name] = fixture
 	if !confirm {
@@ -415,6 +487,43 @@ func (suite *testSuite) systemRejectsUnsupportedMessageVideo() error {
 		return err
 	}
 	return suite.lastErrorResponseShouldSay(filedomain.ErrUnsupportedMessageVideo.Error())
+}
+
+func (suite *testSuite) tryUploadOversizedMessageVideo(sizeMiBText string) error {
+	sizeMiB, err := strconv.Atoi(sizeMiBText)
+	if err != nil || sizeMiB <= 0 {
+		return fmt.Errorf("expected a positive video size in MiB, got %q", sizeMiBText)
+	}
+	if sizeMiB*1024*1024 != oversizedConversationVideoSize {
+		return fmt.Errorf("expected an oversized video fixture of %d bytes, got %d", oversizedConversationVideoSize, sizeMiB*1024*1024)
+	}
+	_, err = suite.requestProfilePhotoPresign(suite.currentAuth0ID, presignFileRequest{
+		OriginalName: "video-grande.mp4",
+		MimeType:     conversationMessageVideoMIME,
+		SizeBytes:    sizeMiB * 1024 * 1024,
+		Purpose:      conversationMessageVideoPurpose,
+	})
+	return err
+}
+
+func (suite *testSuite) tryConfirmLastMessageVideo() error {
+	fixture, err := suite.messageVideoFixture(suite.lastAttemptedMessageVideoName)
+	if err != nil {
+		return err
+	}
+	return suite.confirmMessageVideoUpload(suite.currentAuth0ID, fixture)
+}
+
+func (suite *testSuite) systemRejectsOversizedMessageVideo() error {
+	return suite.systemRejectsUnsupportedMessageVideo()
+}
+
+func (suite *testSuite) systemRejectsVideoOverDuration() error {
+	return suite.systemRejectsUnsupportedMessageVideo()
+}
+
+func (suite *testSuite) systemRejectsVideoOverResolution() error {
+	return suite.systemRejectsUnsupportedMessageVideo()
 }
 
 func parsedVideoCodec(codec string) string {
@@ -839,22 +948,18 @@ func (suite *testSuite) conversationDetailAfterRejectedMessage() (conversationDe
 	return suite.conversationDetailResponseFromLastBody()
 }
 
-func testMP4Video(durationSeconds int, withAudio bool) []byte {
-	audioCodec := ""
-	if withAudio {
-		audioCodec = "AAC"
-	}
-	return testMP4VideoWithCodecs(durationSeconds, "H.264", audioCodec)
+func testMP4VideoWithCodecs(durationSeconds int, videoCodec, audioCodec string) []byte {
+	return testMP4VideoWithCodecsAndDimensions(durationSeconds, videoCodec, audioCodec, 1080, 1920)
 }
 
-func testMP4VideoWithCodecs(durationSeconds int, videoCodec, audioCodec string) []byte {
+func testMP4VideoWithCodecsAndDimensions(durationSeconds int, videoCodec, audioCodec string, width, height int) []byte {
 	mvhd := make([]byte, 20)
 	binary.BigEndian.PutUint32(mvhd[12:16], 1000)
 	binary.BigEndian.PutUint32(mvhd[16:20], uint32(durationSeconds*1000))
 	videoTkhd := make([]byte, 84)
-	binary.BigEndian.PutUint32(videoTkhd[76:80], uint32(1080)<<16)
-	binary.BigEndian.PutUint32(videoTkhd[80:84], uint32(1920)<<16)
-	videoStsd := append(make([]byte, 8), testMP4Box(videoSampleEntryType(videoCodec), videoSampleEntry())...)
+	binary.BigEndian.PutUint32(videoTkhd[76:80], uint32(width)<<16)
+	binary.BigEndian.PutUint32(videoTkhd[80:84], uint32(height)<<16)
+	videoStsd := append(make([]byte, 8), testMP4Box(videoSampleEntryType(videoCodec), videoSampleEntry(width, height))...)
 	videoTrack := testMP4Box("trak",
 		testMP4Box("tkhd", videoTkhd),
 		testMP4Box("mdia",
@@ -894,10 +999,10 @@ func audioSampleEntryType(codec string) string {
 	}
 }
 
-func videoSampleEntry() []byte {
+func videoSampleEntry(width, height int) []byte {
 	entry := make([]byte, 28)
-	binary.BigEndian.PutUint16(entry[24:26], 1080)
-	binary.BigEndian.PutUint16(entry[26:28], 1920)
+	binary.BigEndian.PutUint16(entry[24:26], uint16(width))
+	binary.BigEndian.PutUint16(entry[26:28], uint16(height))
 	return entry
 }
 
