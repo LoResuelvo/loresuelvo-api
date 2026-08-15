@@ -64,7 +64,6 @@ Feature: 50.1 Enviar audios por el chat
 
     Rule: El audio es una modalidad de mensaje exclusiva
 
-    @wip
     Scenario: 50.1.6-EAC Rechazar un mensaje que combina audio con texto
         Given que existe un chat activo entre el consumidor "ana@example.com" y el prestador "juan.plomero@example.com"
         And que estoy autenticado como consumidor "ana@example.com"
@@ -76,7 +75,6 @@ Feature: 50.1 Enviar audios por el chat
         Then el sistema rechaza el mensaje porque el audio debe enviarse sin texto ni imágenes
         And el sistema no asocia el audio a ningún mensaje
 
-    @wip
     Scenario: 50.1.7-EAC Rechazar un mensaje que combina audio con imágenes
         Given que existe un chat activo entre el consumidor "ana@example.com" y el prestador "juan.plomero@example.com"
         And que estoy autenticado como consumidor "ana@example.com"
@@ -86,7 +84,6 @@ Feature: 50.1 Enviar audios por el chat
         Then el sistema rechaza el mensaje porque el audio debe enviarse sin texto ni imágenes
         And el sistema no asocia el audio ni la imagen a ningún mensaje
 
-    @wip
     Scenario: 50.1.8-EAC Rechazar un mensaje que combina audio con texto e imágenes
         Given que existe un chat activo entre el consumidor "ana@example.com" y el prestador "juan.plomero@example.com"
         And que estoy autenticado como consumidor "ana@example.com"
