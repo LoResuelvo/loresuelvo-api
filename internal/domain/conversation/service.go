@@ -102,18 +102,25 @@ func (s *Service) getChatbotConversationDetail(ctx context.Context, authID strin
 	return s.withMessageAttachmentURLs(ctx, detail)
 }
 
-func (s *Service) SendMessage(ctx context.Context, authID string, conversationID int, content string, imageFileIDs []string, audioFileID string) (*Message, error) {
+func (s *Service) SendMessage(ctx context.Context, authID string, conversationID int, content string, imageFileIDs []string, audioFileID string, videoFileIDs ...string) (*Message, error) {
 	content = strings.TrimSpace(content)
 	audioFileID = strings.TrimSpace(audioFileID)
 	imageFileIDs = normalizeMessageImageFileIDs(imageFileIDs)
-	if audioFileID != "" && (content != "" || len(imageFileIDs) > 0) {
+	videoFileID := ""
+	if len(videoFileIDs) > 0 {
+		videoFileID = strings.TrimSpace(videoFileIDs[0])
+	}
+	if audioFileID != "" && (content != "" || len(imageFileIDs) > 0 || videoFileID != "") {
 		return nil, ErrMessageAudioMustBeExclusive
 	}
+	if videoFileID != "" && len(imageFileIDs) > 0 {
+		return nil, ErrMessageVideoCannotIncludeImages
+	}
 
-	return s.sendParticipantMessage(ctx, authID, conversationID, content, imageFileIDs, audioFileID)
+	return s.sendParticipantMessage(ctx, authID, conversationID, content, imageFileIDs, audioFileID, videoFileID)
 }
 
-func (s *Service) sendParticipantMessage(ctx context.Context, authID string, conversationID int, content string, imageFileIDs []string, audioFileID string) (*Message, error) {
+func (s *Service) sendParticipantMessage(ctx context.Context, authID string, conversationID int, content string, imageFileIDs []string, audioFileID string, videoFileID string) (*Message, error) {
 	foundConversation, err := s.conversationRepository.FindByID(ctx, conversationID)
 	if err != nil {
 		return nil, err
@@ -131,6 +138,13 @@ func (s *Service) sendParticipantMessage(ctx context.Context, authID string, con
 			return nil, err
 		}
 		message, err = newParticipantAudioMessage(senderRole, *audio)
+	} else if videoFileID != "" {
+		var video *filedomain.MessageVideo
+		video, err = s.messageVideoForSender(ctx, authID, videoFileID)
+		if err != nil {
+			return nil, err
+		}
+		message, err = newParticipantVideoMessage(senderRole, content, *video)
 	} else {
 		var images []filedomain.MessageImage
 		images, err = s.messageImagesForSender(ctx, authID, imageFileIDs)
@@ -601,6 +615,13 @@ func newParticipantAudioMessage(senderRole string, audio filedomain.MessageAudio
 	return NewProviderAudioMessage(audio)
 }
 
+func newParticipantVideoMessage(senderRole, content string, video filedomain.MessageVideo) (*Message, error) {
+	if senderRole == SenderConsumer {
+		return NewConsumerVideoMessage(content, video)
+	}
+	return NewProviderVideoMessage(content, video)
+}
+
 func (s *Service) messageImagesForSender(ctx context.Context, authID string, fileIDs []string) ([]filedomain.MessageImage, error) {
 	preparedFiles, err := s.fileService.PrepareMessageImages(ctx, authID, fileIDs)
 	if err != nil {
@@ -624,6 +645,20 @@ func (s *Service) messageAudioForSender(ctx context.Context, authID, fileID stri
 		return nil, ErrMessageAudioNotAvailable
 	}
 	return preparedAudio, nil
+}
+
+func (s *Service) messageVideoForSender(ctx context.Context, authID, fileID string) (*filedomain.MessageVideo, error) {
+	preparedVideo, err := s.fileService.PrepareMessageVideo(ctx, authID, fileID)
+	if err != nil {
+		if errors.Is(err, filedomain.ErrMessageVideoNotAvailable) {
+			return nil, ErrMessageVideoNotAvailable
+		}
+		return nil, fmt.Errorf("preparing message video: %w", err)
+	}
+	if preparedVideo == nil {
+		return nil, ErrMessageVideoNotAvailable
+	}
+	return preparedVideo, nil
 }
 
 // TODO: Jamás deberíamos devolver fmt.Errorf, siempre errores específicos de dominio
@@ -655,12 +690,16 @@ func optionalImageFileIDs(imageFileIDs [][]string) []string {
 func (s *Service) withMessageAttachmentURLs(ctx context.Context, detail *readmodel.ConversationDetail) (*readmodel.ConversationDetail, error) {
 	fileIDs := make([]string, 0)
 	audioFileIDs := make([]string, 0)
+	videoFileIDs := make([]string, 0)
 	for _, message := range detail.Messages {
 		for _, image := range message.Images {
 			fileIDs = append(fileIDs, image.FileID)
 		}
 		if message.Audio != nil {
 			audioFileIDs = append(audioFileIDs, message.Audio.FileID)
+		}
+		if message.Video != nil {
+			videoFileIDs = append(videoFileIDs, message.Video.FileID)
 		}
 	}
 	resolved, err := s.fileService.ResolveMessageImages(ctx, fileIDs)
@@ -692,6 +731,21 @@ func (s *Service) withMessageAttachmentURLs(ctx context.Context, detail *readmod
 			return nil, ErrMessageAudioNotAvailable
 		}
 		*audio = file
+	}
+	videos, err := s.fileService.ResolveMessageVideos(ctx, videoFileIDs)
+	if err != nil {
+		return nil, fmt.Errorf("resolving conversation message videos: %w", err)
+	}
+	for messageIndex := range detail.Messages {
+		video := detail.Messages[messageIndex].Video
+		if video == nil {
+			continue
+		}
+		file, ok := videos[video.FileID]
+		if !ok || file.URL == "" {
+			return nil, ErrMessageVideoNotAvailable
+		}
+		*video = file
 	}
 	return detail, nil
 }

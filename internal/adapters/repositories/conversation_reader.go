@@ -15,14 +15,19 @@ type ConversationReader struct {
 	db                     *sql.DB
 	messageImageRepository *MessageImageRepository
 	messageAudioRepository *MessageAudioRepository
+	messageVideoRepository *MessageVideoRepository
 }
 
 func (reader *ConversationReader) FindSummariesByUserAndType(ctx context.Context, foundUser user.User, conversationType string) ([]readmodel.ConversationSummary, error) {
 	return reader.FindSummariesByParticipantIDRoleAndType(ctx, foundUser.ID(), foundUser.Role(), conversationType)
 }
 
-func NewConversationReader(db *sql.DB, messageImageRepository *MessageImageRepository, messageAudioRepository *MessageAudioRepository) *ConversationReader {
-	return &ConversationReader{db: db, messageImageRepository: messageImageRepository, messageAudioRepository: messageAudioRepository}
+func NewConversationReader(db *sql.DB, messageImageRepository *MessageImageRepository, messageAudioRepository *MessageAudioRepository, videoRepositories ...*MessageVideoRepository) *ConversationReader {
+	messageVideoRepository := NewMessageVideoRepository(db)
+	if len(videoRepositories) > 0 && videoRepositories[0] != nil {
+		messageVideoRepository = videoRepositories[0]
+	}
+	return &ConversationReader{db: db, messageImageRepository: messageImageRepository, messageAudioRepository: messageAudioRepository, messageVideoRepository: messageVideoRepository}
 }
 
 func (reader *ConversationReader) FindSummariesByParticipantIDRoleAndType(ctx context.Context, participantID int, participantRole string, conversationType string) ([]readmodel.ConversationSummary, error) {
@@ -359,6 +364,11 @@ func (reader *ConversationReader) withMessageAttachments(ctx context.Context, de
 		return nil, err
 	}
 	attachAudiosToMessageDetails(detail.Messages, audiosByMessageID)
+	videosByMessageID, err := reader.messageVideoRepository.findByConversationID(ctx, detail.ID)
+	if err != nil {
+		return nil, err
+	}
+	attachVideosToMessageDetails(detail.Messages, videosByMessageID)
 	return detail, nil
 }
 

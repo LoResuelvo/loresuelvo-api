@@ -46,15 +46,6 @@ type messageAudioResponse struct {
 	DurationSeconds int    `json:"duration_seconds"`
 }
 
-type confirmedAudioResponse struct {
-	ID              string `json:"id"`
-	URL             string `json:"url"`
-	OriginalName    string `json:"original_name"`
-	MimeType        string `json:"mime_type"`
-	Codec           string `json:"codec"`
-	DurationSeconds int    `json:"duration_seconds"`
-}
-
 func registerSendAudioSteps(sc *godog.ScenarioContext, suite *testSuite) {
 	sc.Step(`^que existe una conversación pendiente entre el consumidor "([^"]*)" y el prestador "([^"]*)"$`, suite.thereIsPendingConversationBetweenConsumerAndProviderWithoutInitialMessage)
 	sc.Step(`^que el consumidor "([^"]*)" ya alcanzó el límite de mensajes permitido en esa conversación pendiente$`, suite.consumerHasReachedPendingConversationMessageLimit)
@@ -487,11 +478,11 @@ func (suite *testSuite) confirmMessageAudio(authID string, upload presignFileRes
 		return err
 	}
 
-	var response confirmedAudioResponse
+	var response confirmedFileResponse
 	if err := json.Unmarshal(body, &response); err != nil {
 		return fmt.Errorf("failed to parse audio confirmation response: %w", err)
 	}
-	if response.ID != fixture.FileID || response.OriginalName != fixture.OriginalName || response.MimeType != fixture.MimeType || response.Codec != fixture.Codec || response.DurationSeconds != fixture.DurationSeconds {
+	if response.ID != fixture.FileID || response.OriginalName != fixture.OriginalName || response.MimeType != fixture.MimeType || response.Type != "audio" || response.Audio == nil || response.Audio.Codec != fixture.Codec || response.Audio.DurationSeconds != fixture.DurationSeconds || response.Video != nil {
 		return fmt.Errorf("audio confirmation response does not match fixture %q: %s", fixture.OriginalName, string(body))
 	}
 	return nil

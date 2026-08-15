@@ -22,6 +22,10 @@ func handleFileError(c *gin.Context, err error) {
 		httphandler.RespondError(c, http.StatusBadRequest, err.Error())
 		return
 	}
+	if errors.Is(err, filedomain.ErrUnsupportedMessageVideo) || errors.Is(err, filedomain.ErrMessageVideoNotAvailable) {
+		httphandler.RespondError(c, http.StatusBadRequest, err.Error())
+		return
+	}
 	if errors.Is(err, filedomain.ErrFileNotAvailable) {
 		httphandler.RespondError(c, http.StatusBadRequest, err.Error())
 		return

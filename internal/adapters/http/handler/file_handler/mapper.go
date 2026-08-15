@@ -40,11 +40,40 @@ func fileResponseFromDomain(file *filedomain.ConfirmUploadResult) fileResponse {
 		ID:           file.FileID,
 		URL:          file.URL,
 		OriginalName: file.OriginalName,
+		MimeType:     file.MimeType,
+		Type:         fileResponseType(file),
 	}
-	if file.Codec != "" || file.DurationSeconds > 0 {
-		response.MimeType = file.MimeType
-		response.Codec = file.Codec
-		response.DurationSeconds = file.DurationSeconds
+
+	switch response.Type {
+	case fileTypeAudio:
+		response.Audio = &fileAudioResponse{
+			Codec:           file.Codec,
+			DurationSeconds: file.DurationSeconds,
+		}
+	case fileTypeVideo:
+		response.Video = &fileVideoResponse{
+			VideoCodec:      file.VideoCodec,
+			AudioCodec:      file.AudioCodec,
+			DurationSeconds: file.DurationSeconds,
+			Width:           file.Width,
+			Height:          file.Height,
+		}
 	}
 	return response
+}
+
+const (
+	fileTypeImage = "image"
+	fileTypeAudio = "audio"
+	fileTypeVideo = "video"
+)
+
+func fileResponseType(file *filedomain.ConfirmUploadResult) string {
+	if file.VideoCodec != "" {
+		return fileTypeVideo
+	}
+	if file.Codec != "" {
+		return fileTypeAudio
+	}
+	return fileTypeImage
 }

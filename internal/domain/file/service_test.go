@@ -79,6 +79,18 @@ func (parser *audioMetadataParserMock) Parse(_ []byte) (filedomain.AudioMetadata
 	return parser.metadata, nil
 }
 
+type videoMetadataParserMock struct {
+	metadata filedomain.VideoMetadata
+	err      error
+}
+
+func (parser *videoMetadataParserMock) Parse(_ []byte) (filedomain.VideoMetadata, error) {
+	if parser.err != nil {
+		return filedomain.VideoMetadata{}, parser.err
+	}
+	return parser.metadata, nil
+}
+
 func (storage *storageMock) GenerateDownloadURL(_ context.Context, object filedomain.ObjectToDownload) (string, error) {
 	return "https://download/" + object.Bucket + "/" + object.Key, nil
 }
@@ -147,7 +159,13 @@ func newFileService(repo *fileRepositoryMock, storage *storageMock) *filedomain.
 }
 
 func newFileServiceWithParser(repo *fileRepositoryMock, storage *storageMock, parser filedomain.AudioMetadataParser) *filedomain.Service {
-	return filedomain.NewService(repo, storage, "public", "private", fixedClock{}, parser)
+	return filedomain.NewService(repo, storage, "public", "private", fixedClock{}, parser, nil)
+}
+
+func newFileServiceWithVideoParser(repo *fileRepositoryMock, storage *storageMock, parser filedomain.VideoMetadataParser) *filedomain.Service {
+	return filedomain.NewService(repo, storage, "public", "private", fixedClock{}, &audioMetadataParserMock{
+		metadata: filedomain.AudioMetadata{DurationSeconds: 18, Codec: "opus"},
+	}, parser)
 }
 
 func TestRequestUploadCreatesPendingProfilePhoto(t *testing.T) {
@@ -512,6 +530,117 @@ func TestConfirmUploadRejectsAudioOverDurationLimit(t *testing.T) {
 
 	assert.ErrorIs(t, err, filedomain.ErrUnsupportedMessageAudio)
 	assert.False(t, repo.files[upload.FileID].IsConfirmed())
+}
+
+func TestConfirmUploadConfirmsVideoFromValidatedMetadata(t *testing.T) {
+	repo := newFileRepositoryMock()
+	storage := newStorageMock()
+	service := newFileServiceWithVideoParser(repo, storage, &videoMetadataParserMock{
+		metadata: filedomain.VideoMetadata{
+			DurationSeconds: 24,
+			VideoCodec:      "h264",
+			AudioCodec:      "aac",
+			Width:           1080,
+			Height:          1920,
+		},
+	})
+	videoData := []byte("valid video")
+	upload, err := service.RequestUpload(context.Background(), filedomain.PresignRequest{
+		AuthID:       "auth0|provider",
+		OriginalName: "reparacion-propuesta.mp4",
+		MimeType:     "video/mp4",
+		SizeBytes:    len(videoData),
+		Purpose:      filedomain.PurposeConversationMessageVideo,
+	})
+	require.NoError(t, err)
+	storage.dataByObject["private/"+upload.Key] = videoData
+
+	confirmed, err := service.ConfirmUpload(context.Background(), filedomain.ConfirmRequest{
+		AuthID:    "auth0|provider",
+		FileID:    upload.FileID,
+		Key:       upload.Key,
+		MimeType:  "video/mp4",
+		SizeBytes: len(videoData),
+	})
+
+	require.NoError(t, err)
+	assert.Equal(t, upload.FileID, confirmed.FileID)
+	assert.Equal(t, "video/mp4", confirmed.MimeType)
+	assert.Equal(t, "h264", confirmed.VideoCodec)
+	assert.Equal(t, "aac", confirmed.AudioCodec)
+	assert.Equal(t, 24, confirmed.DurationSeconds)
+	assert.Equal(t, 1080, confirmed.Width)
+	assert.Equal(t, 1920, confirmed.Height)
+	assert.True(t, repo.files[upload.FileID].IsConfirmed())
+}
+
+func TestConfirmUploadRejectsVideoOverDurationLimit(t *testing.T) {
+	repo := newFileRepositoryMock()
+	storage := newStorageMock()
+	service := newFileServiceWithVideoParser(repo, storage, &videoMetadataParserMock{
+		metadata: filedomain.VideoMetadata{
+			DurationSeconds: filedomain.MaxConversationMessageVideoDurationSeconds + 1,
+			VideoCodec:      "h264",
+			Width:           1080,
+			Height:          1920,
+		},
+	})
+	videoData := []byte("video over duration")
+	upload, err := service.RequestUpload(context.Background(), filedomain.PresignRequest{
+		AuthID:       "auth0|consumer",
+		OriginalName: "video-extenso.mp4",
+		MimeType:     "video/mp4",
+		SizeBytes:    len(videoData),
+		Purpose:      filedomain.PurposeConversationMessageVideo,
+	})
+	require.NoError(t, err)
+	storage.dataByObject["private/"+upload.Key] = videoData
+
+	_, err = service.ConfirmUpload(context.Background(), filedomain.ConfirmRequest{
+		AuthID:    "auth0|consumer",
+		FileID:    upload.FileID,
+		Key:       upload.Key,
+		MimeType:  "video/mp4",
+		SizeBytes: len(videoData),
+	})
+
+	assert.ErrorIs(t, err, filedomain.ErrUnsupportedMessageVideo)
+	assert.False(t, repo.files[upload.FileID].IsConfirmed())
+}
+
+func TestPrepareMessageVideoRequiresOwnerAndReturnsPrivateURL(t *testing.T) {
+	repo := newFileRepositoryMock()
+	storage := newStorageMock()
+	service := newFileServiceWithVideoParser(repo, storage, &videoMetadataParserMock{
+		metadata: filedomain.VideoMetadata{DurationSeconds: 18, VideoCodec: "h264", Width: 1080, Height: 1920},
+	})
+	videoData := []byte("video")
+	upload, err := service.RequestUpload(context.Background(), filedomain.PresignRequest{
+		AuthID:       "auth0|consumer",
+		OriginalName: "perdida-canilla.mp4",
+		MimeType:     "video/mp4",
+		SizeBytes:    len(videoData),
+		Purpose:      filedomain.PurposeConversationMessageVideo,
+	})
+	require.NoError(t, err)
+	storage.dataByObject["private/"+upload.Key] = videoData
+	_, err = service.ConfirmUpload(context.Background(), filedomain.ConfirmRequest{
+		AuthID:    "auth0|consumer",
+		FileID:    upload.FileID,
+		Key:       upload.Key,
+		MimeType:  "video/mp4",
+		SizeBytes: len(videoData),
+	})
+	require.NoError(t, err)
+
+	prepared, err := service.PrepareMessageVideo(context.Background(), "auth0|consumer", upload.FileID)
+	require.NoError(t, err)
+	require.NotNil(t, prepared)
+	assert.Equal(t, upload.FileID, prepared.FileID)
+	assert.Equal(t, "https://download/private/"+upload.Key, prepared.URL)
+
+	_, err = service.PrepareMessageVideo(context.Background(), "auth0|other", upload.FileID)
+	assert.ErrorIs(t, err, filedomain.ErrMessageVideoNotAvailable)
 }
 
 func TestConfirmUploadRejectsUnavailableFile(t *testing.T) {

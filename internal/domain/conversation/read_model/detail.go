@@ -44,5 +44,6 @@ type MessageDetail struct {
 	Content    string
 	Images     []filedomain.MessageImage
 	Audio      *filedomain.MessageAudio
+	Video      *filedomain.MessageVideo
 	CreatedOn  time.Time
 }

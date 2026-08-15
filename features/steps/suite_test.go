@@ -69,8 +69,11 @@ type testSuite struct {
 	lastAttemptedChatbotContinuationMessage string
 	messageImagesByName                     map[string]messageImageFixture
 	messageAudiosByName                     map[string]messageAudioFixture
+	messageVideosByName                     map[string]messageVideoFixture
 	lastSentMessageID                       int
 	lastAttemptedMessageAudioName           string
+	lastAttemptedMessageVideoName           string
+	lastAttemptedMessageVideoContent        string
 	lastAttemptedMessageImageNames          []string
 	aiJobRequestsByProvider                 map[string]jobRequestCreationResponse
 	aiSourceChatbotConversationID           int
@@ -136,6 +139,7 @@ func (s *testSuite) registerAllSteps(sc *godog.ScenarioContext) {
 	registerRealtimeMessageSteps(sc, s)
 	registerAttachMessageImagesSteps(sc, s)
 	registerSendAudioSteps(sc, s)
+	registerSendVideoSteps(sc, s)
 	registerChatbotSteps(sc, s)
 	registerChatbotContinuationSteps(sc, s)
 	registerChatbotAttachImagesSteps(sc, s)
@@ -206,8 +210,11 @@ func (s *testSuite) cleanup() error {
 	s.lastAttemptedChatbotContinuationMessage = ""
 	s.messageImagesByName = map[string]messageImageFixture{}
 	s.messageAudiosByName = map[string]messageAudioFixture{}
+	s.messageVideosByName = map[string]messageVideoFixture{}
 	s.lastSentMessageID = 0
 	s.lastAttemptedMessageAudioName = ""
+	s.lastAttemptedMessageVideoName = ""
+	s.lastAttemptedMessageVideoContent = ""
 	s.lastAttemptedMessageImageNames = nil
 	s.aiJobRequestsByProvider = map[string]jobRequestCreationResponse{}
 	s.aiSourceChatbotConversationID = 0
@@ -311,6 +318,7 @@ func newTestSuite(tb testing.TB, database *sql.DB) *testSuite {
 		realtimeConnections:                map[string]*realtimeTestConnection{},
 		messageImagesByName:                map[string]messageImageFixture{},
 		messageAudiosByName:                map[string]messageAudioFixture{},
+		messageVideosByName:                map[string]messageVideoFixture{},
 		aiJobRequestsByProvider:            map[string]jobRequestCreationResponse{},
 		aiWorkConversationIDsBeforeContact: map[int]int{},
 		expectedChatbotImageDescriptions:   map[string]string{},

@@ -15,6 +15,7 @@ func sentMessageResponseFromDomain(message conversation.Message) sentMessageResp
 		Content:        message.Content,
 		Images:         messageImageResponsesFromDomain(message.Images),
 		Audio:          messageAudioResponseFromDomain(message.Audio),
+		Video:          messageVideoResponseFromDomain(message.Video),
 		CreatedOn:      message.CreatedOn,
 	}
 }
@@ -30,6 +31,7 @@ func chatbotConversationResponseFromDomain(result conversation.ChatbotConversati
 			Content:    message.Content,
 			Images:     messageImageResponsesFromDomain(message.Images),
 			Audio:      messageAudioResponseFromDomain(message.Audio),
+			Video:      messageVideoResponseFromDomain(message.Video),
 			CreatedOn:  message.CreatedOn,
 		}
 		messages = append(messages, messageResponse)
@@ -73,6 +75,7 @@ func conversationDetailResponseFromDomain(foundConversation readmodel.Conversati
 			Content:    message.Content,
 			Images:     messageImageResponsesFromDomain(message.Images),
 			Audio:      messageAudioResponseFromDomain(message.Audio),
+			Video:      messageVideoResponseFromDomain(message.Video),
 			CreatedOn:  message.CreatedOn,
 		})
 	}
@@ -108,6 +111,24 @@ func messageAudioResponseFromDomain(audio *filedomain.MessageAudio) *messageAudi
 		MimeType:        audio.MimeType,
 		Codec:           audio.Codec,
 		DurationSeconds: audio.DurationSeconds,
+	}
+}
+
+func messageVideoResponseFromDomain(video *filedomain.MessageVideo) *messageVideoResponse {
+	if video == nil {
+		return nil
+	}
+
+	return &messageVideoResponse{
+		ID:              video.FileID,
+		URL:             video.URL,
+		OriginalName:    video.OriginalName,
+		MimeType:        video.MimeType,
+		VideoCodec:      video.VideoCodec,
+		AudioCodec:      video.AudioCodec,
+		DurationSeconds: video.DurationSeconds,
+		Width:           video.Width,
+		Height:          video.Height,
 	}
 }
 

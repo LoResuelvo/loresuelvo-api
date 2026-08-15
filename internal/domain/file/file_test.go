@@ -31,6 +31,35 @@ func TestNewFileMetadataStoresValues(t *testing.T) {
 	assert.Equal(t, 1024, metadata.SizeBytes())
 }
 
+func TestMediaFileMetadataEmbedsCommonMetadata(t *testing.T) {
+	audioMetadata, err := filedomain.NewAudioFileMetadata("audio.webm", "audio/webm", 2048, 18, " OPUS ")
+	require.NoError(t, err)
+	assert.Equal(t, "audio.webm", audioMetadata.OriginalName())
+	assert.Equal(t, "audio/webm", audioMetadata.MimeType())
+	assert.Equal(t, 2048, audioMetadata.SizeBytes())
+	assert.Equal(t, 18, audioMetadata.DurationSeconds())
+	assert.Equal(t, "opus", audioMetadata.Codec())
+	assert.Empty(t, audioMetadata.VideoCodec())
+
+	videoMetadata, err := filedomain.NewVideoFileMetadata("video.mp4", "video/mp4", 4096, filedomain.VideoMetadata{
+		DurationSeconds: 24,
+		VideoCodec:      " H264 ",
+		AudioCodec:      " AAC ",
+		Width:           1080,
+		Height:          1920,
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "video.mp4", videoMetadata.OriginalName())
+	assert.Equal(t, "video/mp4", videoMetadata.MimeType())
+	assert.Equal(t, 4096, videoMetadata.SizeBytes())
+	assert.Equal(t, 24, videoMetadata.DurationSeconds())
+	assert.Equal(t, "h264", videoMetadata.VideoCodec())
+	assert.Equal(t, "aac", videoMetadata.AudioCodec())
+	assert.Equal(t, 1080, videoMetadata.Width())
+	assert.Equal(t, 1920, videoMetadata.Height())
+	assert.Empty(t, videoMetadata.Codec())
+}
+
 func TestNewFileMetadataValidatesRequiredFields(t *testing.T) {
 	tests := []struct {
 		name         string
@@ -159,6 +188,45 @@ func TestConfirmMarksFileConfirmed(t *testing.T) {
 
 	assert.Equal(t, filedomain.StatusConfirmed, file.Status)
 	assert.Equal(t, confirmedOn, file.UpdatedOn)
+}
+
+func TestConfirmAudioReplacesCommonMetadataWithAudioVariant(t *testing.T) {
+	now := validFileTime()
+	file, err := filedomain.NewPendingFile("file-id", "key", "bucket", validFileMetadata(t), filedomain.VisibilityPrivate, filedomain.PurposeConversationMessageAudio, "auth0|consumer", now)
+	require.NoError(t, err)
+
+	err = file.ConfirmAudio(now.Add(time.Hour), 18, " OPUS ")
+	require.NoError(t, err)
+
+	metadata, ok := file.Metadata().(*filedomain.AudioFileMetadata)
+	require.True(t, ok)
+	assert.Equal(t, "opus", metadata.Codec())
+	assert.Equal(t, 18, metadata.DurationSeconds())
+	assert.Empty(t, metadata.VideoCodec())
+}
+
+func TestConfirmVideoReplacesCommonMetadataWithVideoVariant(t *testing.T) {
+	now := validFileTime()
+	file, err := filedomain.NewPendingFile("file-id", "key", "bucket", validFileMetadata(t), filedomain.VisibilityPrivate, filedomain.PurposeConversationMessageVideo, "auth0|consumer", now)
+	require.NoError(t, err)
+
+	err = file.ConfirmVideo(now.Add(time.Hour), filedomain.VideoMetadata{
+		DurationSeconds: 24,
+		VideoCodec:      "h264",
+		AudioCodec:      "aac",
+		Width:           1080,
+		Height:          1920,
+	})
+	require.NoError(t, err)
+
+	metadata, ok := file.Metadata().(*filedomain.VideoFileMetadata)
+	require.True(t, ok)
+	assert.Equal(t, "h264", metadata.VideoCodec())
+	assert.Equal(t, "aac", metadata.AudioCodec())
+	assert.Equal(t, 24, metadata.DurationSeconds())
+	assert.Equal(t, 1080, metadata.Width())
+	assert.Equal(t, 1920, metadata.Height())
+	assert.Empty(t, metadata.Codec())
 }
 
 func TestUploadPolicyAllowsSupportedMetadataWithinSize(t *testing.T) {

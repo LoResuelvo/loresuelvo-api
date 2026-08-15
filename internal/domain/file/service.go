@@ -16,6 +16,7 @@ type Service struct {
 	privateBucket       string
 	clock               domainclock.Clock
 	audioMetadataParser AudioMetadataParser
+	videoMetadataParser VideoMetadataParser
 	idGenerator         func() string
 	policies            map[string]UploadPolicy
 }
@@ -38,7 +39,11 @@ var jobRequestImageValidation = imageValidation{
 	errorContext: "job request",
 }
 
-func NewService(repository Repository, storage Storage, publicBucket, privateBucket string, clock domainclock.Clock, audioMetadataParser AudioMetadataParser) *Service {
+func NewService(repository Repository, storage Storage, publicBucket, privateBucket string, clock domainclock.Clock, audioMetadataParser AudioMetadataParser, videoMetadataParsers ...VideoMetadataParser) *Service {
+	var videoMetadataParser VideoMetadataParser
+	if len(videoMetadataParsers) > 0 {
+		videoMetadataParser = videoMetadataParsers[0]
+	}
 	return &Service{
 		repository:          repository,
 		storage:             storage,
@@ -46,6 +51,7 @@ func NewService(repository Repository, storage Storage, publicBucket, privateBuc
 		privateBucket:       privateBucket,
 		clock:               clock,
 		audioMetadataParser: audioMetadataParser,
+		videoMetadataParser: videoMetadataParser,
 		idGenerator:         uuid.NewString,
 		policies:            defaultUploadPolicies(),
 	}
@@ -117,6 +123,10 @@ func (s *Service) ConfirmUpload(ctx context.Context, request ConfirmRequest) (*C
 		if err := s.confirmAudioFile(ctx, file); err != nil {
 			return nil, err
 		}
+	} else if file.IsVideo() {
+		if err := s.confirmVideoFile(ctx, file); err != nil {
+			return nil, err
+		}
 	} else {
 		file.Confirm(s.clock.Now())
 	}
@@ -130,7 +140,11 @@ func (s *Service) ConfirmUpload(ctx context.Context, request ConfirmRequest) (*C
 		OriginalName:    file.OriginalName(),
 		MimeType:        file.MimeType(),
 		Codec:           file.Codec(),
+		VideoCodec:      file.VideoCodec(),
+		AudioCodec:      file.AudioCodec(),
 		DurationSeconds: file.DurationSeconds(),
+		Width:           file.Width(),
+		Height:          file.Height(),
 	}, nil
 }
 
@@ -171,6 +185,42 @@ func (s *Service) confirmAudioFile(ctx context.Context, file *File) error {
 		return ErrUnsupportedMessageAudio
 	}
 
+	return nil
+}
+
+func (s *Service) confirmVideoFile(ctx context.Context, file *File) error {
+	if file.Visibility != conversationMessageVideoPolicy.Visibility || !conversationMessageVideoPolicy.Allows(file.Metadata()) {
+		return ErrUnsupportedMessageVideo
+	}
+
+	data, err := s.storage.ReadObject(ctx, ObjectToDownload{
+		Bucket:       file.Bucket,
+		Key:          file.Key,
+		MaxSizeBytes: conversationMessageVideoPolicy.MaxSizeBytes,
+	})
+	if err != nil || len(data) == 0 || len(data) != file.SizeBytes() {
+		return ErrUnsupportedMessageVideo
+	}
+	if s.videoMetadataParser == nil {
+		return ErrUnsupportedMessageVideo
+	}
+	videoMetadata, err := s.videoMetadataParser.Parse(data)
+	if err != nil {
+		return ErrUnsupportedMessageVideo
+	}
+	metadata, err := NewVideoFileMetadata(
+		file.OriginalName(),
+		file.MimeType(),
+		file.SizeBytes(),
+		videoMetadata,
+	)
+	if err != nil || !conversationMessageVideoPolicy.AllowsConfirmedVideo(*metadata) {
+		return ErrUnsupportedMessageVideo
+	}
+
+	if err := file.ConfirmVideo(s.clock.Now(), videoMetadata); err != nil {
+		return ErrUnsupportedMessageVideo
+	}
 	return nil
 }
 
@@ -275,6 +325,27 @@ func (s *Service) PrepareMessageAudio(ctx context.Context, authID, fileID string
 		return nil, fmt.Errorf("resolving message audio: %w", err)
 	}
 	return &audio, nil
+}
+
+func (s *Service) PrepareMessageVideo(ctx context.Context, authID, fileID string) (*MessageVideo, error) {
+	fileID = normalizeFileID(fileID)
+	if fileID == "" {
+		return nil, ErrMessageVideoNotAvailable
+	}
+
+	files, err := s.repository.FindByIDs(ctx, []string{fileID})
+	if err != nil {
+		return nil, fmt.Errorf("finding message video: %w", err)
+	}
+	if len(files) != 1 || !isValidVideoFor(files[0], authID) {
+		return nil, ErrMessageVideoNotAvailable
+	}
+
+	video, err := s.resolveMessageVideo(ctx, files[0])
+	if err != nil {
+		return nil, fmt.Errorf("resolving message video: %w", err)
+	}
+	return &video, nil
 }
 
 func (s *Service) PrepareChatbotMessageImages(ctx context.Context, authID string, fileIDs []string) ([]MessageImageContent, error) {
@@ -402,6 +473,30 @@ func (s *Service) ResolveMessageAudios(ctx context.Context, fileIDs []string) (m
 	return result, nil
 }
 
+func (s *Service) ResolveMessageVideos(ctx context.Context, fileIDs []string) (map[string]MessageVideo, error) {
+	uniqueFileIDs := uniqueNonEmptyFileIDs(fileIDs)
+	if len(uniqueFileIDs) == 0 {
+		return map[string]MessageVideo{}, nil
+	}
+	files, err := s.repository.FindByIDs(ctx, uniqueFileIDs)
+	if err != nil {
+		return nil, fmt.Errorf("finding message videos: %w", err)
+	}
+
+	result := make(map[string]MessageVideo, len(files))
+	for _, file := range files {
+		if !isAvailableVideo(file) {
+			continue
+		}
+		video, err := s.resolveMessageVideo(ctx, file)
+		if err != nil {
+			return nil, err
+		}
+		result[file.ID] = video
+	}
+	return result, nil
+}
+
 func (s *Service) resolveMessageImage(ctx context.Context, file File) (MessageImage, error) {
 	resolved, err := s.resolveImage(ctx, file)
 	if err != nil {
@@ -422,6 +517,24 @@ func (s *Service) resolveMessageAudio(ctx context.Context, file File) (MessageAu
 		MimeType:        file.MimeType(),
 		Codec:           file.Codec(),
 		DurationSeconds: file.DurationSeconds(),
+	}, nil
+}
+
+func (s *Service) resolveMessageVideo(ctx context.Context, file File) (MessageVideo, error) {
+	url, err := s.storage.GenerateDownloadURL(ctx, ObjectToDownload{Bucket: file.Bucket, Key: file.Key})
+	if err != nil {
+		return MessageVideo{}, fmt.Errorf("generating video download url: %w", err)
+	}
+	return MessageVideo{
+		FileID:          file.ID,
+		OriginalName:    file.OriginalName(),
+		URL:             url,
+		MimeType:        file.MimeType(),
+		VideoCodec:      file.VideoCodec(),
+		AudioCodec:      file.AudioCodec(),
+		DurationSeconds: file.DurationSeconds(),
+		Width:           file.Width(),
+		Height:          file.Height(),
 	}, nil
 }
 
@@ -546,9 +659,20 @@ func isValidAudioFor(file File, authID string) bool {
 	return isAvailableAudio(file) && file.WasUploadedBy(authID)
 }
 
+func isValidVideoFor(file File, authID string) bool {
+	return isAvailableVideo(file) && file.WasUploadedBy(authID)
+}
+
 func isAvailableAudio(file File) bool {
 	return file.IsConfirmed() &&
 		file.Visibility == conversationMessageAudioPolicy.Visibility &&
 		file.HasPurpose(conversationMessageAudioPolicy.Purpose) &&
 		conversationMessageAudioPolicy.AllowsConfirmedAudio(file.Metadata())
+}
+
+func isAvailableVideo(file File) bool {
+	return file.IsConfirmed() &&
+		file.Visibility == conversationMessageVideoPolicy.Visibility &&
+		file.HasPurpose(conversationMessageVideoPolicy.Purpose) &&
+		conversationMessageVideoPolicy.AllowsConfirmedVideo(file.Metadata())
 }

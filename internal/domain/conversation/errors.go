@@ -10,7 +10,11 @@ var ErrMessageImageNotAvailable = errors.New("Message image is not available")
 
 var ErrMessageAudioNotAvailable = errors.New("Message audio is not available")
 
+var ErrMessageVideoNotAvailable = errors.New("Message video is not available")
+
 var ErrMessageAudioMustBeExclusive = errors.New("Message audio must be sent without text or images")
+
+var ErrMessageVideoCannotIncludeImages = errors.New("Message video cannot be sent with images")
 
 var ErrConsumerRequired = errors.New("Consumer id is required")
 

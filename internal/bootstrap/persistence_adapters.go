@@ -13,6 +13,7 @@ type PersistenceAdapters struct {
 	MessageRepository              *repositories.MessageRepository
 	MessageImageRepository         *repositories.MessageImageRepository
 	MessageAudioRepository         *repositories.MessageAudioRepository
+	MessageVideoRepository         *repositories.MessageVideoRepository
 	JobRequestRepository           *repositories.JobRequestRepository
 	ServiceProposalRepository      *repositories.ServiceProposalRepository
 	ConversationReader             *repositories.ConversationReader
@@ -31,10 +32,11 @@ func NewPersistenceAdapters(database *sql.DB) *PersistenceAdapters {
 	categoryRepository := repositories.NewCategoryRepository(database)
 	messageImageRepository := repositories.NewMessageImageRepository(database)
 	messageAudioRepository := repositories.NewMessageAudioRepository(database)
-	messageRepository := repositories.NewMessageRepository(database, messageImageRepository, messageAudioRepository)
+	messageVideoRepository := repositories.NewMessageVideoRepository(database)
+	messageRepository := repositories.NewMessageRepository(database, messageImageRepository, messageAudioRepository, messageVideoRepository)
 	conversationRepository := repositories.NewConversationRepository(database, messageRepository)
 	jobRequestRepository := repositories.NewJobRequestRepository(database)
-	conversationReader := repositories.NewConversationReader(database, messageImageRepository, messageAudioRepository)
+	conversationReader := repositories.NewConversationReader(database, messageImageRepository, messageAudioRepository, messageVideoRepository)
 	fileRepository := repositories.NewFileRepository(database)
 	serviceProposalRepository := repositories.NewServiceProposalRepository(database)
 	paymentIntentRepository := repositories.NewPaymentIntentRepository(database)
@@ -61,6 +63,7 @@ func NewPersistenceAdapters(database *sql.DB) *PersistenceAdapters {
 		MessageRepository:              messageRepository,
 		MessageImageRepository:         messageImageRepository,
 		MessageAudioRepository:         messageAudioRepository,
+		MessageVideoRepository:         messageVideoRepository,
 		JobRequestRepository:           jobRequestRepository,
 		ServiceProposalRepository:      serviceProposalRepository,
 		ConversationReader:             conversationReader,

@@ -8,10 +8,24 @@ type presignFileResponse struct {
 }
 
 type fileResponse struct {
-	ID              string `json:"id"`
-	URL             string `json:"url,omitempty"`
-	OriginalName    string `json:"original_name"`
-	MimeType        string `json:"mime_type,omitempty"`
-	Codec           string `json:"codec,omitempty"`
-	DurationSeconds int    `json:"duration_seconds,omitempty"`
+	ID           string             `json:"id"`
+	URL          string             `json:"url,omitempty"`
+	OriginalName string             `json:"original_name"`
+	MimeType     string             `json:"mime_type"`
+	Type         string             `json:"type"`
+	Audio        *fileAudioResponse `json:"audio,omitempty"`
+	Video        *fileVideoResponse `json:"video,omitempty"`
+}
+
+type fileAudioResponse struct {
+	Codec           string `json:"codec"`
+	DurationSeconds int    `json:"duration_seconds"`
+}
+
+type fileVideoResponse struct {
+	VideoCodec      string `json:"video_codec"`
+	AudioCodec      string `json:"audio_codec,omitempty"`
+	DurationSeconds int    `json:"duration_seconds"`
+	Width           int    `json:"width"`
+	Height          int    `json:"height"`
 }

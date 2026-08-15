@@ -16,6 +16,7 @@ type sendMessageRequest struct {
 	Content      string   `json:"content,omitempty"`
 	ImageFileIDs []string `json:"image_file_ids,omitempty"`
 	AudioFileID  string   `json:"audio_file_id,omitempty"`
+	VideoFileID  string   `json:"video_file_id,omitempty"`
 }
 
 type sentMessageResponse struct {
@@ -25,6 +26,7 @@ type sentMessageResponse struct {
 	Content        string                 `json:"content"`
 	Images         []messageImageResponse `json:"images"`
 	Audio          *messageAudioResponse  `json:"audio,omitempty"`
+	Video          *messageVideoResponse  `json:"video,omitempty"`
 	CreatedOn      time.Time              `json:"created_on"`
 }
 

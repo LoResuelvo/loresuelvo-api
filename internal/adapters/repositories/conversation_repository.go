@@ -523,6 +523,11 @@ func (repository *ConversationRepository) findMessagesByConversationID(ctx conte
 		return nil, err
 	}
 	attachAudiosToMessages(messages, audiosByMessageID)
+	videosByMessageID, err := repository.messageRepository.findVideosByConversationID(ctx, conversationID)
+	if err != nil {
+		return nil, err
+	}
+	attachVideosToMessages(messages, videosByMessageID)
 
 	return messages, nil
 }

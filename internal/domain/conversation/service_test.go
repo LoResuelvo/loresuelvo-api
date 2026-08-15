@@ -344,6 +344,44 @@ func (m *fileURLResolverMock) ResolveMessageAudios(_ context.Context, fileIDs []
 	return audios, nil
 }
 
+func (m *fileURLResolverMock) PrepareMessageVideo(_ context.Context, _ string, fileID string) (*filedomain.MessageVideo, error) {
+	if m.err != nil {
+		return nil, m.err
+	}
+	return &filedomain.MessageVideo{
+		FileID:          fileID,
+		OriginalName:    fileID + ".mp4",
+		URL:             "https://files/" + fileID,
+		MimeType:        "video/mp4",
+		VideoCodec:      "h264",
+		AudioCodec:      "aac",
+		DurationSeconds: 18,
+		Width:           1080,
+		Height:          1920,
+	}, nil
+}
+
+func (m *fileURLResolverMock) ResolveMessageVideos(_ context.Context, fileIDs []string) (map[string]filedomain.MessageVideo, error) {
+	if m.err != nil {
+		return nil, m.err
+	}
+	videos := make(map[string]filedomain.MessageVideo, len(fileIDs))
+	for _, fileID := range fileIDs {
+		videos[fileID] = filedomain.MessageVideo{
+			FileID:          fileID,
+			OriginalName:    fileID + ".mp4",
+			URL:             "https://files/" + fileID,
+			MimeType:        "video/mp4",
+			VideoCodec:      "h264",
+			AudioCodec:      "aac",
+			DurationSeconds: 18,
+			Width:           1080,
+			Height:          1920,
+		}
+	}
+	return videos, nil
+}
+
 func (m *fileURLResolverMock) ResolvePublicURL(ctx context.Context, fileID string) (string, error) {
 	m.resolvedFileIDs = []string{fileID}
 	urlsByFileID, err := m.ResolvePublicURLs(ctx, []string{fileID})
@@ -992,6 +1030,51 @@ func TestSendMessageRejectsAudioCombinedWithTextOrImages(t *testing.T) {
 			assert.False(t, repo.updateCalled)
 		})
 	}
+}
+
+func TestSendMessageAddsConsumerVideoOnly(t *testing.T) {
+	repo := &conversationRepositoryMock{foundResult: activeConversationFixture()}
+	publisher := &messagePublisherMock{}
+	service := conversation.NewService(repo, newUserRepositoryMock(&consumerIDFinderMock{consumerID: 10}, &providerIDFinderMock{}), &conversationReaderMock{}, publisher, &chatbotMock{}, nil, &fileURLResolverMock{}, fixedClock{now: time.Now().UTC()})
+
+	sentMessage, err := service.SendMessage(context.Background(), "auth0|consumer", 1, "", nil, "", "video-file-id")
+
+	require.NoError(t, err)
+	require.NotNil(t, sentMessage)
+	require.NotNil(t, sentMessage.Video)
+	assert.Equal(t, conversation.SenderConsumer, sentMessage.SenderRole)
+	assert.Empty(t, sentMessage.Content)
+	assert.Empty(t, sentMessage.Images)
+	assert.Equal(t, "video-file-id", sentMessage.Video.FileID)
+	assert.Equal(t, sentMessage.Video, publisher.publishedMessage.Video)
+}
+
+func TestSendMessageAddsProviderVideoWithText(t *testing.T) {
+	repo := &conversationRepositoryMock{foundResult: activeConversationFixture()}
+	publisher := &messagePublisherMock{}
+	service := conversation.NewService(repo, newUserRepositoryMock(&consumerIDFinderMock{err: errors.New("consumer not found")}, &providerIDFinderMock{providerID: 20}), &conversationReaderMock{}, publisher, &chatbotMock{}, nil, &fileURLResolverMock{}, fixedClock{now: time.Now().UTC()})
+
+	sentMessage, err := service.SendMessage(context.Background(), "auth0|provider", 1, "  Te muestro la reparación.  ", nil, "", "video-file-id")
+
+	require.NoError(t, err)
+	require.NotNil(t, sentMessage)
+	require.NotNil(t, sentMessage.Video)
+	assert.Equal(t, conversation.SenderProvider, sentMessage.SenderRole)
+	assert.Equal(t, "Te muestro la reparación.", sentMessage.Content)
+	assert.Equal(t, "video-file-id", sentMessage.Video.FileID)
+	assert.Equal(t, sentMessage.Video, publisher.publishedMessage.Video)
+}
+
+func TestSendMessageRejectsVideoCombinedWithImages(t *testing.T) {
+	repo := &conversationRepositoryMock{foundResult: activeConversationFixture()}
+	service := conversation.NewService(repo, newUserRepositoryMock(&consumerIDFinderMock{consumerID: 10}, &providerIDFinderMock{}), &conversationReaderMock{}, &messagePublisherMock{}, &chatbotMock{}, nil, &fileURLResolverMock{}, fixedClock{now: time.Now().UTC()})
+
+	sentMessage, err := service.SendMessage(context.Background(), "auth0|consumer", 1, "Detalle", []string{"image-file-id"}, "", "video-file-id")
+
+	assert.ErrorIs(t, err, conversation.ErrMessageVideoCannotIncludeImages)
+	assert.Nil(t, sentMessage)
+	assert.False(t, repo.findByIDCalled)
+	assert.False(t, repo.updateCalled)
 }
 
 func TestSendMessageRejectsUnavailableImageBeforePersistence(t *testing.T) {

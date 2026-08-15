@@ -12,6 +12,7 @@ const (
 	PurposeProfilePhoto             = "profile_photo"
 	PurposeConversationMessageImage = "conversation_message_image"
 	PurposeConversationMessageAudio = "conversation_message_audio"
+	PurposeConversationMessageVideo = "conversation_message_video"
 	PurposeJobRequestImage          = "job_request_image"
 )
 
@@ -19,7 +20,7 @@ type File struct {
 	ID               string
 	Key              string
 	Bucket           string
-	metadata         FileMetadata
+	metadata         Metadata
 	Status           string
 	Visibility       string
 	Purpose          string
@@ -28,7 +29,7 @@ type File struct {
 	UpdatedOn        time.Time
 }
 
-func NewPendingFile(id, key, bucket string, metadata FileMetadata, visibility, purpose, uploadedByAuthID string, createdOn time.Time) (*File, error) {
+func NewPendingFile(id, key, bucket string, metadata Metadata, visibility, purpose, uploadedByAuthID string, createdOn time.Time) (*File, error) {
 	file, err := NewFile(id, key, bucket, metadata, StatusPending, visibility, purpose, uploadedByAuthID, createdOn, createdOn)
 	if err != nil {
 		return nil, err
@@ -37,7 +38,10 @@ func NewPendingFile(id, key, bucket string, metadata FileMetadata, visibility, p
 	return file, nil
 }
 
-func NewFile(id, key, bucket string, metadata FileMetadata, status, visibility, purpose, uploadedByAuthID string, createdOn, updatedOn time.Time) (*File, error) {
+func NewFile(id, key, bucket string, metadata Metadata, status, visibility, purpose, uploadedByAuthID string, createdOn, updatedOn time.Time) (*File, error) {
+	if metadata == nil {
+		return nil, ErrFileMetadataRequired
+	}
 	if err := validateFileFields(id, status, key, bucket, visibility, purpose, uploadedByAuthID, createdOn, updatedOn); err != nil {
 		return nil, err
 	}
@@ -81,7 +85,23 @@ func (f File) Codec() string {
 	return f.metadata.Codec()
 }
 
-func (f File) Metadata() FileMetadata {
+func (f File) VideoCodec() string {
+	return f.metadata.VideoCodec()
+}
+
+func (f File) AudioCodec() string {
+	return f.metadata.AudioCodec()
+}
+
+func (f File) Width() int {
+	return f.metadata.Width()
+}
+
+func (f File) Height() int {
+	return f.metadata.Height()
+}
+
+func (f File) Metadata() Metadata {
 	return f.metadata
 }
 
@@ -105,11 +125,28 @@ func (f File) IsAudio() bool {
 	return f.HasPurpose(PurposeConversationMessageAudio)
 }
 
+func (f File) IsVideo() bool {
+	return f.HasPurpose(PurposeConversationMessageVideo)
+}
+
 func (f *File) ConfirmAudio(updatedOn time.Time, durationSeconds int, codec string) error {
-	if err := f.metadata.SetAudioMetadata(durationSeconds, codec); err != nil {
+	metadata, err := NewAudioFileMetadata(f.OriginalName(), f.MimeType(), f.SizeBytes(), durationSeconds, codec)
+	if err != nil {
 		return err
 	}
 
+	f.metadata = metadata
+	f.Confirm(updatedOn)
+	return nil
+}
+
+func (f *File) ConfirmVideo(updatedOn time.Time, metadata VideoMetadata) error {
+	fileMetadata, err := NewVideoFileMetadata(f.OriginalName(), f.MimeType(), f.SizeBytes(), metadata)
+	if err != nil {
+		return err
+	}
+
+	f.metadata = fileMetadata
 	f.Confirm(updatedOn)
 	return nil
 }

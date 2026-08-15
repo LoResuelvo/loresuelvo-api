@@ -30,6 +30,9 @@ func (repository *FileRepository) Save(ctx context.Context, file filedomain.File
 	if err := repository.syncAudioMetadataWithTx(ctx, tx, file); err != nil {
 		return rollbackFileTx(tx, err)
 	}
+	if err := repository.syncVideoMetadataWithTx(ctx, tx, file); err != nil {
+		return rollbackFileTx(tx, err)
+	}
 
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("committing file transaction: %w", err)
@@ -104,6 +107,41 @@ func (repository *FileRepository) syncAudioMetadataWithTx(ctx context.Context, t
 	return nil
 }
 
+func (repository *FileRepository) syncVideoMetadataWithTx(ctx context.Context, tx *sql.Tx, file filedomain.File) error {
+	if !file.IsVideo() || !file.IsConfirmed() {
+		if _, err := tx.ExecContext(ctx, `DELETE FROM file_videos WHERE file_id = $1`, file.ID); err != nil {
+			return fmt.Errorf("removing file video metadata: %w", err)
+		}
+		return nil
+	}
+
+	if file.VideoCodec() == "" || file.DurationSeconds() <= 0 || file.Width() <= 0 || file.Height() <= 0 {
+		return fmt.Errorf("saving file video metadata: %w", filedomain.ErrMessageVideoNotAvailable)
+	}
+
+	_, err := tx.ExecContext(ctx,
+		`INSERT INTO file_videos (file_id, video_codec, audio_codec, duration_seconds, width, height)
+		VALUES ($1, $2, NULLIF($3, ''), $4, $5, $6)
+		ON CONFLICT (file_id) DO UPDATE SET
+			video_codec = EXCLUDED.video_codec,
+			audio_codec = EXCLUDED.audio_codec,
+			duration_seconds = EXCLUDED.duration_seconds,
+			width = EXCLUDED.width,
+			height = EXCLUDED.height`,
+		file.ID,
+		strings.ToLower(strings.TrimSpace(file.VideoCodec())),
+		strings.ToLower(strings.TrimSpace(file.AudioCodec())),
+		file.DurationSeconds(),
+		file.Width(),
+		file.Height(),
+	)
+	if err != nil {
+		return fmt.Errorf("saving file video metadata: %w", err)
+	}
+
+	return nil
+}
+
 func (repository *FileRepository) FindByID(ctx context.Context, id string) (*filedomain.File, error) {
 	file, err := repository.findOne(ctx, fileSelectQuery+`WHERE f.id = $1`, id)
 	if err != nil {
@@ -158,9 +196,11 @@ func (repository *FileRepository) findOne(ctx context.Context, query string, arg
 
 const fileSelectQuery = `SELECT f.id, f.key, f.bucket, f.original_name, f.mime_type, f.size_bytes,
 	fa.duration_seconds, fa.codec,
+	fv.video_codec, fv.audio_codec, fv.duration_seconds, fv.width, fv.height,
 	f.status, f.visibility, f.purpose, f.uploaded_by_auth_id, f.created_on, f.updated_on
 	FROM files f
 	LEFT JOIN file_audios fa ON fa.file_id = f.id
+	LEFT JOIN file_videos fv ON fv.file_id = f.id
 	`
 
 type fileScanner interface {
@@ -176,6 +216,11 @@ func scanFile(scanner fileScanner) (*filedomain.File, error) {
 	var sizeBytes int
 	var durationSeconds sql.NullInt64
 	var codec sql.NullString
+	var videoCodec sql.NullString
+	var audioCodec sql.NullString
+	var videoDurationSeconds sql.NullInt64
+	var width sql.NullInt64
+	var height sql.NullInt64
 	var status string
 	var visibility string
 	var purpose string
@@ -192,6 +237,11 @@ func scanFile(scanner fileScanner) (*filedomain.File, error) {
 		&sizeBytes,
 		&durationSeconds,
 		&codec,
+		&videoCodec,
+		&audioCodec,
+		&videoDurationSeconds,
+		&width,
+		&height,
 		&status,
 		&visibility,
 		&purpose,
@@ -202,11 +252,16 @@ func scanFile(scanner fileScanner) (*filedomain.File, error) {
 		return nil, fmt.Errorf("scanning file: %w", err)
 	}
 
-	metadata, err := filedomain.NewFileMetadata(originalName, mimeType, sizeBytes)
+	baseMetadata, err := filedomain.NewFileMetadata(originalName, mimeType, sizeBytes)
 	if err != nil {
 		return nil, fmt.Errorf("restoring file metadata: %w", err)
 	}
+	var metadata filedomain.Metadata = baseMetadata
 	hasAudioMetadata := durationSeconds.Valid || codec.Valid
+	hasVideoMetadata := videoCodec.Valid || audioCodec.Valid || videoDurationSeconds.Valid || width.Valid || height.Valid
+	if hasAudioMetadata && hasVideoMetadata {
+		return nil, fmt.Errorf("restoring file metadata: %w", filedomain.ErrFileNotAvailable)
+	}
 	if hasAudioMetadata {
 		if !durationSeconds.Valid || !codec.Valid || purpose != filedomain.PurposeConversationMessageAudio || status != filedomain.StatusConfirmed {
 			return nil, fmt.Errorf("restoring file audio metadata: %w", filedomain.ErrMessageAudioNotAvailable)
@@ -218,7 +273,24 @@ func scanFile(scanner fileScanner) (*filedomain.File, error) {
 	} else if purpose == filedomain.PurposeConversationMessageAudio && status == filedomain.StatusConfirmed {
 		return nil, fmt.Errorf("restoring confirmed audio file: %w", filedomain.ErrMessageAudioNotAvailable)
 	}
-	file, err := filedomain.NewFile(id, key, bucket, *metadata, status, visibility, purpose, uploadedByAuthID, createdOn, updatedOn)
+	if hasVideoMetadata {
+		if !videoCodec.Valid || !videoDurationSeconds.Valid || !width.Valid || !height.Valid || purpose != filedomain.PurposeConversationMessageVideo || status != filedomain.StatusConfirmed {
+			return nil, fmt.Errorf("restoring file video metadata: %w", filedomain.ErrMessageVideoNotAvailable)
+		}
+		metadata, err = filedomain.NewVideoFileMetadata(originalName, mimeType, sizeBytes, filedomain.VideoMetadata{
+			DurationSeconds: int(videoDurationSeconds.Int64),
+			VideoCodec:      videoCodec.String,
+			AudioCodec:      audioCodec.String,
+			Width:           int(width.Int64),
+			Height:          int(height.Int64),
+		})
+		if err != nil {
+			return nil, fmt.Errorf("restoring video file metadata: %w", err)
+		}
+	} else if purpose == filedomain.PurposeConversationMessageVideo && status == filedomain.StatusConfirmed {
+		return nil, fmt.Errorf("restoring confirmed video file: %w", filedomain.ErrMessageVideoNotAvailable)
+	}
+	file, err := filedomain.NewFile(id, key, bucket, metadata, status, visibility, purpose, uploadedByAuthID, createdOn, updatedOn)
 	if err != nil {
 		return nil, fmt.Errorf("restoring file: %w", err)
 	}

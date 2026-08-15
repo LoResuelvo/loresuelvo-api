@@ -12,10 +12,15 @@ type MessageRepository struct {
 	db              *sql.DB
 	imageRepository *MessageImageRepository
 	audioRepository *MessageAudioRepository
+	videoRepository *MessageVideoRepository
 }
 
-func NewMessageRepository(db *sql.DB, imageRepository *MessageImageRepository, audioRepository *MessageAudioRepository) *MessageRepository {
-	return &MessageRepository{db: db, imageRepository: imageRepository, audioRepository: audioRepository}
+func NewMessageRepository(db *sql.DB, imageRepository *MessageImageRepository, audioRepository *MessageAudioRepository, videoRepositories ...*MessageVideoRepository) *MessageRepository {
+	videoRepository := NewMessageVideoRepository(db)
+	if len(videoRepositories) > 0 && videoRepositories[0] != nil {
+		videoRepository = videoRepositories[0]
+	}
+	return &MessageRepository{db: db, imageRepository: imageRepository, audioRepository: audioRepository, videoRepository: videoRepository}
 }
 
 func (repository *MessageRepository) ExistsInConversation(conversationID int, content string) (bool, error) {
@@ -83,12 +88,22 @@ func (repository *MessageRepository) saveWithTx(ctx context.Context, tx *sql.Tx,
 	if message.Audio != nil && len(message.Images) > 0 {
 		return nil, conversation.ErrMessageAudioMustBeExclusive
 	}
+	if message.Audio != nil && message.Video != nil {
+		return nil, conversation.ErrMessageAudioMustBeExclusive
+	}
+	if message.Video != nil && len(message.Images) > 0 {
+		return nil, conversation.ErrMessageVideoCannotIncludeImages
+	}
 	savedMessage.Images = append(savedMessage.Images, message.Images...)
 	if err := repository.imageRepository.saveWithTx(ctx, tx, savedMessage.ID, savedMessage.Images); err != nil {
 		return nil, err
 	}
 	savedMessage.Audio = message.Audio
 	if err := repository.audioRepository.saveWithTx(ctx, tx, savedMessage.ID, savedMessage.Audio); err != nil {
+		return nil, err
+	}
+	savedMessage.Video = message.Video
+	if err := repository.videoRepository.saveWithTx(ctx, tx, savedMessage.ID, savedMessage.Video); err != nil {
 		return nil, err
 	}
 
@@ -101,4 +116,8 @@ func (repository *MessageRepository) findImagesByConversationID(ctx context.Cont
 
 func (repository *MessageRepository) findAudiosByConversationID(ctx context.Context, conversationID int) (map[int]persistedMessageAudio, error) {
 	return repository.audioRepository.findByConversationID(ctx, conversationID)
+}
+
+func (repository *MessageRepository) findVideosByConversationID(ctx context.Context, conversationID int) (map[int]persistedMessageVideo, error) {
+	return repository.videoRepository.findByConversationID(ctx, conversationID)
 }

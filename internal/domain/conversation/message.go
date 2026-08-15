@@ -20,6 +20,7 @@ type Message struct {
 	Content        string
 	Images         []filedomain.MessageImage
 	Audio          *filedomain.MessageAudio
+	Video          *filedomain.MessageVideo
 	CreatedOn      time.Time
 }
 
@@ -37,6 +38,14 @@ func NewConsumerAudioMessage(audio filedomain.MessageAudio) (*Message, error) {
 
 func NewProviderAudioMessage(audio filedomain.MessageAudio) (*Message, error) {
 	return newAudioMessage(SenderProvider, audio)
+}
+
+func NewConsumerVideoMessage(content string, video filedomain.MessageVideo) (*Message, error) {
+	return newVideoMessage(SenderConsumer, content, video)
+}
+
+func NewProviderVideoMessage(content string, video filedomain.MessageVideo) (*Message, error) {
+	return newVideoMessage(SenderProvider, content, video)
 }
 
 func NewChatbotMessage(content string) (*Message, error) {
@@ -72,6 +81,23 @@ func newAudioMessage(senderRole string, audio filedomain.MessageAudio) (*Message
 	audio.OriginalName = strings.TrimSpace(audio.OriginalName)
 	audio.Codec = strings.ToLower(strings.TrimSpace(audio.Codec))
 	return &Message{SenderRole: senderRole, Audio: &audio}, nil
+}
+
+func newVideoMessage(senderRole, content string, video filedomain.MessageVideo) (*Message, error) {
+	trimmedContent := strings.TrimSpace(content)
+	if strings.TrimSpace(video.FileID) == "" || strings.TrimSpace(video.OriginalName) == "" {
+		return nil, ErrMessageVideoNotAvailable
+	}
+	if video.DurationSeconds <= 0 || strings.TrimSpace(video.VideoCodec) == "" || video.Width <= 0 || video.Height <= 0 {
+		return nil, ErrMessageVideoNotAvailable
+	}
+
+	video.FileID = strings.TrimSpace(video.FileID)
+	video.OriginalName = strings.TrimSpace(video.OriginalName)
+	video.MimeType = strings.ToLower(strings.TrimSpace(video.MimeType))
+	video.VideoCodec = strings.ToLower(strings.TrimSpace(video.VideoCodec))
+	video.AudioCodec = strings.ToLower(strings.TrimSpace(video.AudioCodec))
+	return &Message{SenderRole: senderRole, Content: trimmedContent, Video: &video}, nil
 }
 
 func ensureMessageImages(images []filedomain.MessageImage) ([]filedomain.MessageImage, error) {

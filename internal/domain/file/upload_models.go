@@ -29,5 +29,9 @@ type ConfirmUploadResult struct {
 	OriginalName    string
 	MimeType        string
 	Codec           string
+	VideoCodec      string
+	AudioCodec      string
 	DurationSeconds int
+	Width           int
+	Height          int
 }

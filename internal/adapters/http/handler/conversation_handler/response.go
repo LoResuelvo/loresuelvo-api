@@ -9,6 +9,7 @@ type sentMessageResponse struct {
 	Content        string                 `json:"content"`
 	Images         []messageImageResponse `json:"images"`
 	Audio          *messageAudioResponse  `json:"audio,omitempty"`
+	Video          *messageVideoResponse  `json:"video,omitempty"`
 	CreatedOn      time.Time              `json:"created_on"`
 }
 
@@ -49,6 +50,7 @@ type conversationMessageResponse struct {
 	Content    string                 `json:"content"`
 	Images     []messageImageResponse `json:"images"`
 	Audio      *messageAudioResponse  `json:"audio,omitempty"`
+	Video      *messageVideoResponse  `json:"video,omitempty"`
 	CreatedOn  time.Time              `json:"created_on"`
 }
 
@@ -65,6 +67,18 @@ type messageAudioResponse struct {
 	MimeType        string `json:"mime_type"`
 	Codec           string `json:"codec"`
 	DurationSeconds int    `json:"duration_seconds"`
+}
+
+type messageVideoResponse struct {
+	ID              string `json:"id"`
+	URL             string `json:"url"`
+	OriginalName    string `json:"original_name"`
+	MimeType        string `json:"mime_type"`
+	VideoCodec      string `json:"video_codec"`
+	AudioCodec      string `json:"audio_codec,omitempty"`
+	DurationSeconds int    `json:"duration_seconds"`
+	Width           int    `json:"width"`
+	Height          int    `json:"height"`
 }
 
 type conversationSummaryResponse struct {

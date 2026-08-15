@@ -11,7 +11,9 @@ type FileService interface {
 	ResolvePublicURLs(ctx context.Context, fileIDs []string) (map[string]string, error)
 	PrepareMessageImages(ctx context.Context, authID string, fileIDs []string) ([]filedomain.MessageImage, error)
 	PrepareMessageAudio(ctx context.Context, authID, fileID string) (*filedomain.MessageAudio, error)
+	PrepareMessageVideo(ctx context.Context, authID, fileID string) (*filedomain.MessageVideo, error)
 	PrepareChatbotMessageImages(ctx context.Context, authID string, fileIDs []string) ([]filedomain.MessageImageContent, error)
 	ResolveMessageImages(ctx context.Context, fileIDs []string) (map[string]filedomain.MessageImage, error)
 	ResolveMessageAudios(ctx context.Context, fileIDs []string) (map[string]filedomain.MessageAudio, error)
+	ResolveMessageVideos(ctx context.Context, fileIDs []string) (map[string]filedomain.MessageVideo, error)
 }

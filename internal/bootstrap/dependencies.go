@@ -160,6 +160,7 @@ func NewDependenciesWithPaymentAccountAdapters(
 		storageComponents.PrivateBucket,
 		systemClock,
 		mediaadapter.NewWebMAudioParser(),
+		mediaadapter.NewMP4VideoParser(),
 	)
 	categoryService := category.NewService(persistence.CategoryRepository)
 	providerService := provider.NewService(persistence.UserRepository, persistence.CategoryRepository, fileService)

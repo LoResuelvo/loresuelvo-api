@@ -4,6 +4,7 @@ type sendMessageRequest struct {
 	Content      string   `json:"content"`
 	ImageFileIDs []string `json:"image_file_ids"`
 	AudioFileID  string   `json:"audio_file_id"`
+	VideoFileID  string   `json:"video_file_id"`
 }
 
 type chatbotMessageRequest struct {

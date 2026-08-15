@@ -63,6 +63,7 @@ func (h *ConversationHandler) SendMessage(c *gin.Context) {
 		req.Content,
 		req.ImageFileIDs,
 		req.AudioFileID,
+		req.VideoFileID,
 	)
 	if err != nil {
 		handleSendMessageError(c, err)
