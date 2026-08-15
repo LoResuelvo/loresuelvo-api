@@ -52,7 +52,9 @@ func registerSendAudioSteps(sc *godog.ScenarioContext, suite *testSuite) {
 	sc.Step(`^el mensaje fue enviado por el prestador "([^"]*)"$`, suite.audioMessageWasSentBy)
 	sc.Step(`^que cargué y confirmé el audio "([^"]*)" de ([0-9]+) segundos$`, suite.uploadAndConfirmMessageAudio)
 	sc.Step(`^envío únicamente el audio "([^"]*)" en el chat con el prestador "([^"]*)"$`, suite.sendAudioOnlyMessageInChatWithProvider)
+	sc.Step(`^envío únicamente el audio "([^"]*)" en la conversación pendiente con el prestador "([^"]*)"$`, suite.sendAudioOnlyMessageInPendingConversationWithProvider)
 	sc.Step(`^el sistema registra el mensaje de audio "([^"]*)" en el chat$`, suite.systemRegistersAudioMessage)
+	sc.Step(`^el sistema registra el mensaje de audio "([^"]*)" en la conversación pendiente$`, suite.systemRegistersAudioMessageInPendingConversation)
 	sc.Step(`^el mensaje fue enviado por el consumidor "([^"]*)"$`, suite.audioMessageWasSentBy)
 	sc.Step(`^el audio queda asociado al mensaje enviado$`, suite.audioRemainsAssociatedWithSentMessage)
 }
@@ -165,6 +167,10 @@ func (suite *testSuite) sendAudioOnlyMessageInChatWithConsumer(audioName, consum
 	return suite.sendAudioOnlyMessageInChatWithParticipant(audioName, consumerFullName, participantRoleConsumer)
 }
 
+func (suite *testSuite) sendAudioOnlyMessageInPendingConversationWithProvider(audioName, providerFullName string) error {
+	return suite.sendAudioOnlyMessageInChatWithParticipant(audioName, providerFullName, participantRoleProvider)
+}
+
 func (suite *testSuite) sendAudioOnlyMessageInChatWithParticipant(audioName, participantFullName, participantRole string) error {
 	if err := suite.ensureKnownParticipantFullName(participantFullName, participantRole); err != nil {
 		return err
@@ -217,6 +223,24 @@ func (suite *testSuite) audioMessageWasSentBy(senderFullName string) error {
 	}
 	if response.SenderRole != expectedRole {
 		return fmt.Errorf("expected audio message sender role %q for %q, got %q", expectedRole, senderFullName, response.SenderRole)
+	}
+	return nil
+}
+
+func (suite *testSuite) systemRegistersAudioMessageInPendingConversation(audioName string) error {
+	if err := suite.systemRegistersAudioMessage(audioName); err != nil {
+		return err
+	}
+	if err := suite.audioRemainsAssociatedWithSentMessage(); err != nil {
+		return err
+	}
+
+	detail, err := suite.conversationDetailResponseFromLastBody()
+	if err != nil {
+		return err
+	}
+	if detail.Status != "pending" {
+		return fmt.Errorf("expected conversation %d to remain pending, got %q", suite.lastConversationID, detail.Status)
 	}
 	return nil
 }
