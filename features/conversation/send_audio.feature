@@ -98,7 +98,6 @@ Feature: 50.1 Enviar audios por el chat
 
     Rule: La contraparte puede recibir y consultar los audios del chat
 
-    @wip
     Scenario: 50.1.9-EAC La contraparte consulta un mensaje de audio
         Given que el consumidor "ana@example.com" envió el audio "ruido-bomba.webm" en el chat con el prestador "juan.plomero@example.com"
         And que estoy autenticado como prestador "juan.plomero@example.com"
@@ -107,7 +106,6 @@ Feature: 50.1 Enviar audios por el chat
         And el detalle muestra la duración, el formato WebM y el codec Opus del audio
         And el sistema permite al prestador acceder al audio adjunto
 
-    @wip
     Scenario: 50.1.10-EAC La contraparte recibe en tiempo real un mensaje de audio
         Given que existe un chat activo entre el consumidor "ana@example.com" y el prestador "juan.plomero@example.com"
         And que el prestador "juan.plomero@example.com" está disponible para recibir mensajes en tiempo real
@@ -117,7 +115,6 @@ Feature: 50.1 Enviar audios por el chat
         Then el prestador "juan.plomero@example.com" recibe en tiempo real el mensaje de audio "ruido-bomba.webm"
         And el evento recibido incluye la duración y el acceso al audio
 
-    @wip
     Scenario: 50.1.11-EAC Mostrar un último mensaje de audio en el listado de conversaciones
         Given que estoy autenticado como consumidor "ana@example.com"
         And que tengo un chat activo con el prestador "juan.plomero@example.com" cuyo último mensaje es el audio "ruido-bomba.webm" de 18 segundos
