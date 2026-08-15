@@ -32,7 +32,6 @@ Feature: 50.1 Enviar audios por el chat
 
     Rule: Los mensajes de audio respetan el estado del chat de trabajo
 
-    @wip
     Scenario: 50.1.3-EAC Consumidor envía un audio en un chat pendiente
         Given que existe una conversación pendiente entre el consumidor "ana@example.com" y el prestador "juan.plomero@example.com" con el mensaje inicial:
             """
