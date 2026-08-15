@@ -59,6 +59,11 @@ func registerSendAudioSteps(sc *godog.ScenarioContext, suite *testSuite) {
 	sc.Step(`^envío únicamente el audio "([^"]*)" en el chat con la consumidora "([^"]*)"$`, suite.sendAudioOnlyMessageInChatWithConsumer)
 	sc.Step(`^el mensaje fue enviado por el prestador "([^"]*)"$`, suite.audioMessageWasSentBy)
 	sc.Step(`^que cargué y confirmé el audio "([^"]*)" de ([0-9]+) segundos$`, suite.uploadAndConfirmMessageAudio)
+	sc.Step(`^intento enviar el audio "([^"]*)" junto con el texto:$`, suite.trySendAudioWithText)
+	sc.Step(`^intento enviar el audio "([^"]*)" junto con la imagen "([^"]*)"$`, suite.trySendAudioWithImage)
+	sc.Step(`^intento enviar el audio "([^"]*)" junto con la imagen "([^"]*)" y el texto:$`, suite.trySendAudioWithImageAndText)
+	sc.Step(`^el sistema rechaza el mensaje porque el audio debe enviarse sin texto ni imágenes$`, suite.systemRejectsAudioCombinedMessage)
+	sc.Step(`^el sistema no asocia el audio ni la imagen a ningún mensaje$`, suite.systemDoesNotAssociateAudioOrImageWithAnyMessage)
 	sc.Step(`^envío únicamente el audio "([^"]*)" en el chat con el prestador "([^"]*)"$`, suite.sendAudioOnlyMessageInChatWithProvider)
 	sc.Step(`^envío únicamente el audio "([^"]*)" en la conversación pendiente con el prestador "([^"]*)"$`, suite.sendAudioOnlyMessageInPendingConversationWithProvider)
 	sc.Step(`^el sistema registra el mensaje de audio "([^"]*)" en el chat$`, suite.systemRegistersAudioMessage)
@@ -220,13 +225,66 @@ func (suite *testSuite) sendAudioOnlyMessageInChatWithParticipant(audioName, par
 	if err := suite.ensureKnownParticipantFullName(participantFullName, participantRole); err != nil {
 		return err
 	}
+	audioFileID, err := suite.messageAudioFileID(audioName)
+	if err != nil {
+		return err
+	}
+	suite.lastAttemptedMessageImageNames = nil
+	return suite.requestSendMessageToPreparedConversation(sendMessageRequest{AudioFileID: audioFileID})
+}
+
+func (suite *testSuite) messageAudioFileID(audioName string) (string, error) {
 	fixture, ok := suite.messageAudiosByName[audioName]
 	if !ok {
-		return fmt.Errorf("expected audio fixture %q to exist", audioName)
+		return "", fmt.Errorf("expected audio fixture %q to exist", audioName)
 	}
 	suite.lastAttemptedMessageAudioName = audioName
+	return fixture.FileID, nil
+}
+
+func (suite *testSuite) trySendAudioWithText(audioName string, text *godog.DocString) error {
+	audioFileID, err := suite.messageAudioFileID(audioName)
+	if err != nil {
+		return err
+	}
 	suite.lastAttemptedMessageImageNames = nil
-	return suite.requestSendMessageToPreparedConversation(sendMessageRequest{AudioFileID: fixture.FileID})
+	return suite.requestSendMessageToPreparedConversation(sendMessageRequest{
+		Content:     normalizeDocString(text),
+		AudioFileID: audioFileID,
+	})
+}
+
+func (suite *testSuite) trySendAudioWithImage(audioName, imageName string) error {
+	audioFileID, err := suite.messageAudioFileID(audioName)
+	if err != nil {
+		return err
+	}
+	imageFileIDs, err := suite.messageImageFileIDs([]string{imageName})
+	if err != nil {
+		return err
+	}
+	suite.lastAttemptedMessageImageNames = []string{imageName}
+	return suite.requestSendMessageToPreparedConversation(sendMessageRequest{
+		ImageFileIDs: imageFileIDs,
+		AudioFileID:  audioFileID,
+	})
+}
+
+func (suite *testSuite) trySendAudioWithImageAndText(audioName, imageName string, text *godog.DocString) error {
+	audioFileID, err := suite.messageAudioFileID(audioName)
+	if err != nil {
+		return err
+	}
+	imageFileIDs, err := suite.messageImageFileIDs([]string{imageName})
+	if err != nil {
+		return err
+	}
+	suite.lastAttemptedMessageImageNames = []string{imageName}
+	return suite.requestSendMessageToPreparedConversation(sendMessageRequest{
+		Content:      normalizeDocString(text),
+		ImageFileIDs: imageFileIDs,
+		AudioFileID:  audioFileID,
+	})
 }
 
 func (suite *testSuite) systemRegistersAudioMessage(audioName string) error {
@@ -304,6 +362,13 @@ func (suite *testSuite) systemRejectsConsumerAudioInPendingConversation() error 
 	return suite.lastErrorResponseShouldSay(conversation.ErrPendingConversationMessageLimitReached.Error())
 }
 
+func (suite *testSuite) systemRejectsAudioCombinedMessage() error {
+	if err := suite.lastResponseShouldHaveStatusCode(http.StatusBadRequest); err != nil {
+		return err
+	}
+	return suite.lastErrorResponseShouldSay(conversation.ErrMessageAudioMustBeExclusive.Error())
+}
+
 func (suite *testSuite) systemDoesNotAssociateAudioWithAnyMessage() error {
 	fixture, ok := suite.messageAudiosByName[suite.lastAttemptedMessageAudioName]
 	if !ok {
@@ -323,6 +388,42 @@ func (suite *testSuite) systemDoesNotAssociateAudioWithAnyMessage() error {
 	for _, message := range detail.Messages {
 		if message.Audio != nil && message.Audio.ID == fixture.FileID {
 			return fmt.Errorf("expected audio %q not to be associated with a message, found message %d", fixture.OriginalName, message.ID)
+		}
+	}
+	return nil
+}
+
+func (suite *testSuite) systemDoesNotAssociateAudioOrImageWithAnyMessage() error {
+	audioFixture, ok := suite.messageAudiosByName[suite.lastAttemptedMessageAudioName]
+	if !ok {
+		return fmt.Errorf("expected attempted audio fixture %q to exist", suite.lastAttemptedMessageAudioName)
+	}
+	if len(suite.lastAttemptedMessageImageNames) == 0 {
+		return fmt.Errorf("expected an attempted image alongside audio %q", audioFixture.OriginalName)
+	}
+	imageFixture, ok := suite.messageImagesByName[suite.lastAttemptedMessageImageNames[0]]
+	if !ok {
+		return fmt.Errorf("expected attempted image fixture %q to exist", suite.lastAttemptedMessageImageNames[0])
+	}
+	if err := suite.requestConversationByID(suite.lastConversationID); err != nil {
+		return err
+	}
+	if err := suite.lastResponseShouldHaveStatusCode(http.StatusOK); err != nil {
+		return err
+	}
+
+	detail, err := suite.conversationDetailResponseFromLastBody()
+	if err != nil {
+		return err
+	}
+	for _, message := range detail.Messages {
+		if message.Audio != nil && message.Audio.ID == audioFixture.FileID {
+			return fmt.Errorf("expected audio %q not to be associated with a message, found message %d", audioFixture.OriginalName, message.ID)
+		}
+		for _, image := range message.Images {
+			if image.ID == imageFixture.FileID {
+				return fmt.Errorf("expected image %q not to be associated with a message, found message %d", imageFixture.OriginalName, message.ID)
+			}
 		}
 	}
 	return nil

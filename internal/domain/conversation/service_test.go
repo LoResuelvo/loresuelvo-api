@@ -976,6 +976,7 @@ func TestSendMessageRejectsAudioCombinedWithTextOrImages(t *testing.T) {
 	}{
 		{name: "text", content: "mensaje", audioFileID: "audio-file-id"},
 		{name: "images", imageFileIDs: []string{"image-file-id"}, audioFileID: "audio-file-id"},
+		{name: "text and images", content: "mensaje", imageFileIDs: []string{"image-file-id"}, audioFileID: "audio-file-id"},
 	}
 
 	for _, test := range tests {
