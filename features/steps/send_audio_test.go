@@ -82,6 +82,8 @@ func registerSendAudioSteps(sc *godog.ScenarioContext, suite *testSuite) {
 	sc.Step(`^que la consumidora "([^"]*)" cargó y confirmó el audio "([^"]*)"$`, suite.consumerUploadedAndConfirmedMessageAudio)
 	sc.Step(`^que cargué pero no confirmé el audio "([^"]*)"$`, suite.uploadedButDidNotConfirmMessageAudio)
 	sc.Step(`^que cargué y confirmé el archivo "([^"]*)" para otra finalidad$`, suite.uploadedAndConfirmedAudioFileForOtherPurpose)
+	sc.Step(`^intento acceder al audio "([^"]*)" adjunto al mensaje$`, suite.tryAccessMessageAudio)
+	sc.Step(`^el sistema me indica que no puedo acceder a ese audio$`, suite.systemReportsMessageAudioAccessDenied)
 	sc.Step(`^el detalle incluye el mensaje de audio "([^"]*)"$`, suite.conversationDetailIncludesAudio)
 	sc.Step(`^el detalle muestra la duración, el formato WebM y el codec Opus del audio$`, suite.conversationDetailShowsAudioMetadata)
 	sc.Step(`^el sistema permite al prestador acceder al audio adjunto$`, suite.systemAllowsProviderToAccessAttachedAudio)
@@ -105,6 +107,17 @@ func (suite *testSuite) consumerSentAudioInActiveChat(consumerEmail, audioName, 
 		return err
 	}
 	return suite.systemRegistersAudioMessage(audioName)
+}
+
+func (suite *testSuite) tryAccessMessageAudio(audioName string) error {
+	if _, ok := suite.messageAudiosByName[audioName]; !ok {
+		return fmt.Errorf("expected audio %q to exist before checking access", audioName)
+	}
+	return suite.requestConversationByID(suite.lastConversationID)
+}
+
+func (suite *testSuite) systemReportsMessageAudioAccessDenied() error {
+	return suite.lastResponseShouldHaveStatusCode(http.StatusForbidden)
 }
 
 func (suite *testSuite) consumerHasActiveChatWithLastAudio(providerEmail, audioName, durationText string) error {
