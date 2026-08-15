@@ -164,26 +164,22 @@ Feature: 50.1 Enviar audios por el chat
 
     Rule: Los audios deben usar el formato WebM con codec Opus, no superar 5 MiB y durar como máximo 300 segundos
 
-    @wip
     Scenario: 50.1.17-EAC Rechazar un formato de audio no soportado
         Given que estoy autenticado como consumidor "ana@example.com"
         When intento cargar el audio "grabacion.m4a" con formato MP4 y codec AAC para un mensaje del chat
         Then el sistema rechaza la carga porque el audio no usa el formato WebM con codec Opus
 
-    @wip
     Scenario: 50.1.18-EAC Rechazar un audio que supera el tamaño máximo permitido
         Given que estoy autenticado como consumidor "ana@example.com"
         When intento cargar un audio WebM con codec Opus de 6 MiB para un mensaje del chat
         Then el sistema rechaza la carga porque el audio supera el máximo de 5 MiB
 
-    @wip
     Scenario: 50.1.19-EAC Rechazar un audio que supera la duración máxima permitida
         Given que estoy autenticado como consumidor "ana@example.com"
         And que cargué el audio WebM con codec Opus "grabacion-extensa.webm" de 301 segundos
         When intento confirmar el audio para un mensaje del chat
         Then el sistema rechaza la confirmación porque el audio supera el máximo de 300 segundos
 
-    @wip
     Scenario: 50.1.20-EAC Aceptar un audio que cumple exactamente los límites permitidos
         Given que existe un chat activo entre el consumidor "ana@example.com" y el prestador "juan.plomero@example.com"
         And que estoy autenticado como consumidor "ana@example.com"
