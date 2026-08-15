@@ -119,7 +119,6 @@ Feature: 50.2 Enviar videos por el chat
 
     Rule: Solo pueden enviarse videos confirmados y pertenecientes al remitente
 
-    @wip
     Scenario: 50.2.11-EVC Rechazar un video que todavía no fue confirmado
         Given que existe un chat activo entre el consumidor "ana@example.com" y el prestador "juan.plomero@example.com"
         And que estoy autenticado como consumidor "ana@example.com"
@@ -128,7 +127,6 @@ Feature: 50.2 Enviar videos por el chat
         Then el sistema rechaza el mensaje porque el video no está disponible
         And el sistema no asocia el video a ningún mensaje
 
-    @wip
     Scenario: 50.2.12-EVC Rechazar un video cargado por otro usuario
         Given que existe un chat activo entre el consumidor "ana@example.com" y el prestador "juan.plomero@example.com"
         And que la consumidora "carla@example.com" cargó y confirmó el video "video-ajeno.mp4"
@@ -137,7 +135,6 @@ Feature: 50.2 Enviar videos por el chat
         Then el sistema rechaza el mensaje porque el video no está disponible
         And el sistema no asocia el video a ningún mensaje
 
-    @wip
     Scenario: 50.2.13-EVC Rechazar un archivo cargado para otra finalidad
         Given que existe un chat activo entre el consumidor "ana@example.com" y el prestador "juan.plomero@example.com"
         And que estoy autenticado como consumidor "ana@example.com"
