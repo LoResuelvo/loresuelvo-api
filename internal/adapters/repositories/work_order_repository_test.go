@@ -81,7 +81,7 @@ func TestWorkOrderRepositoryFindsOnlyOrdersScheduledInsideWindow(t *testing.T) {
 
 	paidOn := insideOrder.ScheduledOn().Add(time.Hour)
 	require.NoError(t, updated.RegisterApprovedBalancePayment(paidOn))
-	updated, err = testContext.workOrderRepository.Save(t.Context(), updated)
+	_, err = testContext.workOrderRepository.Save(t.Context(), updated)
 	require.NoError(t, err)
 
 	fullyPaid, err := testContext.workOrderRepository.FindByID(t.Context(), insideOrder.ID())
