@@ -8,8 +8,9 @@ import (
 type Status string
 
 const (
-	StatusScheduled Status = "scheduled"
-	StatusPaid      Status = "paid"
+	StatusScheduled       Status = "scheduled"
+	StatusAwaitingPayment Status = "awaiting_payment"
+	StatusPaid            Status = "paid"
 )
 
 type ServiceProposal interface {
@@ -54,7 +55,24 @@ func (wo *WorkOrder) SetID(id int) {
 }
 
 func (wo *WorkOrder) Status() Status {
+	if wo == nil || wo.state == nil {
+		return ""
+	}
 	return wo.state.status()
+}
+
+func (wo *WorkOrder) CompletionReport() *CompletionReport {
+	if wo == nil || wo.state == nil {
+		return nil
+	}
+	return wo.state.completionReport()
+}
+
+func (wo *WorkOrder) PaidOn() time.Time {
+	if wo == nil || wo.state == nil {
+		return time.Time{}
+	}
+	return wo.state.paidOn()
 }
 
 func (wo *WorkOrder) AcceptedOn() time.Time {
@@ -103,6 +121,56 @@ func (wo *WorkOrder) ConsumerID() int {
 
 func (wo *WorkOrder) ProviderID() int {
 	return wo.serviceProposal.ProviderID()
+}
+
+func (wo *WorkOrder) ReportCompletion(providerID int, report *CompletionReport) error {
+	if wo == nil || wo.id <= 0 || wo.serviceProposal == nil {
+		return ErrInvalidWorkOrderIdentity
+	}
+	if providerID <= 0 || wo.ProviderID() != providerID {
+		return ErrOnlyAssignedProviderCanReport
+	}
+	if report == nil {
+		return ErrCompletionReportRequired
+	}
+	if report.ReportedOn().UTC().Before(wo.ScheduledOn().UTC()) {
+		return ErrWorkOrderNotReadyForCompletion
+	}
+
+	nextState, err := wo.state.reportCompletion(report)
+	if err != nil {
+		return err
+	}
+	wo.state = nextState
+	return nil
+}
+
+func (wo *WorkOrder) AuthorizeBalanceCheckout(consumerID int, now time.Time) error {
+	if wo == nil || wo.id <= 0 || wo.serviceProposal == nil {
+		return ErrInvalidWorkOrderIdentity
+	}
+	if consumerID <= 0 || wo.ConsumerID() != consumerID {
+		return ErrOnlyWorkOrderConsumerCanCheckout
+	}
+	if now.IsZero() {
+		return ErrWorkOrderNotScheduledYet
+	}
+	if now.UTC().Before(wo.ScheduledOn().UTC()) {
+		return ErrWorkOrderNotScheduledYet
+	}
+	return wo.state.authorizeBalanceCheckout()
+}
+
+func (wo *WorkOrder) RegisterApprovedBalancePayment(paidOn time.Time) error {
+	if wo == nil || wo.id <= 0 || wo.serviceProposal == nil {
+		return ErrWorkOrderNotEligibleForFullPayment
+	}
+	nextState, err := wo.state.registerApprovedBalancePayment(paidOn)
+	if err != nil {
+		return err
+	}
+	wo.state = nextState
+	return nil
 }
 
 func (wo *WorkOrder) MarkPaid() error {
