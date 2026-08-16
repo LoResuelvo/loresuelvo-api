@@ -117,6 +117,7 @@ func (client *CheckoutClient) CreateCheckout(
 		ExternalReference:  checkoutRequest.ExternalReference,
 		NotificationURL:    client.config.NotificationURL,
 		MarketplaceFee:     sdkAmountFromCents(checkoutRequest.PlatformFeeCents),
+		AutoReturn:         "approved",
 		BinaryMode:         false,
 		Expires:            true,
 		ExpirationDateFrom: &checkoutRequest.StartsOn,

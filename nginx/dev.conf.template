@@ -68,7 +68,13 @@ server {
         proxy_pass http://dev_api;
     }
 
-    # Browser routes, including Mercado Pago return URLs, go to the web app.
+    # Mercado Pago return URLs: redirect to localhost so the browser keeps
+    # its session cookies instead of landing on the tunnel domain.
+    location ^~ /payments/ {
+        return 302 http://localhost:3000$request_uri;
+    }
+
+    # Browser routes go to the web app.
     location / {
         proxy_pass http://dev_web;
     }
