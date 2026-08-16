@@ -1,11 +1,10 @@
-@wip
 Feature: Consultar detalle y evidencia de una orden de trabajo
     Como participante de una orden de trabajo
     quiero consultar su detalle y la evidencia presentada
     para verificar el trabajo antes del pago y conservar su historial
 
     Background:
-        Given que la fecha y hora actual del sistema es "2026-08-15T16:00:00Z"
+        Given que la fecha y hora actual del sistema es "2026-07-04T10:00:00-03:00"
         And que existe el rubro "Plomería"
         And que existe un consumidor registrado con correo "ana@example.com", nombre "Ana" y apellido "Pérez"
         And que existe un consumidor registrado con correo "carla@example.com", nombre "Carla" y apellido "Gómez"

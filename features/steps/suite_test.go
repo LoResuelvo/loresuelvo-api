@@ -72,6 +72,9 @@ type testSuite struct {
 	messageVideosByName                     map[string]messageVideoFixture
 	completionImagesByName                  map[string]completionImageFixture
 	completionImageNames                    []string
+	workOrderDetailCompletionDescription    string
+	workOrderDetailTargetStatus             string
+	missingWorkOrderID                      int
 	lastCompletionReport                    completionReportResponse
 	lastCompletionReportWorkOrderID         int
 	lastSentMessageID                       int
@@ -135,6 +138,7 @@ func (s *testSuite) registerAllSteps(sc *godog.ScenarioContext) {
 	registerAcceptServiceProposalSteps(sc, s)
 	registerGetWorkOrdersSteps(sc, s)
 	registerReportWorkCompletionSteps(sc, s)
+	registerGetWorkOrderDetailSteps(sc, s)
 	registerCompleteServicePaymentSteps(sc, s)
 	registerConnectMercadoPagoAccountSteps(sc, s)
 	registerNotifyUrgentWorkOrdersSteps(sc, s)
@@ -218,6 +222,9 @@ func (s *testSuite) cleanup() error {
 	s.messageVideosByName = map[string]messageVideoFixture{}
 	s.completionImagesByName = map[string]completionImageFixture{}
 	s.completionImageNames = nil
+	s.workOrderDetailCompletionDescription = ""
+	s.workOrderDetailTargetStatus = ""
+	s.missingWorkOrderID = 0
 	s.lastCompletionReport = completionReportResponse{}
 	s.lastCompletionReportWorkOrderID = 0
 	s.lastSentMessageID = 0
