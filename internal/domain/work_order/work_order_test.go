@@ -30,6 +30,16 @@ func TestWorkOrderRejectsBeingMarkedPaidWhenItIsNotEligible(t *testing.T) {
 	assert.Equal(t, workorder.StatusScheduled, order.Status)
 }
 
+func TestPaidWorkOrderRejectsBeingMarkedPaidAgain(t *testing.T) {
+	order := workOrderFixture(84, 10, 20, time.Now().UTC())
+	require.NoError(t, order.MarkPaid())
+
+	err := order.MarkPaid()
+
+	assert.ErrorIs(t, err, workorder.ErrWorkOrderNotEligibleForFullPayment)
+	assert.Equal(t, workorder.StatusPaid, order.Status)
+}
+
 func TestNewWorkOrderStartsScheduled(t *testing.T) {
 	acceptedOn := time.Date(2026, time.July, 4, 13, 0, 0, 0, time.UTC)
 

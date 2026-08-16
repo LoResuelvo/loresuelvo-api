@@ -30,6 +30,7 @@ type WorkOrder struct {
 	ServiceProposal ServiceProposal
 	Status          Status
 	AcceptedOn      time.Time
+	state           state
 }
 
 func New(serviceProposal ServiceProposal, acceptedOn time.Time) (*WorkOrder, error) {
@@ -37,10 +38,12 @@ func New(serviceProposal ServiceProposal, acceptedOn time.Time) (*WorkOrder, err
 		return nil, fmt.Errorf("creating work order: service proposal is required")
 	}
 
+	initialState := newScheduledState()
 	return &WorkOrder{
 		ServiceProposal: serviceProposal,
-		Status:          StatusScheduled,
+		Status:          initialState.status(),
 		AcceptedOn:      acceptedOn,
+		state:           initialState,
 	}, nil
 }
 
@@ -87,10 +90,20 @@ func (wo *WorkOrder) ProviderID() int {
 func (wo *WorkOrder) MarkPaid() error {
 	if wo == nil ||
 		wo.ID <= 0 ||
-		wo.ServiceProposal == nil ||
-		wo.Status != StatusScheduled {
+		wo.ServiceProposal == nil {
 		return ErrWorkOrderNotEligibleForFullPayment
 	}
-	wo.Status = StatusPaid
+
+	currentState := wo.state
+	if currentState == nil || currentState.status() != wo.Status {
+		currentState = stateFromStatus(wo.Status)
+	}
+
+	nextState, err := currentState.markPaid()
+	if err != nil {
+		return err
+	}
+	wo.state = nextState
+	wo.Status = nextState.status()
 	return nil
 }
