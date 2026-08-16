@@ -18,8 +18,10 @@ Feature: Completar el pago del servicio
 
     Rule: Completar el pago cobra únicamente el saldo acordado
 
-        Scenario: 27.1-CPS Iniciar el checkout del saldo de una orden programada
-            Given que estoy autenticado como consumidor "ana@example.com"
+        @wip
+        Scenario: 28.1-CPS Iniciar el checkout del saldo de una orden pendiente de pago
+            Given que el prestador "juan.plomero@example.com" informó la finalización con evidencia válida de la orden
+            And que estoy autenticado como consumidor "ana@example.com"
             When solicito completar el pago de la orden de trabajo
             Then el sistema entrega una URL para completar el checkout del saldo
             And la respuesta identifica el intento de pago del saldo en estado "checkout_ready"
@@ -32,15 +34,19 @@ Feature: Completar el pago del servicio
 
     Rule: El pago aprobado y verificado completa el saldo de la orden
 
-        Scenario: 27.2-CPS Marcar la orden como pagada después de aprobar el saldo
-            Given que "ana@example.com" inició el checkout del saldo de la orden de trabajo
+        @wip
+        Scenario: 28.2-CPS Marcar la orden como pagada después de aprobar el saldo
+            Given que el prestador "juan.plomero@example.com" informó la finalización con evidencia válida de la orden
+            And que "ana@example.com" inició el checkout del saldo de la orden de trabajo
             When el sistema procesa una notificación válida de Mercado Pago y verifica un pago aprobado por "84000.00" pesos argentinos para ese saldo
             Then el intento de pago del saldo puede consultarse en estado "paid"
             And la orden de trabajo queda pagada por completo
             And el servicio todavía no queda confirmado como realizado
 
-        Scenario Outline: 27.3-CPS Mantener la orden sin pagar cuando el pago resulta <resultado>
-            Given que "ana@example.com" inició el checkout del saldo de la orden de trabajo
+        @wip
+        Scenario Outline: 28.3-CPS Mantener la orden sin pagar cuando el pago resulta <resultado>
+            Given que el prestador "juan.plomero@example.com" informó la finalización con evidencia válida de la orden
+            And que "ana@example.com" inició el checkout del saldo de la orden de trabajo
             When el sistema procesa una notificación válida de Mercado Pago y verifica un pago <resultado> para ese saldo
             Then el intento de pago del saldo puede consultarse en estado "<estado>"
             And la orden de trabajo todavía no queda pagada por completo
@@ -51,8 +57,10 @@ Feature: Completar el pago del servicio
                 | en proceso   | processing   |
                 | rechazado    | rejected     |
 
-        Scenario: 27.4-CPS Permitir reintentar después de rechazar el pago del saldo
-            Given que la orden de trabajo tiene un intento de pago del saldo rechazado
+        @wip
+        Scenario: 28.4-CPS Permitir reintentar después de rechazar el pago del saldo
+            Given que el prestador "juan.plomero@example.com" informó la finalización con evidencia válida de la orden
+            And que la orden de trabajo tiene un intento de pago del saldo rechazado
             And que estoy autenticado como consumidor "ana@example.com"
             When solicito nuevamente completar el pago de la orden de trabajo
             Then el sistema entrega una URL para completar un nuevo checkout del saldo
@@ -61,8 +69,10 @@ Feature: Completar el pago del servicio
 
     Rule: Solo el consumidor de la orden puede completar el pago
 
-        Scenario Outline: 27.5-CPS Rechazar el pago solicitado por <actor>
-            Given que estoy autenticado como <rol> "<correo>"
+        @wip
+        Scenario Outline: 28.5-CPS Rechazar el pago solicitado por <actor>
+            Given que el prestador "juan.plomero@example.com" informó la finalización con evidencia válida de la orden
+            And que estoy autenticado como <rol> "<correo>"
             When intento completar el pago de la orden de trabajo
             Then el sistema deniega el pago del saldo
             And la orden de trabajo conserva el saldo pendiente
@@ -72,7 +82,7 @@ Feature: Completar el pago del servicio
                 | otro consumidor    | consumidor  | carla@example.com          |
                 | el prestador       | prestador   | juan.plomero@example.com   |
 
-        Scenario: 27.6-CPS Rechazar el pago sin una sesión válida
+        Scenario: 28.6-CPS Rechazar el pago sin una sesión válida
             Given que no tengo una sesión válida
             When intento completar el pago de la orden de trabajo
             Then el sistema deniega el acceso
@@ -80,15 +90,18 @@ Feature: Completar el pago del servicio
 
     Rule: El saldo se paga a partir de la fecha y hora acordadas y una sola vez
 
-        Scenario: 27.9-CPS Rechazar el pago antes de la fecha y hora programadas
+        @wip
+        Scenario: 28.9-CPS Rechazar el pago antes de la fecha y hora programadas y antes del reporte
             Given que la fecha y hora actual del sistema es "2026-07-06T09:59:59-03:00"
+            And que la orden de trabajo todavía no tiene reporte de finalización
             And que estoy autenticado como consumidor "ana@example.com"
             When intento completar el pago de la orden de trabajo
             Then el sistema rechaza el pago porque todavía no llegó la fecha y hora programadas
             And la orden de trabajo conserva el saldo pendiente
             And el sistema no registra una sesión de checkout del saldo
 
-        Scenario: 27.10-CPS Evitar un segundo cobro después de completar el pago
+        @wip
+        Scenario: 28.10-CPS Evitar un segundo cobro después de completar el pago
             Given que el pago aprobado del saldo dejó la orden de trabajo pagada por completo
             And que estoy autenticado como consumidor "ana@example.com"
             When solicito nuevamente completar el pago de la orden de trabajo
@@ -98,15 +111,19 @@ Feature: Completar el pago del servicio
 
     Rule: El checkout y la notificación externa del saldo son idempotentes
 
-        Scenario: 27.11-CPS Evitar checkouts activos duplicados ante solicitudes concurrentes
-            Given que estoy autenticado como consumidor "ana@example.com"
+        @wip
+        Scenario: 28.11-CPS Evitar checkouts activos duplicados ante solicitudes concurrentes
+            Given que el prestador "juan.plomero@example.com" informó la finalización con evidencia válida de la orden
+            And que estoy autenticado como consumidor "ana@example.com"
             When solicito concurrentemente dos veces completar el pago de la orden de trabajo
             Then el sistema conserva un único intento de pago activo para el saldo
             And el sistema conserva una única sesión de checkout activa para el saldo
             And ambas solicitudes obtienen la misma URL de checkout
 
-        Scenario: 27.12-CPS Procesar una sola vez una notificación de pago duplicada
-            Given que "ana@example.com" inició el checkout del saldo de la orden de trabajo
+        @wip
+        Scenario: 28.12-CPS Procesar una sola vez una notificación de pago duplicada
+            Given que el prestador "juan.plomero@example.com" informó la finalización con evidencia válida de la orden
+            And que "ana@example.com" inició el checkout del saldo de la orden de trabajo
             When el sistema procesa dos veces la misma notificación válida de Mercado Pago y verifica el pago aprobado del saldo
             Then el sistema registra una única transacción para el pago externo
             And la orden de trabajo queda pagada por completo
