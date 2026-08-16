@@ -284,12 +284,7 @@ func TestStartServiceBalanceCheckoutCreatesReadyIntentWithFrozenRemainingPricing
 		ScheduledOn:  now,
 		BookingTerms: terms,
 	}
-	order := &workorder.WorkOrder{
-		ID:              84,
-		ServiceProposal: proposal,
-		Status:          workorder.StatusScheduled,
-		AcceptedOn:      now.Add(-48 * time.Hour),
-	}
+	order := newWorkOrderFixture(t, 84, proposal, now.Add(-48*time.Hour))
 	account, err := paymentaccount.NewPaymentAccount(
 		proposalProvider.ID(),
 		paymentaccount.PaymentProvider("mercado_pago"),
@@ -318,7 +313,7 @@ func TestStartServiceBalanceCheckoutCreatesReadyIntentWithFrozenRemainingPricing
 		clockStub{now: now},
 	)
 
-	result, err := service.StartServiceBalanceCheckout(t.Context(), "auth0|consumer", order.ID)
+	result, err := service.StartServiceBalanceCheckout(t.Context(), "auth0|consumer", order.ID())
 
 	require.NoError(t, err)
 	assert.True(t, result.Created)
@@ -341,10 +336,10 @@ func TestStartServiceBalanceCheckoutCreatesReadyIntentWithFrozenRemainingPricing
 	assert.Equal(t, now.Add(30*time.Minute), checkoutGateway.request.ExpiresOn)
 	require.NotNil(t, intent.CheckoutSession)
 	assert.Equal(t, checkoutGateway.request.ExpiresOn, intent.CheckoutSession.ExpiresOn)
-	assert.Equal(t, workorder.StatusScheduled, order.Status)
+	assert.Equal(t, workorder.StatusScheduled, order.Status())
 
 	intentRepository.found = intent
-	reusedResult, err := service.StartServiceBalanceCheckout(t.Context(), "auth0|consumer", order.ID)
+	reusedResult, err := service.StartServiceBalanceCheckout(t.Context(), "auth0|consumer", order.ID())
 	require.NoError(t, err)
 	assert.False(t, reusedResult.Created)
 	assert.Equal(t, intent.ID, reusedResult.Intent.ID)
@@ -632,8 +627,8 @@ func TestProcessApprovedPaymentConfirmsPaidBooking(t *testing.T) {
 	assert.Same(t, intent, unitOfWork.intent)
 	require.NotNil(t, unitOfWork.order)
 	assert.Equal(t, proposal.ID, unitOfWork.order.ServiceProposalID())
-	assert.Equal(t, workorder.StatusScheduled, unitOfWork.order.Status)
-	assert.Equal(t, now, unitOfWork.order.AcceptedOn)
+	assert.Equal(t, workorder.StatusScheduled, unitOfWork.order.Status())
+	assert.Equal(t, now, unitOfWork.order.AcceptedOn())
 	require.NotNil(t, unitOfWork.notification)
 	assert.Equal(t, proposalProvider.ID(), unitOfWork.notification.UserID)
 	assert.Equal(t, notification.TypeServiceProposalAccepted, unitOfWork.notification.Type)
@@ -670,12 +665,7 @@ func TestProcessApprovedServiceBalanceAtomicallyPaysWorkOrder(t *testing.T) {
 		ScheduledOn:  now.Add(-5 * time.Minute),
 		BookingTerms: terms,
 	}
-	order := &workorder.WorkOrder{
-		ID:              84,
-		ServiceProposal: proposal,
-		Status:          workorder.StatusScheduled,
-		AcceptedOn:      now.Add(-48 * time.Hour),
-	}
+	order := newWorkOrderFixture(t, 84, proposal, now.Add(-48*time.Hour))
 	intent, err := payment.NewServiceBalanceIntent(
 		"83b4dd7d-6d1c-4e9e-b3e5-7be31b264540",
 		order,
@@ -737,7 +727,7 @@ func TestProcessApprovedServiceBalanceAtomicallyPaysWorkOrder(t *testing.T) {
 	assert.Same(t, order, unitOfWork.order)
 	assert.Nil(t, unitOfWork.proposal)
 	assert.Nil(t, unitOfWork.notification)
-	assert.Equal(t, workorder.StatusPaid, order.Status)
+	assert.Equal(t, workorder.StatusPaid, order.Status())
 
 	transactionRepository.found = unitOfWork.transaction
 	require.NoError(t, service.ProcessPaymentNotification(t.Context(), payment.PaymentNotification{
@@ -745,7 +735,7 @@ func TestProcessApprovedServiceBalanceAtomicallyPaysWorkOrder(t *testing.T) {
 		SellerAccountID:   gateway.payment.SellerAccountID,
 	}))
 	assert.Equal(t, 1, unitOfWork.calls)
-	assert.Equal(t, workorder.StatusPaid, order.Status)
+	assert.Equal(t, workorder.StatusPaid, order.Status())
 }
 
 func TestProcessProcessingPaymentOnlyUpdatesIntent(t *testing.T) {

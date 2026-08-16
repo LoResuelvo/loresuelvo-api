@@ -98,7 +98,7 @@ func (s *Service) notificationForUsers(order *WorkOrder) (*notification.Notifica
 		order.ConsumerID(),
 		notification.TypeWorkOrderCloseToScheduledTime,
 		notification.ResourceWorkOrder,
-		order.ID,
+		order.ID(),
 		s.clock,
 	)
 
@@ -106,7 +106,7 @@ func (s *Service) notificationForUsers(order *WorkOrder) (*notification.Notifica
 		order.ProviderID(),
 		notification.TypeWorkOrderCloseToScheduledTime,
 		notification.ResourceWorkOrder,
-		order.ID,
+		order.ID(),
 		s.clock,
 	)
 

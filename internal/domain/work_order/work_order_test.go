@@ -17,17 +17,17 @@ func TestWorkOrderCanBeMarkedAsFullyPaid(t *testing.T) {
 	err := order.MarkPaid()
 
 	require.NoError(t, err)
-	assert.Equal(t, workorder.StatusPaid, order.Status)
+	assert.Equal(t, workorder.StatusPaid, order.Status())
 }
 
 func TestWorkOrderRejectsBeingMarkedPaidWhenItIsNotEligible(t *testing.T) {
 	order := workOrderFixture(84, 10, 20, time.Now().UTC())
-	order.ID = 0
+	order.SetID(0)
 
 	err := order.MarkPaid()
 
 	assert.ErrorIs(t, err, workorder.ErrWorkOrderNotEligibleForFullPayment)
-	assert.Equal(t, workorder.StatusScheduled, order.Status)
+	assert.Equal(t, workorder.StatusScheduled, order.Status())
 }
 
 func TestPaidWorkOrderRejectsBeingMarkedPaidAgain(t *testing.T) {
@@ -37,7 +37,7 @@ func TestPaidWorkOrderRejectsBeingMarkedPaidAgain(t *testing.T) {
 	err := order.MarkPaid()
 
 	assert.ErrorIs(t, err, workorder.ErrWorkOrderNotEligibleForFullPayment)
-	assert.Equal(t, workorder.StatusPaid, order.Status)
+	assert.Equal(t, workorder.StatusPaid, order.Status())
 }
 
 func TestNewWorkOrderStartsScheduled(t *testing.T) {
@@ -50,7 +50,7 @@ func TestNewWorkOrderStartsScheduled(t *testing.T) {
 	order, err := workorder.New(&proposal, acceptedOn)
 
 	assert.NoError(t, err)
-	assert.Equal(t, &proposal, order.ServiceProposal)
-	assert.Equal(t, workorder.StatusScheduled, order.Status)
-	assert.Equal(t, acceptedOn, order.AcceptedOn)
+	assert.Equal(t, &proposal, order.ServiceProposal())
+	assert.Equal(t, workorder.StatusScheduled, order.Status())
+	assert.Equal(t, acceptedOn, order.AcceptedOn())
 }

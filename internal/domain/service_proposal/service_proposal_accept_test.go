@@ -23,9 +23,9 @@ func TestServiceProposalAccept(t *testing.T) {
 
 	order, err := workorder.New(proposal, now)
 	require.NoError(t, err)
-	assert.Equal(t, proposal, order.ServiceProposal)
-	assert.Equal(t, workorder.StatusScheduled, order.Status)
-	assert.Equal(t, now, order.AcceptedOn)
+	assert.Equal(t, proposal, order.ServiceProposal())
+	assert.Equal(t, workorder.StatusScheduled, order.Status())
+	assert.Equal(t, now, order.AcceptedOn())
 }
 
 func TestAcceptedServiceProposalCreatesProviderNotification(t *testing.T) {

@@ -13,16 +13,16 @@ func (ServiceBalanceCheckoutPolicy) Authorize(
 	consumerID int,
 	now time.Time,
 ) error {
-	if order == nil || order.ServiceProposal == nil {
+	if order == nil || order.ServiceProposalID() <= 0 {
 		return ErrInvalidWorkOrder
 	}
 	if consumerID <= 0 || order.ConsumerID() != consumerID {
 		return ErrOnlyWorkOrderConsumerCanCheckout
 	}
-	if order.Status == workorder.StatusPaid {
+	if order.Status() == workorder.StatusPaid {
 		return ErrWorkOrderAlreadyFullyPaid
 	}
-	if order.Status != workorder.StatusScheduled {
+	if order.Status() != workorder.StatusScheduled {
 		return ErrWorkOrderNotScheduled
 	}
 	if now.IsZero() || now.UTC().Before(order.ScheduledOn().UTC()) {

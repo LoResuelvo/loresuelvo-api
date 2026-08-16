@@ -120,8 +120,8 @@ func TestWorkOrderRepositoryDoesNotPersistServiceProposalTransitions(t *testing.
 
 	require.NoError(t, err)
 	require.NotNil(t, savedOrder)
-	assert.NotZero(t, savedOrder.ID)
-	assert.Equal(t, workorder.StatusScheduled, savedOrder.Status)
+	assert.NotZero(t, savedOrder.ID())
+	assert.Equal(t, workorder.StatusScheduled, savedOrder.Status())
 
 	var storedProposalStatus serviceproposal.Status
 	require.NoError(t, testContext.database.QueryRow(
@@ -137,7 +137,7 @@ func TestWorkOrderRepositoryDoesNotPersistServiceProposalTransitions(t *testing.
 		`SELECT service_proposal_id, status, accepted_on
 		FROM work_orders
 		WHERE id = $1`,
-		savedOrder.ID,
+		savedOrder.ID(),
 	).Scan(&storedProposalID, &storedStatus, &storedAcceptedOn))
 	assert.Equal(t, proposal.ID, storedProposalID)
 	assert.Equal(t, workorder.StatusScheduled, storedStatus)
@@ -145,10 +145,10 @@ func TestWorkOrderRepositoryDoesNotPersistServiceProposalTransitions(t *testing.
 
 	foundOrder, err := testContext.workOrderRepository.FindByServiceProposalID(context.Background(), proposal.ID)
 	require.NoError(t, err)
-	assert.Equal(t, savedOrder.ID, foundOrder.ID)
-	assert.Equal(t, savedOrder.ServiceProposal.ServiceProposalID(), foundOrder.ServiceProposal.ServiceProposalID())
-	assert.Equal(t, savedOrder.Status, foundOrder.Status)
-	assert.Equal(t, savedOrder.AcceptedOn.UTC(), foundOrder.AcceptedOn.UTC())
+	assert.Equal(t, savedOrder.ID(), foundOrder.ID())
+	assert.Equal(t, savedOrder.ServiceProposalID(), foundOrder.ServiceProposalID())
+	assert.Equal(t, savedOrder.Status(), foundOrder.Status())
+	assert.Equal(t, savedOrder.AcceptedOn().UTC(), foundOrder.AcceptedOn().UTC())
 }
 
 func TestWorkOrderRepositoryReturnsNotFoundForMissingServiceProposal(t *testing.T) {

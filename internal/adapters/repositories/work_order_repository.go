@@ -63,8 +63,10 @@ func (r *WorkOrderRepository) findOne(
 	argument int,
 ) (*workorder.WorkOrder, error) {
 	var (
-		order    workorder.WorkOrder
-		proposal serviceproposal.ServiceProposal
+		orderID    int
+		proposal   serviceproposal.ServiceProposal
+		status     workorder.Status
+		acceptedOn time.Time
 	)
 	err := r.db.QueryRowContext(
 		ctx,
@@ -73,10 +75,10 @@ func (r *WorkOrderRepository) findOne(
 		`+clause,
 		argument,
 	).Scan(
-		&order.ID,
+		&orderID,
 		&proposal.ID,
-		&order.Status,
-		&order.AcceptedOn,
+		&status,
+		&acceptedOn,
 	)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, workorder.ErrDoesNotExist
@@ -88,8 +90,11 @@ func (r *WorkOrderRepository) findOne(
 	if err != nil {
 		return nil, fmt.Errorf("hydrating work order service proposal: %w", err)
 	}
-	order.ServiceProposal = foundProposal
-	return &order, nil
+	order, err := workOrderFromRecord(orderID, foundProposal, status, acceptedOn)
+	if err != nil {
+		return nil, fmt.Errorf("rehydrating work order: %w", err)
+	}
+	return order, nil
 }
 
 func (r *WorkOrderRepository) FindByUserID(ctx context.Context, userID int, viewerRole string) ([]readmodel.WorkOrderSummary, error) {
@@ -193,14 +198,16 @@ func (r *WorkOrderRepository) FindScheduledBetween(ctx context.Context, from tim
 
 	workOrders := make([]*workorder.WorkOrder, 0)
 	for rows.Next() {
-		var order workorder.WorkOrder
+		var orderID int
 		var proposal serviceproposal.ServiceProposal
+		var status workorder.Status
+		var acceptedOn time.Time
 		var consumerID, providerID int
 		var serviceTotalCents, depositCents, platformFeeTotalCents, platformFeeDueNowCents int64
 		var currency string
 		var bookingPaymentDeadline time.Time
 		if err := rows.Scan(
-			&order.ID,
+			&orderID,
 			&proposal.ID,
 			&serviceTotalCents,
 			&currency,
@@ -210,8 +217,8 @@ func (r *WorkOrderRepository) FindScheduledBetween(ctx context.Context, from tim
 			&bookingPaymentDeadline,
 			&proposal.ScheduledOn,
 			&proposal.Description,
-			&order.Status,
-			&order.AcceptedOn,
+			&status,
+			&acceptedOn,
 			&consumerID,
 			&providerID,
 		); err != nil {
@@ -230,8 +237,11 @@ func (r *WorkOrderRepository) FindScheduledBetween(ctx context.Context, from tim
 		}
 		proposal.Consumer = &consumer.Consumer{BaseUser: user.RehydrateBaseUser(consumerID, "", "", "", "", consumer.Role, nil)}
 		proposal.Provider = &provider.Provider{BaseUser: user.RehydrateBaseUser(providerID, "", "", "", "", provider.Role, nil)}
-		order.ServiceProposal = &proposal
-		workOrders = append(workOrders, &order)
+		order, err := workOrderFromRecord(orderID, &proposal, status, acceptedOn)
+		if err != nil {
+			return nil, fmt.Errorf("rehydrating scheduled work order %d: %w", orderID, err)
+		}
+		workOrders = append(workOrders, order)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("iterating work orders scheduled between: %w", err)
@@ -246,12 +256,12 @@ func (r *WorkOrderRepository) saveWithTx(ctx context.Context, tx *sql.Tx, order 
 	if order == nil {
 		return nil, fmt.Errorf("saving work order: work order is required")
 	}
-	if order.ServiceProposal == nil {
+	if order.ServiceProposalID() <= 0 {
 		return nil, fmt.Errorf("saving work order: service proposal is required")
 	}
 
-	saved := *order
-	if order.ID <= 0 {
+	if order.ID() <= 0 {
+		var savedID int
 		err := tx.QueryRowContext(
 			ctx,
 			`INSERT INTO work_orders (
@@ -262,16 +272,19 @@ func (r *WorkOrderRepository) saveWithTx(ctx context.Context, tx *sql.Tx, order 
 		)
 		VALUES ($1, $2, $3, NOW())
 		RETURNING id`,
-			order.ServiceProposal.ServiceProposalID(),
-			order.Status,
-			order.AcceptedOn,
-		).Scan(&saved.ID)
+			order.ServiceProposalID(),
+			order.Status(),
+			order.AcceptedOn(),
+		).Scan(&savedID)
 		if err != nil {
 			return nil, fmt.Errorf("saving work order: %w", err)
 		}
+		saved := *order
+		saved.SetID(savedID)
 		return &saved, nil
 	}
 
+	var savedID int
 	err := tx.QueryRowContext(
 		ctx,
 		`UPDATE work_orders
@@ -279,17 +292,40 @@ func (r *WorkOrderRepository) saveWithTx(ctx context.Context, tx *sql.Tx, order 
 			updated_on = NOW()
 		WHERE id = $2 AND service_proposal_id = $3
 		RETURNING id`,
-		order.Status,
-		order.ID,
-		order.ServiceProposal.ServiceProposalID(),
-	).Scan(&saved.ID)
+		order.Status(),
+		order.ID(),
+		order.ServiceProposalID(),
+	).Scan(&savedID)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, workorder.ErrDoesNotExist
 	}
 	if err != nil {
 		return nil, fmt.Errorf("updating work order: %w", err)
 	}
-	return &saved, nil
+	return order, nil
+}
+
+func workOrderFromRecord(
+	id int,
+	proposal workorder.ServiceProposal,
+	status workorder.Status,
+	acceptedOn time.Time,
+) (*workorder.WorkOrder, error) {
+	order, err := workorder.New(proposal, acceptedOn)
+	if err != nil {
+		return nil, err
+	}
+	order.SetID(id)
+	if status == workorder.StatusScheduled {
+		return order, nil
+	}
+	if status == workorder.StatusPaid {
+		if err := order.MarkPaid(); err != nil {
+			return nil, err
+		}
+		return order, nil
+	}
+	return nil, fmt.Errorf("unsupported work order status %q", status)
 }
 
 func rollbackWorkOrderTx(tx *sql.Tx, cause error) error {

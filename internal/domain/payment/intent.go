@@ -84,8 +84,7 @@ func NewBookingDepositIntent(
 func NewServiceBalanceIntent(id string, order *workorder.WorkOrder, now time.Time) (*Intent, error) {
 	if strings.TrimSpace(id) == "" ||
 		order == nil ||
-		order.ID <= 0 ||
-		order.ServiceProposal == nil ||
+		order.ID() <= 0 ||
 		order.ServiceProposalID() <= 0 ||
 		strings.TrimSpace(order.Currency()) == "" ||
 		order.RemainingServiceBalance() <= 0 ||

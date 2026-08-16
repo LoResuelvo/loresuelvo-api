@@ -90,7 +90,7 @@ func (suite *testSuite) requestServiceBalanceCheckout() error {
 	if err != nil {
 		return err
 	}
-	response, err := suite.performServiceBalanceCheckoutRequest(order.ID)
+	response, err := suite.performServiceBalanceCheckoutRequest(order.ID())
 	if err != nil {
 		return err
 	}
@@ -142,7 +142,7 @@ func (suite *testSuite) requestServiceBalanceCheckoutConcurrentlyTwice() error {
 	for index := range results {
 		go func(index int) {
 			defer waitGroup.Done()
-			results[index], errorsByRequest[index] = suite.performServiceBalanceCheckoutRequest(order.ID)
+			results[index], errorsByRequest[index] = suite.performServiceBalanceCheckoutRequest(order.ID())
 		}(index)
 	}
 	waitGroup.Wait()
@@ -331,8 +331,8 @@ func (suite *testSuite) workOrderIsFullyPaid() error {
 	if err != nil {
 		return err
 	}
-	if order.Status != workorder.StatusPaid {
-		return fmt.Errorf("expected work order status %q, got %q", workorder.StatusPaid, order.Status)
+	if order.Status() != workorder.StatusPaid {
+		return fmt.Errorf("expected work order status %q, got %q", workorder.StatusPaid, order.Status())
 	}
 	return nil
 }
@@ -353,8 +353,8 @@ func (suite *testSuite) workOrderIsNotFullyPaid() error {
 	if err != nil {
 		return err
 	}
-	if order.Status != workorder.StatusScheduled {
-		return fmt.Errorf("expected work order status %q, got %q", workorder.StatusScheduled, order.Status)
+	if order.Status() != workorder.StatusScheduled {
+		return fmt.Errorf("expected work order status %q, got %q", workorder.StatusScheduled, order.Status())
 	}
 	return nil
 }
@@ -364,8 +364,8 @@ func (suite *testSuite) workOrderKeepsPendingBalance() error {
 	if err != nil {
 		return err
 	}
-	if order.Status != workorder.StatusScheduled {
-		return fmt.Errorf("expected work order status %q, got %q", workorder.StatusScheduled, order.Status)
+	if order.Status() != workorder.StatusScheduled {
+		return fmt.Errorf("expected work order status %q, got %q", workorder.StatusScheduled, order.Status())
 	}
 	if order.RemainingServiceBalance() <= 0 ||
 		order.RemainingPlatformFee() <= 0 ||
@@ -494,8 +494,8 @@ func (suite *testSuite) serviceIsNotYetConfirmedAsPerformed() error {
 	if intent.Status == payment.StatusPaid {
 		expectedStatus = workorder.StatusPaid
 	}
-	if order.Status != expectedStatus {
-		return fmt.Errorf("expected unconfirmed work order status %q, got %q", expectedStatus, order.Status)
+	if order.Status() != expectedStatus {
+		return fmt.Errorf("expected unconfirmed work order status %q, got %q", expectedStatus, order.Status())
 	}
 	return nil
 }

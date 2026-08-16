@@ -41,18 +41,18 @@ func TestWorkOrderRepositoryFindsOnlyOrdersScheduledInsideWindow(t *testing.T) {
 
 	require.NoError(t, err)
 	require.Len(t, orders, 1)
-	assert.Equal(t, insideOrder.ID, orders[0].ID)
+	assert.Equal(t, insideOrder.ID(), orders[0].ID())
 	assert.Equal(t, consumerID, orders[0].ConsumerID())
 	assert.Equal(t, providerID, orders[0].ProviderID())
 	assert.Equal(t, int64(1500050), orders[0].Amount())
-	proposal, ok := orders[0].ServiceProposal.(*serviceproposal.ServiceProposal)
+	proposal, ok := orders[0].ServiceProposal().(*serviceproposal.ServiceProposal)
 	require.True(t, ok)
 	assertBookingTermsEqual(t, bookingTermsForAmount(t, 1500050, from.Add(time.Hour)), proposal.BookingTerms)
 	assert.Equal(t, from.Add(time.Hour), orders[0].ScheduledOn().UTC())
 
-	foundByID, err := testContext.workOrderRepository.FindByID(t.Context(), insideOrder.ID)
+	foundByID, err := testContext.workOrderRepository.FindByID(t.Context(), insideOrder.ID())
 	require.NoError(t, err)
-	assert.Equal(t, insideOrder.ID, foundByID.ID)
+	assert.Equal(t, insideOrder.ID(), foundByID.ID())
 	assert.Equal(t, insideOrder.ServiceProposalID(), foundByID.ServiceProposalID())
 	assert.Equal(t, consumerID, foundByID.ConsumerID())
 	assert.Equal(t, providerID, foundByID.ProviderID())
@@ -61,11 +61,11 @@ func TestWorkOrderRepositoryFindsOnlyOrdersScheduledInsideWindow(t *testing.T) {
 	require.NoError(t, insideOrder.MarkPaid())
 	updated, err := testContext.workOrderRepository.Save(t.Context(), insideOrder)
 	require.NoError(t, err)
-	assert.Equal(t, insideOrder.ID, updated.ID)
+	assert.Equal(t, insideOrder.ID(), updated.ID())
 
-	fullyPaid, err := testContext.workOrderRepository.FindByID(t.Context(), insideOrder.ID)
+	fullyPaid, err := testContext.workOrderRepository.FindByID(t.Context(), insideOrder.ID())
 	require.NoError(t, err)
-	assert.Equal(t, workorder.StatusPaid, fullyPaid.Status)
+	assert.Equal(t, workorder.StatusPaid, fullyPaid.Status())
 }
 
 func saveScheduledWorkOrderAt(

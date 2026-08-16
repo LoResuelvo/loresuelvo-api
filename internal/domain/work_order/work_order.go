@@ -26,10 +26,9 @@ type ServiceProposal interface {
 }
 
 type WorkOrder struct {
-	ID              int
-	ServiceProposal ServiceProposal
-	Status          Status
-	AcceptedOn      time.Time
+	id              int
+	serviceProposal ServiceProposal
+	acceptedOn      time.Time
 	state           state
 }
 
@@ -40,70 +39,83 @@ func New(serviceProposal ServiceProposal, acceptedOn time.Time) (*WorkOrder, err
 
 	initialState := newScheduledState()
 	return &WorkOrder{
-		ServiceProposal: serviceProposal,
-		Status:          initialState.status(),
-		AcceptedOn:      acceptedOn,
+		serviceProposal: serviceProposal,
+		acceptedOn:      acceptedOn,
 		state:           initialState,
 	}, nil
 }
 
+func (wo *WorkOrder) ID() int {
+	return wo.id
+}
+
+func (wo *WorkOrder) SetID(id int) {
+	wo.id = id
+}
+
+func (wo *WorkOrder) Status() Status {
+	return wo.state.status()
+}
+
+func (wo *WorkOrder) AcceptedOn() time.Time {
+	return wo.acceptedOn
+}
+
+func (wo *WorkOrder) ServiceProposal() ServiceProposal {
+	return wo.serviceProposal
+}
+
 func (wo *WorkOrder) ServiceProposalID() int {
-	return wo.ServiceProposal.ServiceProposalID()
+	return wo.serviceProposal.ServiceProposalID()
 }
 
 func (wo *WorkOrder) Amount() int64 {
-	return wo.ServiceProposal.ServiceProposalAmount()
+	return wo.serviceProposal.ServiceProposalAmount()
 }
 
 func (wo *WorkOrder) Currency() string {
-	return wo.ServiceProposal.ServiceProposalCurrency()
+	return wo.serviceProposal.ServiceProposalCurrency()
 }
 
 func (wo *WorkOrder) RemainingServiceBalance() int64 {
-	return wo.ServiceProposal.ServiceProposalRemainingServiceBalance()
+	return wo.serviceProposal.ServiceProposalRemainingServiceBalance()
 }
 
 func (wo *WorkOrder) RemainingPlatformFee() int64 {
-	return wo.ServiceProposal.ServiceProposalRemainingPlatformFee()
+	return wo.serviceProposal.ServiceProposalRemainingPlatformFee()
 }
 
 func (wo *WorkOrder) RemainingAmountDue() int64 {
-	return wo.ServiceProposal.ServiceProposalRemainingAmountDue()
+	return wo.serviceProposal.ServiceProposalRemainingAmountDue()
 }
 
 func (wo *WorkOrder) ScheduledOn() time.Time {
-	return wo.ServiceProposal.ServiceProposalScheduledOn()
+	return wo.serviceProposal.ServiceProposalScheduledOn()
 }
 
 func (wo *WorkOrder) Description() string {
-	return wo.ServiceProposal.ServiceProposalDescription()
+	return wo.serviceProposal.ServiceProposalDescription()
 }
 
 func (wo *WorkOrder) ConsumerID() int {
-	return wo.ServiceProposal.ConsumerID()
+	return wo.serviceProposal.ConsumerID()
 }
 
 func (wo *WorkOrder) ProviderID() int {
-	return wo.ServiceProposal.ProviderID()
+	return wo.serviceProposal.ProviderID()
 }
 
 func (wo *WorkOrder) MarkPaid() error {
 	if wo == nil ||
-		wo.ID <= 0 ||
-		wo.ServiceProposal == nil {
+		wo.id <= 0 ||
+		wo.serviceProposal == nil {
 		return ErrWorkOrderNotEligibleForFullPayment
 	}
 
-	currentState := wo.state
-	if currentState == nil || currentState.status() != wo.Status {
-		currentState = stateFromStatus(wo.Status)
-	}
-
-	nextState, err := currentState.markPaid()
+	nextState, err := wo.state.markPaid()
 	if err != nil {
 		return err
 	}
 	wo.state = nextState
-	wo.Status = nextState.status()
 	return nil
 }

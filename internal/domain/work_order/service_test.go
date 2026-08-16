@@ -17,8 +17,8 @@ func TestUrgentNotificationSavesAndNotifiesBothParticipants(t *testing.T) {
 	order := workOrderFixture(9, 10, 20, now.Add(time.Hour))
 	env := setupWorkOrderServiceTest(now)
 	env.reader.On("FindScheduledBetween", mock.Anything, now, now.Add(24*time.Hour)).Return([]*workorder.WorkOrder{order}, nil).Once()
-	env.repository.On("Save", mock.Anything, mock.MatchedBy(matchesWorkOrderNotification(10, order.ID))).Return(&notification.Notification{ID: 1, UserID: 10}, nil).Once()
-	env.repository.On("Save", mock.Anything, mock.MatchedBy(matchesWorkOrderNotification(20, order.ID))).Return(&notification.Notification{ID: 2, UserID: 20}, nil).Once()
+	env.repository.On("Save", mock.Anything, mock.MatchedBy(matchesWorkOrderNotification(10, order.ID()))).Return(&notification.Notification{ID: 1, UserID: 10}, nil).Once()
+	env.repository.On("Save", mock.Anything, mock.MatchedBy(matchesWorkOrderNotification(20, order.ID()))).Return(&notification.Notification{ID: 2, UserID: 20}, nil).Once()
 	env.notificator.On("Notify", mock.Anything, &notification.Notification{ID: 1, UserID: 10}).Return(nil).Once()
 	env.notificator.On("Notify", mock.Anything, &notification.Notification{ID: 2, UserID: 20}).Return(nil).Once()
 

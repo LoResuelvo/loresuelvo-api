@@ -95,16 +95,17 @@ func setupWorkOrderServiceTest(now time.Time) *workOrderServiceTestEnv {
 }
 
 func workOrderFixture(id, consumerID, providerID int, scheduledOn time.Time) *workorder.WorkOrder {
-	return &workorder.WorkOrder{
-		ID: id,
-		ServiceProposal: &serviceproposal.ServiceProposal{
-			ID:          id + 100,
-			Consumer:    &consumer.Consumer{BaseUser: user.RehydrateBaseUser(consumerID, "", "", "", "", "", nil)},
-			Provider:    &provider.Provider{BaseUser: user.RehydrateBaseUser(providerID, "", "", "", "", "", nil)},
-			ScheduledOn: scheduledOn,
-		},
-		Status: workorder.StatusScheduled,
+	order, err := workorder.New(&serviceproposal.ServiceProposal{
+		ID:          id + 100,
+		Consumer:    &consumer.Consumer{BaseUser: user.RehydrateBaseUser(consumerID, "", "", "", "", "", nil)},
+		Provider:    &provider.Provider{BaseUser: user.RehydrateBaseUser(providerID, "", "", "", "", "", nil)},
+		ScheduledOn: scheduledOn,
+	}, time.Time{})
+	if err != nil {
+		panic(err)
 	}
+	order.SetID(id)
+	return order
 }
 
 func matchesWorkOrderNotification(userID, workOrderID int) func(*notification.Notification) bool {

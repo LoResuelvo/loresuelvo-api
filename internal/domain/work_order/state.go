@@ -40,14 +40,3 @@ func newPaidState() state {
 		baseState: baseState{currentStatus: StatusPaid},
 	}
 }
-
-func stateFromStatus(status Status) state {
-	switch status {
-	case StatusScheduled:
-		return newScheduledState()
-	case StatusPaid:
-		return newPaidState()
-	default:
-		return baseState{currentStatus: status}
-	}
-}

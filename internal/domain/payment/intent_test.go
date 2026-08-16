@@ -9,7 +9,6 @@ import (
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/provider"
 	serviceproposal "github.com/LoResuelvo/loresuelvo-api/internal/domain/service_proposal"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/user"
-	workorder "github.com/LoResuelvo/loresuelvo-api/internal/domain/work_order"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -24,7 +23,7 @@ func TestServiceBalanceIntentUsesWorkOrderRemainingAmounts(t *testing.T) {
 		Provider:     &provider.Provider{BaseUser: user.RehydrateBaseUser(20, "", "", "", "", provider.Role, nil)},
 		BookingTerms: terms,
 	}
-	order := &workorder.WorkOrder{ID: 84, ServiceProposal: proposal, Status: workorder.StatusScheduled}
+	order := newWorkOrderFixture(t, 84, proposal, createdOn)
 
 	intent, err := payment.NewServiceBalanceIntent(
 		"83b4dd7d-6d1c-4e9e-b3e5-7be31b264540",

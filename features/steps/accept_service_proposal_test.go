@@ -684,13 +684,13 @@ func (suite *testSuite) systemRegistersOneScheduledWorkOrder() error {
 	if err != nil {
 		return err
 	}
-	if order.ID == 0 {
+	if order.ID() == 0 {
 		return fmt.Errorf("expected persisted work order id")
 	}
-	if order.Status != workorder.StatusScheduled {
-		return fmt.Errorf("expected work order status %q, got %q", workorder.StatusScheduled, order.Status)
+	if order.Status() != workorder.StatusScheduled {
+		return fmt.Errorf("expected work order status %q, got %q", workorder.StatusScheduled, order.Status())
 	}
-	if order.AcceptedOn.IsZero() {
+	if order.AcceptedOn().IsZero() {
 		return fmt.Errorf("expected work order accepted_on")
 	}
 	suite.rememberPersistedWorkOrder(order)
@@ -904,8 +904,8 @@ func (suite *testSuite) workOrderHasStatus(expected string) error {
 	if err != nil {
 		return err
 	}
-	if string(order.Status) != expected {
-		return fmt.Errorf("expected work order status %q, got %q", expected, order.Status)
+	if string(order.Status()) != expected {
+		return fmt.Errorf("expected work order status %q, got %q", expected, order.Status())
 	}
 	return nil
 }
@@ -923,15 +923,15 @@ func (suite *testSuite) rememberPersistedWorkOrder(order *workorder.WorkOrder) {
 		return
 	}
 	response := workOrderResponse{
-		ID:                order.ID,
+		ID:                order.ID(),
 		ServiceProposalID: order.ServiceProposalID(),
 		ConsumerID:        order.ConsumerID(),
 		ProviderID:        order.ProviderID(),
 		AmountCents:       order.Amount(),
 		ScheduledOn:       order.ScheduledOn(),
 		Description:       order.Description(),
-		Status:            string(order.Status),
-		AcceptedOn:        order.AcceptedOn,
+		Status:            string(order.Status()),
+		AcceptedOn:        order.AcceptedOn(),
 	}
 	suite.workOrdersByServiceProposalID[order.ServiceProposalID()] = []workOrderResponse{response}
 }

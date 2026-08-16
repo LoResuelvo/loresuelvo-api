@@ -281,7 +281,7 @@ func TestPaymentUnitOfWorkAtomicallyPersistsApprovedBooking(t *testing.T) {
 	})
 
 	require.NoError(t, err)
-	assert.NotZero(t, order.ID)
+	assert.NotZero(t, order.ID())
 	assert.NotZero(t, acceptedNotification.ID)
 	var storedIntentStatus payment.IntentStatus
 	var storedProposalStatus serviceproposal.Status
