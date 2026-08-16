@@ -72,3 +72,13 @@ Feature: 21.1 Obtener órdenes de trabajo
             Given que no tengo una sesión válida
             When intento consultar mis órdenes de trabajo
             Then el sistema deniega el acceso
+
+    Rule: El listado distingue el estado sin incluir la evidencia de finalización
+
+        Scenario: 21.1.7-GWO Distinguir los estados de las órdenes sin cargar imágenes
+            Given existe un prestador registrado con correo "luis.electricista@example.com", nombre "Luis", apellido "Díaz" y rubro "Electricidad"
+            And que existen órdenes de trabajo en estados "scheduled", "awaiting_payment" y "paid" para "ana@example.com"
+            And que estoy autenticado como consumidor "ana@example.com"
+            When consulto mis órdenes de trabajo
+            Then el listado distingue los estados "scheduled", "awaiting_payment" y "paid"
+            And el listado no incluye reportes ni imágenes

@@ -32,6 +32,7 @@ func registerGetWorkOrdersSteps(sc *godog.ScenarioContext, suite *testSuite) {
 	sc.Step(`^que existe una orden de trabajo programada para la propuesta aceptada de "([^"]*)" para "([^"]*)" por "([^"]*)" para la fecha y hora "([^"]*)" con la descripción:$`, suite.thereIsScheduledWorkOrderForAcceptedProposalWithDetails)
 	sc.Step(`^que existe una orden de trabajo programada para la propuesta aceptada de "([^"]*)" para "([^"]*)"$`, suite.thereIsScheduledWorkOrderForAcceptedProposal)
 	sc.Step(`^que existen varias órdenes de trabajo programadas para "([^"]*)" con distintas fechas y horas de servicio$`, suite.thereAreScheduledWorkOrdersAtDifferentServiceTimes)
+	sc.Step(`^que existen órdenes de trabajo en estados "([^"]*)", "([^"]*)" y "([^"]*)" para "([^"]*)"$`, suite.thereAreWorkOrdersInStatuses)
 	sc.Step(`^consulto mis órdenes de trabajo$`, suite.requestMyWorkOrders)
 	sc.Step(`^intento consultar mis órdenes de trabajo$`, suite.requestMyWorkOrders)
 	sc.Step(`^el sistema muestra un listado de órdenes de trabajo vacío$`, suite.systemShowsEmptyWorkOrderList)
@@ -44,6 +45,8 @@ func registerGetWorkOrdersSteps(sc *godog.ScenarioContext, suite *testSuite) {
 	sc.Step(`^la contraparte de la orden de trabajo no incluye un rubro$`, suite.workOrderCounterpartDoesNotIncludeCategory)
 	sc.Step(`^el sistema muestra solamente la orden de trabajo entre "([^"]*)" y "([^"]*)"$`, suite.systemShowsOnlyWorkOrderBetween)
 	sc.Step(`^el sistema muestra las órdenes de trabajo ordenadas desde la fecha y hora de servicio más próxima$`, suite.systemShowsClosestWorkOrdersFirst)
+	sc.Step(`^el listado distingue los estados "([^"]*)", "([^"]*)" y "([^"]*)"$`, suite.workOrderListShowsStatuses)
+	sc.Step(`^el listado no incluye reportes ni imágenes$`, suite.workOrderListDoesNotIncludeCompletionEvidence)
 }
 
 func (suite *testSuite) thereIsScheduledWorkOrderForAcceptedProposalWithDetails(providerEmail, consumerEmail, amount, scheduledOn string, description *godog.DocString) error {
@@ -95,6 +98,85 @@ func (suite *testSuite) thereAreScheduledWorkOrdersAtDifferentServiceTimes(consu
 		); err != nil {
 			return err
 		}
+	}
+	return nil
+}
+
+func (suite *testSuite) thereAreWorkOrdersInStatuses(firstStatus, secondStatus, thirdStatus, consumerEmail string) error {
+	fixtures := []struct {
+		status        string
+		providerEmail string
+		imageName     string
+	}{
+		{status: firstStatus, providerEmail: "juan.plomero@example.com"},
+		{status: secondStatus, providerEmail: "pedro.electricista@example.com", imageName: "listado-awaiting.jpg"},
+		{status: thirdStatus, providerEmail: "luis.electricista@example.com", imageName: "listado-paid.jpg"},
+	}
+
+	for _, fixture := range fixtures {
+		if err := suite.createWorkOrderForListingStatus(
+			fixture.status,
+			fixture.providerEmail,
+			consumerEmail,
+			fixture.imageName,
+		); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (suite *testSuite) createWorkOrderForListingStatus(status, providerEmail, consumerEmail, imageName string) error {
+	if status != string(workorder.StatusScheduled) &&
+		status != string(workorder.StatusAwaitingPayment) &&
+		status != string(workorder.StatusPaid) {
+		return fmt.Errorf("unsupported work order listing status %q", status)
+	}
+
+	scheduledOn := suite.clock.Now().UTC().Add(48 * time.Hour)
+	if err := suite.createScheduledWorkOrderFixture(
+		providerEmail,
+		consumerEmail,
+		defaultServiceProposalAmount,
+		scheduledOn,
+		defaultServiceProposalDescription,
+	); err != nil {
+		return err
+	}
+	if status == string(workorder.StatusScheduled) {
+		return nil
+	}
+
+	suite.currentAuth0ID = auth0IDForProviderEmail(providerEmail)
+	if err := suite.uploadAndConfirmCompletionImage(imageName); err != nil {
+		return fmt.Errorf("preparing listing evidence image %q: %w", imageName, err)
+	}
+	order, err := suite.persistedWorkOrderForLastServiceProposal()
+	if err != nil {
+		return err
+	}
+	if err := suite.requestTestClockMock(order.ScheduledOn().UTC().Add(time.Minute).Format(time.RFC3339)); err != nil {
+		return err
+	}
+	if err := suite.reportCompletion(defaultServiceProposalDescription, []string{imageName}); err != nil {
+		return err
+	}
+	if suite.lastStatus != http.StatusCreated {
+		return fmt.Errorf("creating listing completion report returned status %d with body %s", suite.lastStatus, suite.lastBody)
+	}
+	if status != string(workorder.StatusPaid) {
+		return nil
+	}
+
+	order, err = suite.persistedWorkOrderForLastServiceProposal()
+	if err != nil {
+		return err
+	}
+	if err := order.RegisterApprovedBalancePayment(suite.clock.Now().UTC().Add(time.Minute)); err != nil {
+		return fmt.Errorf("registering paid listing fixture: %w", err)
+	}
+	if _, err := suite.workOrderRepository.Save(context.Background(), order); err != nil {
+		return fmt.Errorf("saving paid listing fixture: %w", err)
 	}
 	return nil
 }
@@ -317,6 +399,50 @@ func (suite *testSuite) systemShowsClosestWorkOrdersFirst() error {
 		}
 		if index > 0 && orders[index-1].ScheduledOn.After(order.ScheduledOn) {
 			return fmt.Errorf("expected work orders ordered by scheduled_on ascending, got body %s", string(suite.lastBody))
+		}
+	}
+	return nil
+}
+
+func (suite *testSuite) workOrderListShowsStatuses(firstStatus, secondStatus, thirdStatus string) error {
+	expectedStatuses := []string{firstStatus, secondStatus, thirdStatus}
+	orders, err := suite.workOrderSummaryResponsesShouldHaveStatusCode(http.StatusOK)
+	if err != nil {
+		return err
+	}
+	if len(orders) != len(expectedStatuses) {
+		return fmt.Errorf("expected %d work orders in status listing, got %d with body %s", len(expectedStatuses), len(orders), string(suite.lastBody))
+	}
+
+	expectedCounts := make(map[string]int, len(expectedStatuses))
+	for _, status := range expectedStatuses {
+		expectedCounts[status]++
+	}
+	actualCounts := make(map[string]int, len(orders))
+	for _, order := range orders {
+		actualCounts[order.Status]++
+	}
+	for status, expectedCount := range expectedCounts {
+		if actualCounts[status] != expectedCount {
+			return fmt.Errorf("expected status %q %d time(s), got %d with body %s", status, expectedCount, actualCounts[status], string(suite.lastBody))
+		}
+	}
+	return nil
+}
+
+func (suite *testSuite) workOrderListDoesNotIncludeCompletionEvidence() error {
+	if err := suite.lastResponseShouldHaveStatusCode(http.StatusOK); err != nil {
+		return err
+	}
+	var entries []map[string]json.RawMessage
+	if err := json.Unmarshal(suite.lastBody, &entries); err != nil {
+		return fmt.Errorf("response is not a valid work order summary list: %w", err)
+	}
+	for index, entry := range entries {
+		for _, forbiddenField := range []string{"completion_report", "images", "file_id"} {
+			if _, exists := entry[forbiddenField]; exists {
+				return fmt.Errorf("work order summary %d unexpectedly includes %q: %s", index, forbiddenField, string(suite.lastBody))
+			}
 		}
 	}
 	return nil
