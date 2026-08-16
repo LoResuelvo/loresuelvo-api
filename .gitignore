@@ -3,3 +3,4 @@ certbot/
 coverage.out
 .vscode
 credenciales
+/plan.md

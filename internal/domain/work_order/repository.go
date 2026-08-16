@@ -19,6 +19,17 @@ type NotificationRepository interface {
 	Save(ctx context.Context, notification *notification.Notification) (*notification.Notification, error)
 }
 
+// TransactionalStore persists the aggregates changed by a work-order use case
+// within the unit of work transaction.
+type TransactionalStore interface {
+	SaveWorkOrder(ctx context.Context, order *WorkOrder) error
+	SaveNotification(ctx context.Context, notification *notification.Notification) error
+}
+
+type UnitOfWork interface {
+	Execute(ctx context.Context, operation func(TransactionalStore) error) error
+}
+
 type UserRepository interface {
 	FindByAuthID(auth0ID string) (user.User, error)
 }
