@@ -90,7 +90,7 @@ func (r *WorkOrderRepository) findOne(
 	if err != nil {
 		return nil, fmt.Errorf("hydrating work order service proposal: %w", err)
 	}
-	order, err := workOrderFromRecord(orderID, foundProposal, status, acceptedOn)
+	order, err := (workorder.RestoreFactory{}).Restore(orderID, foundProposal, status, acceptedOn)
 	if err != nil {
 		return nil, fmt.Errorf("rehydrating work order: %w", err)
 	}
@@ -237,7 +237,7 @@ func (r *WorkOrderRepository) FindScheduledBetween(ctx context.Context, from tim
 		}
 		proposal.Consumer = &consumer.Consumer{BaseUser: user.RehydrateBaseUser(consumerID, "", "", "", "", consumer.Role, nil)}
 		proposal.Provider = &provider.Provider{BaseUser: user.RehydrateBaseUser(providerID, "", "", "", "", provider.Role, nil)}
-		order, err := workOrderFromRecord(orderID, &proposal, status, acceptedOn)
+		order, err := (workorder.RestoreFactory{}).Restore(orderID, &proposal, status, acceptedOn)
 		if err != nil {
 			return nil, fmt.Errorf("rehydrating scheduled work order %d: %w", orderID, err)
 		}
@@ -303,29 +303,6 @@ func (r *WorkOrderRepository) saveWithTx(ctx context.Context, tx *sql.Tx, order 
 		return nil, fmt.Errorf("updating work order: %w", err)
 	}
 	return order, nil
-}
-
-func workOrderFromRecord(
-	id int,
-	proposal workorder.ServiceProposal,
-	status workorder.Status,
-	acceptedOn time.Time,
-) (*workorder.WorkOrder, error) {
-	order, err := workorder.New(proposal, acceptedOn)
-	if err != nil {
-		return nil, err
-	}
-	order.SetID(id)
-	if status == workorder.StatusScheduled {
-		return order, nil
-	}
-	if status == workorder.StatusPaid {
-		if err := order.MarkPaid(); err != nil {
-			return nil, err
-		}
-		return order, nil
-	}
-	return nil, fmt.Errorf("unsupported work order status %q", status)
 }
 
 func rollbackWorkOrderTx(tx *sql.Tx, cause error) error {
