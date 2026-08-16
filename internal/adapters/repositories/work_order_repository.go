@@ -20,6 +20,38 @@ type WorkOrderRepository struct {
 	serviceProposalRepository *ServiceProposalRepository
 }
 
+type workOrderRecord struct {
+	ID                sql.NullInt64
+	ServiceProposalID sql.NullInt64
+	Status            sql.NullString
+	AcceptedOn        sql.NullTime
+}
+
+func (record workOrderRecord) Restore(proposal workorder.ServiceProposal) (*workorder.WorkOrder, error) {
+	if !record.ID.Valid || record.ID.Int64 <= 0 {
+		return nil, fmt.Errorf("work order id is required")
+	}
+	if !record.ServiceProposalID.Valid || record.ServiceProposalID.Int64 <= 0 {
+		return nil, fmt.Errorf("service proposal id is required")
+	}
+	if !record.Status.Valid || record.Status.String == "" {
+		return nil, fmt.Errorf("work order status is required")
+	}
+	if !record.AcceptedOn.Valid {
+		return nil, fmt.Errorf("work order accepted_on is required")
+	}
+	if proposal == nil || proposal.ServiceProposalID() != int(record.ServiceProposalID.Int64) {
+		return nil, fmt.Errorf("work order service proposal does not match record")
+	}
+
+	return (workorder.RestoreFactory{}).Restore(
+		int(record.ID.Int64),
+		proposal,
+		workorder.Status(record.Status.String),
+		record.AcceptedOn.Time,
+	)
+}
+
 func NewWorkOrderRepository(
 	db *sql.DB,
 	serviceProposalRepository *ServiceProposalRepository,
@@ -62,12 +94,8 @@ func (r *WorkOrderRepository) findOne(
 	clause string,
 	argument int,
 ) (*workorder.WorkOrder, error) {
-	var (
-		orderID    int
-		proposal   serviceproposal.ServiceProposal
-		status     workorder.Status
-		acceptedOn time.Time
-	)
+	var record workOrderRecord
+	var serviceProposalID sql.NullInt64
 	err := r.db.QueryRowContext(
 		ctx,
 		`SELECT wo.id, wo.service_proposal_id, wo.status, wo.accepted_on
@@ -75,10 +103,10 @@ func (r *WorkOrderRepository) findOne(
 		`+clause,
 		argument,
 	).Scan(
-		&orderID,
-		&proposal.ID,
-		&status,
-		&acceptedOn,
+		&record.ID,
+		&serviceProposalID,
+		&record.Status,
+		&record.AcceptedOn,
 	)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, workorder.ErrDoesNotExist
@@ -86,11 +114,15 @@ func (r *WorkOrderRepository) findOne(
 	if err != nil {
 		return nil, fmt.Errorf("finding work order: %w", err)
 	}
-	foundProposal, err := r.serviceProposalRepository.FindByID(ctx, proposal.ID)
+	if !serviceProposalID.Valid || serviceProposalID.Int64 <= 0 {
+		return nil, fmt.Errorf("finding work order: service proposal id is required")
+	}
+	record.ServiceProposalID = serviceProposalID
+	foundProposal, err := r.serviceProposalRepository.FindByID(ctx, int(serviceProposalID.Int64))
 	if err != nil {
 		return nil, fmt.Errorf("hydrating work order service proposal: %w", err)
 	}
-	order, err := (workorder.RestoreFactory{}).Restore(orderID, foundProposal, status, acceptedOn)
+	order, err := record.Restore(foundProposal)
 	if err != nil {
 		return nil, fmt.Errorf("rehydrating work order: %w", err)
 	}
@@ -198,17 +230,16 @@ func (r *WorkOrderRepository) FindScheduledBetween(ctx context.Context, from tim
 
 	workOrders := make([]*workorder.WorkOrder, 0)
 	for rows.Next() {
-		var orderID int
+		var record workOrderRecord
 		var proposal serviceproposal.ServiceProposal
-		var status workorder.Status
-		var acceptedOn time.Time
+		var serviceProposalID sql.NullInt64
 		var consumerID, providerID int
 		var serviceTotalCents, depositCents, platformFeeTotalCents, platformFeeDueNowCents int64
 		var currency string
 		var bookingPaymentDeadline time.Time
 		if err := rows.Scan(
-			&orderID,
-			&proposal.ID,
+			&record.ID,
+			&serviceProposalID,
 			&serviceTotalCents,
 			&currency,
 			&depositCents,
@@ -217,13 +248,18 @@ func (r *WorkOrderRepository) FindScheduledBetween(ctx context.Context, from tim
 			&bookingPaymentDeadline,
 			&proposal.ScheduledOn,
 			&proposal.Description,
-			&status,
-			&acceptedOn,
+			&record.Status,
+			&record.AcceptedOn,
 			&consumerID,
 			&providerID,
 		); err != nil {
 			return nil, fmt.Errorf("scanning work orders scheduled between: %w", err)
 		}
+		record.ServiceProposalID = serviceProposalID
+		if !serviceProposalID.Valid || serviceProposalID.Int64 <= 0 {
+			return nil, fmt.Errorf("rehydrating scheduled work order: service proposal id is required")
+		}
+		proposal.ID = int(serviceProposalID.Int64)
 		proposal.BookingTerms, err = serviceproposal.NewBookingTerms(
 			currency,
 			serviceTotalCents,
@@ -237,9 +273,9 @@ func (r *WorkOrderRepository) FindScheduledBetween(ctx context.Context, from tim
 		}
 		proposal.Consumer = &consumer.Consumer{BaseUser: user.RehydrateBaseUser(consumerID, "", "", "", "", consumer.Role, nil)}
 		proposal.Provider = &provider.Provider{BaseUser: user.RehydrateBaseUser(providerID, "", "", "", "", provider.Role, nil)}
-		order, err := (workorder.RestoreFactory{}).Restore(orderID, &proposal, status, acceptedOn)
+		order, err := record.Restore(&proposal)
 		if err != nil {
-			return nil, fmt.Errorf("rehydrating scheduled work order %d: %w", orderID, err)
+			return nil, fmt.Errorf("rehydrating scheduled work order %d: %w", record.ID.Int64, err)
 		}
 		workOrders = append(workOrders, order)
 	}
