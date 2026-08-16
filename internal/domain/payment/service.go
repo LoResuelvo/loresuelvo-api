@@ -37,7 +37,6 @@ type Service struct {
 	idGenerator           IDGenerator
 	clock                 clock.Clock
 	checkoutPolicy        BookingCheckoutPolicy
-	serviceBalancePolicy  ServiceBalanceCheckoutPolicy
 }
 
 func NewService(
@@ -148,7 +147,7 @@ func (service *Service) StartServiceBalanceCheckout(
 		return nil, err
 	}
 	now := service.clock.Now().UTC()
-	if err := service.serviceBalancePolicy.Authorize(order, foundUser.ID(), now); err != nil {
+	if err := order.AuthorizeBalanceCheckout(foundUser.ID(), now); err != nil {
 		return nil, err
 	}
 
@@ -159,7 +158,7 @@ func (service *Service) StartServiceBalanceCheckout(
 			return findOrderErr
 		}
 		now = service.clock.Now().UTC()
-		if authorizeErr := service.serviceBalancePolicy.Authorize(lockedOrder, foundUser.ID(), now); authorizeErr != nil {
+		if authorizeErr := lockedOrder.AuthorizeBalanceCheckout(foundUser.ID(), now); authorizeErr != nil {
 			return authorizeErr
 		}
 		intent, findIntentErr := service.intentRepository.FindLatestByProposalIDAndPurpose(
@@ -428,7 +427,7 @@ func (persistence *paymentOutcomePersistence) VisitServiceBalanceApproved(outcom
 	if err != nil {
 		return err
 	}
-	if err := order.MarkPaid(); err != nil {
+	if err := order.RegisterApprovedBalancePayment(persistence.service.clock.Now().UTC()); err != nil {
 		return err
 	}
 	return persistence.service.unitOfWork.Execute(

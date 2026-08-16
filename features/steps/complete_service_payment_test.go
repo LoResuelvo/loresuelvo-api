@@ -34,6 +34,7 @@ func registerCompleteServicePaymentSteps(sc *godog.ScenarioContext, suite *testS
 	sc.Step(`^el sistema entrega una URL para completar un nuevo checkout del saldo$`, suite.systemReturnsNewServiceBalanceCheckoutURL)
 	sc.Step(`^el sistema deniega el pago del saldo$`, suite.systemDeniesServiceBalancePayment)
 	sc.Step(`^el sistema rechaza el pago porque todavía no llegó la fecha y hora programadas$`, suite.systemRejectsServiceBalancePaymentBeforeScheduledTime)
+	sc.Step(`^el sistema rechaza el pago porque la orden no tiene reporte de finalización$`, suite.systemRejectsServiceBalancePaymentBeforeCompletionReport)
 	sc.Step(`^el sistema informa que la orden de trabajo ya está pagada por completo$`, suite.systemReportsWorkOrderAlreadyFullyPaid)
 	sc.Step(`^la respuesta identifica el intento de pago del saldo en estado "([^"]*)"$`, suite.responseIdentifiesServiceBalanceIntentWithStatus)
 	sc.Step(`^la respuesta identifica un nuevo intento de pago del saldo en estado "([^"]*)"$`, suite.responseIdentifiesNewServiceBalanceIntentWithStatus)
@@ -214,6 +215,24 @@ func (suite *testSuite) systemRejectsServiceBalancePaymentBeforeScheduledTime() 
 	return nil
 }
 
+func (suite *testSuite) systemRejectsServiceBalancePaymentBeforeCompletionReport() error {
+	if err := suite.lastResponseShouldHaveStatusCode(http.StatusConflict); err != nil {
+		return err
+	}
+	var response registrationResponse
+	if err := json.Unmarshal(suite.lastBody, &response); err != nil {
+		return fmt.Errorf("decoding service balance checkout error response: %w", err)
+	}
+	if response.Error != workorder.ErrWorkOrderNotAwaitingPayment.Error() {
+		return fmt.Errorf(
+			"expected completion report requirement error %q, got %q",
+			workorder.ErrWorkOrderNotAwaitingPayment,
+			response.Error,
+		)
+	}
+	return nil
+}
+
 func (suite *testSuite) systemReportsWorkOrderAlreadyFullyPaid() error {
 	if err := suite.lastResponseShouldHaveStatusCode(http.StatusConflict); err != nil {
 		return err
@@ -353,8 +372,12 @@ func (suite *testSuite) workOrderIsNotFullyPaid() error {
 	if err != nil {
 		return err
 	}
-	if order.Status() != workorder.StatusScheduled {
-		return fmt.Errorf("expected work order status %q, got %q", workorder.StatusScheduled, order.Status())
+	expectedStatus := workorder.StatusScheduled
+	if order.CompletionReport() != nil {
+		expectedStatus = workorder.StatusAwaitingPayment
+	}
+	if order.Status() != expectedStatus {
+		return fmt.Errorf("expected work order status %q, got %q", expectedStatus, order.Status())
 	}
 	return nil
 }
@@ -364,8 +387,12 @@ func (suite *testSuite) workOrderKeepsPendingBalance() error {
 	if err != nil {
 		return err
 	}
-	if order.Status() != workorder.StatusScheduled {
-		return fmt.Errorf("expected work order status %q, got %q", workorder.StatusScheduled, order.Status())
+	expectedStatus := workorder.StatusScheduled
+	if order.CompletionReport() != nil {
+		expectedStatus = workorder.StatusAwaitingPayment
+	}
+	if order.Status() != expectedStatus {
+		return fmt.Errorf("expected work order status %q, got %q", expectedStatus, order.Status())
 	}
 	if order.RemainingServiceBalance() <= 0 ||
 		order.RemainingPlatformFee() <= 0 ||

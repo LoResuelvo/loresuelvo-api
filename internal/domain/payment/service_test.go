@@ -285,6 +285,13 @@ func TestStartServiceBalanceCheckoutCreatesReadyIntentWithFrozenRemainingPricing
 		BookingTerms: terms,
 	}
 	order := newWorkOrderFixture(t, 84, proposal, now.Add(-48*time.Hour))
+	report, err := workorder.NewCompletionReport(
+		"Trabajo finalizado y funcionamiento verificado.",
+		[]string{"completion-image-1"},
+		now,
+	)
+	require.NoError(t, err)
+	require.NoError(t, order.ReportCompletion(proposalProvider.ID(), report))
 	account, err := paymentaccount.NewPaymentAccount(
 		proposalProvider.ID(),
 		paymentaccount.PaymentProvider("mercado_pago"),
@@ -336,7 +343,7 @@ func TestStartServiceBalanceCheckoutCreatesReadyIntentWithFrozenRemainingPricing
 	assert.Equal(t, now.Add(30*time.Minute), checkoutGateway.request.ExpiresOn)
 	require.NotNil(t, intent.CheckoutSession)
 	assert.Equal(t, checkoutGateway.request.ExpiresOn, intent.CheckoutSession.ExpiresOn)
-	assert.Equal(t, workorder.StatusScheduled, order.Status())
+	assert.Equal(t, workorder.StatusAwaitingPayment, order.Status())
 
 	intentRepository.found = intent
 	reusedResult, err := service.StartServiceBalanceCheckout(t.Context(), "auth0|consumer", order.ID())
@@ -666,6 +673,13 @@ func TestProcessApprovedServiceBalanceAtomicallyPaysWorkOrder(t *testing.T) {
 		BookingTerms: terms,
 	}
 	order := newWorkOrderFixture(t, 84, proposal, now.Add(-48*time.Hour))
+	report, err := workorder.NewCompletionReport(
+		"Trabajo finalizado y funcionamiento verificado.",
+		[]string{"completion-image-1"},
+		now,
+	)
+	require.NoError(t, err)
+	require.NoError(t, order.ReportCompletion(proposalProvider.ID(), report))
 	intent, err := payment.NewServiceBalanceIntent(
 		"83b4dd7d-6d1c-4e9e-b3e5-7be31b264540",
 		order,

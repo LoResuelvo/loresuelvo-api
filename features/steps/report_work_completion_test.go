@@ -53,6 +53,7 @@ func registerReportWorkCompletionSteps(sc *godog.ScenarioContext, suite *testSui
 	sc.Step(`^que preparé (cero|cuatro) imágenes para el reporte de finalización$`, suite.prepareCompletionImageCount)
 	sc.Step(`^que preparé una imagen "([^"]*)" (perteneciente a otro prestador|pendiente de confirmación|con propósito incorrecto|con formato no permitido|que supera los 5 MB) para el reporte de finalización$`, suite.prepareUnavailableCompletionImage)
 	sc.Step(`^que la orden ya tiene un reporte de finalización válido$`, suite.thereIsValidCompletionReport)
+	sc.Step(`^que el prestador "([^"]*)" informó la finalización con evidencia válida de la orden$`, suite.providerReportedValidCompletion)
 
 	sc.Step(`^informo la finalización de la orden con la imagen "([^"]*)" y la descripción:$`, suite.reportCompletionWithImageAndDescription)
 	sc.Step(`^informo la finalización de la orden con las imágenes "([^"]*)", "([^"]*)" y "([^"]*)" y la descripción:$`, suite.reportCompletionWithThreeImagesAndDescription)
@@ -67,6 +68,7 @@ func registerReportWorkCompletionSteps(sc *godog.ScenarioContext, suite *testSui
 	sc.Step(`^el sistema rechaza el reporte de finalización con estado (\d+)$`, suite.systemRejectsCompletionReportWithStatus)
 	sc.Step(`^el sistema registra la notificación de finalización para el consumidor "([^"]*)"$`, suite.systemRegistersCompletionNotification)
 	sc.Step(`^el consumidor "([^"]*)" recibe en tiempo real la notificación de finalización$`, suite.consumerReceivesCompletionNotification)
+	sc.Step(`^la orden conserva la evidencia de finalización$`, suite.workOrderKeepsCompletionEvidence)
 }
 
 func (suite *testSuite) uploadAndConfirmCompletionImage(name string) error {
@@ -186,6 +188,27 @@ func (suite *testSuite) thereIsValidCompletionReport() error {
 	}
 	if suite.lastStatus != http.StatusCreated {
 		return fmt.Errorf("creating initial completion report returned status %d with body %s", suite.lastStatus, suite.lastBody)
+	}
+	return nil
+}
+
+func (suite *testSuite) providerReportedValidCompletion(providerEmail string) error {
+	suite.currentAuth0ID = auth0IDForProviderEmail(providerEmail)
+	reportedOn := suite.clock.Now().UTC().Add(time.Minute)
+	if reportedOn.IsZero() {
+		return fmt.Errorf("expected a non-zero test clock before preparing completion report")
+	}
+	if err := suite.requestTestClockMock(reportedOn.Format(time.RFC3339)); err != nil {
+		return err
+	}
+	if err := suite.uploadAndConfirmCompletionImage("trabajo-inicial.jpg"); err != nil {
+		return err
+	}
+	if err := suite.reportCompletion("Trabajo finalizado y funcionamiento verificado.", []string{"trabajo-inicial.jpg"}); err != nil {
+		return err
+	}
+	if suite.lastStatus != http.StatusCreated {
+		return fmt.Errorf("creating completion report for payment fixture returned status %d with body %s", suite.lastStatus, suite.lastBody)
 	}
 	return nil
 }
@@ -330,6 +353,23 @@ func (suite *testSuite) systemRegistersCompletionNotification(email string) erro
 	}
 	if found.ID == 0 || found.UserID != userID || found.Type != notification.TypeWorkOrderCompletionReported || found.ResourceType != notification.ResourceWorkOrder || found.ResourceID != suite.lastCompletionReportWorkOrderID {
 		return fmt.Errorf("unexpected persisted completion notification: %+v", found)
+	}
+	return nil
+}
+
+func (suite *testSuite) workOrderKeepsCompletionEvidence() error {
+	order, err := suite.persistedWorkOrderForLastServiceProposal()
+	if err != nil {
+		return err
+	}
+	if order.CompletionReport() == nil {
+		return fmt.Errorf("expected work order to keep its completion report")
+	}
+	if strings.TrimSpace(order.CompletionReport().Description()) == "" {
+		return fmt.Errorf("expected work order completion report description to be present")
+	}
+	if len(order.CompletionReport().ImageFileIDs()) == 0 {
+		return fmt.Errorf("expected work order completion report images to be present")
 	}
 	return nil
 }

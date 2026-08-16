@@ -10,34 +10,13 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestWorkOrderCanBeMarkedAsFullyPaid(t *testing.T) {
-	acceptedOn := time.Date(2026, time.July, 4, 13, 0, 0, 0, time.UTC)
-	order := workOrderFixture(84, 10, 20, acceptedOn.Add(48*time.Hour))
-
-	err := order.MarkPaid()
-
-	require.NoError(t, err)
-	assert.Equal(t, workorder.StatusPaid, order.Status())
-}
-
-func TestWorkOrderRejectsBeingMarkedPaidWhenItIsNotEligible(t *testing.T) {
+func TestScheduledWorkOrderRejectsApprovedBalancePaymentBeforeCompletion(t *testing.T) {
 	order := workOrderFixture(84, 10, 20, time.Now().UTC())
-	order.SetID(0)
 
-	err := order.MarkPaid()
+	err := order.RegisterApprovedBalancePayment(time.Now().UTC())
 
 	assert.ErrorIs(t, err, workorder.ErrWorkOrderNotEligibleForFullPayment)
 	assert.Equal(t, workorder.StatusScheduled, order.Status())
-}
-
-func TestPaidWorkOrderRejectsBeingMarkedPaidAgain(t *testing.T) {
-	order := workOrderFixture(84, 10, 20, time.Now().UTC())
-	require.NoError(t, order.MarkPaid())
-
-	err := order.MarkPaid()
-
-	assert.ErrorIs(t, err, workorder.ErrWorkOrderNotEligibleForFullPayment)
-	assert.Equal(t, workorder.StatusPaid, order.Status())
 }
 
 func TestNewWorkOrderStartsScheduled(t *testing.T) {

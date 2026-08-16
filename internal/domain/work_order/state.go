@@ -9,7 +9,6 @@ type state interface {
 	reportCompletion(*CompletionReport) (state, error)
 	authorizeBalanceCheckout() error
 	registerApprovedBalancePayment(time.Time) (state, error)
-	markPaid() (state, error)
 }
 
 type baseState struct {
@@ -42,10 +41,6 @@ func (baseState) registerApprovedBalancePayment(time.Time) (state, error) {
 	return nil, ErrWorkOrderNotEligibleForFullPayment
 }
 
-func (baseState) markPaid() (state, error) {
-	return nil, ErrWorkOrderNotEligibleForFullPayment
-}
-
 type scheduledState struct {
 	baseState
 }
@@ -61,10 +56,6 @@ func (scheduledState) reportCompletion(report *CompletionReport) (state, error) 
 		return nil, ErrCompletionReportRequired
 	}
 	return newAwaitingPaymentState(report), nil
-}
-
-func (scheduledState) markPaid() (state, error) {
-	return newPaidState(nil, time.Time{}), nil
 }
 
 type paidState struct {

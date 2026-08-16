@@ -172,18 +172,3 @@ func (wo *WorkOrder) RegisterApprovedBalancePayment(paidOn time.Time) error {
 	wo.state = nextState
 	return nil
 }
-
-func (wo *WorkOrder) MarkPaid() error {
-	if wo == nil ||
-		wo.id <= 0 ||
-		wo.serviceProposal == nil {
-		return ErrWorkOrderNotEligibleForFullPayment
-	}
-
-	nextState, err := wo.state.markPaid()
-	if err != nil {
-		return err
-	}
-	wo.state = nextState
-	return nil
-}

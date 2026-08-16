@@ -196,11 +196,19 @@ func handleStartServiceBalanceCheckoutError(context *gin.Context, err error) {
 	switch {
 	case errors.Is(err, workorder.ErrDoesNotExist):
 		httphandler.RespondError(context, http.StatusNotFound, err.Error())
-	case errors.Is(err, payment.ErrOnlyWorkOrderConsumerCanCheckout):
+	case errors.Is(err, payment.ErrOnlyWorkOrderConsumerCanCheckout),
+		errors.Is(err, workorder.ErrOnlyWorkOrderConsumerCanCheckout):
 		httphandler.RespondError(context, http.StatusForbidden, err.Error())
-	case errors.Is(err, payment.ErrWorkOrderAlreadyFullyPaid),
-		errors.Is(err, payment.ErrWorkOrderNotScheduled),
+	case errors.Is(err, payment.ErrWorkOrderAlreadyFullyPaid):
+		httphandler.RespondError(context, http.StatusConflict, err.Error())
+	case errors.Is(err, workorder.ErrWorkOrderAlreadyPaid):
+		// Preserve the existing HTTP error contract while the domain owns the
+		// transition decision.
+		httphandler.RespondError(context, http.StatusConflict, payment.ErrWorkOrderAlreadyFullyPaid.Error())
+	case errors.Is(err, payment.ErrWorkOrderNotScheduled),
 		errors.Is(err, payment.ErrServiceBalancePaymentNotAvailable),
+		errors.Is(err, workorder.ErrWorkOrderNotAwaitingPayment),
+		errors.Is(err, workorder.ErrWorkOrderNotScheduledYet),
 		errors.Is(err, paymentaccount.ErrConnectionNotFound):
 		httphandler.RespondError(context, http.StatusConflict, err.Error())
 	default:
