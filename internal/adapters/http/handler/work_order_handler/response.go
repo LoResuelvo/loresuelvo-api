@@ -21,3 +21,16 @@ type workOrderCounterpartResponse struct {
 	CategoryName    string `json:"category_name,omitempty"`
 	ProfilePhotoURL string `json:"profile_photo_url,omitempty"`
 }
+
+type completionReportResponse struct {
+	ID          int                       `json:"id"`
+	Description string                    `json:"description"`
+	ReportedOn  time.Time                 `json:"reported_on"`
+	Images      []completionImageResponse `json:"images"`
+}
+
+type completionImageResponse struct {
+	FileID       string `json:"file_id"`
+	OriginalName string `json:"original_name"`
+	URL          string `json:"url"`
+}

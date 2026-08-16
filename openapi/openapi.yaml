@@ -82,6 +82,8 @@ paths:
     $ref: ./paths/mercado-pago-webhook.yaml
   /work-orders:
     $ref: ./paths/work-orders.yaml
+  /work-orders/{workOrderId}/completion-reports:
+    $ref: ./paths/work-order-completion-reports.yaml
   /work-orders/{workOrderId}/checkout-sessions:
     $ref: ./paths/work-order-checkout-sessions.yaml
   /conversations/{conversationId}:
@@ -258,6 +260,12 @@ components:
       $ref: ./components/schemas/work-order-summary.yaml
     WorkOrderCounterpart:
       $ref: ./components/schemas/work-order-counterpart.yaml
+    WorkOrderCompletionReportRequest:
+      $ref: ./components/schemas/work-order-completion-report-request.yaml
+    WorkOrderCompletionReport:
+      $ref: ./components/schemas/work-order-completion-report.yaml
+    WorkOrderCompletionImage:
+      $ref: ./components/schemas/work-order-completion-image.yaml
     CreateChatbotConversationRequest:
       $ref: ./components/schemas/create-chatbot-conversation-request.yaml
     ChatbotConversationResponse:

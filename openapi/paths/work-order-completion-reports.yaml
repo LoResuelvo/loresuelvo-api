@@ -1,0 +1,87 @@
+post:
+  tags:
+    - WorkOrders
+  operationId: reportWorkOrderCompletion
+  summary: Report work completion with evidence
+  description: |
+    Records the assigned provider's completion report and one to three private
+    completion images. The report moves the work order from `scheduled` to
+    `awaiting_payment` and enables the consumer to start the balance checkout.
+  security:
+    - BearerAuth: []
+  parameters:
+    - name: workOrderId
+      in: path
+      required: true
+      description: Work order identifier.
+      schema:
+        type: integer
+        minimum: 1
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/WorkOrderCompletionReportRequest'
+        example:
+          description: Trabajo finalizado y funcionamiento verificado.
+          image_file_ids:
+            - uuid-1
+            - uuid-2
+  responses:
+    '201':
+      description: Completion report created successfully.
+      headers:
+        Location:
+          description: Work order detail URI.
+          schema:
+            type: string
+            example: /work-orders/42
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/WorkOrderCompletionReport'
+          example:
+            id: 17
+            description: Trabajo finalizado y funcionamiento verificado.
+            reported_on: '2026-08-15T15:00:00Z'
+            images:
+              - file_id: uuid-1
+                original_name: trabajo.jpg
+                url: https://private.example/work-order-images/temporary-uuid-1
+    '400':
+      description: The request or completion evidence is invalid.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    '401':
+      description: Missing or invalid authentication.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/AuthErrorResponse'
+    '403':
+      description: The authenticated user is not the assigned provider.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    '404':
+      description: The work order does not exist.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    '409':
+      description: The work order cannot accept a completion report in its current state.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    '500':
+      description: The completion report could not be persisted.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'

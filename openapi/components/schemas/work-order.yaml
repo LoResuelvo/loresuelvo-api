@@ -37,6 +37,7 @@ properties:
     type: string
     enum:
       - scheduled
+      - awaiting_payment
       - paid
   accepted_on:
     type: string

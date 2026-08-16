@@ -1,0 +1,21 @@
+type: object
+description: Evidence submitted by the assigned provider after completing a work order.
+required:
+  - description
+  - image_file_ids
+properties:
+  description:
+    type: string
+    minLength: 1
+    description: Description of the completed work. Whitespace-only values are rejected.
+    example: Trabajo finalizado y funcionamiento verificado.
+  image_file_ids:
+    type: array
+    minItems: 1
+    maxItems: 3
+    uniqueItems: true
+    items:
+      type: string
+      minLength: 1
+    description: Confirmed private completion-image file identifiers in display order.
+additionalProperties: false

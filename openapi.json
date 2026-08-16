@@ -2944,6 +2944,143 @@
                 }
             }
         },
+        "/work-orders/{workOrderId}/completion-reports": {
+            "post": {
+                "tags": [
+                    "WorkOrders"
+                ],
+                "operationId": "reportWorkOrderCompletion",
+                "summary": "Report work completion with evidence",
+                "description": "Records the assigned provider's completion report and one to three private\ncompletion images. The report moves the work order from `scheduled` to\n`awaiting_payment` and enables the consumer to start the balance checkout.\n",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "name": "workOrderId",
+                        "in": "path",
+                        "required": true,
+                        "description": "Work order identifier.",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/WorkOrderCompletionReportRequest"
+                            },
+                            "example": {
+                                "description": "Trabajo finalizado y funcionamiento verificado.",
+                                "image_file_ids": [
+                                    "uuid-1",
+                                    "uuid-2"
+                                ]
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Completion report created successfully.",
+                        "headers": {
+                            "Location": {
+                                "description": "Work order detail URI.",
+                                "schema": {
+                                    "type": "string",
+                                    "example": "/work-orders/42"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/WorkOrderCompletionReport"
+                                },
+                                "example": {
+                                    "id": 17,
+                                    "description": "Trabajo finalizado y funcionamiento verificado.",
+                                    "reported_on": "2026-08-15T15:00:00Z",
+                                    "images": [
+                                        {
+                                            "file_id": "uuid-1",
+                                            "original_name": "trabajo.jpg",
+                                            "url": "https://private.example/work-order-images/temporary-uuid-1"
+                                        }
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "The request or completion evidence is invalid.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AuthErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "The authenticated user is not the assigned provider.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "The work order does not exist.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "The work order cannot accept a completion report in its current state.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "The completion report could not be persisted.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/work-orders/{workOrderId}/checkout-sessions": {
             "post": {
                 "tags": [
@@ -4975,6 +5112,7 @@
                         "type": "string",
                         "enum": [
                             "scheduled",
+                            "awaiting_payment",
                             "paid"
                         ]
                     },
@@ -5067,6 +5205,91 @@
                         "type": "string"
                     },
                     "profile_photo_url": {
+                        "type": "string",
+                        "format": "uri"
+                    }
+                },
+                "additionalProperties": false
+            },
+            "WorkOrderCompletionReportRequest": {
+                "type": "object",
+                "description": "Evidence submitted by the assigned provider after completing a work order.",
+                "required": [
+                    "description",
+                    "image_file_ids"
+                ],
+                "properties": {
+                    "description": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "Description of the completed work. Whitespace-only values are rejected.",
+                        "example": "Trabajo finalizado y funcionamiento verificado."
+                    },
+                    "image_file_ids": {
+                        "type": "array",
+                        "minItems": 1,
+                        "maxItems": 3,
+                        "uniqueItems": true,
+                        "items": {
+                            "type": "string",
+                            "minLength": 1
+                        },
+                        "description": "Confirmed private completion-image file identifiers in display order."
+                    }
+                },
+                "additionalProperties": false
+            },
+            "WorkOrderCompletionReport": {
+                "type": "object",
+                "description": "Completion evidence recorded for a work order.",
+                "required": [
+                    "id",
+                    "description",
+                    "reported_on",
+                    "images"
+                ],
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "minimum": 1
+                    },
+                    "description": {
+                        "type": "string",
+                        "minLength": 1
+                    },
+                    "reported_on": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "images": {
+                        "type": "array",
+                        "minItems": 1,
+                        "maxItems": 3,
+                        "items": {
+                            "$ref": "#/components/schemas/WorkOrderCompletionImage"
+                        }
+                    }
+                },
+                "additionalProperties": false
+            },
+            "WorkOrderCompletionImage": {
+                "type": "object",
+                "description": "Private completion image exposed through a temporary URL.",
+                "required": [
+                    "file_id",
+                    "original_name",
+                    "url"
+                ],
+                "properties": {
+                    "file_id": {
+                        "type": "string",
+                        "minLength": 1
+                    },
+                    "original_name": {
+                        "type": "string",
+                        "minLength": 1
+                    },
+                    "url": {
                         "type": "string",
                         "format": "uri"
                     }

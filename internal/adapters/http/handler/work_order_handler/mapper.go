@@ -25,3 +25,21 @@ func workOrderSummaryResponsesFromReadModel(summaries []readmodel.WorkOrderSumma
 	}
 	return responses
 }
+
+func completionReportResponseFromReadModel(report readmodel.CompletionReport) completionReportResponse {
+	images := make([]completionImageResponse, 0, len(report.Images))
+	for _, image := range report.Images {
+		images = append(images, completionImageResponse{
+			FileID:       image.FileID,
+			OriginalName: image.OriginalName,
+			URL:          image.URL,
+		})
+	}
+
+	return completionReportResponse{
+		ID:          report.ID,
+		Description: report.Description,
+		ReportedOn:  report.ReportedOn,
+		Images:      images,
+	}
+}

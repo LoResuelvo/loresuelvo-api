@@ -1,0 +1,17 @@
+type: object
+description: Private completion image exposed through a temporary URL.
+required:
+  - file_id
+  - original_name
+  - url
+properties:
+  file_id:
+    type: string
+    minLength: 1
+  original_name:
+    type: string
+    minLength: 1
+  url:
+    type: string
+    format: uri
+additionalProperties: false
