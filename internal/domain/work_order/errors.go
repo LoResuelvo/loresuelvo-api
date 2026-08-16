@@ -24,4 +24,5 @@ var (
 	ErrPaidOnRequired                       = errors.New("paid_on is required")
 	ErrWorkOrderCompletionImageNotAvailable = errors.New("work order completion image is not available")
 	ErrWorkOrderUnitOfWorkRequired          = errors.New("work order unit of work is required")
+	ErrOnlyWorkOrderParticipantCanView      = errors.New("only a work order participant can view its detail")
 )

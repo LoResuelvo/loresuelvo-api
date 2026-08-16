@@ -7,9 +7,11 @@ import (
 	"time"
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/clock"
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/consumer"
 	filedomain "github.com/LoResuelvo/loresuelvo-api/internal/domain/file"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/notification"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/provider"
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/user"
 	readmodel "github.com/LoResuelvo/loresuelvo-api/internal/domain/work_order/read_model"
 )
 
@@ -70,6 +72,72 @@ func (s *Service) GetWorkOrders(ctx context.Context, auth0ID string) ([]readmode
 	}
 
 	return orders, nil
+}
+
+func (s *Service) GetWorkOrder(ctx context.Context, auth0ID string, workOrderID int) (*readmodel.WorkOrderDetail, error) {
+	order, err := s.reader.FindByID(ctx, workOrderID)
+	if err != nil {
+		return nil, err
+	}
+	if order == nil {
+		return nil, ErrDoesNotExist
+	}
+
+	foundUser, err := s.userRepository.FindByAuthID(auth0ID)
+	if err != nil || !isWorkOrderParticipant(foundUser, order) {
+		return nil, ErrOnlyWorkOrderParticipantCanView
+	}
+
+	detail := &readmodel.WorkOrderDetail{
+		ID:                order.ID(),
+		ServiceProposalID: order.ServiceProposalID(),
+		ConsumerID:        order.ConsumerID(),
+		ProviderID:        order.ProviderID(),
+		Amount:            order.Amount(),
+		ScheduledOn:       order.ScheduledOn(),
+		Description:       order.Description(),
+		Status:            string(order.Status()),
+		AcceptedOn:        order.AcceptedOn(),
+		PaidOn:            order.PaidOn(),
+	}
+
+	report := order.CompletionReport()
+	if report == nil {
+		return detail, nil
+	}
+	if s.fileService == nil {
+		return nil, fmt.Errorf("resolving work order completion images: file service is required")
+	}
+
+	images := make([]filedomain.Image, 0, len(report.ImageFileIDs()))
+	for _, fileID := range report.ImageFileIDs() {
+		images = append(images, filedomain.Image{FileID: fileID})
+	}
+	resolvedImages, err := s.fileService.ResolveWorkOrderCompletionImages(ctx, images)
+	if err != nil {
+		return nil, fmt.Errorf("resolving work order completion images: %w", err)
+	}
+	detail.CompletionReport = &readmodel.CompletionReport{
+		ID:          report.ID(),
+		Description: report.Description(),
+		ReportedOn:  report.ReportedOn(),
+		Images:      resolvedImages,
+	}
+
+	return detail, nil
+}
+
+func isWorkOrderParticipant(foundUser user.User, order *WorkOrder) bool {
+	if foundUser == nil || order == nil {
+		return false
+	}
+	if foundUser.Role() == consumer.Role {
+		return foundUser.ID() == order.ConsumerID()
+	}
+	if foundUser.Role() == provider.Role {
+		return foundUser.ID() == order.ProviderID()
+	}
+	return false
 }
 
 func (s *Service) ReportCompletion(

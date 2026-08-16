@@ -90,6 +90,17 @@ func (m *fileServiceMock) PrepareWorkOrderCompletionImages(
 	return args.Get(0).([]filedomain.Image), args.Error(1)
 }
 
+func (m *fileServiceMock) ResolveWorkOrderCompletionImages(
+	ctx context.Context,
+	images []filedomain.Image,
+) ([]filedomain.Image, error) {
+	args := m.Called(ctx, images)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]filedomain.Image), args.Error(1)
+}
+
 type transactionalStoreMock struct{ mock.Mock }
 
 func (m *transactionalStoreMock) SaveWorkOrder(ctx context.Context, order *workorder.WorkOrder) error {

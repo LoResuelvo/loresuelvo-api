@@ -82,6 +82,8 @@ paths:
     $ref: ./paths/mercado-pago-webhook.yaml
   /work-orders:
     $ref: ./paths/work-orders.yaml
+  /work-orders/{workOrderId}:
+    $ref: ./paths/work-order-detail.yaml
   /work-orders/{workOrderId}/completion-reports:
     $ref: ./paths/work-order-completion-reports.yaml
   /work-orders/{workOrderId}/checkout-sessions:

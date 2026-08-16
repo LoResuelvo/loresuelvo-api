@@ -9,4 +9,5 @@ import (
 type FileService interface {
 	ResolvePublicURLs(ctx context.Context, fileIDs []string) (map[string]string, error)
 	PrepareWorkOrderCompletionImages(ctx context.Context, authID string, fileIDs []string) ([]filedomain.Image, error)
+	ResolveWorkOrderCompletionImages(ctx context.Context, images []filedomain.Image) ([]filedomain.Image, error)
 }

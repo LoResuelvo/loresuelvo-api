@@ -16,6 +16,7 @@ type WorkOrderHandler struct {
 
 type workOrderService interface {
 	GetWorkOrders(ctx context.Context, auth0ID string) ([]readmodel.WorkOrderSummary, error)
+	GetWorkOrder(ctx context.Context, auth0ID string, workOrderID int) (*readmodel.WorkOrderDetail, error)
 	ReportCompletion(ctx context.Context, auth0ID string, workOrderID int, description string, imageFileIDs []string) (*readmodel.CompletionReport, error)
 }
 
@@ -36,6 +37,27 @@ func (h *WorkOrderHandler) GetWorkOrders(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, workOrderSummaryResponsesFromReadModel(orders))
+}
+
+func (h *WorkOrderHandler) GetWorkOrder(c *gin.Context) {
+	auth0ID, ok := httphandler.GetAuthenticatedUserID(c)
+	if !ok {
+		return
+	}
+
+	workOrderID, err := httphandler.PositiveIDFromString(c.Param("workOrderID"), "work order id")
+	if err != nil {
+		httphandler.RespondError(c, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	detail, err := h.workOrderService.GetWorkOrder(c.Request.Context(), auth0ID, workOrderID)
+	if err != nil {
+		handleGetWorkOrderError(c, err)
+		return
+	}
+
+	c.JSON(http.StatusOK, workOrderDetailResponseFromReadModel(*detail))
 }
 
 func (h *WorkOrderHandler) ReportCompletion(c *gin.Context) {

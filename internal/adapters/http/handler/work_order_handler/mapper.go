@@ -43,3 +43,26 @@ func completionReportResponseFromReadModel(report readmodel.CompletionReport) co
 		Images:      images,
 	}
 }
+
+func workOrderDetailResponseFromReadModel(detail readmodel.WorkOrderDetail) workOrderDetailResponse {
+	response := workOrderDetailResponse{
+		ID:                detail.ID,
+		ServiceProposalID: detail.ServiceProposalID,
+		ConsumerID:        detail.ConsumerID,
+		ProviderID:        detail.ProviderID,
+		AmountCents:       detail.Amount,
+		ScheduledOn:       detail.ScheduledOn,
+		Description:       detail.Description,
+		Status:            detail.Status,
+		AcceptedOn:        detail.AcceptedOn,
+	}
+	if !detail.PaidOn.IsZero() {
+		paidOn := detail.PaidOn
+		response.PaidOn = &paidOn
+	}
+	if detail.CompletionReport != nil {
+		report := completionReportResponseFromReadModel(*detail.CompletionReport)
+		response.CompletionReport = &report
+	}
+	return response
+}

@@ -13,6 +13,20 @@ type workOrderSummaryResponse struct {
 	Counterpart       workOrderCounterpartResponse `json:"counterpart"`
 }
 
+type workOrderDetailResponse struct {
+	ID                int                       `json:"id"`
+	ServiceProposalID int                       `json:"service_proposal_id"`
+	ConsumerID        int                       `json:"consumer_id"`
+	ProviderID        int                       `json:"provider_id"`
+	AmountCents       int64                     `json:"amount_cents"`
+	ScheduledOn       time.Time                 `json:"scheduled_on"`
+	Description       string                    `json:"description"`
+	Status            string                    `json:"status"`
+	AcceptedOn        time.Time                 `json:"accepted_on"`
+	PaidOn            *time.Time                `json:"paid_on,omitempty"`
+	CompletionReport  *completionReportResponse `json:"completion_report,omitempty"`
+}
+
 type workOrderCounterpartResponse struct {
 	ID              int    `json:"id"`
 	Role            string `json:"role"`

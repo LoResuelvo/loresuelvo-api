@@ -1,0 +1,87 @@
+get:
+  tags:
+    - WorkOrders
+  operationId: getWorkOrder
+  summary: Get a work order detail
+  description: |
+    Returns the contractual detail of a work order for its consumer or
+    assigned provider. When completion evidence exists, each private image is
+    exposed through a temporary download URL.
+  security:
+    - BearerAuth: []
+  parameters:
+    - name: workOrderId
+      in: path
+      required: true
+      description: Work order identifier.
+      schema:
+        type: integer
+        minimum: 1
+  responses:
+    '200':
+      description: Work order detail returned successfully.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/WorkOrder'
+          examples:
+            scheduled:
+              value:
+                id: 42
+                service_proposal_id: 10
+                consumer_id: 3
+                provider_id: 7
+                amount_cents: 10000000
+                scheduled_on: '2026-08-15T15:00:00Z'
+                description: Reparación de pérdida de agua en cocina con materiales incluidos.
+                status: scheduled
+                accepted_on: '2026-08-01T13:00:00Z'
+            awaitingPayment:
+              value:
+                id: 42
+                service_proposal_id: 10
+                consumer_id: 3
+                provider_id: 7
+                amount_cents: 10000000
+                scheduled_on: '2026-08-15T15:00:00Z'
+                description: Reparación de pérdida de agua en cocina con materiales incluidos.
+                status: awaiting_payment
+                accepted_on: '2026-08-01T13:00:00Z'
+                completion_report:
+                  id: 17
+                  description: Trabajo finalizado y funcionamiento verificado.
+                  reported_on: '2026-08-15T16:00:00Z'
+                  images:
+                    - file_id: uuid-1
+                      original_name: trabajo.jpg
+                      url: https://private.example/work-order-images/temporary-uuid-1
+    '400':
+      description: The work order identifier is invalid.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    '401':
+      description: Missing or invalid authentication.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/AuthErrorResponse'
+    '403':
+      description: The authenticated user is not a participant in the work order.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    '404':
+      description: The work order does not exist.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    '500':
+      description: The work order detail could not be retrieved.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'

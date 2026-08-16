@@ -9,6 +9,17 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+func handleGetWorkOrderError(c *gin.Context, err error) {
+	switch {
+	case errors.Is(err, workorder.ErrDoesNotExist):
+		httphandler.RespondError(c, http.StatusNotFound, err.Error())
+	case errors.Is(err, workorder.ErrOnlyWorkOrderParticipantCanView):
+		httphandler.RespondError(c, http.StatusForbidden, err.Error())
+	default:
+		httphandler.RespondError(c, http.StatusInternalServerError, "internal server error")
+	}
+}
+
 func handleReportCompletionError(c *gin.Context, err error) {
 	switch {
 	case errors.Is(err, workorder.ErrDoesNotExist):

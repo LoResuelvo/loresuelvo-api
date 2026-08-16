@@ -1,5 +1,5 @@
 type: object
-description: Scheduled work order created from an accepted service proposal.
+description: Work order detail created from an accepted service proposal.
 required:
   - id
   - service_proposal_id
@@ -42,4 +42,9 @@ properties:
   accepted_on:
     type: string
     format: date-time
+  paid_on:
+    type: string
+    format: date-time
+  completion_report:
+    $ref: '#/components/schemas/WorkOrderCompletionReport'
 additionalProperties: false
