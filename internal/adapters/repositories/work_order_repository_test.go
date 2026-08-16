@@ -58,14 +58,38 @@ func TestWorkOrderRepositoryFindsOnlyOrdersScheduledInsideWindow(t *testing.T) {
 	assert.Equal(t, providerID, foundByID.ProviderID())
 	assert.Equal(t, insideOrder.RemainingAmountDue(), foundByID.RemainingAmountDue())
 
-	require.NoError(t, insideOrder.MarkPaid())
+	completionImageID := "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+	_, err = testContext.database.Exec(
+		`INSERT INTO files (id, key, bucket, original_name, mime_type, size_bytes, status, visibility, purpose, uploaded_by_auth_id, created_on, updated_on)
+		VALUES ($1, $2, 'private', 'trabajo.jpg', 'image/jpeg', 1024, 'confirmed', 'private', 'work_order_completion_image', 'auth0|urgent-provider', NOW(), NOW())`,
+		completionImageID,
+		"files/2026/08/work_order_completion_image/"+completionImageID+"/trabajo.jpg",
+	)
+	require.NoError(t, err)
+	report, err := workorder.NewCompletionReport(
+		"Trabajo finalizado y funcionamiento verificado.",
+		[]string{completionImageID},
+		insideOrder.ScheduledOn(),
+	)
+	require.NoError(t, err)
+	require.NoError(t, insideOrder.ReportCompletion(providerID, report))
 	updated, err := testContext.workOrderRepository.Save(t.Context(), insideOrder)
 	require.NoError(t, err)
 	assert.Equal(t, insideOrder.ID(), updated.ID())
+	assert.Equal(t, workorder.StatusAwaitingPayment, updated.Status())
+	assert.Equal(t, []string{completionImageID}, updated.CompletionReport().ImageFileIDs())
+
+	paidOn := insideOrder.ScheduledOn().Add(time.Hour)
+	require.NoError(t, updated.RegisterApprovedBalancePayment(paidOn))
+	updated, err = testContext.workOrderRepository.Save(t.Context(), updated)
+	require.NoError(t, err)
 
 	fullyPaid, err := testContext.workOrderRepository.FindByID(t.Context(), insideOrder.ID())
 	require.NoError(t, err)
 	assert.Equal(t, workorder.StatusPaid, fullyPaid.Status())
+	assert.Equal(t, paidOn, fullyPaid.PaidOn())
+	assert.Equal(t, report.Description(), fullyPaid.CompletionReport().Description())
+	assert.Equal(t, []string{completionImageID}, fullyPaid.CompletionReport().ImageFileIDs())
 }
 
 func saveScheduledWorkOrderAt(

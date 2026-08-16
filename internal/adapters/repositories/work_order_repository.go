@@ -13,6 +13,7 @@ import (
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/user"
 	workorder "github.com/LoResuelvo/loresuelvo-api/internal/domain/work_order"
 	readmodel "github.com/LoResuelvo/loresuelvo-api/internal/domain/work_order/read_model"
+	"github.com/jackc/pgx/v5/pgconn"
 )
 
 type WorkOrderRepository struct {
@@ -21,10 +22,15 @@ type WorkOrderRepository struct {
 }
 
 type workOrderRecord struct {
-	ID                sql.NullInt64
-	ServiceProposalID sql.NullInt64
-	Status            sql.NullString
-	AcceptedOn        sql.NullTime
+	ID                           sql.NullInt64
+	ServiceProposalID            sql.NullInt64
+	Status                       sql.NullString
+	AcceptedOn                   sql.NullTime
+	PaidOn                       sql.NullTime
+	CompletionReportID           sql.NullInt64
+	CompletionReportDescription  sql.NullString
+	CompletionReportReportedOn   sql.NullTime
+	CompletionReportImageFileIDs []string
 }
 
 func (record workOrderRecord) Restore(proposal workorder.ServiceProposal) (*workorder.WorkOrder, error) {
@@ -44,12 +50,29 @@ func (record workOrderRecord) Restore(proposal workorder.ServiceProposal) (*work
 		return nil, fmt.Errorf("work order service proposal does not match record")
 	}
 
-	return (workorder.RestoreFactory{}).Restore(
-		int(record.ID.Int64),
-		proposal,
-		workorder.Status(record.Status.String),
-		record.AcceptedOn.Time,
-	)
+	return (workorder.RestoreFactory{}).Restore(workorder.RestoreInput{
+		ID:               int(record.ID.Int64),
+		ServiceProposal:  proposal,
+		Status:           workorder.Status(record.Status.String),
+		AcceptedOn:       record.AcceptedOn.Time,
+		CompletionReport: record.completionReport(),
+		PaidOn:           record.PaidOn.Time,
+	})
+}
+
+func (record workOrderRecord) completionReport() *workorder.CompletionReportRestoreInput {
+	if !record.CompletionReportID.Valid &&
+		!record.CompletionReportDescription.Valid &&
+		!record.CompletionReportReportedOn.Valid {
+		return nil
+	}
+
+	return &workorder.CompletionReportRestoreInput{
+		ID:           int(record.CompletionReportID.Int64),
+		Description:  record.CompletionReportDescription.String,
+		ImageFileIDs: append([]string(nil), record.CompletionReportImageFileIDs...),
+		ReportedOn:   record.CompletionReportReportedOn.Time,
+	}
 }
 
 func NewWorkOrderRepository(
@@ -95,18 +118,18 @@ func (r *WorkOrderRepository) findOne(
 	argument int,
 ) (*workorder.WorkOrder, error) {
 	var record workOrderRecord
-	var serviceProposalID sql.NullInt64
 	err := r.db.QueryRowContext(
 		ctx,
-		`SELECT wo.id, wo.service_proposal_id, wo.status, wo.accepted_on
+		`SELECT wo.id, wo.service_proposal_id, wo.status, wo.accepted_on, wo.paid_on
 		FROM work_orders wo
 		`+clause,
 		argument,
 	).Scan(
 		&record.ID,
-		&serviceProposalID,
+		&record.ServiceProposalID,
 		&record.Status,
 		&record.AcceptedOn,
+		&record.PaidOn,
 	)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, workorder.ErrDoesNotExist
@@ -114,11 +137,15 @@ func (r *WorkOrderRepository) findOne(
 	if err != nil {
 		return nil, fmt.Errorf("finding work order: %w", err)
 	}
-	if !serviceProposalID.Valid || serviceProposalID.Int64 <= 0 {
+	if !record.ServiceProposalID.Valid || record.ServiceProposalID.Int64 <= 0 {
 		return nil, fmt.Errorf("finding work order: service proposal id is required")
 	}
-	record.ServiceProposalID = serviceProposalID
-	foundProposal, err := r.serviceProposalRepository.FindByID(ctx, int(serviceProposalID.Int64))
+	completionReport, err := r.findCompletionReport(ctx, int(record.ID.Int64))
+	if err != nil {
+		return nil, fmt.Errorf("finding work order completion report: %w", err)
+	}
+	record.setCompletionReport(completionReport)
+	foundProposal, err := r.serviceProposalRepository.FindByID(ctx, int(record.ServiceProposalID.Int64))
 	if err != nil {
 		return nil, fmt.Errorf("hydrating work order service proposal: %w", err)
 	}
@@ -127,6 +154,67 @@ func (r *WorkOrderRepository) findOne(
 		return nil, fmt.Errorf("rehydrating work order: %w", err)
 	}
 	return order, nil
+}
+
+func (record *workOrderRecord) setCompletionReport(report *workorder.CompletionReportRestoreInput) {
+	if report == nil {
+		return
+	}
+	record.CompletionReportID = sql.NullInt64{Int64: int64(report.ID), Valid: true}
+	record.CompletionReportDescription = sql.NullString{String: report.Description, Valid: true}
+	record.CompletionReportReportedOn = sql.NullTime{Time: report.ReportedOn, Valid: true}
+	record.CompletionReportImageFileIDs = append([]string(nil), report.ImageFileIDs...)
+}
+
+func (r *WorkOrderRepository) findCompletionReport(ctx context.Context, workOrderID int) (*workorder.CompletionReportRestoreInput, error) {
+	var report workorder.CompletionReportRestoreInput
+	var reportID sql.NullInt64
+	var description sql.NullString
+	var reportedOn sql.NullTime
+	err := r.db.QueryRowContext(
+		ctx,
+		`SELECT id, description, reported_on
+		FROM work_order_completion_reports
+		WHERE work_order_id = $1`,
+		workOrderID,
+	).Scan(&reportID, &description, &reportedOn)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("finding completion report: %w", err)
+	}
+
+	images, err := r.db.QueryContext(
+		ctx,
+		`SELECT file_id::text
+		FROM work_order_completion_images
+		WHERE completion_report_id = $1
+		ORDER BY position ASC`,
+		reportID.Int64,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("finding completion report images: %w", err)
+	}
+	defer func() { _ = images.Close() }()
+
+	imageFileIDs := make([]string, 0, 3)
+	for images.Next() {
+		var fileID sql.NullString
+		if err := images.Scan(&fileID); err != nil {
+			return nil, fmt.Errorf("scanning completion report image: %w", err)
+		}
+		imageFileIDs = append(imageFileIDs, fileID.String)
+	}
+	if err := images.Err(); err != nil {
+		return nil, fmt.Errorf("iterating completion report images: %w", err)
+	}
+
+	report.ID = int(reportID.Int64)
+	report.Description = description.String
+	report.ImageFileIDs = imageFileIDs
+	report.ReportedOn = reportedOn.Time
+	return &report, nil
 }
 
 func (r *WorkOrderRepository) FindByUserID(ctx context.Context, userID int, viewerRole string) ([]readmodel.WorkOrderSummary, error) {
@@ -212,6 +300,7 @@ func (r *WorkOrderRepository) FindScheduledBetween(ctx context.Context, from tim
 			sp.description,
 			wo.status,
 			wo.accepted_on,
+			wo.paid_on,
 			sp.consumer_id,
 			sp.provider_id
 		FROM work_orders wo
@@ -250,12 +339,18 @@ func (r *WorkOrderRepository) FindScheduledBetween(ctx context.Context, from tim
 			&proposal.Description,
 			&record.Status,
 			&record.AcceptedOn,
+			&record.PaidOn,
 			&consumerID,
 			&providerID,
 		); err != nil {
 			return nil, fmt.Errorf("scanning work orders scheduled between: %w", err)
 		}
 		record.ServiceProposalID = serviceProposalID
+		completionReport, err := r.findCompletionReport(ctx, int(record.ID.Int64))
+		if err != nil {
+			return nil, fmt.Errorf("finding scheduled work order completion report: %w", err)
+		}
+		record.setCompletionReport(completionReport)
 		if !serviceProposalID.Valid || serviceProposalID.Int64 <= 0 {
 			return nil, fmt.Errorf("rehydrating scheduled work order: service proposal id is required")
 		}
@@ -295,6 +390,10 @@ func (r *WorkOrderRepository) saveWithTx(ctx context.Context, tx *sql.Tx, order 
 	if order.ServiceProposalID() <= 0 {
 		return nil, fmt.Errorf("saving work order: service proposal is required")
 	}
+	var paidOn any
+	if !order.PaidOn().IsZero() {
+		paidOn = order.PaidOn().UTC()
+	}
 
 	if order.ID() <= 0 {
 		var savedID int
@@ -304,19 +403,24 @@ func (r *WorkOrderRepository) saveWithTx(ctx context.Context, tx *sql.Tx, order 
 			service_proposal_id,
 			status,
 			accepted_on,
+			paid_on,
 			updated_on
 		)
-		VALUES ($1, $2, $3, NOW())
+		VALUES ($1, $2, $3, $4, NOW())
 		RETURNING id`,
 			order.ServiceProposalID(),
 			order.Status(),
 			order.AcceptedOn(),
+			paidOn,
 		).Scan(&savedID)
 		if err != nil {
 			return nil, fmt.Errorf("saving work order: %w", err)
 		}
 		saved := *order
 		saved.SetID(savedID)
+		if err := r.saveCompletionReportWithTx(ctx, tx, &saved); err != nil {
+			return nil, err
+		}
 		return &saved, nil
 	}
 
@@ -325,10 +429,12 @@ func (r *WorkOrderRepository) saveWithTx(ctx context.Context, tx *sql.Tx, order 
 		ctx,
 		`UPDATE work_orders
 		SET status = $1,
+			paid_on = $2,
 			updated_on = NOW()
-		WHERE id = $2 AND service_proposal_id = $3
+		WHERE id = $3 AND service_proposal_id = $4
 		RETURNING id`,
 		order.Status(),
+		paidOn,
 		order.ID(),
 		order.ServiceProposalID(),
 	).Scan(&savedID)
@@ -338,7 +444,78 @@ func (r *WorkOrderRepository) saveWithTx(ctx context.Context, tx *sql.Tx, order 
 	if err != nil {
 		return nil, fmt.Errorf("updating work order: %w", err)
 	}
-	return order, nil
+	saved := *order
+	saved.SetID(savedID)
+	if err := r.saveCompletionReportWithTx(ctx, tx, &saved); err != nil {
+		return nil, err
+	}
+	return &saved, nil
+}
+
+func (r *WorkOrderRepository) saveCompletionReportWithTx(
+	ctx context.Context,
+	tx *sql.Tx,
+	order *workorder.WorkOrder,
+) error {
+	if order == nil || order.ID() <= 0 {
+		return fmt.Errorf("saving work order completion report: work order identity is required")
+	}
+
+	report := order.CompletionReport()
+	if report == nil {
+		if _, err := tx.ExecContext(
+			ctx,
+			`DELETE FROM work_order_completion_reports WHERE work_order_id = $1`,
+			order.ID(),
+		); err != nil {
+			return fmt.Errorf("removing work order completion report: %w", err)
+		}
+		return nil
+	}
+
+	var reportID int
+	err := tx.QueryRowContext(
+		ctx,
+		`INSERT INTO work_order_completion_reports (work_order_id, description, reported_on)
+		VALUES ($1, $2, $3)
+		ON CONFLICT (work_order_id) DO UPDATE SET
+			description = EXCLUDED.description,
+			reported_on = EXCLUDED.reported_on
+		RETURNING id`,
+		order.ID(),
+		report.Description(),
+		report.ReportedOn().UTC(),
+	).Scan(&reportID)
+	if err != nil {
+		return fmt.Errorf("saving work order completion report: %w", err)
+	}
+	report.SetID(reportID)
+
+	if _, err := tx.ExecContext(
+		ctx,
+		`DELETE FROM work_order_completion_images WHERE completion_report_id = $1`,
+		reportID,
+	); err != nil {
+		return fmt.Errorf("replacing work order completion images: %w", err)
+	}
+
+	for position, fileID := range report.ImageFileIDs() {
+		if _, err := tx.ExecContext(
+			ctx,
+			`INSERT INTO work_order_completion_images (completion_report_id, file_id, position)
+			VALUES ($1, $2, $3)`,
+			reportID,
+			fileID,
+			position,
+		); err != nil {
+			var pgErr *pgconn.PgError
+			if errors.As(err, &pgErr) && (pgErr.Code == uniqueViolationCode || pgErr.Code == foreignKeyViolationCode) {
+				return workorder.ErrCompletionReportImageNotAvailable
+			}
+			return fmt.Errorf("saving work order completion image: %w", err)
+		}
+	}
+	return nil
 }
 
 func rollbackWorkOrderTx(tx *sql.Tx, cause error) error {

@@ -12,6 +12,7 @@ var (
 	ErrCompletionReportImageCount          = errors.New("completion report must contain between one and three images")
 	ErrCompletionReportImageRequired       = errors.New("completion report image file id is required")
 	ErrCompletionReportDuplicateImage      = errors.New("completion report cannot contain duplicate images")
+	ErrCompletionReportImageNotAvailable   = errors.New("completion report image is not available")
 	ErrCompletionReportReportedOnRequired  = errors.New("completion report reported_on is required")
 	ErrCompletionReportAlreadyExists       = errors.New("work order already has a completion report")
 	ErrOnlyAssignedProviderCanReport       = errors.New("only the assigned provider can report work completion")
