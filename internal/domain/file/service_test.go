@@ -168,6 +168,40 @@ func newFileServiceWithVideoParser(repo *fileRepositoryMock, storage *storageMoc
 	}, parser)
 }
 
+func createWorkOrderCompletionImage(
+	t *testing.T,
+	service *filedomain.Service,
+	authID string,
+	purpose string,
+	fileName string,
+	mimeType string,
+	sizeBytes int,
+	confirm bool,
+) string {
+	t.Helper()
+	upload, err := service.RequestUpload(context.Background(), filedomain.PresignRequest{
+		AuthID:       authID,
+		OriginalName: fileName,
+		MimeType:     mimeType,
+		SizeBytes:    sizeBytes,
+		Purpose:      purpose,
+	})
+	require.NoError(t, err)
+	if !confirm {
+		return upload.FileID
+	}
+
+	_, err = service.ConfirmUpload(context.Background(), filedomain.ConfirmRequest{
+		AuthID:    authID,
+		FileID:    upload.FileID,
+		Key:       upload.Key,
+		MimeType:  mimeType,
+		SizeBytes: sizeBytes,
+	})
+	require.NoError(t, err)
+	return upload.FileID
+}
+
 func TestRequestUploadCreatesPendingProfilePhoto(t *testing.T) {
 	repo := newFileRepositoryMock()
 	service := newFileService(repo, newStorageMock())
@@ -188,6 +222,128 @@ func TestRequestUploadCreatesPendingProfilePhoto(t *testing.T) {
 	assert.Equal(t, filedomain.StatusPending, createdFile.Status)
 	assert.Equal(t, filedomain.VisibilityPublic, createdFile.Visibility)
 	assert.Equal(t, "auth0|provider", createdFile.UploadedByAuthID)
+}
+
+func TestRequestUploadCreatesPrivateWorkOrderCompletionImage(t *testing.T) {
+	repo := newFileRepositoryMock()
+	service := newFileService(repo, newStorageMock())
+
+	result, err := service.RequestUpload(context.Background(), filedomain.PresignRequest{
+		AuthID:       "auth0|provider",
+		OriginalName: "trabajo.webp",
+		MimeType:     "image/webp",
+		SizeBytes:    1024,
+		Purpose:      filedomain.PurposeWorkOrderCompletionImage,
+	})
+
+	require.NoError(t, err)
+	createdFile := repo.files[result.FileID]
+	assert.Equal(t, filedomain.StatusPending, createdFile.Status)
+	assert.Equal(t, filedomain.VisibilityPrivate, createdFile.Visibility)
+	assert.Equal(t, filedomain.PurposeWorkOrderCompletionImage, createdFile.Purpose)
+	assert.Equal(t, "auth0|provider", createdFile.UploadedByAuthID)
+	assert.Contains(t, result.Key, "/work_order_completion_image/")
+}
+
+func TestRequestUploadAcceptsAllWorkOrderCompletionImageMIMETypes(t *testing.T) {
+	for _, test := range []struct {
+		name     string
+		fileName string
+		mimeType string
+	}{
+		{name: "jpeg", fileName: "trabajo.jpg", mimeType: "image/jpeg"},
+		{name: "png", fileName: "trabajo.png", mimeType: "image/png"},
+		{name: "webp", fileName: "trabajo.webp", mimeType: "image/webp"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			service := newFileService(newFileRepositoryMock(), newStorageMock())
+			_, err := service.RequestUpload(context.Background(), filedomain.PresignRequest{
+				AuthID:       "auth0|provider",
+				OriginalName: test.fileName,
+				MimeType:     test.mimeType,
+				SizeBytes:    1024,
+				Purpose:      filedomain.PurposeWorkOrderCompletionImage,
+			})
+			assert.NoError(t, err)
+		})
+	}
+}
+
+func TestRequestUploadRejectsInvalidWorkOrderCompletionImageMetadata(t *testing.T) {
+	for _, test := range []struct {
+		name      string
+		fileName  string
+		mimeType  string
+		sizeBytes int
+	}{
+		{name: "unsupported mime type", fileName: "trabajo.gif", mimeType: "image/gif", sizeBytes: 1024},
+		{name: "oversized file", fileName: "trabajo.jpg", mimeType: "image/jpeg", sizeBytes: 5*1024*1024 + 1},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			service := newFileService(newFileRepositoryMock(), newStorageMock())
+			_, err := service.RequestUpload(context.Background(), filedomain.PresignRequest{
+				AuthID:       "auth0|provider",
+				OriginalName: test.fileName,
+				MimeType:     test.mimeType,
+				SizeBytes:    test.sizeBytes,
+				Purpose:      filedomain.PurposeWorkOrderCompletionImage,
+			})
+			assert.ErrorIs(t, err, filedomain.ErrWorkOrderCompletionImageNotAvailable)
+		})
+	}
+}
+
+func TestPrepareWorkOrderCompletionImagesRequiresOneToThreeValidPrivateFiles(t *testing.T) {
+	repo := newFileRepositoryMock()
+	service := newFileService(repo, newStorageMock())
+	validIDs := []string{
+		createWorkOrderCompletionImage(t, service, "auth0|provider", filedomain.PurposeWorkOrderCompletionImage, "uno.jpg", "image/jpeg", 1024, true),
+		createWorkOrderCompletionImage(t, service, "auth0|provider", filedomain.PurposeWorkOrderCompletionImage, "dos.png", "image/png", 2048, true),
+		createWorkOrderCompletionImage(t, service, "auth0|provider", filedomain.PurposeWorkOrderCompletionImage, "tres.webp", "image/webp", 4096, true),
+	}
+
+	prepared, err := service.PrepareWorkOrderCompletionImages(context.Background(), "auth0|provider", validIDs)
+
+	require.NoError(t, err)
+	require.Len(t, prepared, 3)
+	assert.Equal(t, validIDs[0], prepared[0].FileID)
+	assert.Equal(t, "https://download/private/"+repo.files[validIDs[0]].Key, prepared[0].URL)
+
+	_, err = service.PrepareWorkOrderCompletionImages(context.Background(), "auth0|provider", nil)
+	assert.ErrorIs(t, err, filedomain.ErrWorkOrderCompletionImageNotAvailable)
+
+	fourthID := createWorkOrderCompletionImage(t, service, "auth0|provider", filedomain.PurposeWorkOrderCompletionImage, "cuatro.jpg", "image/jpeg", 1024, true)
+	_, err = service.PrepareWorkOrderCompletionImages(context.Background(), "auth0|provider", append(validIDs, fourthID))
+	assert.ErrorIs(t, err, filedomain.ErrWorkOrderCompletionImageNotAvailable)
+}
+
+func TestPrepareWorkOrderCompletionImagesRejectsWrongOwnerPendingAndWrongPurpose(t *testing.T) {
+	repo := newFileRepositoryMock()
+	service := newFileService(repo, newStorageMock())
+	wrongOwnerID := createWorkOrderCompletionImage(t, service, "auth0|other", filedomain.PurposeWorkOrderCompletionImage, "ajena.jpg", "image/jpeg", 1024, true)
+	pendingID := createWorkOrderCompletionImage(t, service, "auth0|provider", filedomain.PurposeWorkOrderCompletionImage, "pendiente.jpg", "image/jpeg", 1024, false)
+	wrongPurposeID := createWorkOrderCompletionImage(t, service, "auth0|provider", filedomain.PurposeProfilePhoto, "perfil.jpg", "image/jpeg", 1024, true)
+
+	for _, fileID := range []string{wrongOwnerID, pendingID, wrongPurposeID} {
+		_, err := service.PrepareWorkOrderCompletionImages(context.Background(), "auth0|provider", []string{fileID})
+		assert.ErrorIs(t, err, filedomain.ErrWorkOrderCompletionImageNotAvailable)
+	}
+}
+
+func TestResolveWorkOrderCompletionImagesReturnsPrivateURLsInInputOrder(t *testing.T) {
+	repo := newFileRepositoryMock()
+	service := newFileService(repo, newStorageMock())
+	firstID := createWorkOrderCompletionImage(t, service, "auth0|provider", filedomain.PurposeWorkOrderCompletionImage, "primera.jpg", "image/jpeg", 1024, true)
+	secondID := createWorkOrderCompletionImage(t, service, "auth0|provider", filedomain.PurposeWorkOrderCompletionImage, "segunda.jpg", "image/jpeg", 1024, true)
+
+	resolved, err := service.ResolveWorkOrderCompletionImages(context.Background(), []filedomain.Image{{FileID: firstID}, {FileID: secondID}})
+
+	require.NoError(t, err)
+	require.Len(t, resolved, 2)
+	assert.Equal(t, firstID, resolved[0].FileID)
+	assert.Equal(t, "primera.jpg", resolved[0].OriginalName)
+	assert.Equal(t, "https://download/private/"+repo.files[firstID].Key, resolved[0].URL)
+	assert.Equal(t, secondID, resolved[1].FileID)
 }
 
 func TestRequestUploadCreatesPrivateConversationMessageImage(t *testing.T) {

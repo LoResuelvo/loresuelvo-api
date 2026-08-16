@@ -14,6 +14,7 @@ const (
 	PurposeConversationMessageAudio = "conversation_message_audio"
 	PurposeConversationMessageVideo = "conversation_message_video"
 	PurposeJobRequestImage          = "job_request_image"
+	PurposeWorkOrderCompletionImage = "work_order_completion_image"
 )
 
 type File struct {

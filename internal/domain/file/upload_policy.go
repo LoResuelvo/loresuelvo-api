@@ -6,8 +6,10 @@ const (
 	maxConversationMessageAudioBytes           = 5 * 1024 * 1024
 	maxConversationMessageVideoBytes           = 50 * 1024 * 1024
 	maxJobRequestImageBytes                    = 5 * 1024 * 1024
+	maxWorkOrderCompletionImageBytes           = 5 * 1024 * 1024
 	MaxConversationMessageImages               = 5
 	MaxJobRequestImages                        = 3
+	MaxWorkOrderCompletionImages               = 3
 	MaxConversationMessageAudioDurationSeconds = 300
 	MaxConversationMessageVideoDurationSeconds = 120
 	MaxConversationMessageVideoWidth           = 1920
@@ -147,6 +149,18 @@ var jobRequestImagePolicy = UploadPolicy{
 	InvalidMetadataError: ErrJobRequestImageNotAvailable,
 }
 
+var workOrderCompletionImagePolicy = UploadPolicy{
+	Purpose:      PurposeWorkOrderCompletionImage,
+	Visibility:   VisibilityPrivate,
+	MaxSizeBytes: maxWorkOrderCompletionImageBytes,
+	AllowedMimeTypes: map[string]struct{}{
+		"image/jpeg": {},
+		"image/png":  {},
+		"image/webp": {},
+	},
+	InvalidMetadataError: ErrWorkOrderCompletionImageNotAvailable,
+}
+
 func defaultUploadPolicies() map[string]UploadPolicy {
 	return map[string]UploadPolicy{
 		PurposeProfilePhoto:             profilePhotoPolicy,
@@ -154,5 +168,6 @@ func defaultUploadPolicies() map[string]UploadPolicy {
 		PurposeConversationMessageAudio: conversationMessageAudioPolicy,
 		PurposeConversationMessageVideo: conversationMessageVideoPolicy,
 		PurposeJobRequestImage:          jobRequestImagePolicy,
+		PurposeWorkOrderCompletionImage: workOrderCompletionImagePolicy,
 	}
 }

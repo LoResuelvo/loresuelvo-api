@@ -23,6 +23,7 @@ type Service struct {
 
 type imageValidation struct {
 	policy       UploadPolicy
+	minFiles     int
 	maxFiles     int
 	errorContext string
 }
@@ -37,6 +38,13 @@ var jobRequestImageValidation = imageValidation{
 	policy:       jobRequestImagePolicy,
 	maxFiles:     MaxJobRequestImages,
 	errorContext: "job request",
+}
+
+var workOrderCompletionImageValidation = imageValidation{
+	policy:       workOrderCompletionImagePolicy,
+	minFiles:     1,
+	maxFiles:     MaxWorkOrderCompletionImages,
+	errorContext: "work order completion",
 }
 
 func NewService(repository Repository, storage Storage, publicBucket, privateBucket string, clock domainclock.Clock, audioMetadataParser AudioMetadataParser, videoMetadataParsers ...VideoMetadataParser) *Service {
@@ -290,6 +298,22 @@ func (s *Service) PrepareJobRequestImages(ctx context.Context, authID string, fi
 	return result, nil
 }
 
+func (s *Service) PrepareWorkOrderCompletionImages(ctx context.Context, authID string, fileIDs []string) ([]Image, error) {
+	files, err := s.validatedWorkOrderCompletionImageFiles(ctx, authID, fileIDs)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]Image, 0, len(files))
+	for _, file := range files {
+		resolved, err := s.resolveImage(ctx, file)
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, resolved)
+	}
+	return result, nil
+}
+
 func (s *Service) PrepareMessageImages(ctx context.Context, authID string, fileIDs []string) ([]MessageImage, error) {
 	files, err := s.validatedMessageImageFiles(ctx, authID, fileIDs)
 	if err != nil {
@@ -387,12 +411,16 @@ func (s *Service) validatedJobRequestImageFiles(ctx context.Context, authID stri
 	return s.validatedImageFiles(ctx, authID, fileIDs, jobRequestImageValidation)
 }
 
+func (s *Service) validatedWorkOrderCompletionImageFiles(ctx context.Context, authID string, fileIDs []string) ([]File, error) {
+	return s.validatedImageFiles(ctx, authID, fileIDs, workOrderCompletionImageValidation)
+}
+
 func (s *Service) validatedImageFiles(ctx context.Context, authID string, fileIDs []string, validation imageValidation) ([]File, error) {
+	if len(fileIDs) < validation.minFiles || len(fileIDs) > validation.maxFiles {
+		return nil, validation.policy.InvalidMetadataError
+	}
 	if len(fileIDs) == 0 {
 		return []File{}, nil
-	}
-	if len(fileIDs) > validation.maxFiles {
-		return nil, validation.policy.InvalidMetadataError
 	}
 	uniqueFileIDs := uniqueNonEmptyFileIDs(fileIDs)
 	if len(uniqueFileIDs) != len(fileIDs) {
@@ -571,6 +599,49 @@ func (s *Service) ResolveJobRequestImages(ctx context.Context, images []Image) (
 		file, ok := filesByID[image.FileID]
 		if !ok {
 			return nil, ErrJobRequestImageNotAvailable
+		}
+		resolved, err := s.resolveImage(ctx, file)
+		if err != nil {
+			return nil, err
+		}
+		result = append(result, resolved)
+	}
+	return result, nil
+}
+
+func (s *Service) ResolveWorkOrderCompletionImages(ctx context.Context, images []Image) ([]Image, error) {
+	fileIDs := make([]string, 0, len(images))
+	for _, image := range images {
+		fileIDs = append(fileIDs, image.FileID)
+	}
+	if len(fileIDs) < workOrderCompletionImageValidation.minFiles || len(fileIDs) > workOrderCompletionImageValidation.maxFiles {
+		return nil, ErrWorkOrderCompletionImageNotAvailable
+	}
+	uniqueFileIDs := uniqueNonEmptyFileIDs(fileIDs)
+	if len(uniqueFileIDs) != len(fileIDs) {
+		return nil, ErrWorkOrderCompletionImageNotAvailable
+	}
+
+	files, err := s.repository.FindByIDs(ctx, uniqueFileIDs)
+	if err != nil {
+		return nil, fmt.Errorf("finding work order completion images: %w", err)
+	}
+	if len(files) != len(uniqueFileIDs) {
+		return nil, ErrWorkOrderCompletionImageNotAvailable
+	}
+	filesByID := make(map[string]File, len(files))
+	for _, file := range files {
+		if !isAvailableImageForPolicy(file, workOrderCompletionImagePolicy) {
+			return nil, ErrWorkOrderCompletionImageNotAvailable
+		}
+		filesByID[file.ID] = file
+	}
+
+	result := make([]Image, 0, len(images))
+	for _, image := range images {
+		file, ok := filesByID[image.FileID]
+		if !ok {
+			return nil, ErrWorkOrderCompletionImageNotAvailable
 		}
 		resolved, err := s.resolveImage(ctx, file)
 		if err != nil {
