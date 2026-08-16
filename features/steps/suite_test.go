@@ -70,6 +70,10 @@ type testSuite struct {
 	messageImagesByName                     map[string]messageImageFixture
 	messageAudiosByName                     map[string]messageAudioFixture
 	messageVideosByName                     map[string]messageVideoFixture
+	completionImagesByName                  map[string]completionImageFixture
+	completionImageNames                    []string
+	lastCompletionReport                    completionReportResponse
+	lastCompletionReportWorkOrderID         int
 	lastSentMessageID                       int
 	lastAttemptedMessageAudioName           string
 	lastAttemptedMessageVideoName           string
@@ -130,6 +134,7 @@ func (s *testSuite) registerAllSteps(sc *godog.ScenarioContext) {
 	registerGetServiceProposalsSteps(sc, s)
 	registerAcceptServiceProposalSteps(sc, s)
 	registerGetWorkOrdersSteps(sc, s)
+	registerReportWorkCompletionSteps(sc, s)
 	registerCompleteServicePaymentSteps(sc, s)
 	registerConnectMercadoPagoAccountSteps(sc, s)
 	registerNotifyUrgentWorkOrdersSteps(sc, s)
@@ -211,6 +216,10 @@ func (s *testSuite) cleanup() error {
 	s.messageImagesByName = map[string]messageImageFixture{}
 	s.messageAudiosByName = map[string]messageAudioFixture{}
 	s.messageVideosByName = map[string]messageVideoFixture{}
+	s.completionImagesByName = map[string]completionImageFixture{}
+	s.completionImageNames = nil
+	s.lastCompletionReport = completionReportResponse{}
+	s.lastCompletionReportWorkOrderID = 0
 	s.lastSentMessageID = 0
 	s.lastAttemptedMessageAudioName = ""
 	s.lastAttemptedMessageVideoName = ""
@@ -319,6 +328,7 @@ func newTestSuite(tb testing.TB, database *sql.DB) *testSuite {
 		messageImagesByName:                map[string]messageImageFixture{},
 		messageAudiosByName:                map[string]messageAudioFixture{},
 		messageVideosByName:                map[string]messageVideoFixture{},
+		completionImagesByName:             map[string]completionImageFixture{},
 		aiJobRequestsByProvider:            map[string]jobRequestCreationResponse{},
 		aiWorkConversationIDsBeforeContact: map[int]int{},
 		expectedChatbotImageDescriptions:   map[string]string{},

@@ -1,4 +1,3 @@
-@wip
 Feature: Informar finalización de una orden de trabajo
     Como prestador asignado
     quiero informar que realicé el trabajo adjuntando una descripción y fotografías
@@ -19,6 +18,7 @@ Feature: Informar finalización de una orden de trabajo
     Rule: Sólo el prestador asignado puede informar la finalización
 
         Scenario: 26.1.1-IFWO El prestador asignado informa la finalización con una foto
+            Given que la fecha y hora actual del sistema es "2026-08-15T16:00:00Z"
             Given que estoy autenticado como prestador "juan.plomero@example.com"
             And que cargué y confirmé una imagen privada de finalización "trabajo.jpg" para la orden
             When informo la finalización de la orden con la imagen "trabajo.jpg" y la descripción:
@@ -29,6 +29,7 @@ Feature: Informar finalización de una orden de trabajo
             And la orden de trabajo queda en estado "awaiting_payment"
 
         Scenario: 26.1.2-IFWO El prestador asignado informa la finalización con tres fotos
+            Given que la fecha y hora actual del sistema es "2026-08-15T16:00:00Z"
             Given que estoy autenticado como prestador "juan.plomero@example.com"
             And que cargué y confirmé tres imágenes privadas de finalización: "antes.jpg", "durante.png" y "después.webp"
             When informo la finalización de la orden con las imágenes "antes.jpg", "durante.png" y "después.webp" y la descripción:
@@ -77,6 +78,7 @@ Feature: Informar finalización de una orden de trabajo
             Then el sistema rechaza el reporte de finalización con estado 409
 
         Scenario: 26.3.2-IFWO Rechazar una descripción vacía o con espacios
+            Given que la fecha y hora actual del sistema es "2026-08-15T16:00:00Z"
             Given que estoy autenticado como prestador "juan.plomero@example.com"
             And que cargué y confirmé una imagen privada de finalización "trabajo.jpg" para la orden
             When intento informar la finalización de la orden con la imagen "trabajo.jpg" y la descripción:
@@ -99,6 +101,7 @@ Feature: Informar finalización de una orden de trabajo
     Rule: Sólo se aceptan imágenes privadas confirmadas y aptas para finalización
 
         Scenario Outline: 26.4.1-IFWO Rechazar una imagen no disponible para finalización
+            Given que la fecha y hora actual del sistema es "2026-08-15T16:00:00Z"
             Given que estoy autenticado como prestador "juan.plomero@example.com"
             And que preparé una imagen "trabajo.jpg" <condición> para el reporte de finalización
             When intento informar la finalización de la orden con la descripción "Trabajo finalizado"
@@ -115,6 +118,7 @@ Feature: Informar finalización de una orden de trabajo
     Rule: La notificación se persiste y se entrega después del commit
 
         Scenario: 26.5.1-IFWO Notificar al consumidor la finalización registrada
+            Given que la fecha y hora actual del sistema es "2026-08-15T16:00:00Z"
             Given que estoy autenticado como prestador "juan.plomero@example.com"
             And que el consumidor "ana@example.com" está disponible para recibir mensajes en tiempo real
             And que cargué y confirmé una imagen privada de finalización "trabajo.jpg" para la orden

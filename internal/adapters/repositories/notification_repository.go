@@ -26,6 +26,41 @@ func (repository *NotificationRepository) Save(ctx context.Context, notification
 	return repository.save(ctx, repository.db, notification)
 }
 
+func (repository *NotificationRepository) FindLatestByUserAndResource(
+	ctx context.Context,
+	userID int,
+	notificationType notification.Type,
+	resourceType notification.ResourceType,
+	resourceID int,
+) (*notification.Notification, error) {
+	var found notification.Notification
+	err := repository.db.QueryRowContext(
+		ctx,
+		`SELECT id, user_id, type, resource_type, resource_id, read_at, created_at
+		FROM notifications
+		WHERE user_id = $1 AND type = $2 AND resource_type = $3 AND resource_id = $4
+		ORDER BY id DESC
+		LIMIT 1`,
+		userID,
+		notificationType,
+		resourceType,
+		resourceID,
+	).Scan(
+		&found.ID,
+		&found.UserID,
+		&found.Type,
+		&found.ResourceType,
+		&found.ResourceID,
+		&found.ReadAt,
+		&found.CreatedAt,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("finding latest notification: %w", err)
+	}
+
+	return &found, nil
+}
+
 func (repository *NotificationRepository) saveWithTx(
 	ctx context.Context,
 	tx *sql.Tx,

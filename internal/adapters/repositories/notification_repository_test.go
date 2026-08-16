@@ -99,3 +99,40 @@ func TestNotificationRepositoryCanSave(t *testing.T) {
 	assert.False(t, storedReadAt.Valid)
 	assert.Equal(t, createdAt, storedCreatedAt.UTC())
 }
+
+func TestNotificationRepositoryFindsLatestByUserAndResource(t *testing.T) {
+	testContext := newNotificationRepositoryTest(t)
+	consumerToSave, err := consumer.NewConsumer("auth0|notification-reader", "notification.reader@example.com", "Ana", "Perez", nil)
+	require.NoError(t, err)
+	_, err = testContext.userRepository.Save(context.Background(), consumerToSave)
+	require.NoError(t, err)
+	consumerID, err := testContext.userRepository.FindIDByEmail(consumerToSave.Email())
+	require.NoError(t, err)
+
+	for index := 0; index < 2; index++ {
+		_, err = testContext.notificationRepository.Save(context.Background(), &notification.Notification{
+			UserID:       consumerID,
+			Type:         notification.TypeWorkOrderCompletionReported,
+			ResourceType: notification.ResourceWorkOrder,
+			ResourceID:   42,
+			CreatedAt:    time.Now().UTC().Add(time.Duration(index) * time.Second),
+		})
+		require.NoError(t, err)
+	}
+
+	found, err := testContext.notificationRepository.FindLatestByUserAndResource(
+		context.Background(),
+		consumerID,
+		notification.TypeWorkOrderCompletionReported,
+		notification.ResourceWorkOrder,
+		42,
+	)
+
+	require.NoError(t, err)
+	require.NotNil(t, found)
+	assert.NotZero(t, found.ID)
+	assert.Equal(t, consumerID, found.UserID)
+	assert.Equal(t, notification.TypeWorkOrderCompletionReported, found.Type)
+	assert.Equal(t, notification.ResourceWorkOrder, found.ResourceType)
+	assert.Equal(t, 42, found.ResourceID)
+}
