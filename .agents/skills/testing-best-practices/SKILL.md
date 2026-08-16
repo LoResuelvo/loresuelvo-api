@@ -74,6 +74,22 @@ make migrate-test-down    # Teardown test DB
 - Use `testify/require` for assertions.
 - Use `DATA-DOG/go-sqlmock` for SQL mocking where appropriate.
 - Auth test helper in `testhelper/fakevalidator.go` — do not mock real Auth0.
+- Keep every mock/double shared by a package's unit tests in that package's
+  `mock_test.go`; individual test files should contain scenarios and
+  assertions, not private mock implementations. Move reusable setup helpers
+  there as well when they construct those mocks.
+- Name mocks after the smallest port they implement (for example,
+  `fileServiceMock` or `unitOfWorkMock`) and embed `testify/mock.Mock`.
+  Implement port methods with `m.Called(...)`; configure behavior in each test
+  with `On(...).Return(...).Once()` and verify it with
+  `AssertExpectations`/`AssertNotCalled`.
+- Use `mock.Anything` for request contexts and `mock.MatchedBy` for meaningful
+  domain predicates. Use `Run` callbacks when a persistence mock must mutate a
+  passed aggregate (for example, assigning a generated ID), rather than
+  adding bespoke mutable fields and handwritten behavior to the mock.
+- When an interface dependency is intentionally absent, pass a nil interface
+  to the constructor; avoid passing a typed nil mock because it is non-nil
+  after interface conversion.
 
 ## Coverage
 

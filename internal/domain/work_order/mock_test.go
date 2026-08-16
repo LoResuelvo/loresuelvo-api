@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/consumer"
+	filedomain "github.com/LoResuelvo/loresuelvo-api/internal/domain/file"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/notification"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/provider"
 	serviceproposal "github.com/LoResuelvo/loresuelvo-api/internal/domain/service_proposal"
@@ -67,6 +68,51 @@ func (m *userRepositoryMock) FindByAuthID(auth0ID string) (user.User, error) {
 	return args.Get(0).(user.User), args.Error(1)
 }
 
+type fileServiceMock struct{ mock.Mock }
+
+func (m *fileServiceMock) ResolvePublicURLs(ctx context.Context, fileIDs []string) (map[string]string, error) {
+	args := m.Called(ctx, fileIDs)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(map[string]string), args.Error(1)
+}
+
+func (m *fileServiceMock) PrepareWorkOrderCompletionImages(
+	ctx context.Context,
+	auth0ID string,
+	fileIDs []string,
+) ([]filedomain.Image, error) {
+	args := m.Called(ctx, auth0ID, fileIDs)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]filedomain.Image), args.Error(1)
+}
+
+type transactionalStoreMock struct{ mock.Mock }
+
+func (m *transactionalStoreMock) SaveWorkOrder(ctx context.Context, order *workorder.WorkOrder) error {
+	return m.Called(ctx, order).Error(0)
+}
+
+func (m *transactionalStoreMock) SaveNotification(ctx context.Context, created *notification.Notification) error {
+	return m.Called(ctx, created).Error(0)
+}
+
+type unitOfWorkMock struct {
+	mock.Mock
+	store workorder.TransactionalStore
+}
+
+func (m *unitOfWorkMock) Execute(ctx context.Context, operation func(workorder.TransactionalStore) error) error {
+	args := m.Called(ctx, operation)
+	if err := args.Error(0); err != nil {
+		return err
+	}
+	return operation(m.store)
+}
+
 type workOrderServiceTestEnv struct {
 	reader      *readerMock
 	users       *userRepositoryMock
@@ -90,8 +136,25 @@ func setupWorkOrderServiceTest(now time.Time) *workOrderServiceTestEnv {
 		repository:  repository,
 		notificator: notificator,
 		clock:       clock,
-		service:     workorder.NewService(reader, users, nil, repository, notificator, clock),
+		service:     workorder.NewService(reader, users, nil, repository, notificator, nil, clock),
 	}
+}
+
+func setupCompletionServiceTest(
+	now time.Time,
+	order *workorder.WorkOrder,
+	actor user.User,
+	fileService *fileServiceMock,
+	unitOfWork workorder.UnitOfWork,
+	notificator *notificatorMock,
+) *workorder.Service {
+	reader := new(readerMock)
+	reader.On("FindByID", mock.Anything, order.ID()).Return(order, nil).Once()
+	users := new(userRepositoryMock)
+	users.On("FindByAuthID", actor.AuthID()).Return(actor, nil).Once()
+	clock := new(clockMock)
+	clock.On("Now").Return(now)
+	return workorder.NewService(reader, users, fileService, nil, notificator, unitOfWork, clock)
 }
 
 func workOrderFixture(id, consumerID, providerID int, scheduledOn time.Time) *workorder.WorkOrder {

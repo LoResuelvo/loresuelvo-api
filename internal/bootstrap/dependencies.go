@@ -224,6 +224,7 @@ func NewDependenciesWithPaymentAccountAdapters(
 		fileService,
 		persistence.NotificationRepository,
 		notificator,
+		persistence.WorkOrderUnitOfWork,
 		systemClock,
 	)
 	urgentWorkOrderScheduler := scheduler.NewScheduler(time.Hour, workOrderService)

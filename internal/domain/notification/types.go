@@ -7,6 +7,7 @@ const (
 	TypeServiceProposalAccepted       Type = "service_proposal_accepted"
 	TypeServiceProposalRejected       Type = "service_proposal_rejected"
 	TypeWorkOrderCloseToScheduledTime Type = "work_order_close_to_scheduled_time"
+	TypeWorkOrderCompletionReported   Type = "work_order_completion_reported"
 )
 
 type ResourceType string
