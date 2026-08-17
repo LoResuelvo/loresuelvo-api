@@ -16,6 +16,36 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestWorkOrderRepositoryStoresReview(t *testing.T) {
+	testContext := newServiceProposalRepositoryTest(t)
+	order, review := savePaidWorkOrderWithReview(t, testContext)
+
+	_, err := testContext.workOrderRepository.Save(t.Context(), order)
+	require.NoError(t, err)
+
+	var storedRating int
+	var storedDescription string
+	require.NoError(t, testContext.database.QueryRow(
+		`SELECT rating, description
+		FROM work_order_reviews
+		WHERE work_order_id = $1`,
+		order.ID(),
+	).Scan(&storedRating, &storedDescription))
+	require.Equal(t, review.Rating(), storedRating)
+	require.Equal(t, review.Description(), storedDescription)
+}
+
+func TestWorkOrderRepositoryHydratesReview(t *testing.T) {
+	testContext := newServiceProposalRepositoryTest(t)
+	order, expectedReview := savePaidWorkOrderWithReview(t, testContext)
+	_, err := testContext.workOrderRepository.Save(t.Context(), order)
+	require.NoError(t, err)
+
+	found, err := testContext.workOrderRepository.FindByID(t.Context(), order.ID())
+	require.NoError(t, err)
+	require.Equal(t, expectedReview, found.Review())
+}
+
 func TestWorkOrderRepositoryFindsOnlyOrdersScheduledInsideWindow(t *testing.T) {
 	testContext := newServiceProposalRepositoryTest(t)
 	consumerID := savedConsumerIDWithData(t, jobRequestRepositoryTestContext{
@@ -119,4 +149,70 @@ func saveScheduledWorkOrderAt(
 	savedOrder, err := testContext.workOrderRepository.Save(t.Context(), order)
 	require.NoError(t, err)
 	return savedOrder
+}
+
+func savePaidWorkOrderWithReview(
+	t *testing.T,
+	testContext serviceProposalRepositoryTestContext,
+) (*workorder.WorkOrder, *workorder.Review) {
+	t.Helper()
+	consumerAuthID := "auth0|review-repository-consumer"
+	providerAuthID := "auth0|review-repository-provider"
+	consumerID := savedConsumerIDWithData(t, jobRequestRepositoryTestContext{
+		userRepository: testContext.userRepository,
+	}, consumerAuthID, "review.repository.consumer@example.com", "Ana", "Perez")
+	providerID := savedProviderIDWithData(t, jobRequestRepositoryTestContext{
+		database:           testContext.database,
+		userRepository:     testContext.userRepository,
+		categoryRepository: testContext.categoryRepository,
+	}, providerAuthID, "review.repository.provider@example.com", "Juan", "Gomez", "Plomeria")
+	activeConversation, err := conversation.NewPendingConversation(consumerID, providerID)
+	require.NoError(t, err)
+	require.NoError(t, activeConversation.Activate())
+	activeConversation, err = testContext.conversationRepository.SaveConversation(t.Context(), activeConversation)
+	require.NoError(t, err)
+
+	scheduledOn := time.Now().UTC().Truncate(time.Microsecond).Add(48 * time.Hour)
+	order := saveScheduledWorkOrderAt(t, testContext, activeConversation, consumerID, providerID, scheduledOn)
+	completionImageID := "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee"
+	saveReviewCompletionImage(t, testContext, providerAuthID, completionImageID)
+	report, err := workorder.NewCompletionReport("Trabajo terminado", []string{completionImageID}, scheduledOn)
+	require.NoError(t, err)
+	require.NoError(t, order.ReportCompletion(providerID, report))
+	require.NoError(t, order.RegisterApprovedBalancePayment(scheduledOn.Add(time.Hour)))
+
+	reviewer := &consumer.Consumer{
+		BaseUser: user.RehydrateBaseUser(
+			consumerID,
+			consumerAuthID,
+			"review.repository.consumer@example.com",
+			"Ana",
+			"Perez",
+			consumer.Role,
+			nil,
+		),
+	}
+	review, err := workorder.NewReview(5, "  Trabajo prolijo y claro.  ")
+	require.NoError(t, err)
+	require.NoError(t, order.AddReview(reviewer, review))
+
+	return order, review
+}
+
+func saveReviewCompletionImage(
+	t *testing.T,
+	testContext serviceProposalRepositoryTestContext,
+	providerAuthID string,
+	fileID string,
+) {
+	t.Helper()
+
+	_, err := testContext.database.Exec(
+		`INSERT INTO files (id, key, bucket, original_name, mime_type, size_bytes, status, visibility, purpose, uploaded_by_auth_id, created_on, updated_on)
+		VALUES ($1, $2, 'private', 'trabajo.jpg', 'image/jpeg', 1024, 'confirmed', 'private', 'work_order_completion_image', $3, NOW(), NOW())`,
+		fileID,
+		"files/2026/08/work_order_completion_image/"+fileID+"/trabajo.jpg",
+		providerAuthID,
+	)
+	require.NoError(t, err)
 }

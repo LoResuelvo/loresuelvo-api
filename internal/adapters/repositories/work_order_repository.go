@@ -31,6 +31,8 @@ type workOrderRecord struct {
 	CompletionReportDescription  sql.NullString
 	CompletionReportReportedOn   sql.NullTime
 	CompletionReportImageFileIDs []string
+	ReviewRating                 sql.NullInt64
+	ReviewDescription            sql.NullString
 }
 
 func (record workOrderRecord) Restore(proposal workorder.ServiceProposal) (*workorder.WorkOrder, error) {
@@ -57,6 +59,7 @@ func (record workOrderRecord) Restore(proposal workorder.ServiceProposal) (*work
 		AcceptedOn:       record.AcceptedOn.Time,
 		CompletionReport: record.completionReport(),
 		PaidOn:           record.PaidOn.Time,
+		Review:           record.review(),
 	})
 }
 
@@ -72,6 +75,17 @@ func (record workOrderRecord) completionReport() *workorder.CompletionReportRest
 		Description:  record.CompletionReportDescription.String,
 		ImageFileIDs: append([]string(nil), record.CompletionReportImageFileIDs...),
 		ReportedOn:   record.CompletionReportReportedOn.Time,
+	}
+}
+
+func (record workOrderRecord) review() *workorder.ReviewRestoreInput {
+	if !record.ReviewRating.Valid && !record.ReviewDescription.Valid {
+		return nil
+	}
+
+	return &workorder.ReviewRestoreInput{
+		Rating:      int(record.ReviewRating.Int64),
+		Description: record.ReviewDescription.String,
 	}
 }
 
@@ -145,6 +159,11 @@ func (r *WorkOrderRepository) findOne(
 		return nil, fmt.Errorf("finding work order completion report: %w", err)
 	}
 	record.setCompletionReport(completionReport)
+	review, err := r.findReview(ctx, int(record.ID.Int64))
+	if err != nil {
+		return nil, fmt.Errorf("finding work order review: %w", err)
+	}
+	record.setReview(review)
 	foundProposal, err := r.serviceProposalRepository.FindByID(ctx, int(record.ServiceProposalID.Int64))
 	if err != nil {
 		return nil, fmt.Errorf("hydrating work order service proposal: %w", err)
@@ -164,6 +183,14 @@ func (record *workOrderRecord) setCompletionReport(report *workorder.CompletionR
 	record.CompletionReportDescription = sql.NullString{String: report.Description, Valid: true}
 	record.CompletionReportReportedOn = sql.NullTime{Time: report.ReportedOn, Valid: true}
 	record.CompletionReportImageFileIDs = append([]string(nil), report.ImageFileIDs...)
+}
+
+func (record *workOrderRecord) setReview(review *workorder.ReviewRestoreInput) {
+	if review == nil {
+		return
+	}
+	record.ReviewRating = sql.NullInt64{Int64: int64(review.Rating), Valid: true}
+	record.ReviewDescription = sql.NullString{String: review.Description, Valid: true}
 }
 
 func (r *WorkOrderRepository) findCompletionReport(ctx context.Context, workOrderID int) (*workorder.CompletionReportRestoreInput, error) {
@@ -215,6 +242,29 @@ func (r *WorkOrderRepository) findCompletionReport(ctx context.Context, workOrde
 	report.ImageFileIDs = imageFileIDs
 	report.ReportedOn = reportedOn.Time
 	return &report, nil
+}
+
+func (r *WorkOrderRepository) findReview(ctx context.Context, workOrderID int) (*workorder.ReviewRestoreInput, error) {
+	var rating sql.NullInt64
+	var description sql.NullString
+	err := r.db.QueryRowContext(
+		ctx,
+		`SELECT rating, description
+		FROM work_order_reviews
+		WHERE work_order_id = $1`,
+		workOrderID,
+	).Scan(&rating, &description)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("finding work order review: %w", err)
+	}
+
+	return &workorder.ReviewRestoreInput{
+		Rating:      int(rating.Int64),
+		Description: description.String,
+	}, nil
 }
 
 func (r *WorkOrderRepository) FindByUserID(ctx context.Context, userID int, viewerRole string) ([]readmodel.WorkOrderSummary, error) {
@@ -351,6 +401,11 @@ func (r *WorkOrderRepository) FindScheduledBetween(ctx context.Context, from tim
 			return nil, fmt.Errorf("finding scheduled work order completion report: %w", err)
 		}
 		record.setCompletionReport(completionReport)
+		review, err := r.findReview(ctx, int(record.ID.Int64))
+		if err != nil {
+			return nil, fmt.Errorf("finding scheduled work order review: %w", err)
+		}
+		record.setReview(review)
 		if !serviceProposalID.Valid || serviceProposalID.Int64 <= 0 {
 			return nil, fmt.Errorf("rehydrating scheduled work order: service proposal id is required")
 		}
@@ -421,6 +476,9 @@ func (r *WorkOrderRepository) saveWithTx(ctx context.Context, tx *sql.Tx, order 
 		if err := r.saveCompletionReportWithTx(ctx, tx, &saved); err != nil {
 			return nil, err
 		}
+		if err := r.saveReviewWithTx(ctx, tx, &saved); err != nil {
+			return nil, err
+		}
 		return &saved, nil
 	}
 
@@ -447,6 +505,9 @@ func (r *WorkOrderRepository) saveWithTx(ctx context.Context, tx *sql.Tx, order 
 	saved := *order
 	saved.SetID(savedID)
 	if err := r.saveCompletionReportWithTx(ctx, tx, &saved); err != nil {
+		return nil, err
+	}
+	if err := r.saveReviewWithTx(ctx, tx, &saved); err != nil {
 		return nil, err
 	}
 	return &saved, nil
@@ -514,6 +575,43 @@ func (r *WorkOrderRepository) saveCompletionReportWithTx(
 			}
 			return fmt.Errorf("saving work order completion image: %w", err)
 		}
+	}
+	return nil
+}
+
+func (r *WorkOrderRepository) saveReviewWithTx(
+	ctx context.Context,
+	tx *sql.Tx,
+	order *workorder.WorkOrder,
+) error {
+	if order == nil || order.ID() <= 0 {
+		return fmt.Errorf("saving work order review: work order identity is required")
+	}
+
+	review := order.Review()
+	if review == nil {
+		if _, err := tx.ExecContext(
+			ctx,
+			`DELETE FROM work_order_reviews WHERE work_order_id = $1`,
+			order.ID(),
+		); err != nil {
+			return fmt.Errorf("removing work order review: %w", err)
+		}
+		return nil
+	}
+
+	if _, err := tx.ExecContext(
+		ctx,
+		`INSERT INTO work_order_reviews (work_order_id, rating, description)
+		VALUES ($1, $2, $3)
+		ON CONFLICT (work_order_id) DO UPDATE SET
+			rating = EXCLUDED.rating,
+			description = EXCLUDED.description`,
+		order.ID(),
+		review.Rating(),
+		review.Description(),
+	); err != nil {
+		return fmt.Errorf("saving work order review: %w", err)
 	}
 	return nil
 }
