@@ -3,6 +3,8 @@ package workorder
 import (
 	"fmt"
 	"time"
+
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/consumer"
 )
 
 type Status string
@@ -73,6 +75,13 @@ func (wo *WorkOrder) PaidOn() time.Time {
 		return time.Time{}
 	}
 	return wo.state.paidOn()
+}
+
+func (wo *WorkOrder) Review() *Review {
+	if wo == nil || wo.state == nil {
+		return nil
+	}
+	return wo.state.review()
 }
 
 func (wo *WorkOrder) AcceptedOn() time.Time {
@@ -166,6 +175,25 @@ func (wo *WorkOrder) RegisterApprovedBalancePayment(paidOn time.Time) error {
 		return ErrWorkOrderNotEligibleForFullPayment
 	}
 	nextState, err := wo.state.registerApprovedBalancePayment(paidOn)
+	if err != nil {
+		return err
+	}
+	wo.state = nextState
+	return nil
+}
+
+func (wo *WorkOrder) AddReview(reviewer *consumer.Consumer, review *Review) error {
+	if wo == nil || wo.id <= 0 || wo.serviceProposal == nil {
+		return ErrInvalidWorkOrderIdentity
+	}
+	if reviewer == nil || reviewer.ID() <= 0 || reviewer.ID() != wo.ConsumerID() {
+		return ErrOnlyWorkOrderConsumerCanReview
+	}
+	if review == nil {
+		return ErrReviewRequired
+	}
+
+	nextState, err := wo.state.addReview(review)
 	if err != nil {
 		return err
 	}

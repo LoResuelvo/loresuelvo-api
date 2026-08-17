@@ -6,9 +6,11 @@ type state interface {
 	status() Status
 	completionReport() *CompletionReport
 	paidOn() time.Time
+	review() *Review
 	reportCompletion(*CompletionReport) (state, error)
 	authorizeBalanceCheckout() error
 	registerApprovedBalancePayment(time.Time) (state, error)
+	addReview(*Review) (state, error)
 }
 
 type baseState struct {
@@ -29,6 +31,10 @@ func (s baseState) paidOn() time.Time {
 	return s.completedOn
 }
 
+func (baseState) review() *Review {
+	return nil
+}
+
 func (baseState) reportCompletion(*CompletionReport) (state, error) {
 	return nil, ErrCompletionReportAlreadyExists
 }
@@ -39,6 +45,10 @@ func (baseState) authorizeBalanceCheckout() error {
 
 func (baseState) registerApprovedBalancePayment(time.Time) (state, error) {
 	return nil, ErrWorkOrderNotEligibleForFullPayment
+}
+
+func (baseState) addReview(*Review) (state, error) {
+	return nil, ErrWorkOrderNotPaid
 }
 
 type scheduledState struct {
@@ -60,12 +70,25 @@ func (scheduledState) reportCompletion(report *CompletionReport) (state, error) 
 
 type paidState struct {
 	baseState
+	reviewValue *Review
 }
 
-func newPaidState(report *CompletionReport, paidOn time.Time) state {
+func newPaidState(report *CompletionReport, paidOn time.Time, review *Review) state {
 	return paidState{
-		baseState: baseState{currentStatus: StatusPaid, report: report, completedOn: paidOn},
+		baseState:   baseState{currentStatus: StatusPaid, report: report, completedOn: paidOn},
+		reviewValue: review,
 	}
+}
+
+func (s paidState) review() *Review {
+	return s.reviewValue
+}
+
+func (s paidState) addReview(review *Review) (state, error) {
+	if s.reviewValue != nil {
+		return nil, ErrReviewAlreadyExists
+	}
+	return newPaidState(s.report, s.completedOn, review), nil
 }
 
 type awaitingPaymentState struct {
@@ -90,7 +113,7 @@ func (s awaitingPaymentState) registerApprovedBalancePayment(paidOn time.Time) (
 	if paidOn.IsZero() {
 		return nil, ErrPaidOnRequired
 	}
-	return newPaidState(s.report, paidOn.UTC()), nil
+	return newPaidState(s.report, paidOn.UTC(), nil), nil
 }
 
 func (paidState) reportCompletion(*CompletionReport) (state, error) {

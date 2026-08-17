@@ -14,6 +14,7 @@ type RestoreInput struct {
 	AcceptedOn       time.Time
 	CompletionReport *CompletionReportRestoreInput
 	PaidOn           time.Time
+	Review           *ReviewRestoreInput
 }
 
 type CompletionReportRestoreInput struct {
@@ -21,6 +22,11 @@ type CompletionReportRestoreInput struct {
 	Description  string
 	ImageFileIDs []string
 	ReportedOn   time.Time
+}
+
+type ReviewRestoreInput struct {
+	Rating      int
+	Description string
 }
 
 func (RestoreFactory) Restore(input RestoreInput) (*WorkOrder, error) {
@@ -38,16 +44,20 @@ func (RestoreFactory) Restore(input RestoreInput) (*WorkOrder, error) {
 	if err != nil {
 		return nil, err
 	}
+	review, err := restoreReview(input.Review)
+	if err != nil {
+		return nil, err
+	}
 
 	switch input.Status {
 	case StatusScheduled:
-		if completionReport != nil || !input.PaidOn.IsZero() {
-			return nil, fmt.Errorf("%w: scheduled work order cannot contain completion evidence or paid_on", ErrInvalidWorkOrderState)
+		if completionReport != nil || !input.PaidOn.IsZero() || review != nil {
+			return nil, fmt.Errorf("%w: scheduled work order cannot contain completion evidence, paid_on, or review", ErrInvalidWorkOrderState)
 		}
 		return order, nil
 	case StatusAwaitingPayment:
-		if completionReport == nil {
-			return nil, fmt.Errorf("%w: awaiting payment work order requires completion report", ErrInvalidWorkOrderState)
+		if completionReport == nil || review != nil {
+			return nil, fmt.Errorf("%w: awaiting payment work order requires completion report and cannot contain review", ErrInvalidWorkOrderState)
 		}
 		order.state = newAwaitingPaymentState(completionReport)
 		return order, nil
@@ -55,11 +65,23 @@ func (RestoreFactory) Restore(input RestoreInput) (*WorkOrder, error) {
 		if completionReport == nil || input.PaidOn.IsZero() {
 			return nil, fmt.Errorf("%w: paid work order requires completion report and paid_on", ErrInvalidWorkOrderState)
 		}
-		order.state = newPaidState(completionReport, input.PaidOn.UTC())
+		order.state = newPaidState(completionReport, input.PaidOn.UTC(), review)
 		return order, nil
 	default:
 		return nil, fmt.Errorf("%w: %q", ErrInvalidWorkOrderState, input.Status)
 	}
+}
+
+func restoreReview(input *ReviewRestoreInput) (*Review, error) {
+	if input == nil {
+		return nil, nil
+	}
+
+	review, err := NewReview(input.Rating, input.Description)
+	if err != nil {
+		return nil, fmt.Errorf("restoring review: %w", err)
+	}
+	return review, nil
 }
 
 func restoreCompletionReport(input *CompletionReportRestoreInput) (*CompletionReport, error) {

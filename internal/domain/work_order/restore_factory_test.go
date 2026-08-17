@@ -53,6 +53,34 @@ func TestRestoreFactoryRestoresPaidWorkOrder(t *testing.T) {
 	assert.Equal(t, reportedOn.Add(time.Hour), order.PaidOn())
 }
 
+func TestRestoreFactoryRestoresPaidWorkOrderWithReview(t *testing.T) {
+	reportedOn := time.Date(2026, time.July, 6, 13, 0, 0, 0, time.UTC)
+	order, err := (workorder.RestoreFactory{}).Restore(
+		workorder.RestoreInput{
+			ID:              84,
+			ServiceProposal: &serviceproposal.ServiceProposal{ID: 42},
+			Status:          workorder.StatusPaid,
+			AcceptedOn:      reportedOn.Add(-time.Hour),
+			CompletionReport: &workorder.CompletionReportRestoreInput{
+				ID:           9,
+				Description:  "Trabajo terminado",
+				ImageFileIDs: []string{"file-1"},
+				ReportedOn:   reportedOn,
+			},
+			PaidOn: reportedOn.Add(time.Hour),
+			Review: &workorder.ReviewRestoreInput{
+				Rating:      4,
+				Description: "  Trabajo correcto  ",
+			},
+		},
+	)
+
+	require.NoError(t, err)
+	require.NotNil(t, order.Review())
+	assert.Equal(t, 4, order.Review().Rating())
+	assert.Equal(t, "Trabajo correcto", order.Review().Description())
+}
+
 func TestRestoreFactoryRejectsInvalidIdentity(t *testing.T) {
 	_, err := (workorder.RestoreFactory{}).Restore(workorder.RestoreInput{
 		ID:              0,
@@ -113,4 +141,56 @@ func TestRestoreFactoryRejectsInconsistentCompletionEvidence(t *testing.T) {
 	base.PaidOn = time.Time{}
 	_, err = (workorder.RestoreFactory{}).Restore(base)
 	assert.ErrorIs(t, err, workorder.ErrInvalidWorkOrderState)
+}
+
+func TestRestoreFactoryRejectsReviewForUnpaidWorkOrder(t *testing.T) {
+	base := workorder.RestoreInput{
+		ID:              84,
+		ServiceProposal: &serviceproposal.ServiceProposal{ID: 42},
+		AcceptedOn:      time.Now().UTC(),
+		Review: &workorder.ReviewRestoreInput{
+			Rating:      5,
+			Description: "Trabajo correcto",
+		},
+	}
+
+	for _, status := range []workorder.Status{workorder.StatusScheduled, workorder.StatusAwaitingPayment} {
+		t.Run(string(status), func(t *testing.T) {
+			input := base
+			input.Status = status
+			if status == workorder.StatusAwaitingPayment {
+				input.CompletionReport = &workorder.CompletionReportRestoreInput{
+					ID:           9,
+					Description:  "Trabajo terminado",
+					ImageFileIDs: []string{"file-1"},
+					ReportedOn:   time.Now().UTC(),
+				}
+			}
+
+			_, err := (workorder.RestoreFactory{}).Restore(input)
+
+			assert.ErrorIs(t, err, workorder.ErrInvalidWorkOrderState)
+		})
+	}
+}
+
+func TestRestoreFactoryRejectsInvalidReview(t *testing.T) {
+	_, err := (workorder.RestoreFactory{}).Restore(workorder.RestoreInput{
+		ID:              84,
+		ServiceProposal: &serviceproposal.ServiceProposal{ID: 42},
+		Status:          workorder.StatusPaid,
+		AcceptedOn:      time.Now().UTC(),
+		CompletionReport: &workorder.CompletionReportRestoreInput{
+			ID:           9,
+			Description:  "Trabajo terminado",
+			ImageFileIDs: []string{"file-1"},
+			ReportedOn:   time.Now().UTC(),
+		},
+		PaidOn: time.Now().UTC(),
+		Review: &workorder.ReviewRestoreInput{
+			Rating: 0,
+		},
+	})
+
+	assert.ErrorIs(t, err, workorder.ErrReviewRatingOutOfRange)
 }
