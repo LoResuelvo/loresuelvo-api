@@ -95,3 +95,12 @@ make migrate-test-down    # Teardown test DB
 
 - Aim for meaningful coverage, not vanity metrics.
 - Happy path + error paths for each domain service method.
+
+## Test focus and scope
+
+- Define each test around one new observable behavior of the functionality being added.
+- Keep the test short and split unrelated behaviors into separate tests; do not use one scenario to verify persistence, hydration, authorization, validation, and uniqueness together.
+- Reuse helpers for fixture setup, but keep the action and the assertions visible in the test.
+- Assert only the behavior introduced by the test. Do not repeat assertions already covered by another test or by an existing lower layer.
+- Use focused names such as `StoresReview` and `HydratesReview` so the test states the single responsibility it verifies.
+- For an aggregate persistence feature, prefer separate tests for writing the new data and reading it back; assert only the new fields relevant to that behavior.
