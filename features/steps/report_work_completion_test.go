@@ -193,10 +193,15 @@ func (suite *testSuite) thereIsValidCompletionReport() error {
 }
 
 func (suite *testSuite) providerReportedValidCompletion(providerEmail string) error {
+	order, err := suite.persistedWorkOrderForLastServiceProposal()
+	if err != nil {
+		return err
+	}
+
 	suite.currentAuth0ID = auth0IDForProviderEmail(providerEmail)
-	reportedOn := suite.clock.Now().UTC().Add(time.Minute)
+	reportedOn := order.ScheduledOn().UTC().Add(time.Minute)
 	if reportedOn.IsZero() {
-		return fmt.Errorf("expected a non-zero test clock before preparing completion report")
+		return fmt.Errorf("expected a non-zero scheduled time before preparing completion report")
 	}
 	if err := suite.requestTestClockMock(reportedOn.Format(time.RFC3339)); err != nil {
 		return err

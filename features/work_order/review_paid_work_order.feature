@@ -1,4 +1,3 @@
-@wip
 Feature: Reseñar una orden de trabajo pagada
     Como consumidor
     quiero calificar el trabajo terminado
@@ -10,7 +9,8 @@ Feature: Reseñar una orden de trabajo pagada
         And que existe un consumidor registrado con correo "ana@example.com", nombre "Ana" y apellido "Pérez"
         And que existe un consumidor registrado con correo "carla@example.com", nombre "Carla" y apellido "Gómez"
         And existe un prestador registrado con correo "juan.plomero@example.com", nombre "Juan", apellido "Gómez" y rubro "Plomería"
-        And existe una orden de trabajo programada para la propuesta aceptada de "juan.plomero@example.com" para "ana@example.com" por "100000.00" para la fecha y hora "2026-08-15T15:00:00Z" con la descripción:
+        And que la cuenta de Mercado Pago "mp-juan" está vinculada al prestador "juan.plomero@example.com"
+        And que existe una orden de trabajo programada para la propuesta aceptada de "juan.plomero@example.com" para "ana@example.com" por "100000.00" para la fecha y hora "2026-08-15T15:00:00Z" con la descripción:
             """
             Reparación de pérdida de agua en cocina con materiales incluidos.
             """
@@ -73,7 +73,7 @@ Feature: Reseñar una orden de trabajo pagada
     Rule: Sólo una orden pagada puede tener una reseña y sólo una vez
 
         Scenario Outline: 30.2.1-CRWO Rechazar reseñar una orden no pagada en estado <estado>
-            Given que existe una orden de trabajo en estado "<estado>" para "ana@example.com" y "juan.plomero@example.com"
+            Given que existe una orden de trabajo para reseña en estado "<estado>" para "ana@example.com" y "juan.plomero@example.com"
             And que estoy autenticado como consumidor "ana@example.com"
             When intento crear una reseña para la orden con 5 estrellas y la descripción "Trabajo correcto"
             Then el sistema rechaza la reseña con estado 409

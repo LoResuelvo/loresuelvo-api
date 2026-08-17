@@ -140,6 +140,7 @@ func (s *testSuite) registerAllSteps(sc *godog.ScenarioContext) {
 	registerReportWorkCompletionSteps(sc, s)
 	registerGetWorkOrderDetailSteps(sc, s)
 	registerCompleteServicePaymentSteps(sc, s)
+	registerReviewPaidWorkOrderSteps(sc, s)
 	registerConnectMercadoPagoAccountSteps(sc, s)
 	registerNotifyUrgentWorkOrdersSteps(sc, s)
 	registerGetJobRequestSteps(sc, s)
