@@ -1,0 +1,79 @@
+post:
+  tags:
+    - WorkOrders
+  operationId: createWorkOrderReview
+  summary: Review a paid work order
+  description: |
+    Creates one immutable review for a paid work order. Only the consumer who
+    owns the work order can submit it.
+  security:
+    - BearerAuth: []
+  parameters:
+    - name: workOrderId
+      in: path
+      required: true
+      description: Work order identifier.
+      schema:
+        type: integer
+        minimum: 1
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/WorkOrderReviewRequest'
+        example:
+          rating: 5
+          description: Trabajo prolijo y excelente atención.
+  responses:
+    '201':
+      description: Review created successfully.
+      headers:
+        Location:
+          description: Work order detail URI containing the created review.
+          schema:
+            type: string
+            example: /work-orders/42
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/WorkOrderReview'
+          example:
+            rating: 5
+            description: Trabajo prolijo y excelente atención.
+    '400':
+      description: The request or review values are invalid.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    '401':
+      description: Missing or invalid authentication.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/AuthErrorResponse'
+    '403':
+      description: The authenticated user is not the consumer who owns the work order.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    '404':
+      description: The work order does not exist.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    '409':
+      description: The work order is not paid or already has a review.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    '500':
+      description: The review could not be persisted.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'

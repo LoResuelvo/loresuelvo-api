@@ -1,0 +1,16 @@
+type: object
+description: Consumer review attached to a paid work order.
+required:
+  - rating
+  - description
+properties:
+  rating:
+    type: integer
+    minimum: 1
+    maximum: 5
+    example: 5
+  description:
+    type: string
+    maxLength: 500
+    example: Trabajo prolijo y excelente atención.
+additionalProperties: false

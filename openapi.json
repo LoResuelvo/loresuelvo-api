@@ -3015,6 +3015,36 @@
                                                 ]
                                             }
                                         }
+                                    },
+                                    "paid": {
+                                        "value": {
+                                            "id": 42,
+                                            "service_proposal_id": 10,
+                                            "consumer_id": 3,
+                                            "provider_id": 7,
+                                            "amount_cents": 10000000,
+                                            "scheduled_on": "2026-08-15T15:00:00Z",
+                                            "description": "Reparación de pérdida de agua en cocina con materiales incluidos.",
+                                            "status": "paid",
+                                            "accepted_on": "2026-08-01T13:00:00Z",
+                                            "paid_on": "2026-08-15T17:00:00Z",
+                                            "completion_report": {
+                                                "id": 17,
+                                                "description": "Trabajo finalizado y funcionamiento verificado.",
+                                                "reported_on": "2026-08-15T16:00:00Z",
+                                                "images": [
+                                                    {
+                                                        "file_id": "uuid-1",
+                                                        "original_name": "trabajo.jpg",
+                                                        "url": "https://private.example/work-order-images/temporary-uuid-1"
+                                                    }
+                                                ]
+                                            },
+                                            "review": {
+                                                "rating": 5,
+                                                "description": "Trabajo prolijo y excelente atención."
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -3199,6 +3229,132 @@
                     },
                     "500": {
                         "description": "The completion report could not be persisted.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/work-orders/{workOrderId}/reviews": {
+            "post": {
+                "tags": [
+                    "WorkOrders"
+                ],
+                "operationId": "createWorkOrderReview",
+                "summary": "Review a paid work order",
+                "description": "Creates one immutable review for a paid work order. Only the consumer who\nowns the work order can submit it.\n",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "name": "workOrderId",
+                        "in": "path",
+                        "required": true,
+                        "description": "Work order identifier.",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/WorkOrderReviewRequest"
+                            },
+                            "example": {
+                                "rating": 5,
+                                "description": "Trabajo prolijo y excelente atención."
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Review created successfully.",
+                        "headers": {
+                            "Location": {
+                                "description": "Work order detail URI containing the created review.",
+                                "schema": {
+                                    "type": "string",
+                                    "example": "/work-orders/42"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/WorkOrderReview"
+                                },
+                                "example": {
+                                    "rating": 5,
+                                    "description": "Trabajo prolijo y excelente atención."
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "The request or review values are invalid.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AuthErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "The authenticated user is not the consumer who owns the work order.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "The work order does not exist.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "The work order is not paid or already has a review.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "The review could not be persisted.",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -5255,6 +5411,9 @@
                     },
                     "completion_report": {
                         "$ref": "#/components/schemas/WorkOrderCompletionReport"
+                    },
+                    "review": {
+                        "$ref": "#/components/schemas/WorkOrderReview"
                     }
                 },
                 "additionalProperties": false
@@ -5428,6 +5587,51 @@
                     "url": {
                         "type": "string",
                         "format": "uri"
+                    }
+                },
+                "additionalProperties": false
+            },
+            "WorkOrderReviewRequest": {
+                "type": "object",
+                "description": "Review submitted by the consumer for a paid work order.",
+                "required": [
+                    "rating"
+                ],
+                "properties": {
+                    "rating": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 5,
+                        "description": "Whole-number rating from one to five stars.",
+                        "example": 5
+                    },
+                    "description": {
+                        "type": "string",
+                        "maxLength": 500,
+                        "description": "Optional review description. An omitted description is returned as an empty string.",
+                        "example": "Trabajo prolijo y excelente atención."
+                    }
+                },
+                "additionalProperties": false
+            },
+            "WorkOrderReview": {
+                "type": "object",
+                "description": "Consumer review attached to a paid work order.",
+                "required": [
+                    "rating",
+                    "description"
+                ],
+                "properties": {
+                    "rating": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 5,
+                        "example": 5
+                    },
+                    "description": {
+                        "type": "string",
+                        "maxLength": 500,
+                        "example": "Trabajo prolijo y excelente atención."
                     }
                 },
                 "additionalProperties": false

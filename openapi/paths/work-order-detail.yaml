@@ -55,6 +55,29 @@ get:
                     - file_id: uuid-1
                       original_name: trabajo.jpg
                       url: https://private.example/work-order-images/temporary-uuid-1
+            paid:
+              value:
+                id: 42
+                service_proposal_id: 10
+                consumer_id: 3
+                provider_id: 7
+                amount_cents: 10000000
+                scheduled_on: '2026-08-15T15:00:00Z'
+                description: Reparación de pérdida de agua en cocina con materiales incluidos.
+                status: paid
+                accepted_on: '2026-08-01T13:00:00Z'
+                paid_on: '2026-08-15T17:00:00Z'
+                completion_report:
+                  id: 17
+                  description: Trabajo finalizado y funcionamiento verificado.
+                  reported_on: '2026-08-15T16:00:00Z'
+                  images:
+                    - file_id: uuid-1
+                      original_name: trabajo.jpg
+                      url: https://private.example/work-order-images/temporary-uuid-1
+                review:
+                  rating: 5
+                  description: Trabajo prolijo y excelente atención.
     '400':
       description: The work order identifier is invalid.
       content:

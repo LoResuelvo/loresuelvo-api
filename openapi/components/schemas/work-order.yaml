@@ -47,4 +47,6 @@ properties:
     format: date-time
   completion_report:
     $ref: '#/components/schemas/WorkOrderCompletionReport'
+  review:
+    $ref: '#/components/schemas/WorkOrderReview'
 additionalProperties: false
