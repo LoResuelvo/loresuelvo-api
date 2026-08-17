@@ -99,6 +99,7 @@ func (s *Service) GetWorkOrder(ctx context.Context, auth0ID string, workOrderID 
 		Status:            string(order.Status()),
 		AcceptedOn:        order.AcceptedOn(),
 		PaidOn:            order.PaidOn(),
+		Review:            reviewToReadModel(order.Review()),
 	}
 
 	report := order.CompletionReport()
@@ -125,6 +126,58 @@ func (s *Service) GetWorkOrder(ctx context.Context, auth0ID string, workOrderID 
 	}
 
 	return detail, nil
+}
+
+func (s *Service) CreateReview(
+	ctx context.Context,
+	auth0ID string,
+	workOrderID int,
+	rating int,
+	description string,
+) (*readmodel.Review, error) {
+	foundUser, err := s.userRepository.FindByAuthID(auth0ID)
+	if err != nil {
+		return nil, err
+	}
+
+	order, err := s.reader.FindByID(ctx, workOrderID)
+	if err != nil {
+		return nil, err
+	}
+	if order == nil {
+		return nil, ErrDoesNotExist
+	}
+	reviewer, ok := foundUser.(*consumer.Consumer)
+	if !ok || reviewer == nil || reviewer.Role() != consumer.Role {
+		return nil, ErrOnlyWorkOrderConsumerCanReview
+	}
+	review, err := NewReview(rating, description)
+	if err != nil {
+		return nil, err
+	}
+	if err := order.AddReview(reviewer, review); err != nil {
+		return nil, err
+	}
+	if s.unitOfWork == nil {
+		return nil, ErrWorkOrderUnitOfWorkRequired
+	}
+	if err := s.unitOfWork.Execute(ctx, func(store TransactionalStore) error {
+		return store.SaveWorkOrder(ctx, order)
+	}); err != nil {
+		return nil, err
+	}
+
+	return reviewToReadModel(review), nil
+}
+
+func reviewToReadModel(review *Review) *readmodel.Review {
+	if review == nil {
+		return nil
+	}
+	return &readmodel.Review{
+		Rating:      review.Rating(),
+		Description: review.Description(),
+	}
 }
 
 func isWorkOrderParticipant(foundUser user.User, order *WorkOrder) bool {

@@ -14,4 +14,5 @@ type WorkOrderDetail struct {
 	AcceptedOn        time.Time
 	PaidOn            time.Time
 	CompletionReport  *CompletionReport
+	Review            *Review
 }

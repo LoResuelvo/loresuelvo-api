@@ -168,6 +168,28 @@ func setupCompletionServiceTest(
 	return workorder.NewService(reader, users, fileService, nil, notificator, unitOfWork, clock)
 }
 
+type reviewServiceTestEnv struct {
+	reader  *readerMock
+	users   *userRepositoryMock
+	service *workorder.Service
+}
+
+func setupReviewServiceTest(
+	order *workorder.WorkOrder,
+	actor user.User,
+	unitOfWork workorder.UnitOfWork,
+) *reviewServiceTestEnv {
+	reader := new(readerMock)
+	reader.On("FindByID", mock.Anything, order.ID()).Return(order, nil).Once()
+	users := new(userRepositoryMock)
+	users.On("FindByAuthID", actor.AuthID()).Return(actor, nil).Once()
+	return &reviewServiceTestEnv{
+		reader:  reader,
+		users:   users,
+		service: workorder.NewService(reader, users, nil, nil, nil, unitOfWork, nil),
+	}
+}
+
 func workOrderFixture(id, consumerID, providerID int, scheduledOn time.Time) *workorder.WorkOrder {
 	order, err := workorder.New(&serviceproposal.ServiceProposal{
 		ID:          id + 100,
