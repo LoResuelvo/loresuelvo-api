@@ -39,3 +39,21 @@ func handleReportCompletionError(c *gin.Context, err error) {
 		httphandler.RespondError(c, http.StatusInternalServerError, "internal server error")
 	}
 }
+
+func handleCreateReviewError(c *gin.Context, err error) {
+	switch {
+	case errors.Is(err, workorder.ErrReviewRatingOutOfRange),
+		errors.Is(err, workorder.ErrReviewDescriptionTooLong),
+		errors.Is(err, workorder.ErrReviewRequired):
+		httphandler.RespondError(c, http.StatusBadRequest, err.Error())
+	case errors.Is(err, workorder.ErrOnlyWorkOrderConsumerCanReview):
+		httphandler.RespondError(c, http.StatusForbidden, err.Error())
+	case errors.Is(err, workorder.ErrDoesNotExist):
+		httphandler.RespondError(c, http.StatusNotFound, err.Error())
+	case errors.Is(err, workorder.ErrWorkOrderNotPaid),
+		errors.Is(err, workorder.ErrReviewAlreadyExists):
+		httphandler.RespondError(c, http.StatusConflict, err.Error())
+	default:
+		httphandler.RespondError(c, http.StatusInternalServerError, "internal server error")
+	}
+}

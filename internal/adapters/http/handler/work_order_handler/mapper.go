@@ -44,6 +44,13 @@ func completionReportResponseFromReadModel(report readmodel.CompletionReport) co
 	}
 }
 
+func reviewResponseFromReadModel(review readmodel.Review) reviewResponse {
+	return reviewResponse{
+		Rating:      review.Rating,
+		Description: review.Description,
+	}
+}
+
 func workOrderDetailResponseFromReadModel(detail readmodel.WorkOrderDetail) workOrderDetailResponse {
 	response := workOrderDetailResponse{
 		ID:                detail.ID,
@@ -63,6 +70,10 @@ func workOrderDetailResponseFromReadModel(detail readmodel.WorkOrderDetail) work
 	if detail.CompletionReport != nil {
 		report := completionReportResponseFromReadModel(*detail.CompletionReport)
 		response.CompletionReport = &report
+	}
+	if detail.Review != nil {
+		review := reviewResponseFromReadModel(*detail.Review)
+		response.Review = &review
 	}
 	return response
 }

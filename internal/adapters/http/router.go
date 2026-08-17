@@ -171,6 +171,7 @@ func (router *Router) registerWorkOrderRoutes(engine *gin.Engine, authMiddleware
 	engine.GET("/work-orders", authMiddleware, router.workOrderHandler.GetWorkOrders)
 	engine.GET("/work-orders/:workOrderID", authMiddleware, router.workOrderHandler.GetWorkOrder)
 	engine.POST("/work-orders/:workOrderID/completion-reports", authMiddleware, router.workOrderHandler.ReportCompletion)
+	engine.POST("/work-orders/:workOrderID/reviews", authMiddleware, router.workOrderHandler.CreateReview)
 	engine.POST("/work-orders/:workOrderID/checkout-sessions", authMiddleware, router.paymentHandler.StartServiceBalanceCheckout)
 }
 

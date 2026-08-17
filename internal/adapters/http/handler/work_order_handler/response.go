@@ -25,6 +25,7 @@ type workOrderDetailResponse struct {
 	AcceptedOn        time.Time                 `json:"accepted_on"`
 	PaidOn            *time.Time                `json:"paid_on,omitempty"`
 	CompletionReport  *completionReportResponse `json:"completion_report,omitempty"`
+	Review            *reviewResponse           `json:"review,omitempty"`
 }
 
 type workOrderCounterpartResponse struct {
@@ -47,4 +48,9 @@ type completionImageResponse struct {
 	FileID       string `json:"file_id"`
 	OriginalName string `json:"original_name"`
 	URL          string `json:"url"`
+}
+
+type reviewResponse struct {
+	Rating      int    `json:"rating"`
+	Description string `json:"description"`
 }

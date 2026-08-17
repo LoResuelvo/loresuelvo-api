@@ -18,6 +18,7 @@ type workOrderService interface {
 	GetWorkOrders(ctx context.Context, auth0ID string) ([]readmodel.WorkOrderSummary, error)
 	GetWorkOrder(ctx context.Context, auth0ID string, workOrderID int) (*readmodel.WorkOrderDetail, error)
 	ReportCompletion(ctx context.Context, auth0ID string, workOrderID int, description string, imageFileIDs []string) (*readmodel.CompletionReport, error)
+	CreateReview(ctx context.Context, auth0ID string, workOrderID int, rating int, description string) (*readmodel.Review, error)
 }
 
 func NewWorkOrderHandler(workOrderService workOrderService) *WorkOrderHandler {
@@ -92,4 +93,38 @@ func (h *WorkOrderHandler) ReportCompletion(c *gin.Context) {
 
 	c.Header("Location", fmt.Sprintf("/work-orders/%d", workOrderID))
 	c.JSON(http.StatusCreated, completionReportResponseFromReadModel(*report))
+}
+
+func (h *WorkOrderHandler) CreateReview(c *gin.Context) {
+	auth0ID, ok := httphandler.GetAuthenticatedUserID(c)
+	if !ok {
+		return
+	}
+
+	workOrderID, err := httphandler.PositiveIDFromString(c.Param("workOrderID"), "work order id")
+	if err != nil {
+		httphandler.RespondError(c, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	var req createReviewRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		httphandler.RespondError(c, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	review, err := h.workOrderService.CreateReview(
+		c.Request.Context(),
+		auth0ID,
+		workOrderID,
+		req.Rating,
+		req.Description,
+	)
+	if err != nil {
+		handleCreateReviewError(c, err)
+		return
+	}
+
+	c.Header("Location", fmt.Sprintf("/work-orders/%d", workOrderID))
+	c.JSON(http.StatusCreated, reviewResponseFromReadModel(*review))
 }
