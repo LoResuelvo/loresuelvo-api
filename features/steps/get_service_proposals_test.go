@@ -178,12 +178,18 @@ func (suite *testSuite) createServiceProposalFixture(
 }
 
 func (suite *testSuite) prepareServiceProposalFixtureParticipants(providerEmail, consumerEmail string) (serviceProposalFixtureParticipants, error) {
-	if err := suite.thereIsActiveChatBetweenConsumerAndProviderWithInitialMessage(
-		consumerEmail,
-		providerEmail,
-		&godog.DocString{Content: "Conversación preparada para una propuesta de servicio."},
-	); err != nil {
-		return serviceProposalFixtureParticipants{}, err
+	conversationKey := serviceProposalParticipantsKey(consumerEmail, providerEmail)
+	conversationID := suite.serviceProposalConversationIDs[conversationKey]
+	if conversationID == 0 {
+		if err := suite.thereIsActiveChatBetweenConsumerAndProviderWithInitialMessage(
+			consumerEmail,
+			providerEmail,
+			&godog.DocString{Content: "Conversación preparada para una propuesta de servicio."},
+		); err != nil {
+			return serviceProposalFixtureParticipants{}, err
+		}
+		conversationID = suite.lastConversationID
+		suite.serviceProposalConversationIDs[conversationKey] = conversationID
 	}
 
 	foundProvider, err := suite.userRepository.FindByAuthID(auth0IDForProviderEmail(providerEmail))
@@ -204,12 +210,11 @@ func (suite *testSuite) prepareServiceProposalFixtureParticipants(providerEmail,
 		return serviceProposalFixtureParticipants{}, fmt.Errorf("expected consumer fixture for %q, got %T", consumerEmail, foundConsumer)
 	}
 
-	proposalConversation, err := suite.conversationRepository.FindByID(context.Background(), suite.lastConversationID)
+	proposalConversation, err := suite.conversationRepository.FindByID(context.Background(), conversationID)
 	if err != nil {
 		return serviceProposalFixtureParticipants{}, fmt.Errorf("finding service proposal conversation fixture: %w", err)
 	}
 
-	suite.serviceProposalConversationIDs[serviceProposalParticipantsKey(consumerEmail, providerEmail)] = suite.lastConversationID
 	return serviceProposalFixtureParticipants{
 		provider:     proposalProvider,
 		consumer:     proposalConsumer,

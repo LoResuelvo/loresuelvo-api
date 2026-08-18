@@ -12,19 +12,16 @@ Feature: US-16 - Ver trabajos realizados de prestador
 
     Rule: El detalle siempre informa el resumen de reputación
 
-        @wip
         Scenario: 16.1.1-VPWH Informar promedio cero cuando el prestador no tiene reviews
             Given que estoy autenticado como consumidor "ana@example.com"
             When consulto el detalle público del prestador "juan.plomero@example.com"
             Then el detalle informa un promedio de rating de 0
 
-        @wip
         Scenario: 16.1.2-VPWH Informar cantidad cero cuando el prestador no tiene reviews
             Given que estoy autenticado como consumidor "ana@example.com"
             When consulto el detalle público del prestador "juan.plomero@example.com"
             Then el detalle informa una cantidad de ratings de 0
 
-        @wip
         Scenario: 16.1.3-VPWH Calcular el promedio de las reviews del prestador
             Given que existe una orden de trabajo programada para la propuesta aceptada de "juan.plomero@example.com" para "ana@example.com" por "100000.00" para la fecha y hora "2026-08-15T15:00:00Z" con la descripción:
                 """
@@ -44,7 +41,6 @@ Feature: US-16 - Ver trabajos realizados de prestador
             When consulto el detalle público del prestador "juan.plomero@example.com"
             Then el detalle informa un promedio de rating de 4.5
 
-        @wip
         Scenario: 16.1.4-VPWH Contar las reviews del prestador
             Given que existe una orden de trabajo programada para la propuesta aceptada de "juan.plomero@example.com" para "ana@example.com" por "100000.00" para la fecha y hora "2026-08-15T15:00:00Z" con la descripción:
                 """
@@ -66,13 +62,11 @@ Feature: US-16 - Ver trabajos realizados de prestador
 
     Rule: El historial público contiene únicamente trabajos pagados
 
-        @wip
         Scenario: 16.2.1-VPWH Informar un historial vacío sin trabajos pagados
             Given que estoy autenticado como consumidor "ana@example.com"
             When consulto el detalle público del prestador "juan.plomero@example.com"
             Then el detalle de trabajos realizados es un arreglo vacío
 
-        @wip
         Scenario: 16.2.2-VPWH Mostrar un trabajo pagado aunque no tenga review
             Given que existe una orden de trabajo programada para la propuesta aceptada de "juan.plomero@example.com" para "ana@example.com" por "100000.00" para la fecha y hora "2026-08-15T15:00:00Z" con la descripción:
                 """
@@ -87,7 +81,6 @@ Feature: US-16 - Ver trabajos realizados de prestador
                 Reparación de pérdida de agua en cocina.
                 """
 
-        @wip
         Scenario: 16.2.3-VPWH Excluir una orden que todavía no fue pagada
             Given que existe una orden de trabajo programada para la propuesta aceptada de "juan.plomero@example.com" para "ana@example.com" por "100000.00" para la fecha y hora "2026-08-15T15:00:00Z" con la descripción:
                 """
@@ -100,7 +93,6 @@ Feature: US-16 - Ver trabajos realizados de prestador
                 Trabajo pendiente de pago.
                 """
 
-        @wip
         Scenario: 16.2.4-VPWH Ordenar los trabajos desde el más reciente
             Given que existe una orden de trabajo programada para la propuesta aceptada de "juan.plomero@example.com" para "ana@example.com" por "100000.00" para la fecha y hora "2026-08-15T15:00:00Z" con la descripción:
                 """
@@ -121,7 +113,6 @@ Feature: US-16 - Ver trabajos realizados de prestador
                 Trabajo más reciente.
                 """
 
-        @wip
         Scenario: 16.2.5-VPWH Mostrar el reporte de finalización del trabajo pagado
             Given que existe una orden de trabajo programada para la propuesta aceptada de "juan.plomero@example.com" para "ana@example.com" por "100000.00" para la fecha y hora "2026-08-15T15:00:00Z" con la descripción:
                 """
@@ -138,7 +129,6 @@ Feature: US-16 - Ver trabajos realizados de prestador
 
     Rule: El historial puede incluir la review asociada al trabajo pagado
 
-        @wip
         Scenario: 16.3.1-VPWH Mostrar el rating de la review del trabajo
             Given que existe una orden de trabajo programada para la propuesta aceptada de "juan.plomero@example.com" para "ana@example.com" por "100000.00" para la fecha y hora "2026-08-15T15:00:00Z" con la descripción:
                 """
@@ -151,7 +141,6 @@ Feature: US-16 - Ver trabajos realizados de prestador
             When consulto el detalle público del prestador "juan.plomero@example.com"
             Then el trabajo del historial incluye una review de 5 estrellas
 
-        @wip
         Scenario: 16.3.2-VPWH Mostrar el comentario de la review del trabajo
             Given que existe una orden de trabajo programada para la propuesta aceptada de "juan.plomero@example.com" para "ana@example.com" por "100000.00" para la fecha y hora "2026-08-15T15:00:00Z" con la descripción:
                 """
@@ -166,7 +155,6 @@ Feature: US-16 - Ver trabajos realizados de prestador
 
     Rule: El historial público no expone datos privados del trabajo
 
-        @wip
         Scenario: 16.4.1-VPWH No exponer la identidad del consumidor en el historial
             Given que existe una orden de trabajo programada para la propuesta aceptada de "juan.plomero@example.com" para "ana@example.com" por "100000.00" para la fecha y hora "2026-08-15T15:00:00Z" con la descripción:
                 """
@@ -178,7 +166,6 @@ Feature: US-16 - Ver trabajos realizados de prestador
             When consulto el detalle público del prestador "juan.plomero@example.com"
             Then el historial no expone la identidad del consumidor "Ana Pérez"
 
-        @wip
         Scenario: 16.4.2-VPWH No exponer el importe en el historial
             Given que existe una orden de trabajo programada para la propuesta aceptada de "juan.plomero@example.com" para "ana@example.com" por "100000.00" para la fecha y hora "2026-08-15T15:00:00Z" con la descripción:
                 """
@@ -190,7 +177,6 @@ Feature: US-16 - Ver trabajos realizados de prestador
             When consulto el detalle público del prestador "juan.plomero@example.com"
             Then el historial no expone el importe "100000.00"
 
-        @wip
         Scenario: 16.4.3-VPWH No exponer las imágenes de evidencia en el historial
             Given que existe una orden de trabajo programada para la propuesta aceptada de "juan.plomero@example.com" para "ana@example.com" por "100000.00" para la fecha y hora "2026-08-15T15:00:00Z" con la descripción:
                 """
