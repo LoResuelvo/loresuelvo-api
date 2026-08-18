@@ -128,6 +128,7 @@ func (s *testSuite) registerAllSteps(sc *godog.ScenarioContext) {
 	registerFilterProvidersByCategorySteps(sc, s)
 	registerLoginSteps(sc, s)
 	registerGetProviderProfileSteps(sc, s)
+	registerGetProviderWorkHistorySteps(sc, s)
 	registerSendContactRequestToProviderSteps(sc, s)
 	registerGetConversationSteps(sc, s)
 	registerGetConversationsSteps(sc, s)
