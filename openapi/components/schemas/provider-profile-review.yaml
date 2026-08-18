@@ -1,0 +1,17 @@
+type: object
+description: Public review attached to a paid work order.
+required:
+  - rating
+  - description
+properties:
+  rating:
+    type: integer
+    format: int32
+    minimum: 1
+    maximum: 5
+    example: 5
+  description:
+    type: string
+    maxLength: 500
+    example: Trabajo prolijo y excelente atención.
+additionalProperties: false

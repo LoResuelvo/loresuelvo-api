@@ -781,7 +781,25 @@
                                     "category": {
                                         "id": 1,
                                         "name": "Plomería"
-                                    }
+                                    },
+                                    "rating_average": 4.5,
+                                    "rating_count": 2,
+                                    "work_orders": [
+                                        {
+                                            "id": 84,
+                                            "scheduled_on": "2026-08-15T15:00:00Z",
+                                            "description": "Reparación de pérdida de agua en cocina.",
+                                            "status": "paid",
+                                            "completion_report": {
+                                                "description": "Trabajo finalizado y funcionamiento verificado.",
+                                                "reported_on": "2026-08-15T16:00:00Z"
+                                            },
+                                            "review": {
+                                                "rating": 5,
+                                                "description": "Trabajo prolijo y excelente atención."
+                                            }
+                                        }
+                                    ]
                                 }
                             }
                         }
@@ -4236,7 +4254,10 @@
                     "name",
                     "surname",
                     "profile_photo",
-                    "category"
+                    "category",
+                    "rating_average",
+                    "rating_count",
+                    "work_orders"
                 ],
                 "properties": {
                     "id": {
@@ -4257,6 +4278,106 @@
                     },
                     "category": {
                         "$ref": "#/components/schemas/CategoryListItem"
+                    },
+                    "rating_average": {
+                        "type": "number",
+                        "format": "double",
+                        "minimum": 0,
+                        "maximum": 5,
+                        "example": 4.5
+                    },
+                    "rating_count": {
+                        "type": "integer",
+                        "format": "int32",
+                        "minimum": 0,
+                        "example": 2
+                    },
+                    "work_orders": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/ProviderProfileWorkOrder"
+                        }
+                    }
+                },
+                "additionalProperties": false
+            },
+            "ProviderProfileWorkOrder": {
+                "type": "object",
+                "description": "Public summary of a paid work order completed by the provider.",
+                "required": [
+                    "id",
+                    "scheduled_on",
+                    "description",
+                    "status",
+                    "completion_report"
+                ],
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "format": "int32",
+                        "minimum": 1
+                    },
+                    "scheduled_on": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "description": {
+                        "type": "string",
+                        "minLength": 1
+                    },
+                    "status": {
+                        "type": "string",
+                        "enum": [
+                            "paid"
+                        ]
+                    },
+                    "completion_report": {
+                        "$ref": "#/components/schemas/ProviderProfileCompletionReport"
+                    },
+                    "review": {
+                        "$ref": "#/components/schemas/ProviderProfileReview"
+                    }
+                },
+                "additionalProperties": false
+            },
+            "ProviderProfileCompletionReport": {
+                "type": "object",
+                "description": "Public completion report without private evidence images.",
+                "required": [
+                    "description",
+                    "reported_on"
+                ],
+                "properties": {
+                    "description": {
+                        "type": "string",
+                        "minLength": 1
+                    },
+                    "reported_on": {
+                        "type": "string",
+                        "format": "date-time"
+                    }
+                },
+                "additionalProperties": false
+            },
+            "ProviderProfileReview": {
+                "type": "object",
+                "description": "Public review attached to a paid work order.",
+                "required": [
+                    "rating",
+                    "description"
+                ],
+                "properties": {
+                    "rating": {
+                        "type": "integer",
+                        "format": "int32",
+                        "minimum": 1,
+                        "maximum": 5,
+                        "example": 5
+                    },
+                    "description": {
+                        "type": "string",
+                        "maxLength": 500,
+                        "example": "Trabajo prolijo y excelente atención."
                     }
                 },
                 "additionalProperties": false

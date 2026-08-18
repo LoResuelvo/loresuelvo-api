@@ -6,6 +6,9 @@ required:
 - surname
 - profile_photo
 - category
+- rating_average
+- rating_count
+- work_orders
 properties:
   id:
     type: integer
@@ -21,4 +24,19 @@ properties:
     $ref: '#/components/schemas/CurrentUserProfilePhoto'
   category:
     $ref: '#/components/schemas/CategoryListItem'
+  rating_average:
+    type: number
+    format: double
+    minimum: 0
+    maximum: 5
+    example: 4.5
+  rating_count:
+    type: integer
+    format: int32
+    minimum: 0
+    example: 2
+  work_orders:
+    type: array
+    items:
+      $ref: '#/components/schemas/ProviderProfileWorkOrder'
 additionalProperties: false

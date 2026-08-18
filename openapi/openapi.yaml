@@ -212,6 +212,12 @@ components:
       $ref: ./components/schemas/provider-summary.yaml
     ProviderProfile:
       $ref: ./components/schemas/provider-profile.yaml
+    ProviderProfileWorkOrder:
+      $ref: ./components/schemas/provider-profile-work-order.yaml
+    ProviderProfileCompletionReport:
+      $ref: ./components/schemas/provider-profile-completion-report.yaml
+    ProviderProfileReview:
+      $ref: ./components/schemas/provider-profile-review.yaml
     PaymentAccountAuthorization:
       $ref: ./components/schemas/payment-account-authorization.yaml
     PaymentAccountConnection:

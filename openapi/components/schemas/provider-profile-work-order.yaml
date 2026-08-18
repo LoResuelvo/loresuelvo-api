@@ -1,0 +1,28 @@
+type: object
+description: Public summary of a paid work order completed by the provider.
+required:
+  - id
+  - scheduled_on
+  - description
+  - status
+  - completion_report
+properties:
+  id:
+    type: integer
+    format: int32
+    minimum: 1
+  scheduled_on:
+    type: string
+    format: date-time
+  description:
+    type: string
+    minLength: 1
+  status:
+    type: string
+    enum:
+      - paid
+  completion_report:
+    $ref: '#/components/schemas/ProviderProfileCompletionReport'
+  review:
+    $ref: '#/components/schemas/ProviderProfileReview'
+additionalProperties: false

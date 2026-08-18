@@ -33,6 +33,19 @@ get:
             category:
               id: 1
               name: Plomería
+            rating_average: 4.5
+            rating_count: 2
+            work_orders:
+            - id: 84
+              scheduled_on: '2026-08-15T15:00:00Z'
+              description: Reparación de pérdida de agua en cocina.
+              status: paid
+              completion_report:
+                description: Trabajo finalizado y funcionamiento verificado.
+                reported_on: '2026-08-15T16:00:00Z'
+              review:
+                rating: 5
+                description: Trabajo prolijo y excelente atención.
     '400':
       description: The Provider identifier is invalid.
       content:
