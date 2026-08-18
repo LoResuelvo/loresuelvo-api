@@ -126,6 +126,7 @@ func (s *testSuite) registerAllSteps(sc *godog.ScenarioContext) {
 	registerCreateCategorySteps(sc, s)
 	registerListCategoriesSteps(sc, s)
 	registerFilterProvidersByCategorySteps(sc, s)
+	registerProviderRatingSearchSteps(sc, s)
 	registerLoginSteps(sc, s)
 	registerGetProviderProfileSteps(sc, s)
 	registerGetProviderWorkHistorySteps(sc, s)
