@@ -7,21 +7,34 @@ import (
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/category"
 	filedomain "github.com/LoResuelvo/loresuelvo-api/internal/domain/file"
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/provider/read_model"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/validator"
 )
 
 type Service struct {
-	userRepository UserRepository
-	categoryFinder CategoryFinder
-	fileService    FileService
+	userRepository        UserRepository
+	categoryFinder        CategoryFinder
+	fileService           FileService
+	ratingStatsReader     RatingStatsReader
+	paidWorkHistoryReader PaidWorkHistoryReader
 }
 
-func NewService(repository UserRepository, categoryFinder CategoryFinder, fileService FileService) *Service {
-	return &Service{
+func NewService(
+	repository UserRepository,
+	categoryFinder CategoryFinder,
+	fileService FileService,
+	profileReaders ...ProfileReaders,
+) *Service {
+	service := &Service{
 		userRepository: repository,
 		categoryFinder: categoryFinder,
 		fileService:    fileService,
 	}
+	if len(profileReaders) > 0 {
+		service.ratingStatsReader = profileReaders[0].RatingStatsReader
+		service.paidWorkHistoryReader = profileReaders[0].PaidWorkHistoryReader
+	}
+	return service
 }
 
 func (s *Service) RegisterProvider(ctx context.Context, authID, email, name, surname string, categoryID int, profilePhotoFileID string) (*Provider, error) {
@@ -94,6 +107,57 @@ func (s *Service) GetProviderProfile(ctx context.Context, providerID int) (*Prov
 	foundProvider.SetProfilePhotoURL(profilePhotoURL)
 
 	return foundProvider, nil
+}
+
+func (s *Service) GetProviderProfileDetail(ctx context.Context, providerID int) (*readmodel.Profile, error) {
+	if s.ratingStatsReader == nil || s.paidWorkHistoryReader == nil {
+		return nil, ErrProfileReadersNotConfigured
+	}
+
+	foundProvider, err := s.GetProviderProfile(ctx, providerID)
+	if err != nil {
+		return nil, err
+	}
+
+	ratingStats, err := s.ratingStatsReader.FindRatingStatsByProviderID(ctx, providerID)
+	if err != nil {
+		return nil, fmt.Errorf("finding provider rating stats: %w", err)
+	}
+
+	workOrders, err := s.paidWorkHistoryReader.FindPaidWorkHistoryByProviderID(ctx, providerID)
+	if err != nil {
+		return nil, fmt.Errorf("finding provider paid work history: %w", err)
+	}
+	if workOrders == nil {
+		workOrders = []readmodel.WorkOrder{}
+	}
+
+	ratingSummary := ratingStats.Summary()
+	return &readmodel.Profile{
+		ID:            foundProvider.ID(),
+		Name:          foundProvider.Name(),
+		Surname:       foundProvider.Surname(),
+		ProfilePhoto:  foundProvider.ProfilePhoto(),
+		CategoryID:    categoryID(foundProvider),
+		CategoryName:  categoryName(foundProvider),
+		RatingAverage: ratingSummary.Average,
+		RatingCount:   ratingSummary.Count,
+		WorkOrders:    workOrders,
+	}, nil
+}
+
+func categoryID(foundProvider *Provider) int {
+	if foundProvider.Category == nil {
+		return 0
+	}
+	return foundProvider.Category.ID
+}
+
+func categoryName(foundProvider *Provider) string {
+	if foundProvider.Category == nil {
+		return ""
+	}
+	return foundProvider.Category.Name
 }
 
 func (s *Service) validateCategory(categoryID int) (*category.Category, error) {

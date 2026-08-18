@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/category"
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/provider/read_model"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/user"
 )
 
@@ -16,4 +17,17 @@ type UserRepository interface {
 
 type CategoryFinder interface {
 	FindByID(id int) *category.Category
+}
+
+type RatingStatsReader interface {
+	FindRatingStatsByProviderID(ctx context.Context, providerID int) (RatingStats, error)
+}
+
+type PaidWorkHistoryReader interface {
+	FindPaidWorkHistoryByProviderID(ctx context.Context, providerID int) ([]readmodel.WorkOrder, error)
+}
+
+type ProfileReaders struct {
+	RatingStatsReader     RatingStatsReader
+	PaidWorkHistoryReader PaidWorkHistoryReader
 }
