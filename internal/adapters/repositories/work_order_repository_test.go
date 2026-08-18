@@ -2,6 +2,7 @@ package repositories_test
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -9,6 +10,7 @@ import (
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/consumer"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/conversation"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/provider"
+	providerreadmodel "github.com/LoResuelvo/loresuelvo-api/internal/domain/provider/read_model"
 	serviceproposal "github.com/LoResuelvo/loresuelvo-api/internal/domain/service_proposal"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/user"
 	workorder "github.com/LoResuelvo/loresuelvo-api/internal/domain/work_order"
@@ -44,6 +46,139 @@ func TestWorkOrderRepositoryHydratesReview(t *testing.T) {
 	found, err := testContext.workOrderRepository.FindByID(t.Context(), order.ID())
 	require.NoError(t, err)
 	require.Equal(t, expectedReview, found.Review())
+}
+
+func TestWorkOrderRepositoryFindsZeroProviderRatingStatsWithoutReviews(t *testing.T) {
+	testContext := newServiceProposalRepositoryTest(t)
+	fixture := newProviderWorkOrderTestFixture(t, testContext, "zero-rating")
+
+	stats, err := testContext.workOrderRepository.FindRatingStatsByProviderID(t.Context(), fixture.providerID)
+
+	require.NoError(t, err)
+	assert.Equal(t, provider.RatingStats{}, stats)
+}
+
+func TestWorkOrderRepositoryAggregatesProviderRatingStats(t *testing.T) {
+	testContext := newServiceProposalRepositoryTest(t)
+	fixture := newProviderWorkOrderTestFixture(t, testContext, "rating-stats")
+	baseScheduledOn := time.Now().UTC().Truncate(time.Microsecond).Add(48 * time.Hour)
+	savePaidWorkOrderWithReviewForFixture(t, testContext, fixture, baseScheduledOn, "11111111-1111-1111-1111-111111111111", 5, "Muy buen trabajo.")
+	savePaidWorkOrderWithReviewForFixture(t, testContext, fixture, baseScheduledOn.Add(24*time.Hour), "22222222-2222-2222-2222-222222222222", 3, "Trabajo correcto.")
+
+	stats, err := testContext.workOrderRepository.FindRatingStatsByProviderID(t.Context(), fixture.providerID)
+
+	require.NoError(t, err)
+	assert.Equal(t, provider.RatingStats{Total: 8, Count: 2}, stats)
+}
+
+func TestWorkOrderRepositoryKeepsPaidWorkOrderWithoutReviewInProviderHistory(t *testing.T) {
+	testContext := newServiceProposalRepositoryTest(t)
+	fixture := newProviderWorkOrderTestFixture(t, testContext, "history-without-review")
+	savePaidWorkOrderWithoutReviewForFixture(
+		t,
+		testContext,
+		fixture,
+		time.Now().UTC().Truncate(time.Microsecond).Add(48*time.Hour),
+		"33333333-3333-3333-3333-333333333333",
+	)
+
+	history, err := testContext.workOrderRepository.FindPaidWorkHistoryByProviderID(t.Context(), fixture.providerID)
+
+	require.NoError(t, err)
+	require.Len(t, history, 1)
+	assert.Nil(t, history[0].Review)
+}
+
+func TestWorkOrderRepositoryIncludesReviewInProviderHistory(t *testing.T) {
+	testContext := newServiceProposalRepositoryTest(t)
+	fixture := newProviderWorkOrderTestFixture(t, testContext, "history-with-review")
+	savePaidWorkOrderWithReviewForFixture(
+		t,
+		testContext,
+		fixture,
+		time.Now().UTC().Truncate(time.Microsecond).Add(48*time.Hour),
+		"44444444-4444-4444-4444-444444444444",
+		4,
+		"Trabajo claro y prolijo.",
+	)
+
+	history, err := testContext.workOrderRepository.FindPaidWorkHistoryByProviderID(t.Context(), fixture.providerID)
+
+	require.NoError(t, err)
+	require.Len(t, history, 1)
+	require.NotNil(t, history[0].Review)
+	assert.Equal(t, providerreadmodel.Review{Rating: 4, Description: "Trabajo claro y prolijo."}, *history[0].Review)
+}
+
+func TestWorkOrderRepositoryIncludesCompletionReportInProviderHistory(t *testing.T) {
+	testContext := newServiceProposalRepositoryTest(t)
+	fixture := newProviderWorkOrderTestFixture(t, testContext, "history-with-report")
+	scheduledOn := time.Now().UTC().Truncate(time.Microsecond).Add(48 * time.Hour)
+	savePaidWorkOrderWithoutReviewForFixture(t, testContext, fixture, scheduledOn, "55555555-5555-5555-5555-555555555555")
+
+	history, err := testContext.workOrderRepository.FindPaidWorkHistoryByProviderID(t.Context(), fixture.providerID)
+
+	require.NoError(t, err)
+	require.Len(t, history, 1)
+	require.NotNil(t, history[0].CompletionReport)
+	assert.Equal(t, providerreadmodel.CompletionReport{
+		Description: "Trabajo terminado",
+		ReportedOn:  scheduledOn,
+	}, *history[0].CompletionReport)
+}
+
+func TestWorkOrderRepositoryFiltersProviderHistoryToPaidOrders(t *testing.T) {
+	testContext := newServiceProposalRepositoryTest(t)
+	fixture := newProviderWorkOrderTestFixture(t, testContext, "history-paid-only")
+	baseScheduledOn := time.Now().UTC().Truncate(time.Microsecond).Add(48 * time.Hour)
+	paidOrder := savePaidWorkOrderWithoutReviewForFixture(t, testContext, fixture, baseScheduledOn, "66666666-6666-6666-6666-666666666666")
+	saveScheduledWorkOrderAt(t, testContext, fixture.conversation, fixture.consumerID, fixture.providerID, baseScheduledOn.Add(24*time.Hour))
+
+	history, err := testContext.workOrderRepository.FindPaidWorkHistoryByProviderID(t.Context(), fixture.providerID)
+
+	require.NoError(t, err)
+	require.Len(t, history, 1)
+	assert.Equal(t, paidOrder.ID(), history[0].ID)
+}
+
+func TestWorkOrderRepositoryOrdersProviderHistoryByMostRecentScheduledDate(t *testing.T) {
+	testContext := newServiceProposalRepositoryTest(t)
+	fixture := newProviderWorkOrderTestFixture(t, testContext, "history-order")
+	baseScheduledOn := time.Now().UTC().Truncate(time.Microsecond).Add(48 * time.Hour)
+	olderOrder := savePaidWorkOrderWithoutReviewForFixture(t, testContext, fixture, baseScheduledOn, "77777777-7777-7777-7777-777777777777")
+	recentOrder := savePaidWorkOrderWithoutReviewForFixture(t, testContext, fixture, baseScheduledOn.Add(24*time.Hour), "88888888-8888-8888-8888-888888888888")
+
+	history, err := testContext.workOrderRepository.FindPaidWorkHistoryByProviderID(t.Context(), fixture.providerID)
+
+	require.NoError(t, err)
+	require.Len(t, history, 2)
+	assert.Equal(t, []int{recentOrder.ID(), olderOrder.ID()}, []int{history[0].ID, history[1].ID})
+}
+
+func TestWorkOrderRepositoryRejectsPaidHistoryWithoutCompletionReport(t *testing.T) {
+	testContext := newServiceProposalRepositoryTest(t)
+	fixture := newProviderWorkOrderTestFixture(t, testContext, "history-inconsistent")
+	order := saveScheduledWorkOrderAt(
+		t,
+		testContext,
+		fixture.conversation,
+		fixture.consumerID,
+		fixture.providerID,
+		time.Now().UTC().Truncate(time.Microsecond).Add(48*time.Hour),
+	)
+	_, err := testContext.database.Exec(
+		`UPDATE work_orders
+		SET status = $1, paid_on = $2
+		WHERE id = $3`,
+		workorder.StatusPaid,
+		time.Now().UTC().Truncate(time.Microsecond),
+		order.ID(),
+	)
+	require.NoError(t, err)
+
+	_, err = testContext.workOrderRepository.FindPaidWorkHistoryByProviderID(t.Context(), fixture.providerID)
+
+	assert.ErrorIs(t, err, workorder.ErrInvalidWorkOrderState)
 }
 
 func TestWorkOrderRepositoryFindsOnlyOrdersScheduledInsideWindow(t *testing.T) {
@@ -215,4 +350,99 @@ func saveReviewCompletionImage(
 		providerAuthID,
 	)
 	require.NoError(t, err)
+}
+
+type providerWorkOrderTestFixture struct {
+	consumerID     int
+	consumerAuthID string
+	providerID     int
+	providerAuthID string
+	conversation   conversation.Conversation
+}
+
+func newProviderWorkOrderTestFixture(
+	t *testing.T,
+	testContext serviceProposalRepositoryTestContext,
+	suffix string,
+) providerWorkOrderTestFixture {
+	t.Helper()
+	consumerAuthID := fmt.Sprintf("auth0|provider-work-order-consumer-%s", suffix)
+	providerAuthID := fmt.Sprintf("auth0|provider-work-order-provider-%s", suffix)
+	consumerID := savedConsumerIDWithData(t, jobRequestRepositoryTestContext{
+		userRepository: testContext.userRepository,
+	}, consumerAuthID, fmt.Sprintf("provider.work.order.consumer.%s@example.com", suffix), "Ana", "Perez")
+	providerID := savedProviderIDWithData(t, jobRequestRepositoryTestContext{
+		database:           testContext.database,
+		userRepository:     testContext.userRepository,
+		categoryRepository: testContext.categoryRepository,
+	}, providerAuthID, fmt.Sprintf("provider.work.order.provider.%s@example.com", suffix), "Juan", "Gomez", "Plomeria")
+	activeConversation, err := conversation.NewPendingConversation(consumerID, providerID)
+	require.NoError(t, err)
+	require.NoError(t, activeConversation.Activate())
+	activeConversation, err = testContext.conversationRepository.SaveConversation(t.Context(), activeConversation)
+	require.NoError(t, err)
+
+	return providerWorkOrderTestFixture{
+		consumerID:     consumerID,
+		consumerAuthID: consumerAuthID,
+		providerID:     providerID,
+		providerAuthID: providerAuthID,
+		conversation:   activeConversation,
+	}
+}
+
+func savePaidWorkOrderWithoutReviewForFixture(
+	t *testing.T,
+	testContext serviceProposalRepositoryTestContext,
+	fixture providerWorkOrderTestFixture,
+	scheduledOn time.Time,
+	completionImageID string,
+) *workorder.WorkOrder {
+	t.Helper()
+	order := saveScheduledWorkOrderAt(
+		t,
+		testContext,
+		fixture.conversation,
+		fixture.consumerID,
+		fixture.providerID,
+		scheduledOn,
+	)
+	saveReviewCompletionImage(t, testContext, fixture.providerAuthID, completionImageID)
+	report, err := workorder.NewCompletionReport("Trabajo terminado", []string{completionImageID}, scheduledOn)
+	require.NoError(t, err)
+	require.NoError(t, order.ReportCompletion(fixture.providerID, report))
+	require.NoError(t, order.RegisterApprovedBalancePayment(scheduledOn.Add(time.Hour)))
+	savedOrder, err := testContext.workOrderRepository.Save(t.Context(), order)
+	require.NoError(t, err)
+	return savedOrder
+}
+
+func savePaidWorkOrderWithReviewForFixture(
+	t *testing.T,
+	testContext serviceProposalRepositoryTestContext,
+	fixture providerWorkOrderTestFixture,
+	scheduledOn time.Time,
+	completionImageID string,
+	rating int,
+	description string,
+) *workorder.WorkOrder {
+	t.Helper()
+	order := savePaidWorkOrderWithoutReviewForFixture(t, testContext, fixture, scheduledOn, completionImageID)
+	review, err := workorder.NewReview(rating, description)
+	require.NoError(t, err)
+	reviewer := &consumer.Consumer{
+		BaseUser: user.RehydrateBaseUser(
+			fixture.consumerID,
+			fixture.consumerAuthID,
+			"",
+			"Ana",
+			"Perez",
+			consumer.Role,
+			nil,
+		),
+	}
+	require.NoError(t, order.AddReview(reviewer, review))
+	savedOrder, err := testContext.workOrderRepository.Save(t.Context(), order)
+	require.NoError(t, err)
+	return savedOrder
 }

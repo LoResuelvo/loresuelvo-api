@@ -9,6 +9,7 @@ import (
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/consumer"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/provider"
+	providerreadmodel "github.com/LoResuelvo/loresuelvo-api/internal/domain/provider/read_model"
 	serviceproposal "github.com/LoResuelvo/loresuelvo-api/internal/domain/service_proposal"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/user"
 	workorder "github.com/LoResuelvo/loresuelvo-api/internal/domain/work_order"
@@ -265,6 +266,110 @@ func (r *WorkOrderRepository) findReview(ctx context.Context, workOrderID int) (
 		Rating:      int(rating.Int64),
 		Description: description.String,
 	}, nil
+}
+
+func (r *WorkOrderRepository) FindRatingStatsByProviderID(ctx context.Context, providerID int) (provider.RatingStats, error) {
+	var total int64
+	var count int64
+	err := r.db.QueryRowContext(
+		ctx,
+		`SELECT COALESCE(SUM(review.rating), 0), COUNT(review.work_order_id)
+		FROM work_order_reviews review
+		INNER JOIN work_orders wo ON wo.id = review.work_order_id
+		INNER JOIN service_proposals sp ON sp.id = wo.service_proposal_id
+		WHERE sp.provider_id = $1`,
+		providerID,
+	).Scan(&total, &count)
+	if err != nil {
+		return provider.RatingStats{}, fmt.Errorf("finding provider rating stats: %w", err)
+	}
+
+	return provider.RatingStats{Total: total, Count: int(count)}, nil
+}
+
+func (r *WorkOrderRepository) FindPaidWorkHistoryByProviderID(ctx context.Context, providerID int) ([]providerreadmodel.WorkOrder, error) {
+	rows, err := r.db.QueryContext(
+		ctx,
+		`SELECT
+			wo.id,
+			sp.scheduled_on,
+			sp.description,
+			wo.status,
+			completion_report.id,
+			completion_report.description,
+			completion_report.reported_on,
+			review.rating,
+			review.description
+		FROM work_orders wo
+		INNER JOIN service_proposals sp ON sp.id = wo.service_proposal_id
+		LEFT JOIN work_order_completion_reports completion_report
+			ON completion_report.work_order_id = wo.id
+		LEFT JOIN work_order_reviews review
+			ON review.work_order_id = wo.id
+		WHERE sp.provider_id = $1 AND wo.status = $2
+		ORDER BY sp.scheduled_on DESC, wo.id DESC`,
+		providerID,
+		workorder.StatusPaid,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("finding paid work history by provider id: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	workOrders := make([]providerreadmodel.WorkOrder, 0)
+	for rows.Next() {
+		var (
+			orderID               int
+			scheduledOn           time.Time
+			description           string
+			status                string
+			completionReportID    sql.NullInt64
+			completionDescription sql.NullString
+			completionReportedOn  sql.NullTime
+			reviewRating          sql.NullInt64
+			reviewDescription     sql.NullString
+		)
+
+		if err := rows.Scan(
+			&orderID,
+			&scheduledOn,
+			&description,
+			&status,
+			&completionReportID,
+			&completionDescription,
+			&completionReportedOn,
+			&reviewRating,
+			&reviewDescription,
+		); err != nil {
+			return nil, fmt.Errorf("scanning paid work history by provider id: %w", err)
+		}
+		if !completionReportID.Valid {
+			return nil, fmt.Errorf("paid work order %d has no completion report: %w", orderID, workorder.ErrInvalidWorkOrderState)
+		}
+
+		order := providerreadmodel.WorkOrder{
+			ID:          orderID,
+			ScheduledOn: scheduledOn,
+			Description: description,
+			Status:      status,
+			CompletionReport: &providerreadmodel.CompletionReport{
+				Description: completionDescription.String,
+				ReportedOn:  completionReportedOn.Time,
+			},
+		}
+		if reviewRating.Valid {
+			order.Review = &providerreadmodel.Review{
+				Rating:      int(reviewRating.Int64),
+				Description: reviewDescription.String,
+			}
+		}
+		workOrders = append(workOrders, order)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterating paid work history by provider id: %w", err)
+	}
+
+	return workOrders, nil
 }
 
 func (r *WorkOrderRepository) FindByUserID(ctx context.Context, userID int, viewerRole string) ([]readmodel.WorkOrderSummary, error) {

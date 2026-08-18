@@ -163,7 +163,15 @@ func NewDependenciesWithPaymentAccountAdapters(
 		mediaadapter.NewMP4VideoParser(),
 	)
 	categoryService := category.NewService(persistence.CategoryRepository)
-	providerService := provider.NewService(persistence.UserRepository, persistence.CategoryRepository, fileService)
+	providerService := provider.NewService(
+		persistence.UserRepository,
+		persistence.CategoryRepository,
+		fileService,
+		provider.ProfileReaders{
+			RatingStatsReader:     persistence.WorkOrderRepository,
+			PaidWorkHistoryReader: persistence.WorkOrderRepository,
+		},
+	)
 	consumerService := consumer.NewService(persistence.UserRepository, fileService)
 	conversationService := conversation.NewService(
 		persistence.ConversationRepository,
