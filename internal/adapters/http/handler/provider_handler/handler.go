@@ -68,13 +68,13 @@ func (h *ProviderHandler) GetProviderProfile(c *gin.Context) {
 		return
 	}
 
-	foundProvider, err := h.providerService.GetProviderProfile(c.Request.Context(), providerID)
+	profile, err := h.providerService.GetProviderProfileDetail(c.Request.Context(), providerID)
 	if err != nil {
 		handleGetProviderProfileError(c, err)
 		return
 	}
 
-	c.JSON(http.StatusOK, providerProfileResponseFromDomain(*foundProvider))
+	c.JSON(http.StatusOK, providerProfileResponseFromReadModel(*profile))
 }
 
 func categoryIDFromQuery(c *gin.Context) (int, error) {

@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/provider"
+	readmodel "github.com/LoResuelvo/loresuelvo-api/internal/domain/provider/read_model"
 )
 
 func normalizeRegisterProviderRequest(req registerProviderRequest) registerProviderRequest {
@@ -38,18 +39,46 @@ func providerSummaryResponsesFromDomain(providers []provider.Provider) []provide
 	return response
 }
 
-func providerProfileResponseFromDomain(foundProvider provider.Provider) providerProfileResponse {
+func providerProfileResponseFromReadModel(profile readmodel.Profile) providerProfileResponse {
+	workOrders := make([]providerProfileWorkOrderResponse, 0, len(profile.WorkOrders))
+	for _, workOrder := range profile.WorkOrders {
+		workOrderResponse := providerProfileWorkOrderResponse{
+			ID:          workOrder.ID,
+			ScheduledOn: workOrder.ScheduledOn,
+			Description: workOrder.Description,
+			Status:      workOrder.Status,
+		}
+		if workOrder.CompletionReport != nil {
+			workOrderResponse.CompletionReport = &providerProfileCompletionReportResponse{
+				Description: workOrder.CompletionReport.Description,
+				ReportedOn:  workOrder.CompletionReport.ReportedOn,
+			}
+		}
+		if workOrder.Review != nil {
+			workOrderResponse.Review = &providerProfileReviewResponse{
+				Rating:      workOrder.Review.Rating,
+				Description: workOrder.Review.Description,
+			}
+		}
+		workOrders = append(workOrders, workOrderResponse)
+	}
+
+	profilePhoto := providerProfilePhotoResponse{}
+	if profile.ProfilePhoto != nil {
+		profilePhoto = providerProfilePhotoResponse{
+			OriginalName: profile.ProfilePhoto.OriginalName,
+			URL:          profile.ProfilePhoto.URL,
+		}
+	}
+
 	return providerProfileResponse{
-		ID:      foundProvider.ID(),
-		Name:    foundProvider.Name(),
-		Surname: foundProvider.Surname(),
-		ProfilePhoto: providerProfilePhotoResponse{
-			OriginalName: foundProvider.ProfilePhoto().OriginalName,
-			URL:          foundProvider.ProfilePhoto().URL,
-		},
-		Category: providerProfileCategoryResponse{
-			ID:   foundProvider.Category.ID,
-			Name: foundProvider.Category.Name,
-		},
+		ID:            profile.ID,
+		Name:          profile.Name,
+		Surname:       profile.Surname,
+		ProfilePhoto:  profilePhoto,
+		Category:      providerProfileCategoryResponse{ID: profile.CategoryID, Name: profile.CategoryName},
+		RatingAverage: profile.RatingAverage,
+		RatingCount:   profile.RatingCount,
+		WorkOrders:    workOrders,
 	}
 }
