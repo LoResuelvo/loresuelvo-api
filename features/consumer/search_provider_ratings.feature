@@ -1,10 +1,10 @@
-@wip
 Feature: US-30.1 - Ver reputación en la búsqueda de prestadores
     Como consumidor
     quiero conocer la reputación de cada prestador en los resultados de búsqueda
     para comparar profesionales antes de contactarlos
 
     Background:
+        Given que la fecha y hora actual del sistema es "2026-08-15T14:00:00Z"
         Given que existe el rubro "Plomería"
         And que existe un consumidor registrado con correo "ana@example.com", nombre "Ana" y apellido "Pérez"
         And existe un prestador registrado con correo "juan.plomero@example.com", nombre "Juan", apellido "Pérez" y rubro "Plomería"
