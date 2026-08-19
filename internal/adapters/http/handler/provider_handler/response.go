@@ -10,6 +10,16 @@ type providerSummaryResponse struct {
 	ProfilePhotoURL string `json:"profile_photo_url"`
 }
 
+type providerSearchResponse struct {
+	ID              int     `json:"id"`
+	Name            string  `json:"name"`
+	Surname         string  `json:"surname"`
+	CategoryName    string  `json:"category_name"`
+	ProfilePhotoURL string  `json:"profile_photo_url"`
+	RatingAverage   float64 `json:"rating_average"`
+	RatingCount     int     `json:"rating_count"`
+}
+
 type providerProfilePhotoResponse struct {
 	OriginalName string `json:"original_name"`
 	URL          string `json:"url"`

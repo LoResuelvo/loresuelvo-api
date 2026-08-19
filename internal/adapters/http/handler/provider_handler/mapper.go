@@ -30,10 +30,22 @@ func providerSummaryResponseFromDomain(provider provider.Provider) providerSumma
 	}
 }
 
-func providerSummaryResponsesFromDomain(providers []provider.Provider) []providerSummaryResponse {
-	response := make([]providerSummaryResponse, 0, len(providers))
-	for _, provider := range providers {
-		response = append(response, providerSummaryResponseFromDomain(provider))
+func providerSearchResponsesFromReadModel(results []readmodel.ProviderSearchResult) []providerSearchResponse {
+	response := make([]providerSearchResponse, 0, len(results))
+	for _, result := range results {
+		profilePhotoURL := ""
+		if result.ProfilePhoto != nil {
+			profilePhotoURL = result.ProfilePhoto.URL
+		}
+		response = append(response, providerSearchResponse{
+			ID:              result.ID,
+			Name:            result.Name,
+			Surname:         result.Surname,
+			CategoryName:    result.CategoryName,
+			ProfilePhotoURL: profilePhotoURL,
+			RatingAverage:   result.RatingAverage,
+			RatingCount:     result.RatingCount,
+		})
 	}
 
 	return response

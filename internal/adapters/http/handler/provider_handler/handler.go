@@ -52,13 +52,13 @@ func (h *ProviderHandler) FilterProvidersByCategory(c *gin.Context) {
 		return
 	}
 
-	providers, err := h.providerService.FilterProvidersByCategoryID(c.Request.Context(), categoryID)
+	providers, err := h.providerService.SearchProvidersByCategoryID(c.Request.Context(), categoryID)
 	if err != nil {
 		handleFilterProvidersError(c, err)
 		return
 	}
 
-	c.JSON(http.StatusOK, providerSummaryResponsesFromDomain(providers))
+	c.JSON(http.StatusOK, providerSearchResponsesFromReadModel(providers))
 }
 
 func (h *ProviderHandler) GetProviderProfile(c *gin.Context) {
