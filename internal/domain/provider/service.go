@@ -12,29 +12,23 @@ import (
 )
 
 type Service struct {
-	userRepository         UserRepository
-	categoryFinder         CategoryFinder
-	fileService            FileService
-	ratingStatsReader      RatingStatsReader
-	ratingStatsBatchReader RatingStatsBatchReader
-	paidWorkHistoryReader  PaidWorkHistoryReader
+	userRepository UserRepository
+	categoryFinder CategoryFinder
+	fileService    FileService
+	profileReader  ProviderProfileReader
 }
 
 func NewService(
 	repository UserRepository,
 	categoryFinder CategoryFinder,
 	fileService FileService,
-	profileReaders ...ProfileReaders,
+	profileReader ProviderProfileReader,
 ) *Service {
 	service := &Service{
 		userRepository: repository,
 		categoryFinder: categoryFinder,
 		fileService:    fileService,
-	}
-	if len(profileReaders) > 0 {
-		service.ratingStatsReader = profileReaders[0].RatingStatsReader
-		service.ratingStatsBatchReader = profileReaders[0].RatingStatsBatchReader
-		service.paidWorkHistoryReader = profileReaders[0].PaidWorkHistoryReader
+		profileReader:  profileReader,
 	}
 	return service
 }
@@ -106,8 +100,8 @@ func (s *Service) SearchProvidersByCategoryID(ctx context.Context, categoryID in
 	if len(providers) == 0 {
 		return results, nil
 	}
-	if s.ratingStatsBatchReader == nil {
-		return nil, ErrRatingStatsBatchReaderNotConfigured
+	if s.profileReader == nil {
+		return nil, ErrProfileReaderNotConfigured
 	}
 
 	providerIDs := make([]int, 0, len(providers))
@@ -115,7 +109,7 @@ func (s *Service) SearchProvidersByCategoryID(ctx context.Context, categoryID in
 		providerIDs = append(providerIDs, providers[index].ID())
 	}
 
-	ratingStatsByProviderID, err := s.ratingStatsBatchReader.FindRatingStatsByProviderIDs(ctx, providerIDs)
+	ratingStatsByProviderID, err := s.profileReader.FindRatingStatsByProviderIDs(ctx, providerIDs)
 	if err != nil {
 		return nil, fmt.Errorf("finding provider rating stats for search: %w", err)
 	}
@@ -153,8 +147,8 @@ func (s *Service) GetProviderProfile(ctx context.Context, providerID int) (*Prov
 }
 
 func (s *Service) GetProviderProfileDetail(ctx context.Context, providerID int) (*readmodel.Profile, error) {
-	if s.ratingStatsReader == nil || s.paidWorkHistoryReader == nil {
-		return nil, ErrProfileReadersNotConfigured
+	if s.profileReader == nil {
+		return nil, ErrProfileReaderNotConfigured
 	}
 
 	foundProvider, err := s.GetProviderProfile(ctx, providerID)
@@ -162,12 +156,12 @@ func (s *Service) GetProviderProfileDetail(ctx context.Context, providerID int) 
 		return nil, err
 	}
 
-	ratingStats, err := s.ratingStatsReader.FindRatingStatsByProviderID(ctx, providerID)
+	ratingStats, err := s.profileReader.FindRatingStatsByProviderID(ctx, providerID)
 	if err != nil {
 		return nil, fmt.Errorf("finding provider rating stats: %w", err)
 	}
 
-	workOrders, err := s.paidWorkHistoryReader.FindPaidWorkHistoryByProviderID(ctx, providerID)
+	workOrders, err := s.profileReader.FindPaidWorkHistoryByProviderID(ctx, providerID)
 	if err != nil {
 		return nil, fmt.Errorf("finding provider paid work history: %w", err)
 	}

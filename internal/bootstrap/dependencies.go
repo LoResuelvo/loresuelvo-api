@@ -167,11 +167,7 @@ func NewDependenciesWithPaymentAccountAdapters(
 		persistence.UserRepository,
 		persistence.CategoryRepository,
 		fileService,
-		provider.ProfileReaders{
-			RatingStatsReader:      persistence.WorkOrderRepository,
-			RatingStatsBatchReader: persistence.WorkOrderRepository,
-			PaidWorkHistoryReader:  persistence.WorkOrderRepository,
-		},
+		persistence.WorkOrderRepository,
 	)
 	consumerService := consumer.NewService(persistence.UserRepository, fileService)
 	conversationService := conversation.NewService(

@@ -13,7 +13,7 @@ import (
 )
 
 func TestServiceIncludesProviderRatingSummary(t *testing.T) {
-	providerService, _ := newProviderServiceWithProfileReaders(t, provider.RatingStats{Total: 9, Count: 2}, nil)
+	providerService, _ := newProviderServiceWithProfileReader(t, provider.RatingStats{Total: 9, Count: 2}, nil)
 
 	profile, err := providerService.GetProviderProfileDetail(context.Background(), 12)
 
@@ -23,7 +23,7 @@ func TestServiceIncludesProviderRatingSummary(t *testing.T) {
 }
 
 func TestServiceReturnsEmptyWorkHistoryWhenProviderHasNoPaidOrders(t *testing.T) {
-	providerService, _ := newProviderServiceWithProfileReaders(t, provider.RatingStats{}, nil)
+	providerService, _ := newProviderServiceWithProfileReader(t, provider.RatingStats{}, nil)
 
 	profile, err := providerService.GetProviderProfileDetail(context.Background(), 12)
 
@@ -33,7 +33,7 @@ func TestServiceReturnsEmptyWorkHistoryWhenProviderHasNoPaidOrders(t *testing.T)
 
 func TestServiceIncludesPaidWorkOrderWithoutReview(t *testing.T) {
 	workOrder := readmodel.WorkOrder{ID: 41, Status: "paid"}
-	providerService, _ := newProviderServiceWithProfileReaders(t, provider.RatingStats{}, []readmodel.WorkOrder{workOrder})
+	providerService, _ := newProviderServiceWithProfileReader(t, provider.RatingStats{}, []readmodel.WorkOrder{workOrder})
 
 	profile, err := providerService.GetProviderProfileDetail(context.Background(), 12)
 
@@ -43,7 +43,7 @@ func TestServiceIncludesPaidWorkOrderWithoutReview(t *testing.T) {
 
 func TestServiceIncludesReviewInPaidWorkOrder(t *testing.T) {
 	review := &readmodel.Review{Rating: 5, Description: "Excelente trabajo"}
-	providerService, _ := newProviderServiceWithProfileReaders(t, provider.RatingStats{}, []readmodel.WorkOrder{
+	providerService, _ := newProviderServiceWithProfileReader(t, provider.RatingStats{}, []readmodel.WorkOrder{
 		{ID: 41, Status: "paid", Review: review},
 	})
 
@@ -57,15 +57,11 @@ func TestServiceIncludesReviewInPaidWorkOrder(t *testing.T) {
 func TestServicePropagatesRatingStatsError(t *testing.T) {
 	expectedErr := errors.New("rating stats unavailable")
 	repository := &providerRepositoryMock{providerByID: providerForProfileService(t)}
-	ratingStatsReader := &ratingStatsReaderMock{err: expectedErr}
 	providerService := provider.NewService(
 		repository,
 		categoryFinderWithExistingCategory(),
 		profilePhotoServiceForProfile(t),
-		provider.ProfileReaders{
-			RatingStatsReader:     ratingStatsReader,
-			PaidWorkHistoryReader: &paidWorkHistoryReaderMock{},
-		},
+		&providerProfileReaderMock{ratingStatsErr: expectedErr},
 	)
 
 	_, err := providerService.GetProviderProfileDetail(context.Background(), 12)
@@ -80,10 +76,7 @@ func TestServicePropagatesPaidWorkHistoryError(t *testing.T) {
 		repository,
 		categoryFinderWithExistingCategory(),
 		profilePhotoServiceForProfile(t),
-		provider.ProfileReaders{
-			RatingStatsReader:     &ratingStatsReaderMock{},
-			PaidWorkHistoryReader: &paidWorkHistoryReaderMock{err: expectedErr},
-		},
+		&providerProfileReaderMock{workHistoryErr: expectedErr},
 	)
 
 	_, err := providerService.GetProviderProfileDetail(context.Background(), 12)
@@ -91,17 +84,14 @@ func TestServicePropagatesPaidWorkHistoryError(t *testing.T) {
 	assert.ErrorIs(t, err, expectedErr)
 }
 
-func newProviderServiceWithProfileReaders(t *testing.T, stats provider.RatingStats, workOrders []readmodel.WorkOrder) (*provider.Service, *providerRepositoryMock) {
+func newProviderServiceWithProfileReader(t *testing.T, stats provider.RatingStats, workOrders []readmodel.WorkOrder) (*provider.Service, *providerRepositoryMock) {
 	t.Helper()
 	repository := &providerRepositoryMock{providerByID: providerForProfileService(t)}
 	providerService := provider.NewService(
 		repository,
 		categoryFinderWithExistingCategory(),
 		profilePhotoServiceForProfile(t),
-		provider.ProfileReaders{
-			RatingStatsReader:     &ratingStatsReaderMock{stats: stats},
-			PaidWorkHistoryReader: &paidWorkHistoryReaderMock{workOrders: workOrders},
-		},
+		&providerProfileReaderMock{stats: stats, workOrders: workOrders},
 	)
 
 	return providerService, repository

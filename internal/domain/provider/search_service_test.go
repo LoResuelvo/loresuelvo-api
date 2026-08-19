@@ -36,7 +36,7 @@ func TestServiceComposesRatingSummaryForEachProviderSearchResult(t *testing.T) {
 	require.NoError(t, err)
 	pedro.SetPersistenceID(15)
 
-	ratingReader := &ratingStatsBatchReaderMock{
+	profileReader := &providerProfileReaderMock{
 		statsByProviderID: map[int]provider.RatingStats{
 			juan.ID():  {Total: 9, Count: 2},
 			pedro.ID(): {Total: 2, Count: 1},
@@ -56,14 +56,14 @@ func TestServiceComposesRatingSummaryForEachProviderSearchResult(t *testing.T) {
 				"pedro-photo": "https://cdn.example/pedro.jpg",
 			},
 		},
-		provider.ProfileReaders{RatingStatsBatchReader: ratingReader},
+		profileReader,
 	)
 
 	results, err := providerService.SearchProvidersByCategoryID(context.Background(), providerCategory.ID)
 
 	require.NoError(t, err)
 	require.Len(t, results, 2)
-	assert.Equal(t, []int{juan.ID(), pedro.ID()}, ratingReader.providerIDs)
+	assert.Equal(t, []int{juan.ID(), pedro.ID()}, profileReader.providerIDs)
 	assert.Equal(t, readmodel.ProviderSearchResult{
 		ID:            juan.ID(),
 		Name:          "Juan",
@@ -89,14 +89,14 @@ func TestServiceUsesZeroRatingSummaryWhenProviderHasNoRatings(t *testing.T) {
 	)
 	require.NoError(t, err)
 	foundProvider.SetPersistenceID(12)
-	ratingReader := &ratingStatsBatchReaderMock{statsByProviderID: map[int]provider.RatingStats{}}
+	profileReader := &providerProfileReaderMock{statsByProviderID: map[int]provider.RatingStats{}}
 	providerService := provider.NewService(
 		&providerRepositoryMock{providersByCategoryID: map[int][]provider.Provider{
 			providerCategory.ID: {*foundProvider},
 		}},
 		categoryFinderWithExistingCategory(),
 		&profilePhotoValidatorMock{},
-		provider.ProfileReaders{RatingStatsBatchReader: ratingReader},
+		profileReader,
 	)
 
 	results, err := providerService.SearchProvidersByCategoryID(context.Background(), providerCategory.ID)
@@ -126,7 +126,7 @@ func TestServicePropagatesProviderSearchRatingReaderError(t *testing.T) {
 		}},
 		categoryFinderWithExistingCategory(),
 		&profilePhotoValidatorMock{},
-		provider.ProfileReaders{RatingStatsBatchReader: &ratingStatsBatchReaderMock{err: expectedErr}},
+		&providerProfileReaderMock{batchStatsErr: expectedErr},
 	)
 
 	results, err := providerService.SearchProvidersByCategoryID(context.Background(), providerCategory.ID)
