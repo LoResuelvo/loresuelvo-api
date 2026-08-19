@@ -23,11 +23,16 @@ type RatingStatsReader interface {
 	FindRatingStatsByProviderID(ctx context.Context, providerID int) (RatingStats, error)
 }
 
+type RatingStatsBatchReader interface {
+	FindRatingStatsByProviderIDs(ctx context.Context, providerIDs []int) (map[int]RatingStats, error)
+}
+
 type PaidWorkHistoryReader interface {
 	FindPaidWorkHistoryByProviderID(ctx context.Context, providerID int) ([]readmodel.WorkOrder, error)
 }
 
 type ProfileReaders struct {
-	RatingStatsReader     RatingStatsReader
-	PaidWorkHistoryReader PaidWorkHistoryReader
+	RatingStatsReader      RatingStatsReader
+	RatingStatsBatchReader RatingStatsBatchReader
+	PaidWorkHistoryReader  PaidWorkHistoryReader
 }

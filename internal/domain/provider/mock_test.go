@@ -16,6 +16,17 @@ func (reader *ratingStatsReaderMock) FindRatingStatsByProviderID(_ context.Conte
 	return reader.stats, reader.err
 }
 
+type ratingStatsBatchReaderMock struct {
+	statsByProviderID map[int]provider.RatingStats
+	providerIDs       []int
+	err               error
+}
+
+func (reader *ratingStatsBatchReaderMock) FindRatingStatsByProviderIDs(_ context.Context, providerIDs []int) (map[int]provider.RatingStats, error) {
+	reader.providerIDs = append([]int(nil), providerIDs...)
+	return reader.statsByProviderID, reader.err
+}
+
 type paidWorkHistoryReaderMock struct {
 	workOrders []readmodel.WorkOrder
 	err        error

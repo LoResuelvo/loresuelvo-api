@@ -12,11 +12,12 @@ import (
 )
 
 type Service struct {
-	userRepository        UserRepository
-	categoryFinder        CategoryFinder
-	fileService           FileService
-	ratingStatsReader     RatingStatsReader
-	paidWorkHistoryReader PaidWorkHistoryReader
+	userRepository         UserRepository
+	categoryFinder         CategoryFinder
+	fileService            FileService
+	ratingStatsReader      RatingStatsReader
+	ratingStatsBatchReader RatingStatsBatchReader
+	paidWorkHistoryReader  PaidWorkHistoryReader
 }
 
 func NewService(
@@ -32,6 +33,7 @@ func NewService(
 	}
 	if len(profileReaders) > 0 {
 		service.ratingStatsReader = profileReaders[0].RatingStatsReader
+		service.ratingStatsBatchReader = profileReaders[0].RatingStatsBatchReader
 		service.paidWorkHistoryReader = profileReaders[0].PaidWorkHistoryReader
 	}
 	return service
@@ -92,6 +94,47 @@ func (s *Service) FilterProvidersByCategoryID(ctx context.Context, categoryID in
 	}
 
 	return WithProfilePhotoURLs(providers, profilePhotoURLs), nil
+}
+
+func (s *Service) SearchProvidersByCategoryID(ctx context.Context, categoryID int) ([]readmodel.ProviderSearchResult, error) {
+	providers, err := s.FilterProvidersByCategoryID(ctx, categoryID)
+	if err != nil {
+		return nil, err
+	}
+
+	results := make([]readmodel.ProviderSearchResult, 0, len(providers))
+	if len(providers) == 0 {
+		return results, nil
+	}
+	if s.ratingStatsBatchReader == nil {
+		return nil, ErrRatingStatsBatchReaderNotConfigured
+	}
+
+	providerIDs := make([]int, 0, len(providers))
+	for index := range providers {
+		providerIDs = append(providerIDs, providers[index].ID())
+	}
+
+	ratingStatsByProviderID, err := s.ratingStatsBatchReader.FindRatingStatsByProviderIDs(ctx, providerIDs)
+	if err != nil {
+		return nil, fmt.Errorf("finding provider rating stats for search: %w", err)
+	}
+
+	for index := range providers {
+		foundProvider := providers[index]
+		ratingSummary := ratingStatsByProviderID[foundProvider.ID()].Summary()
+		results = append(results, readmodel.ProviderSearchResult{
+			ID:            foundProvider.ID(),
+			Name:          foundProvider.Name(),
+			Surname:       foundProvider.Surname(),
+			CategoryName:  categoryName(&foundProvider),
+			ProfilePhoto:  foundProvider.ProfilePhoto(),
+			RatingAverage: ratingSummary.Average,
+			RatingCount:   ratingSummary.Count,
+		})
+	}
+
+	return results, nil
 }
 
 func (s *Service) GetProviderProfile(ctx context.Context, providerID int) (*Provider, error) {
