@@ -25,7 +25,7 @@ get:
           schema:
             type: array
             items:
-              $ref: '#/components/schemas/ProviderSummary'
+              $ref: '#/components/schemas/ProviderSearchResult'
           examples:
             providersFound:
               value:
@@ -34,11 +34,15 @@ get:
                 surname: Pérez
                 category_name: Plomería
                 profile_photo_url: https://cdn.example/files/2026/06/profile_photo/juan.jpg
+                rating_average: 4.5
+                rating_count: 2
               - id: 2
                 name: Pedro
                 surname: Dib
                 category_name: Plomería
                 profile_photo_url: https://cdn.example/files/2026/06/profile_photo/pedro.jpg
+                rating_average: 0
+                rating_count: 0
             noProviders:
               value: []
     '400':

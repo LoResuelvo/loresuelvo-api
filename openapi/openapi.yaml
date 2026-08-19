@@ -210,6 +210,8 @@ components:
       $ref: ./components/schemas/register-provider-request.yaml
     ProviderSummary:
       $ref: ./components/schemas/provider-summary.yaml
+    ProviderSearchResult:
+      $ref: ./components/schemas/provider-search-result.yaml
     ProviderProfile:
       $ref: ./components/schemas/provider-profile.yaml
     ProviderProfileWorkOrder:
