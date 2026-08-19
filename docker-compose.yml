@@ -13,6 +13,7 @@ services:
       DATABASE_URL: "postgres://postgres:example@dev-db:5432/loresuelvo?sslmode=disable"
       TEST_DATABASE_URL: "postgres://postgres:example@test-db:5432/loresuelvo_test?sslmode=disable"
       ENVIRONMENT: "${ENVIRONMENT:-dev}"
+      LOG_LEVEL: "${LOG_LEVEL:-debug}"
       CORS_ALLOWED_ORIGINS: "${CORS_ALLOWED_ORIGINS:-http://localhost:8081,http://localhost:3000,http://localhost:8082}"
       SEEDS_ENABLED: "${SEEDS_ENABLED:-false}"
       SEEDS_FILE: "${SEEDS_FILE:-seeds/default.yaml}"
