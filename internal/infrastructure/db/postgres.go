@@ -3,10 +3,12 @@ package db
 import (
 	"context"
 	"database/sql"
+	"log/slog"
 	"os"
 	"time"
 
-	_ "github.com/jackc/pgx/v5/stdlib"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/stdlib"
 )
 
 const (
@@ -15,26 +17,31 @@ const (
 )
 
 type PostgresConfig struct {
-	URL string
+	URL    string
+	Logger *slog.Logger
 }
 
 func NewPostgresConfigFromEnv() PostgresConfig {
 	return PostgresConfig{
-		URL: envOrDefault("DATABASE_URL", defaultPostgresURL),
+		URL:    envOrDefault("DATABASE_URL", defaultPostgresURL),
+		Logger: slog.Default(),
 	}
 }
 
 func NewTestPostgresConfigFromEnv() PostgresConfig {
 	return PostgresConfig{
-		URL: envOrDefault("TEST_DATABASE_URL", defaultTestPostgresURL),
+		URL:    envOrDefault("TEST_DATABASE_URL", defaultTestPostgresURL),
+		Logger: slog.Default(),
 	}
 }
 
 func ConnectPostgres(ctx context.Context, config PostgresConfig) (*sql.DB, error) {
-	database, err := sql.Open("pgx", config.URL)
+	connectionConfig, err := pgx.ParseConfig(config.URL)
 	if err != nil {
 		return nil, err
 	}
+	connectionConfig.Tracer = NewQueryTracer(config.Logger)
+	database := stdlib.OpenDB(*connectionConfig)
 
 	pingCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
