@@ -30,7 +30,6 @@ func RequestLogger(logger *slog.Logger) gin.HandlerFunc {
 		c.Next()
 
 		status := c.Writer.Status()
-		responseSize := max(c.Writer.Size(), 0)
 		route := c.FullPath()
 		if route == "" {
 			route = "unmatched"
@@ -39,14 +38,19 @@ func RequestLogger(logger *slog.Logger) gin.HandlerFunc {
 			return
 		}
 
-		level := httpLogLevel(status)
-		requestLogger.Log(c.Request.Context(), level, "http.request.completed",
+		attributes := []any{
 			"http.method", c.Request.Method,
 			"http.route", route,
 			"http.status_code", status,
-			"http.response_size_bytes", responseSize,
 			"duration_ms", time.Since(startedOn).Milliseconds(),
-		)
+		}
+		if pathParams := pathParameters(c.Params); len(pathParams) > 0 {
+			attributes = append(attributes, "http.path_params", pathParams)
+		}
+		if queryParams := queryParameters(c.Request); len(queryParams) > 0 {
+			attributes = append(attributes, "http.query_params", queryParams)
+		}
+		requestLogger.Log(c.Request.Context(), httpLogLevel(status), "http.request.completed", attributes...)
 	}
 }
 
@@ -75,14 +79,28 @@ func requestIDFromHeader(header string) string {
 }
 
 func httpLogLevel(status int) slog.Level {
-	switch {
-	case status >= http.StatusInternalServerError:
+	if status >= http.StatusInternalServerError {
 		return slog.LevelError
-	case status >= http.StatusBadRequest:
-		return slog.LevelWarn
-	default:
-		return slog.LevelInfo
 	}
+	return slog.LevelInfo
+}
+
+func pathParameters(params gin.Params) map[string]string {
+	result := make(map[string]string, len(params))
+	for _, param := range params {
+		result[param.Key] = param.Value
+	}
+	return result
+}
+
+func queryParameters(request *http.Request) map[string]string {
+	result := make(map[string]string)
+	for _, key := range []string{"category_id", "data.id"} {
+		if value := strings.TrimSpace(request.URL.Query().Get(key)); value != "" {
+			result[key] = value
+		}
+	}
+	return result
 }
 
 func safeStackTrace() string {
