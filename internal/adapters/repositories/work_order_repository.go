@@ -287,6 +287,48 @@ func (r *WorkOrderRepository) FindRatingStatsByProviderID(ctx context.Context, p
 	return provider.RatingStats{Total: total, Count: int(count)}, nil
 }
 
+func (r *WorkOrderRepository) FindRatingStatsByProviderIDs(ctx context.Context, providerIDs []int) (map[int]provider.RatingStats, error) {
+	statsByProviderID := make(map[int]provider.RatingStats, len(providerIDs))
+	if len(providerIDs) == 0 {
+		return statsByProviderID, nil
+	}
+
+	rows, err := r.db.QueryContext(
+		ctx,
+		`SELECT
+			sp.provider_id,
+			COALESCE(SUM(review.rating), 0),
+			COUNT(review.work_order_id)
+		FROM work_order_reviews review
+		INNER JOIN work_orders wo ON wo.id = review.work_order_id
+		INNER JOIN service_proposals sp ON sp.id = wo.service_proposal_id
+		WHERE sp.provider_id = ANY($1)
+		GROUP BY sp.provider_id`,
+		providerIDs,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("finding provider rating stats by ids: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	for rows.Next() {
+		var (
+			providerID int
+			total      int64
+			count      int64
+		)
+		if err := rows.Scan(&providerID, &total, &count); err != nil {
+			return nil, fmt.Errorf("scanning provider rating stats by ids: %w", err)
+		}
+		statsByProviderID[providerID] = provider.RatingStats{Total: total, Count: int(count)}
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterating provider rating stats by ids: %w", err)
+	}
+
+	return statsByProviderID, nil
+}
+
 func (r *WorkOrderRepository) FindPaidWorkHistoryByProviderID(ctx context.Context, providerID int) ([]providerreadmodel.WorkOrder, error) {
 	rows, err := r.db.QueryContext(
 		ctx,

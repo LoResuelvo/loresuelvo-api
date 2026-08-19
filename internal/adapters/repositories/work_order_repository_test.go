@@ -71,6 +71,37 @@ func TestWorkOrderRepositoryAggregatesProviderRatingStats(t *testing.T) {
 	assert.Equal(t, provider.RatingStats{Total: 8, Count: 2}, stats)
 }
 
+func TestWorkOrderRepositoryAggregatesRatingStatsForMultipleProviders(t *testing.T) {
+	testContext := newServiceProposalRepositoryTest(t)
+	firstFixture := newProviderWorkOrderTestFixture(t, testContext, "rating-stats-batch-first")
+	secondFixture := newProviderWorkOrderTestFixture(t, testContext, "rating-stats-batch-second")
+	baseScheduledOn := time.Now().UTC().Truncate(time.Microsecond).Add(48 * time.Hour)
+	savePaidWorkOrderWithReviewForFixture(t, testContext, firstFixture, baseScheduledOn, "99999999-9999-9999-9999-999999999991", 5, "Muy buen trabajo.")
+	savePaidWorkOrderWithReviewForFixture(t, testContext, firstFixture, baseScheduledOn.Add(24*time.Hour), "99999999-9999-9999-9999-999999999992", 3, "Trabajo correcto.")
+	savePaidWorkOrderWithReviewForFixture(t, testContext, secondFixture, baseScheduledOn, "99999999-9999-9999-9999-999999999993", 2, "Debe mejorar.")
+
+	statsByProviderID, err := testContext.workOrderRepository.FindRatingStatsByProviderIDs(
+		t.Context(),
+		[]int{firstFixture.providerID, secondFixture.providerID},
+	)
+
+	require.NoError(t, err)
+	assert.Equal(t, map[int]provider.RatingStats{
+		firstFixture.providerID:  {Total: 8, Count: 2},
+		secondFixture.providerID: {Total: 2, Count: 1},
+	}, statsByProviderID)
+}
+
+func TestWorkOrderRepositoryOmitsProvidersWithoutReviewsFromRatingStatsBatch(t *testing.T) {
+	testContext := newServiceProposalRepositoryTest(t)
+	fixture := newProviderWorkOrderTestFixture(t, testContext, "rating-stats-batch-empty")
+
+	statsByProviderID, err := testContext.workOrderRepository.FindRatingStatsByProviderIDs(t.Context(), []int{fixture.providerID})
+
+	require.NoError(t, err)
+	assert.Empty(t, statsByProviderID)
+}
+
 func TestWorkOrderRepositoryKeepsPaidWorkOrderWithoutReviewInProviderHistory(t *testing.T) {
 	testContext := newServiceProposalRepositoryTest(t)
 	fixture := newProviderWorkOrderTestFixture(t, testContext, "history-without-review")
