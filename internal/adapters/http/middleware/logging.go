@@ -35,11 +35,11 @@ func RequestLogger(logger *slog.Logger) gin.HandlerFunc {
 		if route == "" {
 			route = "unmatched"
 		}
+		if c.Request.Method == http.MethodGet && route == "/" && status < http.StatusBadRequest {
+			return
+		}
 
 		level := httpLogLevel(status)
-		if c.Request.Method == http.MethodGet && route == "/" && status < http.StatusBadRequest {
-			level = slog.LevelDebug
-		}
 		requestLogger.Log(c.Request.Context(), level, "http.request.completed",
 			"http.method", c.Request.Method,
 			"http.route", route,
