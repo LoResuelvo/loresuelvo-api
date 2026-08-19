@@ -26,6 +26,16 @@ func RequestLogger(logger *slog.Logger) gin.HandlerFunc {
 		c.Request = c.Request.WithContext(observability.ContextWithLogger(c.Request.Context(), requestLogger))
 		c.Header(requestIDHeader, requestID)
 
+		includeBodies := requestLogger.Enabled(c.Request.Context(), slog.LevelInfo)
+		var requestBody *limitedBodyCapture
+		var responseBody *limitedBodyCapture
+		if includeBodies {
+			requestBody = captureRequestBody(c.Request)
+			responseWriter, capture := captureResponseBody(c.Writer)
+			c.Writer = responseWriter
+			responseBody = capture
+		}
+
 		startedOn := time.Now()
 		c.Next()
 
@@ -49,6 +59,18 @@ func RequestLogger(logger *slog.Logger) gin.HandlerFunc {
 		}
 		if queryParams := queryParameters(c.Request); len(queryParams) > 0 {
 			attributes = append(attributes, "http.query_params", queryParams)
+		}
+		if includeBodies {
+			attributes = append(attributes, capturedBodyAttributes(
+				"http.request",
+				requestBody,
+				c.Request.Header.Get("Content-Type"),
+			)...)
+			attributes = append(attributes, capturedBodyAttributes(
+				"http.response",
+				responseBody,
+				c.Writer.Header().Get("Content-Type"),
+			)...)
 		}
 		requestLogger.Log(c.Request.Context(), httpLogLevel(status), "http.request.completed", attributes...)
 	}
