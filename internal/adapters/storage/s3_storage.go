@@ -11,6 +11,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 
 	filedomain "github.com/LoResuelvo/loresuelvo-api/internal/domain/file"
+	"github.com/LoResuelvo/loresuelvo-api/internal/observability"
 )
 
 type S3Storage struct {
@@ -24,6 +25,7 @@ func NewS3Storage(config Config) *S3Storage {
 	awsConfig := aws.Config{
 		Region:      config.Region,
 		Credentials: credentials.NewStaticCredentialsProvider(config.AccessKeyID, config.SecretAccessKey, ""),
+		HTTPClient:  observability.NewLoggingHTTPClient("s3", "object_request", 0),
 	}
 
 	client := s3.NewFromConfig(awsConfig, func(options *s3.Options) {
@@ -75,6 +77,7 @@ func (storage *S3Storage) GenerateDownloadURL(ctx context.Context, object filedo
 }
 
 func (storage *S3Storage) ReadObjectMetadata(ctx context.Context, bucket, key string) (*filedomain.ObjectMetadata, error) {
+	ctx = observability.ContextWithExternalOperation(ctx, "read_object_metadata")
 	result, err := storage.client.HeadObject(ctx, &s3.HeadObjectInput{
 		Bucket: aws.String(bucket),
 		Key:    aws.String(key),
@@ -89,6 +92,7 @@ func (storage *S3Storage) ReadObjectMetadata(ctx context.Context, bucket, key st
 }
 
 func (storage *S3Storage) ReadObject(ctx context.Context, object filedomain.ObjectToDownload) ([]byte, error) {
+	ctx = observability.ContextWithExternalOperation(ctx, "read_object")
 	result, err := storage.client.GetObject(ctx, &s3.GetObjectInput{
 		Bucket: aws.String(object.Bucket),
 		Key:    aws.String(object.Key),

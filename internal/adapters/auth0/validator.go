@@ -5,6 +5,7 @@ import (
 	"net/url"
 	"time"
 
+	"github.com/LoResuelvo/loresuelvo-api/internal/observability"
 	"github.com/auth0/go-jwt-middleware/v3/jwks"
 	"github.com/auth0/go-jwt-middleware/v3/validator"
 )
@@ -20,6 +21,7 @@ func NewValidator(domain, audience string) (*validator.Validator, error) {
 	provider, err := jwks.NewCachingProvider(
 		jwks.WithIssuerURL(issuerURL),
 		jwks.WithCacheTTL(5*time.Minute),
+		jwks.WithCustomClient(observability.NewLoggingHTTPClient("auth0", "fetch_jwks", 10*time.Second)),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create JWKS provider: %w", err)

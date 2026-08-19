@@ -4,10 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"strings"
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/category"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/conversation"
+	"github.com/LoResuelvo/loresuelvo-api/internal/observability"
 	"google.golang.org/genai"
 )
 
@@ -16,12 +18,14 @@ const defaultGeminiModel = "gemini-2.5-flash"
 type GeminiChatbot struct {
 	apiKey string
 	model  string
+	client *http.Client
 }
 
 func NewGeminiChatbot(model, apiKey string) *GeminiChatbot {
 	return &GeminiChatbot{
 		apiKey: strings.TrimSpace(apiKey),
 		model:  model,
+		client: observability.NewLoggingHTTPClient("gemini", "generate_content", 0),
 	}
 }
 
@@ -30,9 +34,11 @@ func (chatbot *GeminiChatbot) AnswerHomeProblemQuestion(ctx context.Context, que
 		return nil, conversation.ErrChatbotUnavailable
 	}
 
+	ctx = observability.ContextWithExternalOperation(ctx, "answer_home_problem")
 	client, err := genai.NewClient(ctx, &genai.ClientConfig{
-		APIKey:  chatbot.apiKey,
-		Backend: genai.BackendGeminiAPI,
+		APIKey:     chatbot.apiKey,
+		Backend:    genai.BackendGeminiAPI,
+		HTTPClient: chatbot.client,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("creating Gemini client: %w", err)
@@ -64,9 +70,11 @@ func (chatbot *GeminiChatbot) SummarizeHomeProblemConversation(ctx context.Conte
 		return "", conversation.ErrChatbotUnavailable
 	}
 
+	ctx = observability.ContextWithExternalOperation(ctx, "summarize_home_problem")
 	client, err := genai.NewClient(ctx, &genai.ClientConfig{
-		APIKey:  chatbot.apiKey,
-		Backend: genai.BackendGeminiAPI,
+		APIKey:     chatbot.apiKey,
+		Backend:    genai.BackendGeminiAPI,
+		HTTPClient: chatbot.client,
 	})
 	if err != nil {
 		return "", fmt.Errorf("creating Gemini client: %w", err)

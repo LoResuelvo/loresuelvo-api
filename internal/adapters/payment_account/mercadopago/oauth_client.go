@@ -15,6 +15,7 @@ import (
 	"time"
 
 	paymentaccount "github.com/LoResuelvo/loresuelvo-api/internal/domain/payment_account"
+	"github.com/LoResuelvo/loresuelvo-api/internal/observability"
 )
 
 var ErrInvalidOAuthConfiguration = errors.New("Mercado Pago OAuth configuration is incomplete")
@@ -32,7 +33,7 @@ func NewOAuthClient(config Config) (*OAuthClient, error) {
 	}
 	return &OAuthClient{
 		config:     config,
-		httpClient: &http.Client{Timeout: 10 * time.Second},
+		httpClient: observability.NewLoggingHTTPClient("mercado_pago", "exchange_authorization_code", 10*time.Second),
 	}, nil
 }
 
@@ -77,6 +78,7 @@ func (client *OAuthClient) ExchangeAuthorizationCode(ctx context.Context, code, 
 	if client.config.ClientID == "" || client.config.ClientSecret == "" || client.config.RedirectURI == "" || client.config.APIBaseURL == "" {
 		return paymentaccount.OAuthCredentials{}, ErrInvalidOAuthConfiguration
 	}
+	ctx = observability.ContextWithExternalOperation(ctx, "exchange_authorization_code")
 	payload, err := json.Marshal(struct {
 		ClientID     string `json:"client_id"`
 		ClientSecret string `json:"client_secret"`

@@ -10,6 +10,7 @@ import (
 	sharedmercadopago "github.com/LoResuelvo/loresuelvo-api/internal/adapters/mercadopago"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/payment"
 	paymentaccount "github.com/LoResuelvo/loresuelvo-api/internal/domain/payment_account"
+	"github.com/LoResuelvo/loresuelvo-api/internal/observability"
 	mercadopagoconfig "github.com/mercadopago/sdk-go/pkg/config"
 	mercadopagopayment "github.com/mercadopago/sdk-go/pkg/payment"
 	"github.com/mercadopago/sdk-go/pkg/preference"
@@ -67,6 +68,7 @@ func newSDKPreferenceClient(accessToken string) (preferenceCreator, error) {
 	if err != nil {
 		return nil, fmt.Errorf("configuring Mercado Pago SDK: %w", err)
 	}
+	sdkConfig.Requester = observability.NewLoggingRequester("mercado_pago", "create_checkout", sdkConfig.Requester)
 	return preference.NewClient(sdkConfig), nil
 }
 
@@ -75,6 +77,7 @@ func newSDKPaymentClient(accessToken string) (paymentGetter, error) {
 	if err != nil {
 		return nil, fmt.Errorf("configuring Mercado Pago SDK: %w", err)
 	}
+	sdkConfig.Requester = observability.NewLoggingRequester("mercado_pago", "get_payment", sdkConfig.Requester)
 	return mercadopagopayment.NewClient(sdkConfig), nil
 }
 
@@ -83,6 +86,7 @@ func (client *CheckoutClient) CreateCheckout(
 	accessToken string,
 	checkoutRequest payment.CheckoutRequest,
 ) (payment.ExternalCheckout, error) {
+	ctx = observability.ContextWithExternalOperation(ctx, "create_checkout")
 	if strings.TrimSpace(accessToken) == "" ||
 		strings.TrimSpace(checkoutRequest.ExternalReference) == "" ||
 		!validCheckoutPurpose(checkoutRequest.Purpose) ||
@@ -167,6 +171,7 @@ func (client *CheckoutClient) GetPayment(
 	accessToken,
 	externalPaymentID string,
 ) (payment.ExternalPayment, error) {
+	ctx = observability.ContextWithExternalOperation(ctx, "get_payment")
 	if strings.TrimSpace(accessToken) == "" {
 		return payment.ExternalPayment{}, fmt.Errorf("getting Mercado Pago payment: access token is required")
 	}
