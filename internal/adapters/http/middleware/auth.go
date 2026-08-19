@@ -1,11 +1,11 @@
 package middleware
 
 import (
-	"log/slog"
 	"net/http"
 	"slices"
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/auth0"
+	"github.com/LoResuelvo/loresuelvo-api/internal/observability"
 	jwtmiddleware "github.com/auth0/go-jwt-middleware/v3"
 	"github.com/auth0/go-jwt-middleware/v3/validator"
 	"github.com/gin-gonic/gin"
@@ -31,8 +31,8 @@ func newJwtMiddleware(jwtValidator *validator.Validator) (*jwtmiddleware.JWTMidd
 	return jwtmiddleware.New(
 		jwtmiddleware.WithValidator(jwtValidator),
 		jwtmiddleware.WithValidateOnOptions(false),
-		jwtmiddleware.WithErrorHandler(func(w http.ResponseWriter, r *http.Request, err error) {
-			slog.Error("JWT validation failed", "error", err, "path", r.URL.Path)
+		jwtmiddleware.WithErrorHandler(func(w http.ResponseWriter, r *http.Request, _ error) {
+			observability.LoggerFromContext(r.Context()).WarnContext(r.Context(), "authentication denied")
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusUnauthorized)
 			_, _ = w.Write([]byte(`{"error":"invalid_token","message":"Failed to validate JWT."}`))
@@ -97,7 +97,12 @@ func RequirePermissionLayer(permission string) gin.HandlerFunc {
 			return
 		}
 
-		slog.Warn("permission denied", "required", permission, "path", c.FullPath())
+		observability.LoggerFromContext(c.Request.Context()).WarnContext(
+			c.Request.Context(),
+			"permission denied",
+			"required_permission", permission,
+			"http.route", c.FullPath(),
+		)
 		c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "insufficient permissions"})
 	}
 }

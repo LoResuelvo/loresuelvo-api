@@ -45,7 +45,7 @@ func main() {
 		panic(err)
 	}
 
-	router := httpadapter.NewRouter(dependencies.RouterConfig(auth0Validator))
+	router := httpadapter.NewRouter(dependencies.RouterConfig(auth0Validator, logger))
 	engine, err := router.SetUp()
 	if err != nil {
 		panic(err)

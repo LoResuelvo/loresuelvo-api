@@ -2,6 +2,7 @@ package httpadapter
 
 import (
 	"fmt"
+	"log/slog"
 	"net/http"
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/category_handler"
@@ -37,6 +38,7 @@ type RouterConfig struct {
 	TestHandler            *test_handler.TestHandler
 	RealtimeHandler        *realtime.Handler
 	Auth0Validator         *validator.Validator
+	Logger                 *slog.Logger
 }
 
 type Router struct {
@@ -54,9 +56,14 @@ type Router struct {
 	testHandler            *test_handler.TestHandler
 	realtimeHandler        *realtime.Handler
 	auth0Validator         *validator.Validator
+	logger                 *slog.Logger
 }
 
 func NewRouter(config RouterConfig) *Router {
+	logger := config.Logger
+	if logger == nil {
+		logger = slog.Default()
+	}
 	router := &Router{
 		categoryHandler:        config.CategoryHandler,
 		consumerHandler:        config.ConsumerHandler,
@@ -72,6 +79,7 @@ func NewRouter(config RouterConfig) *Router {
 		testHandler:            config.TestHandler,
 		realtimeHandler:        config.RealtimeHandler,
 		auth0Validator:         config.Auth0Validator,
+		logger:                 logger,
 	}
 
 	return router
@@ -88,7 +96,8 @@ func (router *Router) SetUp() (*gin.Engine, error) {
 	}
 
 	engine := gin.New()
-	engine.Use(gin.Recovery())
+	engine.Use(middleware.RequestLogger(router.logger))
+	engine.Use(middleware.Recovery(router.logger))
 	engine.Use(middleware.CORSLayer(middleware.NewCORSConfigFromEnv()))
 
 	router.registerHealthRoutes(engine)

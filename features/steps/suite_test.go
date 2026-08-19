@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"encoding/base64"
 	"fmt"
+	"log/slog"
 	"net/http/httptest"
 	"testing"
 
@@ -301,7 +302,7 @@ func newTestSuite(tb testing.TB, database *sql.DB) *testSuite {
 	auth0Validator := auth0.NewFakeValidator()
 	tokenBuilder := auth0.NewTokenBuilder()
 
-	router := httpadapter.NewRouter(dependencies.RouterConfig(auth0Validator))
+	router := httpadapter.NewRouter(dependencies.RouterConfig(auth0Validator, slog.Default()))
 	engine, err := router.SetUp()
 	require.NoError(tb, err, "could not initialize router")
 

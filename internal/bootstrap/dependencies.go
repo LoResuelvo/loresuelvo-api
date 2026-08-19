@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"log/slog"
 	"time"
 
 	chatbotadapter "github.com/LoResuelvo/loresuelvo-api/internal/adapters/chatbot"
@@ -70,7 +71,7 @@ type Dependencies struct {
 	Clock *clockadapter.SystemClock
 }
 
-func (dependencies *Dependencies) RouterConfig(auth0Validator *validator.Validator) httpadapter.RouterConfig {
+func (dependencies *Dependencies) RouterConfig(auth0Validator *validator.Validator, logger *slog.Logger) httpadapter.RouterConfig {
 	return httpadapter.RouterConfig{
 		CategoryHandler:        dependencies.CategoryHandler,
 		ConsumerHandler:        dependencies.ConsumerHandler,
@@ -86,6 +87,7 @@ func (dependencies *Dependencies) RouterConfig(auth0Validator *validator.Validat
 		TestHandler:            dependencies.TestHandler,
 		RealtimeHandler:        dependencies.RealtimeHandler,
 		Auth0Validator:         auth0Validator,
+		Logger:                 logger,
 	}
 }
 
