@@ -11,7 +11,6 @@ Feature: Registrar prestador con zonas de cobertura
 
     Rule: El prestador debe seleccionar al menos una zona de cobertura habilitada
 
-        @wip
         Scenario: 35.5.1-RPWCZ Registrar un prestador con una zona de cobertura
             When me registro como prestador con correo "prestador@example.com", nombre "Juan", apellido "Pérez", rubro "Plomería" y zona de cobertura "Comuna 6"
             Then el sistema confirma el registro
