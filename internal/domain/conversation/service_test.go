@@ -542,7 +542,7 @@ func TestCreateChatbotConversationIncludesRecommendedProvidersWhenDiagnosisIsCom
 	repo := &conversationRepositoryMock{}
 	consumerIDFinder := &consumerIDFinderMock{consumerID: 10}
 	plumbingCategory := &category.Category{ID: 3, Name: "Plomería", NormalizedName: "plomería"}
-	recommendedProvider, err := provider.NewProvider("auth0|provider", "juan@example.com", "Juan", "Gómez", plumbingCategory, &filedomain.Image{FileID: "provider-photo-file-id"})
+	recommendedProvider, err := provider.NewProvider("auth0|provider", "juan@example.com", "Juan", "Gómez", plumbingCategory, &filedomain.Image{FileID: "provider-photo-file-id"}, nil)
 	require.NoError(t, err)
 	recommendedProvider.SetPersistenceID(20)
 	categoryLister := &recommendationCategoryListerMock{categories: []category.Category{*plumbingCategory}}
@@ -889,7 +889,7 @@ func TestGetByIDReturnsChatbotConversationDetailForOwnerConsumer(t *testing.T) {
 	}}
 	consumerIDFinder := &consumerIDFinderMock{consumerID: 10}
 	plumbingCategory := &category.Category{ID: recommendedCategoryID, Name: "Plomería", NormalizedName: "plomería"}
-	recommendedProvider, err := provider.NewProvider("auth0|provider", "juan@example.com", "Juan", "Gómez", plumbingCategory, &filedomain.Image{FileID: "provider-photo-file-id"})
+	recommendedProvider, err := provider.NewProvider("auth0|provider", "juan@example.com", "Juan", "Gómez", plumbingCategory, &filedomain.Image{FileID: "provider-photo-file-id"}, nil)
 	require.NoError(t, err)
 	recommendedProvider.SetPersistenceID(20)
 	providerFinder := &providerIDFinderMock{providers: []provider.Provider{*recommendedProvider}}

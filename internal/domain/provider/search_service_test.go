@@ -21,6 +21,7 @@ func TestServiceComposesRatingSummaryForEachProviderSearchResult(t *testing.T) {
 		"Pérez",
 		&providerCategory,
 		&filedomain.Image{FileID: "juan-photo", URL: "https://cdn.example/juan.jpg"},
+		nil,
 	)
 	require.NoError(t, err)
 	juan.SetPersistenceID(12)
@@ -32,6 +33,7 @@ func TestServiceComposesRatingSummaryForEachProviderSearchResult(t *testing.T) {
 		"Dib",
 		&providerCategory,
 		&filedomain.Image{FileID: "pedro-photo", URL: "https://cdn.example/pedro.jpg"},
+		nil,
 	)
 	require.NoError(t, err)
 	pedro.SetPersistenceID(15)
@@ -86,6 +88,7 @@ func TestServiceUsesZeroRatingSummaryWhenProviderHasNoRatings(t *testing.T) {
 		"Pérez",
 		&providerCategory,
 		&filedomain.Image{FileID: "juan-photo"},
+		nil,
 	)
 	require.NoError(t, err)
 	foundProvider.SetPersistenceID(12)
@@ -116,6 +119,7 @@ func TestServicePropagatesProviderSearchRatingReaderError(t *testing.T) {
 		"Pérez",
 		&providerCategory,
 		&filedomain.Image{FileID: "juan-photo"},
+		nil,
 	)
 	require.NoError(t, err)
 	foundProvider.SetPersistenceID(12)

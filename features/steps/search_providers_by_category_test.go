@@ -42,7 +42,6 @@ func (suite *testSuite) thereIsRegisteredProviderWithEmailNameSurnameAndCategory
 		Name:                   name,
 		Surname:                surname,
 		CategoryID:             categoryID,
-		CoverageZone:           []string{"Zona Norte"},
 		CriminalRecordFile:     "criminal-record.pdf",
 		CUITCertificateFile:    "cuit-certificate.pdf",
 		BiometricValidationID:  "biometric-validation-approved",

@@ -492,6 +492,7 @@ func registeredProvider(t *testing.T) *provider.Provider {
 		"Gómez",
 		&category.Category{ID: 1, Name: "Plomería"},
 		nil,
+		nil,
 	)
 	require.NoError(t, err)
 	providerUser.SetPersistenceID(providerID)

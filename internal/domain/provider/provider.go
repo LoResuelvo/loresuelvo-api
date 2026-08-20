@@ -2,6 +2,7 @@ package provider
 
 import (
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/category"
+	coveragezone "github.com/LoResuelvo/loresuelvo-api/internal/domain/coverage_zone"
 	filedomain "github.com/LoResuelvo/loresuelvo-api/internal/domain/file"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/user"
 )
@@ -10,10 +11,19 @@ const Role = "provider"
 
 type Provider struct {
 	*user.BaseUser
-	Category *category.Category
+	Category      *category.Category
+	CoverageZones []coveragezone.CoverageZone
 }
 
-func NewProvider(auth0ID string, email string, name string, surname string, providerCategory *category.Category, profilePhoto *filedomain.Image) (*Provider, error) {
+func NewProvider(
+	auth0ID string,
+	email string,
+	name string,
+	surname string,
+	providerCategory *category.Category,
+	profilePhoto *filedomain.Image,
+	coverageZones []coveragezone.CoverageZone,
+) (*Provider, error) {
 	if providerCategory == nil {
 		return nil, category.ErrDoesNotExist
 	}
@@ -24,8 +34,9 @@ func NewProvider(auth0ID string, email string, name string, surname string, prov
 	}
 
 	return &Provider{
-		BaseUser: providerUser,
-		Category: providerCategory,
+		BaseUser:      providerUser,
+		Category:      providerCategory,
+		CoverageZones: append([]coveragezone.CoverageZone{}, coverageZones...),
 	}, nil
 }
 

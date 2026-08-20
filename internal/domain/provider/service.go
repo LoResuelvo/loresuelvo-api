@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/category"
+	coveragezone "github.com/LoResuelvo/loresuelvo-api/internal/domain/coverage_zone"
 	filedomain "github.com/LoResuelvo/loresuelvo-api/internal/domain/file"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/provider/read_model"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/validator"
@@ -33,7 +34,7 @@ func NewService(
 	return service
 }
 
-func (s *Service) RegisterProvider(ctx context.Context, authID, email, name, surname string, categoryID int, profilePhotoFileID string) (*Provider, error) {
+func (s *Service) RegisterProvider(ctx context.Context, authID, email, name, surname string, categoryID int, profilePhotoFileID string, coverageZoneIDs []int) (*Provider, error) {
 	if s.userRepository.FindByEmail(email) {
 		return nil, validator.ErrEmailAlreadyRegistered
 	}
@@ -42,8 +43,15 @@ func (s *Service) RegisterProvider(ctx context.Context, authID, email, name, sur
 	if err != nil {
 		return nil, err
 	}
-
-	provider, err := NewProvider(authID, email, name, surname, category, &filedomain.Image{FileID: profilePhotoFileID})
+	provider, err := NewProvider(
+		authID,
+		email,
+		name,
+		surname,
+		category,
+		&filedomain.Image{FileID: profilePhotoFileID},
+		coverageZonesFromIDs(coverageZoneIDs),
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -65,6 +73,14 @@ func (s *Service) RegisterProvider(ctx context.Context, authID, email, name, sur
 
 	provider.SetPersistenceID(savedUser.ID())
 	return provider, nil
+}
+
+func coverageZonesFromIDs(ids []int) []coveragezone.CoverageZone {
+	zones := make([]coveragezone.CoverageZone, 0, len(ids))
+	for _, id := range ids {
+		zones = append(zones, coveragezone.CoverageZone{ID: id})
+	}
+	return zones
 }
 
 func (s *Service) FilterProvidersByCategoryID(ctx context.Context, categoryID int) ([]Provider, error) {

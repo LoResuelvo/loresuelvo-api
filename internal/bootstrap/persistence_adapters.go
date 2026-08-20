@@ -9,6 +9,7 @@ import (
 type PersistenceAdapters struct {
 	UserRepository                 *repositories.UserRepository
 	CategoryRepository             *repositories.CategoryRepository
+	CoverageZoneRepository         *repositories.CoverageZoneRepository
 	ConversationRepository         *repositories.ConversationRepository
 	MessageRepository              *repositories.MessageRepository
 	MessageImageRepository         *repositories.MessageImageRepository
@@ -31,6 +32,7 @@ type PersistenceAdapters struct {
 func NewPersistenceAdapters(database *sql.DB) *PersistenceAdapters {
 	userRepository := repositories.NewUserRepository(database)
 	categoryRepository := repositories.NewCategoryRepository(database)
+	coverageZoneRepository := repositories.NewCoverageZoneRepository(database)
 	messageImageRepository := repositories.NewMessageImageRepository(database)
 	messageAudioRepository := repositories.NewMessageAudioRepository(database)
 	messageVideoRepository := repositories.NewMessageVideoRepository(database)
@@ -65,6 +67,7 @@ func NewPersistenceAdapters(database *sql.DB) *PersistenceAdapters {
 	return &PersistenceAdapters{
 		UserRepository:                 userRepository,
 		CategoryRepository:             categoryRepository,
+		CoverageZoneRepository:         coverageZoneRepository,
 		ConversationRepository:         conversationRepository,
 		MessageRepository:              messageRepository,
 		MessageImageRepository:         messageImageRepository,

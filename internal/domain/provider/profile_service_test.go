@@ -107,6 +107,7 @@ func providerForProfileService(t *testing.T) *provider.Provider {
 		"Gómez",
 		&providerCategory,
 		&filedomain.Image{FileID: "profile-photo-id"},
+		nil,
 	)
 	require.NoError(t, err)
 	foundProvider.SetPersistenceID(12)

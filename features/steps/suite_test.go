@@ -33,6 +33,7 @@ type testSuite struct {
 	server                       *httptest.Server
 	database                     *sql.DB
 	categoryRepository           *repositories.CategoryRepository
+	coverageZoneRepository       *repositories.CoverageZoneRepository
 	conversationRepository       *repositories.ConversationRepository
 	messageRepository            *repositories.MessageRepository
 	jobRequestRepository         *repositories.JobRequestRepository
@@ -124,6 +125,7 @@ func (s *testSuite) registerAllSteps(sc *godog.ScenarioContext) {
 	registerConsumerAccountSteps(sc, s)
 	registerProviderAccountSteps(sc, s)
 	registerProviderWithProfilePhotoSteps(sc, s)
+	registerProviderWithCoverageZonesSteps(sc, s)
 	registerCreateCategorySteps(sc, s)
 	registerListCategoriesSteps(sc, s)
 	registerFilterProvidersByCategorySteps(sc, s)
@@ -193,6 +195,10 @@ func (s *testSuite) cleanup() error {
 
 	if err := s.userRepository.DeleteAll(); err != nil {
 		return fmt.Errorf("could not clean users: %w", err)
+	}
+
+	if err := s.coverageZoneRepository.DeleteAll(); err != nil {
+		return fmt.Errorf("could not clean coverage zones: %w", err)
 	}
 
 	if err := s.fileRepository.DeleteAll(); err != nil {
@@ -316,6 +322,7 @@ func newTestSuite(tb testing.TB, database *sql.DB) *testSuite {
 		server:                       server,
 		database:                     database,
 		categoryRepository:           dependencies.Persistence.CategoryRepository,
+		coverageZoneRepository:       dependencies.Persistence.CoverageZoneRepository,
 		conversationRepository:       dependencies.Persistence.ConversationRepository,
 		messageRepository:            dependencies.Persistence.MessageRepository,
 		jobRequestRepository:         dependencies.Persistence.JobRequestRepository,

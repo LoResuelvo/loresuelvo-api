@@ -8,6 +8,7 @@ import (
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/repositories"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/category"
+	coveragezone "github.com/LoResuelvo/loresuelvo-api/internal/domain/coverage_zone"
 	filedomain "github.com/LoResuelvo/loresuelvo-api/internal/domain/file"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/provider"
 	"github.com/LoResuelvo/loresuelvo-api/internal/infrastructure/db"
@@ -24,6 +25,9 @@ func cleanProviderRepositoryTestDatabase(t *testing.T, database *sql.DB) {
 
 	_, err = database.Exec("DELETE FROM users")
 	require.NoError(t, err, "could not clean users")
+
+	_, err = database.Exec("DELETE FROM coverage_zones")
+	require.NoError(t, err, "could not clean coverage zones")
 
 	_, err = database.Exec("DELETE FROM files")
 	require.NoError(t, err, "could not clean files")
@@ -74,9 +78,15 @@ func providerUser(value *provider.Provider) *provider.Provider {
 func validProviderWithData(t *testing.T, categoryRepository *repositories.CategoryRepository, database *sql.DB, authID, email, name, surname, categoryName string) *provider.Provider {
 	t.Helper()
 
+	return validProviderWithCoverageZones(t, categoryRepository, database, authID, email, name, surname, categoryName, nil)
+}
+
+func validProviderWithCoverageZones(t *testing.T, categoryRepository *repositories.CategoryRepository, database *sql.DB, authID, email, name, surname, categoryName string, coverageZones []coveragezone.CoverageZone) *provider.Provider {
+	t.Helper()
+
 	savedCategory := savedCategoryForProvider(t, categoryRepository, categoryName)
 	profilePhotoFileID := savedProviderProfilePhotoFileID(t, database, authID)
-	provider, err := provider.NewProvider(authID, email, name, surname, savedCategory, &filedomain.Image{FileID: profilePhotoFileID})
+	provider, err := provider.NewProvider(authID, email, name, surname, savedCategory, &filedomain.Image{FileID: profilePhotoFileID}, coverageZones)
 	require.NoError(t, err, "could not prepare provider")
 	return provider
 }
@@ -132,6 +142,25 @@ func TestProviderRepositoryCanSaveAProvider(t *testing.T) {
 	assert.NoError(t, err)
 	exists := repo.FindByEmail(provider.Email())
 	assert.True(t, exists, "Provider should be saved on database")
+}
+
+func TestProviderRepositorySavesCoverageZonesAtomically(t *testing.T) {
+	testContext := newProviderRepositoryTest(t)
+	coverageZoneRepository := repositories.NewCoverageZoneRepository(testContext.database)
+	zone, err := coveragezone.New("Comuna 6")
+	require.NoError(t, err)
+	savedZone, err := coverageZoneRepository.Save(context.Background(), *zone)
+	require.NoError(t, err)
+
+	providerToSave := validProviderWithCoverageZones(t, testContext.categoryRepository, testContext.database, "auth0|josue", "josugod@gmail.com", "Josue", "el pro", "Plomería", []coveragezone.CoverageZone{*savedZone})
+
+	savedUser, err := testContext.providerRepository.Save(context.Background(), providerUser(providerToSave))
+	require.NoError(t, err)
+
+	zones, err := coverageZoneRepository.FindByProviderID(context.Background(), savedUser.ID())
+
+	require.NoError(t, err)
+	require.Equal(t, []coveragezone.CoverageZone{*savedZone}, zones)
 }
 
 func TestProviderRepositoryCanDeleteAllProviders(t *testing.T) {

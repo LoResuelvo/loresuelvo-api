@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/category"
+	coveragezone "github.com/LoResuelvo/loresuelvo-api/internal/domain/coverage_zone"
 	filedomain "github.com/LoResuelvo/loresuelvo-api/internal/domain/file"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/provider"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/user"
@@ -140,6 +141,7 @@ func TestRegisterProviderWithValidData(t *testing.T) {
 		"Perez",
 		1,
 		"profile-photo-file-id",
+		nil,
 	)
 
 	require.NoError(t, err)
@@ -154,8 +156,30 @@ func TestRegisterProviderWithValidData(t *testing.T) {
 	assert.Equal(t, "https://cdn/profile-photo.jpg", createdProvider.ProfilePhoto().URL)
 }
 
+func TestRegisterProviderIncludesSelectedCoverageZones(t *testing.T) {
+	repository := &providerRepositoryMock{}
+	categoryFinder := categoryFinderWithExistingCategory()
+	profilePhotoValidator := &profilePhotoValidatorMock{profilePhotoURLsByFile: map[string]string{"profile-photo-file-id": "https://cdn/profile-photo.jpg"}}
+	providerManager := provider.NewService(repository, categoryFinder, profilePhotoValidator, nil)
+
+	createdProvider, err := providerManager.RegisterProvider(
+		context.Background(),
+		"auth0|ana",
+		"ana@example.com",
+		"Ana",
+		"Perez",
+		1,
+		"profile-photo-file-id",
+		[]int{6},
+	)
+
+	require.NoError(t, err)
+	require.NotNil(t, createdProvider)
+	require.Equal(t, []coveragezone.CoverageZone{{ID: 6}}, repository.savedProvider.CoverageZones)
+}
+
 func TestNewProviderRequiresCategory(t *testing.T) {
-	createdProvider, err := provider.NewProvider("auth0|ana", "ana@example.com", "Ana", "Perez", nil, &filedomain.Image{FileID: "profile-photo-file-id"})
+	createdProvider, err := provider.NewProvider("auth0|ana", "ana@example.com", "Ana", "Perez", nil, &filedomain.Image{FileID: "profile-photo-file-id"}, nil)
 
 	assert.Nil(t, createdProvider)
 	assert.ErrorIs(t, err, category.ErrDoesNotExist)
@@ -163,7 +187,7 @@ func TestNewProviderRequiresCategory(t *testing.T) {
 
 func TestNewProviderExposesUserFieldsThroughAccessors(t *testing.T) {
 	providerCategory := existingCategory()
-	createdProvider, err := provider.NewProvider("auth0|ana", "ana@example.com", "Ana", "Perez", &providerCategory, &filedomain.Image{FileID: "profile-photo-file-id"})
+	createdProvider, err := provider.NewProvider("auth0|ana", "ana@example.com", "Ana", "Perez", &providerCategory, &filedomain.Image{FileID: "profile-photo-file-id"}, nil)
 
 	require.NoError(t, err)
 	assert.Equal(t, "auth0|ana", createdProvider.AuthID())
@@ -186,6 +210,7 @@ func TestRegisterProviderWithEmailWithoutArroba(t *testing.T) {
 		"Perez",
 		1,
 		"",
+		nil,
 	)
 
 	assert.ErrorIs(t, err, validator.ErrInvalidEmailFormat)
@@ -207,6 +232,7 @@ func TestRegisterProviderReturnsRepositorySaveError(t *testing.T) {
 		"Perez",
 		1,
 		"profile-photo-file-id",
+		nil,
 	)
 
 	assert.Nil(t, createdProvider)
@@ -229,6 +255,7 @@ func TestRegisterProviderReturnsProfilePhotoURLResolutionErrorBeforeSaving(t *te
 		"Perez",
 		1,
 		"profile-photo-file-id",
+		nil,
 	)
 
 	assert.Nil(t, createdProvider)
@@ -250,6 +277,7 @@ func TestRegisterProviderWithEmailWithoutDomain(t *testing.T) {
 		"Perez",
 		1,
 		"",
+		nil,
 	)
 
 	assert.ErrorIs(t, err, validator.ErrInvalidEmailFormat)
@@ -269,6 +297,7 @@ func TestRegisterProviderWithEmailWithoutName(t *testing.T) {
 		"Perez",
 		1,
 		"",
+		nil,
 	)
 
 	assert.ErrorIs(t, err, validator.ErrInvalidEmailFormat)
@@ -288,6 +317,7 @@ func TestRegisterProviderWithAlreadyRegisteredEmail(t *testing.T) {
 		"Perez",
 		1,
 		"",
+		nil,
 	)
 
 	assert.ErrorIs(t, err, validator.ErrEmailAlreadyRegistered)
@@ -308,6 +338,7 @@ func TestRegisterProviderWithMissingCategory(t *testing.T) {
 		"Perez",
 		0,
 		"",
+		nil,
 	)
 
 	assert.ErrorIs(t, err, category.ErrIDRequired)
@@ -327,6 +358,7 @@ func TestRegisterProviderWithNonExistingCategory(t *testing.T) {
 		"Perez",
 		999,
 		"",
+		nil,
 	)
 
 	assert.ErrorIs(t, err, category.ErrDoesNotExist)
@@ -346,6 +378,7 @@ func TestRegisterProviderWithWrongCategoryID(t *testing.T) {
 		"Perez",
 		2,
 		"",
+		nil,
 	)
 
 	assert.ErrorIs(t, err, category.ErrDoesNotExist)
@@ -354,7 +387,7 @@ func TestRegisterProviderWithWrongCategoryID(t *testing.T) {
 
 func TestFilterProvidersByCategoryID(t *testing.T) {
 	providerCategory := existingCategory()
-	providerToReturn, err := provider.NewProvider("auth0|ana", "ana@example.com", "Ana", "Perez", &providerCategory, &filedomain.Image{FileID: "profile-photo-file-id"})
+	providerToReturn, err := provider.NewProvider("auth0|ana", "ana@example.com", "Ana", "Perez", &providerCategory, &filedomain.Image{FileID: "profile-photo-file-id"}, nil)
 	require.NoError(t, err)
 	providerToReturn.SetPersistenceID(1)
 	repository := &providerRepositoryMock{
@@ -418,7 +451,7 @@ func TestFilterProvidersByCategoryIDReturnsRepositoryError(t *testing.T) {
 func TestFilterProvidersByCategoryIDWrapsProfilePhotoURLResolutionError(t *testing.T) {
 	expectedErr := errors.New("resolve urls")
 	providerCategory := existingCategory()
-	providerToReturn, err := provider.NewProvider("auth0|ana", "ana@example.com", "Ana", "Perez", &providerCategory, &filedomain.Image{FileID: "profile-photo-file-id"})
+	providerToReturn, err := provider.NewProvider("auth0|ana", "ana@example.com", "Ana", "Perez", &providerCategory, &filedomain.Image{FileID: "profile-photo-file-id"}, nil)
 	require.NoError(t, err)
 	repository := &providerRepositoryMock{
 		providersByCategoryID: map[int][]provider.Provider{
@@ -440,6 +473,7 @@ func TestGetProviderProfileResolvesProfilePhotoURL(t *testing.T) {
 	foundProvider, err := provider.NewProvider(
 		"auth0|juan", "juan@example.com", "Juan", "Gómez", &providerCategory,
 		&filedomain.Image{FileID: "profile-photo-id", OriginalName: "juan.jpg"},
+		nil,
 	)
 	require.NoError(t, err)
 	foundProvider.SetPersistenceID(12)
@@ -474,6 +508,7 @@ func TestGetProviderProfileWrapsProfilePhotoURLResolutionError(t *testing.T) {
 	foundProvider, err := provider.NewProvider(
 		"auth0|juan", "juan@example.com", "Juan", "Gómez", &providerCategory,
 		&filedomain.Image{FileID: "profile-photo-id"},
+		nil,
 	)
 	require.NoError(t, err)
 	expectedErr := errors.New("storage unavailable")
@@ -528,6 +563,7 @@ func TestRegisterProviderRequiresProfilePhoto(t *testing.T) {
 		"Perez",
 		1,
 		"",
+		nil,
 	)
 
 	assert.ErrorIs(t, err, filedomain.ErrProfilePhotoRequired)
@@ -548,6 +584,7 @@ func TestRegisterProviderRejectsUnavailableProfilePhoto(t *testing.T) {
 		"Perez",
 		1,
 		"file-id",
+		nil,
 	)
 
 	assert.ErrorIs(t, err, filedomain.ErrProfilePhotoNotAvailable)
@@ -570,6 +607,7 @@ func TestRegisterProviderMapsUnexpectedProfilePhotoValidationError(t *testing.T)
 		"Perez",
 		1,
 		"file-id",
+		nil,
 	)
 
 	assert.ErrorIs(t, err, filedomain.ErrProfilePhotoNotAvailable)

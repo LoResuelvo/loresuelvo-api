@@ -11,16 +11,16 @@ import (
 )
 
 type providerRegistrationRequest struct {
-	Email                  string   `json:"email"`
-	Name                   string   `json:"name"`
-	Surname                string   `json:"surname"`
-	CategoryID             int      `json:"category_id"`
-	CoverageZone           []string `json:"coverage_zone"`
-	CriminalRecordFile     string   `json:"criminal_record_file"`
-	CUITCertificateFile    string   `json:"cuit_certificate_file"`
-	BiometricValidationID  string   `json:"biometric_validation_id"`
-	ProfessionalCredential string   `json:"professional_credential_file"`
-	ProfilePhotoFileID     string   `json:"profile_photo_file_id,omitempty"`
+	Email                  string `json:"email"`
+	Name                   string `json:"name"`
+	Surname                string `json:"surname"`
+	CategoryID             int    `json:"category_id"`
+	CoverageZoneIDs        []int  `json:"coverage_zone_ids,omitempty"`
+	CriminalRecordFile     string `json:"criminal_record_file"`
+	CUITCertificateFile    string `json:"cuit_certificate_file"`
+	BiometricValidationID  string `json:"biometric_validation_id"`
+	ProfessionalCredential string `json:"professional_credential_file"`
+	ProfilePhotoFileID     string `json:"profile_photo_file_id,omitempty"`
 }
 
 func registerProviderAccountSteps(sc *godog.ScenarioContext, suite *testSuite) {

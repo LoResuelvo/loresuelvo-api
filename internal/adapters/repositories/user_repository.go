@@ -59,6 +59,9 @@ func (repository *UserRepository) Save(ctx context.Context, userToSave user.User
 		_, err = tx.ExecContext(ctx,
 			`INSERT INTO providers (user_id, category_id) VALUES ($1, $2)`,
 			typedUser.ID(), typedUser.Category.ID)
+		if err == nil {
+			err = saveProviderCoverageZones(ctx, tx, typedUser)
+		}
 	default:
 		err = fmt.Errorf("saving user: unsupported user type %T", userToSave)
 	}
@@ -69,6 +72,21 @@ func (repository *UserRepository) Save(ctx context.Context, userToSave user.User
 		return nil, fmt.Errorf("committing user transaction: %w", err)
 	}
 	return userToSave, nil
+}
+
+func saveProviderCoverageZones(ctx context.Context, tx *sql.Tx, providerToSave *provider.Provider) error {
+	for _, zone := range providerToSave.CoverageZones {
+		if _, err := tx.ExecContext(
+			ctx,
+			`INSERT INTO provider_coverage_zones (provider_id, coverage_zone_id) VALUES ($1, $2)`,
+			providerToSave.ID(),
+			zone.ID,
+		); err != nil {
+			return fmt.Errorf("saving provider coverage zone %d: %w", zone.ID, err)
+		}
+	}
+
+	return nil
 }
 
 type userQueryRower interface {

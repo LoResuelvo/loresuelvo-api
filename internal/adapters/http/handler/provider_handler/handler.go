@@ -36,7 +36,7 @@ func (h *ProviderHandler) RegisterProvider(c *gin.Context) {
 
 	req = normalizeRegisterProviderRequest(req)
 
-	createdProvider, err := h.providerService.RegisterProvider(c.Request.Context(), auth0ID, req.Email, req.Name, req.Surname, req.CategoryID, req.ProfilePhotoFileID)
+	createdProvider, err := h.providerService.RegisterProvider(c.Request.Context(), auth0ID, req.Email, req.Name, req.Surname, req.CategoryID, req.ProfilePhotoFileID, req.CoverageZoneIDs)
 	if err != nil {
 		handleRegisterProviderError(c, err)
 		return
