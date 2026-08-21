@@ -74,6 +74,32 @@ func (repository *CoverageZoneRepository) FindByID(ctx context.Context, id int) 
 	return &zone, nil
 }
 
+func (repository *CoverageZoneRepository) Update(ctx context.Context, zone coveragezone.CoverageZone) error {
+	result, err := repository.db.ExecContext(
+		ctx,
+		`UPDATE coverage_zones
+		SET name = $1, normalized_name = $2, enabled = $3, updated_on = NOW()
+		WHERE id = $4`,
+		zone.Name,
+		zone.NormalizedName,
+		zone.Enabled,
+		zone.ID,
+	)
+	if err != nil {
+		return fmt.Errorf("updating coverage zone: %w", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("checking updated coverage zone: %w", err)
+	}
+	if rowsAffected == 0 {
+		return coveragezone.ErrDoesNotExist
+	}
+
+	return nil
+}
+
 func (repository *CoverageZoneRepository) FindByProviderID(ctx context.Context, providerID int) ([]coveragezone.CoverageZone, error) {
 	rows, err := repository.db.QueryContext(
 		ctx,

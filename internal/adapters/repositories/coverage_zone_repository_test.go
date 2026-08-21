@@ -61,3 +61,20 @@ func TestCoverageZoneRepositoryFindByIDReturnsNotFound(t *testing.T) {
 	assert.Nil(t, foundZone)
 	assert.ErrorIs(t, err, coveragezone.ErrDoesNotExist)
 }
+
+func TestCoverageZoneRepositoryCanUpdateEnabledState(t *testing.T) {
+	repository := newCoverageZoneRepositoryTest(t)
+	zone, err := coveragezone.New("Comuna 15")
+	require.NoError(t, err)
+
+	savedZone, err := repository.Save(context.Background(), *zone)
+	require.NoError(t, err)
+	savedZone.Disable()
+
+	err = repository.Update(context.Background(), *savedZone)
+
+	require.NoError(t, err)
+	foundZone, err := repository.FindByID(context.Background(), savedZone.ID)
+	require.NoError(t, err)
+	assert.False(t, foundZone.Enabled)
+}

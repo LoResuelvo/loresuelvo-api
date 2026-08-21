@@ -241,6 +241,37 @@ func TestRegisterProviderRejectsNonExistingCoverageZone(t *testing.T) {
 	assert.Empty(t, profilePhotoValidator.resolvedFileIDs, "profile photo URL should not be resolved with a non-existing coverage zone")
 }
 
+func TestRegisterProviderRejectsUnavailableCoverageZone(t *testing.T) {
+	repository := &providerRepositoryMock{}
+	categoryFinder := categoryFinderWithExistingCategory()
+	disabledZone := defaultCoverageZone()
+	disabledZone.Enabled = false
+	coverageZoneFinder := &coverageZoneFinderMock{
+		zonesByID: map[int]coveragezone.CoverageZone{disabledZone.ID: disabledZone},
+	}
+	profilePhotoValidator := &profilePhotoValidatorMock{profilePhotoURLsByFile: map[string]string{
+		"profile-photo-file-id": "https://cdn/profile-photo.jpg",
+	}}
+	providerManager := provider.NewService(repository, categoryFinder, profilePhotoValidator, nil, coverageZoneFinder)
+
+	createdProvider, err := providerManager.RegisterProvider(
+		context.Background(),
+		"auth0|ana",
+		"ana@example.com",
+		"Ana",
+		"Perez",
+		1,
+		"profile-photo-file-id",
+		[]int{disabledZone.ID},
+	)
+
+	assert.Nil(t, createdProvider)
+	assert.ErrorIs(t, err, coveragezone.ErrNotAvailable)
+	assert.Equal(t, []int{disabledZone.ID}, coverageZoneFinder.requestedZoneIDs)
+	assert.False(t, repository.saveCalled, "provider should not be saved with an unavailable coverage zone")
+	assert.Empty(t, profilePhotoValidator.resolvedFileIDs, "profile photo URL should not be resolved with an unavailable coverage zone")
+}
+
 func TestNewProviderRequiresCategory(t *testing.T) {
 	createdProvider, err := provider.NewProvider("auth0|ana", "ana@example.com", "Ana", "Perez", nil, &filedomain.Image{FileID: "profile-photo-file-id"}, nil)
 

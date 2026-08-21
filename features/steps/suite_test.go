@@ -53,6 +53,7 @@ type testSuite struct {
 
 	lastStatus                              int
 	lastBody                                []byte
+	expectedCoverageZoneRegistrationError   string
 	lastLocation                            string
 	currentAuth0ID                          string
 	lastConversationID                      int
@@ -219,6 +220,7 @@ func (s *testSuite) cleanup() error {
 	s.lastProviderProfileID = 0
 	s.lastJobRequestID = 0
 	s.providerProfilePhotoFileID = ""
+	s.expectedCoverageZoneRegistrationError = ""
 	s.chatbot.Reset()
 	s.checkoutClient.Reset()
 	s.chatbotConversationIDs = nil

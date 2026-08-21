@@ -106,6 +106,9 @@ func (s *Service) resolveCoverageZones(ctx context.Context, ids []int) ([]covera
 		if zone == nil {
 			return nil, coveragezone.ErrDoesNotExist
 		}
+		if err := zone.ValidateSelection(); err != nil {
+			return nil, err
+		}
 		zones = append(zones, *zone)
 	}
 

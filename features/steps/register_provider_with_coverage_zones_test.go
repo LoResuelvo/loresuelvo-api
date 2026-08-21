@@ -13,6 +13,7 @@ import (
 func registerProviderWithCoverageZonesSteps(sc *godog.ScenarioContext, suite *testSuite) {
 	sc.Step(`^que están habilitadas las zonas de cobertura "([^"]*)", "([^"]*)" y "([^"]*)"$`, suite.thereAreEnabledCoverageZones)
 	sc.Step(`^que no existe la zona de cobertura "([^"]*)"$`, suite.coverageZoneDoesNotExist)
+	sc.Step(`^que la zona de cobertura "([^"]*)" está deshabilitada$`, suite.coverageZoneIsDisabled)
 	sc.Step(`^me registro como prestador con correo "([^"]*)", nombre "([^"]*)", apellido "([^"]*)", rubro "([^"]*)" y zona de cobertura "([^"]*)"$`, suite.requestProviderRegistrationWithCoverageZone)
 	sc.Step(`^me registro como prestador con correo "([^"]*)", nombre "([^"]*)", apellido "([^"]*)", rubro "([^"]*)" y sin zonas de cobertura$`, suite.requestProviderRegistrationWithoutCoverageZones)
 	sc.Step(`^el prestador "([^"]*)" queda registrado con la zona de cobertura "([^"]*)"$`, suite.providerIsRegisteredWithCoverageZone)
@@ -78,6 +79,33 @@ func (suite *testSuite) coverageZoneDoesNotExist(name string) error {
 	return fmt.Errorf("coverage zone %q unexpectedly exists", name)
 }
 
+func (suite *testSuite) coverageZoneIsDisabled(name string) error {
+	ctx := context.Background()
+	zone, err := suite.coverageZoneRepository.FindByName(ctx, name)
+	if err != nil {
+		return fmt.Errorf("could not find coverage zone %q to disable: %w", name, err)
+	}
+	if zone == nil {
+		return fmt.Errorf("coverage zone repository returned no zone for %q", name)
+	}
+	if zone.Enabled {
+		zone.Disable()
+		if err := suite.coverageZoneRepository.Update(ctx, *zone); err != nil {
+			return fmt.Errorf("could not disable coverage zone %q: %w", name, err)
+		}
+	}
+
+	disabledZone, err := suite.coverageZoneRepository.FindByID(ctx, zone.ID)
+	if err != nil {
+		return fmt.Errorf("could not verify that coverage zone %q is disabled: %w", name, err)
+	}
+	if disabledZone == nil || disabledZone.Enabled {
+		return fmt.Errorf("coverage zone %q is still enabled", name)
+	}
+
+	return nil
+}
+
 func (suite *testSuite) requestProviderRegistrationWithCoverageZone(email, name, surname, categoryName, coverageZoneName string) error {
 	categoryID, err := suite.categoryIDFor(categoryName)
 	if err != nil {
@@ -91,8 +119,15 @@ func (suite *testSuite) requestProviderRegistrationWithCoverageZone(email, name,
 			return fmt.Errorf("coverage zone repository returned no zone for %q", coverageZoneName)
 		}
 		coverageZoneID = zone.ID
+		if !zone.Enabled {
+			suite.expectedCoverageZoneRegistrationError = coveragezone.ErrNotAvailable.Error()
+		} else {
+			suite.expectedCoverageZoneRegistrationError = ""
+		}
 	} else if !errors.Is(err, coveragezone.ErrDoesNotExist) {
 		return fmt.Errorf("could not find coverage zone %q for the scenario: %w", coverageZoneName, err)
+	} else {
+		suite.expectedCoverageZoneRegistrationError = coveragezone.ErrDoesNotExist.Error()
 	}
 
 	return suite.requestProviderRegistration(providerRegistrationRequest{
@@ -110,6 +145,8 @@ func (suite *testSuite) requestProviderRegistrationWithCoverageZone(email, name,
 }
 
 func (suite *testSuite) requestProviderRegistrationWithoutCoverageZones(email, name, surname, categoryName string) error {
+	suite.expectedCoverageZoneRegistrationError = ""
+
 	categoryID, err := suite.categoryIDFor(categoryName)
 	if err != nil {
 		return err
@@ -164,8 +201,11 @@ func (suite *testSuite) systemReportsCoverageZoneUnavailable() error {
 	if err := suite.registrationResponseShouldHaveStatusCode(http.StatusBadRequest); err != nil {
 		return err
 	}
+	if suite.expectedCoverageZoneRegistrationError == "" {
+		return fmt.Errorf("expected a coverage-zone availability error for the registration scenario")
+	}
 
-	return suite.registrationResponseShouldSay(coveragezone.ErrDoesNotExist.Error())
+	return suite.registrationResponseShouldSay(suite.expectedCoverageZoneRegistrationError)
 }
 
 func (suite *testSuite) providerIsNotRegistered(email string) error {

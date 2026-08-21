@@ -22,3 +22,19 @@ func TestNewCoverageZoneRequiresName(t *testing.T) {
 	require.ErrorIs(t, err, coveragezone.ErrNameRequired)
 	require.Nil(t, zone)
 }
+
+func TestCoverageZoneRejectsSelectionWhenDisabled(t *testing.T) {
+	zone := coveragezone.CoverageZone{Enabled: false}
+
+	err := zone.ValidateSelection()
+
+	require.ErrorIs(t, err, coveragezone.ErrNotAvailable)
+}
+
+func TestCoverageZoneCanBeDisabled(t *testing.T) {
+	zone := coveragezone.CoverageZone{Enabled: true}
+
+	zone.Disable()
+
+	require.False(t, zone.Enabled)
+}

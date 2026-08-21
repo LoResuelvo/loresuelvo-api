@@ -21,3 +21,15 @@ func New(name string) (*CoverageZone, error) {
 		Enabled:        true,
 	}, nil
 }
+
+func (zone *CoverageZone) Disable() {
+	zone.Enabled = false
+}
+
+func (zone CoverageZone) ValidateSelection() error {
+	if !zone.Enabled {
+		return ErrNotAvailable
+	}
+
+	return nil
+}
