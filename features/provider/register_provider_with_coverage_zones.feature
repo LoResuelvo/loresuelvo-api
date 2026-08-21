@@ -21,7 +21,6 @@ Feature: Registrar prestador con zonas de cobertura
             Then el sistema me indica que debo seleccionar al menos una zona de cobertura
             And el prestador "prestador@example.com" no queda registrado
 
-        @wip
         Scenario: 35.5.3-RPWCZ Rechazar el registro con una zona de cobertura inexistente
             Given que no existe la zona de cobertura "Comuna 99"
             When me registro como prestador con correo "prestador@example.com", nombre "Juan", apellido "Pérez", rubro "Plomería" y zona de cobertura "Comuna 99"
