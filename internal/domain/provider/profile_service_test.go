@@ -62,6 +62,7 @@ func TestServicePropagatesRatingStatsError(t *testing.T) {
 		categoryFinderWithExistingCategory(),
 		profilePhotoServiceForProfile(t),
 		&providerProfileReaderMock{ratingStatsErr: expectedErr},
+		nil,
 	)
 
 	_, err := providerService.GetProviderProfileDetail(context.Background(), 12)
@@ -77,6 +78,7 @@ func TestServicePropagatesPaidWorkHistoryError(t *testing.T) {
 		categoryFinderWithExistingCategory(),
 		profilePhotoServiceForProfile(t),
 		&providerProfileReaderMock{workHistoryErr: expectedErr},
+		nil,
 	)
 
 	_, err := providerService.GetProviderProfileDetail(context.Background(), 12)
@@ -92,6 +94,7 @@ func newProviderServiceWithProfileReader(t *testing.T, stats provider.RatingStat
 		categoryFinderWithExistingCategory(),
 		profilePhotoServiceForProfile(t),
 		&providerProfileReaderMock{stats: stats, workOrders: workOrders},
+		nil,
 	)
 
 	return providerService, repository

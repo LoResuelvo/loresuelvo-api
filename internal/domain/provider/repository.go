@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/category"
+	coveragezone "github.com/LoResuelvo/loresuelvo-api/internal/domain/coverage_zone"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/provider/read_model"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/user"
 )
@@ -17,6 +18,10 @@ type UserRepository interface {
 
 type CategoryFinder interface {
 	FindByID(id int) *category.Category
+}
+
+type CoverageZoneFinder interface {
+	FindByID(ctx context.Context, id int) (*coveragezone.CoverageZone, error)
 }
 
 type ProviderProfileReader interface {

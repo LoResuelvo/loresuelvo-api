@@ -29,7 +29,7 @@ func handleRegisterProviderError(c *gin.Context, err error) {
 		return
 	}
 
-	if errors.Is(err, coveragezone.ErrAtLeastOneRequired) {
+	if errors.Is(err, coveragezone.ErrAtLeastOneRequired) || errors.Is(err, coveragezone.ErrDoesNotExist) {
 		httphandler.RespondError(c, http.StatusBadRequest, err.Error())
 		return
 	}

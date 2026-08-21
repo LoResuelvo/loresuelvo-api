@@ -13,10 +13,11 @@ import (
 )
 
 type Service struct {
-	userRepository UserRepository
-	categoryFinder CategoryFinder
-	fileService    FileService
-	profileReader  ProviderProfileReader
+	userRepository     UserRepository
+	categoryFinder     CategoryFinder
+	coverageZoneFinder CoverageZoneFinder
+	fileService        FileService
+	profileReader      ProviderProfileReader
 }
 
 func NewService(
@@ -24,12 +25,14 @@ func NewService(
 	categoryFinder CategoryFinder,
 	fileService FileService,
 	profileReader ProviderProfileReader,
+	coverageZoneFinder CoverageZoneFinder,
 ) *Service {
 	service := &Service{
-		userRepository: repository,
-		categoryFinder: categoryFinder,
-		fileService:    fileService,
-		profileReader:  profileReader,
+		userRepository:     repository,
+		categoryFinder:     categoryFinder,
+		coverageZoneFinder: coverageZoneFinder,
+		fileService:        fileService,
+		profileReader:      profileReader,
 	}
 	return service
 }
@@ -43,6 +46,10 @@ func (s *Service) RegisterProvider(ctx context.Context, authID, email, name, sur
 	if err != nil {
 		return nil, err
 	}
+	coverageZones, err := s.resolveCoverageZones(ctx, coverageZoneIDs)
+	if err != nil {
+		return nil, err
+	}
 	provider, err := NewProvider(
 		authID,
 		email,
@@ -50,7 +57,7 @@ func (s *Service) RegisterProvider(ctx context.Context, authID, email, name, sur
 		surname,
 		category,
 		&filedomain.Image{FileID: profilePhotoFileID},
-		coverageZonesFromIDs(coverageZoneIDs),
+		coverageZones,
 	)
 	if err != nil {
 		return nil, err
@@ -79,12 +86,30 @@ func (s *Service) RegisterProvider(ctx context.Context, authID, email, name, sur
 	return provider, nil
 }
 
-func coverageZonesFromIDs(ids []int) []coveragezone.CoverageZone {
+func (s *Service) resolveCoverageZones(ctx context.Context, ids []int) ([]coveragezone.CoverageZone, error) {
 	zones := make([]coveragezone.CoverageZone, 0, len(ids))
-	for _, id := range ids {
-		zones = append(zones, coveragezone.CoverageZone{ID: id})
+	if len(ids) == 0 {
+		return zones, nil
 	}
-	return zones
+	if s.coverageZoneFinder == nil {
+		return nil, ErrCoverageZoneFinderNotConfigured
+	}
+
+	for _, id := range ids {
+		zone, err := s.coverageZoneFinder.FindByID(ctx, id)
+		if err != nil {
+			if errors.Is(err, coveragezone.ErrDoesNotExist) {
+				return nil, coveragezone.ErrDoesNotExist
+			}
+			return nil, fmt.Errorf("finding coverage zone %d: %w", id, err)
+		}
+		if zone == nil {
+			return nil, coveragezone.ErrDoesNotExist
+		}
+		zones = append(zones, *zone)
+	}
+
+	return zones, nil
 }
 
 func (s *Service) FilterProvidersByCategoryID(ctx context.Context, categoryID int) ([]Provider, error) {

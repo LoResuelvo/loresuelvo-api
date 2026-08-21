@@ -170,6 +170,7 @@ func NewDependenciesWithPaymentAccountAdapters(
 		persistence.CategoryRepository,
 		fileService,
 		persistence.WorkOrderRepository,
+		persistence.CoverageZoneRepository,
 	)
 	consumerService := consumer.NewService(persistence.UserRepository, fileService)
 	conversationService := conversation.NewService(

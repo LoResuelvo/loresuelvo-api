@@ -59,6 +59,7 @@ func TestServiceComposesRatingSummaryForEachProviderSearchResult(t *testing.T) {
 			},
 		},
 		profileReader,
+		nil,
 	)
 
 	results, err := providerService.SearchProvidersByCategoryID(context.Background(), providerCategory.ID)
@@ -100,6 +101,7 @@ func TestServiceUsesZeroRatingSummaryWhenProviderHasNoRatings(t *testing.T) {
 		categoryFinderWithExistingCategory(),
 		&profilePhotoValidatorMock{},
 		profileReader,
+		nil,
 	)
 
 	results, err := providerService.SearchProvidersByCategoryID(context.Background(), providerCategory.ID)
@@ -131,6 +133,7 @@ func TestServicePropagatesProviderSearchRatingReaderError(t *testing.T) {
 		categoryFinderWithExistingCategory(),
 		&profilePhotoValidatorMock{},
 		&providerProfileReaderMock{batchStatsErr: expectedErr},
+		nil,
 	)
 
 	results, err := providerService.SearchProvidersByCategoryID(context.Background(), providerCategory.ID)

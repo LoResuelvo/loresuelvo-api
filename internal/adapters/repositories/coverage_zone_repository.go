@@ -55,6 +55,25 @@ func (repository *CoverageZoneRepository) FindByName(ctx context.Context, name s
 	return &zone, nil
 }
 
+func (repository *CoverageZoneRepository) FindByID(ctx context.Context, id int) (*coveragezone.CoverageZone, error) {
+	var zone coveragezone.CoverageZone
+	err := repository.db.QueryRowContext(
+		ctx,
+		`SELECT id, name, normalized_name, enabled
+		FROM coverage_zones
+		WHERE id = $1`,
+		id,
+	).Scan(&zone.ID, &zone.Name, &zone.NormalizedName, &zone.Enabled)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, coveragezone.ErrDoesNotExist
+		}
+		return nil, fmt.Errorf("finding coverage zone by id: %w", err)
+	}
+
+	return &zone, nil
+}
+
 func (repository *CoverageZoneRepository) FindByProviderID(ctx context.Context, providerID int) ([]coveragezone.CoverageZone, error) {
 	rows, err := repository.db.QueryContext(
 		ctx,
