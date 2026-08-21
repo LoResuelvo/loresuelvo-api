@@ -66,6 +66,78 @@ func TestCoverageZoneRepositoryCanFindByID(t *testing.T) {
 	assert.Equal(t, savedZone, foundZone)
 }
 
+func TestCoverageZoneRepositoryListsOnlyAvailableZonesInDeterministicOrder(t *testing.T) {
+	repository := newCoverageZoneRepositoryTest(t)
+	market := savedCoverageMarket(t, repository)
+
+	zone14, err := coveragezone.New(market.ID, "CABA-COMMUNE-14", "Comuna 14", coveragezone.KindCommune)
+	require.NoError(t, err)
+	zone06, err := coveragezone.New(market.ID, "CABA-COMMUNE-06", "Comuna 6", coveragezone.KindCommune)
+	require.NoError(t, err)
+	disabledZone, err := coveragezone.New(market.ID, "CABA-COMMUNE-15", "Comuna 15", coveragezone.KindCommune)
+	require.NoError(t, err)
+	disabledZone.Disable()
+
+	savedZone14 := mustSaveCoverageZone(t, repository, zone14)
+	savedZone06 := mustSaveCoverageZone(t, repository, zone06)
+	mustSaveCoverageZone(t, repository, disabledZone)
+	saveCoverageZoneBoundaryReference(t, repository, savedZone14, "google-place-14")
+	saveCoverageZoneBoundaryReference(t, repository, savedZone06, "google-place-6")
+
+	zones, err := repository.ListAvailableByMarketCode(context.Background(), " caba ")
+
+	require.NoError(t, err)
+	require.Len(t, zones, 2)
+	assert.Equal(t, "CABA-COMMUNE-06", zones[0].Zone.Code)
+	assert.Equal(t, "google-place-6", zones[0].BoundaryReference.ExternalID)
+	assert.Equal(t, "CABA-COMMUNE-14", zones[1].Zone.Code)
+	assert.Equal(t, "google-place-14", zones[1].BoundaryReference.ExternalID)
+	assert.True(t, zones[0].Zone.Enabled)
+	assert.True(t, zones[1].Zone.Enabled)
+}
+
+func TestCoverageZoneRepositoryRejectsAvailableZoneWithoutBoundaryReference(t *testing.T) {
+	repository := newCoverageZoneRepositoryTest(t)
+	market := savedCoverageMarket(t, repository)
+	zone, err := coveragezone.New(market.ID, "CABA-COMMUNE-06", "Comuna 6", coveragezone.KindCommune)
+	require.NoError(t, err)
+	mustSaveCoverageZone(t, repository, zone)
+
+	zones, err := repository.ListAvailableByMarketCode(context.Background(), "CABA")
+
+	assert.Nil(t, zones)
+	assert.ErrorIs(t, err, coveragezone.ErrBoundaryReferenceNotConfigured)
+}
+
+func TestCoverageZoneRepositoryReturnsEmptyListWhenMarketHasNoAvailableZones(t *testing.T) {
+	repository := newCoverageZoneRepositoryTest(t)
+	_ = savedCoverageMarket(t, repository)
+
+	zones, err := repository.ListAvailableByMarketCode(context.Background(), "CABA")
+
+	require.NoError(t, err)
+	assert.NotNil(t, zones)
+	assert.Empty(t, zones)
+}
+
+func TestCoverageZoneRepositoryExcludesZonesFromDisabledMarket(t *testing.T) {
+	repository := newCoverageZoneRepositoryTest(t)
+	market, err := coveragezone.NewMarket("ROSARIO", "Rosario")
+	require.NoError(t, err)
+	market.Enabled = false
+	savedMarket, err := repository.SaveMarket(context.Background(), *market)
+	require.NoError(t, err)
+
+	zone, err := coveragezone.New(savedMarket.ID, "ROSARIO-CENTRO", "Centro", coveragezone.KindOperationalZone)
+	require.NoError(t, err)
+	mustSaveCoverageZone(t, repository, zone)
+
+	zones, err := repository.ListAvailableByMarketCode(context.Background(), "ROSARIO")
+
+	require.NoError(t, err)
+	assert.Empty(t, zones)
+}
+
 func TestCoverageZoneRepositoryPersistsDomainNormalizedName(t *testing.T) {
 	repository := newCoverageZoneRepositoryTest(t)
 	market := savedCoverageMarket(t, repository)
@@ -150,4 +222,16 @@ func mustSaveCoverageZone(t *testing.T, repository *repositories.CoverageZoneRep
 	savedZone, err := repository.Save(context.Background(), *zone)
 	require.NoError(t, err)
 	return savedZone
+}
+
+func saveCoverageZoneBoundaryReference(
+	t *testing.T,
+	repository *repositories.CoverageZoneRepository,
+	zone *coveragezone.CoverageZone,
+	externalID string,
+) {
+	t.Helper()
+	reference, err := coveragezone.NewExternalReference(zone.ID, "GOOGLE", externalID, "repository-test")
+	require.NoError(t, err)
+	require.NoError(t, repository.SaveExternalReference(context.Background(), *reference))
 }

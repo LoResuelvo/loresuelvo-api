@@ -129,6 +129,7 @@ func (s *testSuite) registerAllSteps(sc *godog.ScenarioContext) {
 	registerProviderWithCoverageZonesSteps(sc, s)
 	registerCreateCategorySteps(sc, s)
 	registerListCategoriesSteps(sc, s)
+	registerListAvailableCoverageZonesSteps(sc, s)
 	registerFilterProvidersByCategorySteps(sc, s)
 	registerProviderRatingSearchSteps(sc, s)
 	registerLoginSteps(sc, s)

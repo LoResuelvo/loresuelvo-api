@@ -8,6 +8,7 @@ import (
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/category_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/consumer_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/conversation_handler"
+	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/coverage_zone_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/file_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/job_request_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/payment_account_handler"
@@ -25,6 +26,7 @@ import (
 
 type RouterConfig struct {
 	CategoryHandler        *category_handler.CategoryHandler
+	CoverageZoneHandler    *coverage_zone_handler.CoverageZoneHandler
 	ConsumerHandler        *consumer_handler.ConsumerHandler
 	ProviderHandler        *provider_handler.ProviderHandler
 	ConversationHandler    *conversation_handler.ConversationHandler
@@ -43,6 +45,7 @@ type RouterConfig struct {
 
 type Router struct {
 	categoryHandler        *category_handler.CategoryHandler
+	coverageZoneHandler    *coverage_zone_handler.CoverageZoneHandler
 	consumerHandler        *consumer_handler.ConsumerHandler
 	providerHandler        *provider_handler.ProviderHandler
 	conversationHandler    *conversation_handler.ConversationHandler
@@ -66,6 +69,7 @@ func NewRouter(config RouterConfig) *Router {
 	}
 	router := &Router{
 		categoryHandler:        config.CategoryHandler,
+		coverageZoneHandler:    config.CoverageZoneHandler,
 		consumerHandler:        config.ConsumerHandler,
 		providerHandler:        config.ProviderHandler,
 		conversationHandler:    config.ConversationHandler,
@@ -102,6 +106,7 @@ func (router *Router) SetUp() (*gin.Engine, error) {
 
 	router.registerHealthRoutes(engine)
 	router.registerCategoryRoutes(engine)
+	router.registerCoverageZoneRoutes(engine, authMiddleware)
 	router.registerConsumerRoutes(engine, authMiddleware)
 	router.registerProviderRoutes(engine, authMiddleware)
 	router.registerPaymentAccountRoutes(engine, authMiddleware)
@@ -128,6 +133,10 @@ func (router *Router) registerHealthRoutes(engine *gin.Engine) {
 func (router *Router) registerCategoryRoutes(engine *gin.Engine) {
 	engine.GET("/categories", router.categoryHandler.ListCategories)
 	engine.POST("/categories", router.categoryHandler.CreateCategory)
+}
+
+func (router *Router) registerCoverageZoneRoutes(engine *gin.Engine, authMiddleware gin.HandlerFunc) {
+	engine.GET("/coverage-zones", authMiddleware, router.coverageZoneHandler.ListAvailable)
 }
 
 func (router *Router) registerConsumerRoutes(engine *gin.Engine, authMiddleware gin.HandlerFunc) {

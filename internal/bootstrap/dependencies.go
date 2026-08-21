@@ -14,6 +14,7 @@ import (
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/category_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/consumer_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/conversation_handler"
+	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/coverage_zone_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/file_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/job_request_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/payment_account_handler"
@@ -34,6 +35,7 @@ import (
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/category"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/consumer"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/conversation"
+	coveragezone "github.com/LoResuelvo/loresuelvo-api/internal/domain/coverage_zone"
 	filedomain "github.com/LoResuelvo/loresuelvo-api/internal/domain/file"
 	jobrequest "github.com/LoResuelvo/loresuelvo-api/internal/domain/job_request"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/payment"
@@ -52,6 +54,7 @@ type Dependencies struct {
 	UrgentWorkOrderScheduler *scheduler.Scheduler
 
 	CategoryHandler        *category_handler.CategoryHandler
+	CoverageZoneHandler    *coverage_zone_handler.CoverageZoneHandler
 	ConsumerHandler        *consumer_handler.ConsumerHandler
 	ProviderHandler        *provider_handler.ProviderHandler
 	ConversationHandler    *conversation_handler.ConversationHandler
@@ -74,6 +77,7 @@ type Dependencies struct {
 func (dependencies *Dependencies) RouterConfig(auth0Validator *validator.Validator, logger *slog.Logger) httpadapter.RouterConfig {
 	return httpadapter.RouterConfig{
 		CategoryHandler:        dependencies.CategoryHandler,
+		CoverageZoneHandler:    dependencies.CoverageZoneHandler,
 		ConsumerHandler:        dependencies.ConsumerHandler,
 		ProviderHandler:        dependencies.ProviderHandler,
 		ConversationHandler:    dependencies.ConversationHandler,
@@ -165,6 +169,7 @@ func NewDependenciesWithPaymentAccountAdapters(
 		mediaadapter.NewMP4VideoParser(),
 	)
 	categoryService := category.NewService(persistence.CategoryRepository)
+	coverageZoneService := coveragezone.NewService(persistence.CoverageZoneRepository)
 	providerService := provider.NewService(
 		persistence.UserRepository,
 		persistence.CategoryRepository,
@@ -243,6 +248,7 @@ func NewDependenciesWithPaymentAccountAdapters(
 		WorkOrderService:         workOrderService,
 		UrgentWorkOrderScheduler: urgentWorkOrderScheduler,
 		CategoryHandler:          category_handler.NewCategoryHandler(categoryService),
+		CoverageZoneHandler:      coverage_zone_handler.NewCoverageZoneHandler(coverageZoneService),
 		ConsumerHandler:          consumer_handler.NewConsumerHandler(consumerService),
 		ProviderHandler:          provider_handler.NewProviderHandler(providerService),
 		ConversationHandler:      conversation_handler.NewConversationHandler(conversationService),

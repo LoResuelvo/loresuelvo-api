@@ -25,3 +25,7 @@ var ErrAtLeastOneRequired = errors.New("At least one coverage zone must be selec
 var ErrNotAvailable = errors.New("Coverage zone is not available")
 
 var ErrDuplicateCoverageZone = errors.New("Coverage zone cannot be selected more than once")
+
+var ErrRepositoryNotConfigured = errors.New("Coverage zone repository is not configured")
+
+var ErrBoundaryReferenceNotConfigured = errors.New("Coverage zone boundary reference is not configured")

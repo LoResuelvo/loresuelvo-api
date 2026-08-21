@@ -14,6 +14,8 @@ type CoverageZoneRepository struct {
 	db *sql.DB
 }
 
+const googleCoverageBoundaryProvider = "GOOGLE"
+
 func NewCoverageZoneRepository(db *sql.DB) *CoverageZoneRepository {
 	return &CoverageZoneRepository{db: db}
 }
@@ -73,6 +75,75 @@ func (repository *CoverageZoneRepository) Save(ctx context.Context, zone coverag
 	}
 
 	return &savedZone, nil
+}
+
+func (repository *CoverageZoneRepository) ListAvailableByMarketCode(ctx context.Context, marketCode string) ([]coveragezone.CatalogEntry, error) {
+	rows, err := repository.db.QueryContext(
+		ctx,
+		`SELECT coverage_zones.id, coverage_zones.market_id, coverage_zones.code, coverage_zones.name,
+			coverage_zones.normalized_name, coverage_zones.kind, coverage_zones.parent_zone_id, coverage_zones.enabled,
+			boundary_reference.provider, boundary_reference.external_id
+		FROM coverage_zones
+		INNER JOIN coverage_markets ON coverage_markets.id = coverage_zones.market_id
+		LEFT JOIN coverage_zone_external_references AS boundary_reference
+			ON boundary_reference.coverage_zone_id = coverage_zones.id
+			AND boundary_reference.provider = $2
+		WHERE coverage_markets.code = $1
+			AND coverage_markets.enabled = TRUE
+			AND coverage_zones.enabled = TRUE
+		ORDER BY coverage_zones.code ASC, coverage_zones.id ASC`,
+		strings.ToUpper(strings.TrimSpace(marketCode)),
+		googleCoverageBoundaryProvider,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("listing available coverage zones by market: %w", err)
+	}
+	defer func() {
+		_ = rows.Close()
+	}()
+
+	entries := make([]coveragezone.CatalogEntry, 0)
+	for rows.Next() {
+		var zone coveragezone.CoverageZone
+		var boundaryProvider, boundaryExternalID sql.NullString
+		if err := rows.Scan(
+			&zone.ID,
+			&zone.MarketID,
+			&zone.Code,
+			&zone.Name,
+			&zone.NormalizedName,
+			&zone.Kind,
+			&zone.ParentZoneID,
+			&zone.Enabled,
+			&boundaryProvider,
+			&boundaryExternalID,
+		); err != nil {
+			return nil, fmt.Errorf("scanning available coverage zone: %w", err)
+		}
+		if !boundaryProvider.Valid || !boundaryExternalID.Valid {
+			return nil, fmt.Errorf("coverage zone %d: %w", zone.ID, coveragezone.ErrBoundaryReferenceNotConfigured)
+		}
+
+		boundaryReference, err := coveragezone.NewExternalReference(
+			zone.ID,
+			boundaryProvider.String,
+			boundaryExternalID.String,
+			"",
+		)
+		if err != nil {
+			return nil, fmt.Errorf("building coverage zone %d boundary reference: %w", zone.ID, err)
+		}
+		entries = append(entries, coveragezone.CatalogEntry{
+			Zone:              zone,
+			BoundaryReference: *boundaryReference,
+		})
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterating available coverage zones: %w", err)
+	}
+
+	return entries, nil
 }
 
 func (repository *CoverageZoneRepository) FindByMarketCodeAndName(ctx context.Context, marketCode, name string) (*coveragezone.CoverageZone, error) {
