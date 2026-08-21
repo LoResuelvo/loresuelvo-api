@@ -11,6 +11,7 @@ import (
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/category"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/conversation"
 	readmodel "github.com/LoResuelvo/loresuelvo-api/internal/domain/conversation/read_model"
+	coveragezone "github.com/LoResuelvo/loresuelvo-api/internal/domain/coverage_zone"
 	filedomain "github.com/LoResuelvo/loresuelvo-api/internal/domain/file"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/provider"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/user"
@@ -542,7 +543,7 @@ func TestCreateChatbotConversationIncludesRecommendedProvidersWhenDiagnosisIsCom
 	repo := &conversationRepositoryMock{}
 	consumerIDFinder := &consumerIDFinderMock{consumerID: 10}
 	plumbingCategory := &category.Category{ID: 3, Name: "Plomería", NormalizedName: "plomería"}
-	recommendedProvider, err := provider.NewProvider("auth0|provider", "juan@example.com", "Juan", "Gómez", plumbingCategory, &filedomain.Image{FileID: "provider-photo-file-id"}, nil)
+	recommendedProvider, err := provider.NewProvider("auth0|provider", "juan@example.com", "Juan", "Gómez", plumbingCategory, &filedomain.Image{FileID: "provider-photo-file-id"}, []coveragezone.CoverageZone{{ID: 6, Name: "Comuna 6", Enabled: true}})
 	require.NoError(t, err)
 	recommendedProvider.SetPersistenceID(20)
 	categoryLister := &recommendationCategoryListerMock{categories: []category.Category{*plumbingCategory}}
@@ -889,7 +890,7 @@ func TestGetByIDReturnsChatbotConversationDetailForOwnerConsumer(t *testing.T) {
 	}}
 	consumerIDFinder := &consumerIDFinderMock{consumerID: 10}
 	plumbingCategory := &category.Category{ID: recommendedCategoryID, Name: "Plomería", NormalizedName: "plomería"}
-	recommendedProvider, err := provider.NewProvider("auth0|provider", "juan@example.com", "Juan", "Gómez", plumbingCategory, &filedomain.Image{FileID: "provider-photo-file-id"}, nil)
+	recommendedProvider, err := provider.NewProvider("auth0|provider", "juan@example.com", "Juan", "Gómez", plumbingCategory, &filedomain.Image{FileID: "provider-photo-file-id"}, []coveragezone.CoverageZone{{ID: 6, Name: "Comuna 6", Enabled: true}})
 	require.NoError(t, err)
 	recommendedProvider.SetPersistenceID(20)
 	providerFinder := &providerIDFinderMock{providers: []provider.Provider{*recommendedProvider}}

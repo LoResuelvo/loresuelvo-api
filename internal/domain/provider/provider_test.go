@@ -19,7 +19,7 @@ func TestProviderHasCategory(t *testing.T) {
 
 func TestNewProviderIncludesCoverageZones(t *testing.T) {
 	providerCategory := &category.Category{ID: 1, Name: "Plomería"}
-	selectedZones := []coveragezone.CoverageZone{{ID: 6, Name: "Comuna 6"}}
+	selectedZones := []coveragezone.CoverageZone{{ID: 6, Name: "Comuna 6", Enabled: true}}
 	foundProvider, err := provider.NewProvider(
 		"auth0|ana",
 		"ana@example.com",
@@ -34,5 +34,82 @@ func TestNewProviderIncludesCoverageZones(t *testing.T) {
 
 	selectedZones[0].Name = "Changed after selection"
 
-	assert.Equal(t, []coveragezone.CoverageZone{{ID: 6, Name: "Comuna 6"}}, foundProvider.CoverageZones)
+	assert.Equal(t, []coveragezone.CoverageZone{{ID: 6, Name: "Comuna 6", Enabled: true}}, foundProvider.CoverageZones)
+}
+
+func TestNewProviderRequiresCoverageZone(t *testing.T) {
+	providerCategory := &category.Category{ID: 1, Name: "Plomería"}
+
+	foundProvider, err := provider.NewProvider(
+		"auth0|ana",
+		"ana@example.com",
+		"Ana",
+		"Perez",
+		providerCategory,
+		nil,
+		nil,
+	)
+
+	assert.Nil(t, foundProvider)
+	assert.ErrorIs(t, err, coveragezone.ErrAtLeastOneRequired)
+}
+
+func TestNewProviderRejectsUnavailableCoverageZone(t *testing.T) {
+	providerCategory := &category.Category{ID: 1, Name: "Plomería"}
+	selectedZones := []coveragezone.CoverageZone{{ID: 15, Name: "Comuna 15", Enabled: false}}
+
+	foundProvider, err := provider.NewProvider(
+		"auth0|ana",
+		"ana@example.com",
+		"Ana",
+		"Perez",
+		providerCategory,
+		nil,
+		selectedZones,
+	)
+
+	assert.Nil(t, foundProvider)
+	assert.ErrorIs(t, err, coveragezone.ErrNotAvailable)
+}
+
+func TestNewProviderIncludesMultipleCoverageZones(t *testing.T) {
+	providerCategory := &category.Category{ID: 1, Name: "Plomería"}
+	selectedZones := []coveragezone.CoverageZone{
+		{ID: 6, Name: "Comuna 6", Enabled: true},
+		{ID: 14, Name: "Comuna 14", Enabled: true},
+	}
+
+	foundProvider, err := provider.NewProvider(
+		"auth0|ana",
+		"ana@example.com",
+		"Ana",
+		"Perez",
+		providerCategory,
+		nil,
+		selectedZones,
+	)
+
+	assert.NoError(t, err)
+	assert.Equal(t, selectedZones, foundProvider.CoverageZones)
+}
+
+func TestNewProviderRejectsDuplicateCoverageZones(t *testing.T) {
+	providerCategory := &category.Category{ID: 1, Name: "Plomería"}
+	selectedZones := []coveragezone.CoverageZone{
+		{ID: 6, Name: "Comuna 6", Enabled: true},
+		{ID: 6, Name: "Comuna 6", Enabled: true},
+	}
+
+	foundProvider, err := provider.NewProvider(
+		"auth0|ana",
+		"ana@example.com",
+		"Ana",
+		"Perez",
+		providerCategory,
+		nil,
+		selectedZones,
+	)
+
+	assert.Nil(t, foundProvider)
+	assert.ErrorIs(t, err, coveragezone.ErrDuplicateCoverageZone)
 }

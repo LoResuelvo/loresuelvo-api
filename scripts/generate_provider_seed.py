@@ -20,6 +20,33 @@ CATEGORIES = [
     "Climatización",
 ]
 
+GOOGLE_COMMUNE_PLACE_IDS = [
+    "ChIJuQQBxzE1o5URe4mzo2cEmTc",
+    "ChIJDWsSDp_KvJUR9QfscYcpGOU",
+    "ChIJfYHTguXKvJURoZj4BULLfqM",
+    "ChIJ9_j8amvLvJURXE6r-8YAdB8",
+    "ChIJA7bs4VnKvJUR8YI31twWxkg",
+    "ChIJIR9pFD7KvJURPaMYFhbLY48",
+    "ChIJs7AojjLKvJURJNFcnyOteb0",
+    "ChIJmZurhlXJvJUR4nMVILqKWx4",
+    "ChIJK4_D6QjJvJURJsjRJpB3mVg",
+    "ChIJif2PN8nJvJURdmM8-GjGdMs",
+    "ChIJ9fAAUSS2vJUR1sOIFvvX2XU",
+    "ChIJX3MKLfS2vJURrrZUmIOQI-0",
+    "ChIJ1xHQhS20vJURuGiIQEy6qLk",
+    "ChIJy9bjmp61vJUR1kFz4gnyucs",
+    "ChIJJ2FHGQi2vJURwDLt3Or-hBA",
+]
+
+COVERAGE_ZONES = [
+    {
+        "code": f"CABA-COMMUNE-{number:02d}",
+        "name": f"Comuna {number}",
+        "google_place_id": GOOGLE_COMMUNE_PLACE_IDS[number - 1],
+    }
+    for number in range(1, 16)
+]
+
 FIRST_NAMES = [
     "Juan",
     "Laura",
@@ -125,7 +152,7 @@ def parse_categories(raw_categories: str) -> list[str]:
     return categories
 
 
-def build_providers(count: int, categories: list[str], asset_variants: int) -> list[dict[str, str]]:
+def build_providers(count: int, categories: list[str], asset_variants: int) -> list[dict[str, object]]:
     providers = []
     for index in range(1, count + 1):
         category = categories[(index - 1) % len(categories)]
@@ -143,6 +170,10 @@ def build_providers(count: int, categories: list[str], asset_variants: int) -> l
                 "name": name,
                 "surname": surname,
                 "category": category,
+                "coverage_zone_codes": [
+                    COVERAGE_ZONES[(index - 1) % len(COVERAGE_ZONES)]["code"],
+                    COVERAGE_ZONES[(index + 4) % len(COVERAGE_ZONES)]["code"],
+                ],
                 "profile_photo_file_id": str(uuid.uuid5(uuid.NAMESPACE_DNS, f"loresuelvo-seed-provider-{provider_code}")),
                 "profile_photo_name": file_name,
                 "profile_photo_key": f"seed/profile_photo/providers-100/{file_name}",
@@ -152,10 +183,25 @@ def build_providers(count: int, categories: list[str], asset_variants: int) -> l
     return providers
 
 
-def write_seed(path: Path, categories: list[str], providers: list[dict[str, str]]) -> None:
+def write_seed(path: Path, categories: list[str], providers: list[dict[str, object]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8", newline="\n") as seed_file:
-        seed_file.write("categories:\n")
+        seed_file.write("coverage_markets:\n")
+        seed_file.write("  - code: 'CABA'\n")
+        seed_file.write("    name: 'Ciudad Autónoma de Buenos Aires'\n")
+        seed_file.write("    enabled: true\n")
+        seed_file.write("\ncoverage_zones:\n")
+        for zone in COVERAGE_ZONES:
+            seed_file.write("  - market: 'CABA'\n")
+            seed_file.write(f"    code: {yaml_string(zone['code'])}\n")
+            seed_file.write(f"    name: {yaml_string(zone['name'])}\n")
+            seed_file.write("    kind: 'COMMUNE'\n")
+            seed_file.write("    enabled: true\n")
+            seed_file.write("    external_references:\n")
+            seed_file.write("      - provider: 'GOOGLE'\n")
+            seed_file.write(f"        external_id: {yaml_string(zone['google_place_id'])}\n")
+            seed_file.write("        source_version: 'region-lookup-v1alpha@2026-08-21'\n")
+        seed_file.write("\ncategories:\n")
         for category in categories:
             seed_file.write(f"  - name: {yaml_string(category)}\n")
         seed_file.write("\nproviders:\n")
@@ -165,12 +211,18 @@ def write_seed(path: Path, categories: list[str], providers: list[dict[str, str]
             seed_file.write(f"    name: {yaml_string(provider['name'])}\n")
             seed_file.write(f"    surname: {yaml_string(provider['surname'])}\n")
             seed_file.write(f"    category: {yaml_string(provider['category'])}\n")
+            coverage_zone_codes = provider["coverage_zone_codes"]
+            seed_file.write(
+                "    coverage_zone_codes: ["
+                + ", ".join(yaml_string(code) for code in coverage_zone_codes)
+                + "]\n"
+            )
             seed_file.write(f"    profile_photo_file_id: {provider['profile_photo_file_id']}\n")
             seed_file.write(f"    profile_photo_name: {yaml_string(provider['profile_photo_name'])}\n")
             seed_file.write(f"    profile_photo_key: {yaml_string(provider['profile_photo_key'])}\n")
 
 
-def write_manifest(path: Path, providers: list[dict[str, str]]) -> None:
+def write_manifest(path: Path, providers: list[dict[str, object]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8", newline="\n") as manifest_file:
         manifest_file.write("# source_asset_relative_to_seeds_assets\ttarget_object_key\n")

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 
 	coveragezone "github.com/LoResuelvo/loresuelvo-api/internal/domain/coverage_zone"
 	"github.com/cucumber/godog"
@@ -15,19 +16,29 @@ func registerProviderWithCoverageZonesSteps(sc *godog.ScenarioContext, suite *te
 	sc.Step(`^que no existe la zona de cobertura "([^"]*)"$`, suite.coverageZoneDoesNotExist)
 	sc.Step(`^que la zona de cobertura "([^"]*)" está deshabilitada$`, suite.coverageZoneIsDisabled)
 	sc.Step(`^me registro como prestador con correo "([^"]*)", nombre "([^"]*)", apellido "([^"]*)", rubro "([^"]*)" y zona de cobertura "([^"]*)"$`, suite.requestProviderRegistrationWithCoverageZone)
+	sc.Step(`^me registro como prestador con correo "([^"]*)", nombre "([^"]*)", apellido "([^"]*)", rubro "([^"]*)" y selecciono dos veces la zona de cobertura "([^"]*)"$`, suite.requestProviderRegistrationWithDuplicateCoverageZone)
+	sc.Step(`^me registro como prestador con correo "([^"]*)", nombre "([^"]*)", apellido "([^"]*)", rubro "([^"]*)" y las zonas de cobertura "([^"]*)" y "([^"]*)"$`, suite.requestProviderRegistrationWithCoverageZones)
 	sc.Step(`^me registro como prestador con correo "([^"]*)", nombre "([^"]*)", apellido "([^"]*)", rubro "([^"]*)" y sin zonas de cobertura$`, suite.requestProviderRegistrationWithoutCoverageZones)
 	sc.Step(`^el prestador "([^"]*)" queda registrado con la zona de cobertura "([^"]*)"$`, suite.providerIsRegisteredWithCoverageZone)
+	sc.Step(`^el prestador "([^"]*)" queda registrado únicamente con las siguientes zonas de cobertura:$`, suite.providerIsRegisteredOnlyWithCoverageZones)
 	sc.Step(`^el sistema me indica que debo seleccionar al menos una zona de cobertura$`, suite.systemReportsCoverageZoneRequired)
 	sc.Step(`^el sistema me indica que la zona de cobertura seleccionada no está disponible$`, suite.systemReportsCoverageZoneUnavailable)
+	sc.Step(`^el sistema me indica que una zona de cobertura no puede seleccionarse más de una vez$`, suite.systemReportsDuplicateCoverageZone)
 	sc.Step(`^el prestador "([^"]*)" no queda registrado$`, suite.providerIsNotRegistered)
 }
 
 const defaultProviderCoverageZoneName = "Comuna 6"
 
+const defaultProviderCoverageMarketCode = "CABA"
+
 const nonExistingProviderCoverageZoneID = 999999999
 
 func (suite *testSuite) ensureDefaultProviderCoverageZone() (int, error) {
-	zone, err := suite.coverageZoneRepository.FindByName(context.Background(), defaultProviderCoverageZoneName)
+	market, err := suite.ensureDefaultProviderCoverageMarket()
+	if err != nil {
+		return 0, err
+	}
+	zone, err := suite.coverageZoneRepository.FindByMarketCodeAndName(context.Background(), market.Code, defaultProviderCoverageZoneName)
 	if err == nil {
 		return zone.ID, nil
 	}
@@ -35,7 +46,7 @@ func (suite *testSuite) ensureDefaultProviderCoverageZone() (int, error) {
 		return 0, fmt.Errorf("could not find default provider coverage zone: %w", err)
 	}
 
-	newZone, err := coveragezone.New(defaultProviderCoverageZoneName)
+	newZone, err := coveragezone.New(market.ID, "CABA-COMMUNE-06", defaultProviderCoverageZoneName, coveragezone.KindCommune)
 	if err != nil {
 		return 0, err
 	}
@@ -48,13 +59,38 @@ func (suite *testSuite) ensureDefaultProviderCoverageZone() (int, error) {
 	return savedZone.ID, nil
 }
 
+func (suite *testSuite) ensureDefaultProviderCoverageMarket() (*coveragezone.Market, error) {
+	market, err := suite.coverageZoneRepository.FindMarketByCode(context.Background(), defaultProviderCoverageMarketCode)
+	if err == nil {
+		return market, nil
+	}
+	if !errors.Is(err, coveragezone.ErrDoesNotExist) {
+		return nil, fmt.Errorf("could not find default coverage market: %w", err)
+	}
+
+	newMarket, err := coveragezone.NewMarket(defaultProviderCoverageMarketCode, "Ciudad Autónoma de Buenos Aires")
+	if err != nil {
+		return nil, err
+	}
+	return suite.coverageZoneRepository.SaveMarket(context.Background(), *newMarket)
+}
+
+func (suite *testSuite) findDefaultProviderCoverageZone(ctx context.Context, name string) (*coveragezone.CoverageZone, error) {
+	return suite.coverageZoneRepository.FindByMarketCodeAndName(ctx, defaultProviderCoverageMarketCode, name)
+}
+
 func (suite *testSuite) thereAreEnabledCoverageZones(firstName, secondName, thirdName string) error {
 	if err := suite.coverageZoneRepository.DeleteAll(); err != nil {
 		return fmt.Errorf("could not reset coverage zones: %w", err)
 	}
+	market, err := suite.ensureDefaultProviderCoverageMarket()
+	if err != nil {
+		return err
+	}
 
 	for _, name := range []string{firstName, secondName, thirdName} {
-		zone, err := coveragezone.New(name)
+		zoneCode := "CABA-" + strings.ToUpper(strings.ReplaceAll(name, " ", "-"))
+		zone, err := coveragezone.New(market.ID, zoneCode, name, coveragezone.KindCommune)
 		if err != nil {
 			return err
 		}
@@ -68,7 +104,7 @@ func (suite *testSuite) thereAreEnabledCoverageZones(firstName, secondName, thir
 }
 
 func (suite *testSuite) coverageZoneDoesNotExist(name string) error {
-	_, err := suite.coverageZoneRepository.FindByName(context.Background(), name)
+	_, err := suite.findDefaultProviderCoverageZone(context.Background(), name)
 	if errors.Is(err, coveragezone.ErrDoesNotExist) {
 		return nil
 	}
@@ -81,7 +117,7 @@ func (suite *testSuite) coverageZoneDoesNotExist(name string) error {
 
 func (suite *testSuite) coverageZoneIsDisabled(name string) error {
 	ctx := context.Background()
-	zone, err := suite.coverageZoneRepository.FindByName(ctx, name)
+	zone, err := suite.findDefaultProviderCoverageZone(ctx, name)
 	if err != nil {
 		return fmt.Errorf("could not find coverage zone %q to disable: %w", name, err)
 	}
@@ -113,7 +149,7 @@ func (suite *testSuite) requestProviderRegistrationWithCoverageZone(email, name,
 	}
 
 	coverageZoneID := nonExistingProviderCoverageZoneID
-	zone, err := suite.coverageZoneRepository.FindByName(context.Background(), coverageZoneName)
+	zone, err := suite.findDefaultProviderCoverageZone(context.Background(), coverageZoneName)
 	if err == nil {
 		if zone == nil {
 			return fmt.Errorf("coverage zone repository returned no zone for %q", coverageZoneName)
@@ -136,6 +172,66 @@ func (suite *testSuite) requestProviderRegistrationWithCoverageZone(email, name,
 		Surname:                surname,
 		CategoryID:             categoryID,
 		CoverageZoneIDs:        []int{coverageZoneID},
+		CriminalRecordFile:     "criminal-record.pdf",
+		CUITCertificateFile:    "cuit-certificate.pdf",
+		BiometricValidationID:  "biometric-validation-approved",
+		ProfessionalCredential: "professional-license-or-certificate.pdf",
+		ProfilePhotoFileID:     suite.providerProfilePhotoFileID,
+	})
+}
+
+func (suite *testSuite) requestProviderRegistrationWithDuplicateCoverageZone(email, name, surname, categoryName, coverageZoneName string) error {
+	categoryID, err := suite.categoryIDFor(categoryName)
+	if err != nil {
+		return err
+	}
+
+	zone, err := suite.findDefaultProviderCoverageZone(context.Background(), coverageZoneName)
+	if err != nil {
+		return fmt.Errorf("could not find coverage zone %q for the scenario: %w", coverageZoneName, err)
+	}
+	if zone == nil {
+		return fmt.Errorf("coverage zone repository returned no zone for %q", coverageZoneName)
+	}
+
+	return suite.requestProviderRegistration(providerRegistrationRequest{
+		Email:                  email,
+		Name:                   name,
+		Surname:                surname,
+		CategoryID:             categoryID,
+		CoverageZoneIDs:        []int{zone.ID, zone.ID},
+		CriminalRecordFile:     "criminal-record.pdf",
+		CUITCertificateFile:    "cuit-certificate.pdf",
+		BiometricValidationID:  "biometric-validation-approved",
+		ProfessionalCredential: "professional-license-or-certificate.pdf",
+		ProfilePhotoFileID:     suite.providerProfilePhotoFileID,
+	})
+}
+
+func (suite *testSuite) requestProviderRegistrationWithCoverageZones(email, name, surname, categoryName, firstZoneName, secondZoneName string) error {
+	categoryID, err := suite.categoryIDFor(categoryName)
+	if err != nil {
+		return err
+	}
+
+	zoneIDs := make([]int, 0, 2)
+	for _, zoneName := range []string{firstZoneName, secondZoneName} {
+		zone, err := suite.findDefaultProviderCoverageZone(context.Background(), zoneName)
+		if err != nil {
+			return fmt.Errorf("could not find coverage zone %q for the scenario: %w", zoneName, err)
+		}
+		if zone == nil {
+			return fmt.Errorf("coverage zone repository returned no zone for %q", zoneName)
+		}
+		zoneIDs = append(zoneIDs, zone.ID)
+	}
+
+	return suite.requestProviderRegistration(providerRegistrationRequest{
+		Email:                  email,
+		Name:                   name,
+		Surname:                surname,
+		CategoryID:             categoryID,
+		CoverageZoneIDs:        zoneIDs,
 		CriminalRecordFile:     "criminal-record.pdf",
 		CUITCertificateFile:    "cuit-certificate.pdf",
 		BiometricValidationID:  "biometric-validation-approved",
@@ -189,6 +285,44 @@ func (suite *testSuite) providerIsRegisteredWithCoverageZone(email, expectedZone
 	return nil
 }
 
+func (suite *testSuite) providerIsRegisteredOnlyWithCoverageZones(email string, expectedZones *godog.Table) error {
+	if err := suite.registrationResponseShouldHaveStatusCode(http.StatusCreated); err != nil {
+		return err
+	}
+
+	providerID, err := suite.userRepository.FindIDByEmail(email)
+	if err != nil {
+		return fmt.Errorf("could not find registered provider %q: %w", email, err)
+	}
+
+	zones, err := suite.coverageZoneRepository.FindByProviderID(context.Background(), providerID)
+	if err != nil {
+		return err
+	}
+
+	expectedNames := make(map[string]struct{}, len(expectedZones.Rows)-1)
+	for _, row := range expectedZones.Rows[1:] {
+		if len(row.Cells) != 1 {
+			return fmt.Errorf("expected one coverage-zone column, got %d", len(row.Cells))
+		}
+		expectedNames[normalizedCoverageZoneName(row.Cells[0].Value)] = struct{}{}
+	}
+	if len(zones) != len(expectedNames) {
+		return fmt.Errorf("expected provider %q to have exactly %d coverage zones, got %d", email, len(expectedNames), len(zones))
+	}
+	for _, zone := range zones {
+		if _, exists := expectedNames[normalizedCoverageZoneName(zone.Name)]; !exists {
+			return fmt.Errorf("provider %q has unexpected coverage zone %q", email, zone.Name)
+		}
+	}
+
+	return nil
+}
+
+func normalizedCoverageZoneName(name string) string {
+	return strings.ToLower(strings.TrimSpace(name))
+}
+
 func (suite *testSuite) systemReportsCoverageZoneRequired() error {
 	if err := suite.registrationResponseShouldHaveStatusCode(http.StatusBadRequest); err != nil {
 		return err
@@ -206,6 +340,14 @@ func (suite *testSuite) systemReportsCoverageZoneUnavailable() error {
 	}
 
 	return suite.registrationResponseShouldSay(suite.expectedCoverageZoneRegistrationError)
+}
+
+func (suite *testSuite) systemReportsDuplicateCoverageZone() error {
+	if err := suite.registrationResponseShouldHaveStatusCode(http.StatusBadRequest); err != nil {
+		return err
+	}
+
+	return suite.registrationResponseShouldSay(coveragezone.ErrDuplicateCoverageZone.Error())
 }
 
 func (suite *testSuite) providerIsNotRegistered(email string) error {

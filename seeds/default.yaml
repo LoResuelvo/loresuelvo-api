@@ -1,3 +1,145 @@
+coverage_markets:
+  - code: CABA
+    name: Ciudad Autónoma de Buenos Aires
+    enabled: true
+
+coverage_zones:
+  - market: CABA
+    code: CABA-COMMUNE-01
+    name: Comuna 1
+    kind: COMMUNE
+    enabled: true
+    external_references:
+      - provider: GOOGLE
+        external_id: ChIJuQQBxzE1o5URe4mzo2cEmTc
+        source_version: region-lookup-v1alpha@2026-08-21
+  - market: CABA
+    code: CABA-COMMUNE-02
+    name: Comuna 2
+    kind: COMMUNE
+    enabled: true
+    external_references:
+      - provider: GOOGLE
+        external_id: ChIJDWsSDp_KvJUR9QfscYcpGOU
+        source_version: region-lookup-v1alpha@2026-08-21
+  - market: CABA
+    code: CABA-COMMUNE-03
+    name: Comuna 3
+    kind: COMMUNE
+    enabled: true
+    external_references:
+      - provider: GOOGLE
+        external_id: ChIJfYHTguXKvJURoZj4BULLfqM
+        source_version: region-lookup-v1alpha@2026-08-21
+  - market: CABA
+    code: CABA-COMMUNE-04
+    name: Comuna 4
+    kind: COMMUNE
+    enabled: true
+    external_references:
+      - provider: GOOGLE
+        external_id: ChIJ9_j8amvLvJURXE6r-8YAdB8
+        source_version: region-lookup-v1alpha@2026-08-21
+  - market: CABA
+    code: CABA-COMMUNE-05
+    name: Comuna 5
+    kind: COMMUNE
+    enabled: true
+    external_references:
+      - provider: GOOGLE
+        external_id: ChIJA7bs4VnKvJUR8YI31twWxkg
+        source_version: region-lookup-v1alpha@2026-08-21
+  - market: CABA
+    code: CABA-COMMUNE-06
+    name: Comuna 6
+    kind: COMMUNE
+    enabled: true
+    external_references:
+      - provider: GOOGLE
+        external_id: ChIJIR9pFD7KvJURPaMYFhbLY48
+        source_version: region-lookup-v1alpha@2026-08-21
+  - market: CABA
+    code: CABA-COMMUNE-07
+    name: Comuna 7
+    kind: COMMUNE
+    enabled: true
+    external_references:
+      - provider: GOOGLE
+        external_id: ChIJs7AojjLKvJURJNFcnyOteb0
+        source_version: region-lookup-v1alpha@2026-08-21
+  - market: CABA
+    code: CABA-COMMUNE-08
+    name: Comuna 8
+    kind: COMMUNE
+    enabled: true
+    external_references:
+      - provider: GOOGLE
+        external_id: ChIJmZurhlXJvJUR4nMVILqKWx4
+        source_version: region-lookup-v1alpha@2026-08-21
+  - market: CABA
+    code: CABA-COMMUNE-09
+    name: Comuna 9
+    kind: COMMUNE
+    enabled: true
+    external_references:
+      - provider: GOOGLE
+        external_id: ChIJK4_D6QjJvJURJsjRJpB3mVg
+        source_version: region-lookup-v1alpha@2026-08-21
+  - market: CABA
+    code: CABA-COMMUNE-10
+    name: Comuna 10
+    kind: COMMUNE
+    enabled: true
+    external_references:
+      - provider: GOOGLE
+        external_id: ChIJif2PN8nJvJURdmM8-GjGdMs
+        source_version: region-lookup-v1alpha@2026-08-21
+  - market: CABA
+    code: CABA-COMMUNE-11
+    name: Comuna 11
+    kind: COMMUNE
+    enabled: true
+    external_references:
+      - provider: GOOGLE
+        external_id: ChIJ9fAAUSS2vJUR1sOIFvvX2XU
+        source_version: region-lookup-v1alpha@2026-08-21
+  - market: CABA
+    code: CABA-COMMUNE-12
+    name: Comuna 12
+    kind: COMMUNE
+    enabled: true
+    external_references:
+      - provider: GOOGLE
+        external_id: ChIJX3MKLfS2vJURrrZUmIOQI-0
+        source_version: region-lookup-v1alpha@2026-08-21
+  - market: CABA
+    code: CABA-COMMUNE-13
+    name: Comuna 13
+    kind: COMMUNE
+    enabled: true
+    external_references:
+      - provider: GOOGLE
+        external_id: ChIJ1xHQhS20vJURuGiIQEy6qLk
+        source_version: region-lookup-v1alpha@2026-08-21
+  - market: CABA
+    code: CABA-COMMUNE-14
+    name: Comuna 14
+    kind: COMMUNE
+    enabled: true
+    external_references:
+      - provider: GOOGLE
+        external_id: ChIJy9bjmp61vJUR1kFz4gnyucs
+        source_version: region-lookup-v1alpha@2026-08-21
+  - market: CABA
+    code: CABA-COMMUNE-15
+    name: Comuna 15
+    kind: COMMUNE
+    enabled: true
+    external_references:
+      - provider: GOOGLE
+        external_id: ChIJJ2FHGQi2vJURwDLt3Or-hBA
+        source_version: region-lookup-v1alpha@2026-08-21
+
 categories:
   - name: Plomería
   - name: Electricidad
@@ -8,6 +150,7 @@ providers:
     name: Juan
     surname: Gómez
     category: Plomería
+    coverage_zone_codes: [CABA-COMMUNE-06, CABA-COMMUNE-14]
     profile_photo_file_id: 11111111-1111-4111-8111-111111111111
     profile_photo_name: juan-plomero-seed.webp
     profile_photo_key: seed/profile_photo/juan-plomero-seed.webp
@@ -16,6 +159,7 @@ providers:
     name: Laura
     surname: Suárez
     category: Electricidad
+    coverage_zone_codes: [CABA-COMMUNE-01, CABA-COMMUNE-13]
     profile_photo_file_id: 22222222-2222-4222-8222-222222222222
     profile_photo_name: laura-electricista-seed.webp
     profile_photo_key: seed/profile_photo/laura-electricista-seed.webp

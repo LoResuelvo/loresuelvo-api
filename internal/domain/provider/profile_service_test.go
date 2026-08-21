@@ -5,6 +5,7 @@ import (
 	"errors"
 	"testing"
 
+	coveragezone "github.com/LoResuelvo/loresuelvo-api/internal/domain/coverage_zone"
 	filedomain "github.com/LoResuelvo/loresuelvo-api/internal/domain/file"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/provider"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/provider/read_model"
@@ -110,7 +111,7 @@ func providerForProfileService(t *testing.T) *provider.Provider {
 		"Gómez",
 		&providerCategory,
 		&filedomain.Image{FileID: "profile-photo-id"},
-		nil,
+		[]coveragezone.CoverageZone{defaultCoverageZone()},
 	)
 	require.NoError(t, err)
 	foundProvider.SetPersistenceID(12)

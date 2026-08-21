@@ -3,6 +3,8 @@ package repositories_test
 import (
 	"context"
 	"database/sql"
+	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -78,7 +80,8 @@ func providerUser(value *provider.Provider) *provider.Provider {
 func validProviderWithData(t *testing.T, categoryRepository *repositories.CategoryRepository, database *sql.DB, authID, email, name, surname, categoryName string) *provider.Provider {
 	t.Helper()
 
-	return validProviderWithCoverageZones(t, categoryRepository, database, authID, email, name, surname, categoryName, nil)
+	coverageZone := savedCoverageZoneForProvider(t, database, "Comuna 6")
+	return validProviderWithCoverageZones(t, categoryRepository, database, authID, email, name, surname, categoryName, []coveragezone.CoverageZone{*coverageZone})
 }
 
 func validProviderWithCoverageZones(t *testing.T, categoryRepository *repositories.CategoryRepository, database *sql.DB, authID, email, name, surname, categoryName string, coverageZones []coveragezone.CoverageZone) *provider.Provider {
@@ -89,6 +92,34 @@ func validProviderWithCoverageZones(t *testing.T, categoryRepository *repositori
 	provider, err := provider.NewProvider(authID, email, name, surname, savedCategory, &filedomain.Image{FileID: profilePhotoFileID}, coverageZones)
 	require.NoError(t, err, "could not prepare provider")
 	return provider
+}
+
+func savedCoverageZoneForProvider(t *testing.T, database *sql.DB, name string) *coveragezone.CoverageZone {
+	t.Helper()
+
+	repository := repositories.NewCoverageZoneRepository(database)
+	market, err := repository.FindMarketByCode(context.Background(), "CABA")
+	if errors.Is(err, coveragezone.ErrDoesNotExist) {
+		newMarket, marketErr := coveragezone.NewMarket("CABA", "Ciudad Autónoma de Buenos Aires")
+		require.NoError(t, marketErr)
+		market, err = repository.SaveMarket(context.Background(), *newMarket)
+	}
+	require.NoError(t, err, "could not find or create coverage market")
+
+	existingZone, err := repository.FindByMarketCodeAndName(context.Background(), market.Code, name)
+	if err == nil {
+		return existingZone
+	}
+	if !errors.Is(err, coveragezone.ErrDoesNotExist) {
+		require.NoError(t, err, "could not find provider coverage zone")
+	}
+
+	zoneCode := "CABA-" + strings.ToUpper(strings.ReplaceAll(name, " ", "-"))
+	zone, err := coveragezone.New(market.ID, zoneCode, name, coveragezone.KindCommune)
+	require.NoError(t, err, "could not prepare provider coverage zone")
+	savedZone, err := repository.Save(context.Background(), *zone)
+	require.NoError(t, err, "could not save provider coverage zone")
+	return savedZone
 }
 
 func savedProviderProfilePhotoFileID(t *testing.T, database *sql.DB, authID string) string {
@@ -147,12 +178,10 @@ func TestProviderRepositoryCanSaveAProvider(t *testing.T) {
 func TestProviderRepositorySavesCoverageZonesAtomically(t *testing.T) {
 	testContext := newProviderRepositoryTest(t)
 	coverageZoneRepository := repositories.NewCoverageZoneRepository(testContext.database)
-	zone, err := coveragezone.New("Comuna 6")
-	require.NoError(t, err)
-	savedZone, err := coverageZoneRepository.Save(context.Background(), *zone)
-	require.NoError(t, err)
+	firstZone := savedCoverageZoneForProvider(t, testContext.database, "Comuna 6")
+	secondZone := savedCoverageZoneForProvider(t, testContext.database, "Comuna 14")
 
-	providerToSave := validProviderWithCoverageZones(t, testContext.categoryRepository, testContext.database, "auth0|josue", "josugod@gmail.com", "Josue", "el pro", "Plomería", []coveragezone.CoverageZone{*savedZone})
+	providerToSave := validProviderWithCoverageZones(t, testContext.categoryRepository, testContext.database, "auth0|josue", "josugod@gmail.com", "Josue", "el pro", "Plomería", []coveragezone.CoverageZone{*firstZone, *secondZone})
 
 	savedUser, err := testContext.providerRepository.Save(context.Background(), providerUser(providerToSave))
 	require.NoError(t, err)
@@ -160,7 +189,44 @@ func TestProviderRepositorySavesCoverageZonesAtomically(t *testing.T) {
 	zones, err := coverageZoneRepository.FindByProviderID(context.Background(), savedUser.ID())
 
 	require.NoError(t, err)
-	require.Equal(t, []coveragezone.CoverageZone{*savedZone}, zones)
+	require.Equal(t, []coveragezone.CoverageZone{*firstZone, *secondZone}, zones)
+}
+
+func TestProviderRepositoryHydratesCoverageZones(t *testing.T) {
+	testContext := newProviderRepositoryTest(t)
+	firstZone := savedCoverageZoneForProvider(t, testContext.database, "Comuna 6")
+	secondZone := savedCoverageZoneForProvider(t, testContext.database, "Comuna 14")
+	providerToSave := validProviderWithCoverageZones(t, testContext.categoryRepository, testContext.database, "auth0|josue", "josugod@gmail.com", "Josue", "el pro", "Plomería", []coveragezone.CoverageZone{*firstZone, *secondZone})
+
+	savedUser, err := testContext.providerRepository.Save(context.Background(), providerUser(providerToSave))
+	require.NoError(t, err)
+
+	foundProvider, err := testContext.providerRepository.FindProviderByID(context.Background(), savedUser.ID())
+
+	require.NoError(t, err)
+	require.Equal(t, []coveragezone.CoverageZone{*firstZone, *secondZone}, foundProvider.CoverageZones)
+}
+
+func TestProviderRepositoryRollsBackWhenCoverageZoneCannotBeSaved(t *testing.T) {
+	testContext := newProviderRepositoryTest(t)
+	missingZone := coveragezone.CoverageZone{ID: 999999999, Name: "Missing zone", Enabled: true}
+	providerToSave := validProviderWithCoverageZones(t, testContext.categoryRepository, testContext.database, "auth0|josue", "josugod@gmail.com", "Josue", "el pro", "Plomería", []coveragezone.CoverageZone{missingZone})
+
+	_, err := testContext.providerRepository.Save(context.Background(), providerUser(providerToSave))
+
+	require.Error(t, err)
+	require.False(t, testContext.providerRepository.FindByEmail(providerToSave.Email()))
+
+	var providerCount int
+	err = testContext.database.QueryRow(
+		`SELECT COUNT(*)
+		FROM providers
+		INNER JOIN users ON users.id = providers.user_id
+		WHERE users.email = $1`,
+		providerToSave.Email(),
+	).Scan(&providerCount)
+	require.NoError(t, err)
+	require.Zero(t, providerCount)
 }
 
 func TestProviderRepositoryCanDeleteAllProviders(t *testing.T) {
@@ -261,6 +327,7 @@ func TestProviderRepositoryCanFindProvidersByCategoryID(t *testing.T) {
 	assert.Equal(t, "Plomería", providers[0].Category.Name)
 	assert.Equal(t, plumbingProvider.ProfilePhoto().FileID, providers[0].ProfilePhoto().FileID)
 	assert.Equal(t, "foto.jpg", providers[0].ProfilePhoto().OriginalName)
+	assert.Equal(t, plumbingProvider.CoverageZones, providers[0].CoverageZones)
 	assert.NotZero(t, providers[1].ID)
 	assert.Equal(t, "Pedro", providers[1].Name())
 	assert.Equal(t, "Dib", providers[1].Surname())
@@ -268,6 +335,7 @@ func TestProviderRepositoryCanFindProvidersByCategoryID(t *testing.T) {
 	assert.Equal(t, anotherPlumbingProvider.Category.ID, providers[1].Category.ID)
 	assert.Equal(t, "Plomería", providers[1].Category.Name)
 	assert.Equal(t, anotherPlumbingProvider.ProfilePhoto().FileID, providers[1].ProfilePhoto().FileID)
+	assert.Equal(t, anotherPlumbingProvider.CoverageZones, providers[1].CoverageZones)
 }
 
 func TestProviderRepositoryFindByCategoryIDReturnsEmptyListIfNoProvidersExistForCategory(t *testing.T) {
@@ -317,6 +385,7 @@ func TestProviderRepositoryCanFindByAuthID(t *testing.T) {
 	assert.Equal(t, providerToSave.Category.Name, foundProvider.Category.Name)
 	assert.Equal(t, providerToSave.ProfilePhoto().FileID, foundProvider.ProfilePhoto().FileID)
 	assert.Equal(t, "foto.jpg", foundProvider.ProfilePhoto().OriginalName)
+	assert.Equal(t, providerToSave.CoverageZones, foundProvider.CoverageZones)
 }
 
 func TestProviderRepositoryCanFindByID(t *testing.T) {
@@ -333,6 +402,7 @@ func TestProviderRepositoryCanFindByID(t *testing.T) {
 	assert.Equal(t, providerToSave.Name(), foundProvider.Name())
 	require.NotNil(t, foundProvider.Category)
 	assert.Equal(t, providerToSave.Category.ID, foundProvider.Category.ID)
+	assert.Equal(t, providerToSave.CoverageZones, foundProvider.CoverageZones)
 }
 
 func TestProviderRepositoryFindByIDReturnsNotFound(t *testing.T) {

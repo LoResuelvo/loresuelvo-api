@@ -67,10 +67,6 @@ func (s *Service) RegisterProvider(ctx context.Context, authID, email, name, sur
 		return nil, err
 	}
 
-	if len(coverageZoneIDs) == 0 {
-		return nil, coveragezone.ErrAtLeastOneRequired
-	}
-
 	profilePhotoURL, err := s.fileService.ResolvePublicURL(ctx, profilePhotoFileID)
 	if err != nil {
 		return nil, fmt.Errorf("resolving provider profile photo url: %w", err)
@@ -88,6 +84,9 @@ func (s *Service) RegisterProvider(ctx context.Context, authID, email, name, sur
 
 func (s *Service) resolveCoverageZones(ctx context.Context, ids []int) ([]coveragezone.CoverageZone, error) {
 	zones := make([]coveragezone.CoverageZone, 0, len(ids))
+	if err := coveragezone.ValidateUniqueIDs(ids); err != nil {
+		return nil, err
+	}
 	if len(ids) == 0 {
 		return zones, nil
 	}

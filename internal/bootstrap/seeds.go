@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/storage"
+	coveragezone "github.com/LoResuelvo/loresuelvo-api/internal/domain/coverage_zone"
 	"gopkg.in/yaml.v3"
 )
 
@@ -27,8 +28,31 @@ const (
 )
 
 type seedData struct {
-	Categories []categorySeed `yaml:"categories"`
-	Providers  []providerSeed `yaml:"providers"`
+	CoverageMarkets []coverageMarketSeed `yaml:"coverage_markets"`
+	CoverageZones   []coverageZoneSeed   `yaml:"coverage_zones"`
+	Categories      []categorySeed       `yaml:"categories"`
+	Providers       []providerSeed       `yaml:"providers"`
+}
+
+type coverageMarketSeed struct {
+	Code    string `yaml:"code"`
+	Name    string `yaml:"name"`
+	Enabled bool   `yaml:"enabled"`
+}
+
+type coverageZoneSeed struct {
+	MarketCode         string                              `yaml:"market"`
+	Code               string                              `yaml:"code"`
+	Name               string                              `yaml:"name"`
+	Kind               string                              `yaml:"kind"`
+	Enabled            bool                                `yaml:"enabled"`
+	ExternalReferences []coverageZoneExternalReferenceSeed `yaml:"external_references"`
+}
+
+type coverageZoneExternalReferenceSeed struct {
+	Provider      string `yaml:"provider"`
+	ExternalID    string `yaml:"external_id"`
+	SourceVersion string `yaml:"source_version"`
 }
 
 type categorySeed struct {
@@ -36,14 +60,15 @@ type categorySeed struct {
 }
 
 type providerSeed struct {
-	AuthID             string `yaml:"auth_id"`
-	Email              string `yaml:"email"`
-	Name               string `yaml:"name"`
-	Surname            string `yaml:"surname"`
-	CategoryName       string `yaml:"category"`
-	ProfilePhotoFileID string `yaml:"profile_photo_file_id"`
-	ProfilePhotoName   string `yaml:"profile_photo_name"`
-	ProfilePhotoKey    string `yaml:"profile_photo_key"`
+	AuthID             string   `yaml:"auth_id"`
+	Email              string   `yaml:"email"`
+	Name               string   `yaml:"name"`
+	Surname            string   `yaml:"surname"`
+	CategoryName       string   `yaml:"category"`
+	CoverageZoneCodes  []string `yaml:"coverage_zone_codes"`
+	ProfilePhotoFileID string   `yaml:"profile_photo_file_id"`
+	ProfilePhotoName   string   `yaml:"profile_photo_name"`
+	ProfilePhotoKey    string   `yaml:"profile_photo_key"`
 }
 
 func StartDefaultDataSeederFromEnv(ctx context.Context, database *sql.DB) {
@@ -87,7 +112,7 @@ func StartDefaultDataSeederFromEnv(ctx context.Context, database *sql.DB) {
 				}
 			}
 
-			slog.Info("default seeds are ready", "categories", len(data.Categories), "providers", len(data.Providers))
+			slog.Info("default seeds are ready", "coverage_markets", len(data.CoverageMarkets), "coverage_zones", len(data.CoverageZones), "categories", len(data.Categories), "providers", len(data.Providers))
 			return
 		}
 
@@ -118,7 +143,7 @@ func SeedDefaultDataFromEnv(ctx context.Context, database *sql.DB) error {
 		return err
 	}
 
-	slog.Info("default seeds are ready", "categories", len(data.Categories), "providers", len(data.Providers))
+	slog.Info("default seeds are ready", "coverage_markets", len(data.CoverageMarkets), "coverage_zones", len(data.CoverageZones), "categories", len(data.Categories), "providers", len(data.Providers))
 	return nil
 }
 
@@ -159,13 +184,25 @@ func loadSeedData(path string) (seedData, bool, error) {
 }
 
 func (data seedData) IsEmpty() bool {
-	return len(data.Categories) == 0 && len(data.Providers) == 0
+	return len(data.CoverageMarkets) == 0 && len(data.CoverageZones) == 0 && len(data.Categories) == 0 && len(data.Providers) == 0
 }
 
 func seedDefaultData(ctx context.Context, database *sql.DB, publicBucket string, data seedData) error {
 	tx, err := database.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("beginning seed transaction: %w", err)
+	}
+
+	for _, seed := range data.CoverageMarkets {
+		if err := upsertSeedCoverageMarket(ctx, tx, seed); err != nil {
+			return rollbackSeedTx(tx, err)
+		}
+	}
+
+	for _, seed := range data.CoverageZones {
+		if err := upsertSeedCoverageZone(ctx, tx, seed); err != nil {
+			return rollbackSeedTx(tx, err)
+		}
 	}
 
 	for _, seed := range data.Categories {
@@ -204,6 +241,125 @@ func seedDefaultProvider(ctx context.Context, tx *sql.Tx, publicBucket string, s
 
 	if err := upsertSeedProvider(ctx, tx, userID, categoryID); err != nil {
 		return err
+	}
+	if err := syncSeedProviderCoverageZones(ctx, tx, userID, seed.CoverageZoneCodes); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func upsertSeedCoverageMarket(ctx context.Context, tx *sql.Tx, seed coverageMarketSeed) error {
+	market, err := coveragezone.NewMarket(seed.Code, seed.Name)
+	if err != nil {
+		return fmt.Errorf("seeding coverage market %q: %w", seed.Code, err)
+	}
+	market.Enabled = seed.Enabled
+
+	_, err = tx.ExecContext(
+		ctx,
+		`INSERT INTO coverage_markets (code, name, enabled, created_on, updated_on)
+		VALUES ($1, $2, $3, NOW(), NOW())
+		ON CONFLICT (code) DO UPDATE
+		SET name = EXCLUDED.name, enabled = EXCLUDED.enabled, updated_on = NOW()`,
+		market.Code, market.Name, market.Enabled,
+	)
+	if err != nil {
+		return fmt.Errorf("seeding coverage market %q: %w", seed.Code, err)
+	}
+	return nil
+}
+
+func upsertSeedCoverageZone(ctx context.Context, tx *sql.Tx, seed coverageZoneSeed) error {
+	marketCode := strings.ToUpper(strings.TrimSpace(seed.MarketCode))
+	if marketCode == "" {
+		return errors.New("seeding coverage zone: market is required")
+	}
+
+	var marketID int
+	if err := tx.QueryRowContext(ctx, `SELECT id FROM coverage_markets WHERE code = $1`, marketCode).Scan(&marketID); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return fmt.Errorf("seeding coverage zone %q: coverage market %q does not exist", seed.Name, seed.MarketCode)
+		}
+		return fmt.Errorf("finding coverage market %q for zone %q: %w", seed.MarketCode, seed.Name, err)
+	}
+
+	zone, err := coveragezone.New(
+		marketID,
+		seed.Code,
+		seed.Name,
+		coveragezone.Kind(strings.ToUpper(strings.TrimSpace(seed.Kind))),
+	)
+	if err != nil {
+		return fmt.Errorf("seeding coverage zone %q: %w", seed.Name, err)
+	}
+	zone.Enabled = seed.Enabled
+
+	var coverageZoneID int
+	err = tx.QueryRowContext(
+		ctx,
+		`INSERT INTO coverage_zones (market_id, code, name, normalized_name, kind, enabled, created_on, updated_on)
+		VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
+		ON CONFLICT (code) DO UPDATE
+		SET market_id = EXCLUDED.market_id,
+			name = EXCLUDED.name,
+			normalized_name = EXCLUDED.normalized_name,
+			kind = EXCLUDED.kind,
+			enabled = EXCLUDED.enabled,
+			updated_on = NOW()
+		RETURNING id`,
+		zone.MarketID,
+		zone.Code,
+		zone.Name,
+		zone.NormalizedName,
+		zone.Kind,
+		zone.Enabled,
+	).Scan(&coverageZoneID)
+	if err != nil {
+		return fmt.Errorf("seeding coverage zone %q: %w", seed.Name, err)
+	}
+
+	for _, referenceSeed := range seed.ExternalReferences {
+		if err := upsertSeedCoverageZoneExternalReference(ctx, tx, coverageZoneID, referenceSeed); err != nil {
+			return fmt.Errorf("seeding coverage zone %q: %w", seed.Name, err)
+		}
+	}
+
+	return nil
+}
+
+func upsertSeedCoverageZoneExternalReference(
+	ctx context.Context,
+	tx *sql.Tx,
+	coverageZoneID int,
+	seed coverageZoneExternalReferenceSeed,
+) error {
+	reference, err := coveragezone.NewExternalReference(
+		coverageZoneID,
+		seed.Provider,
+		seed.ExternalID,
+		seed.SourceVersion,
+	)
+	if err != nil {
+		return fmt.Errorf("constructing external reference: %w", err)
+	}
+
+	_, err = tx.ExecContext(
+		ctx,
+		`INSERT INTO coverage_zone_external_references (
+			coverage_zone_id, provider, external_id, source_version, created_on, updated_on
+		) VALUES ($1, $2, $3, NULLIF($4, ''), NOW(), NOW())
+		ON CONFLICT (coverage_zone_id, provider) DO UPDATE
+		SET external_id = EXCLUDED.external_id,
+			source_version = EXCLUDED.source_version,
+			updated_on = NOW()`,
+		reference.CoverageZoneID,
+		reference.Provider,
+		reference.ExternalID,
+		reference.SourceVersion,
+	)
+	if err != nil {
+		return fmt.Errorf("persisting %s external reference: %w", reference.Provider, err)
 	}
 
 	return nil
@@ -302,6 +458,52 @@ func upsertSeedProvider(ctx context.Context, tx *sql.Tx, userID, categoryID int)
 	)
 	if err != nil {
 		return fmt.Errorf("seeding provider for user %d: %w", userID, err)
+	}
+
+	return nil
+}
+
+func syncSeedProviderCoverageZones(ctx context.Context, tx *sql.Tx, providerID int, zoneCodes []string) error {
+	if len(zoneCodes) == 0 {
+		return fmt.Errorf("seeding provider coverage zones for user %d: at least one coverage zone is required", providerID)
+	}
+
+	zoneIDs := make([]int, 0, len(zoneCodes))
+	seenCodes := make(map[string]struct{}, len(zoneCodes))
+	for _, zoneCode := range zoneCodes {
+		normalizedCode := strings.ToUpper(strings.TrimSpace(zoneCode))
+		if _, duplicate := seenCodes[normalizedCode]; duplicate {
+			return fmt.Errorf("seeding provider coverage zone %q: duplicate coverage zone", zoneCode)
+		}
+		seenCodes[normalizedCode] = struct{}{}
+
+		var zoneID int
+		err := tx.QueryRowContext(
+			ctx,
+			`SELECT id FROM coverage_zones WHERE code = $1 AND enabled = TRUE`,
+			normalizedCode,
+		).Scan(&zoneID)
+		if errors.Is(err, sql.ErrNoRows) {
+			return fmt.Errorf("seeding provider coverage zone %q: coverage zone does not exist or is disabled", zoneCode)
+		}
+		if err != nil {
+			return fmt.Errorf("finding provider coverage zone %q: %w", zoneCode, err)
+		}
+		zoneIDs = append(zoneIDs, zoneID)
+	}
+
+	if _, err := tx.ExecContext(ctx, `DELETE FROM provider_coverage_zones WHERE provider_id = $1`, providerID); err != nil {
+		return fmt.Errorf("clearing coverage zones for provider %d: %w", providerID, err)
+	}
+	for _, zoneID := range zoneIDs {
+		if _, err := tx.ExecContext(
+			ctx,
+			`INSERT INTO provider_coverage_zones (provider_id, coverage_zone_id) VALUES ($1, $2)`,
+			providerID,
+			zoneID,
+		); err != nil {
+			return fmt.Errorf("seeding coverage zone %d for provider %d: %w", zoneID, providerID, err)
+		}
 	}
 
 	return nil

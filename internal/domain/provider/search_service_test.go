@@ -5,6 +5,7 @@ import (
 	"errors"
 	"testing"
 
+	coveragezone "github.com/LoResuelvo/loresuelvo-api/internal/domain/coverage_zone"
 	filedomain "github.com/LoResuelvo/loresuelvo-api/internal/domain/file"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/provider"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/provider/read_model"
@@ -21,7 +22,7 @@ func TestServiceComposesRatingSummaryForEachProviderSearchResult(t *testing.T) {
 		"Pérez",
 		&providerCategory,
 		&filedomain.Image{FileID: "juan-photo", URL: "https://cdn.example/juan.jpg"},
-		nil,
+		[]coveragezone.CoverageZone{defaultCoverageZone()},
 	)
 	require.NoError(t, err)
 	juan.SetPersistenceID(12)
@@ -33,7 +34,7 @@ func TestServiceComposesRatingSummaryForEachProviderSearchResult(t *testing.T) {
 		"Dib",
 		&providerCategory,
 		&filedomain.Image{FileID: "pedro-photo", URL: "https://cdn.example/pedro.jpg"},
-		nil,
+		[]coveragezone.CoverageZone{defaultCoverageZone()},
 	)
 	require.NoError(t, err)
 	pedro.SetPersistenceID(15)
@@ -89,7 +90,7 @@ func TestServiceUsesZeroRatingSummaryWhenProviderHasNoRatings(t *testing.T) {
 		"Pérez",
 		&providerCategory,
 		&filedomain.Image{FileID: "juan-photo"},
-		nil,
+		[]coveragezone.CoverageZone{defaultCoverageZone()},
 	)
 	require.NoError(t, err)
 	foundProvider.SetPersistenceID(12)
@@ -121,7 +122,7 @@ func TestServicePropagatesProviderSearchRatingReaderError(t *testing.T) {
 		"Pérez",
 		&providerCategory,
 		&filedomain.Image{FileID: "juan-photo"},
-		nil,
+		[]coveragezone.CoverageZone{defaultCoverageZone()},
 	)
 	require.NoError(t, err)
 	foundProvider.SetPersistenceID(12)

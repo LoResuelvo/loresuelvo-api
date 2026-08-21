@@ -14,7 +14,8 @@ import (
 )
 
 type UserRepository struct {
-	db *sql.DB
+	db                     *sql.DB
+	coverageZoneRepository *CoverageZoneRepository
 }
 
 const userWithProfileSelectSQL = `SELECT u.id, u.auth_id, u.email, u.name, u.surname, u.role,
@@ -28,7 +29,8 @@ const userWithProfileSelectSQL = `SELECT u.id, u.auth_id, u.email, u.name, u.sur
 
 func NewUserRepository(db *sql.DB) *UserRepository {
 	return &UserRepository{
-		db: db,
+		db:                     db,
+		coverageZoneRepository: NewCoverageZoneRepository(db),
 	}
 }
 
@@ -129,17 +131,41 @@ func (repository *UserRepository) FindByEmail(email string) bool {
 }
 
 func (repository *UserRepository) FindByAuthID(authID string) (user.User, error) {
-	return scanUserWithProfile(
+	foundUser, err := scanUserWithProfile(
 		repository.db.QueryRow(userWithProfileSelectSQL+" WHERE u.auth_id = $1", authID),
 		"auth id",
 	)
+	if err != nil {
+		return nil, err
+	}
+
+	return repository.hydrateUserCoverageZones(context.Background(), foundUser)
 }
 
 func (repository *UserRepository) FindByID(ctx context.Context, id int) (user.User, error) {
-	return scanUserWithProfile(
+	foundUser, err := scanUserWithProfile(
 		repository.db.QueryRowContext(ctx, userWithProfileSelectSQL+" WHERE u.id = $1", id),
 		"id",
 	)
+	if err != nil {
+		return nil, err
+	}
+
+	return repository.hydrateUserCoverageZones(ctx, foundUser)
+}
+
+func (repository *UserRepository) hydrateUserCoverageZones(ctx context.Context, foundUser user.User) (user.User, error) {
+	foundProvider, ok := foundUser.(*provider.Provider)
+	if !ok {
+		return foundUser, nil
+	}
+
+	zones, err := repository.coverageZoneRepository.FindByProviderID(ctx, foundProvider.ID())
+	if err != nil {
+		return nil, fmt.Errorf("hydrating provider coverage zones: %w", err)
+	}
+	foundProvider.CoverageZones = zones
+	return foundProvider, nil
 }
 
 type rowScanner interface {
@@ -275,6 +301,11 @@ func (repository *UserRepository) FindProviderByID(ctx context.Context, provider
 	if err != nil {
 		return nil, fmt.Errorf("finding provider by id: %w", err)
 	}
+	zones, err := repository.coverageZoneRepository.FindByProviderID(ctx, providerID)
+	if err != nil {
+		return nil, fmt.Errorf("hydrating provider coverage zones: %w", err)
+	}
+	foundProvider.CoverageZones = zones
 	return foundProvider, nil
 }
 
@@ -314,6 +345,18 @@ func (repository *UserRepository) FindProvidersByCategoryID(categoryID int) ([]p
 
 	if err := rows.Err(); err != nil {
 		return nil, err
+	}
+
+	providerIDs := make([]int, 0, len(providers))
+	for index := range providers {
+		providerIDs = append(providerIDs, providers[index].ID())
+	}
+	zonesByProviderID, err := repository.coverageZoneRepository.FindByProviderIDs(context.Background(), providerIDs)
+	if err != nil {
+		return nil, fmt.Errorf("hydrating provider coverage zones: %w", err)
+	}
+	for index := range providers {
+		providers[index].CoverageZones = zonesByProviderID[providers[index].ID()]
 	}
 
 	return providers, nil

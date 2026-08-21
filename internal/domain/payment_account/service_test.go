@@ -8,6 +8,7 @@ import (
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/category"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/consumer"
+	coveragezone "github.com/LoResuelvo/loresuelvo-api/internal/domain/coverage_zone"
 	paymentaccount "github.com/LoResuelvo/loresuelvo-api/internal/domain/payment_account"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/provider"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/user"
@@ -200,7 +201,7 @@ func TestStartAuthorizationRejectsAlreadyConnectedPaymentAccount(t *testing.T) {
 		paymentaccount.PaymentProvider("mercado_pago"),
 		"mp-juan",
 		[]byte("encrypted-access-token"),
-		nil,
+		[]byte("encrypted-refresh-token"),
 		fixedNow.Add(time.Hour),
 	)
 	require.NoError(t, err)
@@ -492,7 +493,7 @@ func registeredProvider(t *testing.T) *provider.Provider {
 		"Gómez",
 		&category.Category{ID: 1, Name: "Plomería"},
 		nil,
-		nil,
+		[]coveragezone.CoverageZone{{ID: 6, Name: "Comuna 6", Enabled: true}},
 	)
 	require.NoError(t, err)
 	providerUser.SetPersistenceID(providerID)
