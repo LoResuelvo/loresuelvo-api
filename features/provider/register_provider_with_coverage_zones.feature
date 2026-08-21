@@ -33,8 +33,15 @@ Feature: Registrar prestador con zonas de cobertura
             Then el sistema me indica que la zona de cobertura seleccionada no está disponible
             And el prestador "prestador@example.com" no queda registrado
 
-        @wip
         Scenario: 35.5.5-RPWCZ Rechazar una zona de cobertura seleccionada más de una vez
             When me registro como prestador con correo "prestador@example.com", nombre "Juan", apellido "Pérez", rubro "Plomería" y selecciono dos veces la zona de cobertura "Comuna 6"
             Then el sistema me indica que una zona de cobertura no puede seleccionarse más de una vez
             And el prestador "prestador@example.com" no queda registrado
+
+        Scenario: 35.5.6-RPWCZ Registrar un prestador con zonas de cobertura no contiguas
+            When me registro como prestador con correo "prestador@example.com", nombre "Juan", apellido "Pérez", rubro "Plomería" y las zonas de cobertura "Comuna 6" y "Comuna 14"
+            Then el sistema confirma el registro
+            And el prestador "prestador@example.com" queda registrado únicamente con las siguientes zonas de cobertura:
+                | zona      |
+                | Comuna 6  |
+                | Comuna 14 |
