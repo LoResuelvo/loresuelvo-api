@@ -1,11 +1,12 @@
 type: object
 description: Payload accepted by POST /providers. The implementation trims surrounding
   whitespace from email, name, and surname before validation/persistence. category_id and profile_photo_file_id
-  are required by the domain service. coverage_zone is currently accepted by the request
-  struct but ignored by the service.
+  are required by the domain service. coverage_zone_ids contains at least one identifier
+  from the configured LoResuelvo coverage-zone catalog and cannot contain duplicates.
 required:
 - email
 - category_id
+- coverage_zone_ids
 - profile_photo_file_id
 properties:
   email:
@@ -23,16 +24,17 @@ properties:
     description: Provider surname. The current implementation persists the value but
       does not enforce non-empty validation.
     example: Pérez
-  coverage_zone:
+  coverage_zone_ids:
     type: array
-    description: Accepted by JSON binding for backwards compatibility, but the current
-      handler does not pass this value to the provider service and it is not persisted.
+    minItems: 1
+    uniqueItems: true
+    description: Internal identifiers of the coverage zones selected by the provider. At least one is required and identifiers cannot be repeated.
     items:
-      type: string
-      example: Zona Norte
+      type: integer
+      format: int32
+      minimum: 1
     example:
-    - Zona Norte
-    deprecated: true
+    - 1
   profile_photo_file_id:
     type: string
     format: uuid

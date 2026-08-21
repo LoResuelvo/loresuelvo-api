@@ -588,7 +588,7 @@
                 ],
                 "operationId": "registerProvider",
                 "summary": "Register the authenticated user as a provider",
-                "description": "Creates a provider account for the authenticated Auth0 subject. The Auth0 subject is taken from the Bearer JWT and persisted as the user auth identifier. The current implementation consumes email, name, surname, category_id, and a confirmed profile_photo_file_id; coverage_zone is accepted by JSON binding but is not passed to the provider service or persisted.",
+                "description": "Creates a provider account for the authenticated Auth0 subject. The Auth0 subject is taken from the Bearer JWT and persisted as the user auth identifier. The implementation consumes email, name, surname, category_id, a confirmed profile_photo_file_id, and the selected internal coverage_zone_ids.",
                 "security": [
                     {
                         "BearerAuth": []
@@ -610,8 +610,8 @@
                                         "surname": "Pérez",
                                         "category_id": 1,
                                         "profile_photo_file_id": "4af47f1b-97b6-4b32-baa0-b95d6077f919",
-                                        "coverage_zone": [
-                                            "Zona Norte"
+                                        "coverage_zone_ids": [
+                                            1
                                         ]
                                     }
                                 }
@@ -642,7 +642,7 @@
                         }
                     },
                     "400": {
-                        "description": "The request body is not valid JSON, cannot be bound to the expected payload, contains an invalid email format, omits category_id, or references a category that does not exist, omits a profile photo, or references a profile photo that cannot be used.",
+                        "description": "The request body is not valid JSON, cannot be bound to the expected payload, contains an invalid email format, omits category_id, coverage_zone_ids, or profile_photo_file_id, references a category that does not exist, or references a profile photo that cannot be used, or a coverage zone that does not exist, is not available, or is selected more than once.",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -671,6 +671,30 @@
                                         "summary": "Category id does not exist",
                                         "value": {
                                             "error": "Category does not exist"
+                                        }
+                                    },
+                                    "coverageZoneRequired": {
+                                        "summary": "Missing coverage zones",
+                                        "value": {
+                                            "error": "At least one coverage zone must be selected"
+                                        }
+                                    },
+                                    "coverageZoneUnavailable": {
+                                        "summary": "Coverage zone does not exist",
+                                        "value": {
+                                            "error": "Coverage zone does not exist"
+                                        }
+                                    },
+                                    "coverageZoneDisabled": {
+                                        "summary": "Coverage zone is disabled",
+                                        "value": {
+                                            "error": "Coverage zone is not available"
+                                        }
+                                    },
+                                    "coverageZoneDuplicate": {
+                                        "summary": "Duplicate coverage zone",
+                                        "value": {
+                                            "error": "Coverage zone cannot be selected more than once"
                                         }
                                     },
                                     "profilePhotoRequired": {
@@ -4160,10 +4184,11 @@
             },
             "RegisterProviderRequest": {
                 "type": "object",
-                "description": "Payload accepted by POST /providers. The implementation trims surrounding whitespace from email, name, and surname before validation/persistence. category_id and profile_photo_file_id are required by the domain service. coverage_zone is currently accepted by the request struct but ignored by the service.",
+                "description": "Payload accepted by POST /providers. The implementation trims surrounding whitespace from email, name, and surname before validation/persistence. category_id and profile_photo_file_id are required by the domain service. coverage_zone_ids contains at least one identifier from the configured LoResuelvo coverage-zone catalog and cannot contain duplicates.",
                 "required": [
                     "email",
                     "category_id",
+                    "coverage_zone_ids",
                     "profile_photo_file_id"
                 ],
                 "properties": {
@@ -4183,17 +4208,19 @@
                         "description": "Provider surname. The current implementation persists the value but does not enforce non-empty validation.",
                         "example": "Pérez"
                     },
-                    "coverage_zone": {
+                    "coverage_zone_ids": {
                         "type": "array",
-                        "description": "Accepted by JSON binding for backwards compatibility, but the current handler does not pass this value to the provider service and it is not persisted.",
+                        "minItems": 1,
+                        "uniqueItems": true,
+                        "description": "Internal identifiers of the coverage zones selected by the provider. At least one is required and identifiers cannot be repeated.",
                         "items": {
-                            "type": "string",
-                            "example": "Zona Norte"
+                            "type": "integer",
+                            "format": "int32",
+                            "minimum": 1
                         },
                         "example": [
-                            "Zona Norte"
-                        ],
-                        "deprecated": true
+                            1
+                        ]
                     },
                     "profile_photo_file_id": {
                         "type": "string",
