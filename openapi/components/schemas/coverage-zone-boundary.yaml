@@ -1,0 +1,18 @@
+type: object
+description: Google Maps boundary representation used by the current CABA coverage catalog.
+required:
+- type
+- place_id
+properties:
+  type:
+    type: string
+    description: Boundary representation understood by the frontend.
+    enum:
+    - google_place
+    example: google_place
+  place_id:
+    type: string
+    minLength: 1
+    description: Google Place ID used to select and style the corresponding boundary polygon.
+    example: ChIJIR9pFD7KvJURPaMYFhbLY48
+additionalProperties: false

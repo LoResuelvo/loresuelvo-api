@@ -1,0 +1,19 @@
+type: object
+required:
+- id
+- name
+- boundary
+properties:
+  id:
+    type: integer
+    format: int32
+    minimum: 1
+    description: Stable internal coverage-zone identifier accepted by provider coverage operations.
+    example: 6
+  name:
+    type: string
+    description: Human-readable coverage-zone name.
+    example: Comuna 6
+  boundary:
+    $ref: '#/components/schemas/CoverageZoneBoundary'
+additionalProperties: false

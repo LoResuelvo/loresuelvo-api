@@ -29,6 +29,10 @@
             "description": "Service category management endpoints."
         },
         {
+            "name": "CoverageZones",
+            "description": "Coverage-zone catalog endpoints."
+        },
+        {
             "name": "Consumers",
             "description": "Consumer account registration endpoints."
         },
@@ -306,6 +310,101 @@
                                     "categoryAlreadyExists": {
                                         "value": {
                                             "error": "Category already exists"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/coverage-zones": {
+            "get": {
+                "tags": [
+                    "CoverageZones"
+                ],
+                "operationId": "listAvailableCoverageZones",
+                "summary": "List available coverage zones",
+                "description": "Returns the enabled coverage zones in the implicit first-iteration CABA market. Each item includes the stable internal identifier used by LoResuelvo and the Google Place ID required by the frontend to represent the zone boundary. The result is ordered by the stable internal zone code.",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Available coverage zones returned successfully. The array may be empty.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": {
+                                        "$ref": "#/components/schemas/CoverageZoneListItem"
+                                    }
+                                },
+                                "examples": {
+                                    "availableZones": {
+                                        "value": [
+                                            {
+                                                "id": 6,
+                                                "name": "Comuna 6",
+                                                "boundary": {
+                                                    "type": "google_place",
+                                                    "place_id": "ChIJIR9pFD7KvJURPaMYFhbLY48"
+                                                }
+                                            },
+                                            {
+                                                "id": 14,
+                                                "name": "Comuna 14",
+                                                "boundary": {
+                                                    "type": "google_place",
+                                                    "place_id": "ChIJy9bjmp61vJUR1kFz4gnyucs"
+                                                }
+                                            }
+                                        ]
+                                    },
+                                    "empty": {
+                                        "value": []
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Authentication failed or the authenticated user id could not be obtained from the request context.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AuthErrorResponse"
+                                },
+                                "examples": {
+                                    "invalidToken": {
+                                        "value": {
+                                            "error": "invalid_token",
+                                            "message": "Failed to validate JWT."
+                                        }
+                                    },
+                                    "missingUserId": {
+                                        "value": {
+                                            "error": "missing user id"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "The coverage-zone catalog could not be read.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                },
+                                "examples": {
+                                    "catalogUnavailable": {
+                                        "value": {
+                                            "error": "coverage zone catalog is unavailable"
                                         }
                                     }
                                 }
@@ -6621,6 +6720,57 @@
                     "name": {
                         "type": "string",
                         "example": "Plomería"
+                    }
+                },
+                "additionalProperties": false
+            },
+            "CoverageZoneListItem": {
+                "type": "object",
+                "required": [
+                    "id",
+                    "name",
+                    "boundary"
+                ],
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "format": "int32",
+                        "minimum": 1,
+                        "description": "Stable internal coverage-zone identifier accepted by provider coverage operations.",
+                        "example": 6
+                    },
+                    "name": {
+                        "type": "string",
+                        "description": "Human-readable coverage-zone name.",
+                        "example": "Comuna 6"
+                    },
+                    "boundary": {
+                        "$ref": "#/components/schemas/CoverageZoneBoundary"
+                    }
+                },
+                "additionalProperties": false
+            },
+            "CoverageZoneBoundary": {
+                "type": "object",
+                "description": "Google Maps boundary representation used by the current CABA coverage catalog.",
+                "required": [
+                    "type",
+                    "place_id"
+                ],
+                "properties": {
+                    "type": {
+                        "type": "string",
+                        "description": "Boundary representation understood by the frontend.",
+                        "enum": [
+                            "google_place"
+                        ],
+                        "example": "google_place"
+                    },
+                    "place_id": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "Google Place ID used to select and style the corresponding boundary polygon.",
+                        "example": "ChIJIR9pFD7KvJURPaMYFhbLY48"
                     }
                 },
                 "additionalProperties": false

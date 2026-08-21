@@ -1,0 +1,59 @@
+get:
+  tags:
+  - CoverageZones
+  operationId: listAvailableCoverageZones
+  summary: List available coverage zones
+  description: Returns the enabled coverage zones in the implicit first-iteration
+    CABA market. Each item includes the stable internal identifier used by LoResuelvo
+    and the Google Place ID required by the frontend to represent the zone boundary.
+    The result is ordered by the stable internal zone code.
+  security:
+  - BearerAuth: []
+  responses:
+    '200':
+      description: Available coverage zones returned successfully. The array may be empty.
+      content:
+        application/json:
+          schema:
+            type: array
+            items:
+              $ref: '#/components/schemas/CoverageZoneListItem'
+          examples:
+            availableZones:
+              value:
+              - id: 6
+                name: Comuna 6
+                boundary:
+                  type: google_place
+                  place_id: ChIJIR9pFD7KvJURPaMYFhbLY48
+              - id: 14
+                name: Comuna 14
+                boundary:
+                  type: google_place
+                  place_id: ChIJy9bjmp61vJUR1kFz4gnyucs
+            empty:
+              value: []
+    '401':
+      description: Authentication failed or the authenticated user id could not be obtained from the request context.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/AuthErrorResponse'
+          examples:
+            invalidToken:
+              value:
+                error: invalid_token
+                message: Failed to validate JWT.
+            missingUserId:
+              value:
+                error: missing user id
+    '500':
+      description: The coverage-zone catalog could not be read.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            catalogUnavailable:
+              value:
+                error: coverage zone catalog is unavailable
