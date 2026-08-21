@@ -27,7 +27,6 @@ Feature: Registrar prestador con zonas de cobertura
             Then el sistema me indica que la zona de cobertura seleccionada no está disponible
             And el prestador "prestador@example.com" no queda registrado
 
-        @wip
         Scenario: 35.5.4-RPWCZ Rechazar el registro con una zona de cobertura deshabilitada
             Given que la zona de cobertura "Comuna 15" está deshabilitada
             When me registro como prestador con correo "prestador@example.com", nombre "Juan", apellido "Pérez", rubro "Plomería" y zona de cobertura "Comuna 15"
