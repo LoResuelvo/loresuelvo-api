@@ -16,7 +16,6 @@ Feature: Registrar prestador con zonas de cobertura
             Then el sistema confirma el registro
             And el prestador "prestador@example.com" queda registrado con la zona de cobertura "Comuna 6"
 
-        @wip
         Scenario: 35.5.2-RPWCZ Rechazar el registro sin zonas de cobertura
             When me registro como prestador con correo "prestador@example.com", nombre "Juan", apellido "Pérez", rubro "Plomería" y sin zonas de cobertura
             Then el sistema me indica que debo seleccionar al menos una zona de cobertura
