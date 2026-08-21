@@ -98,8 +98,13 @@ func (suite *testSuite) thereIsRegisteredProviderWithProfilePhoto(email, name, s
 		}
 	}
 
+	coverageZoneID, err := suite.ensureDefaultProviderCoverageZone()
+	if err != nil {
+		return err
+	}
+
 	resp, err := suite.postProviderRegistrationWithAuth0ID(auth0ID, providerRegistrationRequest{
-		Email: email, Name: name, Surname: surname, CategoryID: categoryID, ProfilePhotoFileID: fileID,
+		Email: email, Name: name, Surname: surname, CategoryID: categoryID, CoverageZoneIDs: []int{coverageZoneID}, ProfilePhotoFileID: fileID,
 	})
 	if err != nil {
 		return err

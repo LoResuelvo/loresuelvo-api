@@ -141,7 +141,7 @@ func TestRegisterProviderWithValidData(t *testing.T) {
 		"Perez",
 		1,
 		"profile-photo-file-id",
-		nil,
+		[]int{6},
 	)
 
 	require.NoError(t, err)
@@ -232,7 +232,7 @@ func TestRegisterProviderReturnsRepositorySaveError(t *testing.T) {
 		"Perez",
 		1,
 		"profile-photo-file-id",
-		nil,
+		[]int{6},
 	)
 
 	assert.Nil(t, createdProvider)
@@ -255,7 +255,7 @@ func TestRegisterProviderReturnsProfilePhotoURLResolutionErrorBeforeSaving(t *te
 		"Perez",
 		1,
 		"profile-photo-file-id",
-		nil,
+		[]int{6},
 	)
 
 	assert.Nil(t, createdProvider)
@@ -568,6 +568,29 @@ func TestRegisterProviderRequiresProfilePhoto(t *testing.T) {
 
 	assert.ErrorIs(t, err, filedomain.ErrProfilePhotoRequired)
 	assert.False(t, repository.saveCalled, "provider should not be saved without profile photo")
+}
+
+func TestRegisterProviderRequiresCoverageZone(t *testing.T) {
+	repository := &providerRepositoryMock{}
+	categoryFinder := categoryFinderWithExistingCategory()
+	profilePhotoValidator := &profilePhotoValidatorMock{profilePhotoURLsByFile: map[string]string{"profile-photo-file-id": "https://cdn/profile-photo.jpg"}}
+	providerManager := provider.NewService(repository, categoryFinder, profilePhotoValidator, nil)
+
+	createdProvider, err := providerManager.RegisterProvider(
+		context.Background(),
+		"auth0|ana",
+		"ana@example.com",
+		"Ana",
+		"Perez",
+		1,
+		"profile-photo-file-id",
+		nil,
+	)
+
+	assert.Nil(t, createdProvider)
+	assert.ErrorIs(t, err, coveragezone.ErrAtLeastOneRequired)
+	assert.False(t, repository.saveCalled, "provider should not be saved without coverage zones")
+	assert.Empty(t, profilePhotoValidator.resolvedFileIDs, "profile photo URL should not be resolved without coverage zones")
 }
 
 func TestRegisterProviderRejectsUnavailableProfilePhoto(t *testing.T) {

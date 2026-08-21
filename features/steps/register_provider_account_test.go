@@ -46,11 +46,17 @@ func (suite *testSuite) requestProviderAccountRegistration(email, name, surname,
 		return err
 	}
 
+	coverageZoneID, err := suite.ensureDefaultProviderCoverageZone()
+	if err != nil {
+		return err
+	}
+
 	if err := suite.requestProviderRegistration(providerRegistrationRequest{
 		Email:                  email,
 		Name:                   name,
 		Surname:                surname,
 		CategoryID:             categoryID,
+		CoverageZoneIDs:        []int{coverageZoneID},
 		CriminalRecordFile:     "criminal-record.pdf",
 		CUITCertificateFile:    "cuit-certificate.pdf",
 		BiometricValidationID:  "biometric-validation-approved",

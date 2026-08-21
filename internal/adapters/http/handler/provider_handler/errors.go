@@ -6,6 +6,7 @@ import (
 
 	httphandler "github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/category"
+	coveragezone "github.com/LoResuelvo/loresuelvo-api/internal/domain/coverage_zone"
 	filedomain "github.com/LoResuelvo/loresuelvo-api/internal/domain/file"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/provider"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/validator"
@@ -24,6 +25,11 @@ func handleRegisterProviderError(c *gin.Context, err error) {
 	}
 
 	if errors.Is(err, category.ErrIDRequired) || errors.Is(err, category.ErrDoesNotExist) {
+		httphandler.RespondError(c, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	if errors.Is(err, coveragezone.ErrAtLeastOneRequired) {
 		httphandler.RespondError(c, http.StatusBadRequest, err.Error())
 		return
 	}
