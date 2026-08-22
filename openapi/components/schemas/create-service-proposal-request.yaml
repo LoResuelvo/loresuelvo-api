@@ -5,6 +5,7 @@ required:
   - amount
   - scheduled_on
   - description
+  - estimated_duration_minutes
 properties:
   consumer_id:
     type: integer
@@ -27,4 +28,11 @@ properties:
     minLength: 1
     description: Human-readable description of the proposed service.
     example: Reparación de pérdida de agua en cocina con materiales incluidos.
+  estimated_duration_minutes:
+    type: integer
+    format: int32
+    minimum: 15
+    maximum: 1440
+    description: Estimated service duration in minutes.
+    example: 60
 additionalProperties: false

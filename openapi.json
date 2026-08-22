@@ -2724,7 +2724,8 @@
                                         "consumer_id": 1,
                                         "amount": "15000.50",
                                         "scheduled_on": "2026-07-05T12:30:00Z",
-                                        "description": "Reparación de pérdida de agua en cocina con materiales incluidos."
+                                        "description": "Reparación de pérdida de agua en cocina con materiales incluidos.",
+                                        "estimated_duration_minutes": 60
                                     }
                                 }
                             }
@@ -2749,6 +2750,7 @@
                                             "amount_cents": 1500050,
                                             "scheduled_on": "2026-07-05T12:30:00Z",
                                             "description": "Reparación de pérdida de agua en cocina con materiales incluidos.",
+                                            "estimated_duration_minutes": 60,
                                             "status": "pending",
                                             "booking_terms": {
                                                 "currency": "ARS",
@@ -5702,7 +5704,8 @@
                     "consumer_id",
                     "amount",
                     "scheduled_on",
-                    "description"
+                    "description",
+                    "estimated_duration_minutes"
                 ],
                 "properties": {
                     "consumer_id": {
@@ -5729,6 +5732,14 @@
                         "minLength": 1,
                         "description": "Human-readable description of the proposed service.",
                         "example": "Reparación de pérdida de agua en cocina con materiales incluidos."
+                    },
+                    "estimated_duration_minutes": {
+                        "type": "integer",
+                        "format": "int32",
+                        "minimum": 15,
+                        "maximum": 1440,
+                        "description": "Estimated service duration in minutes.",
+                        "example": 60
                     }
                 },
                 "additionalProperties": false
@@ -5744,6 +5755,7 @@
                     "amount_cents",
                     "scheduled_on",
                     "description",
+                    "estimated_duration_minutes",
                     "status",
                     "booking_terms"
                 ],
@@ -5787,6 +5799,14 @@
                     "description": {
                         "type": "string",
                         "example": "Reparación de pérdida de agua en cocina con materiales incluidos."
+                    },
+                    "estimated_duration_minutes": {
+                        "type": "integer",
+                        "format": "int32",
+                        "minimum": 15,
+                        "maximum": 1440,
+                        "description": "Estimated service duration in minutes.",
+                        "example": 60
                     },
                     "status": {
                         "type": "string",
@@ -7025,6 +7045,7 @@
                     "amount_cents",
                     "scheduled_on",
                     "description",
+                    "estimated_duration_minutes",
                     "status",
                     "created_on",
                     "counterpart",
@@ -7051,6 +7072,14 @@
                     },
                     "description": {
                         "type": "string"
+                    },
+                    "estimated_duration_minutes": {
+                        "type": "integer",
+                        "format": "int32",
+                        "minimum": 15,
+                        "maximum": 1440,
+                        "description": "Estimated service duration in minutes.",
+                        "example": 60
                     },
                     "status": {
                         "type": "string",
@@ -7157,6 +7186,14 @@
                         "minimum": 1,
                         "description": "Identifier of the resource referenced by the notification.",
                         "example": 10
+                    },
+                    "estimated_duration_minutes": {
+                        "type": "integer",
+                        "format": "int32",
+                        "minimum": 15,
+                        "maximum": 1440,
+                        "description": "Estimated service duration in minutes when the notification references a service proposal.",
+                        "example": 60
                     },
                     "read_at": {
                         "type": [

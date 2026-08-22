@@ -36,7 +36,11 @@ func (h *ServiceProposalHandler) CreateServiceProposal(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	serviceproposal, err := h.serviceProposalService.CreateServiceProposal(c.Request.Context(), auth0ID, req.ConsumerID, amountInCents, scheduledOnUTC, req.Description)
+	if req.EstimatedDurationMinutes == nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": serviceproposal.ErrEstimatedDurationRequired.Error()})
+		return
+	}
+	serviceproposal, err := h.serviceProposalService.CreateServiceProposal(c.Request.Context(), auth0ID, req.ConsumerID, amountInCents, scheduledOnUTC, req.Description, *req.EstimatedDurationMinutes)
 	if err != nil {
 		handleCreateServiceProposalError(c, err)
 		return

@@ -7,12 +7,13 @@ import (
 
 func serviceProposalCreationResponseFromDomain(proposal *serviceproposal.ServiceProposal) serviceProposalCreationResponse {
 	response := serviceProposalCreationResponse{
-		ID:           proposal.ID,
-		AmountCents:  proposal.BookingTerms.ServiceTotalCents(),
-		ScheduledOn:  proposal.ScheduledOn,
-		Description:  proposal.Description,
-		Status:       string(proposal.Status),
-		BookingTerms: bookingTermsResponseFromDomain(proposal.BookingTerms),
+		ID:                       proposal.ID,
+		AmountCents:              proposal.BookingTerms.ServiceTotalCents(),
+		ScheduledOn:              proposal.ScheduledOn,
+		Description:              proposal.Description,
+		Status:                   string(proposal.Status),
+		EstimatedDurationMinutes: proposal.EstimatedDurationMinutes,
+		BookingTerms:             bookingTermsResponseFromDomain(proposal.BookingTerms),
 	}
 
 	if proposal.Provider != nil {
@@ -48,15 +49,16 @@ func serviceProposalSummaryResponsesFromDomain(proposals []*serviceproposal.Serv
 			counterpartResponse.CategoryName = counterpartProvider.Categoryname()
 		}
 		responses = append(responses, serviceProposalSummaryResponse{
-			ID:             proposal.ID,
-			ConversationID: proposal.Conversation.ID(),
-			AmountCents:    proposal.BookingTerms.ServiceTotalCents(),
-			ScheduledOn:    proposal.ScheduledOn,
-			Description:    proposal.Description,
-			Status:         string(proposal.Status),
-			CreatedOn:      proposal.CreatedOn,
-			Counterpart:    counterpartResponse,
-			BookingTerms:   bookingTermsResponseFromDomain(proposal.BookingTerms),
+			ID:                       proposal.ID,
+			ConversationID:           proposal.Conversation.ID(),
+			AmountCents:              proposal.BookingTerms.ServiceTotalCents(),
+			ScheduledOn:              proposal.ScheduledOn,
+			Description:              proposal.Description,
+			Status:                   string(proposal.Status),
+			EstimatedDurationMinutes: proposal.EstimatedDurationMinutes,
+			CreatedOn:                proposal.CreatedOn,
+			Counterpart:              counterpartResponse,
+			BookingTerms:             bookingTermsResponseFromDomain(proposal.BookingTerms),
 		})
 	}
 	return responses, nil

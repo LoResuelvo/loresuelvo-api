@@ -53,13 +53,14 @@ func BuildNotificationEvent(notification *notification.Notification) ([]byte, er
 	event := realtimeNotificationEvent{
 		Type: "notification.created",
 		Notification: realtimeEventNotification{
-			ID:           notification.ID,
-			UserID:       notification.UserID,
-			Type:         string(notification.Type),
-			ResourceType: string(notification.ResourceType),
-			ResourceID:   notification.ResourceID,
-			ReadAt:       notification.ReadAt,
-			CreatedAt:    notification.CreatedAt,
+			ID:                       notification.ID,
+			UserID:                   notification.UserID,
+			Type:                     string(notification.Type),
+			ResourceType:             string(notification.ResourceType),
+			ResourceID:               notification.ResourceID,
+			EstimatedDurationMinutes: notification.EstimatedDurationMinutes,
+			ReadAt:                   notification.ReadAt,
+			CreatedAt:                notification.CreatedAt,
 		},
 	}
 	payload, err := json.Marshal(event)
@@ -76,11 +77,12 @@ type realtimeNotificationEvent struct {
 }
 
 type realtimeEventNotification struct {
-	ID           int        `json:"id"`
-	UserID       int        `json:"user_id"`
-	Type         string     `json:"type"`
-	ResourceType string     `json:"resource_type"`
-	ResourceID   int        `json:"resource_id"`
-	ReadAt       *time.Time `json:"read_at"`
-	CreatedAt    time.Time  `json:"created_at"`
+	ID                       int        `json:"id"`
+	UserID                   int        `json:"user_id"`
+	Type                     string     `json:"type"`
+	ResourceType             string     `json:"resource_type"`
+	ResourceID               int        `json:"resource_id"`
+	EstimatedDurationMinutes int        `json:"estimated_duration_minutes,omitempty"`
+	ReadAt                   *time.Time `json:"read_at"`
+	CreatedAt                time.Time  `json:"created_at"`
 }

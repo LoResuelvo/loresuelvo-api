@@ -54,6 +54,7 @@ post:
               amount: '15000.50'
               scheduled_on: '2026-07-05T12:30:00Z'
               description: Reparación de pérdida de agua en cocina con materiales incluidos.
+              estimated_duration_minutes: 60
   responses:
     '201':
       description: Service proposal created successfully.
@@ -71,6 +72,7 @@ post:
                 amount_cents: 1500050
                 scheduled_on: '2026-07-05T12:30:00Z'
                 description: Reparación de pérdida de agua en cocina con materiales incluidos.
+                estimated_duration_minutes: 60
                 status: pending
                 booking_terms:
                   currency: ARS

@@ -45,12 +45,13 @@ func TestNotificationNotificatorSendsNotificationToConnectedConsumer(t *testing.
 	notificator := NewNotificationNotificator(hub, notificationAuthIDFinderStub{authID: authID, role: consumer.Role})
 	createdAt := time.Date(2026, 7, 4, 13, 0, 0, 0, time.UTC)
 	notificationToSend := &notification.Notification{
-		ID:           5,
-		UserID:       10,
-		Type:         notification.TypeServiceProposalReceived,
-		ResourceType: notification.ResourceServiceProposal,
-		ResourceID:   99,
-		CreatedAt:    createdAt,
+		ID:                       5,
+		UserID:                   10,
+		Type:                     notification.TypeServiceProposalReceived,
+		ResourceType:             notification.ResourceServiceProposal,
+		ResourceID:               99,
+		EstimatedDurationMinutes: 90,
+		CreatedAt:                createdAt,
 	}
 
 	err := notificator.Notify(context.Background(), notificationToSend)
@@ -65,6 +66,7 @@ func TestNotificationNotificatorSendsNotificationToConnectedConsumer(t *testing.
 	assert.Equal(t, string(notificationToSend.Type), event.Notification.Type)
 	assert.Equal(t, string(notificationToSend.ResourceType), event.Notification.ResourceType)
 	assert.Equal(t, notificationToSend.ResourceID, event.Notification.ResourceID)
+	assert.Equal(t, notificationToSend.EstimatedDurationMinutes, event.Notification.EstimatedDurationMinutes)
 	assert.Nil(t, event.Notification.ReadAt)
 	assert.Equal(t, createdAt, event.Notification.CreatedAt)
 }

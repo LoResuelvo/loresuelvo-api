@@ -26,15 +26,16 @@ const (
 var defaultServiceProposalScheduledOn = time.Date(2026, time.July, 5, 12, 30, 0, 0, time.UTC)
 
 type serviceProposalSummaryResponse struct {
-	ID             int                                `json:"id"`
-	ConversationID int                                `json:"conversation_id"`
-	AmountCents    int64                              `json:"amount_cents"`
-	ScheduledOn    time.Time                          `json:"scheduled_on"`
-	Description    string                             `json:"description"`
-	Status         string                             `json:"status"`
-	CreatedOn      time.Time                          `json:"created_on"`
-	Counterpart    serviceProposalCounterpartResponse `json:"counterpart"`
-	BookingTerms   bookingTermsResponse               `json:"booking_terms"`
+	ID                       int                                `json:"id"`
+	ConversationID           int                                `json:"conversation_id"`
+	AmountCents              int64                              `json:"amount_cents"`
+	ScheduledOn              time.Time                          `json:"scheduled_on"`
+	Description              string                             `json:"description"`
+	Status                   string                             `json:"status"`
+	EstimatedDurationMinutes int                                `json:"estimated_duration_minutes"`
+	CreatedOn                time.Time                          `json:"created_on"`
+	Counterpart              serviceProposalCounterpartResponse `json:"counterpart"`
+	BookingTerms             bookingTermsResponse               `json:"booking_terms"`
 }
 
 type serviceProposalCounterpartResponse struct {
@@ -235,13 +236,14 @@ func (suite *testSuite) saveServiceProposalFixture(
 		return fmt.Errorf("calculating service proposal fixture booking terms: %w", err)
 	}
 	savedProposal, err := repository.Save(&serviceproposal.ServiceProposal{
-		Provider:     participants.provider,
-		Consumer:     participants.consumer,
-		Conversation: participants.conversation,
-		BookingTerms: bookingTerms,
-		ScheduledOn:  scheduledOn,
-		Description:  description,
-		Status:       status,
+		Provider:                 participants.provider,
+		Consumer:                 participants.consumer,
+		Conversation:             participants.conversation,
+		BookingTerms:             bookingTerms,
+		ScheduledOn:              scheduledOn,
+		Description:              description,
+		EstimatedDurationMinutes: 60,
+		Status:                   status,
 	})
 	if err != nil {
 		return fmt.Errorf("saving service proposal fixture: %w", err)

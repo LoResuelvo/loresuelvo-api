@@ -203,9 +203,10 @@ func (suite *testSuite) tryStartMercadoPagoConnectionForProvider(_ string) error
 
 func (suite *testSuite) trySendServiceProposalWithoutMercadoPagoAccount(consumerEmail string) error {
 	return suite.requestServiceProposalToConsumer(consumerEmail, serviceProposalPayload{
-		amount:      "15000.50",
-		scheduledOn: "2026-07-21T12:30:00Z",
-		description: "Servicio acordado entre consumidor y prestador.",
+		amount:                   "15000.50",
+		scheduledOn:              "2026-07-21T12:30:00Z",
+		description:              "Servicio acordado entre consumidor y prestador.",
+		estimatedDurationMinutes: 60,
 	})
 }
 
