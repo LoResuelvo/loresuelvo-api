@@ -32,7 +32,7 @@ func registerConnectGoogleCalendarSteps(sc *godog.ScenarioContext, suite *testSu
 	sc.Step(`^autorizo el acceso de Google Calendar$`, suite.authorizeGoogleCalendarAccess)
 	sc.Step(`^rechazo autorizar el acceso de Google Calendar$`, suite.rejectGoogleCalendarAccess)
 	sc.Step(`^que el consumidor "([^"]*)" ya tiene Google Calendar vinculado$`, suite.consumerAlreadyHasGoogleCalendarConnection)
-	sc.Step(`^vuelvo a vincular Google Calendar desde la web$`, suite.startGoogleCalendarWebAuthorization)
+	sc.Step(`^vuelvo a vincular Google Calendar desde la web$`, suite.reconnectGoogleCalendarWebAuthorization)
 	sc.Step(`^vinculo Google Calendar desde Android con el server auth code "([^"]*)"$`, suite.connectGoogleCalendarFromAndroid)
 	sc.Step(`^el sistema confirma la vinculación de Google Calendar$`, suite.systemConfirmsGoogleCalendarConnection)
 	sc.Step(`^el sistema informa que la autorización de Google Calendar fue rechazada$`, suite.systemReportsGoogleCalendarAuthorizationRejected)
@@ -46,6 +46,13 @@ type calendarConnectionCounter interface {
 
 func (suite *testSuite) startGoogleCalendarWebAuthorization() error {
 	return suite.requestGoogleCalendar(http.MethodPost, googleCalendarAuthorizationPath, true)
+}
+
+func (suite *testSuite) reconnectGoogleCalendarWebAuthorization() error {
+	if err := suite.startGoogleCalendarWebAuthorization(); err != nil {
+		return err
+	}
+	return suite.systemReturnsGoogleCalendarWebAuthorization()
 }
 
 func (suite *testSuite) systemReturnsGoogleCalendarWebAuthorization() error {
