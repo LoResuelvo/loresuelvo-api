@@ -10,7 +10,9 @@ import (
 	chatbotadapter "github.com/LoResuelvo/loresuelvo-api/internal/adapters/chatbot"
 	clockadapter "github.com/LoResuelvo/loresuelvo-api/internal/adapters/clock"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/cryptography"
+	googlecalendar "github.com/LoResuelvo/loresuelvo-api/internal/adapters/google_calendar"
 	httpadapter "github.com/LoResuelvo/loresuelvo-api/internal/adapters/http"
+	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/calendar_connection_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/category_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/consumer_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/conversation_handler"
@@ -32,6 +34,7 @@ import (
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/realtime"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/scheduler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/storage"
+	calendarconnection "github.com/LoResuelvo/loresuelvo-api/internal/domain/calendar_connection"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/category"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/consumer"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/conversation"
@@ -53,19 +56,20 @@ type Dependencies struct {
 	WorkOrderService         *workorder.Service
 	UrgentWorkOrderScheduler *scheduler.Scheduler
 
-	CategoryHandler        *category_handler.CategoryHandler
-	CoverageZoneHandler    *coverage_zone_handler.CoverageZoneHandler
-	ConsumerHandler        *consumer_handler.ConsumerHandler
-	ProviderHandler        *provider_handler.ProviderHandler
-	ConversationHandler    *conversation_handler.ConversationHandler
-	JobRequestHandler      *job_request_handler.JobRequestHandler
-	PaymentAccountHandler  *payment_account_handler.PaymentAccountHandler
-	PaymentHandler         *payment_handler.PaymentHandler
-	UserHandler            *user_handler.UserHandler
-	FileHandler            *file_handler.FileHandler
-	ServiceProposalHandler *service_proposal_handler.ServiceProposalHandler
-	WorkOrderHandler       *work_order_handler.WorkOrderHandler
-	TestHandler            *test_handler.TestHandler
+	CategoryHandler           *category_handler.CategoryHandler
+	CalendarConnectionHandler *calendar_connection_handler.CalendarConnectionHandler
+	CoverageZoneHandler       *coverage_zone_handler.CoverageZoneHandler
+	ConsumerHandler           *consumer_handler.ConsumerHandler
+	ProviderHandler           *provider_handler.ProviderHandler
+	ConversationHandler       *conversation_handler.ConversationHandler
+	JobRequestHandler         *job_request_handler.JobRequestHandler
+	PaymentAccountHandler     *payment_account_handler.PaymentAccountHandler
+	PaymentHandler            *payment_handler.PaymentHandler
+	UserHandler               *user_handler.UserHandler
+	FileHandler               *file_handler.FileHandler
+	ServiceProposalHandler    *service_proposal_handler.ServiceProposalHandler
+	WorkOrderHandler          *work_order_handler.WorkOrderHandler
+	TestHandler               *test_handler.TestHandler
 
 	Hub              *realtime.Hub
 	RealtimeHandler  *realtime.Handler
@@ -76,22 +80,23 @@ type Dependencies struct {
 
 func (dependencies *Dependencies) RouterConfig(auth0Validator *validator.Validator, logger *slog.Logger) httpadapter.RouterConfig {
 	return httpadapter.RouterConfig{
-		CategoryHandler:        dependencies.CategoryHandler,
-		CoverageZoneHandler:    dependencies.CoverageZoneHandler,
-		ConsumerHandler:        dependencies.ConsumerHandler,
-		ProviderHandler:        dependencies.ProviderHandler,
-		ConversationHandler:    dependencies.ConversationHandler,
-		JobRequestHandler:      dependencies.JobRequestHandler,
-		PaymentAccountHandler:  dependencies.PaymentAccountHandler,
-		PaymentHandler:         dependencies.PaymentHandler,
-		UserHandler:            dependencies.UserHandler,
-		FileHandler:            dependencies.FileHandler,
-		ServiceProposalHandler: dependencies.ServiceProposalHandler,
-		WorkOrderHandler:       dependencies.WorkOrderHandler,
-		TestHandler:            dependencies.TestHandler,
-		RealtimeHandler:        dependencies.RealtimeHandler,
-		Auth0Validator:         auth0Validator,
-		Logger:                 logger,
+		CategoryHandler:           dependencies.CategoryHandler,
+		CalendarConnectionHandler: dependencies.CalendarConnectionHandler,
+		CoverageZoneHandler:       dependencies.CoverageZoneHandler,
+		ConsumerHandler:           dependencies.ConsumerHandler,
+		ProviderHandler:           dependencies.ProviderHandler,
+		ConversationHandler:       dependencies.ConversationHandler,
+		JobRequestHandler:         dependencies.JobRequestHandler,
+		PaymentAccountHandler:     dependencies.PaymentAccountHandler,
+		PaymentHandler:            dependencies.PaymentHandler,
+		UserHandler:               dependencies.UserHandler,
+		FileHandler:               dependencies.FileHandler,
+		ServiceProposalHandler:    dependencies.ServiceProposalHandler,
+		WorkOrderHandler:          dependencies.WorkOrderHandler,
+		TestHandler:               dependencies.TestHandler,
+		RealtimeHandler:           dependencies.RealtimeHandler,
+		Auth0Validator:            auth0Validator,
+		Logger:                    logger,
 	}
 }
 
@@ -108,6 +113,15 @@ func NewDependenciesWithChatbot(database *sql.DB, chatbot conversation.Chatbot) 
 	if err != nil {
 		return nil, fmt.Errorf("configuring payment account credential encryption: %w", err)
 	}
+	calendarOAuthConnector, err := googlecalendar.NewOAuthConnectorFromEnv()
+	if err != nil {
+		return nil, err
+	}
+	calendarCredentialCipher, err := cryptography.NewCalendarCredentialCipherFromEnv()
+	if err != nil {
+		return nil, fmt.Errorf("configuring calendar credential encryption: %w", err)
+	}
+	calendarHandlerConfig := calendar_connection_handler.NewConfigFromEnv()
 	paymentAccountHandlerConfig, err := payment_account_handler.NewConfigFromEnv()
 	if err != nil {
 		return nil, err
@@ -120,7 +134,7 @@ func NewDependenciesWithChatbot(database *sql.DB, chatbot conversation.Chatbot) 
 	if err != nil {
 		return nil, err
 	}
-	return NewDependenciesWithPaymentAccountAdapters(
+	return NewDependenciesWithPaymentAccountAndCalendarAdapters(
 		database,
 		chatbot,
 		paymentAccountOAuthConnector,
@@ -129,6 +143,9 @@ func NewDependenciesWithChatbot(database *sql.DB, chatbot conversation.Chatbot) 
 		credentialCipher,
 		cryptography.NewSecureSecretGenerator(),
 		paymentAccountHandlerConfig,
+		calendarOAuthConnector,
+		calendarCredentialCipher,
+		calendarHandlerConfig,
 	), nil
 }
 
@@ -141,6 +158,37 @@ func NewDependenciesWithPaymentAccountAdapters(
 	credentialProtector paymentaccount.CredentialProtector,
 	secretGenerator paymentaccount.SecretGenerator,
 	paymentAccountHandlerConfig payment_account_handler.Config,
+) *Dependencies {
+	return NewDependenciesWithPaymentAccountAndCalendarAdapters(
+		database,
+		chatbot,
+		paymentAccountOAuthConnector,
+		paymentGateway,
+		webhookVerifier,
+		credentialProtector,
+		secretGenerator,
+		paymentAccountHandlerConfig,
+		googlecalendar.NewFakeOAuthClient(),
+		credentialProtector,
+		calendar_connection_handler.Config{
+			ConnectionSuccessURL:   "/me",
+			ConnectionCancelledURL: "/me",
+		},
+	)
+}
+
+func NewDependenciesWithPaymentAccountAndCalendarAdapters(
+	database *sql.DB,
+	chatbot conversation.Chatbot,
+	paymentAccountOAuthConnector paymentaccount.OAuthConnector,
+	paymentGateway payment.Gateway,
+	webhookVerifier payment_handler.WebhookVerifier,
+	credentialProtector paymentaccount.CredentialProtector,
+	secretGenerator paymentaccount.SecretGenerator,
+	paymentAccountHandlerConfig payment_account_handler.Config,
+	calendarOAuthConnector calendarconnection.OAuthConnector,
+	calendarCredentialProtector calendarconnection.CredentialProtector,
+	calendarHandlerConfig calendar_connection_handler.Config,
 ) *Dependencies {
 	persistence := NewPersistenceAdapters(database)
 
@@ -204,6 +252,15 @@ func NewDependenciesWithPaymentAccountAdapters(
 		secretGenerator,
 		systemClock,
 	)
+	calendarConnectionService := calendarconnection.NewService(
+		persistence.UserRepository,
+		persistence.CalendarAuthorizationAttemptRepository,
+		persistence.CalendarConnectionRepository,
+		calendarOAuthConnector,
+		calendarCredentialProtector,
+		cryptography.NewSecureSecretGenerator(),
+		systemClock,
+	)
 	paymentService := payment.NewService(
 		persistence.PaymentIntentRepository,
 		persistence.PaymentTransactionRepository,
@@ -244,25 +301,26 @@ func NewDependenciesWithPaymentAccountAdapters(
 	_ = cancel // TODO: wire shutdown signal to cancel context
 
 	return &Dependencies{
-		Persistence:              persistence,
-		WorkOrderService:         workOrderService,
-		UrgentWorkOrderScheduler: urgentWorkOrderScheduler,
-		CategoryHandler:          category_handler.NewCategoryHandler(categoryService),
-		CoverageZoneHandler:      coverage_zone_handler.NewCoverageZoneHandler(coverageZoneService),
-		ConsumerHandler:          consumer_handler.NewConsumerHandler(consumerService),
-		ProviderHandler:          provider_handler.NewProviderHandler(providerService),
-		ConversationHandler:      conversation_handler.NewConversationHandler(conversationService),
-		JobRequestHandler:        job_request_handler.NewJobRequestHandler(jobRequestService),
-		PaymentAccountHandler:    payment_account_handler.NewPaymentAccountHandler(paymentAccountService, paymentAccountHandlerConfig),
-		PaymentHandler:           payment_handler.NewPaymentHandler(paymentService, webhookVerifier),
-		UserHandler:              user_handler.NewUserHandler(userService),
-		FileHandler:              file_handler.NewFileHandler(fileService),
-		ServiceProposalHandler:   service_proposal_handler.NewServiceProposalHandler(servicePorposalService),
-		WorkOrderHandler:         work_order_handler.NewWorkOrderHandler(workOrderService),
-		TestHandler:              test_handler.NewTestHandler(systemClock),
-		Hub:                      hub,
-		RealtimeHandler:          realtimeHandler,
-		MessagePublisher:         messagePublisher,
-		Clock:                    systemClock,
+		Persistence:               persistence,
+		WorkOrderService:          workOrderService,
+		UrgentWorkOrderScheduler:  urgentWorkOrderScheduler,
+		CategoryHandler:           category_handler.NewCategoryHandler(categoryService),
+		CalendarConnectionHandler: calendar_connection_handler.NewCalendarConnectionHandler(calendarConnectionService, calendarHandlerConfig),
+		CoverageZoneHandler:       coverage_zone_handler.NewCoverageZoneHandler(coverageZoneService),
+		ConsumerHandler:           consumer_handler.NewConsumerHandler(consumerService),
+		ProviderHandler:           provider_handler.NewProviderHandler(providerService),
+		ConversationHandler:       conversation_handler.NewConversationHandler(conversationService),
+		JobRequestHandler:         job_request_handler.NewJobRequestHandler(jobRequestService),
+		PaymentAccountHandler:     payment_account_handler.NewPaymentAccountHandler(paymentAccountService, paymentAccountHandlerConfig),
+		PaymentHandler:            payment_handler.NewPaymentHandler(paymentService, webhookVerifier),
+		UserHandler:               user_handler.NewUserHandler(userService, calendarConnectionService),
+		FileHandler:               file_handler.NewFileHandler(fileService),
+		ServiceProposalHandler:    service_proposal_handler.NewServiceProposalHandler(servicePorposalService),
+		WorkOrderHandler:          work_order_handler.NewWorkOrderHandler(workOrderService),
+		TestHandler:               test_handler.NewTestHandler(systemClock),
+		Hub:                       hub,
+		RealtimeHandler:           realtimeHandler,
+		MessagePublisher:          messagePublisher,
+		Clock:                     systemClock,
 	}
 }

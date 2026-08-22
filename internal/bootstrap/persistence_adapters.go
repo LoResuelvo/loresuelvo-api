@@ -7,26 +7,28 @@ import (
 )
 
 type PersistenceAdapters struct {
-	UserRepository                 *repositories.UserRepository
-	CategoryRepository             *repositories.CategoryRepository
-	CoverageZoneRepository         *repositories.CoverageZoneRepository
-	ConversationRepository         *repositories.ConversationRepository
-	MessageRepository              *repositories.MessageRepository
-	MessageImageRepository         *repositories.MessageImageRepository
-	MessageAudioRepository         *repositories.MessageAudioRepository
-	MessageVideoRepository         *repositories.MessageVideoRepository
-	JobRequestRepository           *repositories.JobRequestRepository
-	ServiceProposalRepository      *repositories.ServiceProposalRepository
-	ConversationReader             *repositories.ConversationReader
-	FileRepository                 *repositories.FileRepository
-	NotificationRepository         *repositories.NotificationRepository
-	WorkOrderRepository            *repositories.WorkOrderRepository
-	PaymentAccountRepository       *repositories.PaymentAccountRepository
-	PaymentIntentRepository        *repositories.PaymentIntentRepository
-	PaymentTransactionRepository   *repositories.PaymentTransactionRepository
-	PaymentUnitOfWork              *repositories.PaymentUnitOfWork
-	WorkOrderUnitOfWork            *repositories.WorkOrderUnitOfWork
-	AuthorizationAttemptRepository *repositories.AuthorizationAttemptRepository
+	UserRepository                         *repositories.UserRepository
+	CategoryRepository                     *repositories.CategoryRepository
+	CoverageZoneRepository                 *repositories.CoverageZoneRepository
+	ConversationRepository                 *repositories.ConversationRepository
+	MessageRepository                      *repositories.MessageRepository
+	MessageImageRepository                 *repositories.MessageImageRepository
+	MessageAudioRepository                 *repositories.MessageAudioRepository
+	MessageVideoRepository                 *repositories.MessageVideoRepository
+	JobRequestRepository                   *repositories.JobRequestRepository
+	ServiceProposalRepository              *repositories.ServiceProposalRepository
+	ConversationReader                     *repositories.ConversationReader
+	FileRepository                         *repositories.FileRepository
+	NotificationRepository                 *repositories.NotificationRepository
+	WorkOrderRepository                    *repositories.WorkOrderRepository
+	PaymentAccountRepository               *repositories.PaymentAccountRepository
+	PaymentIntentRepository                *repositories.PaymentIntentRepository
+	PaymentTransactionRepository           *repositories.PaymentTransactionRepository
+	PaymentUnitOfWork                      *repositories.PaymentUnitOfWork
+	WorkOrderUnitOfWork                    *repositories.WorkOrderUnitOfWork
+	AuthorizationAttemptRepository         *repositories.AuthorizationAttemptRepository
+	CalendarAuthorizationAttemptRepository *repositories.GoogleCalendarAuthorizationAttemptRepository
+	CalendarConnectionRepository           *repositories.GoogleCalendarConnectionRepository
 }
 
 func NewPersistenceAdapters(database *sql.DB) *PersistenceAdapters {
@@ -64,26 +66,30 @@ func NewPersistenceAdapters(database *sql.DB) *PersistenceAdapters {
 	)
 	authorizationAttemptRepository := repositories.NewAuthorizationAttemptRepository(database)
 	paymentAccountRepository := repositories.NewPaymentAccountRepository(database, authorizationAttemptRepository)
+	calendarAuthorizationAttemptRepository := repositories.NewGoogleCalendarAuthorizationAttemptRepository(database)
+	calendarConnectionRepository := repositories.NewGoogleCalendarConnectionRepository(database, calendarAuthorizationAttemptRepository)
 	return &PersistenceAdapters{
-		UserRepository:                 userRepository,
-		CategoryRepository:             categoryRepository,
-		CoverageZoneRepository:         coverageZoneRepository,
-		ConversationRepository:         conversationRepository,
-		MessageRepository:              messageRepository,
-		MessageImageRepository:         messageImageRepository,
-		MessageAudioRepository:         messageAudioRepository,
-		MessageVideoRepository:         messageVideoRepository,
-		JobRequestRepository:           jobRequestRepository,
-		ServiceProposalRepository:      serviceProposalRepository,
-		ConversationReader:             conversationReader,
-		FileRepository:                 fileRepository,
-		NotificationRepository:         notificationRepository,
-		WorkOrderRepository:            workOrderRepository,
-		PaymentAccountRepository:       paymentAccountRepository,
-		PaymentIntentRepository:        paymentIntentRepository,
-		PaymentTransactionRepository:   paymentTransactionRepository,
-		PaymentUnitOfWork:              paymentUnitOfWork,
-		WorkOrderUnitOfWork:            workOrderUnitOfWork,
-		AuthorizationAttemptRepository: authorizationAttemptRepository,
+		UserRepository:                         userRepository,
+		CategoryRepository:                     categoryRepository,
+		CoverageZoneRepository:                 coverageZoneRepository,
+		ConversationRepository:                 conversationRepository,
+		MessageRepository:                      messageRepository,
+		MessageImageRepository:                 messageImageRepository,
+		MessageAudioRepository:                 messageAudioRepository,
+		MessageVideoRepository:                 messageVideoRepository,
+		JobRequestRepository:                   jobRequestRepository,
+		ServiceProposalRepository:              serviceProposalRepository,
+		ConversationReader:                     conversationReader,
+		FileRepository:                         fileRepository,
+		NotificationRepository:                 notificationRepository,
+		WorkOrderRepository:                    workOrderRepository,
+		PaymentAccountRepository:               paymentAccountRepository,
+		PaymentIntentRepository:                paymentIntentRepository,
+		PaymentTransactionRepository:           paymentTransactionRepository,
+		PaymentUnitOfWork:                      paymentUnitOfWork,
+		WorkOrderUnitOfWork:                    workOrderUnitOfWork,
+		AuthorizationAttemptRepository:         authorizationAttemptRepository,
+		CalendarAuthorizationAttemptRepository: calendarAuthorizationAttemptRepository,
+		CalendarConnectionRepository:           calendarConnectionRepository,
 	}
 }
