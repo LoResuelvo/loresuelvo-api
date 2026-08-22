@@ -1,6 +1,7 @@
 package steps_test
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -13,6 +14,7 @@ import (
 
 const (
 	googleCalendarAuthorizationPath = "/me/calendar-connection/authorizations"
+	googleCalendarConnectionPath    = "/me/calendar-connection"
 	googleCalendarCallbackPath      = "/oauth/google-calendar/callback"
 	googleCalendarEventsOwnedScope  = "https://www.googleapis.com/auth/calendar.events.owned"
 )
@@ -27,6 +29,7 @@ func registerConnectGoogleCalendarSteps(sc *godog.ScenarioContext, suite *testSu
 	sc.Step(`^el sistema devuelve una autorización web de Google Calendar$`, suite.systemReturnsGoogleCalendarWebAuthorization)
 	sc.Step(`^la autorización solicita el permiso de eventos propios de Google Calendar$`, suite.googleCalendarAuthorizationRequestsOwnedEvents)
 	sc.Step(`^autorizo el acceso de Google Calendar$`, suite.authorizeGoogleCalendarAccess)
+	sc.Step(`^vinculo Google Calendar desde Android con el server auth code "([^"]*)"$`, suite.connectGoogleCalendarFromAndroid)
 	sc.Step(`^el sistema confirma la vinculación de Google Calendar$`, suite.systemConfirmsGoogleCalendarConnection)
 	sc.Step(`^el perfil informa el estado de Google Calendar "([^"]*)"$`, suite.profileReportsGoogleCalendarStatus)
 }
@@ -91,7 +94,19 @@ func (suite *testSuite) authorizeGoogleCalendarAccess() error {
 }
 
 func (suite *testSuite) systemConfirmsGoogleCalendarConnection() error {
-	return suite.lastResponseShouldHaveStatusCode(http.StatusSeeOther)
+	if suite.lastStatus != http.StatusSeeOther && suite.lastStatus != http.StatusCreated {
+		return fmt.Errorf("expected Google Calendar connection confirmation status 201 or 303, got %d with body %s", suite.lastStatus, string(suite.lastBody))
+	}
+	return nil
+}
+
+func (suite *testSuite) connectGoogleCalendarFromAndroid(serverAuthCode string) error {
+	return suite.requestGoogleCalendarWithBody(
+		http.MethodPost,
+		googleCalendarConnectionPath,
+		true,
+		map[string]string{"server_auth_code": serverAuthCode},
+	)
 }
 
 func (suite *testSuite) profileReportsGoogleCalendarStatus(expectedStatus string) error {
@@ -112,12 +127,30 @@ func (suite *testSuite) profileReportsGoogleCalendarStatus(expectedStatus string
 }
 
 func (suite *testSuite) requestGoogleCalendar(method, path string, authenticated bool) error {
-	httpRequest, err := http.NewRequest(method, suite.server.URL+path, nil)
+	return suite.requestGoogleCalendarWithBody(method, path, authenticated, nil)
+}
+
+func (suite *testSuite) requestGoogleCalendarWithBody(method, path string, authenticated bool, payload any) error {
+	var requestBody *bytes.Reader
+	if payload == nil {
+		requestBody = bytes.NewReader(nil)
+	} else {
+		encodedPayload, err := json.Marshal(payload)
+		if err != nil {
+			return fmt.Errorf("encoding Google Calendar request body: %w", err)
+		}
+		requestBody = bytes.NewReader(encodedPayload)
+	}
+
+	httpRequest, err := http.NewRequest(method, suite.server.URL+path, requestBody)
 	if err != nil {
 		return err
 	}
 	if authenticated && suite.currentAuth0ID != "" {
 		httpRequest.Header.Set("Authorization", "Bearer "+suite.tokenBuilder.BuildToken(suite.currentAuth0ID, nil))
+	}
+	if payload != nil {
+		httpRequest.Header.Set("Content-Type", "application/json")
 	}
 
 	client := &http.Client{CheckRedirect: func(_ *http.Request, _ []*http.Request) error {
