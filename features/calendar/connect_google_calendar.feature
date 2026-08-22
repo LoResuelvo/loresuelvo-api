@@ -3,7 +3,6 @@ Feature: Vincular Google Calendar
     quiero vincular mi Google Calendar
     para que el sistema pueda usarlo en funcionalidades futuras
 
-    @wip
     Scenario: 57.1-CGC Un consumidor vincula Calendar desde la web
         Given que existe un consumidor registrado con correo "ana@example.com", nombre "Ana" y apellido "Pérez" sin foto de perfil
         And que estoy autenticado como consumidor "ana@example.com"

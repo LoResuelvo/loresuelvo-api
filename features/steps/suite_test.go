@@ -42,6 +42,7 @@ type testSuite struct {
 	notificationRepository       *repositories.NotificationRepository
 	workOrderRepository          *repositories.WorkOrderRepository
 	paymentAccountRepository     *repositories.PaymentAccountRepository
+	calendarConnectionRepository *repositories.GoogleCalendarConnectionRepository
 	paymentIntentRepository      *repositories.PaymentIntentRepository
 	paymentTransactionRepository *repositories.PaymentTransactionRepository
 	urgentWorkOrderScheduler     *scheduler.Scheduler
@@ -179,6 +180,10 @@ func (s *testSuite) cleanup() error {
 
 	if err := s.paymentAccountRepository.DeleteAll(); err != nil {
 		return fmt.Errorf("could not clean payment accounts: %w", err)
+	}
+
+	if err := s.calendarConnectionRepository.DeleteAll(); err != nil {
+		return fmt.Errorf("could not clean calendar connections: %w", err)
 	}
 
 	if err := s.jobRequestRepository.DeleteAll(); err != nil {
@@ -337,6 +342,7 @@ func newTestSuite(tb testing.TB, database *sql.DB) *testSuite {
 		notificationRepository:       dependencies.Persistence.NotificationRepository,
 		workOrderRepository:          dependencies.Persistence.WorkOrderRepository,
 		paymentAccountRepository:     dependencies.Persistence.PaymentAccountRepository,
+		calendarConnectionRepository: dependencies.Persistence.CalendarConnectionRepository,
 		paymentIntentRepository:      dependencies.Persistence.PaymentIntentRepository,
 		paymentTransactionRepository: dependencies.Persistence.PaymentTransactionRepository,
 		urgentWorkOrderScheduler:     dependencies.UrgentWorkOrderScheduler,
