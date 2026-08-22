@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/cucumber/godog"
 )
@@ -33,6 +34,8 @@ func registerConnectGoogleCalendarSteps(sc *godog.ScenarioContext, suite *testSu
 	sc.Step(`^rechazo autorizar el acceso de Google Calendar$`, suite.rejectGoogleCalendarAccess)
 	sc.Step(`^que el consumidor "([^"]*)" ya tiene Google Calendar vinculado$`, suite.consumerAlreadyHasGoogleCalendarConnection)
 	sc.Step(`^vuelvo a vincular Google Calendar desde la web$`, suite.reconnectGoogleCalendarWebAuthorization)
+	sc.Step(`^que la conexión de Google Calendar de "([^"]*)" requiere atención$`, suite.googleCalendarConnectionRequiresAttention)
+	sc.Step(`^vuelvo a autorizar Google Calendar desde la web$`, suite.reconnectGoogleCalendarWebAuthorization)
 	sc.Step(`^vinculo Google Calendar desde Android con el server auth code "([^"]*)"$`, suite.connectGoogleCalendarFromAndroid)
 	sc.Step(`^el sistema confirma la vinculación de Google Calendar$`, suite.systemConfirmsGoogleCalendarConnection)
 	sc.Step(`^el sistema informa que la autorización de Google Calendar fue rechazada$`, suite.systemReportsGoogleCalendarAuthorizationRejected)
@@ -135,6 +138,25 @@ func (suite *testSuite) consumerAlreadyHasGoogleCalendarConnection(email string)
 		return err
 	}
 	return suite.systemConfirmsGoogleCalendarConnection()
+}
+
+func (suite *testSuite) googleCalendarConnectionRequiresAttention(email string) error {
+	if err := suite.consumerAlreadyHasGoogleCalendarConnection(email); err != nil {
+		return err
+	}
+	userID, err := suite.userRepository.FindIDByEmail(email)
+	if err != nil {
+		return fmt.Errorf("finding consumer %q: %w", email, err)
+	}
+	connection, err := suite.calendarConnectionRepository.FindByUserID(context.Background(), userID)
+	if err != nil {
+		return fmt.Errorf("finding Google Calendar connection for %q: %w", email, err)
+	}
+	connection.MarkActionRequired(time.Now().UTC())
+	if err := suite.calendarConnectionRepository.Save(context.Background(), connection); err != nil {
+		return fmt.Errorf("marking Google Calendar connection for %q as requiring attention: %w", email, err)
+	}
+	return nil
 }
 
 func (suite *testSuite) consumerHasSingleGoogleCalendarConnection(email string) error {
