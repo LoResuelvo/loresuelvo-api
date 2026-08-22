@@ -29,8 +29,10 @@ func registerConnectGoogleCalendarSteps(sc *godog.ScenarioContext, suite *testSu
 	sc.Step(`^el sistema devuelve una autorización web de Google Calendar$`, suite.systemReturnsGoogleCalendarWebAuthorization)
 	sc.Step(`^la autorización solicita el permiso de eventos propios de Google Calendar$`, suite.googleCalendarAuthorizationRequestsOwnedEvents)
 	sc.Step(`^autorizo el acceso de Google Calendar$`, suite.authorizeGoogleCalendarAccess)
+	sc.Step(`^rechazo autorizar el acceso de Google Calendar$`, suite.rejectGoogleCalendarAccess)
 	sc.Step(`^vinculo Google Calendar desde Android con el server auth code "([^"]*)"$`, suite.connectGoogleCalendarFromAndroid)
 	sc.Step(`^el sistema confirma la vinculación de Google Calendar$`, suite.systemConfirmsGoogleCalendarConnection)
+	sc.Step(`^el sistema informa que la autorización de Google Calendar fue rechazada$`, suite.systemReportsGoogleCalendarAuthorizationRejected)
 	sc.Step(`^el perfil informa el estado de Google Calendar "([^"]*)"$`, suite.profileReportsGoogleCalendarStatus)
 }
 
@@ -93,9 +95,26 @@ func (suite *testSuite) authorizeGoogleCalendarAccess() error {
 	}.Encode(), false)
 }
 
+func (suite *testSuite) rejectGoogleCalendarAccess() error {
+	if err := suite.systemReturnsGoogleCalendarWebAuthorization(); err != nil {
+		return err
+	}
+	return suite.requestGoogleCalendar(http.MethodGet, googleCalendarCallbackPath+"?"+url.Values{
+		"error": []string{"access_denied"},
+		"state": []string{suite.lastGoogleCalendarOAuthState},
+	}.Encode(), false)
+}
+
 func (suite *testSuite) systemConfirmsGoogleCalendarConnection() error {
 	if suite.lastStatus != http.StatusSeeOther && suite.lastStatus != http.StatusCreated {
 		return fmt.Errorf("expected Google Calendar connection confirmation status 201 or 303, got %d with body %s", suite.lastStatus, string(suite.lastBody))
+	}
+	return nil
+}
+
+func (suite *testSuite) systemReportsGoogleCalendarAuthorizationRejected() error {
+	if suite.lastStatus != http.StatusSeeOther {
+		return fmt.Errorf("expected rejected Google Calendar authorization to redirect with status 303, got %d with body %s", suite.lastStatus, string(suite.lastBody))
 	}
 	return nil
 }
