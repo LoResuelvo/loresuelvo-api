@@ -39,7 +39,6 @@ Feature: Crear propuesta de servicio
         Then el consumidor "ana@example.com" recibe en tiempo real la notificación de propuesta de servicio
         And la notificación de propuesta incluye una duración estimada de "60" minutos
 
-    @wip
     Scenario: 53.2.2-PSP Registrar y devolver una duración estimada válida
         Given que existe un chat activo entre el consumidor "ana@example.com" y el prestador "juan.plomero@example.com" con el mensaje inicial:
             """
@@ -53,7 +52,6 @@ Feature: Crear propuesta de servicio
         Then el sistema registra la propuesta de servicio
         And la propuesta de servicio informa una duración estimada de "90" minutos
 
-    @wip
     Scenario: 53.2.3-PSP Rechazar una propuesta sin duración estimada
         Given que existe un chat activo entre el consumidor "ana@example.com" y el prestador "juan.plomero@example.com" con el mensaje inicial:
             """
@@ -66,7 +64,6 @@ Feature: Crear propuesta de servicio
             """
         Then el sistema rechaza la propuesta de servicio porque la duración estimada es obligatoria
 
-    @wip
     Scenario: 53.2.4-PSP Rechazar una duración estimada menor a quince minutos
         Given que existe un chat activo entre el consumidor "ana@example.com" y el prestador "juan.plomero@example.com" con el mensaje inicial:
             """
@@ -79,7 +76,6 @@ Feature: Crear propuesta de servicio
             """
         Then el sistema rechaza la propuesta de servicio porque la duración estimada está fuera de rango
 
-    @wip
     Scenario: 53.2.5-PSP Rechazar una duración estimada mayor a veinticuatro horas
         Given que existe un chat activo entre el consumidor "ana@example.com" y el prestador "juan.plomero@example.com" con el mensaje inicial:
             """
