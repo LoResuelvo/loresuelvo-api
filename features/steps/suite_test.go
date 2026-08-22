@@ -106,6 +106,7 @@ type testSuite struct {
 	serviceProposalFixtures                 map[int]serviceProposalFixture
 	workOrdersByServiceProposalID           map[int][]workOrderResponse
 	lastMercadoPagoOAuthState               string
+	lastGoogleCalendarOAuthState            string
 	lastPaymentIntentID                     string
 	lastExternalPaymentID                   string
 	previousPaymentIntentID                 string
@@ -149,6 +150,7 @@ func (s *testSuite) registerAllSteps(sc *godog.ScenarioContext) {
 	registerCompleteServicePaymentSteps(sc, s)
 	registerReviewPaidWorkOrderSteps(sc, s)
 	registerConnectMercadoPagoAccountSteps(sc, s)
+	registerConnectGoogleCalendarSteps(sc, s)
 	registerNotifyUrgentWorkOrdersSteps(sc, s)
 	registerGetJobRequestSteps(sc, s)
 	registerJobRequestImagesSteps(sc, s)
@@ -266,6 +268,7 @@ func (s *testSuite) cleanup() error {
 	s.serviceProposalFixtures = map[int]serviceProposalFixture{}
 	s.workOrdersByServiceProposalID = map[int][]workOrderResponse{}
 	s.lastMercadoPagoOAuthState = ""
+	s.lastGoogleCalendarOAuthState = ""
 	s.lastPaymentIntentID = ""
 	s.lastExternalPaymentID = ""
 	s.previousPaymentIntentID = ""
