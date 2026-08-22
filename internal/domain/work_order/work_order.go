@@ -24,6 +24,7 @@ type ServiceProposal interface {
 	ServiceProposalRemainingAmountDue() int64
 	ServiceProposalScheduledOn() time.Time
 	ServiceProposalDescription() string
+	ServiceProposalEstimatedDurationMinutes() int
 	ConsumerID() int
 	ProviderID() int
 }
@@ -122,6 +123,10 @@ func (wo *WorkOrder) ScheduledOn() time.Time {
 
 func (wo *WorkOrder) Description() string {
 	return wo.serviceProposal.ServiceProposalDescription()
+}
+
+func (wo *WorkOrder) EstimatedDurationMinutes() int {
+	return wo.serviceProposal.ServiceProposalEstimatedDurationMinutes()
 }
 
 func (wo *WorkOrder) ConsumerID() int {

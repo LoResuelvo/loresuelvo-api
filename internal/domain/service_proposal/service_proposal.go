@@ -143,6 +143,10 @@ func (sp *ServiceProposal) ServiceProposalDescription() string {
 	return sp.Description
 }
 
+func (sp *ServiceProposal) ServiceProposalEstimatedDurationMinutes() int {
+	return sp.EstimatedDurationMinutes
+}
+
 func (sp *ServiceProposal) EstimatedDuration() int {
 	return sp.EstimatedDurationMinutes
 }

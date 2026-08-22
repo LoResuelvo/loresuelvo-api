@@ -23,13 +23,15 @@ func TestNewWorkOrderStartsScheduled(t *testing.T) {
 	acceptedOn := time.Date(2026, time.July, 4, 13, 0, 0, 0, time.UTC)
 
 	proposal := serviceproposal.ServiceProposal{
-		ID: 1,
+		ID:                       1,
+		EstimatedDurationMinutes: 90,
 	}
 
 	order, err := workorder.New(&proposal, acceptedOn)
 
 	assert.NoError(t, err)
 	assert.Equal(t, &proposal, order.ServiceProposal())
+	assert.Equal(t, 90, order.EstimatedDurationMinutes())
 	assert.Equal(t, workorder.StatusScheduled, order.Status())
 	assert.Equal(t, acceptedOn, order.AcceptedOn())
 }
