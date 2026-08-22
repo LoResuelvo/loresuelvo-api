@@ -6,6 +6,7 @@ required:
 - surname
 - email
 - role
+- calendar_connection_status
 properties:
   id:
     type: integer
@@ -26,5 +27,12 @@ properties:
     enum:
     - consumer
     - provider
+  calendar_connection_status:
+    type: string
+    enum:
+    - disconnected
+    - connected
+    - action_required
+    description: Current calendar authorization status for the authenticated user.
   profile_photo:
     $ref: '#/components/schemas/CurrentUserProfilePhoto'

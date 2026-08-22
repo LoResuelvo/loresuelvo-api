@@ -1,0 +1,38 @@
+post:
+  tags:
+  - CalendarConnections
+  operationId: startCalendarConnectionAuthorization
+  summary: Start calendar connection authorization
+  description: Starts the web authorization flow for the authenticated user's calendar.
+  security:
+  - BearerAuth: []
+  responses:
+    '201':
+      description: Authorization URL created.
+      headers:
+        Location:
+          description: Current user resource.
+          schema:
+            type: string
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/CalendarAuthorization'
+    '400':
+      description: Authorization could not be started.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    '401':
+      description: Authentication failed.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/AuthErrorResponse'
+    '500':
+      description: Authorization could not be started.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'

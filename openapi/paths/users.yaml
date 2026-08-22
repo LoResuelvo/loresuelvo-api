@@ -24,6 +24,7 @@ get:
                 surname: Pérez
                 email: ana@example.com
                 role: consumer
+                calendar_connection_status: disconnected
                 profile_photo:
                   original_name: foto-perfil.jpg
                   url: https://cdn.example/profile/foto-perfil.jpg
@@ -35,6 +36,7 @@ get:
                 surname: Gómez
                 email: juan@example.com
                 role: provider
+                calendar_connection_status: connected
                 profile_photo:
                   original_name: foto-perfil.jpg
                   url: https://cdn.example/profile/foto-perfil.jpg

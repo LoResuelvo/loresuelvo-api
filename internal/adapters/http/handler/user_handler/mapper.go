@@ -8,8 +8,8 @@ import (
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/user"
 )
 
-func currentUserResponseFromDomain(currentUser user.User) (any, error) {
-	baseResponse := baseCurrentUserResponseFromDomain(currentUser)
+func currentUserResponseFromDomain(currentUser user.User, calendarConnectionStatus string) (any, error) {
+	baseResponse := baseCurrentUserResponseFromDomain(currentUser, calendarConnectionStatus)
 
 	switch typedUser := currentUser.(type) {
 	case *consumer.Consumer:
@@ -27,13 +27,14 @@ func currentUserResponseFromDomain(currentUser user.User) (any, error) {
 	}
 }
 
-func baseCurrentUserResponseFromDomain(currentUser user.User) currentUserResponse {
+func baseCurrentUserResponseFromDomain(currentUser user.User, calendarConnectionStatus string) currentUserResponse {
 	response := currentUserResponse{
-		ID:      currentUser.ID(),
-		Name:    currentUser.Name(),
-		Surname: currentUser.Surname(),
-		Email:   currentUser.Email(),
-		Role:    currentUser.Role(),
+		ID:                       currentUser.ID(),
+		Name:                     currentUser.Name(),
+		Surname:                  currentUser.Surname(),
+		Email:                    currentUser.Email(),
+		Role:                     currentUser.Role(),
+		CalendarConnectionStatus: calendarConnectionStatus,
 	}
 	if profilePhoto := currentUser.ProfilePhoto(); profilePhoto != nil {
 		response.ProfilePhoto = &currentUserProfilePhotoResponse{

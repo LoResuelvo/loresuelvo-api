@@ -25,6 +25,8 @@ tags:
   description: Provider account registration and search endpoints.
 - name: PaymentAccounts
   description: Provider payment account connection endpoints.
+- name: CalendarConnections
+  description: Authenticated calendar connection endpoints.
 - name: Payments
   description: Checkout and verified payment processing endpoints.
 - name: Files
@@ -60,6 +62,10 @@ paths:
     $ref: ./paths/payment-account-connection.yaml
   /oauth/payment-accounts/callback:
     $ref: ./paths/payment-account-callback.yaml
+  /me/calendar-connection/authorizations:
+    $ref: ./paths/calendar-connection-authorization.yaml
+  /oauth/google-calendar/callback:
+    $ref: ./paths/calendar-connection-callback.yaml
   /files/presign:
     $ref: ./paths/files-presign.yaml
   /files/{fileID}/confirm:
@@ -226,6 +232,8 @@ components:
       $ref: ./components/schemas/provider-profile-review.yaml
     PaymentAccountAuthorization:
       $ref: ./components/schemas/payment-account-authorization.yaml
+    CalendarAuthorization:
+      $ref: ./components/schemas/calendar-authorization.yaml
     PaymentAccountConnection:
       $ref: ./components/schemas/payment-account-connection.yaml
     CheckoutSession:

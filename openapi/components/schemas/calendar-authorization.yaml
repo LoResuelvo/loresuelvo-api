@@ -1,0 +1,13 @@
+type: object
+required:
+- authorization_url
+- state
+properties:
+  authorization_url:
+    type: string
+    format: uri
+    description: Provider authorization URL containing state and PKCE parameters.
+  state:
+    type: string
+    description: Opaque authorization state retained for the callback.
+additionalProperties: false

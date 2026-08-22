@@ -11,12 +11,13 @@ type currentUserCategoryResponse struct {
 }
 
 type currentUserResponse struct {
-	ID           int                              `json:"id"`
-	Name         string                           `json:"name"`
-	Surname      string                           `json:"surname"`
-	Email        string                           `json:"email"`
-	Role         string                           `json:"role"`
-	ProfilePhoto *currentUserProfilePhotoResponse `json:"profile_photo,omitempty"`
+	ID                       int                              `json:"id"`
+	Name                     string                           `json:"name"`
+	Surname                  string                           `json:"surname"`
+	Email                    string                           `json:"email"`
+	Role                     string                           `json:"role"`
+	CalendarConnectionStatus string                           `json:"calendar_connection_status"`
+	ProfilePhoto             *currentUserProfilePhotoResponse `json:"profile_photo,omitempty"`
 }
 
 type consumerCurrentUserResponse struct {

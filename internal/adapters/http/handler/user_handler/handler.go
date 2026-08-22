@@ -1,19 +1,33 @@
 package user_handler
 
 import (
+	"context"
 	"net/http"
 
 	httphandler "github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler"
+	calendarconnection "github.com/LoResuelvo/loresuelvo-api/internal/domain/calendar_connection"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/user"
 	"github.com/gin-gonic/gin"
 )
 
-type UserHandler struct {
-	userService *user.Service
+type CalendarConnectionStatusReader interface {
+	GetConnectionStatus(ctx context.Context, authID string) (string, error)
 }
 
-func NewUserHandler(userService *user.Service) *UserHandler {
-	return &UserHandler{userService: userService}
+type UserHandler struct {
+	userService                    *user.Service
+	calendarConnectionStatusReader CalendarConnectionStatusReader
+}
+
+func NewUserHandler(userService *user.Service, statusReaders ...CalendarConnectionStatusReader) *UserHandler {
+	var statusReader CalendarConnectionStatusReader
+	if len(statusReaders) > 0 {
+		statusReader = statusReaders[0]
+	}
+	return &UserHandler{
+		userService:                    userService,
+		calendarConnectionStatusReader: statusReader,
+	}
 }
 
 func (h *UserHandler) GetCurrentUser(c *gin.Context) {
@@ -28,7 +42,15 @@ func (h *UserHandler) GetCurrentUser(c *gin.Context) {
 		return
 	}
 
-	response, err := currentUserResponseFromDomain(currentUser)
+	calendarStatus := calendarconnection.StatusDisconnected
+	if h.calendarConnectionStatusReader != nil {
+		calendarStatus, err = h.calendarConnectionStatusReader.GetConnectionStatus(c.Request.Context(), auth0ID)
+		if err != nil {
+			handleGetCurrentUserError(c, err)
+			return
+		}
+	}
+	response, err := currentUserResponseFromDomain(currentUser, calendarStatus)
 	if err != nil {
 		handleGetCurrentUserError(c, err)
 		return

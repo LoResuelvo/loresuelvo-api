@@ -1,0 +1,37 @@
+get:
+  tags:
+  - CalendarConnections
+  operationId: completeCalendarConnectionAuthorization
+  summary: Complete calendar connection authorization
+  description: Receives the provider callback and redirects to the configured application result.
+  parameters:
+  - name: state
+    in: query
+    required: false
+    schema:
+      type: string
+  - name: code
+    in: query
+    required: false
+    schema:
+      type: string
+  - name: error
+    in: query
+    required: false
+    schema:
+      type: string
+  responses:
+    '303':
+      description: Authorization completed or was rejected; follow the Location header.
+    '400':
+      description: Callback parameters or authorization state are invalid.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    '500':
+      description: Authorization could not be completed.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
