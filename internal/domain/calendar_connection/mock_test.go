@@ -84,6 +84,11 @@ func (stub *connectionRepositoryStub) FindByUserID(_ context.Context, _ int) (*c
 	return stub.foundConnection, stub.foundErr
 }
 
+func (stub *connectionRepositoryStub) Save(_ context.Context, connection *calendarconnection.Connection) error {
+	stub.savedConnection = connection
+	return nil
+}
+
 type authorizationAttemptRepositoryStub struct {
 	savedAttempt    *calendarconnection.AuthorizationAttempt
 	foundAttempt    *calendarconnection.AuthorizationAttempt

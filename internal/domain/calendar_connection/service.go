@@ -124,6 +124,36 @@ func (service *Service) CompleteAuthorization(ctx context.Context, state, code s
 	return connection, nil
 }
 
+func (service *Service) ConnectWithAuthorizationCode(ctx context.Context, authID, code string) (*Connection, error) {
+	foundUser, err := service.userRepository.FindByAuthID(authID)
+	if err != nil {
+		return nil, err
+	}
+	if foundUser == nil || foundUser.ID() <= 0 {
+		return nil, ErrUserNotFound
+	}
+	code = strings.TrimSpace(code)
+	if code == "" {
+		return nil, ErrAuthorizationCodeRequired
+	}
+	credentials, err := service.oauthConnector.ExchangeAuthorizationCode(ctx, code, "")
+	if err != nil {
+		return nil, fmt.Errorf("exchanging calendar authorization code: %w", err)
+	}
+	connection, err := service.connectionFromCredentials(foundUser.ID(), credentials)
+	if err != nil {
+		return nil, err
+	}
+	writer, ok := service.connectionRepository.(ConnectionWriter)
+	if !ok {
+		return nil, ErrConnectionWriterUnavailable
+	}
+	if err := writer.Save(ctx, connection); err != nil {
+		return nil, fmt.Errorf("saving calendar connection: %w", err)
+	}
+	return connection, nil
+}
+
 func (service *Service) RejectAuthorization(ctx context.Context, state string) error {
 	state = strings.TrimSpace(state)
 	if state == "" {
@@ -187,6 +217,17 @@ func (service *Service) findActiveAuthorizationAttempt(ctx context.Context, stat
 		return nil, ErrAuthorizationAttemptExpired
 	}
 	return attempt, nil
+}
+
+func (service *Service) connectionFromCredentials(userID int, credentials AuthorizationCredentials) (*Connection, error) {
+	if err := ValidateAuthorizationCredentials(credentials); err != nil {
+		return nil, err
+	}
+	refreshTokenCiphertext, err := service.credentialProtector.Encrypt(credentials.RefreshToken)
+	if err != nil {
+		return nil, fmt.Errorf("protecting calendar refresh token: %w", err)
+	}
+	return NewConnection(userID, credentials.CalendarID, refreshTokenCiphertext, service.clock.Now())
 }
 
 func stateDigest(state string) []byte {

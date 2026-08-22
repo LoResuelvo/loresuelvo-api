@@ -14,4 +14,5 @@ var (
 	ErrUserNotFound                 = errors.New("calendar connection user does not exist")
 	ErrUserIDRequired               = errors.New("calendar connection user id is required")
 	ErrConnectionStatusInvalid      = errors.New("calendar connection status is invalid")
+	ErrConnectionWriterUnavailable  = errors.New("calendar connection writer is unavailable")
 )

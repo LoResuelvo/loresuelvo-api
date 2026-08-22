@@ -22,4 +22,8 @@ type ConnectionRepository interface {
 	FindByUserID(ctx context.Context, userID int) (*Connection, error)
 }
 
+type ConnectionWriter interface {
+	Save(ctx context.Context, connection *Connection) error
+}
+
 type Clock = clock.Clock

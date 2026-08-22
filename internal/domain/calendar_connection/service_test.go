@@ -93,6 +93,31 @@ func TestCompleteAuthorizationPersistsOnlyEncryptedRefreshToken(t *testing.T) {
 	assert.Equal(t, calendarconnection.StatusConnected, connection.Status())
 }
 
+func TestConnectWithAuthorizationCodePersistsConnection(t *testing.T) {
+	connectionRepository := &connectionRepositoryStub{}
+	connector := &oauthConnectorStub{credentials: calendarconnection.AuthorizationCredentials{
+		CalendarID:   "calendar-42",
+		RefreshToken: "calendar-refresh-token",
+	}}
+	service := calendarconnection.NewService(
+		&userRepositoryStub{user: registeredConsumer(t)},
+		&authorizationAttemptRepositoryStub{},
+		connectionRepository,
+		connector,
+		&credentialProtectorStub{decryptedPlaintext: "unused"},
+		&secretGeneratorStub{},
+		clockStub{now: calendarConnectionNow},
+	)
+
+	connection, err := service.ConnectWithAuthorizationCode(context.Background(), consumerAuthID, "server-auth-code")
+
+	require.NoError(t, err)
+	require.NotNil(t, connectionRepository.savedConnection)
+	assert.Equal(t, "server-auth-code", connector.code)
+	assert.Equal(t, "calendar-42", connection.CalendarID())
+	assert.Equal(t, []byte("encrypted:calendar-refresh-token"), connection.RefreshTokenCiphertext())
+}
+
 func TestRejectAuthorizationConsumesActiveAttempt(t *testing.T) {
 	state := "state-secret"
 	digest := sha256.Sum256([]byte(state))
