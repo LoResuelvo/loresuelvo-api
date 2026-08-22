@@ -14,7 +14,6 @@ Feature: Vincular Google Calendar
         And consulto mi información de usuario autenticado
         Then el perfil informa el estado de Google Calendar "connected"
 
-    @wip
     Scenario: 57.2-CGC Un prestador vincula Calendar desde la web
         Given que existe un prestador registrado con correo "juan.plomero@example.com", nombre "Juan", apellido "Gómez", rubro "Plomería" y la foto de perfil cargada
         And que estoy autenticado como prestador "juan.plomero@example.com"
