@@ -169,11 +169,8 @@ func TestGoogleCalendarConnectionRepositoryUpsertsOneConnectionPerUser(t *testin
 	found, err := testContext.connectionStore.FindByUserID(context.Background(), testContext.userID)
 	require.NoError(t, err)
 	assert.Equal(t, []byte("second-refresh-token"), found.RefreshTokenCiphertext())
-	var count int
-	require.NoError(t, testContext.database.QueryRow(
-		"SELECT COUNT(*) FROM google_calendar_connections WHERE user_id = $1",
-		testContext.userID,
-	).Scan(&count))
+	count, err := testContext.connectionStore.CountByUserID(context.Background(), testContext.userID)
+	require.NoError(t, err)
 	assert.Equal(t, 1, count)
 }
 

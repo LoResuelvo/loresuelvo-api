@@ -119,6 +119,20 @@ func (repository *GoogleCalendarConnectionRepository) FindByUserID(ctx context.C
 	return connection, nil
 }
 
+func (repository *GoogleCalendarConnectionRepository) CountByUserID(ctx context.Context, userID int) (int, error) {
+	var count int
+	if err := repository.db.QueryRowContext(
+		ctx,
+		`SELECT COUNT(*)
+		FROM google_calendar_connections
+		WHERE user_id = $1`,
+		userID,
+	).Scan(&count); err != nil {
+		return 0, fmt.Errorf("counting calendar connections: %w", err)
+	}
+	return count, nil
+}
+
 func (repository *GoogleCalendarConnectionRepository) DeleteAll() error {
 	tx, err := repository.db.Begin()
 	if err != nil {
