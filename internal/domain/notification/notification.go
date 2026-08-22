@@ -7,21 +7,26 @@ import (
 )
 
 type Notification struct {
-	ID           int
-	UserID       int
-	Type         Type
-	ResourceType ResourceType
-	ResourceID   int
-	ReadAt       *time.Time
-	CreatedAt    time.Time
+	ID                       int
+	UserID                   int
+	Type                     Type
+	ResourceType             ResourceType
+	ResourceID               int
+	EstimatedDurationMinutes int
+	ReadAt                   *time.Time
+	CreatedAt                time.Time
 }
 
-func NewNotification(userID int, notificationType Type, resourceType ResourceType, resourceID int, clock clock.Clock) *Notification {
-	return &Notification{
+func NewNotification(userID int, notificationType Type, resourceType ResourceType, resourceID int, clock clock.Clock, estimatedDuration ...int) *Notification {
+	notification := &Notification{
 		UserID:       userID,
 		Type:         notificationType,
 		ResourceType: resourceType,
 		ResourceID:   resourceID,
 		CreatedAt:    clock.Now(),
 	}
+	if len(estimatedDuration) > 0 {
+		notification.EstimatedDurationMinutes = estimatedDuration[0]
+	}
+	return notification
 }

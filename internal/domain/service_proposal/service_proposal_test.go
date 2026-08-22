@@ -62,6 +62,48 @@ func TestServiceProposalRequiresMoreThanTwentyFourHoursLeadTime(t *testing.T) {
 	}
 }
 
+func TestServiceProposalValidatesEstimatedDuration(t *testing.T) {
+	now := time.Date(2026, time.July, 4, 13, 0, 0, 0, time.UTC)
+	testCases := []struct {
+		name          string
+		duration      int
+		expectedError error
+	}{
+		{name: "missing", duration: 0, expectedError: serviceproposal.ErrEstimatedDurationRequired},
+		{name: "below minimum", duration: 14, expectedError: serviceproposal.ErrInvalidEstimatedDuration},
+		{name: "minimum", duration: 15},
+		{name: "maximum", duration: 1440},
+		{name: "above maximum", duration: 1441, expectedError: serviceproposal.ErrInvalidEstimatedDuration},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			clock := new(MockClock)
+			clock.On("Now").Return(now).Once()
+
+			proposal, err := serviceproposal.NewServiceProposal(
+				validProvider,
+				validConsumer,
+				validConversation,
+				now.Add(25*time.Hour),
+				validServiceDescription,
+				validBookingTerms(),
+				clock,
+				testCase.duration,
+			)
+
+			if testCase.expectedError != nil {
+				assert.ErrorIs(t, err, testCase.expectedError)
+				assert.Nil(t, proposal)
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, testCase.duration, proposal.EstimatedDurationMinutes)
+			}
+			clock.AssertExpectations(t)
+		})
+	}
+}
+
 func TestConversationMustBeAccepted(t *testing.T) {
 	clock := new(MockClock)
 	clock.
@@ -130,12 +172,13 @@ func TestShouldCreateANotification(t *testing.T) {
 	frezzedTime := time.Now()
 	clock.On("Now").Return(frezzedTime)
 	expectedNotification := &notification.Notification{
-		UserID:       validConsumer.ID(),
-		Type:         notification.TypeServiceProposalReceived,
-		ResourceType: notification.ResourceServiceProposal,
-		ResourceID:   0,
-		CreatedAt:    frezzedTime,
-		ReadAt:       nil,
+		UserID:                   validConsumer.ID(),
+		Type:                     notification.TypeServiceProposalReceived,
+		ResourceType:             notification.ResourceServiceProposal,
+		ResourceID:               0,
+		EstimatedDurationMinutes: 60,
+		CreatedAt:                frezzedTime,
+		ReadAt:                   nil,
 	}
 
 	serviceProposal, _ := serviceproposal.NewServiceProposal(

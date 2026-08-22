@@ -43,7 +43,7 @@ func NewService(serviceRepo ServiceProposalRepository, userRepo UserRepository, 
 	}
 }
 
-func (s *Service) CreateServiceProposal(ctx context.Context, auth0ID string, consumerID int, amount int64, scheduledOn time.Time, description string) (*ServiceProposal, error) {
+func (s *Service) CreateServiceProposal(ctx context.Context, auth0ID string, consumerID int, amount int64, scheduledOn time.Time, description string, estimatedDuration ...int) (*ServiceProposal, error) {
 	provider, consumer, conversation, err := s.getParticipants(auth0ID, consumerID)
 	if err != nil {
 		return nil, err
@@ -65,7 +65,7 @@ func (s *Service) CreateServiceProposal(ctx context.Context, auth0ID string, con
 		return nil, err
 	}
 
-	serviceProposal, err := NewServiceProposal(provider, consumer, conversation, scheduledOn, description, bookingTerms, s.clock)
+	serviceProposal, err := NewServiceProposal(provider, consumer, conversation, scheduledOn, description, bookingTerms, s.clock, estimatedDuration...)
 	if err != nil {
 		return nil, err
 	}

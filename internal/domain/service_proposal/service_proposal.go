@@ -13,6 +13,12 @@ import (
 
 const minimumBookingLeadTime = 24 * time.Hour
 
+const (
+	minimumEstimatedDurationMinutes = 15
+	maximumEstimatedDurationMinutes = 24 * 60
+	legacyEstimatedDurationMinutes  = 60
+)
+
 type Status string
 
 const (
@@ -22,19 +28,28 @@ const (
 )
 
 type ServiceProposal struct {
-	ID           int
-	Provider     *provider.Provider
-	Consumer     *consumer.Consumer
-	Conversation conversation.Conversation
-	ScheduledOn  time.Time
-	Description  string
-	Status       Status
-	CreatedOn    time.Time
-	BookingTerms BookingTerms
+	ID                       int
+	Provider                 *provider.Provider
+	Consumer                 *consumer.Consumer
+	Conversation             conversation.Conversation
+	ScheduledOn              time.Time
+	Description              string
+	EstimatedDurationMinutes int
+	Status                   Status
+	CreatedOn                time.Time
+	BookingTerms             BookingTerms
 }
 
-func NewServiceProposal(provider *provider.Provider, consumer *consumer.Consumer, conversation conversation.Conversation, scheduledOn time.Time, description string, bookingTerms BookingTerms, clock clock.Clock) (*ServiceProposal, error) {
+func NewServiceProposal(provider *provider.Provider, consumer *consumer.Consumer, conversation conversation.Conversation, scheduledOn time.Time, description string, bookingTerms BookingTerms, clock clock.Clock, estimatedDuration ...int) (*ServiceProposal, error) {
 	if err := validateParameters(scheduledOn, clock); err != nil {
+		return nil, err
+	}
+
+	durationMinutes := legacyEstimatedDurationMinutes
+	if len(estimatedDuration) > 0 {
+		durationMinutes = estimatedDuration[0]
+	}
+	if err := validateEstimatedDuration(durationMinutes); err != nil {
 		return nil, err
 	}
 
@@ -43,13 +58,14 @@ func NewServiceProposal(provider *provider.Provider, consumer *consumer.Consumer
 	}
 
 	return &ServiceProposal{
-		Provider:     provider,
-		Consumer:     consumer,
-		Conversation: conversation,
-		ScheduledOn:  scheduledOn,
-		Description:  description,
-		Status:       StatusPending,
-		BookingTerms: bookingTerms,
+		Provider:                 provider,
+		Consumer:                 consumer,
+		Conversation:             conversation,
+		ScheduledOn:              scheduledOn,
+		Description:              description,
+		EstimatedDurationMinutes: durationMinutes,
+		Status:                   StatusPending,
+		BookingTerms:             bookingTerms,
 	}, nil
 }
 
@@ -76,6 +92,7 @@ func (sp *ServiceProposal) createNotification(recipientID int, notificationType 
 		notification.ResourceServiceProposal,
 		sp.ID,
 		clock,
+		sp.EstimatedDurationMinutes,
 	)
 }
 
@@ -126,6 +143,10 @@ func (sp *ServiceProposal) ServiceProposalDescription() string {
 	return sp.Description
 }
 
+func (sp *ServiceProposal) EstimatedDuration() int {
+	return sp.EstimatedDurationMinutes
+}
+
 func (sp *ServiceProposal) ConsumerID() int {
 	return sp.Consumer.ID()
 }
@@ -153,5 +174,15 @@ func validateParameters(scheduledOn time.Time, clock clock.Clock) error {
 		return ErrInsufficientBookingLeadTime
 	}
 
+	return nil
+}
+
+func validateEstimatedDuration(durationMinutes int) error {
+	if durationMinutes <= 0 {
+		return ErrEstimatedDurationRequired
+	}
+	if durationMinutes < minimumEstimatedDurationMinutes || durationMinutes > maximumEstimatedDurationMinutes {
+		return ErrInvalidEstimatedDuration
+	}
 	return nil
 }
