@@ -51,12 +51,13 @@ func (r *ServiceProposalRepository) Save(serviceProposal *serviceproposal.Servic
 			platform_fee_due_now_cents,
 			booking_payment_deadline,
 			scheduled_on,
+			estimated_duration_minutes,
 			description,
 			status,
 			created_on,
 			updated_on
 		)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, NOW(), NOW())
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NOW(), NOW())
 		RETURNING id`,
 		serviceProposal.Consumer.ID(),
 		serviceProposal.Provider.ID(),
@@ -68,6 +69,7 @@ func (r *ServiceProposalRepository) Save(serviceProposal *serviceproposal.Servic
 		serviceProposal.BookingTerms.PlatformFeeDueNowCents(),
 		serviceProposal.BookingTerms.BookingPaymentDeadline(),
 		serviceProposal.ScheduledOn,
+		serviceProposal.EstimatedDurationMinutes,
 		serviceProposal.Description,
 		serviceProposal.Status,
 	).Scan(&saved.ID)
@@ -80,15 +82,16 @@ func (r *ServiceProposalRepository) Save(serviceProposal *serviceproposal.Servic
 
 func (r *ServiceProposalRepository) FindByID(ctx context.Context, id int) (*serviceproposal.ServiceProposal, error) {
 	var (
-		proposal               serviceproposal.ServiceProposal
-		consumerID             int
-		providerID             int
-		currency               string
-		depositCents           int64
-		platformFeeTotalCents  int64
-		platformFeeDueNowCents int64
-		serviceTotalCents      int64
-		bookingPaymentDeadline time.Time
+		proposal                 serviceproposal.ServiceProposal
+		consumerID               int
+		providerID               int
+		currency                 string
+		depositCents             int64
+		platformFeeTotalCents    int64
+		platformFeeDueNowCents   int64
+		serviceTotalCents        int64
+		bookingPaymentDeadline   time.Time
+		estimatedDurationMinutes int
 	)
 	err := r.db.QueryRowContext(
 		ctx,
@@ -101,6 +104,7 @@ func (r *ServiceProposalRepository) FindByID(ctx context.Context, id int) (*serv
 			sp.platform_fee_due_now_cents,
 			sp.booking_payment_deadline,
 			sp.scheduled_on,
+			sp.estimated_duration_minutes,
 			sp.description,
 			sp.status,
 			sp.created_on,
@@ -118,6 +122,7 @@ func (r *ServiceProposalRepository) FindByID(ctx context.Context, id int) (*serv
 		&platformFeeDueNowCents,
 		&bookingPaymentDeadline,
 		&proposal.ScheduledOn,
+		&estimatedDurationMinutes,
 		&proposal.Description,
 		&proposal.Status,
 		&proposal.CreatedOn,
@@ -141,6 +146,7 @@ func (r *ServiceProposalRepository) FindByID(ctx context.Context, id int) (*serv
 	if err != nil {
 		return nil, fmt.Errorf("rehydrating booking terms for service proposal %d: %w", proposal.ID, err)
 	}
+	proposal.EstimatedDurationMinutes = estimatedDurationMinutes
 
 	proposal.Consumer = &consumer.Consumer{BaseUser: user.RehydrateBaseUser(consumerID, "", "", "", "", consumer.Role, nil)}
 	proposal.Provider = &provider.Provider{BaseUser: user.RehydrateBaseUser(providerID, "", "", "", "", provider.Role, nil)}
@@ -192,6 +198,7 @@ func (r *ServiceProposalRepository) FindByUserID(ctx context.Context, userID int
 			sp.platform_fee_due_now_cents,
 			sp.booking_payment_deadline,
 			sp.scheduled_on,
+			sp.estimated_duration_minutes,
 			sp.description,
 			sp.status,
 			sp.created_on,
@@ -238,6 +245,7 @@ func (r *ServiceProposalRepository) FindByUserID(ctx context.Context, userID int
 			platformFeeDueNowCents     int64
 			serviceTotalCents          int64
 			bookingPaymentDeadline     time.Time
+			estimatedDurationMinutes   int
 			conversationID             int
 			conversationType           string
 			conversationStatus         string
@@ -265,6 +273,7 @@ func (r *ServiceProposalRepository) FindByUserID(ctx context.Context, userID int
 			&platformFeeDueNowCents,
 			&bookingPaymentDeadline,
 			&proposal.ScheduledOn,
+			&estimatedDurationMinutes,
 			&proposal.Description,
 			&proposal.Status,
 			&proposal.CreatedOn,
@@ -304,6 +313,7 @@ func (r *ServiceProposalRepository) FindByUserID(ctx context.Context, userID int
 		if err != nil {
 			return nil, fmt.Errorf("rehydrating booking terms for service proposal %d: %w", proposal.ID, err)
 		}
+		proposal.EstimatedDurationMinutes = estimatedDurationMinutes
 
 		consumerUser := user.RehydrateBaseUser(consumerID, consumerAuthID, consumerEmail, consumerName, consumerSurname, consumer.Role, imageFromPersistence(consumerProfilePhotoFileID.String, ""))
 		providerUser := user.RehydrateBaseUser(providerID, providerAuthID, providerEmail, providerName, providerSurname, provider.Role, imageFromPersistence(providerProfilePhotoFileID.String, ""))

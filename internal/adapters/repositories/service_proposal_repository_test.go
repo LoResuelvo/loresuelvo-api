@@ -209,6 +209,7 @@ func TestServiceProposalRepositoryCanSave(t *testing.T) {
 	var storedPlatformFeeDueNowCents int64
 	var storedBookingPaymentDeadline time.Time
 	var storedScheduledOn time.Time
+	var storedEstimatedDurationMinutes int
 	var storedDescription string
 	var storedStatus serviceproposal.Status
 	err = testContext.database.QueryRow(
@@ -223,6 +224,7 @@ func TestServiceProposalRepositoryCanSave(t *testing.T) {
 			platform_fee_due_now_cents,
 			booking_payment_deadline,
 			scheduled_on,
+			estimated_duration_minutes,
 			description,
 			status
 		FROM service_proposals
@@ -239,6 +241,7 @@ func TestServiceProposalRepositoryCanSave(t *testing.T) {
 		&storedPlatformFeeDueNowCents,
 		&storedBookingPaymentDeadline,
 		&storedScheduledOn,
+		&storedEstimatedDurationMinutes,
 		&storedDescription,
 		&storedStatus,
 	)
@@ -253,6 +256,7 @@ func TestServiceProposalRepositoryCanSave(t *testing.T) {
 	assert.Equal(t, proposalToSave.BookingTerms.PlatformFeeDueNowCents(), storedPlatformFeeDueNowCents)
 	assert.Equal(t, proposalToSave.BookingTerms.BookingPaymentDeadline(), storedBookingPaymentDeadline.UTC())
 	assert.Equal(t, proposalToSave.ScheduledOn, storedScheduledOn.UTC())
+	assert.Equal(t, proposalToSave.EstimatedDurationMinutes, storedEstimatedDurationMinutes)
 	assert.Equal(t, proposalToSave.Description, storedDescription)
 	assert.Equal(t, proposalToSave.Status, storedStatus)
 
@@ -306,6 +310,7 @@ func TestServiceProposalRepositoryFindsPendingProposalForConsumer(t *testing.T) 
 	assert.Equal(t, expected.ServiceProposalAmount(), found[0].ServiceProposalAmount())
 	assertBookingTermsEqual(t, expected.BookingTerms, found[0].BookingTerms)
 	assert.Equal(t, expected.ScheduledOn, found[0].ScheduledOn.UTC())
+	assert.Equal(t, expected.EstimatedDurationMinutes, found[0].EstimatedDurationMinutes)
 	assert.Equal(t, expected.Description, found[0].Description)
 }
 
