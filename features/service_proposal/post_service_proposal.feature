@@ -25,7 +25,6 @@ Feature: Crear propuesta de servicio
     
     Rule: Se envia la propuesta de servicio al consumidor ademas de crearla
 
-    @wip
     Scenario: 53.2.1-PSP Envio de propuesta de servicio con duración estimada
         Given que existe un chat activo entre el consumidor "ana@example.com" y el prestador "juan.plomero@example.com" con el mensaje inicial:
             """
