@@ -13,6 +13,7 @@ import (
 type Service interface {
 	StartAuthorization(ctx context.Context, authID string) (*calendarconnection.Authorization, error)
 	CompleteAuthorization(ctx context.Context, state, code string) (*calendarconnection.Connection, error)
+	ConnectWithAuthorizationCode(ctx context.Context, authID, code string) (*calendarconnection.Connection, error)
 	RejectAuthorization(ctx context.Context, state string) error
 }
 
@@ -66,4 +67,21 @@ func (handler *CalendarConnectionHandler) CompleteAuthorization(c *gin.Context) 
 		return
 	}
 	c.Redirect(http.StatusSeeOther, handler.successRedirectURL)
+}
+
+func (handler *CalendarConnectionHandler) Connect(c *gin.Context) {
+	authID, ok := httphandler.GetAuthenticatedUserID(c)
+	if !ok {
+		return
+	}
+	var request connectionRequest
+	if err := c.ShouldBindJSON(&request); err != nil {
+		httphandler.RespondError(c, http.StatusBadRequest, err.Error())
+		return
+	}
+	if _, err := handler.service.ConnectWithAuthorizationCode(c.Request.Context(), authID, request.ServerAuthCode); err != nil {
+		handleCalendarConnectionError(c, err)
+		return
+	}
+	c.Status(http.StatusCreated)
 }

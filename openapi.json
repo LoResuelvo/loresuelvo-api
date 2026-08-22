@@ -1287,6 +1287,87 @@
                 }
             }
         },
+        "/me/calendar-connection": {
+            "post": {
+                "tags": [
+                    "CalendarConnections"
+                ],
+                "operationId": "connectCalendarWithAuthorizationCode",
+                "summary": "Connect a calendar with a server authorization code",
+                "description": "Exchanges a mobile authorization code for the authenticated user's calendar connection.",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "required": [
+                                    "server_auth_code"
+                                ],
+                                "properties": {
+                                    "server_auth_code": {
+                                        "type": "string",
+                                        "minLength": 1,
+                                        "description": "Authorization code obtained by the mobile client."
+                                    }
+                                },
+                                "additionalProperties": false
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Calendar connection created or refreshed."
+                    },
+                    "400": {
+                        "description": "The authorization code or request body is invalid.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Authentication failed.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AuthErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "The authenticated user does not exist.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Calendar connection could not be created.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/oauth/google-calendar/callback": {
             "get": {
                 "tags": [

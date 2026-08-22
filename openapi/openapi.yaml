@@ -64,6 +64,8 @@ paths:
     $ref: ./paths/payment-account-callback.yaml
   /me/calendar-connection/authorizations:
     $ref: ./paths/calendar-connection-authorization.yaml
+  /me/calendar-connection:
+    $ref: ./paths/calendar-connection.yaml
   /oauth/google-calendar/callback:
     $ref: ./paths/calendar-connection-callback.yaml
   /files/presign:
