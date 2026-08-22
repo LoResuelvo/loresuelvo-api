@@ -33,7 +33,6 @@ Feature: Vincular Google Calendar
         And consulto mi información de usuario autenticado
         Then el perfil informa el estado de Google Calendar "connected"
 
-    @wip
     Scenario: 57.4-CGC El usuario rechaza la autorización y permanece desconectado
         Given que existe un consumidor registrado con correo "ana@example.com", nombre "Ana" y apellido "Pérez" sin foto de perfil
         And que estoy autenticado como consumidor "ana@example.com"
