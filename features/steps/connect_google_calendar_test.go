@@ -30,16 +30,17 @@ func registerConnectGoogleCalendarSteps(sc *godog.ScenarioContext, suite *testSu
 	sc.Step(`^inicio la vinculación de Google Calendar desde la web$`, suite.startGoogleCalendarWebAuthorization)
 	sc.Step(`^el sistema devuelve una autorización web de Google Calendar$`, suite.systemReturnsGoogleCalendarWebAuthorization)
 	sc.Step(`^la autorización solicita el permiso de eventos propios de Google Calendar$`, suite.googleCalendarAuthorizationRequestsOwnedEvents)
+	sc.Step(`^que existe una autorización web pendiente de Google Calendar$`, suite.googleCalendarWebAuthorizationIsPending)
 	sc.Step(`^autorizo el acceso de Google Calendar$`, suite.authorizeGoogleCalendarAccess)
 	sc.Step(`^rechazo autorizar el acceso de Google Calendar$`, suite.rejectGoogleCalendarAccess)
 	sc.Step(`^que el consumidor "([^"]*)" ya tiene Google Calendar vinculado$`, suite.consumerAlreadyHasGoogleCalendarConnection)
-	sc.Step(`^vuelvo a vincular Google Calendar desde la web$`, suite.reconnectGoogleCalendarWebAuthorization)
 	sc.Step(`^que la conexión de Google Calendar de "([^"]*)" requiere atención$`, suite.googleCalendarConnectionRequiresAttention)
-	sc.Step(`^vuelvo a autorizar Google Calendar desde la web$`, suite.reconnectGoogleCalendarWebAuthorization)
+	sc.Step(`^que el usuario "([^"]*)" rechazó la autorización de Google Calendar$`, suite.googleCalendarAuthorizationWasRejected)
 	sc.Step(`^vinculo Google Calendar desde Android con el server auth code "([^"]*)"$`, suite.connectGoogleCalendarFromAndroid)
 	sc.Step(`^el sistema confirma la vinculación de Google Calendar$`, suite.systemConfirmsGoogleCalendarConnection)
 	sc.Step(`^el sistema informa que la autorización de Google Calendar fue rechazada$`, suite.systemReportsGoogleCalendarAuthorizationRejected)
 	sc.Step(`^el consumidor "([^"]*)" conserva una única conexión de Google Calendar$`, suite.consumerHasSingleGoogleCalendarConnection)
+	sc.Step(`^la conexión de Google Calendar queda en estado "([^"]*)"$`, suite.calendarConnectionHasStatus)
 	sc.Step(`^el perfil informa el estado de Google Calendar "([^"]*)"$`, suite.profileReportsGoogleCalendarStatus)
 }
 
@@ -51,7 +52,7 @@ func (suite *testSuite) startGoogleCalendarWebAuthorization() error {
 	return suite.requestGoogleCalendar(http.MethodPost, googleCalendarAuthorizationPath, true)
 }
 
-func (suite *testSuite) reconnectGoogleCalendarWebAuthorization() error {
+func (suite *testSuite) googleCalendarWebAuthorizationIsPending() error {
 	if err := suite.startGoogleCalendarWebAuthorization(); err != nil {
 		return err
 	}
@@ -114,13 +115,24 @@ func (suite *testSuite) authorizeGoogleCalendarAccess() error {
 }
 
 func (suite *testSuite) rejectGoogleCalendarAccess() error {
-	if err := suite.systemReturnsGoogleCalendarWebAuthorization(); err != nil {
-		return err
-	}
 	return suite.requestGoogleCalendar(http.MethodGet, googleCalendarCallbackPath+"?"+url.Values{
 		"error": []string{"access_denied"},
 		"state": []string{suite.lastGoogleCalendarOAuthState},
 	}.Encode(), false)
+}
+
+func (suite *testSuite) googleCalendarAuthorizationWasRejected(email string) error {
+	previousAuth0ID := suite.currentAuth0ID
+	suite.currentAuth0ID = auth0IDForConsumerEmail(email)
+	defer func() { suite.currentAuth0ID = previousAuth0ID }()
+
+	if err := suite.googleCalendarWebAuthorizationIsPending(); err != nil {
+		return err
+	}
+	if err := suite.rejectGoogleCalendarAccess(); err != nil {
+		return err
+	}
+	return suite.systemReportsGoogleCalendarAuthorizationRejected()
 }
 
 func (suite *testSuite) consumerAlreadyHasGoogleCalendarConnection(email string) error {
@@ -138,6 +150,21 @@ func (suite *testSuite) consumerAlreadyHasGoogleCalendarConnection(email string)
 		return err
 	}
 	return suite.systemConfirmsGoogleCalendarConnection()
+}
+
+func (suite *testSuite) calendarConnectionHasStatus(expectedStatus string) error {
+	foundUser, err := suite.userRepository.FindByAuthID(suite.currentAuth0ID)
+	if err != nil {
+		return fmt.Errorf("finding authenticated user for Google Calendar status: %w", err)
+	}
+	connection, err := suite.calendarConnectionRepository.FindByUserID(context.Background(), foundUser.ID())
+	if err != nil {
+		return fmt.Errorf("finding Google Calendar connection status: %w", err)
+	}
+	if connection.Status() != expectedStatus {
+		return fmt.Errorf("expected Google Calendar connection status %q, got %q", expectedStatus, connection.Status())
+	}
+	return nil
 }
 
 func (suite *testSuite) googleCalendarConnectionRequiresAttention(email string) error {
