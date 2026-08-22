@@ -131,6 +131,24 @@ func TestGoogleCalendarConnectionRepositoryCompletesAuthorizationAtomically(t *t
 	assert.NotNil(t, foundAttempt.ConsumedOn)
 }
 
+func TestGoogleCalendarConnectionRepositorySavesDirectConnection(t *testing.T) {
+	testContext := newGoogleCalendarRepositoryTest(t)
+	connection := calendarConnection(t, testContext.userID, "direct-refresh-token")
+
+	err := testContext.connectionStore.Save(context.Background(), connection)
+
+	require.NoError(t, err)
+	found, err := testContext.connectionStore.FindByUserID(context.Background(), testContext.userID)
+	require.NoError(t, err)
+	assert.Equal(t, []byte("direct-refresh-token"), found.RefreshTokenCiphertext())
+	var attemptCount int
+	require.NoError(t, testContext.database.QueryRow(
+		"SELECT COUNT(*) FROM google_calendar_authorization_attempts WHERE user_id = $1",
+		testContext.userID,
+	).Scan(&attemptCount))
+	assert.Equal(t, 0, attemptCount)
+}
+
 func TestGoogleCalendarConnectionRepositoryUpsertsOneConnectionPerUser(t *testing.T) {
 	testContext := newGoogleCalendarRepositoryTest(t)
 	firstAttempt := calendarAuthorizationAttempt(t, testContext.userID, 3)

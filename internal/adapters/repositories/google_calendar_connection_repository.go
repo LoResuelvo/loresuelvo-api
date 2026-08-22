@@ -45,6 +45,20 @@ func (repository *GoogleCalendarConnectionRepository) SaveFromAuthorization(
 	return nil
 }
 
+func (repository *GoogleCalendarConnectionRepository) Save(ctx context.Context, connection *calendarconnection.Connection) error {
+	tx, err := repository.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("beginning calendar connection transaction: %w", err)
+	}
+	if err := repository.saveWithTx(ctx, tx, connection); err != nil {
+		return rollbackCalendarConnectionTx(tx, err)
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("committing calendar connection transaction: %w", err)
+	}
+	return nil
+}
+
 func (repository *GoogleCalendarConnectionRepository) saveWithTx(ctx context.Context, tx *sql.Tx, connection *calendarconnection.Connection) error {
 	_, err := tx.ExecContext(
 		ctx,
