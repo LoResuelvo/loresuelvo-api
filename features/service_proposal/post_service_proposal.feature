@@ -25,7 +25,8 @@ Feature: Crear propuesta de servicio
     
     Rule: Se envia la propuesta de servicio al consumidor ademas de crearla
 
-    Scenario: 53.2-PSP Envio de propuesta de servicio
+    @wip
+    Scenario: 53.2.1-PSP Envio de propuesta de servicio con duración estimada
         Given que existe un chat activo entre el consumidor "ana@example.com" y el prestador "juan.plomero@example.com" con el mensaje inicial:
             """
             Hola Juan, necesito reparar una pérdida de agua en la cocina. ¿Podrías ayudarme esta semana?
@@ -37,6 +38,60 @@ Feature: Crear propuesta de servicio
             Reparación de pérdida de agua en cocina con materiales incluidos.
             """
         Then el consumidor "ana@example.com" recibe en tiempo real la notificación de propuesta de servicio
+        And la notificación de propuesta incluye una duración estimada de "60" minutos
+
+    @wip
+    Scenario: 53.2.2-PSP Registrar y devolver una duración estimada válida
+        Given que existe un chat activo entre el consumidor "ana@example.com" y el prestador "juan.plomero@example.com" con el mensaje inicial:
+            """
+            Hola Juan, necesito reparar una pérdida de agua en la cocina. ¿Podrías ayudarme esta semana?
+            """
+        And que estoy autenticado como prestador "juan.plomero@example.com"
+        When envío una propuesta de servicio al consumidor "ana@example.com" por "15000.50" para la fecha y hora "2026-07-06T09:30:00-03:00" con una duración estimada de "90" minutos con la descripción:
+            """
+            Reparación de pérdida de agua en cocina con materiales incluidos.
+            """
+        Then el sistema registra la propuesta de servicio
+        And la propuesta de servicio informa una duración estimada de "90" minutos
+
+    @wip
+    Scenario: 53.2.3-PSP Rechazar una propuesta sin duración estimada
+        Given que existe un chat activo entre el consumidor "ana@example.com" y el prestador "juan.plomero@example.com" con el mensaje inicial:
+            """
+            Hola Juan, necesito reparar una pérdida de agua en la cocina. ¿Podrías ayudarme esta semana?
+            """
+        And que estoy autenticado como prestador "juan.plomero@example.com"
+        When intento enviar una propuesta de servicio al consumidor "ana@example.com" por "15000.50" para la fecha y hora "2026-07-06T09:30:00-03:00" sin indicar la duración estimada con la descripción:
+            """
+            Reparación de pérdida de agua en cocina con materiales incluidos.
+            """
+        Then el sistema rechaza la propuesta de servicio porque la duración estimada es obligatoria
+
+    @wip
+    Scenario: 53.2.4-PSP Rechazar una duración estimada menor a quince minutos
+        Given que existe un chat activo entre el consumidor "ana@example.com" y el prestador "juan.plomero@example.com" con el mensaje inicial:
+            """
+            Hola Juan, necesito reparar una pérdida de agua en la cocina. ¿Podrías ayudarme esta semana?
+            """
+        And que estoy autenticado como prestador "juan.plomero@example.com"
+        When intento enviar una propuesta de servicio al consumidor "ana@example.com" por "15000.50" para la fecha y hora "2026-07-06T09:30:00-03:00" con una duración estimada de "14" minutos con la descripción:
+            """
+            Reparación de pérdida de agua en cocina con materiales incluidos.
+            """
+        Then el sistema rechaza la propuesta de servicio porque la duración estimada está fuera de rango
+
+    @wip
+    Scenario: 53.2.5-PSP Rechazar una duración estimada mayor a veinticuatro horas
+        Given que existe un chat activo entre el consumidor "ana@example.com" y el prestador "juan.plomero@example.com" con el mensaje inicial:
+            """
+            Hola Juan, necesito reparar una pérdida de agua en la cocina. ¿Podrías ayudarme esta semana?
+            """
+        And que estoy autenticado como prestador "juan.plomero@example.com"
+        When intento enviar una propuesta de servicio al consumidor "ana@example.com" por "15000.50" para la fecha y hora "2026-07-06T09:30:00-03:00" con una duración estimada de "1441" minutos con la descripción:
+            """
+            Reparación de pérdida de agua en cocina con materiales incluidos.
+            """
+        Then el sistema rechaza la propuesta de servicio porque la duración estimada está fuera de rango
 
     Rule: El monto de la propuesta debe ser mayor a cero
 
