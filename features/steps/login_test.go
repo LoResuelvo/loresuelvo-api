@@ -84,6 +84,10 @@ func (suite *testSuite) uploadValidLoginProviderProfilePhoto() error {
 }
 
 func (suite *testSuite) thereIsRegisteredProviderWithProfilePhoto(email, name, surname, categoryName string) error {
+	if err := suite.thereIsCategoryNamed(categoryName); err != nil {
+		return err
+	}
+
 	categoryID, err := suite.categoryIDFor(categoryName)
 	if err != nil {
 		return err
