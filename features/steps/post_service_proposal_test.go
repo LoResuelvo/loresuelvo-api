@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -17,22 +18,24 @@ import (
 )
 
 type serviceProposalCreationRequest struct {
-	ConsumerID  int    `json:"consumer_id"`
-	Amount      string `json:"amount,omitempty"`
-	ScheduledOn string `json:"scheduled_on,omitempty"`
-	Description string `json:"description,omitempty"`
+	ConsumerID               int    `json:"consumer_id"`
+	Amount                   string `json:"amount,omitempty"`
+	ScheduledOn              string `json:"scheduled_on,omitempty"`
+	Description              string `json:"description,omitempty"`
+	EstimatedDurationMinutes int    `json:"estimated_duration_minutes,omitempty"`
 }
 
 type serviceProposalCreationResponse struct {
-	ID             int                  `json:"id"`
-	ConversationID int                  `json:"conversation_id"`
-	ConsumerID     int                  `json:"consumer_id"`
-	ProviderID     int                  `json:"provider_id"`
-	AmountCents    int64                `json:"amount_cents"`
-	ScheduledOn    time.Time            `json:"scheduled_on"`
-	Description    string               `json:"description"`
-	Status         string               `json:"status"`
-	BookingTerms   bookingTermsResponse `json:"booking_terms"`
+	ID                       int                  `json:"id"`
+	ConversationID           int                  `json:"conversation_id"`
+	ConsumerID               int                  `json:"consumer_id"`
+	ProviderID               int                  `json:"provider_id"`
+	AmountCents              int64                `json:"amount_cents"`
+	ScheduledOn              time.Time            `json:"scheduled_on"`
+	Description              string               `json:"description"`
+	Status                   string               `json:"status"`
+	EstimatedDurationMinutes int                  `json:"estimated_duration_minutes"`
+	BookingTerms             bookingTermsResponse `json:"booking_terms"`
 }
 
 type bookingTermsResponse struct {
@@ -55,25 +58,35 @@ type realtimeNotificationEvent struct {
 }
 
 type realtimeNotificationData struct {
-	ID           int        `json:"id"`
-	UserID       int        `json:"user_id"`
-	Type         string     `json:"type"`
-	ResourceType string     `json:"resource_type"`
-	ResourceID   int        `json:"resource_id"`
-	ReadAt       *time.Time `json:"read_at"`
-	CreatedAt    time.Time  `json:"created_at"`
+	ID                       int        `json:"id"`
+	UserID                   int        `json:"user_id"`
+	Type                     string     `json:"type"`
+	ResourceType             string     `json:"resource_type"`
+	ResourceID               int        `json:"resource_id"`
+	EstimatedDurationMinutes int        `json:"estimated_duration_minutes"`
+	ReadAt                   *time.Time `json:"read_at"`
+	CreatedAt                time.Time  `json:"created_at"`
 }
 
 func registerPostServiceProposalSteps(sc *godog.ScenarioContext, suite *testSuite) {
 	sc.Step(`^que la fecha y hora actual del sistema es "([^"]*)"$`, suite.systemDateTimeIs)
 	sc.Step(`^envío una propuesta de servicio al consumidor "([^"]*)" por "([^"]*)" para la fecha y hora "([^"]*)" con la descripción:$`, suite.sendServiceProposalToConsumerForDateTimeWithDescription)
+	sc.Step(`^envío una propuesta de servicio al consumidor "([^"]*)" por "([^"]*)" para la fecha y hora "([^"]*)" con una duración estimada de "([^"]*)" minutos con la descripción:$`, suite.sendServiceProposalToConsumerForDateTimeWithDurationAndDescription)
 	sc.Step(`^intento enviar una propuesta de servicio al consumidor "([^"]*)" por "([^"]*)" para la fecha y hora "([^"]*)" con la descripción:$`, suite.trySendServiceProposalToConsumerForDateTimeWithDescription)
+	sc.Step(`^intento enviar una propuesta de servicio al consumidor "([^"]*)" por "([^"]*)" para la fecha y hora "([^"]*)" con una duración estimada de "([^"]*)" minutos con la descripción:$`, suite.trySendServiceProposalToConsumerForDateTimeWithDurationAndDescription)
+	sc.Step(`^intento enviar una propuesta de servicio al consumidor "([^"]*)" por "([^"]*)" para la fecha y hora "([^"]*)" sin indicar la duración estimada con la descripción:$`, suite.trySendServiceProposalToConsumerWithoutEstimatedDuration)
 	sc.Step(`^intento enviar una propuesta de servicio al consumidor "([^"]*)" con falta de parámetros$`, suite.trySendServiceProposalToConsumerWithMissingParameters)
 	sc.Step(`^envío una propuesta con precio total de servicio de "([^"]*)" pesos para la fecha y hora "([^"]*)"$`, suite.sendServiceProposalWithServiceTotal)
+	sc.Step(`^envío una propuesta con precio total de servicio de "([^"]*)" pesos para la fecha y hora "([^"]*)" con una duración estimada de "([^"]*)" minutos$`, suite.sendServiceProposalWithServiceTotalAndDuration)
 	sc.Step(`^intento enviar una propuesta con precio total de servicio de "([^"]*)" pesos para la fecha y hora "([^"]*)"$`, suite.trySendServiceProposalWithServiceTotal)
+	sc.Step(`^intento enviar una propuesta con precio total de servicio de "([^"]*)" pesos para la fecha y hora "([^"]*)" con una duración estimada de "([^"]*)" minutos$`, suite.trySendServiceProposalWithServiceTotalAndDuration)
 	sc.Step(`^el sistema registra la propuesta de servicio$`, suite.systemRegistersServiceProposal)
 	sc.Step(`^el consumidor "([^"]*)" recibe en tiempo real la notificación de propuesta de servicio$`, suite.consumerReceivesRealtimeServiceProposalNotification)
+	sc.Step(`^la notificación de propuesta incluye una duración estimada de "([^"]*)" minutos$`, suite.serviceProposalNotificationIncludesEstimatedDuration)
+	sc.Step(`^la propuesta de servicio informa una duración estimada de "([^"]*)" minutos$`, suite.serviceProposalReportsEstimatedDuration)
 	sc.Step(`^el sistema rechaza la propuesta de servicio porque el monto es inválido$`, suite.systemRejectsServiceProposalBecauseAmountIsInvalid)
+	sc.Step(`^el sistema rechaza la propuesta de servicio porque la duración estimada es obligatoria$`, suite.systemRejectsServiceProposalBecauseEstimatedDurationIsRequired)
+	sc.Step(`^el sistema rechaza la propuesta de servicio porque la duración estimada está fuera de rango$`, suite.systemRejectsServiceProposalBecauseEstimatedDurationIsOutOfRange)
 	sc.Step(`^el sistema rechaza la propuesta de servicio porque no existe un chat activo con ese consumidor$`, suite.systemRejectsServiceProposalBecauseActiveChatIsRequired)
 	sc.Step(`^el sistema rechaza la propuesta de servicio porque la fecha y hora debe ser futura$`, suite.systemRejectsServiceProposalBecauseScheduledOnMustBeFuture)
 	sc.Step(`^el sistema rechaza la propuesta de servicio porque faltan parámetros obligatorios$`, suite.systemRejectsServiceProposalBecauseRequiredParametersAreMissing)
@@ -92,15 +105,41 @@ func (suite *testSuite) systemDateTimeIs(currentDateTime string) error {
 }
 
 func (suite *testSuite) sendServiceProposalToConsumerForDateTimeWithDescription(consumerEmail, amount, scheduledOn string, description *godog.DocString) error {
+	return suite.sendServiceProposalToConsumerForDateTimeWithDurationAndDescription(consumerEmail, amount, scheduledOn, "60", description)
+}
+
+func (suite *testSuite) sendServiceProposalToConsumerForDateTimeWithDurationAndDescription(consumerEmail, amount, scheduledOn, duration string, description *godog.DocString) error {
+	testDuration, err := strconv.Atoi(duration)
+	if err != nil {
+		return fmt.Errorf("parsing estimated duration %q: %w", duration, err)
+	}
 	return suite.requestServiceProposalToConsumer(consumerEmail, serviceProposalPayload{
-		amount:      amount,
-		scheduledOn: scheduledOn,
-		description: normalizeDocString(description),
+		amount:                   amount,
+		scheduledOn:              scheduledOn,
+		description:              normalizeDocString(description),
+		estimatedDurationMinutes: testDuration,
 	})
 }
 
 func (suite *testSuite) trySendServiceProposalToConsumerForDateTimeWithDescription(consumerEmail, amount, scheduledOn string, description *godog.DocString) error {
 	return suite.sendServiceProposalToConsumerForDateTimeWithDescription(consumerEmail, amount, scheduledOn, description)
+}
+
+func (suite *testSuite) trySendServiceProposalToConsumerForDateTimeWithDurationAndDescription(consumerEmail, amount, scheduledOn, duration string, description *godog.DocString) error {
+	return suite.sendServiceProposalToConsumerForDateTimeWithDurationAndDescription(consumerEmail, amount, scheduledOn, duration, description)
+}
+
+func (suite *testSuite) trySendServiceProposalToConsumerWithoutEstimatedDuration(consumerEmail, amount, scheduledOn string, description *godog.DocString) error {
+	consumerID, err := suite.userRepository.FindIDByEmail(consumerEmail)
+	if err != nil {
+		return err
+	}
+	return suite.requestServiceProposal(serviceProposalCreationRequest{
+		ConsumerID:  consumerID,
+		Amount:      amount,
+		ScheduledOn: scheduledOn,
+		Description: normalizeDocString(description),
+	})
 }
 
 func (suite *testSuite) trySendServiceProposalToConsumerWithMissingParameters(consumerEmail string) error {
@@ -113,15 +152,28 @@ func (suite *testSuite) trySendServiceProposalToConsumerWithMissingParameters(co
 }
 
 func (suite *testSuite) sendServiceProposalWithServiceTotal(amount, scheduledOn string) error {
+	return suite.sendServiceProposalWithServiceTotalAndDuration(amount, scheduledOn, "60")
+}
+
+func (suite *testSuite) sendServiceProposalWithServiceTotalAndDuration(amount, scheduledOn, duration string) error {
+	testDuration, err := strconv.Atoi(duration)
+	if err != nil {
+		return fmt.Errorf("parsing estimated duration %q: %w", duration, err)
+	}
 	return suite.requestServiceProposalToConsumer("ana@example.com", serviceProposalPayload{
-		amount:      amount,
-		scheduledOn: scheduledOn,
-		description: defaultServiceProposalDescription,
+		amount:                   amount,
+		scheduledOn:              scheduledOn,
+		description:              defaultServiceProposalDescription,
+		estimatedDurationMinutes: testDuration,
 	})
 }
 
 func (suite *testSuite) trySendServiceProposalWithServiceTotal(amount, scheduledOn string) error {
 	return suite.sendServiceProposalWithServiceTotal(amount, scheduledOn)
+}
+
+func (suite *testSuite) trySendServiceProposalWithServiceTotalAndDuration(amount, scheduledOn, duration string) error {
+	return suite.sendServiceProposalWithServiceTotalAndDuration(amount, scheduledOn, duration)
 }
 
 func (suite *testSuite) systemRegistersServiceProposal() error {
@@ -181,6 +233,21 @@ func (suite *testSuite) systemRegistersServiceProposal() error {
 	return nil
 }
 
+func (suite *testSuite) serviceProposalReportsEstimatedDuration(expectedDuration string) error {
+	expected, err := strconv.Atoi(expectedDuration)
+	if err != nil {
+		return fmt.Errorf("parsing expected estimated duration %q: %w", expectedDuration, err)
+	}
+	response, err := suite.serviceProposalCreationResponseFromLastBody()
+	if err != nil {
+		return err
+	}
+	if response.EstimatedDurationMinutes != expected {
+		return fmt.Errorf("expected service proposal estimated duration %d minutes, got %d", expected, response.EstimatedDurationMinutes)
+	}
+	return nil
+}
+
 func (suite *testSuite) consumerReceivesRealtimeServiceProposalNotification(email string) error {
 	connection, err := suite.realtimeConnectionForEmail(email)
 	if err != nil {
@@ -219,6 +286,9 @@ func (suite *testSuite) consumerReceivesRealtimeServiceProposalNotification(emai
 	if notification.ResourceID != response.ID {
 		return fmt.Errorf("expected notification resource_id %d, got %d", response.ID, notification.ResourceID)
 	}
+	if notification.EstimatedDurationMinutes != response.EstimatedDurationMinutes {
+		return fmt.Errorf("expected notification estimated duration %d minutes, got %d", response.EstimatedDurationMinutes, notification.EstimatedDurationMinutes)
+	}
 	if notification.ReadAt != nil {
 		return fmt.Errorf("expected unread realtime notification, got read_at %s", notification.ReadAt.Format(time.RFC3339))
 	}
@@ -229,7 +299,30 @@ func (suite *testSuite) consumerReceivesRealtimeServiceProposalNotification(emai
 	return nil
 }
 
+func (suite *testSuite) serviceProposalNotificationIncludesEstimatedDuration(expectedDuration string) error {
+	expected, err := strconv.Atoi(expectedDuration)
+	if err != nil {
+		return fmt.Errorf("parsing expected notification duration %q: %w", expectedDuration, err)
+	}
+	response, err := suite.serviceProposalCreationResponseFromLastBody()
+	if err != nil {
+		return err
+	}
+	if response.EstimatedDurationMinutes != expected {
+		return fmt.Errorf("expected service proposal response estimated duration %d minutes, got %d", expected, response.EstimatedDurationMinutes)
+	}
+	return nil
+}
+
 func (suite *testSuite) systemRejectsServiceProposalBecauseAmountIsInvalid() error {
+	return suite.conversationRequestShouldFailWithStatus(http.StatusBadRequest)
+}
+
+func (suite *testSuite) systemRejectsServiceProposalBecauseEstimatedDurationIsRequired() error {
+	return suite.conversationRequestShouldFailWithStatus(http.StatusBadRequest)
+}
+
+func (suite *testSuite) systemRejectsServiceProposalBecauseEstimatedDurationIsOutOfRange() error {
 	return suite.conversationRequestShouldFailWithStatus(http.StatusBadRequest)
 }
 
@@ -421,9 +514,10 @@ func bookingPricingTableInCents(table *godog.Table) (map[string]int64, error) {
 }
 
 type serviceProposalPayload struct {
-	amount      string
-	scheduledOn string
-	description string
+	amount                   string
+	scheduledOn              string
+	description              string
+	estimatedDurationMinutes int
 }
 
 func (suite *testSuite) requestServiceProposalToConsumer(consumerEmail string, payload serviceProposalPayload) error {
@@ -433,10 +527,11 @@ func (suite *testSuite) requestServiceProposalToConsumer(consumerEmail string, p
 	}
 
 	return suite.requestServiceProposal(serviceProposalCreationRequest{
-		ConsumerID:  consumerID,
-		Amount:      payload.amount,
-		ScheduledOn: payload.scheduledOn,
-		Description: payload.description,
+		ConsumerID:               consumerID,
+		Amount:                   payload.amount,
+		ScheduledOn:              payload.scheduledOn,
+		Description:              payload.description,
+		EstimatedDurationMinutes: payload.estimatedDurationMinutes,
 	})
 }
 
