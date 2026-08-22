@@ -53,7 +53,6 @@ Feature: Vincular Google Calendar
         And consulto mi información de usuario autenticado
         Then el perfil informa el estado de Google Calendar "connected"
 
-    @wip
     Scenario: 57.6-CGC Un usuario vuelve a autorizar una conexión que requiere atención
         Given que existe un consumidor registrado con correo "ana@example.com", nombre "Ana" y apellido "Pérez" sin foto de perfil
         And que la conexión de Google Calendar de "ana@example.com" requiere atención
