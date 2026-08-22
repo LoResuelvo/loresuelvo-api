@@ -42,7 +42,6 @@ Feature: Vincular Google Calendar
         And consulto mi información de usuario autenticado
         Then el perfil informa el estado de Google Calendar "disconnected"
 
-    @wip
     Scenario: 57.5-CGC Una nueva vinculación no duplica una conexión activa
         Given que existe un consumidor registrado con correo "ana@example.com", nombre "Ana" y apellido "Pérez" sin foto de perfil
         And que el consumidor "ana@example.com" ya tiene Google Calendar vinculado
