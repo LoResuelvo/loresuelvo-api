@@ -35,6 +35,12 @@ func (client *FakeOAuthClient) AuthorizationURL(state, codeVerifier string) (str
 
 func (client *FakeOAuthClient) ExchangeAuthorizationCode(_ context.Context, code, _ string) (calendarconnection.AuthorizationCredentials, error) {
 	const authorizedPrefix = "authorized:"
+	if code == "android-calendar-code" {
+		return calendarconnection.AuthorizationCredentials{
+			CalendarID:   primaryCalendarID,
+			RefreshToken: "fake-refresh-token-for-android",
+		}, nil
+	}
 	if !strings.HasPrefix(code, authorizedPrefix) {
 		return calendarconnection.AuthorizationCredentials{}, ErrAuthorizationCodeUnusable
 	}
