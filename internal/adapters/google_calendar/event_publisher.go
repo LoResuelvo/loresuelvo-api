@@ -103,16 +103,28 @@ func (publisher *CalendarEventPublisher) createEvent(
 	appointment workordercalendar.Appointment,
 ) (string, error) {
 	payload := struct {
-		Summary string `json:"summary"`
-		Start   struct {
+		Summary      string `json:"summary"`
+		Description  string `json:"description"`
+		Visibility   string `json:"visibility"`
+		Transparency string `json:"transparency"`
+		Start        struct {
 			DateTime time.Time `json:"dateTime"`
 		} `json:"start"`
 		End struct {
 			DateTime time.Time `json:"dateTime"`
 		} `json:"end"`
-	}{Summary: "Servicio de LoResuelvo"}
+		Reminders struct {
+			UseDefault bool `json:"useDefault"`
+		} `json:"reminders"`
+	}{
+		Summary:      "Servicio de LoResuelvo",
+		Description:  fmt.Sprintf("Con: %s\n\n%s", appointment.CounterpartName(), appointment.Description()),
+		Visibility:   "private",
+		Transparency: "opaque",
+	}
 	payload.Start.DateTime = appointment.ScheduledOn()
 	payload.End.DateTime = appointment.EndsOn()
+	payload.Reminders.UseDefault = true
 	body, err := json.Marshal(payload)
 	if err != nil {
 		return "", fmt.Errorf("encoding Google Calendar event: %w", err)

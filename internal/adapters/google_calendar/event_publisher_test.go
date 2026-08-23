@@ -70,16 +70,27 @@ func TestCalendarEventPublisherRefreshesCredentialsAndCreatesAnEvent(t *testing.
 	assert.Equal(t, "/calendar/v3/calendars/primary/events", receivedEventPath)
 	assert.Equal(t, "Bearer access-token", receivedAuthorization)
 	var eventPayload struct {
-		Summary string `json:"summary"`
-		Start   struct {
+		Summary      string `json:"summary"`
+		Description  string `json:"description"`
+		Visibility   string `json:"visibility"`
+		Transparency string `json:"transparency"`
+		Start        struct {
 			DateTime time.Time `json:"dateTime"`
 		} `json:"start"`
 		End struct {
 			DateTime time.Time `json:"dateTime"`
 		} `json:"end"`
+		Reminders struct {
+			UseDefault bool `json:"useDefault"`
+		} `json:"reminders"`
 	}
 	require.NoError(t, json.Unmarshal(receivedEventBody, &eventPayload))
 	assert.Equal(t, "Servicio de LoResuelvo", eventPayload.Summary)
+	assert.Contains(t, eventPayload.Description, appointment.CounterpartName())
+	assert.Contains(t, eventPayload.Description, appointment.Description())
+	assert.Equal(t, "private", eventPayload.Visibility)
+	assert.Equal(t, "opaque", eventPayload.Transparency)
+	assert.True(t, eventPayload.Reminders.UseDefault)
 	assert.True(t, eventPayload.Start.DateTime.Equal(appointment.ScheduledOn()))
 	assert.True(t, eventPayload.End.DateTime.Equal(appointment.EndsOn()))
 	protector.AssertExpectations(t)
