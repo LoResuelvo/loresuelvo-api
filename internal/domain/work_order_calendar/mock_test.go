@@ -38,6 +38,11 @@ func (m *connectionReaderMock) FindByUserID(ctx context.Context, userID int) (*c
 
 type eventRepositoryMock struct{ mock.Mock }
 
+func (m *eventRepositoryMock) Exists(ctx context.Context, key workordercalendar.EventKey) (bool, error) {
+	args := m.Called(ctx, key)
+	return args.Bool(0), args.Error(1)
+}
+
 func (m *eventRepositoryMock) Save(ctx context.Context, event *workordercalendar.Event) error {
 	return m.Called(ctx, event).Error(0)
 }

@@ -10,6 +10,7 @@ import (
 )
 
 type EventRepository interface {
+	Exists(ctx context.Context, key EventKey) (bool, error)
 	Save(ctx context.Context, event *Event) error
 }
 

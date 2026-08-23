@@ -75,6 +75,13 @@ func (service *Service) syncParticipant(
 	if err != nil {
 		return fmt.Errorf("creating calendar event: %w", err)
 	}
+	alreadySynchronized, err := service.events.Exists(ctx, event.Key())
+	if err != nil {
+		return fmt.Errorf("checking existing calendar appointment: %w", err)
+	}
+	if alreadySynchronized {
+		return nil
+	}
 	appointment := NewAppointment(order, participant, counterpart)
 	published, err := service.publisher.Create(ctx, connection, appointment)
 	if err != nil {
