@@ -11,6 +11,7 @@ import (
 	googlecalendar "github.com/LoResuelvo/loresuelvo-api/internal/adapters/google_calendar"
 	httphandler "github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler"
 	calendarconnection "github.com/LoResuelvo/loresuelvo-api/internal/domain/calendar_connection"
+	serviceproposal "github.com/LoResuelvo/loresuelvo-api/internal/domain/service_proposal"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/user"
 	"github.com/cucumber/godog"
 )
@@ -27,9 +28,14 @@ type calendarEventDetailsObserver interface {
 	EventDetailsForUser(context.Context, int, int) (googlecalendar.EventDetails, bool, error)
 }
 
+type calendarAvailabilityController interface {
+	SetAvailable(bool)
+}
+
 func registerAddWorkOrderToCalendarSteps(sc *godog.ScenarioContext, suite *testSuite) {
 	sc.Step(`^que existe una orden de trabajo futura para "([^"]*)" y "([^"]*)" el "([^"]*)" con una duración estimada de "([^"]*)" minutos y la descripción:$`, suite.thereIsFutureCalendarWorkOrder)
 	sc.Step(`^que existe una orden de trabajo pasada para "([^"]*)" y "([^"]*)" el "([^"]*)" con una duración estimada de "([^"]*)" minutos y la descripción:$`, suite.thereIsPastCalendarWorkOrder)
+	sc.Step(`^que existe una propuesta de servicio pendiente de "([^"]*)" para "([^"]*)" el "([^"]*)" con una duración estimada de "([^"]*)" minutos y la descripción:$`, suite.thereIsPendingCalendarConfirmationProposal)
 	sc.Step(`^el consumidor "([^"]*)" tiene Google Calendar conectado$`, suite.consumerHasGoogleCalendarConnectedForWorkOrder)
 	sc.Step(`^el prestador "([^"]*)" tiene Google Calendar conectado$`, suite.providerHasGoogleCalendarConnectedForWorkOrder)
 	sc.Step(`^el consumidor "([^"]*)" no tiene Google Calendar conectado$`, suite.consumerDoesNotHaveGoogleCalendarConnection)
@@ -44,6 +50,9 @@ func registerAddWorkOrderToCalendarSteps(sc *godog.ScenarioContext, suite *testS
 	sc.Step(`^no se crea ninguna cita en Google Calendar$`, suite.noCalendarAppointmentIsCreated)
 	sc.Step(`^el consumidor "([^"]*)" tiene una orden futura sin exportar$`, suite.consumerHasUnexportedFutureCalendarWorkOrder)
 	sc.Step(`^el consumidor "([^"]*)" acaba de conectar Google Calendar$`, suite.consumerJustConnectedGoogleCalendar)
+	sc.Step(`^Google Calendar no está disponible$`, suite.googleCalendarIsUnavailable)
+	sc.Step(`^se confirma la contratación de la propuesta$`, suite.confirmCalendarBooking)
+	sc.Step(`^la contratación queda confirmada aunque no se pueda crear la cita$`, suite.calendarBookingIsConfirmedDespiteUnavailableCalendar)
 }
 
 func (suite *testSuite) thereIsFutureCalendarWorkOrder(consumerEmail, providerEmail, scheduledOn, duration string, description *godog.DocString) error {
@@ -97,6 +106,37 @@ func (suite *testSuite) thereIsPastCalendarWorkOrder(consumerEmail, providerEmai
 		normalizeDocString(description),
 		estimatedDuration,
 	)
+}
+
+func (suite *testSuite) thereIsPendingCalendarConfirmationProposal(providerEmail, consumerEmail, scheduledOn, duration string, description *godog.DocString) error {
+	if err := suite.prepareCalendarWorkOrderParticipants(providerEmail, consumerEmail); err != nil {
+		return err
+	}
+	amountCents, err := httphandler.ParseAmountToCents("100000.00")
+	if err != nil {
+		return fmt.Errorf("parsing calendar confirmation amount: %w", err)
+	}
+	scheduledAt, err := time.Parse(time.RFC3339, scheduledOn)
+	if err != nil {
+		return fmt.Errorf("parsing calendar confirmation scheduled_on: %w", err)
+	}
+	estimatedDuration, err := strconv.Atoi(duration)
+	if err != nil {
+		return fmt.Errorf("parsing calendar confirmation duration: %w", err)
+	}
+	if err := suite.createServiceProposalFixture(
+		providerEmail,
+		consumerEmail,
+		serviceproposal.StatusPending,
+		amountCents,
+		scheduledAt.UTC(),
+		normalizeDocString(description),
+		estimatedDuration,
+	); err != nil {
+		return err
+	}
+	suite.currentAuth0ID = auth0IDForConsumerEmail(consumerEmail)
+	return nil
 }
 
 func (suite *testSuite) prepareCalendarWorkOrderParticipants(providerEmail, consumerEmail string) error {
@@ -168,6 +208,31 @@ func (suite *testSuite) syncFutureWorkOrdersToCalendar() error {
 		return fmt.Errorf("calendar synchronization runner is not configured")
 	}
 	return suite.calendarSyncRunner.RunOnce(context.Background())
+}
+
+func (suite *testSuite) googleCalendarIsUnavailable() error {
+	if suite.calendarAvailability == nil {
+		return fmt.Errorf("calendar availability controller is not configured")
+	}
+	suite.calendarAvailability.SetAvailable(false)
+	return nil
+}
+
+func (suite *testSuite) confirmCalendarBooking() error {
+	if suite.currentAuth0ID == "" {
+		return fmt.Errorf("expected an authenticated consumer to confirm the booking")
+	}
+	if err := suite.startCheckoutForPreparedProposal(); err != nil {
+		return err
+	}
+	return suite.processApprovedPayment()
+}
+
+func (suite *testSuite) calendarBookingIsConfirmedDespiteUnavailableCalendar() error {
+	if err := suite.serviceProposalIsAccepted(); err != nil {
+		return err
+	}
+	return suite.systemRegistersOneScheduledWorkOrder()
 }
 
 func (suite *testSuite) consumerReceivesCalendarAppointment(email string) error {

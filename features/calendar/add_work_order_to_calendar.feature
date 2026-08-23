@@ -81,12 +81,13 @@ Feature: Agregar una orden de trabajo a Google Calendar
         When se sincronizan las órdenes de trabajo futuras con Google Calendar
         Then la cita del consumidor "ana@example.com" muestra el horario "2026-08-15T15:00:00Z", dura "90" minutos, identifica a "Juan Gómez", contiene la descripción y es privada
 
-    @wip
     Scenario: 22.8-AWOC Una indisponibilidad de Calendar no impide confirmar la contratación
-        Given que existe una propuesta aceptada por "ana@example.com" y "juan.plomero@example.com" para el "2026-08-15T15:00:00Z" con una duración estimada de "90" minutos y la descripción:
+        Given que la fecha y hora actual del sistema es "2026-08-01T10:00:00Z"
+        Given que existe una propuesta de servicio pendiente de "juan.plomero@example.com" para "ana@example.com" el "2026-08-15T15:00:00Z" con una duración estimada de "90" minutos y la descripción:
             """
             Reparación de pérdida de agua en cocina con materiales incluidos.
             """
+        And que la cuenta de Mercado Pago "mp-juan" está vinculada al prestador "juan.plomero@example.com"
         And el consumidor "ana@example.com" tiene Google Calendar conectado
         And Google Calendar no está disponible
         When se confirma la contratación de la propuesta

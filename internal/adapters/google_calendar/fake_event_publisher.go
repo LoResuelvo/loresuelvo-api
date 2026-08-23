@@ -27,12 +27,19 @@ type EventDetails struct {
 }
 
 type FakeEventPublisher struct {
-	mu     sync.RWMutex
-	events map[fakeEventKey]EventDetails
+	mu        sync.RWMutex
+	available bool
+	events    map[fakeEventKey]EventDetails
 }
 
 func NewFakeEventPublisher() *FakeEventPublisher {
-	return &FakeEventPublisher{events: make(map[fakeEventKey]EventDetails)}
+	return &FakeEventPublisher{available: true, events: make(map[fakeEventKey]EventDetails)}
+}
+
+func (publisher *FakeEventPublisher) SetAvailable(available bool) {
+	publisher.mu.Lock()
+	publisher.available = available
+	publisher.mu.Unlock()
 }
 
 func (publisher *FakeEventPublisher) Create(
@@ -40,6 +47,12 @@ func (publisher *FakeEventPublisher) Create(
 	connection *calendarconnection.Connection,
 	appointment workordercalendar.Appointment,
 ) (workordercalendar.PublishedEvent, error) {
+	publisher.mu.RLock()
+	available := publisher.available
+	publisher.mu.RUnlock()
+	if !available {
+		return workordercalendar.PublishedEvent{}, fmt.Errorf("Google Calendar is unavailable")
+	}
 	key := fakeEventKey{
 		userID:      appointment.Participant().ID(),
 		workOrderID: appointment.WorkOrder().ID(),

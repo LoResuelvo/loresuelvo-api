@@ -49,6 +49,7 @@ type testSuite struct {
 	calendarSyncRunner           calendarSyncRunner
 	calendarEventObserver        calendarEventObserver
 	calendarEventDetailsObserver calendarEventDetailsObserver
+	calendarAvailability         calendarAvailabilityController
 	auth0Validator               *validator.Validator
 	tokenBuilder                 *auth0.TokenBuilder
 	chatbot                      *chatbotadapter.FakeChatbot
@@ -223,6 +224,9 @@ func (s *testSuite) cleanup() error {
 	}
 
 	s.clock.Reset()
+	if s.calendarAvailability != nil {
+		s.calendarAvailability.SetAvailable(true)
+	}
 
 	s.categoryIDsByName = map[string]int{}
 	s.participantRolesByFullName = map[string]string{}
@@ -330,6 +334,10 @@ func newTestSuite(tb testing.TB, database *sql.DB) *testSuite {
 	if observer, ok := dependencies.CalendarEventObserver.(calendarEventDetailsObserver); ok {
 		eventDetailsObserver = observer
 	}
+	var availabilityController calendarAvailabilityController
+	if controller, ok := dependencies.CalendarEventObserver.(calendarAvailabilityController); ok {
+		availabilityController = controller
+	}
 
 	// httptest.Server wraps the engine — no port needed
 	server := httptest.NewServer(engine)
@@ -357,6 +365,7 @@ func newTestSuite(tb testing.TB, database *sql.DB) *testSuite {
 		calendarSyncRunner:           dependencies.CalendarSyncRunner,
 		calendarEventObserver:        dependencies.CalendarEventObserver,
 		calendarEventDetailsObserver: eventDetailsObserver,
+		calendarAvailability:         availabilityController,
 		auth0Validator:               auth0Validator,
 		tokenBuilder:                 tokenBuilder,
 		chatbot:                      chatbot,
