@@ -93,12 +93,13 @@ Feature: Agregar una orden de trabajo a Google Calendar
         When se confirma la contratación de la propuesta
         Then la contratación queda confirmada aunque no se pueda crear la cita
 
-    @wip
     Scenario: 22.9-AWOC La cita aparece cuando Calendar vuelve a estar disponible
+        Given que la fecha y hora actual del sistema es "2026-08-01T10:00:00Z"
         Given que existe una orden de trabajo futura para "ana@example.com" y "juan.plomero@example.com" el "2026-08-15T15:00:00Z" con una duración estimada de "90" minutos y la descripción:
             """
             Reparación de pérdida de agua en cocina con materiales incluidos.
             """
+        And el consumidor "ana@example.com" tiene Google Calendar conectado
         And el consumidor "ana@example.com" tiene una cita pendiente por una indisponibilidad de Google Calendar
         And Google Calendar volvió a estar disponible
         When se reintenta la sincronización de la cita pendiente

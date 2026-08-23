@@ -51,6 +51,9 @@ func registerAddWorkOrderToCalendarSteps(sc *godog.ScenarioContext, suite *testS
 	sc.Step(`^el consumidor "([^"]*)" tiene una orden futura sin exportar$`, suite.consumerHasUnexportedFutureCalendarWorkOrder)
 	sc.Step(`^el consumidor "([^"]*)" acaba de conectar Google Calendar$`, suite.consumerJustConnectedGoogleCalendar)
 	sc.Step(`^Google Calendar no está disponible$`, suite.googleCalendarIsUnavailable)
+	sc.Step(`^el consumidor "([^"]*)" tiene una cita pendiente por una indisponibilidad de Google Calendar$`, suite.consumerHasPendingCalendarAppointment)
+	sc.Step(`^Google Calendar volvió a estar disponible$`, suite.googleCalendarBecameAvailable)
+	sc.Step(`^se reintenta la sincronización de la cita pendiente$`, suite.retryPendingCalendarAppointmentSync)
 	sc.Step(`^se confirma la contratación de la propuesta$`, suite.confirmCalendarBooking)
 	sc.Step(`^la contratación queda confirmada aunque no se pueda crear la cita$`, suite.calendarBookingIsConfirmedDespiteUnavailableCalendar)
 }
@@ -216,6 +219,37 @@ func (suite *testSuite) googleCalendarIsUnavailable() error {
 	}
 	suite.calendarAvailability.SetAvailable(false)
 	return nil
+}
+
+func (suite *testSuite) consumerHasPendingCalendarAppointment(email string) error {
+	if err := suite.googleCalendarIsUnavailable(); err != nil {
+		return err
+	}
+	if suite.calendarSyncRunner == nil {
+		return fmt.Errorf("calendar synchronization runner is not configured")
+	}
+	if err := suite.calendarSyncRunner.RunOnce(context.Background()); err == nil {
+		return fmt.Errorf("expected calendar synchronization to fail while Calendar is unavailable")
+	}
+	if _, err := suite.userRepository.FindIDByAuthID(auth0IDForConsumerEmail(email)); err != nil {
+		return fmt.Errorf("finding pending calendar appointment consumer %q: %w", email, err)
+	}
+	return nil
+}
+
+func (suite *testSuite) googleCalendarBecameAvailable() error {
+	if suite.calendarAvailability == nil {
+		return fmt.Errorf("calendar availability controller is not configured")
+	}
+	suite.calendarAvailability.SetAvailable(true)
+	return nil
+}
+
+func (suite *testSuite) retryPendingCalendarAppointmentSync() error {
+	if suite.calendarSyncRunner == nil {
+		return fmt.Errorf("calendar synchronization runner is not configured")
+	}
+	return suite.calendarSyncRunner.RunOnce(context.Background())
 }
 
 func (suite *testSuite) confirmCalendarBooking() error {
