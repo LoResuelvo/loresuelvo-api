@@ -24,10 +24,12 @@ func registerAddWorkOrderToCalendarSteps(sc *godog.ScenarioContext, suite *testS
 	sc.Step(`^que existe una orden de trabajo futura para "([^"]*)" y "([^"]*)" el "([^"]*)" con una duración estimada de "([^"]*)" minutos y la descripción:$`, suite.thereIsFutureCalendarWorkOrder)
 	sc.Step(`^el consumidor "([^"]*)" tiene Google Calendar conectado$`, suite.consumerHasGoogleCalendarConnectedForWorkOrder)
 	sc.Step(`^el prestador "([^"]*)" tiene Google Calendar conectado$`, suite.providerHasGoogleCalendarConnectedForWorkOrder)
+	sc.Step(`^el consumidor "([^"]*)" no tiene Google Calendar conectado$`, suite.consumerDoesNotHaveGoogleCalendarConnection)
 	sc.Step(`^el prestador "([^"]*)" no tiene Google Calendar conectado$`, suite.providerDoesNotHaveGoogleCalendarConnection)
 	sc.Step(`^se sincronizan las órdenes de trabajo futuras con Google Calendar$`, suite.syncFutureWorkOrdersToCalendar)
 	sc.Step(`^el consumidor "([^"]*)" recibe su cita en su Google Calendar$`, suite.consumerReceivesCalendarAppointment)
 	sc.Step(`^el prestador "([^"]*)" recibe su cita en su Google Calendar$`, suite.providerReceivesCalendarAppointment)
+	sc.Step(`^el consumidor "([^"]*)" no recibe una cita en Google Calendar$`, suite.consumerDoesNotReceiveCalendarAppointment)
 	sc.Step(`^el prestador "([^"]*)" no recibe una cita en Google Calendar$`, suite.providerDoesNotReceiveCalendarAppointment)
 }
 
@@ -82,19 +84,27 @@ func (suite *testSuite) providerHasGoogleCalendarConnectedForWorkOrder(email str
 	return suite.connectGoogleCalendarForWorkOrderParticipant(email, auth0IDForProviderEmail(email))
 }
 
+func (suite *testSuite) consumerDoesNotHaveGoogleCalendarConnection(email string) error {
+	return suite.participantDoesNotHaveGoogleCalendarConnection("consumer", email, auth0IDForConsumerEmail(email))
+}
+
 func (suite *testSuite) providerDoesNotHaveGoogleCalendarConnection(email string) error {
-	userID, err := suite.userRepository.FindIDByAuthID(auth0IDForProviderEmail(email))
+	return suite.participantDoesNotHaveGoogleCalendarConnection("provider", email, auth0IDForProviderEmail(email))
+}
+
+func (suite *testSuite) participantDoesNotHaveGoogleCalendarConnection(role, email, authID string) error {
+	userID, err := suite.userRepository.FindIDByAuthID(authID)
 	if err != nil {
-		return fmt.Errorf("finding provider %q: %w", email, err)
+		return fmt.Errorf("finding %s %q: %w", role, email, err)
 	}
 	_, err = suite.calendarConnectionRepository.FindByUserID(context.Background(), userID)
 	if errors.Is(err, calendarconnection.ErrConnectionNotFound) {
 		return nil
 	}
 	if err != nil {
-		return fmt.Errorf("checking Google Calendar connection for provider %q: %w", email, err)
+		return fmt.Errorf("checking Google Calendar connection for %s %q: %w", role, email, err)
 	}
-	return fmt.Errorf("expected provider %q not to have a Google Calendar connection", email)
+	return fmt.Errorf("expected %s %q not to have a Google Calendar connection", role, email)
 }
 
 func (suite *testSuite) connectGoogleCalendarForWorkOrderParticipant(email, authID string) error {
@@ -128,11 +138,19 @@ func (suite *testSuite) providerReceivesCalendarAppointment(email string) error 
 	return suite.participantReceivesCalendarAppointment(email, auth0IDForProviderEmail(email))
 }
 
+func (suite *testSuite) consumerDoesNotReceiveCalendarAppointment(email string) error {
+	return suite.participantDoesNotReceiveCalendarAppointment(email, auth0IDForConsumerEmail(email))
+}
+
 func (suite *testSuite) providerDoesNotReceiveCalendarAppointment(email string) error {
+	return suite.participantDoesNotReceiveCalendarAppointment(email, auth0IDForProviderEmail(email))
+}
+
+func (suite *testSuite) participantDoesNotReceiveCalendarAppointment(email, authID string) error {
 	if suite.calendarEventObserver == nil {
 		return fmt.Errorf("calendar event observer is not configured")
 	}
-	userID, err := suite.userRepository.FindIDByAuthID(auth0IDForProviderEmail(email))
+	userID, err := suite.userRepository.FindIDByAuthID(authID)
 	if err != nil {
 		return fmt.Errorf("finding calendar appointment recipient %q: %w", email, err)
 	}
