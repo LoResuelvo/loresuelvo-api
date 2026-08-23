@@ -70,6 +70,7 @@ type realtimeNotificationData struct {
 
 func registerPostServiceProposalSteps(sc *godog.ScenarioContext, suite *testSuite) {
 	sc.Step(`^que la fecha y hora actual del sistema es "([^"]*)"$`, suite.systemDateTimeIs)
+	sc.Step(`^la fecha y hora actual del sistema es "([^"]*)"$`, suite.systemDateTimeIs)
 	sc.Step(`^envío una propuesta de servicio al consumidor "([^"]*)" por "([^"]*)" para la fecha y hora "([^"]*)" con la descripción:$`, suite.sendServiceProposalToConsumerForDateTimeWithDescription)
 	sc.Step(`^envío una propuesta de servicio al consumidor "([^"]*)" por "([^"]*)" para la fecha y hora "([^"]*)" con una duración estimada de "([^"]*)" minutos con la descripción:$`, suite.sendServiceProposalToConsumerForDateTimeWithDurationAndDescription)
 	sc.Step(`^intento enviar una propuesta de servicio al consumidor "([^"]*)" por "([^"]*)" para la fecha y hora "([^"]*)" con la descripción:$`, suite.trySendServiceProposalToConsumerForDateTimeWithDescription)

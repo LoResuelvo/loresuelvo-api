@@ -35,6 +35,7 @@ func registerConnectGoogleCalendarSteps(sc *godog.ScenarioContext, suite *testSu
 	sc.Step(`^rechazo autorizar el acceso de Google Calendar$`, suite.rejectGoogleCalendarAccess)
 	sc.Step(`^que el consumidor "([^"]*)" ya tiene Google Calendar vinculado$`, suite.consumerAlreadyHasGoogleCalendarConnection)
 	sc.Step(`^que la conexión de Google Calendar de "([^"]*)" requiere atención$`, suite.googleCalendarConnectionRequiresAttention)
+	sc.Step(`^el consumidor "([^"]*)" tiene una conexión de Google Calendar que requiere autorización$`, suite.googleCalendarConnectionRequiresAttention)
 	sc.Step(`^que el usuario "([^"]*)" rechazó la autorización de Google Calendar$`, suite.googleCalendarAuthorizationWasRejected)
 	sc.Step(`^vinculo Google Calendar desde Android con el server auth code "([^"]*)"$`, suite.connectGoogleCalendarFromAndroid)
 	sc.Step(`^el sistema confirma la vinculación de Google Calendar$`, suite.systemConfirmsGoogleCalendarConnection)

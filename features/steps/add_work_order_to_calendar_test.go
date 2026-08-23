@@ -46,6 +46,8 @@ func registerAddWorkOrderToCalendarSteps(sc *godog.ScenarioContext, suite *testS
 	sc.Step(`^el prestador "([^"]*)" no tiene Google Calendar conectado$`, suite.providerDoesNotHaveGoogleCalendarConnection)
 	sc.Step(`^se sincronizan las órdenes de trabajo futuras con Google Calendar$`, suite.syncFutureWorkOrdersToCalendar)
 	sc.Step(`^el consumidor "([^"]*)" recibe su cita en su Google Calendar$`, suite.consumerReceivesCalendarAppointment)
+	sc.Step(`^el consumidor "([^"]*)" recibe la cita en su Google Calendar$`, suite.consumerReceivesCalendarAppointment)
+	sc.Step(`^el consumidor "([^"]*)" recibe la cita futura en su Google Calendar$`, suite.consumerReceivesCalendarAppointment)
 	sc.Step(`^el prestador "([^"]*)" recibe su cita en su Google Calendar$`, suite.providerReceivesCalendarAppointment)
 	sc.Step(`^el consumidor "([^"]*)" no recibe una cita en Google Calendar$`, suite.consumerDoesNotReceiveCalendarAppointment)
 	sc.Step(`^el consumidor "([^"]*)" no recibe una cita para ese turno$`, suite.consumerDoesNotReceiveCalendarAppointment)
