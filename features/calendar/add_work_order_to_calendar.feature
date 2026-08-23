@@ -27,8 +27,8 @@ Feature: Agregar una orden de trabajo a Google Calendar
         Then el consumidor "ana@example.com" recibe su cita en su Google Calendar
         And el prestador "juan.plomero@example.com" no recibe una cita en Google Calendar
 
-    @wip
     Scenario: 22.3-AWOC Sólo el prestador conectado recibe la cita
+        Given que la fecha y hora actual del sistema es "2026-08-01T10:00:00Z"
         Given que existe una orden de trabajo futura para "ana@example.com" y "juan.plomero@example.com" el "2026-08-15T15:00:00Z" con una duración estimada de "90" minutos y la descripción:
             """
             Reparación de pérdida de agua en cocina con materiales incluidos.
