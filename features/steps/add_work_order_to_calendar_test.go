@@ -33,6 +33,8 @@ func registerAddWorkOrderToCalendarSteps(sc *godog.ScenarioContext, suite *testS
 	sc.Step(`^el consumidor "([^"]*)" no recibe una cita en Google Calendar$`, suite.consumerDoesNotReceiveCalendarAppointment)
 	sc.Step(`^el prestador "([^"]*)" no recibe una cita en Google Calendar$`, suite.providerDoesNotReceiveCalendarAppointment)
 	sc.Step(`^no se crea ninguna cita en Google Calendar$`, suite.noCalendarAppointmentIsCreated)
+	sc.Step(`^el consumidor "([^"]*)" tiene una orden futura sin exportar$`, suite.consumerHasUnexportedFutureCalendarWorkOrder)
+	sc.Step(`^el consumidor "([^"]*)" acaba de conectar Google Calendar$`, suite.consumerJustConnectedGoogleCalendar)
 }
 
 func (suite *testSuite) thereIsFutureCalendarWorkOrder(consumerEmail, providerEmail, scheduledOn, duration string, description *godog.DocString) error {
@@ -189,6 +191,14 @@ func (suite *testSuite) noCalendarAppointmentIsCreated() error {
 		}
 	}
 	return nil
+}
+
+func (suite *testSuite) consumerHasUnexportedFutureCalendarWorkOrder(email string) error {
+	return suite.participantDoesNotReceiveCalendarAppointment(email, auth0IDForConsumerEmail(email))
+}
+
+func (suite *testSuite) consumerJustConnectedGoogleCalendar(email string) error {
+	return suite.connectGoogleCalendarForWorkOrderParticipant(email, auth0IDForConsumerEmail(email))
 }
 
 func (suite *testSuite) participantReceivesCalendarAppointment(email, authID string) error {
