@@ -3,8 +3,8 @@ Feature: Agregar una orden de trabajo a Google Calendar
     quiero recibir el turno de mi orden de trabajo en mi Google Calendar
     para recordar cuándo y con quién se realizará el servicio
 
-    @wip
     Scenario: 22.1-AWOC Ambos participantes reciben su propia cita
+        Given que la fecha y hora actual del sistema es "2026-08-01T10:00:00Z"
         Given que existe una orden de trabajo futura para "ana@example.com" y "juan.plomero@example.com" el "2026-08-15T15:00:00Z" con una duración estimada de "90" minutos y la descripción:
             """
             Reparación de pérdida de agua en cocina con materiales incluidos.

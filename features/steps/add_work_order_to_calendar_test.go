@@ -27,7 +27,7 @@ func registerAddWorkOrderToCalendarSteps(sc *godog.ScenarioContext, suite *testS
 	sc.Step(`^el prestador "([^"]*)" recibe su cita en su Google Calendar$`, suite.providerReceivesCalendarAppointment)
 }
 
-func (suite *testSuite) thereIsFutureCalendarWorkOrder(providerEmail, consumerEmail, scheduledOn, duration string, description *godog.DocString) error {
+func (suite *testSuite) thereIsFutureCalendarWorkOrder(consumerEmail, providerEmail, scheduledOn, duration string, description *godog.DocString) error {
 	if err := suite.prepareCalendarWorkOrderParticipants(providerEmail, consumerEmail); err != nil {
 		return err
 	}
