@@ -16,6 +16,24 @@ func NewWorkOrderCalendarEventRepository(db *sql.DB) *WorkOrderCalendarEventRepo
 	return &WorkOrderCalendarEventRepository{db: db}
 }
 
+func (repository *WorkOrderCalendarEventRepository) Exists(ctx context.Context, key workordercalendar.EventKey) (bool, error) {
+	var exists bool
+	err := repository.db.QueryRowContext(
+		ctx,
+		`SELECT EXISTS(
+			SELECT 1
+			FROM work_order_calendar_events
+			WHERE work_order_id = $1 AND user_id = $2
+		)`,
+		key.WorkOrderID(),
+		key.ParticipantID(),
+	).Scan(&exists)
+	if err != nil {
+		return false, fmt.Errorf("checking work order calendar event existence: %w", err)
+	}
+	return exists, nil
+}
+
 func (repository *WorkOrderCalendarEventRepository) Save(ctx context.Context, event *workordercalendar.Event) error {
 	key := event.Key()
 	published := event.Published()

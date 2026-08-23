@@ -46,4 +46,12 @@ func TestWorkOrderCalendarEventRepositoryStoresSynchronizedEvent(t *testing.T) {
 	assert.Equal(t, "event-40-10", googleEventID)
 	assert.True(t, storedSyncedOn.Equal(syncedOn))
 	assert.Zero(t, attemptCount)
+	exists, err := repository.Exists(t.Context(), event.Key())
+	require.NoError(t, err)
+	assert.True(t, exists)
+	missingKey, err := workordercalendar.NewEventKey(order.ID(), order.Provider().ID())
+	require.NoError(t, err)
+	exists, err = repository.Exists(t.Context(), missingKey)
+	require.NoError(t, err)
+	assert.False(t, exists)
 }
