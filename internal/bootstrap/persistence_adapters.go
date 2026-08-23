@@ -29,6 +29,7 @@ type PersistenceAdapters struct {
 	AuthorizationAttemptRepository         *repositories.AuthorizationAttemptRepository
 	CalendarAuthorizationAttemptRepository *repositories.GoogleCalendarAuthorizationAttemptRepository
 	CalendarConnectionRepository           *repositories.GoogleCalendarConnectionRepository
+	WorkOrderCalendarEventRepository       *repositories.WorkOrderCalendarEventRepository
 }
 
 func NewPersistenceAdapters(database *sql.DB) *PersistenceAdapters {
@@ -68,6 +69,7 @@ func NewPersistenceAdapters(database *sql.DB) *PersistenceAdapters {
 	paymentAccountRepository := repositories.NewPaymentAccountRepository(database, authorizationAttemptRepository)
 	calendarAuthorizationAttemptRepository := repositories.NewGoogleCalendarAuthorizationAttemptRepository(database)
 	calendarConnectionRepository := repositories.NewGoogleCalendarConnectionRepository(database, calendarAuthorizationAttemptRepository)
+	workOrderCalendarEventRepository := repositories.NewWorkOrderCalendarEventRepository(database)
 	return &PersistenceAdapters{
 		UserRepository:                         userRepository,
 		CategoryRepository:                     categoryRepository,
@@ -91,5 +93,6 @@ func NewPersistenceAdapters(database *sql.DB) *PersistenceAdapters {
 		AuthorizationAttemptRepository:         authorizationAttemptRepository,
 		CalendarAuthorizationAttemptRepository: calendarAuthorizationAttemptRepository,
 		CalendarConnectionRepository:           calendarConnectionRepository,
+		WorkOrderCalendarEventRepository:       workOrderCalendarEventRepository,
 	}
 }

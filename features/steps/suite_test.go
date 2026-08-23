@@ -349,6 +349,8 @@ func newTestSuite(tb testing.TB, database *sql.DB) *testSuite {
 		paymentIntentRepository:      dependencies.Persistence.PaymentIntentRepository,
 		paymentTransactionRepository: dependencies.Persistence.PaymentTransactionRepository,
 		urgentWorkOrderScheduler:     dependencies.UrgentWorkOrderScheduler,
+		calendarSyncRunner:           dependencies.CalendarSyncRunner,
+		calendarEventObserver:        dependencies.CalendarEventObserver,
 		auth0Validator:               auth0Validator,
 		tokenBuilder:                 tokenBuilder,
 		chatbot:                      chatbot,

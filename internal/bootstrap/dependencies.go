@@ -47,6 +47,7 @@ import (
 	serviceproposal "github.com/LoResuelvo/loresuelvo-api/internal/domain/service_proposal"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/user"
 	workorder "github.com/LoResuelvo/loresuelvo-api/internal/domain/work_order"
+	workordercalendar "github.com/LoResuelvo/loresuelvo-api/internal/domain/work_order_calendar"
 	"github.com/auth0/go-jwt-middleware/v3/validator"
 	"github.com/google/uuid"
 )
@@ -55,6 +56,8 @@ type Dependencies struct {
 	Persistence              *PersistenceAdapters
 	WorkOrderService         *workorder.Service
 	UrgentWorkOrderScheduler *scheduler.Scheduler
+	CalendarSyncRunner       *scheduler.CalendarSyncRunner
+	CalendarEventObserver    CalendarEventObserver
 
 	CategoryHandler           *category_handler.CategoryHandler
 	CalendarConnectionHandler *calendar_connection_handler.CalendarConnectionHandler
@@ -76,6 +79,10 @@ type Dependencies struct {
 	MessagePublisher conversation.MessagePublisher
 
 	Clock *clockadapter.SystemClock
+}
+
+type CalendarEventObserver interface {
+	HasEventForUser(context.Context, int, int) (bool, error)
 }
 
 func (dependencies *Dependencies) RouterConfig(auth0Validator *validator.Validator, logger *slog.Logger) httpadapter.RouterConfig {
@@ -121,6 +128,10 @@ func NewDependenciesWithChatbot(database *sql.DB, chatbot conversation.Chatbot) 
 	if err != nil {
 		return nil, fmt.Errorf("configuring calendar credential encryption: %w", err)
 	}
+	calendarEventPublisher, err := googlecalendar.NewEventPublisherFromEnv(calendarCredentialCipher)
+	if err != nil {
+		return nil, err
+	}
 	calendarHandlerConfig := calendar_connection_handler.NewConfigFromEnv()
 	paymentAccountHandlerConfig, err := payment_account_handler.NewConfigFromEnv()
 	if err != nil {
@@ -145,6 +156,7 @@ func NewDependenciesWithChatbot(database *sql.DB, chatbot conversation.Chatbot) 
 		paymentAccountHandlerConfig,
 		calendarOAuthConnector,
 		calendarCredentialCipher,
+		calendarEventPublisher,
 		calendarHandlerConfig,
 	), nil
 }
@@ -170,6 +182,7 @@ func NewDependenciesWithPaymentAccountAdapters(
 		paymentAccountHandlerConfig,
 		googlecalendar.NewFakeOAuthClient(),
 		credentialProtector,
+		googlecalendar.NewFakeEventPublisher(),
 		calendar_connection_handler.Config{
 			ConnectionSuccessURL:   "/me",
 			ConnectionCancelledURL: "/me",
@@ -188,6 +201,7 @@ func NewDependenciesWithPaymentAccountAndCalendarAdapters(
 	paymentAccountHandlerConfig payment_account_handler.Config,
 	calendarOAuthConnector calendarconnection.OAuthConnector,
 	calendarCredentialProtector calendarconnection.CredentialProtector,
+	calendarEventPublisher workordercalendar.EventPublisher,
 	calendarHandlerConfig calendar_connection_handler.Config,
 ) *Dependencies {
 	persistence := NewPersistenceAdapters(database)
@@ -297,13 +311,27 @@ func NewDependenciesWithPaymentAccountAndCalendarAdapters(
 		persistence.WorkOrderUnitOfWork,
 		systemClock,
 	)
+	calendarSyncService := workordercalendar.NewService(
+		persistence.WorkOrderRepository,
+		persistence.CalendarConnectionRepository,
+		persistence.WorkOrderCalendarEventRepository,
+		calendarEventPublisher,
+		systemClock,
+	)
 	urgentWorkOrderScheduler := scheduler.NewScheduler(time.Hour, workOrderService)
+	calendarSyncRunner := scheduler.NewCalendarSyncRunner(calendarSyncService)
+	var calendarEventObserver CalendarEventObserver
+	if observer, ok := calendarEventPublisher.(CalendarEventObserver); ok {
+		calendarEventObserver = observer
+	}
 	_ = cancel // TODO: wire shutdown signal to cancel context
 
 	return &Dependencies{
 		Persistence:               persistence,
 		WorkOrderService:          workOrderService,
 		UrgentWorkOrderScheduler:  urgentWorkOrderScheduler,
+		CalendarSyncRunner:        calendarSyncRunner,
+		CalendarEventObserver:     calendarEventObserver,
 		CategoryHandler:           category_handler.NewCategoryHandler(categoryService),
 		CalendarConnectionHandler: calendar_connection_handler.NewCalendarConnectionHandler(calendarConnectionService, calendarHandlerConfig),
 		CoverageZoneHandler:       coverage_zone_handler.NewCoverageZoneHandler(coverageZoneService),
