@@ -317,6 +317,7 @@ func NewDependenciesWithPaymentAccountAndCalendarAdapters(
 		persistence.WorkOrderCalendarEventRepository,
 		calendarEventPublisher,
 		systemClock,
+		notificator,
 	)
 	urgentWorkOrderScheduler := scheduler.NewScheduler(time.Hour, workOrderService)
 	calendarSyncRunner := scheduler.NewCalendarSyncRunner(calendarSyncService)
