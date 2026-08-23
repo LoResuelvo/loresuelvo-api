@@ -60,6 +60,7 @@ func registerAddWorkOrderToCalendarSteps(sc *godog.ScenarioContext, suite *testS
 	sc.Step(`^se reintenta la sincronización de la cita pendiente$`, suite.retryPendingCalendarAppointmentSync)
 	sc.Step(`^se sincroniza dos veces la misma orden de trabajo con Google Calendar$`, suite.syncSameCalendarWorkOrderTwice)
 	sc.Step(`^el consumidor "([^"]*)" conserva una sola cita para ese turno$`, suite.consumerKeepsSingleCalendarAppointment)
+	sc.Step(`^el consumidor "([^"]*)" recibe un aviso para volver a autorizar Google Calendar$`, suite.consumerReceivesCalendarReauthorizationNotice)
 	sc.Step(`^se confirma la contratación de la propuesta$`, suite.confirmCalendarBooking)
 	sc.Step(`^la contratación queda confirmada aunque no se pueda crear la cita$`, suite.calendarBookingIsConfirmedDespiteUnavailableCalendar)
 }
@@ -290,6 +291,38 @@ func (suite *testSuite) consumerKeepsSingleCalendarAppointment(email string) err
 	}
 	if count != 1 {
 		return fmt.Errorf("expected one calendar appointment for %q and work order %d, got %d", email, order.ID(), count)
+	}
+	return nil
+}
+
+func (suite *testSuite) consumerReceivesCalendarReauthorizationNotice(email string) error {
+	connection, err := suite.realtimeConnectionForEmail(email)
+	if err != nil {
+		return err
+	}
+	event, err := connection.readNotificationEvent(realtimeMessageTimeout)
+	if err != nil {
+		return fmt.Errorf("reading calendar reauthorization notification: %w", err)
+	}
+	if event.Type != "notification.created" {
+		return fmt.Errorf("expected realtime event type %q, got %q", "notification.created", event.Type)
+	}
+	userID, err := suite.userRepository.FindIDByAuthID(auth0IDForConsumerEmail(email))
+	if err != nil {
+		return fmt.Errorf("finding calendar reauthorization recipient %q: %w", email, err)
+	}
+	created := event.Notification
+	if created.UserID != userID {
+		return fmt.Errorf("expected calendar reauthorization notification user %d, got %d", userID, created.UserID)
+	}
+	if created.Type != "calendar_reauthorization_required" {
+		return fmt.Errorf("expected calendar reauthorization notification type, got %q", created.Type)
+	}
+	if created.ResourceType != "calendar_connection" || created.ResourceID != userID {
+		return fmt.Errorf("expected calendar connection resource %d, got %s/%d", userID, created.ResourceType, created.ResourceID)
+	}
+	if created.ReadAt != nil || created.CreatedAt.IsZero() {
+		return fmt.Errorf("expected unread calendar reauthorization notification with created_at")
 	}
 	return nil
 }

@@ -117,10 +117,12 @@ Feature: Agregar una orden de trabajo a Google Calendar
 
     @wip
     Scenario: 22.11-AWOC El usuario es informado cuando debe volver a autorizar
+        Given que la fecha y hora actual del sistema es "2026-08-01T10:00:00Z"
         Given que existe una orden de trabajo futura para "ana@example.com" y "juan.plomero@example.com" el "2026-08-15T15:00:00Z" con una duración estimada de "90" minutos y la descripción:
             """
             Reparación de pérdida de agua en cocina con materiales incluidos.
             """
         And el consumidor "ana@example.com" tiene una conexión de Google Calendar que requiere autorización
+        And que el consumidor "ana@example.com" está disponible para recibir mensajes en tiempo real
         When se sincronizan las órdenes de trabajo futuras con Google Calendar
         Then el consumidor "ana@example.com" recibe un aviso para volver a autorizar Google Calendar
