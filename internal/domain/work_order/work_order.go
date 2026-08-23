@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/consumer"
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/user"
 )
 
 type Status string
@@ -25,6 +26,8 @@ type ServiceProposal interface {
 	ServiceProposalScheduledOn() time.Time
 	ServiceProposalDescription() string
 	ServiceProposalEstimatedDurationMinutes() int
+	ServiceProposalConsumer() user.User
+	ServiceProposalProvider() user.User
 	ConsumerID() int
 	ProviderID() int
 }
@@ -127,6 +130,14 @@ func (wo *WorkOrder) Description() string {
 
 func (wo *WorkOrder) EstimatedDurationMinutes() int {
 	return wo.serviceProposal.ServiceProposalEstimatedDurationMinutes()
+}
+
+func (wo *WorkOrder) Consumer() user.User {
+	return wo.serviceProposal.ServiceProposalConsumer()
+}
+
+func (wo *WorkOrder) Provider() user.User {
+	return wo.serviceProposal.ServiceProposalProvider()
 }
 
 func (wo *WorkOrder) ConsumerID() int {

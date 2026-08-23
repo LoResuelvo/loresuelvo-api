@@ -147,6 +147,14 @@ func (sp *ServiceProposal) ServiceProposalEstimatedDurationMinutes() int {
 	return sp.EstimatedDurationMinutes
 }
 
+func (sp *ServiceProposal) ServiceProposalConsumer() user.User {
+	return sp.Consumer
+}
+
+func (sp *ServiceProposal) ServiceProposalProvider() user.User {
+	return sp.Provider
+}
+
 func (sp *ServiceProposal) EstimatedDuration() int {
 	return sp.EstimatedDurationMinutes
 }

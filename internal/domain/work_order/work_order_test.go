@@ -36,6 +36,14 @@ func TestNewWorkOrderStartsScheduled(t *testing.T) {
 	assert.Equal(t, acceptedOn, order.AcceptedOn())
 }
 
+func TestWorkOrderExposesTheProposalParticipants(t *testing.T) {
+	order := workOrderFixture(84, 10, 20, time.Now().UTC())
+	proposal := order.ServiceProposal().(*serviceproposal.ServiceProposal)
+
+	assert.Equal(t, proposal.Consumer, order.Consumer())
+	assert.Equal(t, proposal.Provider, order.Provider())
+}
+
 func TestWorkOrderReportsCompletionAndAwaitsPayment(t *testing.T) {
 	scheduledOn := time.Date(2026, time.July, 6, 13, 0, 0, 0, time.UTC)
 	reportedOn := scheduledOn.Add(time.Minute)
