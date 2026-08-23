@@ -9,6 +9,7 @@ import (
 
 	httphandler "github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler"
 	calendarconnection "github.com/LoResuelvo/loresuelvo-api/internal/domain/calendar_connection"
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/user"
 	"github.com/cucumber/godog"
 )
 
@@ -31,6 +32,7 @@ func registerAddWorkOrderToCalendarSteps(sc *godog.ScenarioContext, suite *testS
 	sc.Step(`^el prestador "([^"]*)" recibe su cita en su Google Calendar$`, suite.providerReceivesCalendarAppointment)
 	sc.Step(`^el consumidor "([^"]*)" no recibe una cita en Google Calendar$`, suite.consumerDoesNotReceiveCalendarAppointment)
 	sc.Step(`^el prestador "([^"]*)" no recibe una cita en Google Calendar$`, suite.providerDoesNotReceiveCalendarAppointment)
+	sc.Step(`^no se crea ninguna cita en Google Calendar$`, suite.noCalendarAppointmentIsCreated)
 }
 
 func (suite *testSuite) thereIsFutureCalendarWorkOrder(consumerEmail, providerEmail, scheduledOn, duration string, description *godog.DocString) error {
@@ -164,6 +166,27 @@ func (suite *testSuite) participantDoesNotReceiveCalendarAppointment(email, auth
 	}
 	if hasEvent {
 		return fmt.Errorf("expected no calendar appointment for %q and work order %d", email, order.ID())
+	}
+	return nil
+}
+
+func (suite *testSuite) noCalendarAppointmentIsCreated() error {
+	if suite.calendarEventObserver == nil {
+		return fmt.Errorf("calendar event observer is not configured")
+	}
+	order, err := suite.persistedWorkOrderForLastServiceProposal()
+	if err != nil {
+		return err
+	}
+	for _, participant := range []user.User{order.Consumer(), order.Provider()} {
+		userID := participant.ID()
+		hasEvent, err := suite.calendarEventObserver.HasEventForUser(context.Background(), userID, order.ID())
+		if err != nil {
+			return fmt.Errorf("checking absent calendar appointment: %w", err)
+		}
+		if hasEvent {
+			return fmt.Errorf("expected no calendar appointment for user %d and work order %d", userID, order.ID())
+		}
 	}
 	return nil
 }
