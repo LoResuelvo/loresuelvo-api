@@ -2,11 +2,13 @@ package steps_test
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strconv"
 	"time"
 
 	httphandler "github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler"
+	calendarconnection "github.com/LoResuelvo/loresuelvo-api/internal/domain/calendar_connection"
 	"github.com/cucumber/godog"
 )
 
@@ -22,9 +24,11 @@ func registerAddWorkOrderToCalendarSteps(sc *godog.ScenarioContext, suite *testS
 	sc.Step(`^que existe una orden de trabajo futura para "([^"]*)" y "([^"]*)" el "([^"]*)" con una duración estimada de "([^"]*)" minutos y la descripción:$`, suite.thereIsFutureCalendarWorkOrder)
 	sc.Step(`^el consumidor "([^"]*)" tiene Google Calendar conectado$`, suite.consumerHasGoogleCalendarConnectedForWorkOrder)
 	sc.Step(`^el prestador "([^"]*)" tiene Google Calendar conectado$`, suite.providerHasGoogleCalendarConnectedForWorkOrder)
+	sc.Step(`^el prestador "([^"]*)" no tiene Google Calendar conectado$`, suite.providerDoesNotHaveGoogleCalendarConnection)
 	sc.Step(`^se sincronizan las órdenes de trabajo futuras con Google Calendar$`, suite.syncFutureWorkOrdersToCalendar)
 	sc.Step(`^el consumidor "([^"]*)" recibe su cita en su Google Calendar$`, suite.consumerReceivesCalendarAppointment)
 	sc.Step(`^el prestador "([^"]*)" recibe su cita en su Google Calendar$`, suite.providerReceivesCalendarAppointment)
+	sc.Step(`^el prestador "([^"]*)" no recibe una cita en Google Calendar$`, suite.providerDoesNotReceiveCalendarAppointment)
 }
 
 func (suite *testSuite) thereIsFutureCalendarWorkOrder(consumerEmail, providerEmail, scheduledOn, duration string, description *godog.DocString) error {
@@ -78,6 +82,21 @@ func (suite *testSuite) providerHasGoogleCalendarConnectedForWorkOrder(email str
 	return suite.connectGoogleCalendarForWorkOrderParticipant(email, auth0IDForProviderEmail(email))
 }
 
+func (suite *testSuite) providerDoesNotHaveGoogleCalendarConnection(email string) error {
+	userID, err := suite.userRepository.FindIDByAuthID(auth0IDForProviderEmail(email))
+	if err != nil {
+		return fmt.Errorf("finding provider %q: %w", email, err)
+	}
+	_, err = suite.calendarConnectionRepository.FindByUserID(context.Background(), userID)
+	if errors.Is(err, calendarconnection.ErrConnectionNotFound) {
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("checking Google Calendar connection for provider %q: %w", email, err)
+	}
+	return fmt.Errorf("expected provider %q not to have a Google Calendar connection", email)
+}
+
 func (suite *testSuite) connectGoogleCalendarForWorkOrderParticipant(email, authID string) error {
 	previousAuthID := suite.currentAuth0ID
 	suite.currentAuth0ID = authID
@@ -107,6 +126,28 @@ func (suite *testSuite) consumerReceivesCalendarAppointment(email string) error 
 
 func (suite *testSuite) providerReceivesCalendarAppointment(email string) error {
 	return suite.participantReceivesCalendarAppointment(email, auth0IDForProviderEmail(email))
+}
+
+func (suite *testSuite) providerDoesNotReceiveCalendarAppointment(email string) error {
+	if suite.calendarEventObserver == nil {
+		return fmt.Errorf("calendar event observer is not configured")
+	}
+	userID, err := suite.userRepository.FindIDByAuthID(auth0IDForProviderEmail(email))
+	if err != nil {
+		return fmt.Errorf("finding calendar appointment recipient %q: %w", email, err)
+	}
+	order, err := suite.persistedWorkOrderForLastServiceProposal()
+	if err != nil {
+		return err
+	}
+	hasEvent, err := suite.calendarEventObserver.HasEventForUser(context.Background(), userID, order.ID())
+	if err != nil {
+		return fmt.Errorf("checking calendar appointment for %q: %w", email, err)
+	}
+	if hasEvent {
+		return fmt.Errorf("expected no calendar appointment for %q and work order %d", email, order.ID())
+	}
+	return nil
 }
 
 func (suite *testSuite) participantReceivesCalendarAppointment(email, authID string) error {
