@@ -481,6 +481,100 @@ func (r *WorkOrderRepository) FindByUserID(ctx context.Context, userID int, view
 	return orders, nil
 }
 
+func (r *WorkOrderRepository) FindScheduledAfter(ctx context.Context, from time.Time) ([]*workorder.WorkOrder, error) {
+	rows, err := r.db.QueryContext(
+		ctx,
+		`SELECT
+			wo.id,
+			wo.service_proposal_id,
+			wo.status,
+			wo.accepted_on,
+			sp.scheduled_on,
+			sp.description,
+			sp.estimated_duration_minutes,
+			consumer_user.id,
+			consumer_user.auth_id,
+			consumer_user.email,
+			consumer_user.name,
+			consumer_user.surname,
+			provider_user.id,
+			provider_user.auth_id,
+			provider_user.email,
+			provider_user.name,
+			provider_user.surname
+		FROM work_orders wo
+		INNER JOIN service_proposals sp ON sp.id = wo.service_proposal_id
+		INNER JOIN users consumer_user ON consumer_user.id = sp.consumer_id
+		INNER JOIN users provider_user ON provider_user.id = sp.provider_id
+		WHERE sp.scheduled_on >= $1 AND wo.status = $2
+		ORDER BY sp.scheduled_on ASC, wo.id ASC`,
+		from,
+		workorder.StatusScheduled,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("finding future work orders: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	workOrders := make([]*workorder.WorkOrder, 0)
+	for rows.Next() {
+		var record workOrderRecord
+		var proposal serviceproposal.ServiceProposal
+		var consumerID, providerID int
+		var consumerAuthID, consumerEmail, consumerName, consumerSurname string
+		var providerAuthID, providerEmail, providerName, providerSurname string
+		if err := rows.Scan(
+			&record.ID,
+			&record.ServiceProposalID,
+			&record.Status,
+			&record.AcceptedOn,
+			&proposal.ScheduledOn,
+			&proposal.Description,
+			&proposal.EstimatedDurationMinutes,
+			&consumerID,
+			&consumerAuthID,
+			&consumerEmail,
+			&consumerName,
+			&consumerSurname,
+			&providerID,
+			&providerAuthID,
+			&providerEmail,
+			&providerName,
+			&providerSurname,
+		); err != nil {
+			return nil, fmt.Errorf("scanning future work order: %w", err)
+		}
+		proposal.ID = int(record.ServiceProposalID.Int64)
+		proposal.Consumer = &consumer.Consumer{BaseUser: user.RehydrateBaseUser(
+			consumerID,
+			consumerAuthID,
+			consumerEmail,
+			consumerName,
+			consumerSurname,
+			consumer.Role,
+			nil,
+		)}
+		proposal.Provider = &provider.Provider{BaseUser: user.RehydrateBaseUser(
+			providerID,
+			providerAuthID,
+			providerEmail,
+			providerName,
+			providerSurname,
+			provider.Role,
+			nil,
+		)}
+		order, err := record.Restore(&proposal)
+		if err != nil {
+			return nil, fmt.Errorf("rehydrating future work order: %w", err)
+		}
+		workOrders = append(workOrders, order)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterating future work orders: %w", err)
+	}
+	return workOrders, nil
+}
+
 func (r *WorkOrderRepository) FindScheduledBetween(ctx context.Context, from time.Time, to time.Time) ([]*workorder.WorkOrder, error) {
 	rows, err := r.db.QueryContext(
 		ctx,

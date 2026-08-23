@@ -288,6 +288,40 @@ func TestWorkOrderRepositoryFindsOnlyOrdersScheduledInsideWindow(t *testing.T) {
 	assert.Equal(t, []string{completionImageID}, fullyPaid.CompletionReport().ImageFileIDs())
 }
 
+func TestWorkOrderRepositoryFindsFutureOrdersWithCalendarData(t *testing.T) {
+	testContext := newServiceProposalRepositoryTest(t)
+	fixture := newProviderWorkOrderTestFixture(t, testContext, "calendar-future")
+	from := time.Now().UTC().Truncate(time.Microsecond).Add(48 * time.Hour)
+	saveScheduledWorkOrderAt(
+		t,
+		testContext,
+		fixture.conversation,
+		fixture.consumerID,
+		fixture.providerID,
+		from.Add(-time.Hour),
+	)
+	futureOrder := saveScheduledWorkOrderAt(
+		t,
+		testContext,
+		fixture.conversation,
+		fixture.consumerID,
+		fixture.providerID,
+		from.Add(time.Hour),
+	)
+
+	orders, err := testContext.workOrderRepository.FindScheduledAfter(t.Context(), from)
+
+	require.NoError(t, err)
+	require.Len(t, orders, 1)
+	assert.Equal(t, futureOrder.ID(), orders[0].ID())
+	assert.Equal(t, "Ana", orders[0].Consumer().Name())
+	assert.Equal(t, "Perez", orders[0].Consumer().Surname())
+	assert.Equal(t, "Juan", orders[0].Provider().Name())
+	assert.Equal(t, "Gomez", orders[0].Provider().Surname())
+	assert.Equal(t, "Urgent work order repository test.", orders[0].Description())
+	assert.Equal(t, 60, orders[0].EstimatedDurationMinutes())
+}
+
 func saveScheduledWorkOrderAt(
 	t *testing.T,
 	testContext serviceProposalRepositoryTestContext,
