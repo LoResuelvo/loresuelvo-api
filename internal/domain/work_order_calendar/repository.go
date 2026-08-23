@@ -10,7 +10,6 @@ import (
 )
 
 type EventRepository interface {
-	FindByKey(ctx context.Context, key EventKey) (*Event, error)
 	Save(ctx context.Context, event *Event) error
 }
 
@@ -19,7 +18,7 @@ type ConnectionReader interface {
 }
 
 type WorkOrderReader interface {
-	FindScheduledBetween(ctx context.Context, from, to time.Time) ([]*workorder.WorkOrder, error)
+	FindScheduledAfter(ctx context.Context, from time.Time) ([]*workorder.WorkOrder, error)
 }
 
 type EventPublisher interface {

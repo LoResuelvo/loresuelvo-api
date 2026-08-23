@@ -18,8 +18,8 @@ import (
 
 type workOrderReaderMock struct{ mock.Mock }
 
-func (m *workOrderReaderMock) FindScheduledBetween(ctx context.Context, from, to time.Time) ([]*workorder.WorkOrder, error) {
-	args := m.Called(ctx, from, to)
+func (m *workOrderReaderMock) FindScheduledAfter(ctx context.Context, from time.Time) ([]*workorder.WorkOrder, error) {
+	args := m.Called(ctx, from)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
@@ -37,14 +37,6 @@ func (m *connectionReaderMock) FindByUserID(ctx context.Context, userID int) (*c
 }
 
 type eventRepositoryMock struct{ mock.Mock }
-
-func (m *eventRepositoryMock) FindByKey(ctx context.Context, key workordercalendar.EventKey) (*workordercalendar.Event, error) {
-	args := m.Called(ctx, key)
-	if args.Get(0) == nil {
-		return nil, args.Error(1)
-	}
-	return args.Get(0).(*workordercalendar.Event), args.Error(1)
-}
 
 func (m *eventRepositoryMock) Save(ctx context.Context, event *workordercalendar.Event) error {
 	return m.Called(ctx, event).Error(0)

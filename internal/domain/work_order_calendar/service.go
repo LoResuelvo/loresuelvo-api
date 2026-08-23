@@ -2,16 +2,12 @@ package workordercalendar
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"time"
 
-	calendarconnection "github.com/LoResuelvo/loresuelvo-api/internal/domain/calendar_connection"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/user"
 	workorder "github.com/LoResuelvo/loresuelvo-api/internal/domain/work_order"
 )
-
-const futureOrderHorizon = 365 * 24 * time.Hour
 
 type Service struct {
 	workOrders  WorkOrderReader
@@ -39,7 +35,7 @@ func NewService(
 
 func (service *Service) Sync(ctx context.Context) error {
 	now := service.clock.Now().UTC()
-	orders, err := service.workOrders.FindScheduledBetween(ctx, now, now.Add(futureOrderHorizon))
+	orders, err := service.workOrders.FindScheduledAfter(ctx, now)
 	if err != nil {
 		return fmt.Errorf("finding future work orders for calendar: %w", err)
 	}
@@ -65,22 +61,15 @@ func (service *Service) syncParticipant(
 	counterpart user.User,
 	now time.Time,
 ) error {
-	connection, connected, err := service.connectedConnection(ctx, participant)
+	connection, err := service.connections.FindByUserID(ctx, participant.ID())
 	if err != nil {
-		return err
-	}
-	if !connected {
-		return nil
+		return fmt.Errorf("finding calendar connection for participant: %w", err)
 	}
 
-	event, err := service.eventForParticipant(ctx, order, participant)
+	event, err := NewEvent(order, participant)
 	if err != nil {
-		return err
+		return fmt.Errorf("creating calendar event: %w", err)
 	}
-	if event.IsSynced() {
-		return nil
-	}
-
 	appointment := NewAppointment(order, participant, counterpart)
 	published, err := service.publisher.Create(ctx, connection, appointment)
 	if err != nil {
@@ -93,32 +82,4 @@ func (service *Service) syncParticipant(
 		return fmt.Errorf("saving calendar appointment: %w", err)
 	}
 	return nil
-}
-
-func (service *Service) connectedConnection(ctx context.Context, participant user.User) (*calendarconnection.Connection, bool, error) {
-	connection, err := service.connections.FindByUserID(ctx, participant.ID())
-	if errors.Is(err, calendarconnection.ErrConnectionNotFound) {
-		return nil, false, nil
-	}
-	if err != nil {
-		return nil, false, fmt.Errorf("finding calendar connection for participant %d: %w", participant.ID(), err)
-	}
-	return connection, connection.IsConnected(), nil
-}
-
-func (service *Service) eventForParticipant(ctx context.Context, order *workorder.WorkOrder, participant user.User) (*Event, error) {
-	key, err := NewEventKey(order.ID(), participant.ID())
-	if err != nil {
-		return nil, fmt.Errorf("identifying calendar event: %w", err)
-	}
-	event, err := service.events.FindByKey(ctx, key)
-	if errors.Is(err, ErrCalendarEventNotFound) {
-		event, err = NewEvent(order, participant)
-		if err != nil {
-			return nil, fmt.Errorf("creating calendar event: %w", err)
-		}
-	} else if err != nil {
-		return nil, fmt.Errorf("finding calendar event: %w", err)
-	}
-	return event, nil
 }

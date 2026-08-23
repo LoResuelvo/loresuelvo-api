@@ -23,7 +23,6 @@ func TestConnectionOwnsRefreshTokenCiphertextAndCalendarIdentity(t *testing.T) {
 	assert.Equal(t, []byte("encrypted-refresh-token"), connection.RefreshTokenCiphertext())
 	assert.Equal(t, "calendar-42", connection.CalendarID())
 	assert.Equal(t, calendarconnection.StatusConnected, connection.Status())
-	assert.True(t, connection.IsConnected())
 	assert.Equal(t, now, connection.ConnectedOn())
 	assert.Equal(t, now, connection.UpdatedOn())
 }
@@ -51,6 +50,5 @@ func TestConnectionCanRequireAttention(t *testing.T) {
 	connection.MarkActionRequired(updated)
 
 	assert.Equal(t, calendarconnection.StatusActionRequired, connection.Status())
-	assert.False(t, connection.IsConnected())
 	assert.Equal(t, updated, connection.UpdatedOn())
 }

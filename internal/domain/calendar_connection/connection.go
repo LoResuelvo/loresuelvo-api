@@ -77,10 +77,6 @@ func (connection *Connection) CalendarID() string { return connection.calendarID
 
 func (connection *Connection) Status() string { return connection.status }
 
-func (connection *Connection) IsConnected() bool {
-	return connection.status == StatusConnected
-}
-
 func (connection *Connection) ConnectedOn() time.Time { return connection.connectedOn }
 
 func (connection *Connection) UpdatedOn() time.Time { return connection.updatedOn }

@@ -69,26 +69,6 @@ func NewEvent(order *workorder.WorkOrder, participant user.User) (*Event, error)
 	return &Event{key: key}, nil
 }
 
-func RehydrateEvent(key EventKey, calendarID, externalID string, syncedOn time.Time) (*Event, error) {
-	if key.workOrderID <= 0 || key.participantID <= 0 {
-		return nil, ErrCalendarEventIdentity
-	}
-	if syncedOn.IsZero() {
-		if calendarID != "" {
-			return nil, ErrCalendarEventCalendarID
-		}
-		if externalID != "" {
-			return nil, ErrCalendarEventExternalID
-		}
-		return &Event{key: key}, nil
-	}
-	published, err := NewPublishedEvent(calendarID, externalID)
-	if err != nil {
-		return nil, err
-	}
-	return &Event{key: key, published: published, syncedOn: syncedOn.UTC()}, nil
-}
-
 func (event *Event) Key() EventKey {
 	return event.key
 }
@@ -101,14 +81,7 @@ func (event *Event) SyncedOn() time.Time {
 	return event.syncedOn
 }
 
-func (event *Event) IsSynced() bool {
-	return !event.syncedOn.IsZero()
-}
-
 func (event *Event) MarkSynced(published PublishedEvent, syncedOn time.Time) error {
-	if !event.syncedOn.IsZero() {
-		return ErrCalendarEventAlreadySynced
-	}
 	if syncedOn.IsZero() {
 		return ErrCalendarEventSyncedOn
 	}

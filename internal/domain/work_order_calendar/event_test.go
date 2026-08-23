@@ -18,7 +18,7 @@ func TestNewEventDerivesItsPersistenceIdentityFromDomainObjects(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, order.ID(), event.Key().WorkOrderID())
 	assert.Equal(t, consumerUser.ID(), event.Key().ParticipantID())
-	assert.False(t, event.IsSynced())
+	assert.True(t, event.SyncedOn().IsZero())
 }
 
 func TestEventMarksThePublishedEventAsSynchronized(t *testing.T) {
@@ -31,22 +31,8 @@ func TestEventMarksThePublishedEventAsSynchronized(t *testing.T) {
 	err = event.MarkSynced(published, now)
 
 	require.NoError(t, err)
-	assert.True(t, event.IsSynced())
 	assert.Equal(t, published, event.Published())
 	assert.Equal(t, now, event.SyncedOn())
-}
-
-func TestEventRejectsASecondSynchronization(t *testing.T) {
-	now := time.Date(2026, time.July, 4, 10, 0, 0, 0, time.UTC)
-	key, err := workordercalendar.NewEventKey(40, 10)
-	require.NoError(t, err)
-	event, err := workordercalendar.RehydrateEvent(key, "primary", "event-40-10", now)
-	require.NoError(t, err)
-
-	err = event.MarkSynced(publishedEventFixture(t, "replacement"), now.Add(time.Minute))
-
-	assert.ErrorIs(t, err, workordercalendar.ErrCalendarEventAlreadySynced)
-	assert.Equal(t, "event-40-10", event.Published().ExternalID())
 }
 
 func TestPublishedEventRequiresExternalIdentities(t *testing.T) {
