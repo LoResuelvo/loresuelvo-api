@@ -61,7 +61,6 @@ Feature: Agregar una orden de trabajo a Google Calendar
         When se sincronizan las órdenes de trabajo futuras con Google Calendar
         Then el consumidor "ana@example.com" recibe la cita futura en su Google Calendar
 
-    @wip
     Scenario: 22.6-AWOC No se agregan turnos pasados
         Given que existe una orden de trabajo pasada para "ana@example.com" y "juan.plomero@example.com" el "2026-07-04T09:00:00Z" con una duración estimada de "90" minutos y la descripción:
             """

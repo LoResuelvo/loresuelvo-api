@@ -23,6 +23,7 @@ type calendarEventObserver interface {
 
 func registerAddWorkOrderToCalendarSteps(sc *godog.ScenarioContext, suite *testSuite) {
 	sc.Step(`^que existe una orden de trabajo futura para "([^"]*)" y "([^"]*)" el "([^"]*)" con una duración estimada de "([^"]*)" minutos y la descripción:$`, suite.thereIsFutureCalendarWorkOrder)
+	sc.Step(`^que existe una orden de trabajo pasada para "([^"]*)" y "([^"]*)" el "([^"]*)" con una duración estimada de "([^"]*)" minutos y la descripción:$`, suite.thereIsPastCalendarWorkOrder)
 	sc.Step(`^el consumidor "([^"]*)" tiene Google Calendar conectado$`, suite.consumerHasGoogleCalendarConnectedForWorkOrder)
 	sc.Step(`^el prestador "([^"]*)" tiene Google Calendar conectado$`, suite.providerHasGoogleCalendarConnectedForWorkOrder)
 	sc.Step(`^el consumidor "([^"]*)" no tiene Google Calendar conectado$`, suite.consumerDoesNotHaveGoogleCalendarConnection)
@@ -31,6 +32,7 @@ func registerAddWorkOrderToCalendarSteps(sc *godog.ScenarioContext, suite *testS
 	sc.Step(`^el consumidor "([^"]*)" recibe su cita en su Google Calendar$`, suite.consumerReceivesCalendarAppointment)
 	sc.Step(`^el prestador "([^"]*)" recibe su cita en su Google Calendar$`, suite.providerReceivesCalendarAppointment)
 	sc.Step(`^el consumidor "([^"]*)" no recibe una cita en Google Calendar$`, suite.consumerDoesNotReceiveCalendarAppointment)
+	sc.Step(`^el consumidor "([^"]*)" no recibe una cita para ese turno$`, suite.consumerDoesNotReceiveCalendarAppointment)
 	sc.Step(`^el prestador "([^"]*)" no recibe una cita en Google Calendar$`, suite.providerDoesNotReceiveCalendarAppointment)
 	sc.Step(`^no se crea ninguna cita en Google Calendar$`, suite.noCalendarAppointmentIsCreated)
 	sc.Step(`^el consumidor "([^"]*)" tiene una orden futura sin exportar$`, suite.consumerHasUnexportedFutureCalendarWorkOrder)
@@ -52,6 +54,33 @@ func (suite *testSuite) thereIsFutureCalendarWorkOrder(consumerEmail, providerEm
 	estimatedDuration, err := strconv.Atoi(duration)
 	if err != nil {
 		return fmt.Errorf("parsing calendar work order duration: %w", err)
+	}
+	return suite.createScheduledWorkOrderFixtureWithDuration(
+		providerEmail,
+		consumerEmail,
+		amountCents,
+		scheduledAt.UTC(),
+		normalizeDocString(description),
+		estimatedDuration,
+	)
+}
+
+func (suite *testSuite) thereIsPastCalendarWorkOrder(consumerEmail, providerEmail, scheduledOn, duration string, description *godog.DocString) error {
+	if err := suite.prepareCalendarWorkOrderParticipants(providerEmail, consumerEmail); err != nil {
+		return err
+	}
+	scheduledAt, err := time.Parse(time.RFC3339, scheduledOn)
+	if err != nil {
+		return fmt.Errorf("parsing past calendar work order scheduled_on: %w", err)
+	}
+	estimatedDuration, err := strconv.Atoi(duration)
+	if err != nil {
+		return fmt.Errorf("parsing past calendar work order duration: %w", err)
+	}
+	suite.clock.SetTime(scheduledAt.UTC().Add(-48 * time.Hour))
+	amountCents, err := httphandler.ParseAmountToCents("15000.50")
+	if err != nil {
+		return fmt.Errorf("parsing past calendar work order amount: %w", err)
 	}
 	return suite.createScheduledWorkOrderFixtureWithDuration(
 		providerEmail,
