@@ -5,8 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
+	googlecalendar "github.com/LoResuelvo/loresuelvo-api/internal/adapters/google_calendar"
 	httphandler "github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler"
 	calendarconnection "github.com/LoResuelvo/loresuelvo-api/internal/domain/calendar_connection"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/user"
@@ -19,6 +21,10 @@ type calendarSyncRunner interface {
 
 type calendarEventObserver interface {
 	HasEventForUser(context.Context, int, int) (bool, error)
+}
+
+type calendarEventDetailsObserver interface {
+	EventDetailsForUser(context.Context, int, int) (googlecalendar.EventDetails, bool, error)
 }
 
 func registerAddWorkOrderToCalendarSteps(sc *godog.ScenarioContext, suite *testSuite) {
@@ -34,6 +40,7 @@ func registerAddWorkOrderToCalendarSteps(sc *godog.ScenarioContext, suite *testS
 	sc.Step(`^el consumidor "([^"]*)" no recibe una cita en Google Calendar$`, suite.consumerDoesNotReceiveCalendarAppointment)
 	sc.Step(`^el consumidor "([^"]*)" no recibe una cita para ese turno$`, suite.consumerDoesNotReceiveCalendarAppointment)
 	sc.Step(`^el prestador "([^"]*)" no recibe una cita en Google Calendar$`, suite.providerDoesNotReceiveCalendarAppointment)
+	sc.Step(`^la cita del consumidor "([^"]*)" muestra el horario "([^"]*)", dura "([^"]*)" minutos, identifica a "([^"]*)", contiene la descripción y es privada$`, suite.consumerCalendarAppointmentShowsDetails)
 	sc.Step(`^no se crea ninguna cita en Google Calendar$`, suite.noCalendarAppointmentIsCreated)
 	sc.Step(`^el consumidor "([^"]*)" tiene una orden futura sin exportar$`, suite.consumerHasUnexportedFutureCalendarWorkOrder)
 	sc.Step(`^el consumidor "([^"]*)" acaba de conectar Google Calendar$`, suite.consumerJustConnectedGoogleCalendar)
@@ -169,6 +176,55 @@ func (suite *testSuite) consumerReceivesCalendarAppointment(email string) error 
 
 func (suite *testSuite) providerReceivesCalendarAppointment(email string) error {
 	return suite.participantReceivesCalendarAppointment(email, auth0IDForProviderEmail(email))
+}
+
+func (suite *testSuite) consumerCalendarAppointmentShowsDetails(email, scheduledOn, duration, counterpartName string) error {
+	if suite.calendarEventDetailsObserver == nil {
+		return fmt.Errorf("calendar event details observer is not configured")
+	}
+	userID, err := suite.userRepository.FindIDByAuthID(auth0IDForConsumerEmail(email))
+	if err != nil {
+		return fmt.Errorf("finding calendar appointment recipient %q: %w", email, err)
+	}
+	order, err := suite.persistedWorkOrderForLastServiceProposal()
+	if err != nil {
+		return err
+	}
+	expectedStart, err := time.Parse(time.RFC3339, scheduledOn)
+	if err != nil {
+		return fmt.Errorf("parsing expected calendar appointment start: %w", err)
+	}
+	expectedDuration, err := strconv.Atoi(duration)
+	if err != nil {
+		return fmt.Errorf("parsing expected calendar appointment duration: %w", err)
+	}
+	details, found, err := suite.calendarEventDetailsObserver.EventDetailsForUser(
+		context.Background(),
+		userID,
+		order.ID(),
+	)
+	if err != nil {
+		return fmt.Errorf("finding calendar appointment details for %q: %w", email, err)
+	}
+	if !found {
+		return fmt.Errorf("expected calendar appointment for %q and work order %d", email, order.ID())
+	}
+	if !details.Start.Equal(expectedStart.UTC()) {
+		return fmt.Errorf("expected calendar appointment to start at %s, got %s", expectedStart.UTC(), details.Start.UTC())
+	}
+	if details.End.Sub(details.Start) != time.Duration(expectedDuration)*time.Minute {
+		return fmt.Errorf("expected calendar appointment duration of %d minutes, got %s", expectedDuration, details.End.Sub(details.Start))
+	}
+	if !strings.Contains(details.Description, counterpartName) {
+		return fmt.Errorf("expected calendar appointment to identify counterpart %q", counterpartName)
+	}
+	if !strings.Contains(details.Description, order.Description()) {
+		return fmt.Errorf("expected calendar appointment to contain work order description")
+	}
+	if details.Visibility != "private" {
+		return fmt.Errorf("expected calendar appointment to be private, got %q", details.Visibility)
+	}
+	return nil
 }
 
 func (suite *testSuite) consumerDoesNotReceiveCalendarAppointment(email string) error {

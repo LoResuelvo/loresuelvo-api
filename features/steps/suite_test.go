@@ -48,6 +48,7 @@ type testSuite struct {
 	urgentWorkOrderScheduler     *scheduler.Scheduler
 	calendarSyncRunner           calendarSyncRunner
 	calendarEventObserver        calendarEventObserver
+	calendarEventDetailsObserver calendarEventDetailsObserver
 	auth0Validator               *validator.Validator
 	tokenBuilder                 *auth0.TokenBuilder
 	chatbot                      *chatbotadapter.FakeChatbot
@@ -325,6 +326,10 @@ func newTestSuite(tb testing.TB, database *sql.DB) *testSuite {
 	router := httpadapter.NewRouter(dependencies.RouterConfig(auth0Validator, slog.Default()))
 	engine, err := router.SetUp()
 	require.NoError(tb, err, "could not initialize router")
+	var eventDetailsObserver calendarEventDetailsObserver
+	if observer, ok := dependencies.CalendarEventObserver.(calendarEventDetailsObserver); ok {
+		eventDetailsObserver = observer
+	}
 
 	// httptest.Server wraps the engine — no port needed
 	server := httptest.NewServer(engine)
@@ -351,6 +356,7 @@ func newTestSuite(tb testing.TB, database *sql.DB) *testSuite {
 		urgentWorkOrderScheduler:     dependencies.UrgentWorkOrderScheduler,
 		calendarSyncRunner:           dependencies.CalendarSyncRunner,
 		calendarEventObserver:        dependencies.CalendarEventObserver,
+		calendarEventDetailsObserver: eventDetailsObserver,
 		auth0Validator:               auth0Validator,
 		tokenBuilder:                 tokenBuilder,
 		chatbot:                      chatbot,
