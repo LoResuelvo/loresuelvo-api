@@ -118,6 +118,46 @@ func TestSyncSkipsParticipantWithoutConnection(t *testing.T) {
 	clock.AssertExpectations(t)
 }
 
+func TestSyncPublishesConnectedParticipantAfterSkippingMissingConnection(t *testing.T) {
+	now := time.Date(2026, time.July, 4, 10, 0, 0, 0, time.UTC)
+	order, consumerUser, providerUser := workOrderCalendarFixture(t, now)
+	providerConnection := calendarConnectionFixture(t, providerUser.ID(), now)
+	providerEventKey, err := workordercalendar.NewEventKey(order.ID(), providerUser.ID())
+	require.NoError(t, err)
+
+	workOrders := new(workOrderReaderMock)
+	connections := new(connectionReaderMock)
+	events := new(eventRepositoryMock)
+	publisher := new(eventPublisherMock)
+	clock := new(clockMock)
+	workOrders.On("FindScheduledAfter", mock.Anything, now).
+		Return([]*workorder.WorkOrder{order}, nil).Once()
+	connections.On("FindByUserID", mock.Anything, consumerUser.ID()).
+		Return(nil, calendarconnection.ErrConnectionNotFound).Once()
+	connections.On("FindByUserID", mock.Anything, providerUser.ID()).
+		Return(providerConnection, nil).Once()
+	publisher.On("Create", mock.Anything, providerConnection, mock.Anything).
+		Return(publishedEventFixture(t, "provider-event"), nil).Once()
+	events.On(
+		"Save",
+		mock.Anything,
+		mock.MatchedBy(func(event *workordercalendar.Event) bool {
+			return event.Key() == providerEventKey && !event.SyncedOn().IsZero()
+		}),
+	).Return(nil).Once()
+	clock.On("Now").Return(now).Once()
+	service := workordercalendar.NewService(workOrders, connections, events, publisher, clock)
+
+	err = service.Sync(context.Background())
+
+	require.NoError(t, err)
+	workOrders.AssertExpectations(t)
+	connections.AssertExpectations(t)
+	events.AssertExpectations(t)
+	publisher.AssertExpectations(t)
+	clock.AssertExpectations(t)
+}
+
 func TestSyncReturnsWorkOrderReaderError(t *testing.T) {
 	now := time.Date(2026, time.July, 4, 10, 0, 0, 0, time.UTC)
 	readErr := errors.New("work order reader unavailable")
