@@ -46,6 +46,8 @@ type testSuite struct {
 	paymentIntentRepository      *repositories.PaymentIntentRepository
 	paymentTransactionRepository *repositories.PaymentTransactionRepository
 	urgentWorkOrderScheduler     *scheduler.Scheduler
+	calendarSyncRunner           calendarSyncRunner
+	calendarEventObserver        calendarEventObserver
 	auth0Validator               *validator.Validator
 	tokenBuilder                 *auth0.TokenBuilder
 	chatbot                      *chatbotadapter.FakeChatbot
@@ -152,6 +154,7 @@ func (s *testSuite) registerAllSteps(sc *godog.ScenarioContext) {
 	registerReviewPaidWorkOrderSteps(sc, s)
 	registerConnectMercadoPagoAccountSteps(sc, s)
 	registerConnectGoogleCalendarSteps(sc, s)
+	registerAddWorkOrderToCalendarSteps(sc, s)
 	registerNotifyUrgentWorkOrdersSteps(sc, s)
 	registerGetJobRequestSteps(sc, s)
 	registerJobRequestImagesSteps(sc, s)

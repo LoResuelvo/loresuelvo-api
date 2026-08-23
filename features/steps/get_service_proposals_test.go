@@ -169,13 +169,14 @@ func (suite *testSuite) createServiceProposalFixture(
 	amountCents int64,
 	scheduledOn time.Time,
 	description string,
+	estimatedDuration ...int,
 ) error {
 	participants, err := suite.prepareServiceProposalFixtureParticipants(providerEmail, consumerEmail)
 	if err != nil {
 		return err
 	}
 
-	return suite.saveServiceProposalFixture(participants, status, amountCents, scheduledOn, description)
+	return suite.saveServiceProposalFixture(participants, status, amountCents, scheduledOn, description, estimatedDuration...)
 }
 
 func (suite *testSuite) prepareServiceProposalFixtureParticipants(providerEmail, consumerEmail string) (serviceProposalFixtureParticipants, error) {
@@ -229,7 +230,12 @@ func (suite *testSuite) saveServiceProposalFixture(
 	amountCents int64,
 	scheduledOn time.Time,
 	description string,
+	estimatedDuration ...int,
 ) error {
+	durationMinutes := 60
+	if len(estimatedDuration) > 0 {
+		durationMinutes = estimatedDuration[0]
+	}
 	repository := repositories.NewServiceProposalRepository(suite.database)
 	bookingTerms, err := serviceproposal.NewBookingPolicy().Calculate(amountCents, scheduledOn)
 	if err != nil {
@@ -242,7 +248,7 @@ func (suite *testSuite) saveServiceProposalFixture(
 		BookingTerms:             bookingTerms,
 		ScheduledOn:              scheduledOn,
 		Description:              description,
-		EstimatedDurationMinutes: 60,
+		EstimatedDurationMinutes: durationMinutes,
 		Status:                   status,
 	})
 	if err != nil {

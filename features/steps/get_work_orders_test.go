@@ -182,6 +182,17 @@ func (suite *testSuite) createWorkOrderForListingStatus(status, providerEmail, c
 }
 
 func (suite *testSuite) createScheduledWorkOrderFixture(providerEmail, consumerEmail string, amountCents int64, scheduledOn time.Time, description string) error {
+	return suite.createScheduledWorkOrderFixtureWithDuration(
+		providerEmail,
+		consumerEmail,
+		amountCents,
+		scheduledOn,
+		description,
+		60,
+	)
+}
+
+func (suite *testSuite) createScheduledWorkOrderFixtureWithDuration(providerEmail, consumerEmail string, amountCents int64, scheduledOn time.Time, description string, estimatedDurationMinutes int) error {
 	if err := suite.createServiceProposalFixture(
 		providerEmail,
 		consumerEmail,
@@ -189,6 +200,7 @@ func (suite *testSuite) createScheduledWorkOrderFixture(providerEmail, consumerE
 		amountCents,
 		scheduledOn,
 		description,
+		estimatedDurationMinutes,
 	); err != nil {
 		return err
 	}
