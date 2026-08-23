@@ -115,7 +115,6 @@ Feature: Agregar una orden de trabajo a Google Calendar
         When se sincroniza dos veces la misma orden de trabajo con Google Calendar
         Then el consumidor "ana@example.com" conserva una sola cita para ese turno
 
-    @wip
     Scenario: 22.11-AWOC El usuario es informado cuando debe volver a autorizar
         Given que la fecha y hora actual del sistema es "2026-08-01T10:00:00Z"
         Given que existe una orden de trabajo futura para "ana@example.com" y "juan.plomero@example.com" el "2026-08-15T15:00:00Z" con una duración estimada de "90" minutos y la descripción:
