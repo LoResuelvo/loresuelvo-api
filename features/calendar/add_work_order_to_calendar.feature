@@ -105,7 +105,6 @@ Feature: Agregar una orden de trabajo a Google Calendar
         When se reintenta la sincronización de la cita pendiente
         Then el consumidor "ana@example.com" recibe la cita en su Google Calendar
 
-    @wip
     Scenario: 22.10-AWOC Un turno aparece una sola vez
         Given que la fecha y hora actual del sistema es "2026-08-01T10:00:00Z"
         Given que existe una orden de trabajo futura para "ana@example.com" y "juan.plomero@example.com" el "2026-08-15T15:00:00Z" con una duración estimada de "90" minutos y la descripción:
