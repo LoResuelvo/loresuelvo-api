@@ -123,6 +123,9 @@ func TestFakeEventPublisherExposesPublishedAppointment(t *testing.T) {
 	assert.True(t, details.End.Equal(appointment.EndsOn()))
 	assert.Equal(t, "private", details.Visibility)
 	assert.Equal(t, "opaque", details.Transparency)
+	count, err := publisher.EventCountForUser(context.Background(), appointment.Participant().ID(), appointment.WorkOrder().ID())
+	require.NoError(t, err)
+	assert.Equal(t, 1, count)
 }
 
 func calendarAppointmentFixture(t *testing.T, scheduledOn time.Time) (workordercalendar.Appointment, *calendarconnection.Connection) {

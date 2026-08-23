@@ -27,13 +27,18 @@ type EventDetails struct {
 }
 
 type FakeEventPublisher struct {
-	mu        sync.RWMutex
-	available bool
-	events    map[fakeEventKey]EventDetails
+	mu          sync.RWMutex
+	available   bool
+	events      map[fakeEventKey]EventDetails
+	eventCounts map[fakeEventKey]int
 }
 
 func NewFakeEventPublisher() *FakeEventPublisher {
-	return &FakeEventPublisher{available: true, events: make(map[fakeEventKey]EventDetails)}
+	return &FakeEventPublisher{
+		available:   true,
+		events:      make(map[fakeEventKey]EventDetails),
+		eventCounts: make(map[fakeEventKey]int),
+	}
 }
 
 func (publisher *FakeEventPublisher) SetAvailable(available bool) {
@@ -70,6 +75,7 @@ func (publisher *FakeEventPublisher) Create(
 	}
 	publisher.mu.Lock()
 	publisher.events[key] = details
+	publisher.eventCounts[key]++
 	publisher.mu.Unlock()
 	return workordercalendar.NewPublishedEvent(connection.CalendarID(), externalID)
 }
@@ -86,6 +92,13 @@ func (publisher *FakeEventPublisher) EventDetailsForUser(_ context.Context, user
 	details, found := publisher.events[fakeEventKey{userID: userID, workOrderID: workOrderID}]
 	publisher.mu.RUnlock()
 	return details, found, nil
+}
+
+func (publisher *FakeEventPublisher) EventCountForUser(_ context.Context, userID, workOrderID int) (int, error) {
+	publisher.mu.RLock()
+	count := publisher.eventCounts[fakeEventKey{userID: userID, workOrderID: workOrderID}]
+	publisher.mu.RUnlock()
+	return count, nil
 }
 
 var _ workordercalendar.EventPublisher = (*FakeEventPublisher)(nil)

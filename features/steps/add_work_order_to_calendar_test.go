@@ -28,6 +28,10 @@ type calendarEventDetailsObserver interface {
 	EventDetailsForUser(context.Context, int, int) (googlecalendar.EventDetails, bool, error)
 }
 
+type calendarEventCountObserver interface {
+	EventCountForUser(context.Context, int, int) (int, error)
+}
+
 type calendarAvailabilityController interface {
 	SetAvailable(bool)
 }
@@ -54,6 +58,8 @@ func registerAddWorkOrderToCalendarSteps(sc *godog.ScenarioContext, suite *testS
 	sc.Step(`^el consumidor "([^"]*)" tiene una cita pendiente por una indisponibilidad de Google Calendar$`, suite.consumerHasPendingCalendarAppointment)
 	sc.Step(`^Google Calendar volvió a estar disponible$`, suite.googleCalendarBecameAvailable)
 	sc.Step(`^se reintenta la sincronización de la cita pendiente$`, suite.retryPendingCalendarAppointmentSync)
+	sc.Step(`^se sincroniza dos veces la misma orden de trabajo con Google Calendar$`, suite.syncSameCalendarWorkOrderTwice)
+	sc.Step(`^el consumidor "([^"]*)" conserva una sola cita para ese turno$`, suite.consumerKeepsSingleCalendarAppointment)
 	sc.Step(`^se confirma la contratación de la propuesta$`, suite.confirmCalendarBooking)
 	sc.Step(`^la contratación queda confirmada aunque no se pueda crear la cita$`, suite.calendarBookingIsConfirmedDespiteUnavailableCalendar)
 }
@@ -250,6 +256,42 @@ func (suite *testSuite) retryPendingCalendarAppointmentSync() error {
 		return fmt.Errorf("calendar synchronization runner is not configured")
 	}
 	return suite.calendarSyncRunner.RunOnce(context.Background())
+}
+
+func (suite *testSuite) syncSameCalendarWorkOrderTwice() error {
+	if suite.calendarSyncRunner == nil {
+		return fmt.Errorf("calendar synchronization runner is not configured")
+	}
+	if err := suite.calendarSyncRunner.RunOnce(context.Background()); err != nil {
+		return fmt.Errorf("first calendar synchronization failed: %w", err)
+	}
+	if err := suite.calendarSyncRunner.RunOnce(context.Background()); err != nil {
+		return fmt.Errorf("second calendar synchronization failed: %w", err)
+	}
+	return nil
+}
+
+func (suite *testSuite) consumerKeepsSingleCalendarAppointment(email string) error {
+	observer, ok := suite.calendarEventObserver.(calendarEventCountObserver)
+	if !ok {
+		return fmt.Errorf("calendar event count observer is not configured")
+	}
+	userID, err := suite.userRepository.FindIDByAuthID(auth0IDForConsumerEmail(email))
+	if err != nil {
+		return fmt.Errorf("finding calendar appointment recipient %q: %w", email, err)
+	}
+	order, err := suite.persistedWorkOrderForLastServiceProposal()
+	if err != nil {
+		return err
+	}
+	count, err := observer.EventCountForUser(context.Background(), userID, order.ID())
+	if err != nil {
+		return fmt.Errorf("counting calendar appointments for %q: %w", email, err)
+	}
+	if count != 1 {
+		return fmt.Errorf("expected one calendar appointment for %q and work order %d, got %d", email, order.ID(), count)
+	}
+	return nil
 }
 
 func (suite *testSuite) confirmCalendarBooking() error {
