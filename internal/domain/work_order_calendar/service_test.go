@@ -7,6 +7,7 @@ import (
 	"time"
 
 	calendarconnection "github.com/LoResuelvo/loresuelvo-api/internal/domain/calendar_connection"
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/notification"
 	workorder "github.com/LoResuelvo/loresuelvo-api/internal/domain/work_order"
 	workordercalendar "github.com/LoResuelvo/loresuelvo-api/internal/domain/work_order_calendar"
 	"github.com/stretchr/testify/assert"
@@ -67,7 +68,7 @@ func TestSyncPublishesAnAppointmentForEachConnectedParticipant(t *testing.T) {
 		}),
 	).Return(nil).Twice()
 	clock.On("Now").Return(now).Once()
-	service := workordercalendar.NewService(workOrders, connections, events, publisher, clock)
+	service := workordercalendar.NewService(workOrders, connections, events, publisher, clock, new(notificationNotificatorMock))
 
 	err = service.Sync(context.Background())
 
@@ -109,7 +110,7 @@ func TestSyncSkipsParticipantWithoutConnection(t *testing.T) {
 		}),
 	).Return(nil).Once()
 	clock.On("Now").Return(now).Once()
-	service := workordercalendar.NewService(workOrders, connections, events, publisher, clock)
+	service := workordercalendar.NewService(workOrders, connections, events, publisher, clock, new(notificationNotificatorMock))
 
 	err = service.Sync(context.Background())
 
@@ -133,7 +134,7 @@ func TestSyncReturnsWorkOrderReaderError(t *testing.T) {
 		Return(nil, readErr).
 		Once()
 	clock.On("Now").Return(now).Once()
-	service := workordercalendar.NewService(workOrders, connections, events, publisher, clock)
+	service := workordercalendar.NewService(workOrders, connections, events, publisher, clock, new(notificationNotificatorMock))
 
 	err := service.Sync(context.Background())
 
@@ -164,7 +165,7 @@ func TestSyncDoesNotSaveWhenPublishingFails(t *testing.T) {
 		Return(workordercalendar.PublishedEvent{}, publishErr).
 		Once()
 	clock.On("Now").Return(now).Once()
-	service := workordercalendar.NewService(workOrders, connections, events, publisher, clock)
+	service := workordercalendar.NewService(workOrders, connections, events, publisher, clock, new(notificationNotificatorMock))
 
 	err := service.Sync(context.Background())
 
@@ -194,7 +195,7 @@ func TestSyncSkipsAlreadySynchronizedEvent(t *testing.T) {
 	connections.On("FindByUserID", mock.Anything, providerUser.ID()).Return(nil, calendarconnection.ErrConnectionNotFound).Once()
 	events.On("Exists", mock.Anything, consumerEventKey).Return(true, nil).Once()
 	clock.On("Now").Return(now).Once()
-	service := workordercalendar.NewService(workOrders, connections, events, publisher, clock)
+	service := workordercalendar.NewService(workOrders, connections, events, publisher, clock, new(notificationNotificatorMock))
 
 	err = service.Sync(context.Background())
 
@@ -204,5 +205,47 @@ func TestSyncSkipsAlreadySynchronizedEvent(t *testing.T) {
 	workOrders.AssertExpectations(t)
 	connections.AssertExpectations(t)
 	events.AssertExpectations(t)
+	clock.AssertExpectations(t)
+}
+
+func TestSyncNotifiesParticipantWhenCalendarAuthorizationRequiresAttention(t *testing.T) {
+	now := time.Date(2026, time.July, 4, 10, 0, 0, 0, time.UTC)
+	order, consumerUser, providerUser := workOrderCalendarFixture(t, now)
+	consumerConnection := calendarConnectionFixture(t, consumerUser.ID(), now)
+	consumerConnection.MarkActionRequired(now)
+
+	workOrders := new(workOrderReaderMock)
+	connections := new(connectionReaderMock)
+	events := new(eventRepositoryMock)
+	publisher := new(eventPublisherMock)
+	notificator := new(notificationNotificatorMock)
+	clock := new(clockMock)
+	workOrders.On("FindScheduledAfter", mock.Anything, now).Return([]*workorder.WorkOrder{order}, nil).Once()
+	connections.On("FindByUserID", mock.Anything, consumerUser.ID()).Return(consumerConnection, nil).Once()
+	connections.On("FindByUserID", mock.Anything, providerUser.ID()).Return(nil, calendarconnection.ErrConnectionNotFound).Once()
+	notificator.On(
+		"Notify",
+		mock.Anything,
+		mock.MatchedBy(func(created *notification.Notification) bool {
+			return created.UserID == consumerUser.ID() &&
+				created.Type == notification.TypeCalendarReauthorizationRequired &&
+				created.ResourceType == notification.ResourceCalendarConnection &&
+				created.ResourceID == consumerUser.ID() &&
+				created.ReadAt == nil &&
+				created.CreatedAt.Equal(now)
+		}),
+	).Return(nil).Once()
+	clock.On("Now").Return(now).Twice()
+	service := workordercalendar.NewService(workOrders, connections, events, publisher, clock, notificator)
+
+	err := service.Sync(context.Background())
+
+	require.NoError(t, err)
+	publisher.AssertNotCalled(t, "Create", mock.Anything, mock.Anything, mock.Anything)
+	events.AssertNotCalled(t, "Exists", mock.Anything, mock.Anything)
+	events.AssertNotCalled(t, "Save", mock.Anything, mock.Anything)
+	workOrders.AssertExpectations(t)
+	connections.AssertExpectations(t)
+	notificator.AssertExpectations(t)
 	clock.AssertExpectations(t)
 }

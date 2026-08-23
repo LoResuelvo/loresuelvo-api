@@ -7,6 +7,7 @@ import (
 
 	calendarconnection "github.com/LoResuelvo/loresuelvo-api/internal/domain/calendar_connection"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/consumer"
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/notification"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/provider"
 	serviceproposal "github.com/LoResuelvo/loresuelvo-api/internal/domain/service_proposal"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/user"
@@ -56,6 +57,12 @@ func (m *eventPublisherMock) Create(
 ) (workordercalendar.PublishedEvent, error) {
 	args := m.Called(ctx, connection, appointment)
 	return args.Get(0).(workordercalendar.PublishedEvent), args.Error(1)
+}
+
+type notificationNotificatorMock struct{ mock.Mock }
+
+func (m *notificationNotificatorMock) Notify(ctx context.Context, created *notification.Notification) error {
+	return m.Called(ctx, created).Error(0)
 }
 
 type clockMock struct{ mock.Mock }

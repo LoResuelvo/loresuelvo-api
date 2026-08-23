@@ -7,6 +7,7 @@ import (
 	"time"
 
 	calendarconnection "github.com/LoResuelvo/loresuelvo-api/internal/domain/calendar_connection"
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/notification"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/user"
 	workorder "github.com/LoResuelvo/loresuelvo-api/internal/domain/work_order"
 )
@@ -17,6 +18,7 @@ type Service struct {
 	events      EventRepository
 	publisher   EventPublisher
 	clock       Clock
+	notificator notification.Notificator
 }
 
 func NewService(
@@ -25,6 +27,7 @@ func NewService(
 	events EventRepository,
 	publisher EventPublisher,
 	clock Clock,
+	notificator notification.Notificator,
 ) *Service {
 	return &Service{
 		workOrders:  workOrders,
@@ -32,6 +35,7 @@ func NewService(
 		events:      events,
 		publisher:   publisher,
 		clock:       clock,
+		notificator: notificator,
 	}
 }
 
@@ -70,6 +74,12 @@ func (service *Service) syncParticipant(
 	if err != nil {
 		return fmt.Errorf("finding calendar connection for participant: %w", err)
 	}
+	if connection.Status() == calendarconnection.StatusActionRequired {
+		if err := service.notifyReauthorizationRequired(ctx, participant.ID()); err != nil {
+			return err
+		}
+		return nil
+	}
 
 	event, err := NewEvent(order, participant)
 	if err != nil {
@@ -92,6 +102,20 @@ func (service *Service) syncParticipant(
 	}
 	if err := service.events.Save(ctx, event); err != nil {
 		return fmt.Errorf("saving calendar appointment: %w", err)
+	}
+	return nil
+}
+
+func (service *Service) notifyReauthorizationRequired(ctx context.Context, userID int) error {
+	reauthorizationNotification := notification.NewNotification(
+		userID,
+		notification.TypeCalendarReauthorizationRequired,
+		notification.ResourceCalendarConnection,
+		userID,
+		service.clock,
+	)
+	if err := service.notificator.Notify(ctx, reauthorizationNotification); err != nil {
+		return fmt.Errorf("notifying calendar reauthorization required: %w", err)
 	}
 	return nil
 }
