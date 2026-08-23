@@ -2,9 +2,11 @@ package workordercalendar
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
+	calendarconnection "github.com/LoResuelvo/loresuelvo-api/internal/domain/calendar_connection"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/user"
 	workorder "github.com/LoResuelvo/loresuelvo-api/internal/domain/work_order"
 )
@@ -62,6 +64,9 @@ func (service *Service) syncParticipant(
 	now time.Time,
 ) error {
 	connection, err := service.connections.FindByUserID(ctx, participant.ID())
+	if errors.Is(err, calendarconnection.ErrConnectionNotFound) {
+		return nil
+	}
 	if err != nil {
 		return fmt.Errorf("finding calendar connection for participant: %w", err)
 	}
