@@ -130,9 +130,6 @@ func (router *Router) SetUp() (*gin.Engine, error) {
 }
 
 func (router *Router) registerCalendarConnectionRoutes(engine *gin.Engine, authMiddleware gin.HandlerFunc) {
-	if router.calendarConnectionHandler == nil {
-		return
-	}
 	engine.POST("/me/calendar-connection/authorizations", authMiddleware, router.calendarConnectionHandler.StartAuthorization)
 	engine.POST("/me/calendar-connection", authMiddleware, router.calendarConnectionHandler.Connect)
 	engine.GET("/oauth/google-calendar/callback", router.calendarConnectionHandler.CompleteAuthorization)
