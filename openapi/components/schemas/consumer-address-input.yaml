@@ -1,0 +1,27 @@
+type: object
+description: Consumer service address. Only consumer-provided address fields are accepted.
+required:
+- street
+- street_number
+properties:
+  street:
+    type: string
+    description: Street name.
+    maxLength: 200
+    example: Av. Rivadavia
+  street_number:
+    type: string
+    description: Street number represented as a string.
+    maxLength: 50
+    example: '5100'
+  floor:
+    type: string
+    maxLength: 20
+    description: Optional floor.
+    example: '4'
+  unit:
+    type: string
+    maxLength: 50
+    description: Optional apartment or unit.
+    example: B
+additionalProperties: false

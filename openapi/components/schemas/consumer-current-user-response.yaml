@@ -1,11 +1,38 @@
-description: Complete authenticated Consumer profile.
+description: Complete authenticated Consumer profile, including the service address visible only to its owner.
 allOf:
 - $ref: '#/components/schemas/BaseCurrentUserResponse'
 - type: object
   required:
   - role
+  - address
   properties:
     role:
       type: string
       enum:
       - consumer
+    address:
+      type: object
+      required:
+      - street
+      - street_number
+      - latitude
+      - longitude
+      - coverage_zone_id
+      properties:
+        street:
+          type: string
+        street_number:
+          type: string
+        floor:
+          type: string
+        unit:
+          type: string
+        latitude:
+          type: number
+          format: double
+        longitude:
+          type: number
+          format: double
+        coverage_zone_id:
+          type: integer
+          format: int32

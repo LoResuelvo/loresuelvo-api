@@ -1,8 +1,10 @@
 type: object
 description: Payload accepted by POST /consumers. The implementation trims surrounding
-  whitespace from all string fields before validation/persistence. The profile photo is optional.
+  whitespace from all string fields before validation/persistence. The address is required;
+  derived geographic data is resolved by the backend. The profile photo is optional.
 required:
 - email
+- address
 properties:
   email:
     type: string
@@ -24,4 +26,6 @@ properties:
     format: uuid
     description: Optional confirmed public profile photo file identifier uploaded by the authenticated consumer.
     example: 4af47f1b-97b6-4b32-baa0-b95d6077f919
+  address:
+    $ref: '#/components/schemas/ConsumerAddressInput'
 additionalProperties: false

@@ -216,6 +216,8 @@ components:
   schemas:
     RegisterConsumerRequest:
       $ref: ./components/schemas/register-consumer-request.yaml
+    ConsumerAddressInput:
+      $ref: ./components/schemas/consumer-address-input.yaml
     ConsumerSummary:
       $ref: ./components/schemas/consumer-summary.yaml
     RegisterProviderRequest:

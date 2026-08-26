@@ -425,7 +425,7 @@
                 ],
                 "operationId": "registerConsumer",
                 "summary": "Register the authenticated user as a consumer",
-                "description": "Creates a consumer account for the authenticated Auth0 subject. The Auth0 subject is taken from the Bearer JWT and persisted as the user's auth identifier. Unknown JSON properties are ignored by the current handler.",
+                "description": "Creates a consumer account for the authenticated Auth0 subject. The Auth0 subject is taken from the Bearer JWT and persisted as the user's auth identifier. The backend validates and resolves the required service address before persisting the user, consumer profile, coordinates, and internal coverage-zone association atomically.",
                 "security": [
                     {
                         "BearerAuth": []
@@ -445,6 +445,12 @@
                                         "email": "ana@example.com",
                                         "name": "Ana Perez",
                                         "surname": "Mamani Tipula",
+                                        "address": {
+                                            "street": "Av. Rivadavia",
+                                            "street_number": "5100",
+                                            "floor": "4",
+                                            "unit": "B"
+                                        },
                                         "profile_photo_file_id": "4af47f1b-97b6-4b32-baa0-b95d6077f919"
                                     }
                                 }
@@ -474,7 +480,7 @@
                         }
                     },
                     "400": {
-                        "description": "The request body is not valid JSON, cannot be bound to the expected payload, contains an invalid email format, or references an unavailable profile photo.",
+                        "description": "The request body is not valid JSON, lacks a required address field, contains an invalid address or email, or references an unavailable profile photo.",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -547,6 +553,16 @@
                                             "error": "Email is already registered"
                                         }
                                     }
+                                }
+                            }
+                        }
+                    },
+                    "503": {
+                        "description": "The location service is temporarily unavailable and the registration was not persisted.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
                                 }
                             }
                         }
@@ -4436,9 +4452,10 @@
         "schemas": {
             "RegisterConsumerRequest": {
                 "type": "object",
-                "description": "Payload accepted by POST /consumers. The implementation trims surrounding whitespace from all string fields before validation/persistence. The profile photo is optional.",
+                "description": "Payload accepted by POST /consumers. The implementation trims surrounding whitespace from all string fields before validation/persistence. The address is required; derived geographic data is resolved by the backend. The profile photo is optional.",
                 "required": [
-                    "email"
+                    "email",
+                    "address"
                 ],
                 "properties": {
                     "email": {
@@ -4462,6 +4479,44 @@
                         "format": "uuid",
                         "description": "Optional confirmed public profile photo file identifier uploaded by the authenticated consumer.",
                         "example": "4af47f1b-97b6-4b32-baa0-b95d6077f919"
+                    },
+                    "address": {
+                        "$ref": "#/components/schemas/ConsumerAddressInput"
+                    }
+                },
+                "additionalProperties": false
+            },
+            "ConsumerAddressInput": {
+                "type": "object",
+                "description": "Consumer service address. Only consumer-provided address fields are accepted.",
+                "required": [
+                    "street",
+                    "street_number"
+                ],
+                "properties": {
+                    "street": {
+                        "type": "string",
+                        "description": "Street name.",
+                        "maxLength": 200,
+                        "example": "Av. Rivadavia"
+                    },
+                    "street_number": {
+                        "type": "string",
+                        "description": "Street number represented as a string.",
+                        "maxLength": 50,
+                        "example": "5100"
+                    },
+                    "floor": {
+                        "type": "string",
+                        "maxLength": 20,
+                        "description": "Optional floor.",
+                        "example": "4"
+                    },
+                    "unit": {
+                        "type": "string",
+                        "maxLength": 50,
+                        "description": "Optional apartment or unit.",
+                        "example": "B"
                     }
                 },
                 "additionalProperties": false
@@ -6859,7 +6914,7 @@
                 }
             },
             "ConsumerCurrentUserResponse": {
-                "description": "Complete authenticated Consumer profile.",
+                "description": "Complete authenticated Consumer profile, including the service address visible only to its owner.",
                 "allOf": [
                     {
                         "$ref": "#/components/schemas/BaseCurrentUserResponse"
@@ -6867,7 +6922,8 @@
                     {
                         "type": "object",
                         "required": [
-                            "role"
+                            "role",
+                            "address"
                         ],
                         "properties": {
                             "role": {
@@ -6875,6 +6931,42 @@
                                 "enum": [
                                     "consumer"
                                 ]
+                            },
+                            "address": {
+                                "type": "object",
+                                "required": [
+                                    "street",
+                                    "street_number",
+                                    "latitude",
+                                    "longitude",
+                                    "coverage_zone_id"
+                                ],
+                                "properties": {
+                                    "street": {
+                                        "type": "string"
+                                    },
+                                    "street_number": {
+                                        "type": "string"
+                                    },
+                                    "floor": {
+                                        "type": "string"
+                                    },
+                                    "unit": {
+                                        "type": "string"
+                                    },
+                                    "latitude": {
+                                        "type": "number",
+                                        "format": "double"
+                                    },
+                                    "longitude": {
+                                        "type": "number",
+                                        "format": "double"
+                                    },
+                                    "coverage_zone_id": {
+                                        "type": "integer",
+                                        "format": "int32"
+                                    }
+                                }
                             }
                         }
                     }

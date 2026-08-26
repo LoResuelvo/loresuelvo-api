@@ -5,7 +5,8 @@ post:
   summary: Register the authenticated user as a consumer
   description: Creates a consumer account for the authenticated Auth0 subject. The
     Auth0 subject is taken from the Bearer JWT and persisted as the user's auth identifier.
-    Unknown JSON properties are ignored by the current handler.
+    The backend validates and resolves the required service address before persisting the
+    user, consumer profile, coordinates, and internal coverage-zone association atomically.
   security:
   - BearerAuth: []
   requestBody:
@@ -21,6 +22,11 @@ post:
               email: ana@example.com
               name: Ana Perez
               surname: Mamani Tipula
+              address:
+                street: Av. Rivadavia
+                street_number: '5100'
+                floor: '4'
+                unit: B
               profile_photo_file_id: 4af47f1b-97b6-4b32-baa0-b95d6077f919
   responses:
     '201':
@@ -37,8 +43,8 @@ post:
                 surname: Mamani Tipula
                 profile_photo_url: https://cdn.example/files/2026/07/profile_photo/4af47f1b-97b6-4b32-baa0-b95d6077f919.jpg
     '400':
-      description: The request body is not valid JSON, cannot be bound to the expected
-        payload, contains an invalid email format, or references an unavailable profile photo.
+      description: The request body is not valid JSON, lacks a required address field,
+        contains an invalid address or email, or references an unavailable profile photo.
       content:
         application/json:
           schema:
@@ -87,3 +93,9 @@ post:
             emailAlreadyRegistered:
               value:
                 error: Email is already registered
+    '503':
+      description: The location service is temporarily unavailable and the registration was not persisted.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
