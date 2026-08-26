@@ -1,4 +1,3 @@
-@wip
 Feature: Recomendar prestadores elegibles por zona de cobertura
     Como consumidor
     quiero recibir únicamente prestadores que cubran la zona de mi domicilio
