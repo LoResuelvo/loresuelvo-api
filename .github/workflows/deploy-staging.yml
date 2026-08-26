@@ -22,6 +22,8 @@ jobs:
 
             cat config/staging.conf > .env
             cat >> .env <<EOF
+            AUTH0_DOMAIN=${{ secrets.AUTH0_DOMAIN_STAGING }}
+            AUTH0_AUDIENCE=${{ secrets.AUTH0_AUDIENCE_STAGING }}
             DATABASE_URL=${{ secrets.DATABASE_URL }}
             STORAGE_ACCESS_KEY_ID=${{ secrets.STORAGE_ACCESS_KEY_ID }}
             STORAGE_SECRET_ACCESS_KEY=${{ secrets.STORAGE_SECRET_ACCESS_KEY }}
