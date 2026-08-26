@@ -85,7 +85,7 @@ func savedConsumerIDForConversation(t *testing.T, testContext conversationReposi
 func savedConsumerIDForConversationWithData(t *testing.T, testContext conversationRepositoryTestContext, authID, email, name, surname string) int {
 	t.Helper()
 
-	consumerToSave := legacyConsumer(authID, email, name, surname)
+	consumerToSave := consumerWithAddress(t, testContext.database, authID, email, name, surname)
 	_, err := testContext.userRepository.Save(context.Background(), consumerToSave)
 	require.NoError(t, err)
 

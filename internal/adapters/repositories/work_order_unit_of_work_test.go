@@ -29,6 +29,7 @@ func newWorkOrderUnitOfWorkTest(t *testing.T) workOrderUnitOfWorkTestContext {
 	})
 
 	consumerID := savedConsumerIDWithData(t, jobRequestRepositoryTestContext{
+		database:       testContext.database,
 		userRepository: testContext.userRepository,
 	}, "auth0|unit-consumer", "unit.consumer@example.com", "Ana", "Perez")
 	providerID := savedProviderIDWithData(t, jobRequestRepositoryTestContext{

@@ -272,9 +272,6 @@ func (suite *testSuite) consumerAddressPreservesStreetAndNumber(street, number s
 	if err != nil {
 		return err
 	}
-	if registeredConsumer.Address() == nil {
-		return fmt.Errorf("registered consumer has no address")
-	}
 	if registeredConsumer.Address().Street != street || registeredConsumer.Address().StreetNumber != number {
 		return fmt.Errorf("expected address %q %q, got %q %q", street, number, registeredConsumer.Address().Street, registeredConsumer.Address().StreetNumber)
 	}
@@ -286,9 +283,6 @@ func (suite *testSuite) consumerAddressPreservesFloorAndUnit(floor, unit string)
 	if err != nil {
 		return err
 	}
-	if registeredConsumer.Address() == nil {
-		return fmt.Errorf("registered consumer has no address")
-	}
 	if registeredConsumer.Address().Floor != floor || registeredConsumer.Address().Unit != unit {
 		return fmt.Errorf("expected floor/unit %q/%q, got %q/%q", floor, unit, registeredConsumer.Address().Floor, registeredConsumer.Address().Unit)
 	}
@@ -299,9 +293,6 @@ func (suite *testSuite) consumerAddressHasValidCoordinates() error {
 	registeredConsumer, err := suite.registeredConsumer()
 	if err != nil {
 		return err
-	}
-	if registeredConsumer.Location() == nil {
-		return fmt.Errorf("registered consumer has no coordinates")
 	}
 	return registeredConsumer.Location().Validate()
 }

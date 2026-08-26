@@ -84,6 +84,7 @@ func cleanServiceProposalRepositoryTestDatabase(t *testing.T, database *sql.DB) 
 func TestWorkOrderRepositoryDoesNotPersistServiceProposalTransitions(t *testing.T) {
 	testContext := newServiceProposalRepositoryTest(t)
 	consumerID := savedConsumerIDWithData(t, jobRequestRepositoryTestContext{
+		database:       testContext.database,
 		userRepository: testContext.userRepository,
 	}, "auth0|acceptance-consumer", "acceptance.consumer@example.com", "Ana", "Perez")
 	providerID := savedProviderIDWithData(t, jobRequestRepositoryTestContext{
@@ -163,6 +164,7 @@ func TestWorkOrderRepositoryReturnsNotFoundForMissingServiceProposal(t *testing.
 func TestServiceProposalRepositoryCanSave(t *testing.T) {
 	testContext := newServiceProposalRepositoryTest(t)
 	consumerID := savedConsumerIDWithData(t, jobRequestRepositoryTestContext{
+		database:       testContext.database,
 		userRepository: testContext.userRepository,
 	}, "auth0|service-proposal-consumer", "service.proposal.consumer@example.com", "Ana", "Perez")
 	providerID := savedProviderIDWithData(t, jobRequestRepositoryTestContext{
@@ -268,6 +270,7 @@ func TestServiceProposalRepositoryCanSave(t *testing.T) {
 func TestServiceProposalRepositoryFindsPendingProposalForConsumer(t *testing.T) {
 	testContext := newServiceProposalRepositoryTest(t)
 	consumerID := savedConsumerIDWithData(t, jobRequestRepositoryTestContext{
+		database:       testContext.database,
 		userRepository: testContext.userRepository,
 	}, "auth0|proposal-list-consumer", "proposal.list.consumer@example.com", "Ana", "Perez")
 	providerID := savedProviderIDWithData(t, jobRequestRepositoryTestContext{

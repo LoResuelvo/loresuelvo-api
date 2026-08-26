@@ -44,7 +44,7 @@ func newGoogleCalendarRepositoryTest(t *testing.T) googleCalendarRepositoryTestC
 func saveCalendarConnectionTestConsumer(t *testing.T, database *sql.DB) int {
 	t.Helper()
 	userRepository := repositories.NewUserRepository(database)
-	consumerToSave := legacyConsumer(
+	consumerToSave := consumerWithAddress(t, database,
 		"auth0|calendar-connection-repository-test",
 		"calendar.connection.repository@example.com",
 		"Ana",

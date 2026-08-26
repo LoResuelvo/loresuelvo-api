@@ -16,10 +16,6 @@ func NewService(repository Repository) *Service {
 }
 
 func (s *Service) List(ctx context.Context) ([]CatalogEntry, error) {
-	if s == nil || s.repository == nil {
-		return nil, ErrRepositoryNotConfigured
-	}
-
 	entries, err := s.repository.ListAvailableByMarketCode(ctx, DefaultMarketCode)
 	if err != nil {
 		return nil, fmt.Errorf("listing available coverage zones: %w", err)

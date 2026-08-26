@@ -23,6 +23,7 @@ import (
 func TestPaymentIntentRepositoryPersistsCheckoutReadyProcessingAndRejectedStatus(t *testing.T) {
 	testContext := newServiceProposalRepositoryTest(t)
 	consumerID := savedConsumerIDWithData(t, jobRequestRepositoryTestContext{
+		database:       testContext.database,
 		userRepository: testContext.userRepository,
 	}, "auth0|payment-consumer", "payment.consumer@example.com", "Ana", "Perez")
 	providerID := savedProviderIDWithData(t, jobRequestRepositoryTestContext{
@@ -127,6 +128,7 @@ func TestPaymentIntentRepositoryPersistsCheckoutReadyProcessingAndRejectedStatus
 func TestPaymentIntentRepositoryPersistsServiceBalancePurposeAndAmounts(t *testing.T) {
 	testContext := newServiceProposalRepositoryTest(t)
 	consumerID := savedConsumerIDWithData(t, jobRequestRepositoryTestContext{
+		database:       testContext.database,
 		userRepository: testContext.userRepository,
 	}, "auth0|balance-consumer", "balance.consumer@example.com", "Ana", "Perez")
 	providerID := savedProviderIDWithData(t, jobRequestRepositoryTestContext{
@@ -172,6 +174,7 @@ func TestPaymentIntentRepositoryPersistsServiceBalancePurposeAndAmounts(t *testi
 func TestPaymentUnitOfWorkAtomicallyPersistsApprovedBooking(t *testing.T) {
 	testContext := newServiceProposalRepositoryTest(t)
 	consumerID := savedConsumerIDWithData(t, jobRequestRepositoryTestContext{
+		database:       testContext.database,
 		userRepository: testContext.userRepository,
 	}, "auth0|paid-consumer", "paid.consumer@example.com", "Ana", "Perez")
 	providerID := savedProviderIDWithData(t, jobRequestRepositoryTestContext{

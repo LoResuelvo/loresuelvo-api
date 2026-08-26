@@ -255,8 +255,8 @@ func TestRegisterConsumerPersistsResolvedAddressData(t *testing.T) {
 	)
 
 	assert.NoError(t, err)
-	assert.Equal(t, &normalizedAddress, repository.savedConsumer.Address())
-	assert.Equal(t, &point, repository.savedConsumer.Location())
+	assert.Equal(t, normalizedAddress, repository.savedConsumer.Address())
+	assert.Equal(t, point, repository.savedConsumer.Location())
 	assert.Equal(t, 6, repository.savedConsumer.CoverageZoneID())
-	assert.Equal(t, &normalizedAddress, created.Address())
+	assert.Equal(t, normalizedAddress, created.Address())
 }

@@ -2,6 +2,7 @@ package repositories_test
 
 import (
 	"context"
+	"database/sql"
 	"testing"
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/repositories"
@@ -11,7 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func newConsumerRepositoryTest(t *testing.T) *repositories.UserRepository {
+func newConsumerRepositoryTest(t *testing.T) (*repositories.UserRepository, *sql.DB) {
 	t.Helper()
 
 	config := db.NewTestPostgresConfigFromEnv()
@@ -28,11 +29,11 @@ func newConsumerRepositoryTest(t *testing.T) *repositories.UserRepository {
 	require.NoError(t, err, "could not clean users")
 
 	userRepository := repositories.NewUserRepository(database)
-	return userRepository
+	return userRepository, database
 }
 
-func validConsumer() consumer.Consumer {
-	return *legacyConsumer("auth0|josue", "josugod@gmail.com", "Josue", "el pro")
+func validConsumer(t *testing.T, database *sql.DB) consumer.Consumer {
+	return *consumerWithAddress(t, database, "auth0|josue", "josugod@gmail.com", "Josue", "el pro")
 }
 
 func consumerUser(value consumer.Consumer) *consumer.Consumer {
@@ -40,8 +41,8 @@ func consumerUser(value consumer.Consumer) *consumer.Consumer {
 }
 
 func TestConsumerRepositoryCanSaveAConsumer(t *testing.T) {
-	repo := newConsumerRepositoryTest(t)
-	consumer := validConsumer()
+	repo, database := newConsumerRepositoryTest(t)
+	consumer := validConsumer(t, database)
 
 	_, err := repo.Save(context.Background(), consumerUser(consumer))
 
@@ -51,20 +52,20 @@ func TestConsumerRepositoryCanSaveAConsumer(t *testing.T) {
 }
 
 func TestConsumerRepositoryCanDeleteAllConsumers(t *testing.T) {
-	repo := newConsumerRepositoryTest(t)
+	repo, database := newConsumerRepositoryTest(t)
 
-	_, _ = repo.Save(context.Background(), consumerUser(validConsumer()))
+	_, _ = repo.Save(context.Background(), consumerUser(validConsumer(t, database)))
 
 	err := repo.DeleteAll()
 
 	assert.NoError(t, err)
-	exists := repo.FindByEmail(validConsumer().Email())
+	exists := repo.FindByEmail(validConsumer(t, database).Email())
 	assert.False(t, exists, "All consumers should be deleted from database")
 }
 
 func TestConsumerRepositoryCanFindByEmail(t *testing.T) {
-	repo := newConsumerRepositoryTest(t)
-	consumer := validConsumer()
+	repo, database := newConsumerRepositoryTest(t)
+	consumer := validConsumer(t, database)
 
 	_, err := repo.Save(context.Background(), consumerUser(consumer))
 
@@ -73,14 +74,14 @@ func TestConsumerRepositoryCanFindByEmail(t *testing.T) {
 }
 
 func TestConsumerRepositoryFindByEmailReturnsFalseIfConsumerDoesNotExist(t *testing.T) {
-	repo := newConsumerRepositoryTest(t)
+	repo, _ := newConsumerRepositoryTest(t)
 
 	assert.False(t, repo.FindByEmail("no-existe@ejemplo.com"), "Consumer should not be found by email if it does not exist")
 }
 
 func TestConsumerRepositoryCanFindIDByEmail(t *testing.T) {
-	repo := newConsumerRepositoryTest(t)
-	consumer := validConsumer()
+	repo, database := newConsumerRepositoryTest(t)
+	consumer := validConsumer(t, database)
 
 	_, err := repo.Save(context.Background(), consumerUser(consumer))
 	require.NoError(t, err, "saving consumer should not return an error")
@@ -92,8 +93,8 @@ func TestConsumerRepositoryCanFindIDByEmail(t *testing.T) {
 }
 
 func TestConsumerRepositoryCanFindIDByAuthID(t *testing.T) {
-	repo := newConsumerRepositoryTest(t)
-	consumer := validConsumer()
+	repo, database := newConsumerRepositoryTest(t)
+	consumer := validConsumer(t, database)
 
 	_, err := repo.Save(context.Background(), consumerUser(consumer))
 	require.NoError(t, err, "saving consumer should not return an error")
@@ -105,8 +106,8 @@ func TestConsumerRepositoryCanFindIDByAuthID(t *testing.T) {
 }
 
 func TestConsumerRepositoryCanFindByID(t *testing.T) {
-	repo := newConsumerRepositoryTest(t)
-	consumerToSave := validConsumer()
+	repo, database := newConsumerRepositoryTest(t)
+	consumerToSave := validConsumer(t, database)
 
 	_, err := repo.Save(context.Background(), consumerUser(consumerToSave))
 	require.NoError(t, err, "saving consumer should not return an error")
@@ -123,6 +124,25 @@ func TestConsumerRepositoryCanFindByID(t *testing.T) {
 	assert.Equal(t, consumerToSave.Name(), foundConsumer.Name())
 	assert.Equal(t, consumerToSave.Surname(), foundConsumer.Surname())
 	assert.Equal(t, consumerToSave.Role(), foundConsumer.Role())
+}
+
+func TestConsumerRepositoryRejectsConsumerWithoutAddressOnRead(t *testing.T) {
+	repo, database := newConsumerRepositoryTest(t)
+
+	var userID int
+	err := database.QueryRow(
+		`INSERT INTO users (auth_id, email, name, surname, role, created_on, updated_on)
+		VALUES ('auth0|consumer-without-address', 'consumer-without-address@example.com', 'Ana', 'Perez', 'consumer', NOW(), NOW())
+		RETURNING id`,
+	).Scan(&userID)
+	require.NoError(t, err)
+
+	_, err = database.Exec(`INSERT INTO consumers (user_id) VALUES ($1)`, userID)
+	require.NoError(t, err)
+
+	_, err = repo.FindConsumerByID(userID)
+
+	assert.ErrorIs(t, err, consumer.ErrConsumerAddressNotPersisted)
 }
 
 func TestConsumerRepositoryPersistsAndRehydratesConsumerAddress(t *testing.T) {
@@ -149,15 +169,13 @@ func TestConsumerRepositoryPersistsAndRehydratesConsumerAddress(t *testing.T) {
 	foundConsumer, err := repository.FindConsumerByID(consumerToSave.ID())
 
 	require.NoError(t, err)
-	require.NotNil(t, foundConsumer.Address())
-	assert.Equal(t, *address, *foundConsumer.Address())
-	require.NotNil(t, foundConsumer.Location())
-	assert.Equal(t, location, *foundConsumer.Location())
+	assert.Equal(t, *address, foundConsumer.Address())
+	assert.Equal(t, location, foundConsumer.Location())
 	assert.Equal(t, coverageZoneID, foundConsumer.CoverageZoneID())
 }
 
 func TestConsumerRepositoryRollsBackConsumerAddressFailure(t *testing.T) {
-	repository := newConsumerRepositoryTest(t)
+	repository, _ := newConsumerRepositoryTest(t)
 	address, err := consumer.NewAddress("Av. Rivadavia", "5100", "", "")
 	require.NoError(t, err)
 	location, err := consumer.NewGeoPoint(-34.6208, -58.4386)

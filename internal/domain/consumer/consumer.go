@@ -9,9 +9,8 @@ const Role = "consumer"
 
 type Consumer struct {
 	*user.BaseUser
-	// These pointers also represent the nullable state of legacy persisted consumers.
-	address        *Address
-	location       *GeoPoint
+	address        Address
+	location       GeoPoint
 	coverageZoneID int
 }
 
@@ -37,13 +36,14 @@ func NewConsumer(
 
 	return &Consumer{
 		BaseUser:       baseUser,
-		address:        address,
-		location:       &location,
+		address:        *address,
+		location:       location,
 		coverageZoneID: coverageZoneID,
 	}, nil
 }
 
-func RehydrateConsumer(baseUser *user.BaseUser, address *Address, location *GeoPoint, coverageZoneID int) *Consumer {
+// RehydrateConsumer restores a consumer from already validated persistence data.
+func RehydrateConsumer(baseUser *user.BaseUser, address Address, location GeoPoint, coverageZoneID int) *Consumer {
 	return &Consumer{
 		BaseUser:       baseUser,
 		address:        address,
@@ -52,11 +52,11 @@ func RehydrateConsumer(baseUser *user.BaseUser, address *Address, location *GeoP
 	}
 }
 
-func (consumer *Consumer) Address() *Address {
+func (consumer *Consumer) Address() Address {
 	return consumer.address
 }
 
-func (consumer *Consumer) Location() *GeoPoint {
+func (consumer *Consumer) Location() GeoPoint {
 	return consumer.location
 }
 

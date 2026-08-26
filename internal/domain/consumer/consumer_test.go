@@ -44,7 +44,7 @@ func TestNewConsumerStoresProvidedValueObjects(t *testing.T) {
 	)
 
 	require.NoError(t, err)
-	require.Same(t, address, createdConsumer.Address())
-	require.Equal(t, &location, createdConsumer.Location())
+	require.Equal(t, *address, createdConsumer.Address())
+	require.Equal(t, location, createdConsumer.Location())
 	require.Equal(t, 6, createdConsumer.CoverageZoneID())
 }

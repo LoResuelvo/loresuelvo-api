@@ -215,6 +215,7 @@ func TestWorkOrderRepositoryRejectsPaidHistoryWithoutCompletionReport(t *testing
 func TestWorkOrderRepositoryFindsOnlyOrdersScheduledInsideWindow(t *testing.T) {
 	testContext := newServiceProposalRepositoryTest(t)
 	consumerID := savedConsumerIDWithData(t, jobRequestRepositoryTestContext{
+		database:       testContext.database,
 		userRepository: testContext.userRepository,
 	}, "auth0|urgent-consumer", "urgent.consumer@example.com", "Ana", "Perez")
 	providerID := savedProviderIDWithData(t, jobRequestRepositoryTestContext{
@@ -359,6 +360,7 @@ func savePaidWorkOrderWithReview(
 	consumerAuthID := "auth0|review-repository-consumer"
 	providerAuthID := "auth0|review-repository-provider"
 	consumerID := savedConsumerIDWithData(t, jobRequestRepositoryTestContext{
+		database:       testContext.database,
 		userRepository: testContext.userRepository,
 	}, consumerAuthID, "review.repository.consumer@example.com", "Ana", "Perez")
 	providerID := savedProviderIDWithData(t, jobRequestRepositoryTestContext{
@@ -434,6 +436,7 @@ func newProviderWorkOrderTestFixture(
 	consumerAuthID := fmt.Sprintf("auth0|provider-work-order-consumer-%s", suffix)
 	providerAuthID := fmt.Sprintf("auth0|provider-work-order-provider-%s", suffix)
 	consumerID := savedConsumerIDWithData(t, jobRequestRepositoryTestContext{
+		database:       testContext.database,
 		userRepository: testContext.userRepository,
 	}, consumerAuthID, fmt.Sprintf("provider.work.order.consumer.%s@example.com", suffix), "Ana", "Perez")
 	providerID := savedProviderIDWithData(t, jobRequestRepositoryTestContext{

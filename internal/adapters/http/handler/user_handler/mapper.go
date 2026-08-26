@@ -15,7 +15,7 @@ func currentUserResponseFromDomain(currentUser user.User, calendarConnectionStat
 	case *consumer.Consumer:
 		address := typedUser.Address()
 		location := typedUser.Location()
-		if address == nil || location == nil || typedUser.CoverageZoneID() <= 0 {
+		if typedUser.CoverageZoneID() <= 0 {
 			return nil, fmt.Errorf("mapping consumer current user: address is missing")
 		}
 		return consumerCurrentUserResponse{

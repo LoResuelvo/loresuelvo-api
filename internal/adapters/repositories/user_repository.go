@@ -86,12 +86,7 @@ func (repository *UserRepository) Save(ctx context.Context, userToSave user.User
 func saveConsumerAddress(ctx context.Context, tx *sql.Tx, consumerToSave *consumer.Consumer) error {
 	address := consumerToSave.Address()
 	location := consumerToSave.Location()
-	if address == nil && location == nil && consumerToSave.CoverageZoneID() == 0 {
-		// Legacy records can predate the mandatory registration address. New
-		// registrations always go through ConsumerService and persist it.
-		return nil
-	}
-	if address == nil || location == nil || consumerToSave.CoverageZoneID() <= 0 {
+	if consumerToSave.CoverageZoneID() <= 0 {
 		return consumer.ErrConsumerAddressNotPersisted
 	}
 
@@ -278,25 +273,21 @@ func rehydrateConsumerAddress(
 	street, streetNumber, floor, unit sql.NullString,
 	latitude, longitude sql.NullFloat64,
 	coverageZoneID sql.NullInt64,
-) (*consumer.Address, *consumer.GeoPoint, int, error) {
-	addressColumnsPresent := street.Valid || streetNumber.Valid || floor.Valid || unit.Valid || latitude.Valid || longitude.Valid || coverageZoneID.Valid
-	if !addressColumnsPresent {
-		return nil, nil, 0, nil
-	}
+) (consumer.Address, consumer.GeoPoint, int, error) {
 	if !street.Valid || !streetNumber.Valid || !latitude.Valid || !longitude.Valid || !coverageZoneID.Valid {
-		return nil, nil, 0, consumer.ErrConsumerAddressNotPersisted
+		return consumer.Address{}, consumer.GeoPoint{}, 0, consumer.ErrConsumerAddressNotPersisted
 	}
 
 	address, err := consumer.NewAddress(street.String, streetNumber.String, floor.String, unit.String)
 	if err != nil {
-		return nil, nil, 0, err
+		return consumer.Address{}, consumer.GeoPoint{}, 0, err
 	}
 	location, err := consumer.NewGeoPoint(latitude.Float64, longitude.Float64)
 	if err != nil {
-		return nil, nil, 0, err
+		return consumer.Address{}, consumer.GeoPoint{}, 0, err
 	}
 
-	return address, &location, int(coverageZoneID.Int64), nil
+	return *address, location, int(coverageZoneID.Int64), nil
 }
 
 func (repository *UserRepository) FindIDByAuthID(authID string) (int, error) {

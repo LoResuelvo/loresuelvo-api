@@ -51,7 +51,7 @@ func cleanNotificationRepositoryTestDatabase(t *testing.T, database *sql.DB) {
 
 func TestNotificationRepositoryCanSave(t *testing.T) {
 	testContext := newNotificationRepositoryTest(t)
-	consumerToSave := legacyConsumer("auth0|notification-consumer", "notification.consumer@example.com", "Ana", "Perez")
+	consumerToSave := consumerWithAddress(t, testContext.database, "auth0|notification-consumer", "notification.consumer@example.com", "Ana", "Perez")
 	_, err := testContext.userRepository.Save(context.Background(), consumerToSave)
 	require.NoError(t, err)
 	consumerID, err := testContext.userRepository.FindIDByEmail(consumerToSave.Email())
@@ -100,7 +100,7 @@ func TestNotificationRepositoryCanSave(t *testing.T) {
 
 func TestNotificationRepositoryFindsLatestByUserAndResource(t *testing.T) {
 	testContext := newNotificationRepositoryTest(t)
-	consumerToSave := legacyConsumer("auth0|notification-reader", "notification.reader@example.com", "Ana", "Perez")
+	consumerToSave := consumerWithAddress(t, testContext.database, "auth0|notification-reader", "notification.reader@example.com", "Ana", "Perez")
 	_, err := testContext.userRepository.Save(context.Background(), consumerToSave)
 	require.NoError(t, err)
 	consumerID, err := testContext.userRepository.FindIDByEmail(consumerToSave.Email())

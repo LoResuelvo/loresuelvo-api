@@ -2,6 +2,7 @@ package repositories_test
 
 import (
 	"context"
+	"database/sql"
 	"testing"
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/repositories"
@@ -11,7 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func newUserRepositoryTest(t *testing.T) *repositories.UserRepository {
+func newUserRepositoryTest(t *testing.T) (*repositories.UserRepository, *sql.DB) {
 	t.Helper()
 
 	config := db.NewTestPostgresConfigFromEnv()
@@ -24,16 +25,16 @@ func newUserRepositoryTest(t *testing.T) *repositories.UserRepository {
 		database.Close()
 	})
 
-	return repositories.NewUserRepository(database)
+	return repositories.NewUserRepository(database), database
 }
 
-func validUser() *consumer.Consumer {
-	return legacyConsumer("auth0|josue", "josugod@gmail.com", "Josue", "el pro")
+func validUser(t *testing.T, database *sql.DB) *consumer.Consumer {
+	return consumerWithAddress(t, database, "auth0|josue", "josugod@gmail.com", "Josue", "el pro")
 }
 
 func TestUserRepositoryCanSaveAUser(t *testing.T) {
-	repo := newUserRepositoryTest(t)
-	user := validUser()
+	repo, database := newUserRepositoryTest(t)
+	user := validUser(t, database)
 
 	_, err := repo.Save(context.Background(), user)
 
@@ -43,20 +44,20 @@ func TestUserRepositoryCanSaveAUser(t *testing.T) {
 }
 
 func TestUserRepositoryCanDeleteAllUsers(t *testing.T) {
-	repo := newUserRepositoryTest(t)
+	repo, database := newUserRepositoryTest(t)
 
-	_, _ = repo.Save(context.Background(), validUser())
+	_, _ = repo.Save(context.Background(), validUser(t, database))
 
 	err := repo.DeleteAll()
 
 	assert.NoError(t, err)
-	exists := repo.FindByEmail(validUser().Email())
+	exists := repo.FindByEmail(validUser(t, database).Email())
 	assert.False(t, exists, "All users should be deleted from database")
 }
 
 func TestUserRepositoryCanFindByEmail(t *testing.T) {
-	repo := newUserRepositoryTest(t)
-	user := validUser()
+	repo, database := newUserRepositoryTest(t)
+	user := validUser(t, database)
 
 	_, _ = repo.Save(context.Background(), user)
 
@@ -64,8 +65,8 @@ func TestUserRepositoryCanFindByEmail(t *testing.T) {
 }
 
 func TestUserRepositoryCanFindPolymorphicUserByID(t *testing.T) {
-	repo := newUserRepositoryTest(t)
-	expected := validUser()
+	repo, database := newUserRepositoryTest(t)
+	expected := validUser(t, database)
 	saved, err := repo.Save(context.Background(), expected)
 	require.NoError(t, err)
 
@@ -80,7 +81,7 @@ func TestUserRepositoryCanFindPolymorphicUserByID(t *testing.T) {
 }
 
 func TestUserRepositoryFindByEmailReturnsFalseIfUserDoesNotExist(t *testing.T) {
-	repo := newUserRepositoryTest(t)
+	repo, _ := newUserRepositoryTest(t)
 
 	assert.False(t, repo.FindByEmail("no-existe@ejemplo.com"), "Consumer should not be found by email if it does not exist")
 }

@@ -81,7 +81,7 @@ func savedConsumerIDForJobRequest(t *testing.T, testContext jobRequestRepository
 func savedConsumerIDWithData(t *testing.T, testContext jobRequestRepositoryTestContext, authID, email, name, surname string) int {
 	t.Helper()
 
-	consumerToSave := legacyConsumer(authID, email, name, surname)
+	consumerToSave := consumerWithAddress(t, testContext.database, authID, email, name, surname)
 	_, err := testContext.userRepository.Save(context.Background(), consumerToSave)
 	require.NoError(t, err)
 
