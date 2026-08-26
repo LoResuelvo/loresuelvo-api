@@ -3,6 +3,7 @@ package consumer
 import (
 	"context"
 
+	coveragezone "github.com/LoResuelvo/loresuelvo-api/internal/domain/coverage_zone"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/user"
 )
 
@@ -14,4 +15,12 @@ type UserRepository interface {
 type FileService interface {
 	ValidateProfilePhoto(ctx context.Context, authID, fileID string) error
 	ResolvePublicURL(ctx context.Context, fileID string) (string, error)
+}
+
+type AddressResolver interface {
+	Resolve(ctx context.Context, address Address) (GeoPoint, error)
+}
+
+type CoverageZoneResolver interface {
+	Resolve(ctx context.Context, location GeoPoint) (*coveragezone.CoverageZone, error)
 }

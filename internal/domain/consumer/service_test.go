@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/consumer"
+	coveragezone "github.com/LoResuelvo/loresuelvo-api/internal/domain/coverage_zone"
 	filedomain "github.com/LoResuelvo/loresuelvo-api/internal/domain/file"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/user"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/validator"
@@ -41,6 +42,37 @@ type profilePhotoServiceMock struct {
 	resolvedFileID  string
 }
 
+type addressResolverMock struct {
+	location consumer.GeoPoint
+	err      error
+}
+
+func (resolver *addressResolverMock) Resolve(_ context.Context, _ consumer.Address) (consumer.GeoPoint, error) {
+	return resolver.location, resolver.err
+}
+
+type coverageZoneResolverMock struct {
+	zone *coveragezone.CoverageZone
+	err  error
+}
+
+func (resolver *coverageZoneResolverMock) Resolve(_ context.Context, _ consumer.GeoPoint) (*coveragezone.CoverageZone, error) {
+	return resolver.zone, resolver.err
+}
+
+func validRegistrationAddress() consumer.Address {
+	return consumer.Address{Street: "Av. Rivadavia", StreetNumber: "5100"}
+}
+
+func newConsumerService(repository *consumerRepositoryMock, files *profilePhotoServiceMock) *consumer.Service {
+	return consumer.NewService(
+		repository,
+		files,
+		&addressResolverMock{location: consumer.GeoPoint{Latitude: -34.62, Longitude: -58.43}},
+		&coverageZoneResolverMock{zone: &coveragezone.CoverageZone{ID: 6, Enabled: true}},
+	)
+}
+
 func (service *profilePhotoServiceMock) ValidateProfilePhoto(_ context.Context, authID, fileID string) error {
 	service.validatedAuthID = authID
 	service.validatedFileID = fileID
@@ -55,10 +87,11 @@ func (service *profilePhotoServiceMock) ResolvePublicURL(_ context.Context, file
 func TestRegisterConsumerWithProfilePhoto(t *testing.T) {
 	repository := &consumerRepositoryMock{}
 	files := &profilePhotoServiceMock{resolvedURL: "https://cdn/profile.jpg"}
-	consumerManager := consumer.NewService(repository, files)
+	consumerManager := newConsumerService(repository, files)
 
 	created, err := consumerManager.RegisterConsumer(
 		context.Background(), "auth0|ana", "ana@example.com", "Ana", "Perez", "profile-file-id",
+		validRegistrationAddress(),
 	)
 
 	assert.NoError(t, err)
@@ -73,10 +106,11 @@ func TestRegisterConsumerWithProfilePhoto(t *testing.T) {
 func TestRegisterConsumerWithoutProfilePhoto(t *testing.T) {
 	repository := &consumerRepositoryMock{}
 	files := &profilePhotoServiceMock{}
-	consumerManager := consumer.NewService(repository, files)
+	consumerManager := newConsumerService(repository, files)
 
 	created, err := consumerManager.RegisterConsumer(
 		context.Background(), "auth0|ana", "ana@example.com", "Ana", "Perez", "",
+		validRegistrationAddress(),
 	)
 
 	assert.NoError(t, err)
@@ -89,10 +123,11 @@ func TestRegisterConsumerWithoutProfilePhoto(t *testing.T) {
 func TestRegisterConsumerRejectsUnavailableProfilePhoto(t *testing.T) {
 	repository := &consumerRepositoryMock{}
 	files := &profilePhotoServiceMock{validateErr: filedomain.ErrProfilePhotoNotAvailable}
-	consumerManager := consumer.NewService(repository, files)
+	consumerManager := newConsumerService(repository, files)
 
 	created, err := consumerManager.RegisterConsumer(
 		context.Background(), "auth0|ana", "ana@example.com", "Ana", "Perez", "unavailable",
+		validRegistrationAddress(),
 	)
 
 	assert.Nil(t, created)
@@ -102,10 +137,11 @@ func TestRegisterConsumerRejectsUnavailableProfilePhoto(t *testing.T) {
 
 func TestRegisterConsumerMapsUnexpectedProfilePhotoValidationError(t *testing.T) {
 	repository := &consumerRepositoryMock{}
-	consumerManager := consumer.NewService(repository, &profilePhotoServiceMock{validateErr: errors.New("storage unavailable")})
+	consumerManager := newConsumerService(repository, &profilePhotoServiceMock{validateErr: errors.New("storage unavailable")})
 
 	_, err := consumerManager.RegisterConsumer(
 		context.Background(), "auth0|ana", "ana@example.com", "Ana", "Perez", "profile-file-id",
+		validRegistrationAddress(),
 	)
 
 	assert.ErrorIs(t, err, filedomain.ErrProfilePhotoNotAvailable)
@@ -116,10 +152,11 @@ func TestRegisterConsumerWithInvalidEmail(t *testing.T) {
 	for _, invalidEmail := range []string{"anaexample.com", "ana@", "@example.com"} {
 		t.Run(invalidEmail, func(t *testing.T) {
 			repository := &consumerRepositoryMock{}
-			consumerManager := consumer.NewService(repository, &profilePhotoServiceMock{})
+			consumerManager := newConsumerService(repository, &profilePhotoServiceMock{})
 
 			_, err := consumerManager.RegisterConsumer(
 				context.Background(), "auth0|ana", invalidEmail, "Ana", "Perez", "",
+				validRegistrationAddress(),
 			)
 
 			assert.ErrorIs(t, err, validator.ErrInvalidEmailFormat)
@@ -130,13 +167,96 @@ func TestRegisterConsumerWithInvalidEmail(t *testing.T) {
 
 func TestRegisterConsumerWithAlreadyRegisteredEmail(t *testing.T) {
 	repository := &consumerRepositoryMock{existsByEmailValue: true}
-	consumerManager := consumer.NewService(repository, &profilePhotoServiceMock{})
+	consumerManager := newConsumerService(repository, &profilePhotoServiceMock{})
 
 	_, err := consumerManager.RegisterConsumer(
 		context.Background(), "auth0|ana", "ana@example.com", "Ana", "Perez", "",
+		validRegistrationAddress(),
 	)
 
 	assert.ErrorIs(t, err, validator.ErrEmailAlreadyRegistered)
 	assert.False(t, repository.saveCalled)
 	assert.True(t, repository.findByEmailCalled)
+}
+
+func TestRegisterConsumerRejectsMissingAddressBeforeResolvingLocation(t *testing.T) {
+	repository := &consumerRepositoryMock{}
+	addressResolver := &addressResolverMock{}
+	service := consumer.NewService(
+		repository,
+		&profilePhotoServiceMock{},
+		addressResolver,
+		&coverageZoneResolverMock{zone: &coveragezone.CoverageZone{ID: 6, Enabled: true}},
+	)
+
+	created, err := service.RegisterConsumer(
+		context.Background(), "auth0|ana", "ana@example.com", "Ana", "Perez", "",
+		consumer.Address{},
+	)
+
+	assert.Nil(t, created)
+	assert.ErrorIs(t, err, consumer.ErrAddressRequired)
+	assert.False(t, repository.saveCalled)
+	assert.Empty(t, addressResolver.location)
+}
+
+func TestRegisterConsumerDoesNotPersistWhenAddressResolutionFails(t *testing.T) {
+	repository := &consumerRepositoryMock{}
+	service := consumer.NewService(
+		repository,
+		&profilePhotoServiceMock{},
+		&addressResolverMock{err: consumer.ErrAddressNotValidated},
+		&coverageZoneResolverMock{zone: &coveragezone.CoverageZone{ID: 6, Enabled: true}},
+	)
+
+	created, err := service.RegisterConsumer(
+		context.Background(), "auth0|ana", "ana@example.com", "Ana", "Perez", "",
+		validRegistrationAddress(),
+	)
+
+	assert.Nil(t, created)
+	assert.ErrorIs(t, err, consumer.ErrAddressNotValidated)
+	assert.False(t, repository.saveCalled)
+}
+
+func TestRegisterConsumerRejectsUnavailableCoverageZoneWithoutPersisting(t *testing.T) {
+	repository := &consumerRepositoryMock{}
+	service := consumer.NewService(
+		repository,
+		&profilePhotoServiceMock{},
+		&addressResolverMock{location: consumer.GeoPoint{Latitude: -34.62, Longitude: -58.43}},
+		&coverageZoneResolverMock{err: coveragezone.ErrDoesNotExist},
+	)
+
+	created, err := service.RegisterConsumer(
+		context.Background(), "auth0|ana", "ana@example.com", "Ana", "Perez", "",
+		validRegistrationAddress(),
+	)
+
+	assert.Nil(t, created)
+	assert.ErrorIs(t, err, consumer.ErrCoverageZoneNotAvailable)
+	assert.False(t, repository.saveCalled)
+}
+
+func TestRegisterConsumerPersistsResolvedAddressData(t *testing.T) {
+	repository := &consumerRepositoryMock{}
+	point := consumer.GeoPoint{Latitude: -34.62, Longitude: -58.43}
+	service := consumer.NewService(
+		repository,
+		&profilePhotoServiceMock{},
+		&addressResolverMock{location: point},
+		&coverageZoneResolverMock{zone: &coveragezone.CoverageZone{ID: 6, Enabled: true}},
+	)
+	address := consumer.Address{Street: " Av. Rivadavia ", StreetNumber: " 5100 ", Floor: " 4 ", Unit: " B "}
+	normalizedAddress := consumer.Address{Street: "Av. Rivadavia", StreetNumber: "5100", Floor: "4", Unit: "B"}
+
+	created, err := service.RegisterConsumer(
+		context.Background(), "auth0|ana", "ana@example.com", "Ana", "Perez", "", address,
+	)
+
+	assert.NoError(t, err)
+	assert.Equal(t, &normalizedAddress, repository.savedConsumer.Address())
+	assert.Equal(t, &point, repository.savedConsumer.Location())
+	assert.Equal(t, 6, repository.savedConsumer.CoverageZoneID())
+	assert.Equal(t, &normalizedAddress, created.Address())
 }

@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/repositories"
-	"github.com/LoResuelvo/loresuelvo-api/internal/domain/consumer"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/notification"
 	"github.com/LoResuelvo/loresuelvo-api/internal/infrastructure/db"
 	"github.com/stretchr/testify/assert"
@@ -52,9 +51,8 @@ func cleanNotificationRepositoryTestDatabase(t *testing.T, database *sql.DB) {
 
 func TestNotificationRepositoryCanSave(t *testing.T) {
 	testContext := newNotificationRepositoryTest(t)
-	consumerToSave, err := consumer.NewConsumer("auth0|notification-consumer", "notification.consumer@example.com", "Ana", "Perez", nil)
-	require.NoError(t, err)
-	_, err = testContext.userRepository.Save(context.Background(), consumerToSave)
+	consumerToSave := legacyConsumer("auth0|notification-consumer", "notification.consumer@example.com", "Ana", "Perez")
+	_, err := testContext.userRepository.Save(context.Background(), consumerToSave)
 	require.NoError(t, err)
 	consumerID, err := testContext.userRepository.FindIDByEmail(consumerToSave.Email())
 	require.NoError(t, err)
@@ -102,9 +100,8 @@ func TestNotificationRepositoryCanSave(t *testing.T) {
 
 func TestNotificationRepositoryFindsLatestByUserAndResource(t *testing.T) {
 	testContext := newNotificationRepositoryTest(t)
-	consumerToSave, err := consumer.NewConsumer("auth0|notification-reader", "notification.reader@example.com", "Ana", "Perez", nil)
-	require.NoError(t, err)
-	_, err = testContext.userRepository.Save(context.Background(), consumerToSave)
+	consumerToSave := legacyConsumer("auth0|notification-reader", "notification.reader@example.com", "Ana", "Perez")
+	_, err := testContext.userRepository.Save(context.Background(), consumerToSave)
 	require.NoError(t, err)
 	consumerID, err := testContext.userRepository.FindIDByEmail(consumerToSave.Email())
 	require.NoError(t, err)

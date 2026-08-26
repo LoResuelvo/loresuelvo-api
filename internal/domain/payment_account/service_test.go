@@ -223,12 +223,19 @@ func TestStartAuthorizationRejectsAlreadyConnectedPaymentAccount(t *testing.T) {
 }
 
 func TestStartAuthorizationRejectsAuthenticatedConsumer(t *testing.T) {
+	address, err := consumer.NewAddress("Av. Rivadavia", "5100", "", "")
+	require.NoError(t, err)
+	location, err := consumer.NewGeoPoint(-34.6208, -58.4386)
+	require.NoError(t, err)
 	consumerUser, err := consumer.NewConsumer(
 		"auth0|consumer-payment-account-test",
 		"ana@example.com",
 		"Ana",
 		"Pérez",
 		nil,
+		address,
+		location,
+		6,
 	)
 	require.NoError(t, err)
 	repository := &repositoryStub{}

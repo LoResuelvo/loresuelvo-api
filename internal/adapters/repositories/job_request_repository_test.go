@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/repositories"
-	"github.com/LoResuelvo/loresuelvo-api/internal/domain/consumer"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/conversation"
 	filedomain "github.com/LoResuelvo/loresuelvo-api/internal/domain/file"
 	jobrequest "github.com/LoResuelvo/loresuelvo-api/internal/domain/job_request"
@@ -82,9 +81,8 @@ func savedConsumerIDForJobRequest(t *testing.T, testContext jobRequestRepository
 func savedConsumerIDWithData(t *testing.T, testContext jobRequestRepositoryTestContext, authID, email, name, surname string) int {
 	t.Helper()
 
-	consumerToSave, err := consumer.NewConsumer(authID, email, name, surname, nil)
-	require.NoError(t, err)
-	_, err = testContext.userRepository.Save(context.Background(), consumerToSave)
+	consumerToSave := legacyConsumer(authID, email, name, surname)
+	_, err := testContext.userRepository.Save(context.Background(), consumerToSave)
 	require.NoError(t, err)
 
 	consumerID, err := testContext.userRepository.FindIDByEmail(consumerToSave.Email())

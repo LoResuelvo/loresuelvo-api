@@ -28,8 +28,7 @@ func newUserRepositoryTest(t *testing.T) *repositories.UserRepository {
 }
 
 func validUser() *consumer.Consumer {
-	user, _ := consumer.NewConsumer("auth0|josue", "josugod@gmail.com", "Josue", "el pro", nil)
-	return user
+	return legacyConsumer("auth0|josue", "josugod@gmail.com", "Josue", "el pro")
 }
 
 func TestUserRepositoryCanSaveAUser(t *testing.T) {

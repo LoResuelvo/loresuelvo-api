@@ -217,10 +217,41 @@ func (repository *CoverageZoneRepository) FindByExternalReference(ctx context.Co
 			coverage_zones.normalized_name, coverage_zones.kind, coverage_zones.parent_zone_id, coverage_zones.enabled
 		FROM coverage_zone_external_references
 		INNER JOIN coverage_zones ON coverage_zones.id = coverage_zone_external_references.coverage_zone_id
+		INNER JOIN coverage_markets ON coverage_markets.id = coverage_zones.market_id
 		WHERE coverage_zone_external_references.provider = $1
-			AND coverage_zone_external_references.external_id = $2`,
+			AND coverage_zone_external_references.external_id = $2
+			AND coverage_markets.enabled = TRUE
+			AND coverage_zones.enabled = TRUE`,
 		strings.ToUpper(strings.TrimSpace(provider)),
 		strings.TrimSpace(externalID),
+	).Scan(&zone.ID, &zone.MarketID, &zone.Code, &zone.Name, &zone.NormalizedName, &zone.Kind, &zone.ParentZoneID, &zone.Enabled)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, coveragezone.ErrDoesNotExist
+		}
+		return nil, fmt.Errorf("finding coverage zone by external reference: %w", err)
+	}
+
+	return &zone, nil
+}
+
+func (repository *CoverageZoneRepository) FindByExternalReferenceInMarket(ctx context.Context, provider, externalID, marketCode string) (*coveragezone.CoverageZone, error) {
+	var zone coveragezone.CoverageZone
+	err := repository.db.QueryRowContext(
+		ctx,
+		`SELECT coverage_zones.id, coverage_zones.market_id, coverage_zones.code, coverage_zones.name,
+			coverage_zones.normalized_name, coverage_zones.kind, coverage_zones.parent_zone_id, coverage_zones.enabled
+		FROM coverage_zone_external_references
+		INNER JOIN coverage_zones ON coverage_zones.id = coverage_zone_external_references.coverage_zone_id
+		INNER JOIN coverage_markets ON coverage_markets.id = coverage_zones.market_id
+		WHERE coverage_zone_external_references.provider = $1
+			AND coverage_zone_external_references.external_id = $2
+			AND coverage_markets.code = $3
+			AND coverage_markets.enabled = TRUE
+			AND coverage_zones.enabled = TRUE`,
+		strings.ToUpper(strings.TrimSpace(provider)),
+		strings.TrimSpace(externalID),
+		strings.ToUpper(strings.TrimSpace(marketCode)),
 	).Scan(&zone.ID, &zone.MarketID, &zone.Code, &zone.Name, &zone.NormalizedName, &zone.Kind, &zone.ParentZoneID, &zone.Enabled)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {

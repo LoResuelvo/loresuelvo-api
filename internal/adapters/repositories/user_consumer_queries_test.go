@@ -32,8 +32,7 @@ func newConsumerRepositoryTest(t *testing.T) *repositories.UserRepository {
 }
 
 func validConsumer() consumer.Consumer {
-	consumer, _ := consumer.NewConsumer("auth0|josue", "josugod@gmail.com", "Josue", "el pro", nil)
-	return *consumer
+	return *legacyConsumer("auth0|josue", "josugod@gmail.com", "Josue", "el pro")
 }
 
 func consumerUser(value consumer.Consumer) *consumer.Consumer {
@@ -124,4 +123,96 @@ func TestConsumerRepositoryCanFindByID(t *testing.T) {
 	assert.Equal(t, consumerToSave.Name(), foundConsumer.Name())
 	assert.Equal(t, consumerToSave.Surname(), foundConsumer.Surname())
 	assert.Equal(t, consumerToSave.Role(), foundConsumer.Role())
+}
+
+func TestConsumerRepositoryPersistsAndRehydratesConsumerAddress(t *testing.T) {
+	repository, coverageZoneID := newConsumerRepositoryTestWithCoverageZone(t)
+	address, err := consumer.NewAddress("Av. Rivadavia", "5100", "4", "B")
+	require.NoError(t, err)
+	location, err := consumer.NewGeoPoint(-34.6208, -58.4386)
+	require.NoError(t, err)
+	consumerToSave, err := consumer.NewConsumer(
+		"auth0|consumer-address",
+		"consumer-address@example.com",
+		"Ana",
+		"Perez",
+		nil,
+		address,
+		location,
+		coverageZoneID,
+	)
+	require.NoError(t, err)
+
+	_, err = repository.Save(context.Background(), consumerToSave)
+	require.NoError(t, err)
+
+	foundConsumer, err := repository.FindConsumerByID(consumerToSave.ID())
+
+	require.NoError(t, err)
+	require.NotNil(t, foundConsumer.Address())
+	assert.Equal(t, *address, *foundConsumer.Address())
+	require.NotNil(t, foundConsumer.Location())
+	assert.Equal(t, location, *foundConsumer.Location())
+	assert.Equal(t, coverageZoneID, foundConsumer.CoverageZoneID())
+}
+
+func TestConsumerRepositoryRollsBackConsumerAddressFailure(t *testing.T) {
+	repository := newConsumerRepositoryTest(t)
+	address, err := consumer.NewAddress("Av. Rivadavia", "5100", "", "")
+	require.NoError(t, err)
+	location, err := consumer.NewGeoPoint(-34.6208, -58.4386)
+	require.NoError(t, err)
+	consumerToSave, err := consumer.NewConsumer(
+		"auth0|consumer-address-rollback",
+		"consumer-address-rollback@example.com",
+		"Ana",
+		"Perez",
+		nil,
+		address,
+		location,
+		999999999,
+	)
+	require.NoError(t, err)
+
+	_, err = repository.Save(context.Background(), consumerToSave)
+
+	require.Error(t, err)
+	assert.False(t, repository.FindByEmail(consumerToSave.Email()))
+}
+
+func newConsumerRepositoryTestWithCoverageZone(t *testing.T) (*repositories.UserRepository, int) {
+	t.Helper()
+
+	config := db.NewTestPostgresConfigFromEnv()
+	database, err := db.ConnectPostgres(context.Background(), config)
+	require.NoError(t, err, "could not connect to test database")
+
+	_, err = database.Exec("DELETE FROM users")
+	require.NoError(t, err, "could not clean users")
+
+	var marketID int
+	err = database.QueryRow(
+		`INSERT INTO coverage_markets (code, name, enabled, created_on, updated_on)
+		VALUES ('CABA-CONSUMER-TEST', 'Consumer test market', TRUE, NOW(), NOW())
+		RETURNING id`,
+	).Scan(&marketID)
+	require.NoError(t, err)
+
+	var coverageZoneID int
+	err = database.QueryRow(
+		`INSERT INTO coverage_zones (market_id, code, name, normalized_name, kind, enabled, created_on, updated_on)
+		VALUES ($1, 'CABA-CONSUMER-TEST-01', 'Consumer Test Zone', 'consumer test zone', 'COMMUNE', TRUE, NOW(), NOW())
+		RETURNING id`,
+		marketID,
+	).Scan(&coverageZoneID)
+	require.NoError(t, err)
+
+	t.Cleanup(func() {
+		_, _ = database.Exec("DELETE FROM users")
+		_, _ = database.Exec("DELETE FROM coverage_zones WHERE id = $1", coverageZoneID)
+		_, _ = database.Exec("DELETE FROM coverage_markets WHERE id = $1", marketID)
+		_ = database.Close()
+	})
+
+	return repositories.NewUserRepository(database), coverageZoneID
 }

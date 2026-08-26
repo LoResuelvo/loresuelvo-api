@@ -11,6 +11,12 @@ func normalizeRegisterConsumerRequest(req registerConsumerRequest) registerConsu
 	req.Name = strings.TrimSpace(req.Name)
 	req.Surname = strings.TrimSpace(req.Surname)
 	req.ProfilePhotoFileID = strings.TrimSpace(req.ProfilePhotoFileID)
+	if req.Address != nil {
+		req.Address.Street = strings.TrimSpace(req.Address.Street)
+		req.Address.StreetNumber = strings.TrimSpace(req.Address.StreetNumber)
+		req.Address.Floor = strings.TrimSpace(req.Address.Floor)
+		req.Address.Unit = strings.TrimSpace(req.Address.Unit)
+	}
 
 	return req
 }

@@ -9,14 +9,57 @@ const Role = "consumer"
 
 type Consumer struct {
 	*user.BaseUser
+	// These pointers also represent the nullable state of legacy persisted consumers.
+	address        *Address
+	location       *GeoPoint
+	coverageZoneID int
 }
 
-func NewConsumer(auth0ID, email, name, surname string, profilePhoto *filedomain.Image) (*Consumer, error) {
+// NewConsumer creates a consumer from already constructed value objects.
+func NewConsumer(
+	auth0ID, email, name, surname string,
+	profilePhoto *filedomain.Image,
+	address *Address,
+	location GeoPoint,
+	coverageZoneID int,
+) (*Consumer, error) {
+	if address == nil {
+		return nil, ErrAddressRequired
+	}
+	if coverageZoneID <= 0 {
+		return nil, ErrCoverageZoneNotAvailable
+	}
+
 	baseUser, err := user.New(auth0ID, name, surname, email, Role, profilePhoto)
 	if err != nil {
 		return nil, err
 	}
+
 	return &Consumer{
-		BaseUser: baseUser,
+		BaseUser:       baseUser,
+		address:        address,
+		location:       &location,
+		coverageZoneID: coverageZoneID,
 	}, nil
+}
+
+func RehydrateConsumer(baseUser *user.BaseUser, address *Address, location *GeoPoint, coverageZoneID int) *Consumer {
+	return &Consumer{
+		BaseUser:       baseUser,
+		address:        address,
+		location:       location,
+		coverageZoneID: coverageZoneID,
+	}
+}
+
+func (consumer *Consumer) Address() *Address {
+	return consumer.address
+}
+
+func (consumer *Consumer) Location() *GeoPoint {
+	return consumer.location
+}
+
+func (consumer *Consumer) CoverageZoneID() int {
+	return consumer.coverageZoneID
 }

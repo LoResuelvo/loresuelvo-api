@@ -32,8 +32,17 @@ func (h *ConsumerHandler) RegisterConsumer(c *gin.Context) {
 	}
 
 	req = normalizeRegisterConsumerRequest(req)
+	address := consumer.Address{}
+	if req.Address != nil {
+		address = consumer.Address{
+			Street:       req.Address.Street,
+			StreetNumber: req.Address.StreetNumber,
+			Floor:        req.Address.Floor,
+			Unit:         req.Address.Unit,
+		}
+	}
 
-	createdConsumer, err := h.consumerService.RegisterConsumer(c.Request.Context(), auth0ID, req.Email, req.Name, req.Surname, req.ProfilePhotoFileID)
+	createdConsumer, err := h.consumerService.RegisterConsumer(c.Request.Context(), auth0ID, req.Email, req.Name, req.Surname, req.ProfilePhotoFileID, address)
 	if err != nil {
 		handleRegisterConsumerError(c, err)
 		return

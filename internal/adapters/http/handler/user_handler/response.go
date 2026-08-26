@@ -20,8 +20,19 @@ type currentUserResponse struct {
 	ProfilePhoto             *currentUserProfilePhotoResponse `json:"profile_photo,omitempty"`
 }
 
+type consumerAddressResponse struct {
+	Street         string  `json:"street"`
+	StreetNumber   string  `json:"street_number"`
+	Floor          string  `json:"floor,omitempty"`
+	Unit           string  `json:"unit,omitempty"`
+	Latitude       float64 `json:"latitude"`
+	Longitude      float64 `json:"longitude"`
+	CoverageZoneID int     `json:"coverage_zone_id"`
+}
+
 type consumerCurrentUserResponse struct {
 	currentUserResponse
+	Address consumerAddressResponse `json:"address"`
 }
 
 type providerCurrentUserResponse struct {

@@ -20,12 +20,16 @@ type UserRepository struct {
 
 const userWithProfileSelectSQL = `SELECT u.id, u.auth_id, u.email, u.name, u.surname, u.role,
 	c.user_id, p.user_id, cat.id, cat.name, cat.normalized_name,
-	COALESCE(u.profile_photo_file_id::text, ''), COALESCE(profile_photo.original_name, '')
+	COALESCE(u.profile_photo_file_id::text, ''), COALESCE(profile_photo.original_name, ''),
+	consumer_address.street, consumer_address.street_number, consumer_address.floor,
+	consumer_address.unit, consumer_address.latitude, consumer_address.longitude,
+	consumer_address.coverage_zone_id
 	FROM users u
 	LEFT JOIN consumers c ON c.user_id = u.id
 	LEFT JOIN providers p ON p.user_id = u.id
 	LEFT JOIN categories cat ON cat.id = p.category_id
-	LEFT JOIN files profile_photo ON profile_photo.id = u.profile_photo_file_id`
+	LEFT JOIN files profile_photo ON profile_photo.id = u.profile_photo_file_id
+	LEFT JOIN consumer_addresses consumer_address ON consumer_address.consumer_id = c.user_id`
 
 func NewUserRepository(db *sql.DB) *UserRepository {
 	return &UserRepository{
@@ -53,6 +57,9 @@ func (repository *UserRepository) Save(ctx context.Context, userToSave user.User
 			break
 		}
 		_, err = tx.ExecContext(ctx, `INSERT INTO consumers (user_id) VALUES ($1)`, typedUser.ID())
+		if err == nil {
+			err = saveConsumerAddress(ctx, tx, typedUser)
+		}
 	case *provider.Provider:
 		if typedUser.Role() != provider.Role || typedUser.Category == nil {
 			err = fmt.Errorf("provider has invalid role or category")
@@ -74,6 +81,46 @@ func (repository *UserRepository) Save(ctx context.Context, userToSave user.User
 		return nil, fmt.Errorf("committing user transaction: %w", err)
 	}
 	return userToSave, nil
+}
+
+func saveConsumerAddress(ctx context.Context, tx *sql.Tx, consumerToSave *consumer.Consumer) error {
+	address := consumerToSave.Address()
+	location := consumerToSave.Location()
+	if address == nil && location == nil && consumerToSave.CoverageZoneID() == 0 {
+		// Legacy records can predate the mandatory registration address. New
+		// registrations always go through ConsumerService and persist it.
+		return nil
+	}
+	if address == nil || location == nil || consumerToSave.CoverageZoneID() <= 0 {
+		return consumer.ErrConsumerAddressNotPersisted
+	}
+
+	if err := address.Validate(); err != nil {
+		return err
+	}
+	if err := location.Validate(); err != nil {
+		return err
+	}
+
+	_, err := tx.ExecContext(
+		ctx,
+		`INSERT INTO consumer_addresses (
+			consumer_id, street, street_number, floor, unit, latitude, longitude, coverage_zone_id
+		) VALUES ($1, $2, $3, NULLIF($4, ''), NULLIF($5, ''), $6, $7, $8)`,
+		consumerToSave.ID(),
+		address.Street,
+		address.StreetNumber,
+		address.Floor,
+		address.Unit,
+		location.Latitude,
+		location.Longitude,
+		consumerToSave.CoverageZoneID(),
+	)
+	if err != nil {
+		return fmt.Errorf("saving consumer address: %w", err)
+	}
+
+	return nil
 }
 
 func saveProviderCoverageZones(ctx context.Context, tx *sql.Tx, providerToSave *provider.Provider) error {
@@ -178,10 +225,15 @@ func scanUserWithProfile(row rowScanner, lookup string) (user.User, error) {
 	var consumerID, providerID, categoryID sql.NullInt64
 	var categoryName, normalizedCategoryName sql.NullString
 	var profilePhotoFileID, profilePhotoOriginalName string
+	var addressStreet, addressStreetNumber, addressFloor, addressUnit sql.NullString
+	var addressLatitude, addressLongitude sql.NullFloat64
+	var addressCoverageZoneID sql.NullInt64
 	err := row.Scan(
 		&id, &authID, &email, &name, &surname, &role,
 		&consumerID, &providerID, &categoryID, &categoryName, &normalizedCategoryName,
 		&profilePhotoFileID, &profilePhotoOriginalName,
+		&addressStreet, &addressStreetNumber, &addressFloor, &addressUnit,
+		&addressLatitude, &addressLongitude, &addressCoverageZoneID,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("finding user by %s: %w", lookup, err)
@@ -192,7 +244,19 @@ func scanUserWithProfile(row rowScanner, lookup string) (user.User, error) {
 		if !consumerID.Valid {
 			return nil, fmt.Errorf("finding user by %s: consumer profile is missing", lookup)
 		}
-		return &consumer.Consumer{BaseUser: base}, nil
+		address, location, coverageZoneID, err := rehydrateConsumerAddress(
+			addressStreet,
+			addressStreetNumber,
+			addressFloor,
+			addressUnit,
+			addressLatitude,
+			addressLongitude,
+			addressCoverageZoneID,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("finding user by %s: %w", lookup, err)
+		}
+		return consumer.RehydrateConsumer(base, address, location, coverageZoneID), nil
 	case provider.Role:
 		if !providerID.Valid || !categoryID.Valid {
 			return nil, fmt.Errorf("finding user by %s: provider profile is incomplete", lookup)
@@ -208,6 +272,31 @@ func scanUserWithProfile(row rowScanner, lookup string) (user.User, error) {
 	default:
 		return nil, fmt.Errorf("finding user by %s: unsupported role %q", lookup, role)
 	}
+}
+
+func rehydrateConsumerAddress(
+	street, streetNumber, floor, unit sql.NullString,
+	latitude, longitude sql.NullFloat64,
+	coverageZoneID sql.NullInt64,
+) (*consumer.Address, *consumer.GeoPoint, int, error) {
+	addressColumnsPresent := street.Valid || streetNumber.Valid || floor.Valid || unit.Valid || latitude.Valid || longitude.Valid || coverageZoneID.Valid
+	if !addressColumnsPresent {
+		return nil, nil, 0, nil
+	}
+	if !street.Valid || !streetNumber.Valid || !latitude.Valid || !longitude.Valid || !coverageZoneID.Valid {
+		return nil, nil, 0, consumer.ErrConsumerAddressNotPersisted
+	}
+
+	address, err := consumer.NewAddress(street.String, streetNumber.String, floor.String, unit.String)
+	if err != nil {
+		return nil, nil, 0, err
+	}
+	location, err := consumer.NewGeoPoint(latitude.Float64, longitude.Float64)
+	if err != nil {
+		return nil, nil, 0, err
+	}
+
+	return address, &location, int(coverageZoneID.Int64), nil
 }
 
 func (repository *UserRepository) FindIDByAuthID(authID string) (int, error) {
@@ -242,41 +331,20 @@ func (repository *UserRepository) FindIDByEmail(email string) (int, error) {
 }
 
 func (repository *UserRepository) FindConsumerByID(consumerID int) (*consumer.Consumer, error) {
-	var id int
-	var authID, email, name, surname, role string
-	var profilePhotoFileID, profilePhotoOriginalName string
-	err := repository.db.QueryRow(
-		`SELECT consumers.user_id,
-			users.auth_id,
-			users.email,
-			users.name,
-			users.surname,
-			users.role,
-			COALESCE(users.profile_photo_file_id::text, ''),
-			COALESCE(profile_photo.original_name, '')
-		FROM consumers
-		INNER JOIN users ON users.id = consumers.user_id
-		LEFT JOIN files profile_photo ON profile_photo.id = users.profile_photo_file_id
-		WHERE consumers.user_id = $1`,
-		consumerID,
-	).Scan(
-		&id,
-		&authID,
-		&email,
-		&name,
-		&surname,
-		&role,
-		&profilePhotoFileID,
-		&profilePhotoOriginalName,
+	foundUser, err := scanUserWithProfile(
+		repository.db.QueryRow(userWithProfileSelectSQL+" WHERE u.id = $1", consumerID),
+		"consumer id",
 	)
 	if err != nil {
 		return nil, fmt.Errorf("finding consumer by id: %w", err)
 	}
 
-	return &consumer.Consumer{BaseUser: user.RehydrateBaseUser(
-		id, authID, email, name, surname, role,
-		imageFromPersistence(profilePhotoFileID, profilePhotoOriginalName),
-	)}, nil
+	foundConsumer, ok := foundUser.(*consumer.Consumer)
+	if !ok {
+		return nil, fmt.Errorf("finding consumer by id: user is not a consumer")
+	}
+
+	return foundConsumer, nil
 }
 
 func (repository *UserRepository) ExistsProviderByID(id int) (bool, error) {

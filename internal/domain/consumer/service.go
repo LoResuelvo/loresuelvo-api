@@ -5,32 +5,55 @@ import (
 	"errors"
 	"fmt"
 
+	coveragezone "github.com/LoResuelvo/loresuelvo-api/internal/domain/coverage_zone"
 	filedomain "github.com/LoResuelvo/loresuelvo-api/internal/domain/file"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/validator"
 )
 
 type Service struct {
-	userRepository UserRepository
-	fileService    FileService
+	userRepository       UserRepository
+	fileService          FileService
+	addressResolver      AddressResolver
+	coverageZoneResolver CoverageZoneResolver
 }
 
-func NewService(userRepository UserRepository, fileService FileService) *Service {
+func NewService(
+	userRepository UserRepository,
+	fileService FileService,
+	addressResolver AddressResolver,
+	coverageZoneResolver CoverageZoneResolver,
+) *Service {
 	return &Service{
-		userRepository: userRepository,
-		fileService:    fileService,
+		userRepository:       userRepository,
+		fileService:          fileService,
+		addressResolver:      addressResolver,
+		coverageZoneResolver: coverageZoneResolver,
 	}
 }
 
-func (cm *Service) RegisterConsumer(ctx context.Context, auth0ID, email, name, surname, profilePhotoFileID string) (*Consumer, error) {
+func (cm *Service) RegisterConsumer(
+	ctx context.Context,
+	auth0ID, email, name, surname, profilePhotoFileID string,
+	address Address,
+) (*Consumer, error) {
 	if cm.userRepository.FindByEmail(email) {
 		return nil, validator.ErrEmailAlreadyRegistered
+	}
+	normalizedAddress, err := NewAddress(address.Street, address.StreetNumber, address.Floor, address.Unit)
+	if err != nil {
+		return nil, err
+	}
+
+	location, coverageZone, err := cm.resolveRegistrationLocation(ctx, *normalizedAddress)
+	if err != nil {
+		return nil, err
 	}
 
 	var profilePhoto *filedomain.Image
 	if profilePhotoFileID != "" {
 		profilePhoto = &filedomain.Image{FileID: profilePhotoFileID}
 	}
-	consumer, err := NewConsumer(auth0ID, email, name, surname, profilePhoto)
+	consumer, err := NewConsumer(auth0ID, email, name, surname, profilePhoto, normalizedAddress, location, coverageZone.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -60,4 +83,38 @@ func (cm *Service) RegisterConsumer(ctx context.Context, auth0ID, email, name, s
 
 	consumer.SetPersistenceID(savedUser.ID())
 	return consumer, nil
+}
+
+func (cm *Service) resolveRegistrationLocation(ctx context.Context, address Address) (GeoPoint, *coveragezone.CoverageZone, error) {
+	location, err := cm.addressResolver.Resolve(ctx, address)
+	if err != nil {
+		return GeoPoint{}, nil, normalizeAddressResolutionError(err)
+	}
+
+	coverageZone, err := cm.coverageZoneResolver.Resolve(ctx, location)
+	if err != nil {
+		if errors.Is(err, coveragezone.ErrDoesNotExist) || errors.Is(err, coveragezone.ErrNotAvailable) {
+			return GeoPoint{}, nil, ErrCoverageZoneNotAvailable
+		}
+		if errors.Is(err, ErrAddressServiceUnavailable) {
+			return GeoPoint{}, nil, err
+		}
+		return GeoPoint{}, nil, ErrAddressServiceUnavailable
+	}
+	if coverageZone == nil {
+		return GeoPoint{}, nil, ErrCoverageZoneNotAvailable
+	}
+	if err := coverageZone.ValidateSelection(); err != nil {
+		return GeoPoint{}, nil, ErrCoverageZoneNotAvailable
+	}
+
+	return location, coverageZone, nil
+}
+
+func normalizeAddressResolutionError(err error) error {
+	if errors.Is(err, ErrAddressNotValidated) || errors.Is(err, ErrAddressServiceUnavailable) {
+		return err
+	}
+
+	return ErrAddressServiceUnavailable
 }

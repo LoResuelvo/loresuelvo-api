@@ -19,7 +19,13 @@ var calendarConnectionNow = time.Date(2026, time.July, 20, 12, 0, 0, 0, time.UTC
 
 func registeredConsumer(t *testing.T) *consumer.Consumer {
 	t.Helper()
-	foundUser, err := consumer.NewConsumer(consumerAuthID, "ana@example.com", "Ana", "Pérez", nil)
+	address, err := consumer.NewAddress("Av. Rivadavia", "5100", "", "")
+	require.NoError(t, err)
+	location, err := consumer.NewGeoPoint(-34.6208, -58.4386)
+	require.NoError(t, err)
+	foundUser, err := consumer.NewConsumer(
+		consumerAuthID, "ana@example.com", "Ana", "Pérez", nil, address, location, 6,
+	)
 	require.NoError(t, err)
 	foundUser.SetPersistenceID(42)
 	return foundUser

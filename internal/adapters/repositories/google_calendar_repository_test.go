@@ -9,7 +9,6 @@ import (
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/repositories"
 	calendarconnection "github.com/LoResuelvo/loresuelvo-api/internal/domain/calendar_connection"
-	"github.com/LoResuelvo/loresuelvo-api/internal/domain/consumer"
 	"github.com/LoResuelvo/loresuelvo-api/internal/infrastructure/db"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -45,15 +44,13 @@ func newGoogleCalendarRepositoryTest(t *testing.T) googleCalendarRepositoryTestC
 func saveCalendarConnectionTestConsumer(t *testing.T, database *sql.DB) int {
 	t.Helper()
 	userRepository := repositories.NewUserRepository(database)
-	consumerToSave, err := consumer.NewConsumer(
+	consumerToSave := legacyConsumer(
 		"auth0|calendar-connection-repository-test",
 		"calendar.connection.repository@example.com",
 		"Ana",
 		"Perez",
-		nil,
 	)
-	require.NoError(t, err)
-	_, err = userRepository.Save(context.Background(), consumerToSave)
+	_, err := userRepository.Save(context.Background(), consumerToSave)
 	require.NoError(t, err)
 	userID, err := userRepository.FindIDByEmail(consumerToSave.Email())
 	require.NoError(t, err)

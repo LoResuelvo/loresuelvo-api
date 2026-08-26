@@ -26,6 +26,7 @@ import (
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/test_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/user_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/work_order_handler"
+	locationadapter "github.com/LoResuelvo/loresuelvo-api/internal/adapters/location"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/locking"
 	mediaadapter "github.com/LoResuelvo/loresuelvo-api/internal/adapters/media"
 	notificationadapter "github.com/LoResuelvo/loresuelvo-api/internal/adapters/notification"
@@ -79,6 +80,8 @@ type Dependencies struct {
 	MessagePublisher conversation.MessagePublisher
 
 	Clock *clockadapter.SystemClock
+
+	ConsumerAddressResolver consumer.AddressResolver
 }
 
 type CalendarEventObserver interface {
@@ -171,7 +174,7 @@ func NewDependenciesWithPaymentAccountAdapters(
 	secretGenerator paymentaccount.SecretGenerator,
 	paymentAccountHandlerConfig payment_account_handler.Config,
 ) *Dependencies {
-	return NewDependenciesWithPaymentAccountAndCalendarAdapters(
+	return newDependenciesWithPaymentAccountAndCalendarAdapters(
 		database,
 		chatbot,
 		paymentAccountOAuthConnector,
@@ -187,6 +190,7 @@ func NewDependenciesWithPaymentAccountAdapters(
 			ConnectionSuccessURL:   "/me",
 			ConnectionCancelledURL: "/me",
 		},
+		true,
 	)
 }
 
@@ -204,7 +208,49 @@ func NewDependenciesWithPaymentAccountAndCalendarAdapters(
 	calendarEventPublisher workordercalendar.EventPublisher,
 	calendarHandlerConfig calendar_connection_handler.Config,
 ) *Dependencies {
+	return newDependenciesWithPaymentAccountAndCalendarAdapters(
+		database,
+		chatbot,
+		paymentAccountOAuthConnector,
+		paymentGateway,
+		webhookVerifier,
+		credentialProtector,
+		secretGenerator,
+		paymentAccountHandlerConfig,
+		calendarOAuthConnector,
+		calendarCredentialProtector,
+		calendarEventPublisher,
+		calendarHandlerConfig,
+		false,
+	)
+}
+
+func newDependenciesWithPaymentAccountAndCalendarAdapters(
+	database *sql.DB,
+	chatbot conversation.Chatbot,
+	paymentAccountOAuthConnector paymentaccount.OAuthConnector,
+	paymentGateway payment.Gateway,
+	webhookVerifier payment_handler.WebhookVerifier,
+	credentialProtector paymentaccount.CredentialProtector,
+	secretGenerator paymentaccount.SecretGenerator,
+	paymentAccountHandlerConfig payment_account_handler.Config,
+	calendarOAuthConnector calendarconnection.OAuthConnector,
+	calendarCredentialProtector calendarconnection.CredentialProtector,
+	calendarEventPublisher workordercalendar.EventPublisher,
+	calendarHandlerConfig calendar_connection_handler.Config,
+	useFakeLocationResolvers bool,
+) *Dependencies {
 	persistence := NewPersistenceAdapters(database)
+
+	var addressResolver consumer.AddressResolver
+	var coverageZoneResolver consumer.CoverageZoneResolver
+	if useFakeLocationResolvers {
+		addressResolver = locationadapter.NewFakeAddressResolver()
+		coverageZoneResolver = locationadapter.NewFakeCoverageZoneResolver(persistence.CoverageZoneRepository)
+	} else {
+		addressResolver = locationadapter.NewGoogleAddressResolverFromEnv()
+		coverageZoneResolver = locationadapter.NewGoogleCoverageZoneResolverFromEnv(persistence.CoverageZoneRepository)
+	}
 
 	storageComponents := storage.NewComponentsFromEnv()
 	systemClock := clockadapter.NewSystemClock()
@@ -239,7 +285,7 @@ func NewDependenciesWithPaymentAccountAndCalendarAdapters(
 		persistence.WorkOrderRepository,
 		persistence.CoverageZoneRepository,
 	)
-	consumerService := consumer.NewService(persistence.UserRepository, fileService)
+	consumerService := consumer.NewService(persistence.UserRepository, fileService, addressResolver, coverageZoneResolver)
 	conversationService := conversation.NewService(
 		persistence.ConversationRepository,
 		persistence.UserRepository,
@@ -351,5 +397,6 @@ func NewDependenciesWithPaymentAccountAndCalendarAdapters(
 		RealtimeHandler:           realtimeHandler,
 		MessagePublisher:          messagePublisher,
 		Clock:                     systemClock,
+		ConsumerAddressResolver:   addressResolver,
 	}
 }

@@ -55,6 +55,7 @@ type testSuite struct {
 	chatbot                      *chatbotadapter.FakeChatbot
 	clock                        *clockadapter.SystemClock
 	checkoutClient               *paymentmercadopago.FakeCheckoutClient
+	consumerAddressResolver      interface{}
 
 	lastStatus                              int
 	lastBody                                []byte
@@ -227,6 +228,9 @@ func (s *testSuite) cleanup() error {
 	if s.calendarAvailability != nil {
 		s.calendarAvailability.SetAvailable(true)
 	}
+	if controller, ok := s.consumerAddressResolver.(interface{ SetAvailable(bool) }); ok {
+		controller.SetAvailable(true)
+	}
 
 	s.categoryIDsByName = map[string]int{}
 	s.participantRolesByFullName = map[string]string{}
@@ -371,6 +375,7 @@ func newTestSuite(tb testing.TB, database *sql.DB) *testSuite {
 		chatbot:                      chatbot,
 		clock:                        dependencies.Clock,
 		checkoutClient:               checkoutClient,
+		consumerAddressResolver:      dependencies.ConsumerAddressResolver,
 
 		categoryIDsByName:                  map[string]int{},
 		participantRolesByFullName:         map[string]string{},

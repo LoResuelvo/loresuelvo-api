@@ -13,7 +13,23 @@ func currentUserResponseFromDomain(currentUser user.User, calendarConnectionStat
 
 	switch typedUser := currentUser.(type) {
 	case *consumer.Consumer:
-		return consumerCurrentUserResponse{currentUserResponse: baseResponse}, nil
+		address := typedUser.Address()
+		location := typedUser.Location()
+		if address == nil || location == nil || typedUser.CoverageZoneID() <= 0 {
+			return nil, fmt.Errorf("mapping consumer current user: address is missing")
+		}
+		return consumerCurrentUserResponse{
+			currentUserResponse: baseResponse,
+			Address: consumerAddressResponse{
+				Street:         address.Street,
+				StreetNumber:   address.StreetNumber,
+				Floor:          address.Floor,
+				Unit:           address.Unit,
+				Latitude:       location.Latitude,
+				Longitude:      location.Longitude,
+				CoverageZoneID: typedUser.CoverageZoneID(),
+			},
+		}, nil
 	case *provider.Provider:
 		return providerCurrentUserResponse{
 			currentUserResponse: baseResponse,

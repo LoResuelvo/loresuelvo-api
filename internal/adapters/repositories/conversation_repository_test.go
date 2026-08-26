@@ -8,7 +8,6 @@ import (
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/repositories"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/category"
-	"github.com/LoResuelvo/loresuelvo-api/internal/domain/consumer"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/conversation"
 	"github.com/LoResuelvo/loresuelvo-api/internal/infrastructure/db"
 	"github.com/stretchr/testify/assert"
@@ -86,9 +85,8 @@ func savedConsumerIDForConversation(t *testing.T, testContext conversationReposi
 func savedConsumerIDForConversationWithData(t *testing.T, testContext conversationRepositoryTestContext, authID, email, name, surname string) int {
 	t.Helper()
 
-	consumerToSave, err := consumer.NewConsumer(authID, email, name, surname, nil)
-	require.NoError(t, err)
-	_, err = testContext.userRepository.Save(context.Background(), consumerToSave)
+	consumerToSave := legacyConsumer(authID, email, name, surname)
+	_, err := testContext.userRepository.Save(context.Background(), consumerToSave)
 	require.NoError(t, err)
 
 	consumerID, err := testContext.userRepository.FindIDByEmail(consumerToSave.Email())
