@@ -110,8 +110,7 @@ func TestCheckoutClientCreatesMarketplacePreferenceAndReturnsProductionInitPoint
 	require.Len(t, creator.request.PaymentMethods.ExcludedPaymentTypes, 1)
 	assert.Equal(t, "ticket", creator.request.PaymentMethods.ExcludedPaymentTypes[0].ID)
 	assert.True(t, creator.request.Expires)
-	require.NotNil(t, creator.request.ExpirationDateFrom)
-	assert.Equal(t, startsOn, *creator.request.ExpirationDateFrom)
+	assert.Nil(t, creator.request.ExpirationDateFrom)
 	require.NotNil(t, creator.request.ExpirationDateTo)
 	assert.Equal(t, expiresOn, *creator.request.ExpirationDateTo)
 }

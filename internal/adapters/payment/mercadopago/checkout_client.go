@@ -121,11 +121,10 @@ func (client *CheckoutClient) CreateCheckout(
 		ExternalReference:  checkoutRequest.ExternalReference,
 		NotificationURL:    client.config.NotificationURL,
 		MarketplaceFee:     sdkAmountFromCents(checkoutRequest.PlatformFeeCents),
-		AutoReturn:         "approved",
-		BinaryMode:         false,
-		Expires:            true,
-		ExpirationDateFrom: &checkoutRequest.StartsOn,
-		ExpirationDateTo:   &checkoutRequest.ExpiresOn,
+		AutoReturn:       "approved",
+		BinaryMode:       false,
+		Expires:          true,
+		ExpirationDateTo: &checkoutRequest.ExpiresOn,
 	}
 	preferenceClient, err := client.preferenceClientFactory(accessToken)
 	if err != nil {
