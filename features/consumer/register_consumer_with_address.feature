@@ -1,4 +1,3 @@
-@wip
 Feature: Registrar consumidor con dirección
   Como consumidor
   quiero registrar obligatoriamente el domicilio donde solicitaré los servicios
@@ -6,6 +5,7 @@ Feature: Registrar consumidor con dirección
 
     Background:
         Given que no existe un usuario con correo "ana@example.com"
+        And que están habilitadas las zonas de cobertura "Comuna 6", "Comuna 1" y "Comuna 2"
 
     Rule: La dirección es obligatoria y debe identificar un domicilio preciso
 
