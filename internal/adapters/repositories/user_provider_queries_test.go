@@ -338,6 +338,87 @@ func TestProviderRepositoryCanFindProvidersByCategoryID(t *testing.T) {
 	assert.Equal(t, anotherPlumbingProvider.CoverageZones, providers[1].CoverageZones)
 }
 
+func TestProviderRepositoryFindsOnlyProvidersCoveringRequestedZone(t *testing.T) {
+	testContext := newProviderRepositoryTest(t)
+	repo := testContext.providerRepository
+	zone6 := savedCoverageZoneForProvider(t, testContext.database, "Comuna 6")
+	zone14 := savedCoverageZoneForProvider(t, testContext.database, "Comuna 14")
+
+	providerInZone6 := validProviderWithCoverageZones(
+		t,
+		testContext.categoryRepository,
+		testContext.database,
+		"auth0|juan-zone-6",
+		"juan.zone6@example.com",
+		"Juan",
+		"Zona6",
+		"Plomería",
+		[]coveragezone.CoverageZone{*zone6},
+	)
+	providerInZone14 := validProviderWithCoverageZones(
+		t,
+		testContext.categoryRepository,
+		testContext.database,
+		"auth0|pedro-zone-14",
+		"pedro.zone14@example.com",
+		"Pedro",
+		"Zona14",
+		"Plomería",
+		[]coveragezone.CoverageZone{*zone14},
+	)
+	providerInBothZones := validProviderWithCoverageZones(
+		t,
+		testContext.categoryRepository,
+		testContext.database,
+		"auth0|laura-both-zones",
+		"laura.both@example.com",
+		"Laura",
+		"AmbasZonas",
+		"Plomería",
+		[]coveragezone.CoverageZone{*zone6, *zone14},
+	)
+
+	for _, providerToSave := range []*provider.Provider{providerInZone6, providerInZone14, providerInBothZones} {
+		_, err := repo.Save(context.Background(), providerToSave)
+		require.NoError(t, err)
+	}
+
+	providers, err := repo.FindProvidersByCategoryAndCoverageZoneID(context.Background(), providerInZone6.Category.ID, zone6.ID)
+
+	require.NoError(t, err)
+	require.Len(t, providers, 2)
+	assert.Equal(t, "Juan", providers[0].Name())
+	assert.Equal(t, "Laura", providers[1].Name())
+	assert.Equal(t, []coveragezone.CoverageZone{*zone6, *zone14}, providers[1].CoverageZones)
+}
+
+func TestProviderRepositoryReturnsEmptyListWhenNoProviderCoversRequestedZone(t *testing.T) {
+	testContext := newProviderRepositoryTest(t)
+	repo := testContext.providerRepository
+	zone6 := savedCoverageZoneForProvider(t, testContext.database, "Comuna 6")
+	zone14 := savedCoverageZoneForProvider(t, testContext.database, "Comuna 14")
+	providerInZone14 := validProviderWithCoverageZones(
+		t,
+		testContext.categoryRepository,
+		testContext.database,
+		"auth0|only-zone-14",
+		"only.zone14@example.com",
+		"Pedro",
+		"Zona14",
+		"Plomería",
+		[]coveragezone.CoverageZone{*zone14},
+	)
+
+	_, err := repo.Save(context.Background(), providerInZone14)
+	require.NoError(t, err)
+
+	providers, err := repo.FindProvidersByCategoryAndCoverageZoneID(context.Background(), providerInZone14.Category.ID, zone6.ID)
+
+	require.NoError(t, err)
+	assert.NotNil(t, providers)
+	assert.Empty(t, providers)
+}
+
 func TestProviderRepositoryFindByCategoryIDReturnsEmptyListIfNoProvidersExistForCategory(t *testing.T) {
 	testContext := newProviderRepositoryTest(t)
 	repo := testContext.providerRepository

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/repositories"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/consumer"
 	"github.com/stretchr/testify/require"
 )
@@ -23,6 +24,10 @@ func consumerWithAddress(t *testing.T, database *sql.DB, authID, email, name, su
 		panic(err)
 	}
 	coverageZoneID := consumerTestCoverageZoneID(t, database)
+	coverageZone, err := repositories.NewCoverageZoneRepository(database).FindByID(context.Background(), coverageZoneID)
+	if err != nil {
+		panic(err)
+	}
 
 	createdConsumer, err := consumer.NewConsumer(
 		authID,
@@ -32,7 +37,7 @@ func consumerWithAddress(t *testing.T, database *sql.DB, authID, email, name, su
 		nil,
 		address,
 		location,
-		coverageZoneID,
+		*coverageZone,
 	)
 	if err != nil {
 		panic(err)

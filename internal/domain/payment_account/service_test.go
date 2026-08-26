@@ -235,7 +235,7 @@ func TestStartAuthorizationRejectsAuthenticatedConsumer(t *testing.T) {
 		nil,
 		address,
 		location,
-		6,
+		coveragezone.CoverageZone{ID: 6, Name: "Comuna 6", Enabled: true},
 	)
 	require.NoError(t, err)
 	repository := &repositoryStub{}

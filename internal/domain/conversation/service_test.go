@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/category"
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/consumer"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/conversation"
 	readmodel "github.com/LoResuelvo/loresuelvo-api/internal/domain/conversation/read_model"
 	coveragezone "github.com/LoResuelvo/loresuelvo-api/internal/domain/coverage_zone"
@@ -142,12 +143,13 @@ func (m *consumerIDFinderMock) FindAuthIDByID(id int) (string, error) {
 }
 
 type providerIDFinderMock struct {
-	providerID             int
-	err                    error
-	providers              []provider.Provider
-	requestedCategoryID    int
-	findByCategoryIDCalled bool
-	findByCategoryIDErr    error
+	providerID                          int
+	err                                 error
+	providers                           []provider.Provider
+	requestedCategoryID                 int
+	requestedCoverageZoneID             int
+	findByCategoryAndCoverageZoneCalled bool
+	findByCategoryAndCoverageZoneErr    error
 }
 
 type userRepositoryMock struct {
@@ -164,7 +166,12 @@ func (m *userRepositoryMock) FindByAuthID(authID string) (user.User, error) {
 	m.findByAuthIDCalls++
 	if m.consumer != nil {
 		if id, err := m.consumer.FindIDByAuthID(authID); err == nil {
-			return user.RehydrateBaseUser(id, authID, "", "", "", conversation.SenderConsumer, nil), nil
+			return consumer.RehydrateConsumer(
+				user.RehydrateBaseUser(id, authID, "consumer@example.com", "", "", conversation.SenderConsumer, nil),
+				consumer.Address{Street: "Av. Rivadavia", StreetNumber: "5100"},
+				consumer.GeoPoint{},
+				coveragezone.CoverageZone{ID: 6, Name: "Comuna 6", Enabled: true},
+			), nil
 		}
 	}
 	if m.provider != nil {
@@ -187,8 +194,21 @@ func (m *userRepositoryMock) FindIDByAuthID(authID string) (int, error) {
 
 func (m *userRepositoryMock) FindAuthIDByID(id int) (string, error) { return "", nil }
 
-func (m *userRepositoryMock) FindProvidersByCategoryID(categoryID int) ([]provider.Provider, error) {
-	return m.provider.FindProvidersByCategoryID(categoryID)
+func (m *userRepositoryMock) FindConsumerByAuthID(_ context.Context, authID string) (*consumer.Consumer, error) {
+	foundUser, err := m.FindByAuthID(authID)
+	if err != nil {
+		return nil, err
+	}
+	foundConsumer, ok := foundUser.(*consumer.Consumer)
+	if !ok {
+		return nil, errors.New("user is not a consumer")
+	}
+
+	return foundConsumer, nil
+}
+
+func (m *userRepositoryMock) FindProvidersByCategoryAndCoverageZoneID(ctx context.Context, categoryID, coverageZoneID int) ([]provider.Provider, error) {
+	return m.provider.FindProvidersByCategoryAndCoverageZoneID(ctx, categoryID, coverageZoneID)
 }
 
 func (m *providerIDFinderMock) FindIDByAuthID(authID string) (int, error) {
@@ -202,13 +222,28 @@ func (m *providerIDFinderMock) FindAuthIDByID(id int) (string, error) {
 	return "", nil
 }
 
-func (m *providerIDFinderMock) FindProvidersByCategoryID(categoryID int) ([]provider.Provider, error) {
-	m.findByCategoryIDCalled = true
+func (m *providerIDFinderMock) FindProvidersByCategoryAndCoverageZoneID(_ context.Context, categoryID, coverageZoneID int) ([]provider.Provider, error) {
+	m.findByCategoryAndCoverageZoneCalled = true
 	m.requestedCategoryID = categoryID
-	if m.findByCategoryIDErr != nil {
-		return nil, m.findByCategoryIDErr
+	m.requestedCoverageZoneID = coverageZoneID
+	if m.findByCategoryAndCoverageZoneErr != nil {
+		return nil, m.findByCategoryAndCoverageZoneErr
 	}
-	return m.providers, nil
+
+	eligibleProviders := make([]provider.Provider, 0, len(m.providers))
+	for _, foundProvider := range m.providers {
+		if foundProvider.Category == nil || foundProvider.Category.ID != categoryID {
+			continue
+		}
+		for _, zone := range foundProvider.CoverageZones {
+			if zone.ID == coverageZoneID && zone.Enabled {
+				eligibleProviders = append(eligibleProviders, foundProvider)
+				break
+			}
+		}
+	}
+
+	return eligibleProviders, nil
 }
 
 type recommendationCategoryListerMock struct {
@@ -546,8 +581,15 @@ func TestCreateChatbotConversationIncludesRecommendedProvidersWhenDiagnosisIsCom
 	recommendedProvider, err := provider.NewProvider("auth0|provider", "juan@example.com", "Juan", "Gómez", plumbingCategory, &filedomain.Image{FileID: "provider-photo-file-id"}, []coveragezone.CoverageZone{{ID: 6, Name: "Comuna 6", Enabled: true}})
 	require.NoError(t, err)
 	recommendedProvider.SetPersistenceID(20)
+	outsideProvider, err := provider.NewProvider("auth0|outside-provider", "pedro@example.com", "Pedro", "López", plumbingCategory, nil, []coveragezone.CoverageZone{{ID: 14, Name: "Comuna 14", Enabled: true}})
+	require.NoError(t, err)
+	outsideProvider.SetPersistenceID(21)
+	electricityCategory := &category.Category{ID: 4, Name: "Electricidad", NormalizedName: "electricidad"}
+	otherCategoryProvider, err := provider.NewProvider("auth0|electrician", "laura@example.com", "Laura", "Suárez", electricityCategory, nil, []coveragezone.CoverageZone{{ID: 6, Name: "Comuna 6", Enabled: true}})
+	require.NoError(t, err)
+	otherCategoryProvider.SetPersistenceID(22)
 	categoryLister := &recommendationCategoryListerMock{categories: []category.Category{*plumbingCategory}}
-	providerFinder := &providerIDFinderMock{providers: []provider.Provider{*recommendedProvider}}
+	providerFinder := &providerIDFinderMock{providers: []provider.Provider{*recommendedProvider, *outsideProvider, *otherCategoryProvider}}
 	fileURLResolver := &fileURLResolverMock{urlsByFileID: map[string]string{"provider-photo-file-id": "https://cdn/provider.jpg"}}
 	chatbot := &chatbotMock{response: &conversation.ChatbotResponse{
 		Status:  conversation.ChatbotResponseAnswered,
@@ -572,8 +614,9 @@ func TestCreateChatbotConversationIncludesRecommendedProvidersWhenDiagnosisIsCom
 	assert.Equal(t, "Plomería", createdResult.ProblemCategory.Name)
 	assert.True(t, categoryLister.called)
 	assert.Equal(t, []string{"Plomería"}, categoryNames(chatbot.availableCategories))
-	assert.True(t, providerFinder.findByCategoryIDCalled)
+	assert.True(t, providerFinder.findByCategoryAndCoverageZoneCalled)
 	assert.Equal(t, 3, providerFinder.requestedCategoryID)
+	assert.Equal(t, 6, providerFinder.requestedCoverageZoneID)
 	assert.Equal(t, []string{"provider-photo-file-id"}, fileURLResolver.resolvedFileIDs)
 	require.Len(t, createdResult.RecommendedProviders, 1)
 	assert.Equal(t, 20, createdResult.RecommendedProviders[0].ID())
@@ -607,7 +650,7 @@ func TestCreateChatbotConversationDoesNotRecommendProvidersBeforeDiagnosisIsComp
 	assert.Equal(t, conversation.AssessmentCollectingInformation, createdResult.Assessment.Outcome)
 	assert.Nil(t, createdResult.ProblemCategory)
 	assert.Empty(t, createdResult.RecommendedProviders)
-	assert.False(t, providerFinder.findByCategoryIDCalled)
+	assert.False(t, providerFinder.findByCategoryAndCoverageZoneCalled)
 	assert.True(t, categoryLister.called)
 	assert.Equal(t, []string{"Plomería"}, categoryNames(chatbot.availableCategories))
 }
@@ -919,8 +962,9 @@ func TestGetByIDReturnsChatbotConversationDetailForOwnerConsumer(t *testing.T) {
 	assert.Equal(t, 7, conversationReader.requestedConversationID)
 	assert.Equal(t, conversation.SenderConsumer, conversationReader.requestedParticipantRole)
 	assert.Equal(t, conversation.TypeChatbot, conversationReader.requestedConversationType)
-	assert.True(t, providerFinder.findByCategoryIDCalled)
+	assert.True(t, providerFinder.findByCategoryAndCoverageZoneCalled)
 	assert.Equal(t, recommendedCategoryID, providerFinder.requestedCategoryID)
+	assert.Equal(t, 6, providerFinder.requestedCoverageZoneID)
 	require.NotNil(t, foundConversation.Chatbot)
 	require.Len(t, foundConversation.Chatbot.RecommendedProviders, 1)
 	assert.Equal(t, 20, foundConversation.Chatbot.RecommendedProviders[0].ID())

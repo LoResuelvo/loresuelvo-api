@@ -7,6 +7,7 @@ import (
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/repositories"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/consumer"
+	coveragezone "github.com/LoResuelvo/loresuelvo-api/internal/domain/coverage_zone"
 	"github.com/LoResuelvo/loresuelvo-api/internal/infrastructure/db"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -105,6 +106,20 @@ func TestConsumerRepositoryCanFindIDByAuthID(t *testing.T) {
 	assert.NotZero(t, consumerID)
 }
 
+func TestConsumerRepositoryCanFindConsumerByAuthID(t *testing.T) {
+	repo, database := newConsumerRepositoryTest(t)
+	consumerToSave := validConsumer(t, database)
+
+	_, err := repo.Save(context.Background(), consumerUser(consumerToSave))
+	require.NoError(t, err, "saving consumer should not return an error")
+
+	foundConsumer, err := repo.FindConsumerByAuthID(context.Background(), consumerToSave.AuthID())
+
+	require.NoError(t, err)
+	assert.Equal(t, consumerToSave.ID(), foundConsumer.ID())
+	assert.Equal(t, consumerToSave.CoverageZone(), foundConsumer.CoverageZone())
+}
+
 func TestConsumerRepositoryCanFindByID(t *testing.T) {
 	repo, database := newConsumerRepositoryTest(t)
 	consumerToSave := validConsumer(t, database)
@@ -146,7 +161,7 @@ func TestConsumerRepositoryRejectsConsumerWithoutAddressOnRead(t *testing.T) {
 }
 
 func TestConsumerRepositoryPersistsAndRehydratesConsumerAddress(t *testing.T) {
-	repository, coverageZoneID := newConsumerRepositoryTestWithCoverageZone(t)
+	repository, coverageZone := newConsumerRepositoryTestWithCoverageZone(t)
 	address, err := consumer.NewAddress("Av. Rivadavia", "5100", "4", "B")
 	require.NoError(t, err)
 	location, err := consumer.NewGeoPoint(-34.6208, -58.4386)
@@ -159,7 +174,7 @@ func TestConsumerRepositoryPersistsAndRehydratesConsumerAddress(t *testing.T) {
 		nil,
 		address,
 		location,
-		coverageZoneID,
+		*coverageZone,
 	)
 	require.NoError(t, err)
 
@@ -171,7 +186,36 @@ func TestConsumerRepositoryPersistsAndRehydratesConsumerAddress(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, *address, foundConsumer.Address())
 	assert.Equal(t, location, foundConsumer.Location())
-	assert.Equal(t, coverageZoneID, foundConsumer.CoverageZoneID())
+	assert.Equal(t, *coverageZone, foundConsumer.CoverageZone())
+}
+
+func TestConsumerRepositoryCanUpdateCoverageZone(t *testing.T) {
+	repository, coverageZone := newConsumerRepositoryTestWithCoverageZone(t)
+	address, err := consumer.NewAddress("Av. Rivadavia", "5100", "", "")
+	require.NoError(t, err)
+	location, err := consumer.NewGeoPoint(-34.6208, -58.4386)
+	require.NoError(t, err)
+	consumerToSave, err := consumer.NewConsumer(
+		"auth0|consumer-address-update",
+		"consumer-address-update@example.com",
+		"Ana",
+		"Perez",
+		nil,
+		address,
+		location,
+		*coverageZone,
+	)
+	require.NoError(t, err)
+
+	_, err = repository.Save(context.Background(), consumerToSave)
+	require.NoError(t, err)
+
+	err = repository.UpdateConsumerCoverageZone(context.Background(), consumerToSave.ID(), coverageZone.ID)
+
+	require.NoError(t, err)
+	foundConsumer, err := repository.FindConsumerByID(consumerToSave.ID())
+	require.NoError(t, err)
+	assert.Equal(t, coverageZone.ID, foundConsumer.CoverageZone().ID)
 }
 
 func TestConsumerRepositoryRollsBackConsumerAddressFailure(t *testing.T) {
@@ -188,7 +232,7 @@ func TestConsumerRepositoryRollsBackConsumerAddressFailure(t *testing.T) {
 		nil,
 		address,
 		location,
-		999999999,
+		coveragezone.CoverageZone{ID: 999999999, Name: "Missing zone", Enabled: true},
 	)
 	require.NoError(t, err)
 
@@ -198,7 +242,7 @@ func TestConsumerRepositoryRollsBackConsumerAddressFailure(t *testing.T) {
 	assert.False(t, repository.FindByEmail(consumerToSave.Email()))
 }
 
-func newConsumerRepositoryTestWithCoverageZone(t *testing.T) (*repositories.UserRepository, int) {
+func newConsumerRepositoryTestWithCoverageZone(t *testing.T) (*repositories.UserRepository, *coveragezone.CoverageZone) {
 	t.Helper()
 
 	config := db.NewTestPostgresConfigFromEnv()
@@ -232,5 +276,8 @@ func newConsumerRepositoryTestWithCoverageZone(t *testing.T) (*repositories.User
 		_ = database.Close()
 	})
 
-	return repositories.NewUserRepository(database), coverageZoneID
+	coverageZone, err := repositories.NewCoverageZoneRepository(database).FindByID(context.Background(), coverageZoneID)
+	require.NoError(t, err, "could not find consumer test coverage zone")
+
+	return repositories.NewUserRepository(database), coverageZone
 }

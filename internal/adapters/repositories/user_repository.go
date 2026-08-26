@@ -8,6 +8,7 @@ import (
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/category"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/consumer"
+	coveragezone "github.com/LoResuelvo/loresuelvo-api/internal/domain/coverage_zone"
 	filedomain "github.com/LoResuelvo/loresuelvo-api/internal/domain/file"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/provider"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/user"
@@ -23,13 +24,17 @@ const userWithProfileSelectSQL = `SELECT u.id, u.auth_id, u.email, u.name, u.sur
 	COALESCE(u.profile_photo_file_id::text, ''), COALESCE(profile_photo.original_name, ''),
 	consumer_address.street, consumer_address.street_number, consumer_address.floor,
 	consumer_address.unit, consumer_address.latitude, consumer_address.longitude,
-	consumer_address.coverage_zone_id
+	consumer_address.coverage_zone_id,
+	consumer_coverage_zone.id, consumer_coverage_zone.market_id, consumer_coverage_zone.code,
+	consumer_coverage_zone.name, consumer_coverage_zone.normalized_name, consumer_coverage_zone.kind,
+	consumer_coverage_zone.parent_zone_id, consumer_coverage_zone.enabled
 	FROM users u
 	LEFT JOIN consumers c ON c.user_id = u.id
 	LEFT JOIN providers p ON p.user_id = u.id
 	LEFT JOIN categories cat ON cat.id = p.category_id
 	LEFT JOIN files profile_photo ON profile_photo.id = u.profile_photo_file_id
-	LEFT JOIN consumer_addresses consumer_address ON consumer_address.consumer_id = c.user_id`
+	LEFT JOIN consumer_addresses consumer_address ON consumer_address.consumer_id = c.user_id
+	LEFT JOIN coverage_zones consumer_coverage_zone ON consumer_coverage_zone.id = consumer_address.coverage_zone_id`
 
 func NewUserRepository(db *sql.DB) *UserRepository {
 	return &UserRepository{
@@ -86,7 +91,8 @@ func (repository *UserRepository) Save(ctx context.Context, userToSave user.User
 func saveConsumerAddress(ctx context.Context, tx *sql.Tx, consumerToSave *consumer.Consumer) error {
 	address := consumerToSave.Address()
 	location := consumerToSave.Location()
-	if consumerToSave.CoverageZoneID() <= 0 {
+	coverageZone := consumerToSave.CoverageZone()
+	if coverageZone.ID <= 0 {
 		return consumer.ErrConsumerAddressNotPersisted
 	}
 
@@ -109,7 +115,7 @@ func saveConsumerAddress(ctx context.Context, tx *sql.Tx, consumerToSave *consum
 		address.Unit,
 		location.Latitude,
 		location.Longitude,
-		consumerToSave.CoverageZoneID(),
+		coverageZone.ID,
 	)
 	if err != nil {
 		return fmt.Errorf("saving consumer address: %w", err)
@@ -184,6 +190,23 @@ func (repository *UserRepository) FindByAuthID(authID string) (user.User, error)
 	return repository.hydrateUserCoverageZones(context.Background(), foundUser)
 }
 
+func (repository *UserRepository) FindConsumerByAuthID(ctx context.Context, authID string) (*consumer.Consumer, error) {
+	foundUser, err := scanUserWithProfile(
+		repository.db.QueryRowContext(ctx, userWithProfileSelectSQL+" WHERE u.auth_id = $1 AND u.role = $2", authID, consumer.Role),
+		"consumer auth id",
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	foundConsumer, ok := foundUser.(*consumer.Consumer)
+	if !ok {
+		return nil, fmt.Errorf("finding consumer by auth id: user is not a consumer")
+	}
+
+	return foundConsumer, nil
+}
+
 func (repository *UserRepository) FindByID(ctx context.Context, id int) (user.User, error) {
 	foundUser, err := scanUserWithProfile(
 		repository.db.QueryRowContext(ctx, userWithProfileSelectSQL+" WHERE u.id = $1", id),
@@ -222,13 +245,17 @@ func scanUserWithProfile(row rowScanner, lookup string) (user.User, error) {
 	var profilePhotoFileID, profilePhotoOriginalName string
 	var addressStreet, addressStreetNumber, addressFloor, addressUnit sql.NullString
 	var addressLatitude, addressLongitude sql.NullFloat64
-	var addressCoverageZoneID sql.NullInt64
+	var addressCoverageZoneID, coverageZoneID, coverageZoneMarketID, coverageZoneParentID sql.NullInt64
+	var coverageZoneCode, coverageZoneName, coverageZoneNormalizedName, coverageZoneKind sql.NullString
+	var coverageZoneEnabled sql.NullBool
 	err := row.Scan(
 		&id, &authID, &email, &name, &surname, &role,
 		&consumerID, &providerID, &categoryID, &categoryName, &normalizedCategoryName,
 		&profilePhotoFileID, &profilePhotoOriginalName,
 		&addressStreet, &addressStreetNumber, &addressFloor, &addressUnit,
 		&addressLatitude, &addressLongitude, &addressCoverageZoneID,
+		&coverageZoneID, &coverageZoneMarketID, &coverageZoneCode, &coverageZoneName,
+		&coverageZoneNormalizedName, &coverageZoneKind, &coverageZoneParentID, &coverageZoneEnabled,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("finding user by %s: %w", lookup, err)
@@ -239,7 +266,7 @@ func scanUserWithProfile(row rowScanner, lookup string) (user.User, error) {
 		if !consumerID.Valid {
 			return nil, fmt.Errorf("finding user by %s: consumer profile is missing", lookup)
 		}
-		address, location, coverageZoneID, err := rehydrateConsumerAddress(
+		address, location, coverageZone, err := rehydrateConsumerAddress(
 			addressStreet,
 			addressStreetNumber,
 			addressFloor,
@@ -247,11 +274,19 @@ func scanUserWithProfile(row rowScanner, lookup string) (user.User, error) {
 			addressLatitude,
 			addressLongitude,
 			addressCoverageZoneID,
+			coverageZoneID,
+			coverageZoneMarketID,
+			coverageZoneParentID,
+			coverageZoneCode,
+			coverageZoneName,
+			coverageZoneNormalizedName,
+			coverageZoneKind,
+			coverageZoneEnabled,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("finding user by %s: %w", lookup, err)
 		}
-		return consumer.RehydrateConsumer(base, address, location, coverageZoneID), nil
+		return consumer.RehydrateConsumer(base, address, location, coverageZone), nil
 	case provider.Role:
 		if !providerID.Valid || !categoryID.Valid {
 			return nil, fmt.Errorf("finding user by %s: provider profile is incomplete", lookup)
@@ -272,22 +307,44 @@ func scanUserWithProfile(row rowScanner, lookup string) (user.User, error) {
 func rehydrateConsumerAddress(
 	street, streetNumber, floor, unit sql.NullString,
 	latitude, longitude sql.NullFloat64,
-	coverageZoneID sql.NullInt64,
-) (consumer.Address, consumer.GeoPoint, int, error) {
-	if !street.Valid || !streetNumber.Valid || !latitude.Valid || !longitude.Valid || !coverageZoneID.Valid {
-		return consumer.Address{}, consumer.GeoPoint{}, 0, consumer.ErrConsumerAddressNotPersisted
+	addressCoverageZoneID, coverageZoneID, coverageZoneMarketID, coverageZoneParentID sql.NullInt64,
+	coverageZoneCode, coverageZoneName, coverageZoneNormalizedName, coverageZoneKind sql.NullString,
+	coverageZoneEnabled sql.NullBool,
+) (consumer.Address, consumer.GeoPoint, coveragezone.CoverageZone, error) {
+	if !street.Valid || !streetNumber.Valid || !latitude.Valid || !longitude.Valid ||
+		!addressCoverageZoneID.Valid || !coverageZoneID.Valid || !coverageZoneMarketID.Valid ||
+		!coverageZoneCode.Valid || !coverageZoneName.Valid || !coverageZoneNormalizedName.Valid ||
+		!coverageZoneKind.Valid || !coverageZoneEnabled.Valid ||
+		addressCoverageZoneID.Int64 != coverageZoneID.Int64 {
+		return consumer.Address{}, consumer.GeoPoint{}, coveragezone.CoverageZone{}, consumer.ErrConsumerAddressNotPersisted
 	}
 
 	address, err := consumer.NewAddress(street.String, streetNumber.String, floor.String, unit.String)
 	if err != nil {
-		return consumer.Address{}, consumer.GeoPoint{}, 0, err
+		return consumer.Address{}, consumer.GeoPoint{}, coveragezone.CoverageZone{}, err
 	}
 	location, err := consumer.NewGeoPoint(latitude.Float64, longitude.Float64)
 	if err != nil {
-		return consumer.Address{}, consumer.GeoPoint{}, 0, err
+		return consumer.Address{}, consumer.GeoPoint{}, coveragezone.CoverageZone{}, err
 	}
 
-	return *address, location, int(coverageZoneID.Int64), nil
+	var parentZoneID *int
+	if coverageZoneParentID.Valid {
+		parentZoneIDValue := int(coverageZoneParentID.Int64)
+		parentZoneID = &parentZoneIDValue
+	}
+	coverageZone := coveragezone.CoverageZone{
+		ID:             int(coverageZoneID.Int64),
+		MarketID:       int(coverageZoneMarketID.Int64),
+		Code:           coverageZoneCode.String,
+		Name:           coverageZoneName.String,
+		NormalizedName: coverageZoneNormalizedName.String,
+		Kind:           coveragezone.Kind(coverageZoneKind.String),
+		ParentZoneID:   parentZoneID,
+		Enabled:        coverageZoneEnabled.Bool,
+	}
+
+	return *address, location, coverageZone, nil
 }
 
 func (repository *UserRepository) FindIDByAuthID(authID string) (int, error) {
@@ -336,6 +393,39 @@ func (repository *UserRepository) FindConsumerByID(consumerID int) (*consumer.Co
 	}
 
 	return foundConsumer, nil
+}
+
+// UpdateConsumerCoverageZone changes the zone associated with a persisted
+// consumer address. The operation is intentionally constrained to enabled
+// zones in enabled markets so an address cannot be moved into unavailable
+// coverage.
+func (repository *UserRepository) UpdateConsumerCoverageZone(ctx context.Context, consumerID, coverageZoneID int) error {
+	result, err := repository.db.ExecContext(
+		ctx,
+		`UPDATE consumer_addresses AS address
+		SET coverage_zone_id = zone.id, updated_on = NOW()
+		FROM coverage_zones AS zone
+		INNER JOIN coverage_markets AS market ON market.id = zone.market_id
+		WHERE address.consumer_id = $1
+			AND zone.id = $2
+			AND zone.enabled = TRUE
+			AND market.enabled = TRUE`,
+		consumerID,
+		coverageZoneID,
+	)
+	if err != nil {
+		return fmt.Errorf("updating consumer coverage zone: %w", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("checking updated consumer coverage zone: %w", err)
+	}
+	if rowsAffected == 0 {
+		return consumer.ErrCoverageZoneNotAvailable
+	}
+
+	return nil
 }
 
 func (repository *UserRepository) ExistsProviderByID(id int) (bool, error) {
@@ -411,6 +501,60 @@ func (repository *UserRepository) FindProvidersByCategoryID(categoryID int) ([]p
 		providerIDs = append(providerIDs, providers[index].ID())
 	}
 	zonesByProviderID, err := repository.coverageZoneRepository.FindByProviderIDs(context.Background(), providerIDs)
+	if err != nil {
+		return nil, fmt.Errorf("hydrating provider coverage zones: %w", err)
+	}
+	for index := range providers {
+		providers[index].CoverageZones = zonesByProviderID[providers[index].ID()]
+	}
+
+	return providers, nil
+}
+
+// FindProvidersByCategoryAndCoverageZoneID returns providers that belong to the
+// requested category and explicitly cover the requested enabled zone.
+func (repository *UserRepository) FindProvidersByCategoryAndCoverageZoneID(ctx context.Context, categoryID, coverageZoneID int) ([]provider.Provider, error) {
+	rows, err := repository.db.QueryContext(
+		ctx,
+		providerSelectSQL+`
+	INNER JOIN provider_coverage_zones
+		ON provider_coverage_zones.provider_id = providers.user_id
+	INNER JOIN coverage_zones
+		ON coverage_zones.id = provider_coverage_zones.coverage_zone_id
+	INNER JOIN coverage_markets
+		ON coverage_markets.id = coverage_zones.market_id
+	WHERE providers.category_id = $1
+		AND provider_coverage_zones.coverage_zone_id = $2
+		AND coverage_zones.enabled = TRUE
+		AND coverage_markets.enabled = TRUE
+	ORDER BY users.name ASC, users.surname ASC`,
+		categoryID,
+		coverageZoneID,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("finding providers by category and coverage zone: %w", err)
+	}
+	defer func() {
+		_ = rows.Close()
+	}()
+
+	providers := make([]provider.Provider, 0)
+	for rows.Next() {
+		foundProvider, err := scanProvider(rows)
+		if err != nil {
+			return nil, fmt.Errorf("scanning provider by category and coverage zone: %w", err)
+		}
+		providers = append(providers, *foundProvider)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterating providers by category and coverage zone: %w", err)
+	}
+
+	providerIDs := make([]int, 0, len(providers))
+	for index := range providers {
+		providerIDs = append(providerIDs, providers[index].ID())
+	}
+	zonesByProviderID, err := repository.coverageZoneRepository.FindByProviderIDs(ctx, providerIDs)
 	if err != nil {
 		return nil, fmt.Errorf("hydrating provider coverage zones: %w", err)
 	}

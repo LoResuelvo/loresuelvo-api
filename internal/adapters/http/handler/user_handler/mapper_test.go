@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/consumer"
+	coveragezone "github.com/LoResuelvo/loresuelvo-api/internal/domain/coverage_zone"
 	"github.com/stretchr/testify/require"
 )
 
@@ -13,7 +14,8 @@ func TestCurrentUserResponseIncludesConsumerAddressForItsOwner(t *testing.T) {
 	location, err := consumer.NewGeoPoint(-34.6208, -58.4386)
 	require.NoError(t, err)
 	currentConsumer, err := consumer.NewConsumer(
-		"auth0|consumer", "ana@example.com", "Ana", "Perez", nil, address, location, 6,
+		"auth0|consumer", "ana@example.com", "Ana", "Perez", nil, address, location,
+		coveragezone.CoverageZone{ID: 6, Name: "Comuna 6", Enabled: true},
 	)
 	require.NoError(t, err)
 	currentConsumer.SetPersistenceID(42)

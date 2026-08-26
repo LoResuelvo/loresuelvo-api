@@ -9,6 +9,7 @@ import (
 
 	calendarconnection "github.com/LoResuelvo/loresuelvo-api/internal/domain/calendar_connection"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/consumer"
+	coveragezone "github.com/LoResuelvo/loresuelvo-api/internal/domain/coverage_zone"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -24,7 +25,8 @@ func registeredConsumer(t *testing.T) *consumer.Consumer {
 	location, err := consumer.NewGeoPoint(-34.6208, -58.4386)
 	require.NoError(t, err)
 	foundUser, err := consumer.NewConsumer(
-		consumerAuthID, "ana@example.com", "Ana", "Pérez", nil, address, location, 6,
+		consumerAuthID, "ana@example.com", "Ana", "Pérez", nil, address, location,
+		coveragezone.CoverageZone{ID: 6, Name: "Comuna 6", Enabled: true},
 	)
 	require.NoError(t, err)
 	foundUser.SetPersistenceID(42)

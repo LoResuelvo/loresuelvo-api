@@ -8,6 +8,7 @@ import (
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/category"
 	domainclock "github.com/LoResuelvo/loresuelvo-api/internal/domain/clock"
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/consumer"
 	readmodel "github.com/LoResuelvo/loresuelvo-api/internal/domain/conversation/read_model"
 	filedomain "github.com/LoResuelvo/loresuelvo-api/internal/domain/file"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/provider"
@@ -86,8 +87,9 @@ func (s *Service) getWorkConversationDetail(ctx context.Context, authID string, 
 }
 
 func (s *Service) getChatbotConversationDetail(ctx context.Context, authID string, chatbotConversation *ChatBotConversation) (*readmodel.ConversationDetail, error) {
-	if !s.authenticatedConsumerMatches(authID, chatbotConversation.ConsumerID) {
-		return nil, ErrConversationAccessDenied
+	authenticatedConsumer, err := s.authenticatedConsumerForChatbot(ctx, authID, chatbotConversation.ConsumerID)
+	if err != nil {
+		return nil, err
 	}
 
 	detail, err := s.conversationReader.FindDetailByIDRoleAndType(ctx, chatbotConversation.ID(), SenderConsumer, TypeChatbot)
@@ -95,7 +97,7 @@ func (s *Service) getChatbotConversationDetail(ctx context.Context, authID strin
 		return nil, err
 	}
 
-	detail, err = s.withRecommendedProviders(ctx, detail)
+	detail, err = s.withRecommendedProviders(ctx, detail, authenticatedConsumer.CoverageZone().ID)
 	if err != nil {
 		return nil, err
 	}
@@ -199,20 +201,22 @@ func (s *Service) ListWorkConversations(ctx context.Context, authID string) ([]r
 }
 
 func (s *Service) ListChatbotConversations(ctx context.Context, authID string) ([]readmodel.ConversationSummary, error) {
-	user, err := s.userRepository.FindByAuthID(authID)
-	if err != nil || user.Role() != SenderConsumer {
+	foundConsumer, err := s.userRepository.FindConsumerByAuthID(ctx, authID)
+	if err != nil || foundConsumer == nil {
 		return nil, ErrOnlyConsumerCanListChatbotConversations
 	}
 
-	return s.conversationReader.FindSummariesByUserAndType(ctx, user, TypeChatbot)
+	return s.conversationReader.FindSummariesByUserAndType(ctx, foundConsumer, TypeChatbot)
 }
 
 // TODO: recibir obligatoriamente una lista de strings para evitar el patrón optionalImageFIleIDs
 func (s *Service) CreateChatbotConversation(ctx context.Context, authID string, content string, imageFileIDs ...[]string) (*ChatbotConversationResult, error) {
-	consumerID, err := s.chatbotConsumerID(authID)
+	chatbotConsumer, err := s.chatbotConsumer(ctx, authID)
 	if err != nil {
 		return nil, err
 	}
+	consumerID := chatbotConsumer.ID()
+	coverageZoneID := chatbotConsumer.CoverageZone().ID
 
 	messageImages, chatbotImages, err := s.chatbotImagesForSender(ctx, authID, optionalImageFileIDs(imageFileIDs))
 	if err != nil {
@@ -223,7 +227,7 @@ func (s *Service) CreateChatbotConversation(ctx context.Context, authID string, 
 		return nil, err
 	}
 
-	answer, err := s.answerChatbotQuestion(ctx, ChatbotHomeProblemQuestion{UserMessage: consumerMessage.Content, Images: chatbotImages, IsNewConversation: true})
+	answer, err := s.answerChatbotQuestion(ctx, ChatbotHomeProblemQuestion{UserMessage: consumerMessage.Content, Images: chatbotImages, IsNewConversation: true}, coverageZoneID)
 	if err != nil {
 		return nil, err
 	}
@@ -255,10 +259,12 @@ func (s *Service) CreateChatbotConversation(ctx context.Context, authID string, 
 }
 
 func (s *Service) ContinueChatbotConversation(ctx context.Context, authID string, conversationID int, content string, imageFileIDs ...[]string) (*ChatbotConversationTurnResult, error) {
-	consumerID, err := s.chatbotConsumerID(authID)
+	chatbotConsumer, err := s.chatbotConsumer(ctx, authID)
 	if err != nil {
 		return nil, err
 	}
+	consumerID := chatbotConsumer.ID()
+	coverageZoneID := chatbotConsumer.CoverageZone().ID
 
 	messageImages, chatbotImages, err := s.chatbotImagesForSender(ctx, authID, optionalImageFileIDs(imageFileIDs))
 	if err != nil {
@@ -289,7 +295,7 @@ func (s *Service) ContinueChatbotConversation(ctx context.Context, authID string
 	}
 
 	question := chatbotHomeProblemQuestionFrom(chatbotConversation, consumerMessage.Content, chatbotImages)
-	answer, err := s.answerChatbotQuestion(ctx, question)
+	answer, err := s.answerChatbotQuestion(ctx, question, coverageZoneID)
 	if err != nil {
 		return nil, err
 	}
@@ -302,7 +308,7 @@ func (s *Service) ContinueChatbotConversation(ctx context.Context, authID string
 		return nil, err
 	}
 	if answer.response.Assessment.Action == ChatbotAssessmentUnchanged {
-		answer.problemCategory, answer.recommendedProviders, err = s.recommendationForCurrentAssessment(ctx, chatbotConversation)
+		answer.problemCategory, answer.recommendedProviders, err = s.recommendationForCurrentAssessment(ctx, chatbotConversation, coverageZoneID)
 		if err != nil {
 			return nil, err
 		}
@@ -317,7 +323,7 @@ func (s *Service) ContinueChatbotConversation(ctx context.Context, authID string
 	return chatbotTurnResult(savedConversation, answer), nil
 }
 
-func (s *Service) recommendationForCurrentAssessment(ctx context.Context, chatbotConversation *ChatBotConversation) (*category.Category, []provider.Provider, error) {
+func (s *Service) recommendationForCurrentAssessment(ctx context.Context, chatbotConversation *ChatBotConversation, coverageZoneID int) (*category.Category, []provider.Provider, error) {
 	assessment := chatbotConversation.CurrentAssessment
 	if assessment == nil || assessment.ProblemCategoryID == nil {
 		return nil, nil, nil
@@ -336,7 +342,7 @@ func (s *Service) recommendationForCurrentAssessment(ctx context.Context, chatbo
 	if matched == nil || !assessment.RequiresProfessional() {
 		return matched, nil, nil
 	}
-	providers, err := s.userRepository.FindProvidersByCategoryID(matched.ID)
+	providers, err := s.userRepository.FindProvidersByCategoryAndCoverageZoneID(ctx, matched.ID, coverageZoneID)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -344,13 +350,13 @@ func (s *Service) recommendationForCurrentAssessment(ctx context.Context, chatbo
 	return matched, summaries, err
 }
 
-func (s *Service) chatbotConsumerID(authID string) (int, error) {
-	foundUser, err := s.userRepository.FindByAuthID(authID)
-	if err != nil || foundUser.Role() != SenderConsumer {
-		return 0, ErrOnlyConsumerCanMessageChatbot
+func (s *Service) chatbotConsumer(ctx context.Context, authID string) (*consumer.Consumer, error) {
+	foundConsumer, err := s.userRepository.FindConsumerByAuthID(ctx, authID)
+	if err != nil || foundConsumer == nil {
+		return nil, ErrOnlyConsumerCanMessageChatbot
 	}
 
-	return foundUser.ID(), nil
+	return foundConsumer, nil
 }
 
 func (s *Service) findOwnedChatbotConversation(ctx context.Context, conversationID int, consumerID int) (*ChatBotConversation, error) {
@@ -370,7 +376,7 @@ func (s *Service) findOwnedChatbotConversation(ctx context.Context, conversation
 	return chatbotConversation, nil
 }
 
-func (s *Service) answerChatbotQuestion(ctx context.Context, question ChatbotHomeProblemQuestion) (*chatbotAnswer, error) {
+func (s *Service) answerChatbotQuestion(ctx context.Context, question ChatbotHomeProblemQuestion, coverageZoneID int) (*chatbotAnswer, error) {
 	availableCategories, err := s.availableCategoriesForChatbot()
 	if err != nil {
 		return nil, err
@@ -388,7 +394,7 @@ func (s *Service) answerChatbotQuestion(ctx context.Context, question ChatbotHom
 		return nil, err
 	}
 
-	problemCategory, recommendedProviders, err := s.assessmentResult(ctx, *chatbotResponse, availableCategories)
+	problemCategory, recommendedProviders, err := s.assessmentResult(ctx, *chatbotResponse, availableCategories, coverageZoneID)
 	if err != nil {
 		return nil, err
 	}
@@ -566,9 +572,13 @@ func copyCurrentAssessment(foundConversation Conversation) *ProblemAssessment {
 	return &assessment
 }
 
-func (s *Service) authenticatedConsumerMatches(authID string, consumerID int) bool {
-	authenticatedUser, err := s.userRepository.FindByAuthID(authID)
-	return err == nil && authenticatedUser.Role() == SenderConsumer && authenticatedUser.ID() == consumerID
+func (s *Service) authenticatedConsumerForChatbot(ctx context.Context, authID string, consumerID int) (*consumer.Consumer, error) {
+	authenticatedConsumer, err := s.userRepository.FindConsumerByAuthID(ctx, authID)
+	if err != nil || authenticatedConsumer == nil || authenticatedConsumer.ID() != consumerID {
+		return nil, ErrConversationAccessDenied
+	}
+
+	return authenticatedConsumer, nil
 }
 
 func (s *Service) authenticatedUserForConversation(authID string, conversation *WorkConversation) (user.User, error) {
@@ -846,7 +856,7 @@ func (s *Service) withCounterpartProfilePhotoURL(ctx context.Context, detail *re
 }
 
 // TODO: Let the chatbot rank providers using richer provider attributes when recommendation criteria evolve.
-func (s *Service) assessmentResult(ctx context.Context, chatbotResponse ChatbotResponse, availableCategories []category.Category) (*category.Category, []provider.Provider, error) {
+func (s *Service) assessmentResult(ctx context.Context, chatbotResponse ChatbotResponse, availableCategories []category.Category, coverageZoneID int) (*category.Category, []provider.Provider, error) {
 	if chatbotResponse.Assessment.Action == ChatbotAssessmentUnchanged {
 		return nil, nil, nil
 	}
@@ -862,7 +872,7 @@ func (s *Service) assessmentResult(ctx context.Context, chatbotResponse ChatbotR
 		return matchedCategory, nil, nil
 	}
 
-	providers, err := s.userRepository.FindProvidersByCategoryID(matchedCategory.ID)
+	providers, err := s.userRepository.FindProvidersByCategoryAndCoverageZoneID(ctx, matchedCategory.ID, coverageZoneID)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -889,12 +899,12 @@ func categoryForChatbotResponse(chatbotResponse ChatbotResponse, availableCatego
 	return findCategoryByNormalizedName(availableCategories, recommendedCategory.NormalizedName)
 }
 
-func (s *Service) withRecommendedProviders(ctx context.Context, detail *readmodel.ConversationDetail) (*readmodel.ConversationDetail, error) {
+func (s *Service) withRecommendedProviders(ctx context.Context, detail *readmodel.ConversationDetail, coverageZoneID int) (*readmodel.ConversationDetail, error) {
 	if detail.Chatbot == nil || detail.Chatbot.Assessment == nil || detail.Chatbot.Assessment.Outcome != string(AssessmentProfessionalRequired) || detail.Chatbot.Assessment.ProblemCategory == nil {
 		return detail, nil
 	}
 
-	providers, err := s.userRepository.FindProvidersByCategoryID(detail.Chatbot.Assessment.ProblemCategory.ID)
+	providers, err := s.userRepository.FindProvidersByCategoryAndCoverageZoneID(ctx, detail.Chatbot.Assessment.ProblemCategory.ID, coverageZoneID)
 	if err != nil {
 		return nil, err
 	}
@@ -910,6 +920,9 @@ func (s *Service) withRecommendedProviders(ctx context.Context, detail *readmode
 func (s *Service) providersWithProfilePhotoURLs(ctx context.Context, providers []provider.Provider) ([]provider.Provider, error) {
 	profilePhotoFileIDs := make([]string, 0, len(providers))
 	for i := range providers {
+		if providers[i].ProfilePhoto() == nil {
+			continue
+		}
 		profilePhotoFileIDs = append(profilePhotoFileIDs, providers[i].ProfilePhoto().FileID)
 	}
 

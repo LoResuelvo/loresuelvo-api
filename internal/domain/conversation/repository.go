@@ -3,6 +3,7 @@ package conversation
 import (
 	"context"
 
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/consumer"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/user"
 
 	readmodel "github.com/LoResuelvo/loresuelvo-api/internal/domain/conversation/read_model"
@@ -17,7 +18,8 @@ type Repository interface {
 
 type UserRepository interface {
 	FindByAuthID(authID string) (user.User, error)
-	FindProvidersByCategoryID(categoryID int) ([]provider.Provider, error)
+	FindConsumerByAuthID(ctx context.Context, authID string) (*consumer.Consumer, error)
+	FindProvidersByCategoryAndCoverageZoneID(ctx context.Context, categoryID, coverageZoneID int) ([]provider.Provider, error)
 }
 
 type Reader interface {

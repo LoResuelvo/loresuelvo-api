@@ -302,7 +302,7 @@ func (suite *testSuite) consumerAddressHasCoverageZone(zoneName string) error {
 	if err != nil {
 		return err
 	}
-	zone, err := suite.coverageZoneRepository.FindByID(context.Background(), registeredConsumer.CoverageZoneID())
+	zone, err := suite.coverageZoneRepository.FindByID(context.Background(), registeredConsumer.CoverageZone().ID)
 	if err != nil {
 		return err
 	}

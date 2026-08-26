@@ -1,6 +1,7 @@
 package consumer
 
 import (
+	coveragezone "github.com/LoResuelvo/loresuelvo-api/internal/domain/coverage_zone"
 	filedomain "github.com/LoResuelvo/loresuelvo-api/internal/domain/file"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/user"
 )
@@ -9,9 +10,9 @@ const Role = "consumer"
 
 type Consumer struct {
 	*user.BaseUser
-	address        Address
-	location       GeoPoint
-	coverageZoneID int
+	address      Address
+	location     GeoPoint
+	coverageZone coveragezone.CoverageZone
 }
 
 // NewConsumer creates a consumer from already constructed value objects.
@@ -20,12 +21,21 @@ func NewConsumer(
 	profilePhoto *filedomain.Image,
 	address *Address,
 	location GeoPoint,
-	coverageZoneID int,
+	coverageZone coveragezone.CoverageZone,
 ) (*Consumer, error) {
 	if address == nil {
 		return nil, ErrAddressRequired
 	}
-	if coverageZoneID <= 0 {
+	if err := address.Validate(); err != nil {
+		return nil, err
+	}
+	if err := location.Validate(); err != nil {
+		return nil, err
+	}
+	if coverageZone.ID <= 0 {
+		return nil, ErrCoverageZoneNotAvailable
+	}
+	if err := coverageZone.ValidateSelection(); err != nil {
 		return nil, ErrCoverageZoneNotAvailable
 	}
 
@@ -35,20 +45,20 @@ func NewConsumer(
 	}
 
 	return &Consumer{
-		BaseUser:       baseUser,
-		address:        *address,
-		location:       location,
-		coverageZoneID: coverageZoneID,
+		BaseUser:     baseUser,
+		address:      *address,
+		location:     location,
+		coverageZone: coverageZone,
 	}, nil
 }
 
 // RehydrateConsumer restores a consumer from already validated persistence data.
-func RehydrateConsumer(baseUser *user.BaseUser, address Address, location GeoPoint, coverageZoneID int) *Consumer {
+func RehydrateConsumer(baseUser *user.BaseUser, address Address, location GeoPoint, coverageZone coveragezone.CoverageZone) *Consumer {
 	return &Consumer{
-		BaseUser:       baseUser,
-		address:        address,
-		location:       location,
-		coverageZoneID: coverageZoneID,
+		BaseUser:     baseUser,
+		address:      address,
+		location:     location,
+		coverageZone: coverageZone,
 	}
 }
 
@@ -60,6 +70,6 @@ func (consumer *Consumer) Location() GeoPoint {
 	return consumer.location
 }
 
-func (consumer *Consumer) CoverageZoneID() int {
-	return consumer.coverageZoneID
+func (consumer *Consumer) CoverageZone() coveragezone.CoverageZone {
+	return consumer.coverageZone
 }

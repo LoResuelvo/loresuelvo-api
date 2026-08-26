@@ -53,7 +53,7 @@ func (cm *Service) RegisterConsumer(
 	if profilePhotoFileID != "" {
 		profilePhoto = &filedomain.Image{FileID: profilePhotoFileID}
 	}
-	consumer, err := NewConsumer(auth0ID, email, name, surname, profilePhoto, normalizedAddress, location, coverageZone.ID)
+	consumer, err := NewConsumer(auth0ID, email, name, surname, profilePhoto, normalizedAddress, location, *coverageZone)
 	if err != nil {
 		return nil, err
 	}

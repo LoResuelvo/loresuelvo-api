@@ -13,6 +13,7 @@ import (
 
 func registerProviderWithCoverageZonesSteps(sc *godog.ScenarioContext, suite *testSuite) {
 	sc.Step(`^que están habilitadas las zonas de cobertura "([^"]*)", "([^"]*)" y "([^"]*)"$`, suite.thereAreEnabledCoverageZones)
+	sc.Step(`^que están habilitadas las zonas de cobertura "([^"]*)" y "([^"]*)"$`, suite.thereAreEnabledCoverageZonesPair)
 	sc.Step(`^que no existe la zona de cobertura "([^"]*)"$`, suite.coverageZoneDoesNotExist)
 	sc.Step(`^que la zona de cobertura "([^"]*)" está deshabilitada$`, suite.coverageZoneIsDisabled)
 	sc.Step(`^me registro como prestador con correo "([^"]*)", nombre "([^"]*)", apellido "([^"]*)", rubro "([^"]*)" y zona de cobertura "([^"]*)"$`, suite.requestProviderRegistrationWithCoverageZone)
@@ -80,6 +81,14 @@ func (suite *testSuite) findDefaultProviderCoverageZone(ctx context.Context, nam
 }
 
 func (suite *testSuite) thereAreEnabledCoverageZones(firstName, secondName, thirdName string) error {
+	return suite.resetAndCreateEnabledCoverageZones([]string{firstName, secondName, thirdName})
+}
+
+func (suite *testSuite) thereAreEnabledCoverageZonesPair(firstName, secondName string) error {
+	return suite.resetAndCreateEnabledCoverageZones([]string{firstName, secondName})
+}
+
+func (suite *testSuite) resetAndCreateEnabledCoverageZones(names []string) error {
 	if err := suite.coverageZoneRepository.DeleteAll(); err != nil {
 		return fmt.Errorf("could not reset coverage zones: %w", err)
 	}
@@ -88,7 +97,7 @@ func (suite *testSuite) thereAreEnabledCoverageZones(firstName, secondName, thir
 		return err
 	}
 
-	for _, name := range []string{firstName, secondName, thirdName} {
+	for _, name := range names {
 		zoneCode := "CABA-" + strings.ToUpper(strings.ReplaceAll(name, " ", "-"))
 		zone, err := coveragezone.New(market.ID, zoneCode, name, coveragezone.KindCommune)
 		if err != nil {
