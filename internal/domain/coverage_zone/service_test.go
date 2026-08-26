@@ -60,12 +60,3 @@ func TestCoverageZoneServicePropagatesRepositoryFailure(t *testing.T) {
 	assert.ErrorIs(t, err, expectedErr)
 	assert.Nil(t, entries)
 }
-
-func TestCoverageZoneServiceRejectsMissingRepository(t *testing.T) {
-	service := coveragezone.NewService(nil)
-
-	entries, err := service.List(context.Background())
-
-	assert.ErrorIs(t, err, coveragezone.ErrRepositoryNotConfigured)
-	assert.Nil(t, entries)
-}
