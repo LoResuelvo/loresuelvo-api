@@ -57,7 +57,7 @@ post:
   - Conversations
   operationId: createChatbotConversation
   summary: Send a message to the AI-assisted chatbot
-  description: Creates a chatbot conversation for the authenticated consumer and returns the persisted consumer message, chatbot answer, and recommended providers in the same response when the chatbot concludes a pre-diagnosis and recommends an appropriate provider category. The first consumer message may include text, confirmed private image file ids, or both.
+  description: Creates a chatbot conversation for the authenticated consumer and returns the persisted consumer message, chatbot answer, and providers in the recommended category that cover the consumer's active coverage zone when the chatbot concludes a pre-diagnosis. The first consumer message may include text, confirmed private image file ids, or both.
   security:
   - BearerAuth: []
   requestBody:

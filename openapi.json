@@ -1827,7 +1827,7 @@
                 ],
                 "operationId": "createChatbotConversation",
                 "summary": "Send a message to the AI-assisted chatbot",
-                "description": "Creates a chatbot conversation for the authenticated consumer and returns the persisted consumer message, chatbot answer, and recommended providers in the same response when the chatbot concludes a pre-diagnosis and recommends an appropriate provider category. The first consumer message may include text, confirmed private image file ids, or both.",
+                "description": "Creates a chatbot conversation for the authenticated consumer and returns the persisted consumer message, chatbot answer, and providers in the recommended category that cover the consumer's active coverage zone when the chatbot concludes a pre-diagnosis. The first consumer message may include text, confirmed private image file ids, or both.",
                 "security": [
                     {
                         "BearerAuth": []
@@ -1988,7 +1988,7 @@
                 ],
                 "operationId": "continueChatbotConversation",
                 "summary": "Send a message to an existing AI-assisted chatbot conversation",
-                "description": "Adds a consumer message to an existing chatbot conversation, sends the persisted context summary plus recent relevant messages and current-turn images to the stateless chatbot, persists the chatbot response, and returns the messages created for this turn with recommended providers when applicable.",
+                "description": "Adds a consumer message to an existing chatbot conversation, sends the persisted context summary plus recent relevant messages and current-turn images to the stateless chatbot, persists the chatbot response, and returns the messages created for this turn with providers in the recommended category that cover the consumer's active coverage zone when applicable.",
                 "security": [
                     {
                         "BearerAuth": []
@@ -6287,7 +6287,7 @@
                 "additionalProperties": false
             },
             "ChatbotConversationResponse": {
-                "description": "Chatbot conversation turn response, including the chatbot answer and recommendations when the diagnosis is concluded.",
+                "description": "Chatbot conversation turn response, including the chatbot answer and providers in the recommended category that cover the authenticated consumer's active coverage zone when the diagnosis is concluded.",
                 "allOf": [
                     {
                         "$ref": "#/components/schemas/ChatbotConversationDetail"
@@ -6356,7 +6356,7 @@
                     },
                     "recommended_providers": {
                         "type": "array",
-                        "description": "Providers derived from the recommended category.",
+                        "description": "Providers in the recommended category that cover the authenticated consumer's active coverage zone.",
                         "items": {
                             "$ref": "#/components/schemas/ProviderSummary"
                         }

@@ -3,7 +3,7 @@ post:
   - Conversations
   operationId: continueChatbotConversation
   summary: Send a message to an existing AI-assisted chatbot conversation
-  description: Adds a consumer message to an existing chatbot conversation, sends the persisted context summary plus recent relevant messages and current-turn images to the stateless chatbot, persists the chatbot response, and returns the messages created for this turn with recommended providers when applicable.
+  description: Adds a consumer message to an existing chatbot conversation, sends the persisted context summary plus recent relevant messages and current-turn images to the stateless chatbot, persists the chatbot response, and returns the messages created for this turn with providers in the recommended category that cover the consumer's active coverage zone when applicable.
   security:
   - BearerAuth: []
   parameters:
