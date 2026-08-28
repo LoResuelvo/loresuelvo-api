@@ -18,7 +18,6 @@ Feature: Procesar resultados de verificación de identidad
             When el verificador informa de forma auténtica que la sesión está "awaiting_user"
             Then "juan.plomero@example.com" consulta en su perfil el estado "awaiting_user"
 
-        @wip
         Scenario: 58.1.3 Registrar que la verificación requiere revisión manual
             When el verificador informa de forma auténtica que la sesión está "in_review"
             Then "juan.plomero@example.com" consulta en su perfil el estado "in_review"
