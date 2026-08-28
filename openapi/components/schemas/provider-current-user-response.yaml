@@ -20,5 +20,6 @@ allOf:
       - not_started
       - in_progress
       - awaiting_user
+      - in_review
       - approved
       description: Current identity-verification status for the authenticated provider.
