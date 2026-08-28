@@ -99,6 +99,8 @@ func statusFromDidit(status string) (identityverification.VerificationStatus, bo
 		return identityverification.StatusInProgress, true
 	case "awaiting user", "awaiting_user":
 		return identityverification.StatusAwaitingUser, true
+	case "in review", "in_review":
+		return identityverification.StatusInReview, true
 	}
 	return "", false
 }

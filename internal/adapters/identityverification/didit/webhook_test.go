@@ -40,6 +40,19 @@ func TestWebhookAdapterTranslatesAwaitingUserStatus(t *testing.T) {
 	require.Equal(t, identityverification.StatusAwaitingUser, result.Status)
 }
 
+func TestWebhookAdapterTranslatesInReviewStatus(t *testing.T) {
+	sessionID, eventID, workflowID := uuid.New(), uuid.New(), uuid.New()
+	body := []byte(`{"event_id":"` + eventID.String() + `","session_id":"` + sessionID.String() + `","status":"In Review","webhook_type":"status.updated","created_at":1788264000,"timestamp":1788264000,"workflow_id":"` + workflowID.String() + `","workflow_version":2,"vendor_data":"42"}`)
+	adapter, err := NewWebhookAdapter("webhook-secret")
+	require.NoError(t, err)
+
+	result, err := adapter.Translate(body)
+
+	require.NoError(t, err)
+	require.Equal(t, sessionID, result.SessionID)
+	require.Equal(t, identityverification.StatusInReview, result.Status)
+}
+
 func TestWebhookAdapterAuthenticatesCanonicalJSON(t *testing.T) {
 	now := time.Unix(1788264000, 0).UTC()
 	sessionID := uuid.MustParse("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee")
