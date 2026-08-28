@@ -10,7 +10,6 @@ Feature: Procesar resultados de verificación de identidad
 
     Rule: El estado local debe reflejar el último resultado auténtico
 
-        @wip
         Scenario: 58.1.1 Registrar que la verificación está en progreso
             When el verificador informa de forma auténtica que la sesión está "in_progress"
             Then "juan.plomero@example.com" consulta en su perfil el estado "in_progress"
