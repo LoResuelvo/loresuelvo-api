@@ -25,7 +25,6 @@ Feature: Iniciar la verificación de identidad de un prestador
 
     Rule: Una sesión activa debe reutilizarse
 
-        @wip
         Scenario: 58.3 Reutilizar una sesión de verificación activa
             Given que la verificación de "juan.plomero@example.com" está en estado "in_progress"
             And que estoy autenticado como prestador "juan.plomero@example.com"
