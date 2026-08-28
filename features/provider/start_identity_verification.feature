@@ -41,7 +41,6 @@ Feature: Iniciar la verificación de identidad de un prestador
 
     Rule: El registro del prestador no depende de la disponibilidad del verificador
 
-        @wip
         Scenario: 58.5 Conservar el registro cuando el verificador no está disponible
             Given que el verificador de identidad no está disponible
             And que estoy autenticado como prestador "juan.plomero@example.com"
