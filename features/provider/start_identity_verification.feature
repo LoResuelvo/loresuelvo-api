@@ -9,7 +9,6 @@ Feature: Iniciar la verificación de identidad de un prestador
 
     Rule: Sólo un prestador registrado puede iniciar su propia verificación
 
-        @wip
         Scenario: 58.1 Iniciar correctamente una verificación de identidad
             Given que estoy autenticado como prestador "juan.plomero@example.com"
             When inicio mi verificación de identidad
