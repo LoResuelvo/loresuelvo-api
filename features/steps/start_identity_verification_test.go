@@ -36,6 +36,9 @@ func registerStartIdentityVerificationSteps(sc *godog.ScenarioContext, suite *te
 	sc.Step(`^el sistema entrega las credenciales de la misma sesión$`, suite.systemReturnsSameVerificationSession)
 	sc.Step(`^se conserva una única sesión activa para "([^"]*)"$`, suite.onlyOneActiveVerificationSession)
 	sc.Step(`^el sistema informa que mi identidad ya está verificada$`, suite.systemReportsIdentityAlreadyApproved)
+	sc.Step(`^que el verificador de identidad no está disponible$`, suite.identityVerifierIsUnavailable)
+	sc.Step(`^el sistema informa que la verificación no está disponible temporalmente$`, suite.systemReportsIdentityVerifierUnavailable)
+	sc.Step(`^no se guarda una sesión incompleta$`, suite.noIncompleteIdentityVerificationSession)
 }
 
 func (suite *testSuite) tryStartIdentityVerificationForProvider(_ string) error {
@@ -118,6 +121,33 @@ func (suite *testSuite) onlyOneActiveVerificationSession(email string) error {
 func (suite *testSuite) systemReportsIdentityAlreadyApproved() error {
 	if suite.lastStatus != http.StatusConflict {
 		return fmt.Errorf("expected status 409, got %d: %s", suite.lastStatus, suite.lastBody)
+	}
+	return nil
+}
+
+func (suite *testSuite) identityVerifierIsUnavailable() error {
+	suite.identityVerifier.SetAvailable(false)
+	return nil
+}
+
+func (suite *testSuite) systemReportsIdentityVerifierUnavailable() error {
+	if suite.lastStatus != http.StatusServiceUnavailable {
+		return fmt.Errorf("expected status 503, got %d: %s", suite.lastStatus, suite.lastBody)
+	}
+	return nil
+}
+
+func (suite *testSuite) noIncompleteIdentityVerificationSession() error {
+	providerID, err := suite.providerIDByEmail("juan.plomero@example.com")
+	if err != nil {
+		return err
+	}
+	verifications, err := suite.identityVerificationRepository.FindByProviderID(context.Background(), providerID)
+	if err != nil {
+		return err
+	}
+	if len(verifications) != 0 {
+		return fmt.Errorf("expected no incomplete identity verification session")
 	}
 	return nil
 }

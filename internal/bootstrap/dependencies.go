@@ -87,6 +87,7 @@ type Dependencies struct {
 	Clock *clockadapter.SystemClock
 
 	ConsumerAddressResolver consumer.AddressResolver
+	IdentityVerifier        identityverification.IdentityVerifier
 }
 
 type CalendarEventObserver interface {
@@ -420,5 +421,6 @@ func newDependenciesWithPaymentAccountAndCalendarAdapters(
 		MessagePublisher:            messagePublisher,
 		Clock:                       systemClock,
 		ConsumerAddressResolver:     addressResolver,
+		IdentityVerifier:            identityVerifier,
 	}
 }

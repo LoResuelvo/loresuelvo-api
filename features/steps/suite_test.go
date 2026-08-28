@@ -19,6 +19,7 @@ import (
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/cryptography"
 	httpadapter "github.com/LoResuelvo/loresuelvo-api/internal/adapters/http"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/payment_account_handler"
+	identityverificationfake "github.com/LoResuelvo/loresuelvo-api/internal/adapters/identityverification/fake"
 	paymentmercadopago "github.com/LoResuelvo/loresuelvo-api/internal/adapters/payment/mercadopago"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/payment_account/mercadopago"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/repositories"
@@ -61,6 +62,7 @@ type testSuite struct {
 	checkoutClient                 *paymentmercadopago.FakeCheckoutClient
 	consumerAddressResolver        interface{}
 	identityVerificationRepository *repositories.IdentityVerificationRepository
+	identityVerifier               *identityverificationfake.Verifier
 	scenarioContext                context.Context
 
 	lastStatus                              int
@@ -389,6 +391,7 @@ func newTestSuite(tb testing.TB, database *sql.DB) *testSuite {
 		checkoutClient:                 checkoutClient,
 		consumerAddressResolver:        dependencies.ConsumerAddressResolver,
 		identityVerificationRepository: dependencies.Persistence.IdentityVerificationRepository,
+		identityVerifier:               dependencies.IdentityVerifier.(*identityverificationfake.Verifier),
 		scenarioContext:                context.Background(),
 
 		categoryIDsByName:                  map[string]int{},

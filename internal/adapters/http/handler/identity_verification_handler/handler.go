@@ -37,6 +37,18 @@ func (handler *IdentityVerificationHandler) StartSession(context *gin.Context) {
 			statusCode = http.StatusConflict
 			message = "identity verification is already approved"
 		}
+		if errors.Is(err, identityverification.ErrVerifierUnavailable) {
+			statusCode = http.StatusServiceUnavailable
+			message = "identity verification is temporarily unavailable"
+		}
+		if errors.Is(err, identityverification.ErrVerifierMisconfigured) {
+			statusCode = http.StatusBadGateway
+			message = "identity verification could not be configured"
+		}
+		if errors.Is(err, identityverification.ErrVerificationAlreadyApproved) {
+			statusCode = http.StatusConflict
+			message = "identity verification is already approved"
+		}
 		httphandler.RespondError(context, statusCode, message)
 		return
 	}
