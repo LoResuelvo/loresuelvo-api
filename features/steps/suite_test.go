@@ -33,32 +33,34 @@ import (
 )
 
 type testSuite struct {
-	server                       *httptest.Server
-	database                     *sql.DB
-	categoryRepository           *repositories.CategoryRepository
-	coverageZoneRepository       *repositories.CoverageZoneRepository
-	conversationRepository       *repositories.ConversationRepository
-	messageRepository            *repositories.MessageRepository
-	jobRequestRepository         *repositories.JobRequestRepository
-	userRepository               *repositories.UserRepository
-	fileRepository               *repositories.FileRepository
-	notificationRepository       *repositories.NotificationRepository
-	workOrderRepository          *repositories.WorkOrderRepository
-	paymentAccountRepository     *repositories.PaymentAccountRepository
-	calendarConnectionRepository *repositories.GoogleCalendarConnectionRepository
-	paymentIntentRepository      *repositories.PaymentIntentRepository
-	paymentTransactionRepository *repositories.PaymentTransactionRepository
-	urgentWorkOrderScheduler     *scheduler.Scheduler
-	calendarSyncRunner           calendarSyncRunner
-	calendarEventObserver        calendarEventObserver
-	calendarEventDetailsObserver calendarEventDetailsObserver
-	calendarAvailability         calendarAvailabilityController
-	auth0Validator               *validator.Validator
-	tokenBuilder                 *auth0.TokenBuilder
-	chatbot                      *chatbotadapter.FakeChatbot
-	clock                        *clockadapter.SystemClock
-	checkoutClient               *paymentmercadopago.FakeCheckoutClient
-	consumerAddressResolver      interface{}
+	server                         *httptest.Server
+	database                       *sql.DB
+	categoryRepository             *repositories.CategoryRepository
+	coverageZoneRepository         *repositories.CoverageZoneRepository
+	conversationRepository         *repositories.ConversationRepository
+	messageRepository              *repositories.MessageRepository
+	jobRequestRepository           *repositories.JobRequestRepository
+	userRepository                 *repositories.UserRepository
+	fileRepository                 *repositories.FileRepository
+	notificationRepository         *repositories.NotificationRepository
+	workOrderRepository            *repositories.WorkOrderRepository
+	paymentAccountRepository       *repositories.PaymentAccountRepository
+	calendarConnectionRepository   *repositories.GoogleCalendarConnectionRepository
+	paymentIntentRepository        *repositories.PaymentIntentRepository
+	paymentTransactionRepository   *repositories.PaymentTransactionRepository
+	urgentWorkOrderScheduler       *scheduler.Scheduler
+	calendarSyncRunner             calendarSyncRunner
+	calendarEventObserver          calendarEventObserver
+	calendarEventDetailsObserver   calendarEventDetailsObserver
+	calendarAvailability           calendarAvailabilityController
+	auth0Validator                 *validator.Validator
+	tokenBuilder                   *auth0.TokenBuilder
+	chatbot                        *chatbotadapter.FakeChatbot
+	clock                          *clockadapter.SystemClock
+	checkoutClient                 *paymentmercadopago.FakeCheckoutClient
+	consumerAddressResolver        interface{}
+	identityVerificationRepository *repositories.IdentityVerificationRepository
+	scenarioContext                context.Context
 
 	lastStatus                              int
 	lastBody                                []byte
@@ -178,10 +180,14 @@ func (s *testSuite) registerAllSteps(sc *godog.ScenarioContext) {
 	registerChatbotProviderRecommendationSteps(sc, s)
 	registerAIJobRequestSteps(sc, s)
 	registerAIJobRequestImageSteps(sc, s)
+	registerStartIdentityVerificationSteps(sc, s)
 }
 
 func (s *testSuite) cleanup() error {
 	s.closeRealtimeConnections()
+	if err := s.identityVerificationRepository.DeleteAll(); err != nil {
+		return fmt.Errorf("could not clean identity verifications: %w", err)
+	}
 
 	if err := s.paymentIntentRepository.DeleteAll(); err != nil {
 		return fmt.Errorf("could not clean payment intents: %w", err)
@@ -353,32 +359,34 @@ func newTestSuite(tb testing.TB, database *sql.DB) *testSuite {
 	})
 
 	return &testSuite{
-		server:                       server,
-		database:                     database,
-		categoryRepository:           dependencies.Persistence.CategoryRepository,
-		coverageZoneRepository:       dependencies.Persistence.CoverageZoneRepository,
-		conversationRepository:       dependencies.Persistence.ConversationRepository,
-		messageRepository:            dependencies.Persistence.MessageRepository,
-		jobRequestRepository:         dependencies.Persistence.JobRequestRepository,
-		userRepository:               dependencies.Persistence.UserRepository,
-		fileRepository:               dependencies.Persistence.FileRepository,
-		notificationRepository:       dependencies.Persistence.NotificationRepository,
-		workOrderRepository:          dependencies.Persistence.WorkOrderRepository,
-		paymentAccountRepository:     dependencies.Persistence.PaymentAccountRepository,
-		calendarConnectionRepository: dependencies.Persistence.CalendarConnectionRepository,
-		paymentIntentRepository:      dependencies.Persistence.PaymentIntentRepository,
-		paymentTransactionRepository: dependencies.Persistence.PaymentTransactionRepository,
-		urgentWorkOrderScheduler:     dependencies.UrgentWorkOrderScheduler,
-		calendarSyncRunner:           dependencies.CalendarSyncRunner,
-		calendarEventObserver:        dependencies.CalendarEventObserver,
-		calendarEventDetailsObserver: eventDetailsObserver,
-		calendarAvailability:         availabilityController,
-		auth0Validator:               auth0Validator,
-		tokenBuilder:                 tokenBuilder,
-		chatbot:                      chatbot,
-		clock:                        dependencies.Clock,
-		checkoutClient:               checkoutClient,
-		consumerAddressResolver:      dependencies.ConsumerAddressResolver,
+		server:                         server,
+		database:                       database,
+		categoryRepository:             dependencies.Persistence.CategoryRepository,
+		coverageZoneRepository:         dependencies.Persistence.CoverageZoneRepository,
+		conversationRepository:         dependencies.Persistence.ConversationRepository,
+		messageRepository:              dependencies.Persistence.MessageRepository,
+		jobRequestRepository:           dependencies.Persistence.JobRequestRepository,
+		userRepository:                 dependencies.Persistence.UserRepository,
+		fileRepository:                 dependencies.Persistence.FileRepository,
+		notificationRepository:         dependencies.Persistence.NotificationRepository,
+		workOrderRepository:            dependencies.Persistence.WorkOrderRepository,
+		paymentAccountRepository:       dependencies.Persistence.PaymentAccountRepository,
+		calendarConnectionRepository:   dependencies.Persistence.CalendarConnectionRepository,
+		paymentIntentRepository:        dependencies.Persistence.PaymentIntentRepository,
+		paymentTransactionRepository:   dependencies.Persistence.PaymentTransactionRepository,
+		urgentWorkOrderScheduler:       dependencies.UrgentWorkOrderScheduler,
+		calendarSyncRunner:             dependencies.CalendarSyncRunner,
+		calendarEventObserver:          dependencies.CalendarEventObserver,
+		calendarEventDetailsObserver:   eventDetailsObserver,
+		calendarAvailability:           availabilityController,
+		auth0Validator:                 auth0Validator,
+		tokenBuilder:                   tokenBuilder,
+		chatbot:                        chatbot,
+		clock:                          dependencies.Clock,
+		checkoutClient:                 checkoutClient,
+		consumerAddressResolver:        dependencies.ConsumerAddressResolver,
+		identityVerificationRepository: dependencies.Persistence.IdentityVerificationRepository,
+		scenarioContext:                context.Background(),
 
 		categoryIDsByName:                  map[string]int{},
 		participantRolesByFullName:         map[string]string{},
