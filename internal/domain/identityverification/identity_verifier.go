@@ -36,5 +36,6 @@ type VerificationResult struct {
 	WorkflowID      uuid.UUID
 	WorkflowVersion int
 	Status          VerificationStatus
+	RiskCodes       []string
 	OccurredOn      time.Time
 }

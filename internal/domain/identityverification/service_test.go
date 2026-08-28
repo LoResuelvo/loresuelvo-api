@@ -138,3 +138,20 @@ func TestServiceCurrentStatusReturnsUnverifiedWithoutSessions(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, StatusUnverified, status)
 }
+
+func TestServiceCurrentStatusDetailsReturnsVerificationDate(t *testing.T) {
+	now := time.Date(2026, 9, 1, 12, 0, 0, 0, time.UTC)
+	verification, err := NewVerification(7, uuid.New(), uuid.New(), "fake", 1, now)
+	require.NoError(t, err)
+	verification.Status = StatusApproved
+	verification.VerifiedOn = &now
+	repo := &verificationRepositoryStub{latest: verification}
+	service := NewService(providerFinderStub{}, repo, &verifierStub{}, fixedClock{now})
+
+	details, err := service.CurrentStatusDetails(context.Background(), verification.ProviderID)
+
+	require.NoError(t, err)
+	require.Equal(t, StatusApproved, details.Status)
+	require.NotNil(t, details.VerifiedOn)
+	require.Equal(t, now, *details.VerifiedOn)
+}

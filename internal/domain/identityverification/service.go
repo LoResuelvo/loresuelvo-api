@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/clock"
 	"github.com/google/uuid"
@@ -12,6 +13,11 @@ import (
 type StartResult struct {
 	Verification *IdentityVerification
 	Credentials  SessionCredentials
+}
+
+type VerificationStatusDetails struct {
+	Status     VerificationStatus
+	VerifiedOn *time.Time
 }
 
 type Service struct {
@@ -46,14 +52,22 @@ func (service *Service) ApplyResult(ctx context.Context, result VerificationResu
 }
 
 func (service *Service) CurrentStatus(ctx context.Context, providerID int) (VerificationStatus, error) {
+	details, err := service.CurrentStatusDetails(ctx, providerID)
+	if err != nil {
+		return "", err
+	}
+	return details.Status, nil
+}
+
+func (service *Service) CurrentStatusDetails(ctx context.Context, providerID int) (VerificationStatusDetails, error) {
 	latest, err := service.repository.FindLatestByProviderID(ctx, providerID)
 	if err != nil {
-		return "", fmt.Errorf("finding current identity verification: %w", err)
+		return VerificationStatusDetails{}, fmt.Errorf("finding current identity verification: %w", err)
 	}
 	if latest == nil {
-		return StatusUnverified, nil
+		return VerificationStatusDetails{Status: StatusUnverified}, nil
 	}
-	return latest.Status, nil
+	return VerificationStatusDetails{Status: latest.Status, VerifiedOn: latest.VerifiedOn}, nil
 }
 
 func (service *Service) Start(ctx context.Context, authID string) (StartResult, error) {

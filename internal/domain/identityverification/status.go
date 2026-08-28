@@ -9,8 +9,19 @@ const (
 	StatusAwaitingUser VerificationStatus = "awaiting_user"
 	StatusInReview     VerificationStatus = "in_review"
 	StatusApproved     VerificationStatus = "approved"
+	StatusDeclined     VerificationStatus = "declined"
+	StatusResubmitted  VerificationStatus = "resubmitted"
+	StatusAbandoned    VerificationStatus = "abandoned"
+	StatusExpired      VerificationStatus = "expired"
+	StatusKYCExpired   VerificationStatus = "kyc_expired"
 )
 
 func (status VerificationStatus) CanApplyResult() bool {
-	return status == StatusInProgress || status == StatusAwaitingUser || status == StatusInReview
+	switch status {
+	case StatusInProgress, StatusAwaitingUser, StatusInReview, StatusApproved,
+		StatusDeclined, StatusResubmitted, StatusAbandoned, StatusExpired, StatusKYCExpired:
+		return true
+	default:
+		return false
+	}
 }
