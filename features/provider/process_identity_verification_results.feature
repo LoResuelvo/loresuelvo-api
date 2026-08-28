@@ -22,35 +22,29 @@ Feature: Procesar resultados de verificación de identidad
             When el verificador informa de forma auténtica que la sesión está "in_review"
             Then "juan.plomero@example.com" consulta en su perfil el estado "in_review"
 
-        @wip
         Scenario: 58.1.4 Aprobar la identidad del prestador
             Given que la fecha y hora actual del sistema es "2026-09-01T12:00:00Z"
             When el verificador informa de forma auténtica que la sesión está "approved"
             Then "juan.plomero@example.com" consulta en su perfil el estado "approved"
             And la fecha de verificación de "juan.plomero@example.com" es "2026-09-01T12:00:00Z"
 
-        @wip
         Scenario: 58.1.5 Registrar una verificación rechazada
             When el verificador informa de forma auténtica que la sesión está "declined" por el riesgo "DOCUMENT_EXPIRED"
             Then "juan.plomero@example.com" consulta en su perfil el estado "declined"
             And el sistema conserva solamente el código de riesgo "DOCUMENT_EXPIRED"
 
-        @wip
         Scenario: 58.1.6 Registrar una solicitud de reenvío
             When el verificador informa de forma auténtica que la sesión está "resubmitted"
             Then "juan.plomero@example.com" consulta en su perfil el estado "resubmitted"
 
-        @wip
         Scenario: 58.1.7 Registrar una verificación abandonada
             When el verificador informa de forma auténtica que la sesión está "abandoned"
             Then "juan.plomero@example.com" consulta en su perfil el estado "abandoned"
 
-        @wip
         Scenario: 58.1.8 Registrar una sesión expirada
             When el verificador informa de forma auténtica que la sesión está "expired"
             Then "juan.plomero@example.com" consulta en su perfil el estado "expired"
 
-        @wip
         Scenario: 58.1.9 Registrar la expiración de una identidad aprobada
             Given que la identidad de "juan.plomero@example.com" está aprobada
             When el verificador informa de forma auténtica que la sesión está "kyc_expired"
