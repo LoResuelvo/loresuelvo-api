@@ -41,4 +41,19 @@ func Rehydrate(externalSessionID uuid.UUID, providerID int, verifier string, wor
 	return verification, nil
 }
 
+func (verification *IdentityVerification) ApplyResult(result VerificationResult, now time.Time) error {
+	if result.SessionID != verification.ExternalSessionID ||
+		result.ProviderID != verification.ProviderID ||
+		result.WorkflowID != verification.WorkflowID ||
+		result.WorkflowVersion != verification.WorkflowVersion ||
+		result.VendorData != ProviderVendorData(verification.ProviderID) ||
+		result.Status != StatusInProgress ||
+		result.OccurredOn.IsZero() || now.IsZero() {
+		return ErrInvalidVerification
+	}
+	verification.Status = result.Status
+	verification.UpdatedOn = now.UTC()
+	return nil
+}
+
 func ProviderVendorData(providerID int) string { return strconv.Itoa(providerID) }

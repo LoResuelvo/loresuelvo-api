@@ -60,3 +60,22 @@ func TestServiceStartReusesInProgressSession(t *testing.T) {
 	require.Equal(t, active, result.Verification)
 	require.NotNil(t, verifier.request.ExistingSessionID)
 }
+
+func TestServiceApplyResultMarksSessionInProgress(t *testing.T) {
+	now := time.Date(2026, 9, 1, 12, 0, 0, 0, time.UTC)
+	sessionID, workflowID := uuid.New(), uuid.New()
+	verification, err := NewVerification(7, sessionID, workflowID, "fake", 1, now)
+	require.NoError(t, err)
+	repo := &verificationRepositoryStub{byID: verification}
+	service := NewService(providerFinderStub{}, repo, &verifierStub{}, fixedClock{now})
+
+	err = service.ApplyResult(context.Background(), VerificationResult{
+		SessionID: sessionID, ProviderID: 7, VendorData: ProviderVendorData(7),
+		WorkflowID: workflowID, WorkflowVersion: 1, Status: StatusInProgress,
+		OccurredOn: now.Add(time.Minute),
+	})
+
+	require.NoError(t, err)
+	require.Equal(t, StatusInProgress, repo.saved.Status)
+	require.Equal(t, now, repo.saved.UpdatedOn)
+}

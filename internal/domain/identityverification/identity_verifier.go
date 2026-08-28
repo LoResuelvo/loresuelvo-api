@@ -2,6 +2,7 @@ package identityverification
 
 import (
 	"context"
+	"time"
 
 	"github.com/google/uuid"
 )
@@ -26,4 +27,14 @@ type SessionCredentials struct {
 
 type IdentityVerifier interface {
 	CreateSession(ctx context.Context, request SessionRequest) (SessionCredentials, error)
+}
+
+type VerificationResult struct {
+	SessionID       uuid.UUID
+	ProviderID      int
+	VendorData      string
+	WorkflowID      uuid.UUID
+	WorkflowVersion int
+	Status          VerificationStatus
+	OccurredOn      time.Time
 }

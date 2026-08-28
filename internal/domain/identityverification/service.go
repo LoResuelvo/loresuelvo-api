@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/clock"
+	"github.com/google/uuid"
 )
 
 type StartResult struct {
@@ -22,6 +23,26 @@ type Service struct {
 
 func NewService(providerFinder ProviderFinder, repository VerificationRepository, verifier IdentityVerifier, systemClock clock.Clock) *Service {
 	return &Service{providerFinder: providerFinder, repository: repository, verifier: verifier, clock: systemClock}
+}
+
+func (service *Service) ApplyResult(ctx context.Context, result VerificationResult) error {
+	if result.SessionID == uuid.Nil || result.ProviderID <= 0 || result.WorkflowID == uuid.Nil || result.WorkflowVersion < 0 || result.Status != StatusInProgress || result.OccurredOn.IsZero() {
+		return ErrInvalidVerification
+	}
+	verification, err := service.repository.FindBySessionID(ctx, result.SessionID)
+	if err != nil {
+		return fmt.Errorf("finding identity verification session: %w", err)
+	}
+	if verification == nil {
+		return ErrSessionNotFound
+	}
+	if err := verification.ApplyResult(result, service.clock.Now()); err != nil {
+		return err
+	}
+	if err := service.repository.Save(ctx, verification); err != nil {
+		return fmt.Errorf("saving identity verification result: %w", err)
+	}
+	return nil
 }
 
 func (service *Service) Start(ctx context.Context, authID string) (StartResult, error) {

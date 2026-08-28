@@ -8,4 +8,5 @@ var (
 	ErrVerificationAlreadyApproved = errors.New("identity verification is already approved")
 	ErrVerifierUnavailable         = errors.New("identity verifier is temporarily unavailable")
 	ErrVerifierMisconfigured       = errors.New("identity verifier is not configured")
+	ErrSessionNotFound             = errors.New("identity verification session does not exist")
 )
