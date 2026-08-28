@@ -26,7 +26,7 @@ func NewService(providerFinder ProviderFinder, repository VerificationRepository
 }
 
 func (service *Service) ApplyResult(ctx context.Context, result VerificationResult) error {
-	if result.SessionID == uuid.Nil || result.ProviderID <= 0 || result.WorkflowID == uuid.Nil || result.WorkflowVersion < 0 || result.Status != StatusInProgress || result.OccurredOn.IsZero() {
+	if result.SessionID == uuid.Nil || result.ProviderID <= 0 || result.WorkflowID == uuid.Nil || result.WorkflowVersion < 0 || !result.Status.CanApplyResult() || result.OccurredOn.IsZero() {
 		return ErrInvalidVerification
 	}
 	verification, err := service.repository.FindBySessionID(ctx, result.SessionID)

@@ -80,6 +80,24 @@ func TestServiceApplyResultMarksSessionInProgress(t *testing.T) {
 	require.Equal(t, now, repo.saved.UpdatedOn)
 }
 
+func TestServiceApplyResultMarksSessionAwaitingUser(t *testing.T) {
+	now := time.Date(2026, 9, 1, 12, 0, 0, 0, time.UTC)
+	sessionID, workflowID := uuid.New(), uuid.New()
+	verification, err := NewVerification(7, sessionID, workflowID, "fake", 1, now)
+	require.NoError(t, err)
+	repo := &verificationRepositoryStub{byID: verification}
+	service := NewService(providerFinderStub{}, repo, &verifierStub{}, fixedClock{now})
+
+	err = service.ApplyResult(context.Background(), VerificationResult{
+		SessionID: sessionID, ProviderID: 7, VendorData: ProviderVendorData(7),
+		WorkflowID: workflowID, WorkflowVersion: 1, Status: StatusAwaitingUser,
+		OccurredOn: now.Add(time.Minute),
+	})
+
+	require.NoError(t, err)
+	require.Equal(t, StatusAwaitingUser, repo.saved.Status)
+}
+
 func TestServiceCurrentStatusReturnsLatestVerificationStatus(t *testing.T) {
 	now := time.Date(2026, 9, 1, 12, 0, 0, 0, time.UTC)
 	verification, err := NewVerification(7, uuid.New(), uuid.New(), "fake", 1, now)
