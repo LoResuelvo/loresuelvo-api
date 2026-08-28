@@ -25,6 +25,7 @@ type WebhookAdapter struct {
 
 type webhookPayload struct {
 	EventID         uuid.UUID `json:"event_id"`
+	RiskCodes       []string  `json:"risk_codes"`
 	SessionID       uuid.UUID `json:"session_id"`
 	Status          string    `json:"status"`
 	WebhookType     string    `json:"webhook_type"`
@@ -89,7 +90,8 @@ func (adapter *WebhookAdapter) Translate(body []byte) (identityverification.Veri
 	}
 	return identityverification.VerificationResult{
 		SessionID: payload.SessionID, ProviderID: providerID, VendorData: payload.VendorData, WorkflowID: payload.WorkflowID,
-		WorkflowVersion: payload.WorkflowVersion, Status: status, OccurredOn: time.Unix(payload.CreatedAt, 0).UTC(),
+		WorkflowVersion: payload.WorkflowVersion, Status: status, RiskCodes: payload.RiskCodes,
+		OccurredOn: time.Unix(payload.CreatedAt, 0).UTC(),
 	}, nil
 }
 
@@ -101,6 +103,18 @@ func statusFromDidit(status string) (identityverification.VerificationStatus, bo
 		return identityverification.StatusAwaitingUser, true
 	case "in review", "in_review":
 		return identityverification.StatusInReview, true
+	case "approved":
+		return identityverification.StatusApproved, true
+	case "declined":
+		return identityverification.StatusDeclined, true
+	case "resubmitted", "re-submitted":
+		return identityverification.StatusResubmitted, true
+	case "abandoned":
+		return identityverification.StatusAbandoned, true
+	case "expired":
+		return identityverification.StatusExpired, true
+	case "kyc expired", "kyc_expired":
+		return identityverification.StatusKYCExpired, true
 	}
 	return "", false
 }

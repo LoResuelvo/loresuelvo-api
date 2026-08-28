@@ -53,6 +53,44 @@ func TestWebhookAdapterTranslatesInReviewStatus(t *testing.T) {
 	require.Equal(t, identityverification.StatusInReview, result.Status)
 }
 
+func TestWebhookAdapterTranslatesTerminalStatuses(t *testing.T) {
+	statuses := map[string]identityverification.VerificationStatus{
+		"Approved":    identityverification.StatusApproved,
+		"Declined":    identityverification.StatusDeclined,
+		"Resubmitted": identityverification.StatusResubmitted,
+		"Abandoned":   identityverification.StatusAbandoned,
+		"Expired":     identityverification.StatusExpired,
+		"KYC Expired": identityverification.StatusKYCExpired,
+	}
+	adapter, err := NewWebhookAdapter("webhook-secret")
+	require.NoError(t, err)
+
+	for diditStatus, expectedStatus := range statuses {
+		t.Run(diditStatus, func(t *testing.T) {
+			sessionID, eventID, workflowID := uuid.New(), uuid.New(), uuid.New()
+			body := []byte(`{"event_id":"` + eventID.String() + `","session_id":"` + sessionID.String() + `","status":"` + diditStatus + `","webhook_type":"status.updated","created_at":1788264000,"timestamp":1788264000,"workflow_id":"` + workflowID.String() + `","workflow_version":2,"vendor_data":"42"}`)
+
+			result, err := adapter.Translate(body)
+
+			require.NoError(t, err)
+			require.Equal(t, expectedStatus, result.Status)
+		})
+	}
+}
+
+func TestWebhookAdapterTranslatesRiskCodes(t *testing.T) {
+	sessionID, eventID, workflowID := uuid.New(), uuid.New(), uuid.New()
+	body := []byte(`{"event_id":"` + eventID.String() + `","session_id":"` + sessionID.String() + `","status":"Declined","risk_codes":["DOCUMENT_EXPIRED","DOCUMENT_MISMATCH"],"webhook_type":"status.updated","created_at":1788264000,"timestamp":1788264000,"workflow_id":"` + workflowID.String() + `","workflow_version":2,"vendor_data":"42"}`)
+	adapter, err := NewWebhookAdapter("webhook-secret")
+	require.NoError(t, err)
+
+	result, err := adapter.Translate(body)
+
+	require.NoError(t, err)
+	require.Equal(t, identityverification.StatusDeclined, result.Status)
+	require.Equal(t, []string{"DOCUMENT_EXPIRED", "DOCUMENT_MISMATCH"}, result.RiskCodes)
+}
+
 func TestWebhookAdapterAuthenticatesCanonicalJSON(t *testing.T) {
 	now := time.Unix(1788264000, 0).UTC()
 	sessionID := uuid.MustParse("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee")
