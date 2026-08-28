@@ -8,6 +8,9 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/auth0"
@@ -409,6 +412,35 @@ func TestFeatures(t *testing.T) {
 	database := newTestDb()
 	t.Cleanup(func() { database.Close() })
 
+	paths := []string{"../"}
+	tags := "~@wip"
+	if scenarioFilter := strings.TrimSpace(os.Getenv("GODOG_SCENARIO")); scenarioFilter != "" {
+		var filteredPaths []string
+		err := filepath.WalkDir("../", func(path string, entry os.DirEntry, walkErr error) error {
+			if walkErr != nil {
+				return walkErr
+			}
+			if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".feature") {
+				return nil
+			}
+			contents, err := os.ReadFile(path)
+			if err != nil {
+				return err
+			}
+			for lineNumber, line := range strings.Split(string(contents), "\n") {
+				if !strings.Contains(line, "Scenario:") || !strings.Contains(strings.ToLower(line), strings.ToLower(scenarioFilter)) {
+					continue
+				}
+				filteredPaths = append(filteredPaths, fmt.Sprintf("%s:%d", path, lineNumber+1))
+			}
+			return nil
+		})
+		require.NoError(t, err, "could not find requested Godog scenario")
+		require.NotEmpty(t, filteredPaths, "no Godog scenario matched GODOG_SCENARIO=%q", scenarioFilter)
+		paths = filteredPaths
+		tags = ""
+	}
+
 	suite := godog.TestSuite{
 		Name: "LoResuelvo Features",
 		ScenarioInitializer: func(sc *godog.ScenarioContext) {
@@ -416,8 +448,8 @@ func TestFeatures(t *testing.T) {
 		},
 		Options: &godog.Options{
 			Format:   "pretty",
-			Paths:    []string{"../"},
-			Tags:     "~@wip",
+			Paths:    paths,
+			Tags:     tags,
 			TestingT: t,
 		},
 	}
