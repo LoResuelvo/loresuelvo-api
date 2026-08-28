@@ -37,6 +37,7 @@ get:
                 email: juan@example.com
                 role: provider
                 calendar_connection_status: connected
+                identity_verification_status: unverified
                 profile_photo:
                   original_name: foto-perfil.jpg
                   url: https://cdn.example/profile/foto-perfil.jpg

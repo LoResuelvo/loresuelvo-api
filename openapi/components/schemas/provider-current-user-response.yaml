@@ -3,8 +3,9 @@ allOf:
 - $ref: '#/components/schemas/BaseCurrentUserResponse'
 - type: object
   required:
-  - role
-  - category
+    - role
+    - category
+    - identity_verification_status
   properties:
     role:
       type: string
@@ -12,3 +13,11 @@ allOf:
       - provider
     category:
       $ref: '#/components/schemas/CategoryListItem'
+    identity_verification_status:
+      type: string
+      enum:
+      - unverified
+      - not_started
+      - in_progress
+      - approved
+      description: Current identity-verification status for the authenticated provider.

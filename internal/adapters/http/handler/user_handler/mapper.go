@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/consumer"
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/identityverification"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/provider"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/user"
 )
@@ -61,4 +62,13 @@ func baseCurrentUserResponseFromDomain(currentUser user.User, calendarConnection
 	}
 
 	return response
+}
+
+func withIdentityVerificationStatus(response any, status identityverification.VerificationStatus) (any, error) {
+	providerResponse, ok := response.(providerCurrentUserResponse)
+	if !ok {
+		return nil, fmt.Errorf("mapping identity verification status for unsupported user response %T", response)
+	}
+	providerResponse.IdentityVerificationStatus = string(status)
+	return providerResponse, nil
 }

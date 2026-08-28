@@ -41,6 +41,8 @@ tags:
   description: Work order endpoints.
 - name: Users
   description: Authenticated user session endpoints.
+- name: IdentityVerification
+  description: Identity-verification status processing endpoints.
 - name: Realtime
   description: WebSocket real-time messaging endpoints.
 paths:
@@ -94,6 +96,8 @@ paths:
     $ref: ./paths/payment-intent.yaml
   /webhooks/mercado-pago:
     $ref: ./paths/mercado-pago-webhook.yaml
+  /webhooks/didit:
+    $ref: ./paths/identity-verification-webhook.yaml
   /work-orders:
     $ref: ./paths/work-orders.yaml
   /work-orders/{workOrderId}:

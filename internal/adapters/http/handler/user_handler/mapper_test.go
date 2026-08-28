@@ -3,8 +3,11 @@ package user_handler
 import (
 	"testing"
 
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/category"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/consumer"
 	coveragezone "github.com/LoResuelvo/loresuelvo-api/internal/domain/coverage_zone"
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/identityverification"
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/provider"
 	"github.com/stretchr/testify/require"
 )
 
@@ -37,4 +40,22 @@ func TestCurrentUserResponseIncludesConsumerAddressForItsOwner(t *testing.T) {
 			Latitude: -34.6208, Longitude: -58.4386, CoverageZoneID: 6,
 		},
 	}, response)
+}
+
+func TestWithIdentityVerificationStatusAddsStatusToProviderResponse(t *testing.T) {
+	currentProvider, err := provider.NewProvider(
+		"auth0|provider", "juan@example.com", "Juan", "Gomez", &category.Category{ID: 2, Name: "Plomeria"}, nil,
+		[]coveragezone.CoverageZone{{ID: 1, Enabled: true}},
+	)
+	require.NoError(t, err)
+	currentProvider.SetPersistenceID(42)
+	response, err := currentUserResponseFromDomain(currentProvider, "disconnected")
+	require.NoError(t, err)
+
+	response, err = withIdentityVerificationStatus(response, identityverification.StatusInProgress)
+
+	require.NoError(t, err)
+	providerResponse, ok := response.(providerCurrentUserResponse)
+	require.True(t, ok)
+	require.Equal(t, string(identityverification.StatusInProgress), providerResponse.IdentityVerificationStatus)
 }

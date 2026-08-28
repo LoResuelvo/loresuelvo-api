@@ -1,0 +1,49 @@
+post:
+  tags:
+    - IdentityVerification
+  operationId: processIdentityVerificationWebhook
+  summary: Process a Didit identity-verification status update
+  description: Receives an authenticated `status.updated` notification from Didit. This public endpoint uses the Didit signature headers and does not accept Auth0 credentials.
+  security: []
+  parameters:
+    - name: X-Signature-V2
+      in: header
+      required: true
+      description: HMAC-SHA256 signature of the canonical JSON request body.
+      schema:
+        type: string
+    - name: X-Timestamp
+      in: header
+      required: true
+      description: Unix timestamp used to limit replay to five minutes.
+      schema:
+        type: string
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          type: object
+          description: Didit status.updated envelope. The payload is validated against the persisted session before it reaches the domain.
+          additionalProperties: true
+  responses:
+    '204':
+      description: Notification accepted and applied.
+    '400':
+      description: Invalid JSON or webhook contract.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    '401':
+      description: Invalid HMAC signature or stale timestamp.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    '503':
+      description: The local verification session is temporarily unavailable.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'

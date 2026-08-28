@@ -6,6 +6,8 @@ import (
 
 	httphandler "github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler"
 	calendarconnection "github.com/LoResuelvo/loresuelvo-api/internal/domain/calendar_connection"
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/identityverification"
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/provider"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/user"
 	"github.com/gin-gonic/gin"
 )
@@ -14,9 +16,14 @@ type CalendarConnectionStatusReader interface {
 	GetConnectionStatus(ctx context.Context, authID string) (string, error)
 }
 
+type IdentityVerificationStatusReader interface {
+	CurrentStatus(ctx context.Context, providerID int) (identityverification.VerificationStatus, error)
+}
+
 type UserHandler struct {
-	userService                    *user.Service
-	calendarConnectionStatusReader CalendarConnectionStatusReader
+	userService                      *user.Service
+	calendarConnectionStatusReader   CalendarConnectionStatusReader
+	identityVerificationStatusReader IdentityVerificationStatusReader
 }
 
 func NewUserHandler(userService *user.Service, statusReaders ...CalendarConnectionStatusReader) *UserHandler {
@@ -27,6 +34,18 @@ func NewUserHandler(userService *user.Service, statusReaders ...CalendarConnecti
 	return &UserHandler{
 		userService:                    userService,
 		calendarConnectionStatusReader: statusReader,
+	}
+}
+
+func NewUserHandlerWithIdentityVerification(
+	userService *user.Service,
+	calendarConnectionStatusReader CalendarConnectionStatusReader,
+	identityVerificationStatusReader IdentityVerificationStatusReader,
+) *UserHandler {
+	return &UserHandler{
+		userService:                      userService,
+		calendarConnectionStatusReader:   calendarConnectionStatusReader,
+		identityVerificationStatusReader: identityVerificationStatusReader,
 	}
 }
 
@@ -54,6 +73,18 @@ func (h *UserHandler) GetCurrentUser(c *gin.Context) {
 	if err != nil {
 		handleGetCurrentUserError(c, err)
 		return
+	}
+	if currentProvider, ok := currentUser.(*provider.Provider); ok && h.identityVerificationStatusReader != nil {
+		status, err := h.identityVerificationStatusReader.CurrentStatus(c.Request.Context(), currentProvider.ID())
+		if err != nil {
+			handleGetCurrentUserError(c, err)
+			return
+		}
+		response, err = withIdentityVerificationStatus(response, status)
+		if err != nil {
+			handleGetCurrentUserError(c, err)
+			return
+		}
 	}
 
 	c.JSON(http.StatusOK, response)

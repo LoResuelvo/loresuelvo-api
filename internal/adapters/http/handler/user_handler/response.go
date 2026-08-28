@@ -37,5 +37,6 @@ type consumerCurrentUserResponse struct {
 
 type providerCurrentUserResponse struct {
 	currentUserResponse
-	Category currentUserCategoryResponse `json:"category"`
+	Category                   currentUserCategoryResponse `json:"category"`
+	IdentityVerificationStatus string                      `json:"identity_verification_status"`
 }
