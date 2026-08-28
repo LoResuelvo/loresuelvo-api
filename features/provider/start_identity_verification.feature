@@ -16,7 +16,6 @@ Feature: Iniciar la verificación de identidad de un prestador
             And la verificación de "juan.plomero@example.com" queda en estado "not_started"
             And la sesión queda asociada solamente al prestador "juan.plomero@example.com"
 
-        @wip
         Scenario: 58.2 Rechazar el inicio de verificación por un consumidor
             Given que existe un consumidor registrado con correo "ana@example.com", nombre "Ana" y apellido "Pérez"
             And que estoy autenticado como consumidor "ana@example.com"
