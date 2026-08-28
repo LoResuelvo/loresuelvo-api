@@ -25,6 +25,35 @@ func registerStartIdentityVerificationSteps(sc *godog.ScenarioContext, suite *te
 	sc.Step(`^el sistema entrega las credenciales temporales de la verificación$`, suite.systemReturnsTemporaryVerificationCredentials)
 	sc.Step(`^la verificación de "([^"]*)" queda en estado "([^"]*)"$`, suite.providerVerificationHasStatus)
 	sc.Step(`^la sesión queda asociada solamente al prestador "([^"]*)"$`, suite.sessionBelongsOnlyToProvider)
+	sc.Step(`^intento iniciar la verificación de identidad del prestador "([^"]*)"$`, suite.tryStartIdentityVerificationForProvider)
+	sc.Step(`^el sistema deniega el inicio de la verificación$`, suite.systemDeniesIdentityVerificationStart)
+	sc.Step(`^no se crea ninguna sesión para "([^"]*)"$`, suite.noIdentityVerificationSessionForProvider)
+}
+
+func (suite *testSuite) tryStartIdentityVerificationForProvider(_ string) error {
+	return suite.startIdentityVerification()
+}
+
+func (suite *testSuite) systemDeniesIdentityVerificationStart() error {
+	if suite.lastStatus != http.StatusForbidden {
+		return fmt.Errorf("expected status 403, got %d: %s", suite.lastStatus, suite.lastBody)
+	}
+	return nil
+}
+
+func (suite *testSuite) noIdentityVerificationSessionForProvider(email string) error {
+	providerID, err := suite.providerIDByEmail(email)
+	if err != nil {
+		return err
+	}
+	verification, err := suite.identityVerificationRepository.FindLatestByProviderID(suite.scenarioContext, providerID)
+	if err != nil {
+		return err
+	}
+	if verification != nil {
+		return fmt.Errorf("expected no identity verification session for %q", email)
+	}
+	return nil
 }
 
 func (suite *testSuite) startIdentityVerification() error {

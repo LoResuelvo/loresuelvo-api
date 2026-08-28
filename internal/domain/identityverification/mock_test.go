@@ -18,8 +18,9 @@ func (stub providerFinderStub) FindProviderByAuthID(string) (*provider.Provider,
 }
 
 type verificationRepositoryStub struct {
-	saved *IdentityVerification
-	err   error
+	saved  *IdentityVerification
+	latest *IdentityVerification
+	err    error
 }
 
 func (stub *verificationRepositoryStub) Save(_ context.Context, verification *IdentityVerification) error {
@@ -32,6 +33,10 @@ func (stub *verificationRepositoryStub) Save(_ context.Context, verification *Id
 
 func (stub *verificationRepositoryStub) FindBySessionID(context.Context, uuid.UUID) (*IdentityVerification, error) {
 	return nil, stub.err
+}
+
+func (stub *verificationRepositoryStub) FindLatestByProviderID(context.Context, int) (*IdentityVerification, error) {
+	return stub.latest, stub.err
 }
 
 type verifierStub struct {

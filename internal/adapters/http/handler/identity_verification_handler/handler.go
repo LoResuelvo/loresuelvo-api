@@ -2,6 +2,7 @@ package identity_verification_handler
 
 import (
 	"context"
+	"errors"
 	"net/http"
 
 	httphandler "github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler"
@@ -26,7 +27,13 @@ func (handler *IdentityVerificationHandler) StartSession(context *gin.Context) {
 	}
 	result, err := handler.service.Start(context.Request.Context(), authID)
 	if err != nil {
-		httphandler.RespondError(context, http.StatusInternalServerError, "identity verification could not be started")
+		statusCode := http.StatusInternalServerError
+		message := "identity verification could not be started"
+		if errors.Is(err, identityverification.ErrProviderRequired) {
+			statusCode = http.StatusForbidden
+			message = "only registered providers can start identity verification"
+		}
+		httphandler.RespondError(context, statusCode, message)
 		return
 	}
 	context.JSON(http.StatusOK, sessionResponse{

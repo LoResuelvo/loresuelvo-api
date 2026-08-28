@@ -60,6 +60,16 @@ func (repository *IdentityVerificationRepository) FindBySessionID(ctx context.Co
 	return verification, nil
 }
 
+func (repository *IdentityVerificationRepository) FindLatestByProviderID(ctx context.Context, providerID int) (*identityverification.IdentityVerification, error) {
+	var sessionID uuid.UUID
+	if err := repository.db.QueryRowContext(ctx, `SELECT external_session_id FROM identity_verification_sessions WHERE provider_id = $1 ORDER BY created_on DESC, external_session_id DESC LIMIT 1`, providerID).Scan(&sessionID); errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
+	} else if err != nil {
+		return nil, fmt.Errorf("finding latest identity verification: %w", err)
+	}
+	return repository.FindBySessionID(ctx, sessionID)
+}
+
 func (repository *IdentityVerificationRepository) DeleteAll() error {
 	if _, err := repository.db.Exec(`DELETE FROM identity_verification_sessions`); err != nil {
 		return fmt.Errorf("deleting identity verification sessions: %w", err)
