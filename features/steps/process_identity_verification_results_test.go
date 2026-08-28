@@ -18,15 +18,15 @@ import (
 const identityVerificationWebhookPath = "/webhooks/didit"
 
 type identityVerificationWebhookPayload struct {
+	CreatedAt       int64     `json:"created_at"`
 	EventID         uuid.UUID `json:"event_id"`
 	SessionID       uuid.UUID `json:"session_id"`
 	Status          string    `json:"status"`
-	WebhookType     string    `json:"webhook_type"`
-	CreatedAt       int64     `json:"created_at"`
 	Timestamp       int64     `json:"timestamp"`
+	VendorData      string    `json:"vendor_data"`
+	WebhookType     string    `json:"webhook_type"`
 	WorkflowID      uuid.UUID `json:"workflow_id"`
 	WorkflowVersion int       `json:"workflow_version"`
-	VendorData      string    `json:"vendor_data"`
 }
 
 type identityVerificationStatusResponse struct {
