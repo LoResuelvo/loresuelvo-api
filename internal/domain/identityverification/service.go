@@ -29,9 +29,21 @@ func (service *Service) Start(ctx context.Context, authID string) (StartResult, 
 	if err != nil {
 		return StartResult{}, ErrProviderRequired
 	}
-	credentials, err := service.verifier.CreateSession(ctx, SessionRequest{ProviderID: provider.ID(), VendorData: ProviderVendorData(provider.ID()), FirstName: provider.Name(), LastName: provider.Surname()})
+	latest, err := service.repository.FindLatestByProviderID(ctx, provider.ID())
+	if err != nil {
+		return StartResult{}, fmt.Errorf("finding latest identity verification: %w", err)
+	}
+	request := SessionRequest{ProviderID: provider.ID(), VendorData: ProviderVendorData(provider.ID()), FirstName: provider.Name(), LastName: provider.Surname()}
+	if latest != nil && latest.Status == StatusInProgress {
+		sessionID := latest.ExternalSessionID
+		request.ExistingSessionID = &sessionID
+	}
+	credentials, err := service.verifier.CreateSession(ctx, request)
 	if err != nil {
 		return StartResult{}, err
+	}
+	if latest != nil && latest.Status == StatusInProgress {
+		return StartResult{Verification: latest, Credentials: credentials}, nil
 	}
 	verification, err := NewVerification(provider.ID(), credentials.SessionID, credentials.WorkflowID, credentials.Verifier, credentials.WorkflowVersion, service.clock.Now())
 	if err != nil {

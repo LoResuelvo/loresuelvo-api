@@ -40,3 +40,23 @@ func TestServiceStartRejectsConsumer(t *testing.T) {
 	_, err := service.Start(context.Background(), "auth0|consumer")
 	require.ErrorIs(t, err, ErrProviderRequired)
 }
+
+func TestServiceStartReusesInProgressSession(t *testing.T) {
+	now := time.Date(2026, 9, 1, 12, 0, 0, 0, time.UTC)
+	foundProvider, err := provider.NewProvider("auth0|provider", "juan@example.com", "Juan", "Gomez", &category.Category{ID: 2, Name: "Plomeria"}, nil, []coveragezone.CoverageZone{{ID: 1, Enabled: true}})
+	require.NoError(t, err)
+	foundProvider.SetPersistenceID(7)
+	active, err := NewVerification(7, uuid.New(), uuid.New(), "fake", 1, now)
+	require.NoError(t, err)
+	active.Status = StatusInProgress
+	repo := &verificationRepositoryStub{latest: active}
+	verifier := &verifierStub{credentials: SessionCredentials{SessionID: active.ExternalSessionID, SessionToken: "secret", VerificationURL: "https://verify.example", Status: StatusNotStarted, Verifier: "fake", WorkflowID: active.WorkflowID, WorkflowVersion: active.WorkflowVersion}}
+	service := NewService(providerFinderStub{provider: foundProvider}, repo, verifier, fixedClock{now})
+
+	result, err := service.Start(context.Background(), foundProvider.AuthID())
+
+	require.NoError(t, err)
+	require.Equal(t, active.ExternalSessionID, result.Credentials.SessionID)
+	require.Equal(t, active, result.Verification)
+	require.NotNil(t, verifier.request.ExistingSessionID)
+}

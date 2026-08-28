@@ -39,6 +39,13 @@ func (stub *verificationRepositoryStub) FindLatestByProviderID(context.Context, 
 	return stub.latest, stub.err
 }
 
+func (stub *verificationRepositoryStub) FindByProviderID(context.Context, int) ([]IdentityVerification, error) {
+	if stub.latest == nil {
+		return nil, stub.err
+	}
+	return []IdentityVerification{*stub.latest}, stub.err
+}
+
 type verifierStub struct {
 	credentials SessionCredentials
 	request     SessionRequest

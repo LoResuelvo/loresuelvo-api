@@ -1,12 +1,15 @@
 package steps_test
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"strings"
+	"time"
 
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/identityverification"
 	"github.com/cucumber/godog"
 	"github.com/google/uuid"
 )
@@ -28,6 +31,10 @@ func registerStartIdentityVerificationSteps(sc *godog.ScenarioContext, suite *te
 	sc.Step(`^intento iniciar la verificación de identidad del prestador "([^"]*)"$`, suite.tryStartIdentityVerificationForProvider)
 	sc.Step(`^el sistema deniega el inicio de la verificación$`, suite.systemDeniesIdentityVerificationStart)
 	sc.Step(`^no se crea ninguna sesión para "([^"]*)"$`, suite.noIdentityVerificationSessionForProvider)
+	sc.Step(`^que la verificación de "([^"]*)" está en estado "([^"]*)"$`, suite.identityVerificationHasStatus)
+	sc.Step(`^inicio nuevamente mi verificación de identidad$`, suite.startIdentityVerification)
+	sc.Step(`^el sistema entrega las credenciales de la misma sesión$`, suite.systemReturnsSameVerificationSession)
+	sc.Step(`^se conserva una única sesión activa para "([^"]*)"$`, suite.onlyOneActiveVerificationSession)
 }
 
 func (suite *testSuite) tryStartIdentityVerificationForProvider(_ string) error {
@@ -52,6 +59,57 @@ func (suite *testSuite) noIdentityVerificationSessionForProvider(email string) e
 	}
 	if verification != nil {
 		return fmt.Errorf("expected no identity verification session for %q", email)
+	}
+	return nil
+}
+
+func (suite *testSuite) identityVerificationHasStatus(email, status string) error {
+	providerID, err := suite.providerIDByEmail(email)
+	if err != nil {
+		return err
+	}
+	verification, err := identityVerificationFixtureForProvider(suite, providerID, status)
+	if err != nil {
+		return err
+	}
+	suite.expectedIdentityVerificationSessionID = verification.ExternalSessionID
+	return nil
+}
+
+func identityVerificationFixtureForProvider(suite *testSuite, providerID int, status string) (*identityverification.IdentityVerification, error) {
+	verification, err := identityverification.NewVerification(providerID, uuid.New(), uuid.New(), "fake", 1, time.Now().UTC())
+	if err != nil {
+		return nil, err
+	}
+	verification.Status = identityverification.VerificationStatus(status)
+	if err := suite.identityVerificationRepository.Save(context.Background(), verification); err != nil {
+		return nil, err
+	}
+	return verification, nil
+}
+
+func (suite *testSuite) systemReturnsSameVerificationSession() error {
+	response, err := suite.identityVerificationResponse()
+	if err != nil {
+		return err
+	}
+	if response.SessionID != suite.expectedIdentityVerificationSessionID {
+		return fmt.Errorf("expected session %s, got %s", suite.expectedIdentityVerificationSessionID, response.SessionID)
+	}
+	return nil
+}
+
+func (suite *testSuite) onlyOneActiveVerificationSession(email string) error {
+	providerID, err := suite.providerIDByEmail(email)
+	if err != nil {
+		return err
+	}
+	verifications, err := suite.identityVerificationRepository.FindByProviderID(context.Background(), providerID)
+	if err != nil {
+		return err
+	}
+	if len(verifications) != 1 {
+		return fmt.Errorf("expected one identity verification session, got %d", len(verifications))
 	}
 	return nil
 }

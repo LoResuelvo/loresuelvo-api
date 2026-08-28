@@ -70,6 +70,32 @@ func (repository *IdentityVerificationRepository) FindLatestByProviderID(ctx con
 	return repository.FindBySessionID(ctx, sessionID)
 }
 
+func (repository *IdentityVerificationRepository) FindByProviderID(ctx context.Context, providerID int) ([]identityverification.IdentityVerification, error) {
+	rows, err := repository.db.QueryContext(ctx, `SELECT external_session_id FROM identity_verification_sessions WHERE provider_id = $1 ORDER BY created_on DESC, external_session_id DESC`, providerID)
+	if err != nil {
+		return nil, fmt.Errorf("finding identity verifications: %w", err)
+	}
+	defer rows.Close()
+	var verifications []identityverification.IdentityVerification
+	for rows.Next() {
+		var sessionID uuid.UUID
+		if err := rows.Scan(&sessionID); err != nil {
+			return nil, fmt.Errorf("scanning identity verification: %w", err)
+		}
+		verification, err := repository.FindBySessionID(ctx, sessionID)
+		if err != nil {
+			return nil, err
+		}
+		if verification != nil {
+			verifications = append(verifications, *verification)
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterating identity verifications: %w", err)
+	}
+	return verifications, nil
+}
+
 func (repository *IdentityVerificationRepository) DeleteAll() error {
 	if _, err := repository.db.Exec(`DELETE FROM identity_verification_sessions`); err != nil {
 		return fmt.Errorf("deleting identity verification sessions: %w", err)

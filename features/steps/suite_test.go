@@ -28,6 +28,7 @@ import (
 	"github.com/LoResuelvo/loresuelvo-api/internal/infrastructure/db"
 	"github.com/auth0/go-jwt-middleware/v3/validator"
 	"github.com/cucumber/godog"
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -127,6 +128,7 @@ type testSuite struct {
 	concurrentCheckoutResponses             []checkoutHTTPResponse
 	lastBookingTermsProposalID              int
 	lastBookingTerms                        bookingTermsResponse
+	expectedIdentityVerificationSessionID   uuid.UUID
 
 	categoryIDsByName              map[string]int
 	lastProviderFilterCategoryName string
@@ -304,6 +306,7 @@ func (s *testSuite) cleanup() error {
 	s.concurrentCheckoutResponses = nil
 	s.lastBookingTermsProposalID = 0
 	s.lastBookingTerms = bookingTermsResponse{}
+	s.expectedIdentityVerificationSessionID = uuid.Nil
 	return nil
 }
 

@@ -19,8 +19,12 @@ func (verifier *Verifier) CreateSession(_ context.Context, request identityverif
 	verifier.mutex.Lock()
 	defer verifier.mutex.Unlock()
 	verifier.requests = append(verifier.requests, request)
+	sessionID := uuid.New()
+	if request.ExistingSessionID != nil {
+		sessionID = *request.ExistingSessionID
+	}
 	return identityverification.SessionCredentials{
-		SessionID: uuid.New(), SessionToken: "temporary-session-token",
+		SessionID: sessionID, SessionToken: "temporary-session-token",
 		VerificationURL: "https://verify.example/session", Status: identityverification.StatusNotStarted,
 		Verifier: "fake", WorkflowID: uuid.New(), WorkflowVersion: 1,
 	}, nil

@@ -15,4 +15,5 @@ type VerificationRepository interface {
 	Save(ctx context.Context, verification *IdentityVerification) error
 	FindBySessionID(ctx context.Context, sessionID uuid.UUID) (*IdentityVerification, error)
 	FindLatestByProviderID(ctx context.Context, providerID int) (*IdentityVerification, error)
+	FindByProviderID(ctx context.Context, providerID int) ([]IdentityVerification, error)
 }

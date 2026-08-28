@@ -7,10 +7,11 @@ import (
 )
 
 type SessionRequest struct {
-	ProviderID int
-	VendorData string
-	FirstName  string
-	LastName   string
+	ProviderID        int
+	VendorData        string
+	FirstName         string
+	LastName          string
+	ExistingSessionID *uuid.UUID
 }
 
 type SessionCredentials struct {
