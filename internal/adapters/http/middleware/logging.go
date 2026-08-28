@@ -60,7 +60,7 @@ func RequestLogger(logger *slog.Logger) gin.HandlerFunc {
 		if queryParams := queryParameters(c.Request); len(queryParams) > 0 {
 			attributes = append(attributes, "http.query_params", queryParams)
 		}
-		if includeBodies {
+		if includeBodies && routeAllowsBodyLogging(c.Request.Method, c.FullPath()) {
 			attributes = append(attributes, capturedBodyAttributes(
 				"http.request",
 				requestBody,
@@ -74,6 +74,10 @@ func RequestLogger(logger *slog.Logger) gin.HandlerFunc {
 		}
 		requestLogger.Log(c.Request.Context(), httpLogLevel(status), "http.request.completed", attributes...)
 	}
+}
+
+func routeAllowsBodyLogging(method, route string) bool {
+	return method != http.MethodPost || route != "/providers/me/identity-verification-sessions"
 }
 
 func Recovery(logger *slog.Logger) gin.HandlerFunc {
