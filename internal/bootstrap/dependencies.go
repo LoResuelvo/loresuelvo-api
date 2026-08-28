@@ -159,6 +159,10 @@ func NewDependenciesWithChatbot(database *sql.DB, chatbot conversation.Chatbot) 
 	if err != nil {
 		return nil, fmt.Errorf("configuring identity verifier: %w", err)
 	}
+	identityWebhook, err := didit.NewWebhookAdapterFromEnv()
+	if err != nil {
+		return nil, fmt.Errorf("configuring identity verification webhook: %w", err)
+	}
 	return NewDependenciesWithPaymentAccountAndCalendarAdapters(
 		database,
 		chatbot,
@@ -173,6 +177,7 @@ func NewDependenciesWithChatbot(database *sql.DB, chatbot conversation.Chatbot) 
 		calendarEventPublisher,
 		calendarHandlerConfig,
 		identityVerifier,
+		identityWebhook,
 	), nil
 }
 
@@ -204,6 +209,7 @@ func NewDependenciesWithPaymentAccountAdapters(
 		},
 		identityverificationfake.NewVerifier(),
 		true,
+		newTestIdentityVerificationWebhook(),
 	)
 }
 
@@ -221,6 +227,7 @@ func NewDependenciesWithPaymentAccountAndCalendarAdapters(
 	calendarEventPublisher workordercalendar.EventPublisher,
 	calendarHandlerConfig calendar_connection_handler.Config,
 	identityVerifier identityverification.IdentityVerifier,
+	identityWebhooks ...identity_verification_handler.IdentityVerificationWebhook,
 ) *Dependencies {
 	return newDependenciesWithPaymentAccountAndCalendarAdapters(
 		database,
@@ -237,6 +244,7 @@ func NewDependenciesWithPaymentAccountAndCalendarAdapters(
 		calendarHandlerConfig,
 		identityVerifier,
 		false,
+		identityWebhooks...,
 	)
 }
 
@@ -255,6 +263,7 @@ func newDependenciesWithPaymentAccountAndCalendarAdapters(
 	calendarHandlerConfig calendar_connection_handler.Config,
 	identityVerifier identityverification.IdentityVerifier,
 	useFakeLocationResolvers bool,
+	identityWebhooks ...identity_verification_handler.IdentityVerificationWebhook,
 ) *Dependencies {
 	persistence := NewPersistenceAdapters(database)
 
@@ -387,6 +396,14 @@ func newDependenciesWithPaymentAccountAndCalendarAdapters(
 		identityVerifier,
 		systemClock,
 	)
+	identityVerificationHandler := identity_verification_handler.NewIdentityVerificationHandler(identityVerificationService)
+	if len(identityWebhooks) > 0 {
+		identityVerificationHandler = identity_verification_handler.NewIdentityVerificationHandlerWithWebhook(
+			identityVerificationService,
+			identityWebhooks[0],
+			systemClock,
+		)
+	}
 	urgentWorkOrderScheduler := scheduler.NewScheduler(time.Hour, workOrderService)
 	calendarSyncRunner := scheduler.NewCalendarSyncRunner(calendarSyncService)
 	var calendarEventObserver CalendarEventObserver
@@ -408,10 +425,10 @@ func newDependenciesWithPaymentAccountAndCalendarAdapters(
 		ProviderHandler:             provider_handler.NewProviderHandler(providerService),
 		ConversationHandler:         conversation_handler.NewConversationHandler(conversationService),
 		JobRequestHandler:           job_request_handler.NewJobRequestHandler(jobRequestService),
-		IdentityVerificationHandler: identity_verification_handler.NewIdentityVerificationHandler(identityVerificationService),
+		IdentityVerificationHandler: identityVerificationHandler,
 		PaymentAccountHandler:       payment_account_handler.NewPaymentAccountHandler(paymentAccountService, paymentAccountHandlerConfig),
 		PaymentHandler:              payment_handler.NewPaymentHandler(paymentService, webhookVerifier),
-		UserHandler:                 user_handler.NewUserHandler(userService, calendarConnectionService),
+		UserHandler:                 user_handler.NewUserHandlerWithIdentityVerification(userService, calendarConnectionService, identityVerificationService),
 		FileHandler:                 file_handler.NewFileHandler(fileService),
 		ServiceProposalHandler:      service_proposal_handler.NewServiceProposalHandler(servicePorposalService),
 		WorkOrderHandler:            work_order_handler.NewWorkOrderHandler(workOrderService),
@@ -423,4 +440,12 @@ func newDependenciesWithPaymentAccountAndCalendarAdapters(
 		ConsumerAddressResolver:     addressResolver,
 		IdentityVerifier:            identityVerifier,
 	}
+}
+
+func newTestIdentityVerificationWebhook() identity_verification_handler.IdentityVerificationWebhook {
+	webhook, err := didit.NewWebhookAdapter("test-didit-webhook-secret")
+	if err != nil {
+		panic(fmt.Errorf("configuring test identity verification webhook: %w", err))
+	}
+	return webhook
 }

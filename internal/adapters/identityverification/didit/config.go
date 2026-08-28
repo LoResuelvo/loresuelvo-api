@@ -20,3 +20,7 @@ func NewClientFromEnv() (*Client, error) {
 	}
 	return NewClient(Config{APIKey: os.Getenv("DIDIT_API_KEY"), WorkflowID: workflowID, BaseURL: defaultBaseURL, Timeout: timeout})
 }
+
+func NewWebhookAdapterFromEnv() (*WebhookAdapter, error) {
+	return NewWebhookAdapter(os.Getenv("DIDIT_WEBHOOK_SECRET"))
+}
