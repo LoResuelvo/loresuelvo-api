@@ -33,6 +33,9 @@ func (service *Service) Start(ctx context.Context, authID string) (StartResult, 
 	if err != nil {
 		return StartResult{}, fmt.Errorf("finding latest identity verification: %w", err)
 	}
+	if latest != nil && latest.Status == StatusApproved {
+		return StartResult{}, ErrVerificationAlreadyApproved
+	}
 	request := SessionRequest{ProviderID: provider.ID(), VendorData: ProviderVendorData(provider.ID()), FirstName: provider.Name(), LastName: provider.Surname()}
 	if latest != nil && latest.Status == StatusInProgress {
 		sessionID := latest.ExternalSessionID

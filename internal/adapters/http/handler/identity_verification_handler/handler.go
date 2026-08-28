@@ -33,6 +33,10 @@ func (handler *IdentityVerificationHandler) StartSession(context *gin.Context) {
 			statusCode = http.StatusForbidden
 			message = "only registered providers can start identity verification"
 		}
+		if errors.Is(err, identityverification.ErrVerificationAlreadyApproved) {
+			statusCode = http.StatusConflict
+			message = "identity verification is already approved"
+		}
 		httphandler.RespondError(context, statusCode, message)
 		return
 	}

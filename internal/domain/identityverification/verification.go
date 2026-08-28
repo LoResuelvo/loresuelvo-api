@@ -29,7 +29,7 @@ func NewVerification(providerID int, sessionID, workflowID uuid.UUID, verifier s
 }
 
 func Rehydrate(externalSessionID uuid.UUID, providerID int, verifier string, workflowID uuid.UUID, workflowVersion int, status VerificationStatus, createdOn, updatedOn time.Time) (*IdentityVerification, error) {
-	if (status != StatusNotStarted && status != StatusInProgress) || updatedOn.IsZero() {
+	if (status != StatusNotStarted && status != StatusInProgress && status != StatusApproved) || updatedOn.IsZero() {
 		return nil, ErrInvalidVerification
 	}
 	verification, err := NewVerification(providerID, externalSessionID, workflowID, verifier, workflowVersion, createdOn)

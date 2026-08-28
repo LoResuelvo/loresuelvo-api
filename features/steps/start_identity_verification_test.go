@@ -35,6 +35,7 @@ func registerStartIdentityVerificationSteps(sc *godog.ScenarioContext, suite *te
 	sc.Step(`^inicio nuevamente mi verificación de identidad$`, suite.startIdentityVerification)
 	sc.Step(`^el sistema entrega las credenciales de la misma sesión$`, suite.systemReturnsSameVerificationSession)
 	sc.Step(`^se conserva una única sesión activa para "([^"]*)"$`, suite.onlyOneActiveVerificationSession)
+	sc.Step(`^el sistema informa que mi identidad ya está verificada$`, suite.systemReportsIdentityAlreadyApproved)
 }
 
 func (suite *testSuite) tryStartIdentityVerificationForProvider(_ string) error {
@@ -110,6 +111,13 @@ func (suite *testSuite) onlyOneActiveVerificationSession(email string) error {
 	}
 	if len(verifications) != 1 {
 		return fmt.Errorf("expected one identity verification session, got %d", len(verifications))
+	}
+	return nil
+}
+
+func (suite *testSuite) systemReportsIdentityAlreadyApproved() error {
+	if suite.lastStatus != http.StatusConflict {
+		return fmt.Errorf("expected status 409, got %d: %s", suite.lastStatus, suite.lastBody)
 	}
 	return nil
 }
