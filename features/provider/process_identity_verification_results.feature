@@ -14,7 +14,6 @@ Feature: Procesar resultados de verificación de identidad
             When el verificador informa de forma auténtica que la sesión está "in_progress"
             Then "juan.plomero@example.com" consulta en su perfil el estado "in_progress"
 
-        @wip
         Scenario: 58.1.2 Registrar que la verificación espera una acción del usuario
             When el verificador informa de forma auténtica que la sesión está "awaiting_user"
             Then "juan.plomero@example.com" consulta en su perfil el estado "awaiting_user"
