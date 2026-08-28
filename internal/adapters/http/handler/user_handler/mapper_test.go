@@ -2,6 +2,7 @@ package user_handler
 
 import (
 	"testing"
+	"time"
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/category"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/consumer"
@@ -58,4 +59,27 @@ func TestWithIdentityVerificationStatusAddsStatusToProviderResponse(t *testing.T
 	providerResponse, ok := response.(providerCurrentUserResponse)
 	require.True(t, ok)
 	require.Equal(t, string(identityverification.StatusInProgress), providerResponse.IdentityVerificationStatus)
+}
+
+func TestWithIdentityVerificationDetailsAddsApprovalDateToProviderResponse(t *testing.T) {
+	currentProvider, err := provider.NewProvider(
+		"auth0|provider", "juan@example.com", "Juan", "Gomez", &category.Category{ID: 2, Name: "Plomeria"}, nil,
+		[]coveragezone.CoverageZone{{ID: 1, Enabled: true}},
+	)
+	require.NoError(t, err)
+	currentProvider.SetPersistenceID(42)
+	response, err := currentUserResponseFromDomain(currentProvider, "disconnected")
+	require.NoError(t, err)
+	verifiedOn := time.Date(2026, 9, 1, 12, 0, 0, 0, time.UTC)
+
+	response, err = withIdentityVerificationDetails(response, identityverification.VerificationStatusDetails{
+		Status: identityverification.StatusApproved, VerifiedOn: &verifiedOn,
+	})
+
+	require.NoError(t, err)
+	providerResponse, ok := response.(providerCurrentUserResponse)
+	require.True(t, ok)
+	require.Equal(t, string(identityverification.StatusApproved), providerResponse.IdentityVerificationStatus)
+	require.NotNil(t, providerResponse.IdentityVerifiedOn)
+	require.Equal(t, verifiedOn, *providerResponse.IdentityVerifiedOn)
 }

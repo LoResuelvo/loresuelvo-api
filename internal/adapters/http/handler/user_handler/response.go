@@ -1,5 +1,7 @@
 package user_handler
 
+import "time"
+
 type currentUserProfilePhotoResponse struct {
 	OriginalName string `json:"original_name"`
 	URL          string `json:"url"`
@@ -39,4 +41,5 @@ type providerCurrentUserResponse struct {
 	currentUserResponse
 	Category                   currentUserCategoryResponse `json:"category"`
 	IdentityVerificationStatus string                      `json:"identity_verification_status"`
+	IdentityVerifiedOn         *time.Time                  `json:"identity_verified_on"`
 }

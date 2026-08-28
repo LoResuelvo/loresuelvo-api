@@ -20,6 +20,10 @@ type IdentityVerificationStatusReader interface {
 	CurrentStatus(ctx context.Context, providerID int) (identityverification.VerificationStatus, error)
 }
 
+type IdentityVerificationDetailsReader interface {
+	CurrentStatusDetails(ctx context.Context, providerID int) (identityverification.VerificationStatusDetails, error)
+}
+
 type UserHandler struct {
 	userService                      *user.Service
 	calendarConnectionStatusReader   CalendarConnectionStatusReader
@@ -75,12 +79,17 @@ func (h *UserHandler) GetCurrentUser(c *gin.Context) {
 		return
 	}
 	if currentProvider, ok := currentUser.(*provider.Provider); ok && h.identityVerificationStatusReader != nil {
-		status, err := h.identityVerificationStatusReader.CurrentStatus(c.Request.Context(), currentProvider.ID())
+		var details identityverification.VerificationStatusDetails
+		if detailsReader, supportsDetails := h.identityVerificationStatusReader.(IdentityVerificationDetailsReader); supportsDetails {
+			details, err = detailsReader.CurrentStatusDetails(c.Request.Context(), currentProvider.ID())
+		} else {
+			details.Status, err = h.identityVerificationStatusReader.CurrentStatus(c.Request.Context(), currentProvider.ID())
+		}
 		if err != nil {
 			handleGetCurrentUserError(c, err)
 			return
 		}
-		response, err = withIdentityVerificationStatus(response, status)
+		response, err = withIdentityVerificationDetails(response, details)
 		if err != nil {
 			handleGetCurrentUserError(c, err)
 			return

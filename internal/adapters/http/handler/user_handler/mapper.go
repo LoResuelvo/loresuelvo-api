@@ -2,6 +2,7 @@ package user_handler
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/consumer"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/identityverification"
@@ -65,10 +66,23 @@ func baseCurrentUserResponseFromDomain(currentUser user.User, calendarConnection
 }
 
 func withIdentityVerificationStatus(response any, status identityverification.VerificationStatus) (any, error) {
+	return withIdentityVerificationDetails(response, identityverification.VerificationStatusDetails{Status: status})
+}
+
+func withIdentityVerificationDetails(response any, details identityverification.VerificationStatusDetails) (any, error) {
 	providerResponse, ok := response.(providerCurrentUserResponse)
 	if !ok {
 		return nil, fmt.Errorf("mapping identity verification status for unsupported user response %T", response)
 	}
-	providerResponse.IdentityVerificationStatus = string(status)
+	providerResponse.IdentityVerificationStatus = string(details.Status)
+	providerResponse.IdentityVerifiedOn = copyTime(details.VerifiedOn)
 	return providerResponse, nil
+}
+
+func copyTime(value *time.Time) *time.Time {
+	if value == nil {
+		return nil
+	}
+	copy := value.UTC()
+	return &copy
 }
