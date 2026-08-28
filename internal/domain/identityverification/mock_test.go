@@ -18,10 +18,8 @@ func (stub providerFinderStub) FindProviderByAuthID(context.Context, string) (*p
 }
 
 type verificationRepositoryStub struct {
-	latest *IdentityVerification
-	byID   *IdentityVerification
-	saved  *IdentityVerification
-	err    error
+	saved *IdentityVerification
+	err   error
 }
 
 func (stub *verificationRepositoryStub) Save(_ context.Context, verification *IdentityVerification) error {
@@ -33,11 +31,7 @@ func (stub *verificationRepositoryStub) Save(_ context.Context, verification *Id
 }
 
 func (stub *verificationRepositoryStub) FindBySessionID(context.Context, uuid.UUID) (*IdentityVerification, error) {
-	return stub.byID, stub.err
-}
-
-func (stub *verificationRepositoryStub) FindLatestByProviderID(context.Context, int) (*IdentityVerification, error) {
-	return stub.latest, stub.err
+	return nil, stub.err
 }
 
 type verifierStub struct {
@@ -49,20 +43,6 @@ type verifierStub struct {
 func (stub *verifierStub) CreateSession(_ context.Context, request SessionRequest) (SessionCredentials, error) {
 	stub.request = request
 	return stub.credentials, stub.err
-}
-
-type unitOfWorkStub struct {
-	event        VerificationEvent
-	verification *IdentityVerification
-	err          error
-}
-
-func (stub *unitOfWorkStub) SaveResult(_ context.Context, event VerificationEvent, verification *IdentityVerification) error {
-	if stub.err != nil {
-		return stub.err
-	}
-	stub.event, stub.verification = event, verification
-	return nil
 }
 
 type fixedClock struct{ now time.Time }

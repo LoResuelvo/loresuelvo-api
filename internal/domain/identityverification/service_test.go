@@ -23,7 +23,7 @@ func TestServiceStartCreatesSessionAfterVerifierSuccess(t *testing.T) {
 	repo := &verificationRepositoryStub{}
 	sessionID, workflowID := uuid.New(), uuid.New()
 	verifier := &verifierStub{credentials: SessionCredentials{SessionID: sessionID, SessionToken: "secret", VerificationURL: "https://verify.example", Status: StatusNotStarted, Verifier: "fake", WorkflowID: workflowID, WorkflowVersion: 1}}
-	service := NewService(finder, repo, verifier, &unitOfWorkStub{}, fixedClock{now})
+	service := NewService(finder, repo, verifier, fixedClock{now})
 
 	result, err := service.Start(context.Background(), foundProvider.AuthID())
 
@@ -34,7 +34,7 @@ func TestServiceStartCreatesSessionAfterVerifierSuccess(t *testing.T) {
 }
 
 func TestServiceStartRejectsConsumer(t *testing.T) {
-	service := NewService(providerFinderStub{err: errors.New("not found")}, &verificationRepositoryStub{}, &verifierStub{}, &unitOfWorkStub{}, fixedClock{now: time.Now()})
+	service := NewService(providerFinderStub{err: errors.New("not found")}, &verificationRepositoryStub{}, &verifierStub{}, fixedClock{now: time.Now()})
 	_, err := service.Start(context.Background(), "auth0|consumer")
 	require.ErrorIs(t, err, ErrProviderRequired)
 }
