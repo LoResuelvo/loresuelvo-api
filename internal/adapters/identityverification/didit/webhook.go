@@ -94,8 +94,11 @@ func (adapter *WebhookAdapter) Translate(body []byte) (identityverification.Veri
 }
 
 func statusFromDidit(status string) (identityverification.VerificationStatus, bool) {
-	if strings.EqualFold(strings.TrimSpace(status), "in progress") || strings.EqualFold(strings.TrimSpace(status), "in_progress") {
+	switch strings.ToLower(strings.TrimSpace(status)) {
+	case "in progress", "in_progress":
 		return identityverification.StatusInProgress, true
+	case "awaiting user", "awaiting_user":
+		return identityverification.StatusAwaitingUser, true
 	}
 	return "", false
 }
