@@ -1,0 +1,2 @@
+DROP TABLE identity_verification_events;
+DROP TABLE identity_verification_sessions;
