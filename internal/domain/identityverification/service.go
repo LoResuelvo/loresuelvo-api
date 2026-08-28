@@ -45,6 +45,17 @@ func (service *Service) ApplyResult(ctx context.Context, result VerificationResu
 	return nil
 }
 
+func (service *Service) CurrentStatus(ctx context.Context, providerID int) (VerificationStatus, error) {
+	latest, err := service.repository.FindLatestByProviderID(ctx, providerID)
+	if err != nil {
+		return "", fmt.Errorf("finding current identity verification: %w", err)
+	}
+	if latest == nil {
+		return StatusUnverified, nil
+	}
+	return latest.Status, nil
+}
+
 func (service *Service) Start(ctx context.Context, authID string) (StartResult, error) {
 	provider, err := service.providerFinder.FindProviderByAuthID(strings.TrimSpace(authID))
 	if err != nil {

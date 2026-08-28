@@ -79,3 +79,26 @@ func TestServiceApplyResultMarksSessionInProgress(t *testing.T) {
 	require.Equal(t, StatusInProgress, repo.saved.Status)
 	require.Equal(t, now, repo.saved.UpdatedOn)
 }
+
+func TestServiceCurrentStatusReturnsLatestVerificationStatus(t *testing.T) {
+	now := time.Date(2026, 9, 1, 12, 0, 0, 0, time.UTC)
+	verification, err := NewVerification(7, uuid.New(), uuid.New(), "fake", 1, now)
+	require.NoError(t, err)
+	verification.Status = StatusInProgress
+	repo := &verificationRepositoryStub{latest: verification}
+	service := NewService(providerFinderStub{}, repo, &verifierStub{}, fixedClock{now})
+
+	status, err := service.CurrentStatus(context.Background(), verification.ProviderID)
+
+	require.NoError(t, err)
+	require.Equal(t, StatusInProgress, status)
+}
+
+func TestServiceCurrentStatusReturnsUnverifiedWithoutSessions(t *testing.T) {
+	service := NewService(providerFinderStub{}, &verificationRepositoryStub{}, &verifierStub{}, fixedClock{time.Now().UTC()})
+
+	status, err := service.CurrentStatus(context.Background(), 7)
+
+	require.NoError(t, err)
+	require.Equal(t, StatusUnverified, status)
+}
