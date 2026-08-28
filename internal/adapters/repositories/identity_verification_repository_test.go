@@ -80,3 +80,17 @@ func TestIdentityVerificationRepositoryFindsAwaitingUserSession(t *testing.T) {
 	require.Equal(t, verification.ExternalSessionID, found.ExternalSessionID)
 	require.Equal(t, identityverification.StatusAwaitingUser, found.Status)
 }
+
+func TestIdentityVerificationRepositoryFindsInReviewSession(t *testing.T) {
+	testContext := newIdentityVerificationRepositoryTest(t)
+	verification, err := identityverification.NewVerification(testContext.providerID, uuid.New(), uuid.New(), "fake", 1, time.Now().UTC())
+	require.NoError(t, err)
+	verification.Status = identityverification.StatusInReview
+	require.NoError(t, testContext.repository.Save(context.Background(), verification))
+
+	found, err := testContext.repository.FindLatestByProviderID(context.Background(), testContext.providerID)
+
+	require.NoError(t, err)
+	require.Equal(t, verification.ExternalSessionID, found.ExternalSessionID)
+	require.Equal(t, identityverification.StatusInReview, found.Status)
+}
