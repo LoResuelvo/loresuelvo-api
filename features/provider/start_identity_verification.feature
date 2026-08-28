@@ -32,7 +32,6 @@ Feature: Iniciar la verificación de identidad de un prestador
             Then el sistema entrega las credenciales de la misma sesión
             And se conserva una única sesión activa para "juan.plomero@example.com"
 
-        @wip
         Scenario: 58.4 No crear otra sesión para un prestador aprobado
             Given que la identidad de "juan.plomero@example.com" está aprobada
             And que estoy autenticado como prestador "juan.plomero@example.com"
