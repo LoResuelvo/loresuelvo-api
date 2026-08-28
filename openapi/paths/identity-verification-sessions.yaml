@@ -1,0 +1,27 @@
+post:
+  tags:
+    - Providers
+  operationId: startIdentityVerificationSession
+  summary: Start the authenticated provider identity verification
+  description: Creates a hosted identity-verification session for the authenticated registered provider. The request has no body and provider identifiers are derived from the JWT subject.
+  security:
+    - BearerAuth: []
+  responses:
+    '200':
+      description: Hosted verification session created.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/IdentityVerificationSession'
+    '401':
+      description: Missing or invalid authentication.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/AuthErrorResponse'
+    '500':
+      description: The identity verification session could not be started.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'

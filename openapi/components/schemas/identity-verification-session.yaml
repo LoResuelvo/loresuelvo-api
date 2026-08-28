@@ -1,0 +1,21 @@
+type: object
+required:
+  - session_id
+  - session_token
+  - verification_url
+  - status
+properties:
+  session_id:
+    type: string
+    format: uuid
+  session_token:
+    type: string
+    description: Temporary secret used by the hosted verification flow.
+  verification_url:
+    type: string
+    format: uri
+  status:
+    type: string
+    enum:
+      - not_started
+additionalProperties: false

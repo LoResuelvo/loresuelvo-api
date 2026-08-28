@@ -56,6 +56,8 @@ paths:
     $ref: ./paths/providers.yaml
   /providers/{providerID}:
     $ref: ./paths/provider-profile.yaml
+  /providers/me/identity-verification-sessions:
+    $ref: ./paths/identity-verification-sessions.yaml
   /providers/me/payment-accounts/authorization:
     $ref: ./paths/payment-account-authorization.yaml
   /providers/me/payment-accounts:
@@ -234,6 +236,8 @@ components:
       $ref: ./components/schemas/provider-profile-completion-report.yaml
     ProviderProfileReview:
       $ref: ./components/schemas/provider-profile-review.yaml
+    IdentityVerificationSession:
+      $ref: ./components/schemas/identity-verification-session.yaml
     PaymentAccountAuthorization:
       $ref: ./components/schemas/payment-account-authorization.yaml
     CalendarAuthorization:

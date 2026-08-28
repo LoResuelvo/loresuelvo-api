@@ -11,6 +11,7 @@ import (
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/conversation_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/coverage_zone_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/file_handler"
+	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/identity_verification_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/job_request_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/payment_account_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/payment_handler"
@@ -26,43 +27,45 @@ import (
 )
 
 type RouterConfig struct {
-	CategoryHandler           *category_handler.CategoryHandler
-	CalendarConnectionHandler *calendar_connection_handler.CalendarConnectionHandler
-	CoverageZoneHandler       *coverage_zone_handler.CoverageZoneHandler
-	ConsumerHandler           *consumer_handler.ConsumerHandler
-	ProviderHandler           *provider_handler.ProviderHandler
-	ConversationHandler       *conversation_handler.ConversationHandler
-	JobRequestHandler         *job_request_handler.JobRequestHandler
-	PaymentAccountHandler     *payment_account_handler.PaymentAccountHandler
-	PaymentHandler            *payment_handler.PaymentHandler
-	UserHandler               *user_handler.UserHandler
-	FileHandler               *file_handler.FileHandler
-	ServiceProposalHandler    *service_proposal_handler.ServiceProposalHandler
-	WorkOrderHandler          *work_order_handler.WorkOrderHandler
-	TestHandler               *test_handler.TestHandler
-	RealtimeHandler           *realtime.Handler
-	Auth0Validator            *validator.Validator
-	Logger                    *slog.Logger
+	CategoryHandler             *category_handler.CategoryHandler
+	CalendarConnectionHandler   *calendar_connection_handler.CalendarConnectionHandler
+	CoverageZoneHandler         *coverage_zone_handler.CoverageZoneHandler
+	ConsumerHandler             *consumer_handler.ConsumerHandler
+	ProviderHandler             *provider_handler.ProviderHandler
+	ConversationHandler         *conversation_handler.ConversationHandler
+	JobRequestHandler           *job_request_handler.JobRequestHandler
+	IdentityVerificationHandler *identity_verification_handler.IdentityVerificationHandler
+	PaymentAccountHandler       *payment_account_handler.PaymentAccountHandler
+	PaymentHandler              *payment_handler.PaymentHandler
+	UserHandler                 *user_handler.UserHandler
+	FileHandler                 *file_handler.FileHandler
+	ServiceProposalHandler      *service_proposal_handler.ServiceProposalHandler
+	WorkOrderHandler            *work_order_handler.WorkOrderHandler
+	TestHandler                 *test_handler.TestHandler
+	RealtimeHandler             *realtime.Handler
+	Auth0Validator              *validator.Validator
+	Logger                      *slog.Logger
 }
 
 type Router struct {
-	categoryHandler           *category_handler.CategoryHandler
-	calendarConnectionHandler *calendar_connection_handler.CalendarConnectionHandler
-	coverageZoneHandler       *coverage_zone_handler.CoverageZoneHandler
-	consumerHandler           *consumer_handler.ConsumerHandler
-	providerHandler           *provider_handler.ProviderHandler
-	conversationHandler       *conversation_handler.ConversationHandler
-	jobRequestHandler         *job_request_handler.JobRequestHandler
-	paymentAccountHandler     *payment_account_handler.PaymentAccountHandler
-	paymentHandler            *payment_handler.PaymentHandler
-	userHandler               *user_handler.UserHandler
-	fileHandler               *file_handler.FileHandler
-	serviceProposalHandler    *service_proposal_handler.ServiceProposalHandler
-	workOrderHandler          *work_order_handler.WorkOrderHandler
-	testHandler               *test_handler.TestHandler
-	realtimeHandler           *realtime.Handler
-	auth0Validator            *validator.Validator
-	logger                    *slog.Logger
+	categoryHandler             *category_handler.CategoryHandler
+	calendarConnectionHandler   *calendar_connection_handler.CalendarConnectionHandler
+	coverageZoneHandler         *coverage_zone_handler.CoverageZoneHandler
+	consumerHandler             *consumer_handler.ConsumerHandler
+	providerHandler             *provider_handler.ProviderHandler
+	conversationHandler         *conversation_handler.ConversationHandler
+	jobRequestHandler           *job_request_handler.JobRequestHandler
+	identityVerificationHandler *identity_verification_handler.IdentityVerificationHandler
+	paymentAccountHandler       *payment_account_handler.PaymentAccountHandler
+	paymentHandler              *payment_handler.PaymentHandler
+	userHandler                 *user_handler.UserHandler
+	fileHandler                 *file_handler.FileHandler
+	serviceProposalHandler      *service_proposal_handler.ServiceProposalHandler
+	workOrderHandler            *work_order_handler.WorkOrderHandler
+	testHandler                 *test_handler.TestHandler
+	realtimeHandler             *realtime.Handler
+	auth0Validator              *validator.Validator
+	logger                      *slog.Logger
 }
 
 func NewRouter(config RouterConfig) *Router {
@@ -71,23 +74,24 @@ func NewRouter(config RouterConfig) *Router {
 		logger = slog.Default()
 	}
 	router := &Router{
-		categoryHandler:           config.CategoryHandler,
-		calendarConnectionHandler: config.CalendarConnectionHandler,
-		coverageZoneHandler:       config.CoverageZoneHandler,
-		consumerHandler:           config.ConsumerHandler,
-		providerHandler:           config.ProviderHandler,
-		conversationHandler:       config.ConversationHandler,
-		jobRequestHandler:         config.JobRequestHandler,
-		paymentAccountHandler:     config.PaymentAccountHandler,
-		paymentHandler:            config.PaymentHandler,
-		userHandler:               config.UserHandler,
-		fileHandler:               config.FileHandler,
-		serviceProposalHandler:    config.ServiceProposalHandler,
-		workOrderHandler:          config.WorkOrderHandler,
-		testHandler:               config.TestHandler,
-		realtimeHandler:           config.RealtimeHandler,
-		auth0Validator:            config.Auth0Validator,
-		logger:                    logger,
+		categoryHandler:             config.CategoryHandler,
+		calendarConnectionHandler:   config.CalendarConnectionHandler,
+		coverageZoneHandler:         config.CoverageZoneHandler,
+		consumerHandler:             config.ConsumerHandler,
+		providerHandler:             config.ProviderHandler,
+		conversationHandler:         config.ConversationHandler,
+		jobRequestHandler:           config.JobRequestHandler,
+		identityVerificationHandler: config.IdentityVerificationHandler,
+		paymentAccountHandler:       config.PaymentAccountHandler,
+		paymentHandler:              config.PaymentHandler,
+		userHandler:                 config.UserHandler,
+		fileHandler:                 config.FileHandler,
+		serviceProposalHandler:      config.ServiceProposalHandler,
+		workOrderHandler:            config.WorkOrderHandler,
+		testHandler:                 config.TestHandler,
+		realtimeHandler:             config.RealtimeHandler,
+		auth0Validator:              config.Auth0Validator,
+		logger:                      logger,
 	}
 
 	return router
@@ -158,6 +162,7 @@ func (router *Router) registerProviderRoutes(engine *gin.Engine, authMiddleware 
 	engine.GET("/providers", router.providerHandler.FilterProvidersByCategory)
 	engine.GET("/providers/:providerID", authMiddleware, router.providerHandler.GetProviderProfile)
 	engine.POST("/providers", authMiddleware, router.providerHandler.RegisterProvider)
+	engine.POST("/providers/me/identity-verification-sessions", authMiddleware, router.identityVerificationHandler.StartSession)
 }
 
 func (router *Router) registerPaymentAccountRoutes(engine *gin.Engine, authMiddleware gin.HandlerFunc) {
