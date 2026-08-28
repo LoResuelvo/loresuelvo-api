@@ -94,3 +94,35 @@ func TestIdentityVerificationRepositoryFindsInReviewSession(t *testing.T) {
 	require.Equal(t, verification.ExternalSessionID, found.ExternalSessionID)
 	require.Equal(t, identityverification.StatusInReview, found.Status)
 }
+
+func TestIdentityVerificationRepositoryStoresAndHydratesApprovalMetadata(t *testing.T) {
+	testContext := newIdentityVerificationRepositoryTest(t)
+	createdOn := time.Date(2026, 9, 1, 11, 0, 0, 0, time.UTC)
+	lastResultOn := time.Date(2026, 9, 1, 11, 59, 0, 0, time.UTC)
+	verifiedOn := time.Date(2026, 9, 1, 12, 0, 0, 0, time.UTC)
+	verification, err := identityverification.NewVerification(testContext.providerID, uuid.New(), uuid.New(), "didit", 3, createdOn)
+	require.NoError(t, err)
+	verification.Status = identityverification.StatusApproved
+	verification.LastResultOn = &lastResultOn
+	verification.VerifiedOn = &verifiedOn
+
+	require.NoError(t, testContext.repository.Save(context.Background(), verification))
+	found, err := testContext.repository.FindBySessionID(context.Background(), verification.ExternalSessionID)
+
+	require.NoError(t, err)
+	require.Equal(t, verification, found)
+}
+
+func TestIdentityVerificationRepositoryStoresSanitizedRiskCodes(t *testing.T) {
+	testContext := newIdentityVerificationRepositoryTest(t)
+	verification, err := identityverification.NewVerification(testContext.providerID, uuid.New(), uuid.New(), "didit", 3, time.Now().UTC())
+	require.NoError(t, err)
+	verification.Status = identityverification.StatusDeclined
+	verification.RiskCodes = []string{"DOCUMENT_EXPIRED", "KYC-FAIL"}
+
+	require.NoError(t, testContext.repository.Save(context.Background(), verification))
+	found, err := testContext.repository.FindBySessionID(context.Background(), verification.ExternalSessionID)
+
+	require.NoError(t, err)
+	require.Equal(t, verification.RiskCodes, found.RiskCodes)
+}
