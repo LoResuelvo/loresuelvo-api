@@ -25,6 +25,7 @@ type providerRegistrationRequest struct {
 
 func registerProviderAccountSteps(sc *godog.ScenarioContext, suite *testSuite) {
 	sc.Step(`^que no existe un usuario con correo "([^"]*)"$`, suite.thereIsNoUserWithEmail)
+	sc.Step(`^no existe un usuario con correo "([^"]*)"$`, suite.thereIsNoUserWithEmail)
 	sc.Step(`^me registro como prestador con correo "([^"]*)", nombre "([^"]*)", apellido "([^"]*)" y rubro "([^"]*)"$`, suite.requestProviderAccountRegistration)
 	sc.Step(`^me registro como prestador con correo "([^"]*)", nombre "([^"]*)", apellido "([^"]*)" y sin rubro$`, suite.requestProviderAccountRegistrationWithoutCategory)
 	sc.Step(`^el sistema me indica que el rubro es obligatorio$`, suite.systemReportsCategoryIsRequired)

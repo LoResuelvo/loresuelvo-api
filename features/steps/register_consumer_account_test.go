@@ -44,6 +44,7 @@ func registerConsumerAccountSteps(sc *godog.ScenarioContext, suite *testSuite) {
 	sc.Step(`^me registro como usuario consumidor con correo "([^"]*)", nombre "([^"]*)" y apellido "([^"]*)" indicando como domicilio "([^"]*)"$`, suite.requestConsumerAccountRegistrationWithAddress)
 	sc.Step(`^me registro como usuario consumidor con correo "([^"]*)", nombre "([^"]*)" y apellido "([^"]*)" indicando como domicilio "([^"]*)", piso "([^"]*)" y departamento "([^"]*)"$`, suite.requestConsumerAccountRegistrationWithAddressDetails)
 	sc.Step(`^intento registrarme como usuario consumidor con correo "([^"]*)", nombre "([^"]*)" y apellido "([^"]*)" sin indicar un domicilio$`, suite.requestConsumerAccountRegistrationWithoutAddress)
+	sc.Step(`^intento registrarme como usuario consumidor con correo "([^"]*)", nombre "([^"]*)" y apellido "([^"]*)" indicando como domicilio "([^"]*)"$`, suite.requestConsumerAccountRegistrationWithAddress)
 	sc.Step(`^intento registrarme como usuario consumidor con correo "([^"]*)", nombre "([^"]*)" y apellido "([^"]*)" indicando solamente el número "([^"]*)"$`, suite.requestConsumerAccountRegistrationWithOnlyNumber)
 	sc.Step(`^intento registrarme como usuario consumidor con correo "([^"]*)", nombre "([^"]*)" y apellido "([^"]*)" indicando solamente la calle "([^"]*)"$`, suite.requestConsumerAccountRegistrationWithOnlyStreet)
 	sc.Step(`^intento registrarme como usuario consumidor con correo "([^"]*)", nombre "([^"]*)" y apellido "([^"]*)" indicando un domicilio inexistente$`, suite.requestConsumerAccountRegistrationWithInvalidAddress)

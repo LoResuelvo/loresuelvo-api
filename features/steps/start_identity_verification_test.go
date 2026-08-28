@@ -33,15 +33,21 @@ func registerStartIdentityVerificationSteps(sc *godog.ScenarioContext, suite *te
 	sc.Step(`^no se crea ninguna sesión para "([^"]*)"$`, suite.noIdentityVerificationSessionForProvider)
 	sc.Step(`^que la verificación de "([^"]*)" está en estado "([^"]*)"$`, suite.identityVerificationHasStatus)
 	sc.Step(`^inicio nuevamente mi verificación de identidad$`, suite.startIdentityVerification)
+	sc.Step(`^intento iniciar otra verificación de identidad$`, suite.tryStartAnotherIdentityVerification)
 	sc.Step(`^el sistema entrega las credenciales de la misma sesión$`, suite.systemReturnsSameVerificationSession)
 	sc.Step(`^se conserva una única sesión activa para "([^"]*)"$`, suite.onlyOneActiveVerificationSession)
 	sc.Step(`^el sistema informa que mi identidad ya está verificada$`, suite.systemReportsIdentityAlreadyApproved)
+	sc.Step(`^no se crea una nueva sesión$`, suite.noNewIdentityVerificationSession)
 	sc.Step(`^que el verificador de identidad no está disponible$`, suite.identityVerifierIsUnavailable)
 	sc.Step(`^el sistema informa que la verificación no está disponible temporalmente$`, suite.systemReportsIdentityVerifierUnavailable)
 	sc.Step(`^no se guarda una sesión incompleta$`, suite.noIncompleteIdentityVerificationSession)
 }
 
 func (suite *testSuite) tryStartIdentityVerificationForProvider(_ string) error {
+	return suite.startIdentityVerification()
+}
+
+func (suite *testSuite) tryStartAnotherIdentityVerification() error {
 	return suite.startIdentityVerification()
 }
 
@@ -121,6 +127,21 @@ func (suite *testSuite) onlyOneActiveVerificationSession(email string) error {
 func (suite *testSuite) systemReportsIdentityAlreadyApproved() error {
 	if suite.lastStatus != http.StatusConflict {
 		return fmt.Errorf("expected status 409, got %d: %s", suite.lastStatus, suite.lastBody)
+	}
+	return nil
+}
+
+func (suite *testSuite) noNewIdentityVerificationSession() error {
+	providerID, err := suite.providerIDByEmail("juan.plomero@example.com")
+	if err != nil {
+		return err
+	}
+	verifications, err := suite.identityVerificationRepository.FindByProviderID(context.Background(), providerID)
+	if err != nil {
+		return err
+	}
+	if len(verifications) != 1 {
+		return fmt.Errorf("expected one identity verification session, got %d", len(verifications))
 	}
 	return nil
 }

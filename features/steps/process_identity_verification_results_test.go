@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/identityverification"
 	"github.com/cucumber/godog"
 	"github.com/google/uuid"
 )
@@ -137,6 +138,14 @@ func (suite *testSuite) identityVerificationIsApproved(email string) error {
 	if err != nil {
 		return err
 	}
+	if suite.expectedIdentityVerificationSessionID == uuid.Nil {
+		verification, err := identityVerificationFixtureForProvider(suite, providerID, string(identityverification.StatusApproved))
+		if err != nil {
+			return err
+		}
+		suite.expectedIdentityVerificationSessionID = verification.ExternalSessionID
+		return nil
+	}
 	verification, err := suite.identityVerificationRepository.FindBySessionID(context.Background(), suite.expectedIdentityVerificationSessionID)
 	if err != nil {
 		return err
@@ -144,7 +153,7 @@ func (suite *testSuite) identityVerificationIsApproved(email string) error {
 	if verification == nil || verification.ProviderID != providerID {
 		return fmt.Errorf("identity verification session is not associated with provider %q", email)
 	}
-	verification.Status = "approved"
+	verification.Status = identityverification.StatusApproved
 	return suite.identityVerificationRepository.Save(context.Background(), verification)
 }
 
@@ -182,8 +191,11 @@ func (suite *testSuite) systemKeepsOnlyRiskCode(expectedRiskCode string) error {
 	if err != nil {
 		return err
 	}
-	if verification == nil || verification.Status != "declined" {
+	if verification == nil || verification.Status != identityverification.StatusDeclined {
 		return fmt.Errorf("expected declined identity verification session")
+	}
+	if len(verification.RiskCodes) != 1 || verification.RiskCodes[0] != expectedRiskCode {
+		return fmt.Errorf("expected only risk code %q, got %v", expectedRiskCode, verification.RiskCodes)
 	}
 	return nil
 }
@@ -207,7 +219,7 @@ func (suite *testSuite) providerIsNotVerified(email string) error {
 	if err := json.Unmarshal(suite.lastBody, &profile); err != nil {
 		return fmt.Errorf("decoding current provider profile: %w", err)
 	}
-	if profile.IdentityVerificationStatus == "approved" {
+	if profile.IdentityVerificationStatus == string(identityverification.StatusApproved) {
 		return fmt.Errorf("provider %q is still verified", email)
 	}
 	return nil

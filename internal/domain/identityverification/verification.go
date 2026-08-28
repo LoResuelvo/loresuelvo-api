@@ -93,6 +93,9 @@ func sanitizeRiskCodes(codes []string) []string {
 		seen[normalized] = struct{}{}
 		sanitized = append(sanitized, normalized)
 	}
+	if len(sanitized) == 0 {
+		return nil
+	}
 	return sanitized
 }
 
