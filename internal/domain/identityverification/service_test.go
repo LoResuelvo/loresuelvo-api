@@ -31,6 +31,8 @@ func TestServiceStartCreatesSessionAfterVerifierSuccess(t *testing.T) {
 	require.Equal(t, sessionID, result.Credentials.SessionID)
 	require.Equal(t, foundProvider.ID(), repo.saved.ProviderID)
 	require.Equal(t, ProviderVendorData(foundProvider.ID()), verifier.request.VendorData)
+	require.Equal(t, foundProvider.Name(), verifier.request.FirstName)
+	require.Equal(t, foundProvider.Surname(), verifier.request.LastName)
 }
 
 func TestServiceStartRejectsConsumer(t *testing.T) {

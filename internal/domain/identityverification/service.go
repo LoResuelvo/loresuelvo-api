@@ -25,7 +25,7 @@ func NewService(providerFinder ProviderFinder, repository VerificationRepository
 }
 
 func (service *Service) Start(ctx context.Context, authID string) (StartResult, error) {
-	provider, err := service.providerFinder.FindProviderByAuthID(ctx, strings.TrimSpace(authID))
+	provider, err := service.providerFinder.FindProviderByAuthID(strings.TrimSpace(authID))
 	if err != nil {
 		return StartResult{}, ErrProviderRequired
 	}

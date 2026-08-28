@@ -13,7 +13,7 @@ type providerFinderStub struct {
 	err      error
 }
 
-func (stub providerFinderStub) FindProviderByAuthID(context.Context, string) (*provider.Provider, error) {
+func (stub providerFinderStub) FindProviderByAuthID(string) (*provider.Provider, error) {
 	return stub.provider, stub.err
 }
 

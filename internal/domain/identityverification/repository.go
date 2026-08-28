@@ -8,7 +8,7 @@ import (
 )
 
 type ProviderFinder interface {
-	FindProviderByAuthID(ctx context.Context, authID string) (*provider.Provider, error)
+	FindProviderByAuthID(authID string) (*provider.Provider, error)
 }
 
 type VerificationRepository interface {
