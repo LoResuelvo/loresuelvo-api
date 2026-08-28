@@ -6,6 +6,7 @@ allOf:
     - role
     - category
     - identity_verification_status
+    - identity_verified_on
   properties:
     role:
       type: string
@@ -22,4 +23,14 @@ allOf:
       - awaiting_user
       - in_review
       - approved
+      - declined
+      - resubmitted
+      - abandoned
+      - expired
+      - kyc_expired
       description: Current identity-verification status for the authenticated provider.
+    identity_verified_on:
+      type: string
+      format: date-time
+      nullable: true
+      description: Timestamp at which the provider's identity was approved, or null when it is not approved.

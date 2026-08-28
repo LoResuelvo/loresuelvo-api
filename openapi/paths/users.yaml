@@ -38,6 +38,7 @@ get:
                 role: provider
                 calendar_connection_status: connected
                 identity_verification_status: unverified
+                identity_verified_on: null
                 profile_photo:
                   original_name: foto-perfil.jpg
                   url: https://cdn.example/profile/foto-perfil.jpg

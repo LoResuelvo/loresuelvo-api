@@ -4394,6 +4394,7 @@
                                             "role": "provider",
                                             "calendar_connection_status": "connected",
                                             "identity_verification_status": "unverified",
+                                            "identity_verified_on": null,
                                             "profile_photo": {
                                                 "original_name": "foto-perfil.jpg",
                                                 "url": "https://cdn.example/profile/foto-perfil.jpg"
@@ -7143,7 +7144,8 @@
                         "required": [
                             "role",
                             "category",
-                            "identity_verification_status"
+                            "identity_verification_status",
+                            "identity_verified_on"
                         ],
                         "properties": {
                             "role": {
@@ -7163,9 +7165,20 @@
                                     "in_progress",
                                     "awaiting_user",
                                     "in_review",
-                                    "approved"
+                                    "approved",
+                                    "declined",
+                                    "resubmitted",
+                                    "abandoned",
+                                    "expired",
+                                    "kyc_expired"
                                 ],
                                 "description": "Current identity-verification status for the authenticated provider."
+                            },
+                            "identity_verified_on": {
+                                "type": "string",
+                                "format": "date-time",
+                                "nullable": true,
+                                "description": "Timestamp at which the provider's identity was approved, or null when it is not approved."
                             }
                         }
                     }
