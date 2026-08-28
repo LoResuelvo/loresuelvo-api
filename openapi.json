@@ -7161,6 +7161,7 @@
                                     "unverified",
                                     "not_started",
                                     "in_progress",
+                                    "awaiting_user",
                                     "approved"
                                 ],
                                 "description": "Current identity-verification status for the authenticated provider."
