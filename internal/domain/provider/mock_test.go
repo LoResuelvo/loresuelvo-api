@@ -17,6 +17,17 @@ type providerProfileReaderMock struct {
 	workHistoryErr    error
 }
 
+type identityApprovalReaderMock struct {
+	approvedByProviderID map[int]bool
+	providerIDs          []int
+	err                  error
+}
+
+func (reader *identityApprovalReaderMock) FindApprovedByProviderIDs(_ context.Context, providerIDs []int) (map[int]bool, error) {
+	reader.providerIDs = append([]int(nil), providerIDs...)
+	return reader.approvedByProviderID, reader.err
+}
+
 func (reader *providerProfileReaderMock) FindRatingStatsByProviderID(_ context.Context, _ int) (provider.RatingStats, error) {
 	return reader.stats, reader.ratingStatsErr
 }

@@ -29,3 +29,7 @@ type ProviderProfileReader interface {
 	FindRatingStatsByProviderIDs(ctx context.Context, providerIDs []int) (map[int]RatingStats, error)
 	FindPaidWorkHistoryByProviderID(ctx context.Context, providerID int) ([]readmodel.WorkOrder, error)
 }
+
+type IdentityApprovalReader interface {
+	FindApprovedByProviderIDs(ctx context.Context, providerIDs []int) (map[int]bool, error)
+}

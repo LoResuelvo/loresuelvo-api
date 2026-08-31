@@ -13,11 +13,12 @@ import (
 )
 
 type Service struct {
-	userRepository     UserRepository
-	categoryFinder     CategoryFinder
-	coverageZoneFinder CoverageZoneFinder
-	fileService        FileService
-	profileReader      ProviderProfileReader
+	userRepository         UserRepository
+	categoryFinder         CategoryFinder
+	coverageZoneFinder     CoverageZoneFinder
+	fileService            FileService
+	profileReader          ProviderProfileReader
+	identityApprovalReader IdentityApprovalReader
 }
 
 func NewService(
@@ -26,6 +27,7 @@ func NewService(
 	fileService FileService,
 	profileReader ProviderProfileReader,
 	coverageZoneFinder CoverageZoneFinder,
+	identityApprovalReaders ...IdentityApprovalReader,
 ) *Service {
 	service := &Service{
 		userRepository:     repository,
@@ -33,6 +35,9 @@ func NewService(
 		coverageZoneFinder: coverageZoneFinder,
 		fileService:        fileService,
 		profileReader:      profileReader,
+	}
+	if len(identityApprovalReaders) > 0 {
+		service.identityApprovalReader = identityApprovalReaders[0]
 	}
 	return service
 }
@@ -160,18 +165,26 @@ func (s *Service) SearchProvidersByCategoryID(ctx context.Context, categoryID in
 	if err != nil {
 		return nil, fmt.Errorf("finding provider rating stats for search: %w", err)
 	}
+	if s.identityApprovalReader == nil {
+		return nil, ErrIdentityApprovalReaderNotConfigured
+	}
+	identityApprovedByProviderID, err := s.identityApprovalReader.FindApprovedByProviderIDs(ctx, providerIDs)
+	if err != nil {
+		return nil, fmt.Errorf("finding approved provider identities for search: %w", err)
+	}
 
 	for index := range providers {
 		foundProvider := providers[index]
 		ratingSummary := ratingStatsByProviderID[foundProvider.ID()].Summary()
 		results = append(results, readmodel.ProviderSearchResult{
-			ID:            foundProvider.ID(),
-			Name:          foundProvider.Name(),
-			Surname:       foundProvider.Surname(),
-			CategoryName:  categoryName(&foundProvider),
-			ProfilePhoto:  foundProvider.ProfilePhoto(),
-			RatingAverage: ratingSummary.Average,
-			RatingCount:   ratingSummary.Count,
+			ID:               foundProvider.ID(),
+			Name:             foundProvider.Name(),
+			Surname:          foundProvider.Surname(),
+			CategoryName:     categoryName(&foundProvider),
+			ProfilePhoto:     foundProvider.ProfilePhoto(),
+			RatingAverage:    ratingSummary.Average,
+			RatingCount:      ratingSummary.Count,
+			IdentityVerified: identityApprovedByProviderID[foundProvider.ID()],
 		})
 	}
 

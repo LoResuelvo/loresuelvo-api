@@ -45,6 +45,9 @@ func TestServiceComposesRatingSummaryForEachProviderSearchResult(t *testing.T) {
 			pedro.ID(): {Total: 2, Count: 1},
 		},
 	}
+	identityApprovalReader := &identityApprovalReaderMock{approvedByProviderID: map[int]bool{
+		juan.ID(): true,
+	}}
 	repository := &providerRepositoryMock{
 		providersByCategoryID: map[int][]provider.Provider{
 			providerCategory.ID: {*juan, *pedro},
@@ -61,6 +64,7 @@ func TestServiceComposesRatingSummaryForEachProviderSearchResult(t *testing.T) {
 		},
 		profileReader,
 		nil,
+		identityApprovalReader,
 	)
 
 	results, err := providerService.SearchProvidersByCategoryID(context.Background(), providerCategory.ID)
@@ -68,14 +72,16 @@ func TestServiceComposesRatingSummaryForEachProviderSearchResult(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, results, 2)
 	assert.Equal(t, []int{juan.ID(), pedro.ID()}, profileReader.providerIDs)
+	assert.Equal(t, []int{juan.ID(), pedro.ID()}, identityApprovalReader.providerIDs)
 	assert.Equal(t, readmodel.ProviderSearchResult{
-		ID:            juan.ID(),
-		Name:          "Juan",
-		Surname:       "Pérez",
-		CategoryName:  "Plomería",
-		ProfilePhoto:  juan.ProfilePhoto(),
-		RatingAverage: 4.5,
-		RatingCount:   2,
+		ID:               juan.ID(),
+		Name:             "Juan",
+		Surname:          "Pérez",
+		CategoryName:     "Plomería",
+		ProfilePhoto:     juan.ProfilePhoto(),
+		RatingAverage:    4.5,
+		RatingCount:      2,
+		IdentityVerified: true,
 	}, results[0])
 	assert.Equal(t, 2.0, results[1].RatingAverage)
 	assert.Equal(t, 1, results[1].RatingCount)
@@ -103,6 +109,7 @@ func TestServiceUsesZeroRatingSummaryWhenProviderHasNoRatings(t *testing.T) {
 		&profilePhotoValidatorMock{},
 		profileReader,
 		nil,
+		&identityApprovalReaderMock{},
 	)
 
 	results, err := providerService.SearchProvidersByCategoryID(context.Background(), providerCategory.ID)
@@ -135,6 +142,7 @@ func TestServicePropagatesProviderSearchRatingReaderError(t *testing.T) {
 		&profilePhotoValidatorMock{},
 		&providerProfileReaderMock{batchStatsErr: expectedErr},
 		nil,
+		&identityApprovalReaderMock{},
 	)
 
 	results, err := providerService.SearchProvidersByCategoryID(context.Background(), providerCategory.ID)
@@ -142,4 +150,36 @@ func TestServicePropagatesProviderSearchRatingReaderError(t *testing.T) {
 	assert.Nil(t, results)
 	assert.ErrorIs(t, err, expectedErr)
 	assert.ErrorContains(t, err, "finding provider rating stats for search")
+}
+
+func TestServicePropagatesProviderSearchIdentityApprovalReaderError(t *testing.T) {
+	providerCategory := existingCategory()
+	foundProvider, err := provider.NewProvider(
+		"auth0|juan",
+		"juan@example.com",
+		"Juan",
+		"Pérez",
+		&providerCategory,
+		&filedomain.Image{FileID: "juan-photo"},
+		[]coveragezone.CoverageZone{defaultCoverageZone()},
+	)
+	require.NoError(t, err)
+	foundProvider.SetPersistenceID(12)
+	expectedErr := errors.New("identity approval reader unavailable")
+	providerService := provider.NewService(
+		&providerRepositoryMock{providersByCategoryID: map[int][]provider.Provider{
+			providerCategory.ID: {*foundProvider},
+		}},
+		categoryFinderWithExistingCategory(),
+		&profilePhotoValidatorMock{},
+		&providerProfileReaderMock{statsByProviderID: map[int]provider.RatingStats{}},
+		nil,
+		&identityApprovalReaderMock{err: expectedErr},
+	)
+
+	results, err := providerService.SearchProvidersByCategoryID(context.Background(), providerCategory.ID)
+
+	assert.Nil(t, results)
+	assert.ErrorIs(t, err, expectedErr)
+	assert.ErrorContains(t, err, "finding approved provider identities for search")
 }
