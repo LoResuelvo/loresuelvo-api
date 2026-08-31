@@ -3302,7 +3302,7 @@
                 ],
                 "operationId": "processIdentityVerificationWebhook",
                 "summary": "Process a Didit identity-verification status update",
-                "description": "Receives an authenticated `status.updated` notification from Didit. This public endpoint uses the Didit signature headers and does not accept Auth0 credentials.",
+                "description": "Receives an authenticated `status.updated` notification from Didit. This public endpoint uses the Didit signature headers and does not accept Auth0 credentials. The unique `event_id` makes retries idempotent: a repeated event is acknowledged without applying it again. Authenticated events whose `created_at` precedes the latest accepted result are recorded and acknowledged without changing the current verification state. Processing the event identity and session state is atomic. Only the event identifier, session identifier, and occurrence/receipt timestamps are retained for this purpose; the complete webhook payload is not persisted.",
                 "security": [],
                 "parameters": [
                     {
@@ -3338,7 +3338,7 @@
                 },
                 "responses": {
                     "204": {
-                        "description": "Notification accepted and applied."
+                        "description": "Notification accepted. New current results are applied; duplicate or older results are acknowledged without changing the current state."
                     },
                     "400": {
                         "description": "Invalid JSON or webhook contract.",
