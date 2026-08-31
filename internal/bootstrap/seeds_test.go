@@ -188,6 +188,14 @@ func cleanupProviderCoverageSeed(t *testing.T, database *sql.DB, seed seedData) 
 			WHERE coverage_markets.code = 'CABA'
 		)`)
 	require.NoError(t, err)
+	_, err = database.Exec(`DELETE FROM consumer_addresses
+		WHERE coverage_zone_id IN (
+			SELECT coverage_zones.id
+			FROM coverage_zones
+			INNER JOIN coverage_markets ON coverage_markets.id = coverage_zones.market_id
+			WHERE coverage_markets.code = 'CABA'
+		)`)
+	require.NoError(t, err)
 	_, err = database.Exec(`DELETE FROM coverage_zones
 		WHERE market_id IN (SELECT id FROM coverage_markets WHERE code = 'CABA')`)
 	require.NoError(t, err)
