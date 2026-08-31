@@ -132,6 +132,40 @@ func (repository *IdentityVerificationRepository) FindLatestByProviderID(ctx con
 	return repository.FindBySessionID(ctx, sessionID)
 }
 
+func (repository *IdentityVerificationRepository) FindApprovedByProviderIDs(ctx context.Context, providerIDs []int) (map[int]bool, error) {
+	approvedByProviderID := make(map[int]bool, len(providerIDs))
+	for _, providerID := range providerIDs {
+		approvedByProviderID[providerID] = false
+	}
+	if len(providerIDs) == 0 {
+		return approvedByProviderID, nil
+	}
+
+	rows, err := repository.db.QueryContext(ctx, `
+		SELECT DISTINCT ON (provider_id) provider_id, status
+		FROM identity_verification_sessions
+		WHERE provider_id = ANY($1)
+		ORDER BY provider_id, created_on DESC, external_session_id DESC`, providerIDs)
+	if err != nil {
+		return nil, fmt.Errorf("finding approved identity verifications by provider ids: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	for rows.Next() {
+		var providerID int
+		var status identityverification.VerificationStatus
+		if err := rows.Scan(&providerID, &status); err != nil {
+			return nil, fmt.Errorf("scanning approved identity verification by provider ids: %w", err)
+		}
+		approvedByProviderID[providerID] = status == identityverification.StatusApproved
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterating approved identity verifications by provider ids: %w", err)
+	}
+
+	return approvedByProviderID, nil
+}
+
 func (repository *IdentityVerificationRepository) FindByProviderID(ctx context.Context, providerID int) ([]identityverification.IdentityVerification, error) {
 	rows, err := repository.db.QueryContext(ctx, `SELECT external_session_id FROM identity_verification_sessions WHERE provider_id = $1 ORDER BY created_on DESC, external_session_id DESC`, providerID)
 	if err != nil {

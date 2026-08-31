@@ -126,3 +126,39 @@ func TestIdentityVerificationRepositoryStoresSanitizedRiskCodes(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, verification.RiskCodes, found.RiskCodes)
 }
+
+func TestIdentityVerificationRepositoryFindsApprovedProvidersInBatch(t *testing.T) {
+	testContext := newIdentityVerificationRepositoryTest(t)
+	unverifiedProviderID := saveIdentityProvider(t, testContext.database)
+	verification, err := identityverification.NewVerification(
+		testContext.providerID,
+		uuid.New(),
+		uuid.New(),
+		"didit",
+		3,
+		time.Date(2026, 9, 1, 12, 0, 0, 0, time.UTC),
+	)
+	require.NoError(t, err)
+	verification.Status = identityverification.StatusApproved
+	require.NoError(t, testContext.repository.Save(context.Background(), verification))
+
+	approvedByProviderID, err := testContext.repository.FindApprovedByProviderIDs(
+		context.Background(),
+		[]int{testContext.providerID, unverifiedProviderID},
+	)
+
+	require.NoError(t, err)
+	require.Equal(t, map[int]bool{
+		testContext.providerID: true,
+		unverifiedProviderID:   false,
+	}, approvedByProviderID)
+}
+
+func TestIdentityVerificationRepositoryReturnsEmptyApprovalMapForEmptyBatch(t *testing.T) {
+	testContext := newIdentityVerificationRepositoryTest(t)
+
+	approvedByProviderID, err := testContext.repository.FindApprovedByProviderIDs(context.Background(), nil)
+
+	require.NoError(t, err)
+	require.Empty(t, approvedByProviderID)
+}
