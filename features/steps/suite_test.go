@@ -131,6 +131,8 @@ type testSuite struct {
 	lastBookingTermsProposalID              int
 	lastBookingTerms                        bookingTermsResponse
 	expectedIdentityVerificationSessionID   uuid.UUID
+	lastIdentityVerificationEventID         uuid.UUID
+	identityVerificationWebhookStatuses     []int
 
 	categoryIDsByName              map[string]int
 	lastProviderFilterCategoryName string
@@ -310,6 +312,8 @@ func (s *testSuite) cleanup() error {
 	s.lastBookingTermsProposalID = 0
 	s.lastBookingTerms = bookingTermsResponse{}
 	s.expectedIdentityVerificationSessionID = uuid.Nil
+	s.lastIdentityVerificationEventID = uuid.Nil
+	s.identityVerificationWebhookStatuses = nil
 	return nil
 }
 

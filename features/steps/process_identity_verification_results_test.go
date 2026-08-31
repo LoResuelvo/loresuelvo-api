@@ -45,6 +45,16 @@ func registerProcessIdentityVerificationResultSteps(sc *godog.ScenarioContext, s
 	sc.Step(`^la fecha de verificación de "([^"]*)" es "([^"]*)"$`, suite.providerChecksIdentityVerificationDate)
 	sc.Step(`^el sistema conserva solamente el código de riesgo "([^"]*)"$`, suite.systemKeepsOnlyRiskCode)
 	sc.Step(`^"([^"]*)" ya no figura como prestador verificado$`, suite.providerIsNotVerified)
+	sc.Step(`^se recibe un resultado "([^"]*)" con una firma de verificación inválida$`, suite.invalidIdentityVerificationWebhookIsReceived)
+	sc.Step(`^el sistema rechaza la notificación$`, suite.systemRejectsIdentityVerificationWebhook)
+	sc.Step(`^la verificación de "([^"]*)" permanece en estado "([^"]*)"$`, suite.identityVerificationRemainsInStatus)
+	sc.Step(`^el verificador envía dos veces el mismo resultado auténtico "([^"]*)"$`, suite.verifierSendsIdentityVerificationResultTwice)
+	sc.Step(`^ambas entregas son aceptadas$`, suite.bothIdentityVerificationDeliveriesAreAccepted)
+	sc.Step(`^la identidad de "([^"]*)" queda aprobada$`, suite.providerIdentityIsApproved)
+	sc.Step(`^el resultado queda registrado una sola vez$`, suite.identityVerificationResultIsRecordedOnce)
+	sc.Step(`^que la identidad de "([^"]*)" fue aprobada a las "([^"]*)"$`, suite.providerIdentityWasApprovedAt)
+	sc.Step(`^llega un resultado auténtico "([^"]*)" ocurrido a las "([^"]*)"$`, suite.identityVerificationResultArrivesWithOccurredOn)
+	sc.Step(`^"([^"]*)" conserva el estado "([^"]*)"$`, suite.providerKeepsIdentityVerificationStatus)
 }
 
 func (suite *testSuite) providerStartedIdentityVerification(email string) error {
@@ -68,6 +78,10 @@ func (suite *testSuite) verifierReportsIdentityVerificationStatus(status string)
 }
 
 func (suite *testSuite) verifierReportsIdentityVerificationStatusWithRisk(status, riskCode string) error {
+	return suite.sendIdentityVerificationWebhook(status, riskCode, uuid.New(), suite.clock.Now(), true)
+}
+
+func (suite *testSuite) sendIdentityVerificationWebhook(status, riskCode string, eventID uuid.UUID, occurredOn time.Time, authentic bool) error {
 	verification, err := suite.identityVerificationRepository.FindBySessionID(context.Background(), suite.expectedIdentityVerificationSessionID)
 	if err != nil {
 		return fmt.Errorf("finding started identity verification: %w", err)
@@ -78,8 +92,8 @@ func (suite *testSuite) verifierReportsIdentityVerificationStatusWithRisk(status
 
 	now := suite.clock.Now()
 	payload := identityVerificationWebhookPayload{
-		EventID: uuid.New(), SessionID: verification.ExternalSessionID, Status: diditStatusFor(status),
-		WebhookType: "status.updated", CreatedAt: now.Unix(), Timestamp: now.Unix(),
+		EventID: eventID, SessionID: verification.ExternalSessionID, Status: diditStatusFor(status),
+		WebhookType: "status.updated", CreatedAt: occurredOn.Unix(), Timestamp: now.Unix(),
 		WorkflowID: verification.WorkflowID, WorkflowVersion: verification.WorkflowVersion,
 		VendorData: strconv.Itoa(verification.ProviderID),
 	}
@@ -96,7 +110,11 @@ func (suite *testSuite) verifierReportsIdentityVerificationStatusWithRisk(status
 	}
 	signer := newIdentityVerificationWebhookSignerStub()
 	request.Header.Set("Content-Type", "application/json")
-	request.Header.Set("X-Signature-V2", signer.Sign(body))
+	signature := signer.Sign(body)
+	if !authentic {
+		signature = "invalid"
+	}
+	request.Header.Set("X-Signature-V2", signature)
 	request.Header.Set("X-Timestamp", strconv.FormatInt(now.Unix(), 10))
 	response, err := http.DefaultClient.Do(request)
 	if err != nil {
@@ -106,6 +124,88 @@ func (suite *testSuite) verifierReportsIdentityVerificationStatusWithRisk(status
 	suite.lastStatus = response.StatusCode
 	suite.lastBody, err = io.ReadAll(response.Body)
 	return err
+}
+
+func (suite *testSuite) invalidIdentityVerificationWebhookIsReceived(status string) error {
+	return suite.sendIdentityVerificationWebhook(status, "", uuid.New(), suite.clock.Now(), false)
+}
+
+func (suite *testSuite) systemRejectsIdentityVerificationWebhook() error {
+	if suite.lastStatus != http.StatusUnauthorized {
+		return fmt.Errorf("expected status 401, got %d: %s", suite.lastStatus, suite.lastBody)
+	}
+	return nil
+}
+
+func (suite *testSuite) identityVerificationRemainsInStatus(email, expectedStatus string) error {
+	return suite.providerChecksIdentityVerificationStatus(email, expectedStatus)
+}
+
+func (suite *testSuite) verifierSendsIdentityVerificationResultTwice(status string) error {
+	eventID := uuid.New()
+	suite.lastIdentityVerificationEventID = eventID
+	suite.identityVerificationWebhookStatuses = nil
+	for range 2 {
+		if err := suite.sendIdentityVerificationWebhook(status, "", eventID, suite.clock.Now(), true); err != nil {
+			return err
+		}
+		suite.identityVerificationWebhookStatuses = append(suite.identityVerificationWebhookStatuses, suite.lastStatus)
+	}
+	return nil
+}
+
+func (suite *testSuite) bothIdentityVerificationDeliveriesAreAccepted() error {
+	if len(suite.identityVerificationWebhookStatuses) != 2 {
+		return fmt.Errorf("expected two identity verification deliveries, got %d", len(suite.identityVerificationWebhookStatuses))
+	}
+	for _, status := range suite.identityVerificationWebhookStatuses {
+		if status != http.StatusNoContent {
+			return fmt.Errorf("expected both deliveries to return 204, got %v", suite.identityVerificationWebhookStatuses)
+		}
+	}
+	return nil
+}
+
+func (suite *testSuite) providerIdentityIsApproved(email string) error {
+	return suite.providerChecksIdentityVerificationStatus(email, string(identityverification.StatusApproved))
+}
+
+func (suite *testSuite) identityVerificationResultIsRecordedOnce() error {
+	counter, ok := any(suite.identityVerificationRepository).(interface {
+		CountEventsByID(context.Context, uuid.UUID) (int, error)
+	})
+	if !ok {
+		return fmt.Errorf("identity verification event counting is not implemented")
+	}
+	count, err := counter.CountEventsByID(context.Background(), suite.lastIdentityVerificationEventID)
+	if err != nil {
+		return err
+	}
+	if count != 1 {
+		return fmt.Errorf("expected one processed identity verification event, got %d", count)
+	}
+	return nil
+}
+
+func (suite *testSuite) providerIdentityWasApprovedAt(_ string, approvedAtText string) error {
+	approvedAt, err := time.Parse(time.RFC3339Nano, approvedAtText)
+	if err != nil {
+		return fmt.Errorf("parsing identity approval occurrence time: %w", err)
+	}
+	suite.clock.SetTime(approvedAt)
+	return suite.sendIdentityVerificationWebhook(string(identityverification.StatusApproved), "", uuid.New(), approvedAt, true)
+}
+
+func (suite *testSuite) identityVerificationResultArrivesWithOccurredOn(status, occurredOnText string) error {
+	occurredOn, err := time.Parse(time.RFC3339Nano, occurredOnText)
+	if err != nil {
+		return fmt.Errorf("parsing identity verification result occurrence time: %w", err)
+	}
+	return suite.sendIdentityVerificationWebhook(status, "", uuid.New(), occurredOn, true)
+}
+
+func (suite *testSuite) providerKeepsIdentityVerificationStatus(email, expectedStatus string) error {
+	return suite.providerChecksIdentityVerificationStatus(email, expectedStatus)
 }
 
 func (suite *testSuite) providerChecksIdentityVerificationStatus(email, expectedStatus string) error {
