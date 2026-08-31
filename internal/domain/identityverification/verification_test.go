@@ -27,7 +27,7 @@ func TestIdentityVerificationAppliesApprovedResultAndRecordsVerificationTime(t *
 	require.NoError(t, err)
 
 	err = verification.ApplyResult(VerificationResult{
-		SessionID: sessionID, ProviderID: 7, VendorData: ProviderVendorData(7),
+		EventID: uuid.New(), SessionID: sessionID, ProviderID: 7, VendorData: ProviderVendorData(7),
 		WorkflowID: workflowID, WorkflowVersion: 1, Status: StatusApproved,
 		OccurredOn: resultOn,
 	}, verifiedOn)
@@ -48,7 +48,7 @@ func TestIdentityVerificationAppliesDeclinedResultWithSanitizedRiskCodes(t *test
 	require.NoError(t, err)
 
 	err = verification.ApplyResult(VerificationResult{
-		SessionID: sessionID, ProviderID: 7, VendorData: ProviderVendorData(7),
+		EventID: uuid.New(), SessionID: sessionID, ProviderID: 7, VendorData: ProviderVendorData(7),
 		WorkflowID: workflowID, WorkflowVersion: 1, Status: StatusDeclined,
 		RiskCodes:  []string{" DOCUMENT_EXPIRED ", "drop table", "DOCUMENT_EXPIRED", "KYC-FAIL"},
 		OccurredOn: now.Add(time.Minute),
@@ -70,7 +70,7 @@ func TestIdentityVerificationAppliesResubmittedAbandonedAndExpiredResults(t *tes
 			require.NoError(t, err)
 
 			err = verification.ApplyResult(VerificationResult{
-				SessionID: sessionID, ProviderID: 7, VendorData: ProviderVendorData(7),
+				EventID: uuid.New(), SessionID: sessionID, ProviderID: 7, VendorData: ProviderVendorData(7),
 				WorkflowID: workflowID, WorkflowVersion: 1, Status: status,
 				OccurredOn: now.Add(time.Minute),
 			}, now.Add(2*time.Minute))
@@ -90,7 +90,7 @@ func TestIdentityVerificationClearsVerificationDateWhenKYCExpires(t *testing.T) 
 	verification.VerifiedOn = &now
 
 	err = verification.ApplyResult(VerificationResult{
-		SessionID: sessionID, ProviderID: 7, VendorData: ProviderVendorData(7),
+		EventID: uuid.New(), SessionID: sessionID, ProviderID: 7, VendorData: ProviderVendorData(7),
 		WorkflowID: workflowID, WorkflowVersion: 1, Status: StatusKYCExpired,
 		OccurredOn: now.Add(time.Minute),
 	}, now.Add(2*time.Minute))
@@ -98,4 +98,27 @@ func TestIdentityVerificationClearsVerificationDateWhenKYCExpires(t *testing.T) 
 	require.NoError(t, err)
 	require.Equal(t, StatusKYCExpired, verification.Status)
 	require.Nil(t, verification.VerifiedOn)
+}
+
+func TestIdentityVerificationIgnoresResultOlderThanLastAcceptedResult(t *testing.T) {
+	approvedOn := time.Date(2026, 9, 1, 12, 0, 0, 0, time.UTC)
+	sessionID, workflowID := uuid.New(), uuid.New()
+	verification, err := NewVerification(7, sessionID, workflowID, "fake", 1, approvedOn.Add(-time.Hour))
+	require.NoError(t, err)
+	require.NoError(t, verification.ApplyResult(VerificationResult{
+		EventID: uuid.New(), SessionID: sessionID, ProviderID: 7, VendorData: ProviderVendorData(7),
+		WorkflowID: workflowID, WorkflowVersion: 1, Status: StatusApproved, OccurredOn: approvedOn,
+	}, approvedOn))
+
+	err = verification.ApplyResult(VerificationResult{
+		EventID: uuid.New(), SessionID: sessionID, ProviderID: 7, VendorData: ProviderVendorData(7),
+		WorkflowID: workflowID, WorkflowVersion: 1, Status: StatusInProgress,
+		OccurredOn: approvedOn.Add(-time.Minute),
+	}, approvedOn.Add(time.Minute))
+
+	require.NoError(t, err)
+	require.Equal(t, StatusApproved, verification.Status)
+	require.Equal(t, approvedOn, *verification.LastResultOn)
+	require.Equal(t, approvedOn, *verification.VerifiedOn)
+	require.Equal(t, approvedOn, verification.UpdatedOn)
 }

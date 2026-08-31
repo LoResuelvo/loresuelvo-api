@@ -70,7 +70,7 @@ func TestServiceApplyResultMarksSessionInProgress(t *testing.T) {
 	service := NewService(providerFinderStub{}, repo, &verifierStub{}, fixedClock{now})
 
 	err = service.ApplyResult(context.Background(), VerificationResult{
-		SessionID: sessionID, ProviderID: 7, VendorData: ProviderVendorData(7),
+		EventID: uuid.New(), SessionID: sessionID, ProviderID: 7, VendorData: ProviderVendorData(7),
 		WorkflowID: workflowID, WorkflowVersion: 1, Status: StatusInProgress,
 		OccurredOn: now.Add(time.Minute),
 	})
@@ -89,7 +89,7 @@ func TestServiceApplyResultMarksSessionAwaitingUser(t *testing.T) {
 	service := NewService(providerFinderStub{}, repo, &verifierStub{}, fixedClock{now})
 
 	err = service.ApplyResult(context.Background(), VerificationResult{
-		SessionID: sessionID, ProviderID: 7, VendorData: ProviderVendorData(7),
+		EventID: uuid.New(), SessionID: sessionID, ProviderID: 7, VendorData: ProviderVendorData(7),
 		WorkflowID: workflowID, WorkflowVersion: 1, Status: StatusAwaitingUser,
 		OccurredOn: now.Add(time.Minute),
 	})
@@ -107,7 +107,7 @@ func TestServiceApplyResultMarksSessionInReview(t *testing.T) {
 	service := NewService(providerFinderStub{}, repo, &verifierStub{}, fixedClock{now})
 
 	err = service.ApplyResult(context.Background(), VerificationResult{
-		SessionID: sessionID, ProviderID: 7, VendorData: ProviderVendorData(7),
+		EventID: uuid.New(), SessionID: sessionID, ProviderID: 7, VendorData: ProviderVendorData(7),
 		WorkflowID: workflowID, WorkflowVersion: 1, Status: StatusInReview,
 		OccurredOn: now.Add(time.Minute),
 	})

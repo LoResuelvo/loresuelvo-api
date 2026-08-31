@@ -52,7 +52,8 @@ func RehydrateWithMetadata(externalSessionID uuid.UUID, providerID int, verifier
 }
 
 func (verification *IdentityVerification) ApplyResult(result VerificationResult, now time.Time) error {
-	if result.SessionID != verification.ExternalSessionID ||
+	if result.EventID == uuid.Nil ||
+		result.SessionID != verification.ExternalSessionID ||
 		result.ProviderID != verification.ProviderID ||
 		result.WorkflowID != verification.WorkflowID ||
 		result.WorkflowVersion != verification.WorkflowVersion ||
@@ -60,6 +61,9 @@ func (verification *IdentityVerification) ApplyResult(result VerificationResult,
 		!result.Status.CanApplyResult() ||
 		result.OccurredOn.IsZero() || now.IsZero() {
 		return ErrInvalidVerification
+	}
+	if verification.LastResultOn != nil && result.OccurredOn.Before(*verification.LastResultOn) {
+		return nil
 	}
 	verification.Status = result.Status
 	resultOn := result.OccurredOn.UTC()

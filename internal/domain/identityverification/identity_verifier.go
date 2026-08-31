@@ -30,6 +30,7 @@ type IdentityVerifier interface {
 }
 
 type VerificationResult struct {
+	EventID         uuid.UUID
 	SessionID       uuid.UUID
 	ProviderID      int
 	VendorData      string
