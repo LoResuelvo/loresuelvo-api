@@ -29,16 +29,16 @@ Feature: Mostrar la verificación de identidad de un prestador
             When consulto el perfil público de "juan.plomero@example.com"
             Then el perfil indica que la identidad está verificada
 
-        @wip
         Scenario: 59.4 Mantener visible a un prestador no aprobado
             Given que la verificación de "juan.plomero@example.com" está en estado "declined"
             When busco prestadores del rubro "Plomería"
             Then "juan.plomero@example.com" continúa apareciendo
             And figura sin identidad verificada
 
-        @wip
         Scenario: 59.5 No exponer detalles privados en el perfil público
-            Given que la verificación de "juan.plomero@example.com" fue rechazada por el riesgo "DOCUMENT_EXPIRED"
+            Given que existe un consumidor registrado con correo "ana@example.com", nombre "Ana" y apellido "Pérez"
+            And que estoy autenticado como consumidor "ana@example.com"
+            And que la verificación de "juan.plomero@example.com" fue rechazada por el riesgo "DOCUMENT_EXPIRED"
             When consulto el perfil público de "juan.plomero@example.com"
             Then el perfil no expone el estado detallado de la verificación
             And el perfil no expone códigos de riesgo ni datos de identidad

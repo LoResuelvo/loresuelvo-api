@@ -74,6 +74,7 @@ type testSuite struct {
 	lastJobRequestID                        int
 	lastWorkRequestProviderID               int
 	lastProviderProfileID                   int
+	lastIdentityVerificationProviderID      int
 	providerProfilePhotoFileID              string
 	consumerProfilePhotoFileID              string
 	realtimeConnections                     map[string]*realtimeTestConnection
@@ -255,6 +256,7 @@ func (s *testSuite) cleanup() error {
 	s.lastRealtimeEvent = nil
 	s.lastWorkRequestProviderID = 0
 	s.lastProviderProfileID = 0
+	s.lastIdentityVerificationProviderID = 0
 	s.lastJobRequestID = 0
 	s.providerProfilePhotoFileID = ""
 	s.expectedCoverageZoneRegistrationError = ""

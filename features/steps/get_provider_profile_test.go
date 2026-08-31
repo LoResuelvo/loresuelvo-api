@@ -141,20 +141,11 @@ func (suite *testSuite) providerProfileShowsCategory(categoryName string) error 
 }
 
 func (suite *testSuite) providerProfileDoesNotExposePrivateIdentity() error {
-	if _, err := suite.providerProfileResponseShouldBeOK(); err != nil {
+	response, err := suite.providerProfileJSONShouldBeOK()
+	if err != nil {
 		return err
 	}
-
-	var response map[string]json.RawMessage
-	if err := json.Unmarshal(suite.lastBody, &response); err != nil {
-		return fmt.Errorf("provider profile response is not valid JSON: %w", err)
-	}
-	for _, privateField := range []string{"email", "auth_id", "AuthID"} {
-		if _, exists := response[privateField]; exists {
-			return fmt.Errorf("expected provider profile not to expose %q, got body %s", privateField, string(suite.lastBody))
-		}
-	}
-	return nil
+	return providerProfileDoesNotExposeFields(response, suite.lastBody, []string{"email", "auth_id", "AuthID"})
 }
 
 func (suite *testSuite) systemReportsProviderProfileNotFound() error {
@@ -174,6 +165,27 @@ func (suite *testSuite) providerProfileResponseShouldBeOK() (*providerProfileRes
 		return nil, fmt.Errorf("expected provider profile id, got body %s", string(suite.lastBody))
 	}
 	return &response, nil
+}
+
+func (suite *testSuite) providerProfileJSONShouldBeOK() (map[string]json.RawMessage, error) {
+	if _, err := suite.providerProfileResponseShouldBeOK(); err != nil {
+		return nil, err
+	}
+
+	var response map[string]json.RawMessage
+	if err := json.Unmarshal(suite.lastBody, &response); err != nil {
+		return nil, fmt.Errorf("provider profile response is not valid JSON: %w", err)
+	}
+	return response, nil
+}
+
+func providerProfileDoesNotExposeFields(response map[string]json.RawMessage, body []byte, forbiddenFields []string) error {
+	for _, forbiddenField := range forbiddenFields {
+		if _, exists := response[forbiddenField]; exists {
+			return fmt.Errorf("expected provider profile not to expose %q, got body %s", forbiddenField, string(body))
+		}
+	}
+	return nil
 }
 
 func splitFullName(fullName string) (string, string, error) {

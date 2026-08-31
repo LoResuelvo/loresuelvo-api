@@ -154,6 +154,71 @@ func TestIdentityVerificationRepositoryFindsApprovedProvidersInBatch(t *testing.
 	}, approvedByProviderID)
 }
 
+func TestIdentityVerificationRepositoryUsesLatestStatusForApproval(t *testing.T) {
+	testContext := newIdentityVerificationRepositoryTest(t)
+	olderVerification, err := identityverification.NewVerification(
+		testContext.providerID,
+		uuid.New(),
+		uuid.New(),
+		"didit",
+		3,
+		time.Date(2026, 9, 1, 11, 0, 0, 0, time.UTC),
+	)
+	require.NoError(t, err)
+	olderVerification.Status = identityverification.StatusApproved
+	require.NoError(t, testContext.repository.Save(context.Background(), olderVerification))
+
+	newerVerification, err := identityverification.NewVerification(
+		testContext.providerID,
+		uuid.New(),
+		uuid.New(),
+		"didit",
+		3,
+		time.Date(2026, 9, 1, 12, 0, 0, 0, time.UTC),
+	)
+	require.NoError(t, err)
+	newerVerification.Status = identityverification.StatusDeclined
+	require.NoError(t, testContext.repository.Save(context.Background(), newerVerification))
+
+	approvedByProviderID, err := testContext.repository.FindApprovedByProviderIDs(context.Background(), []int{testContext.providerID})
+
+	require.NoError(t, err)
+	require.Equal(t, map[int]bool{testContext.providerID: false}, approvedByProviderID)
+}
+
+func TestIdentityVerificationRepositoryReturnsFalseForNonApprovedStatuses(t *testing.T) {
+	testContext := newIdentityVerificationRepositoryTest(t)
+	statuses := []identityverification.VerificationStatus{
+		identityverification.StatusDeclined,
+		identityverification.StatusKYCExpired,
+		identityverification.StatusInProgress,
+		identityverification.StatusResubmitted,
+	}
+	providerIDs := make([]int, 0, len(statuses))
+	for index, status := range statuses {
+		providerID := saveIdentityProvider(t, testContext.database)
+		providerIDs = append(providerIDs, providerID)
+		verification, err := identityverification.NewVerification(
+			providerID,
+			uuid.New(),
+			uuid.New(),
+			"didit",
+			3,
+			time.Date(2026, 9, 1, 12, index, 0, 0, time.UTC),
+		)
+		require.NoError(t, err)
+		verification.Status = status
+		require.NoError(t, testContext.repository.Save(context.Background(), verification))
+	}
+
+	approvedByProviderID, err := testContext.repository.FindApprovedByProviderIDs(context.Background(), providerIDs)
+
+	require.NoError(t, err)
+	for _, providerID := range providerIDs {
+		require.False(t, approvedByProviderID[providerID])
+	}
+}
+
 func TestIdentityVerificationRepositoryReturnsEmptyApprovalMapForEmptyBatch(t *testing.T) {
 	testContext := newIdentityVerificationRepositoryTest(t)
 
