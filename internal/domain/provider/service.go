@@ -228,18 +228,26 @@ func (s *Service) GetProviderProfileDetail(ctx context.Context, providerID int) 
 	if workOrders == nil {
 		workOrders = []readmodel.WorkOrder{}
 	}
+	if s.identityApprovalReader == nil {
+		return nil, ErrIdentityApprovalReaderNotConfigured
+	}
+	identityApprovedByProviderID, err := s.identityApprovalReader.FindApprovedByProviderIDs(ctx, []int{foundProvider.ID()})
+	if err != nil {
+		return nil, fmt.Errorf("finding approved provider identity for profile: %w", err)
+	}
 
 	ratingSummary := ratingStats.Summary()
 	return &readmodel.Profile{
-		ID:            foundProvider.ID(),
-		Name:          foundProvider.Name(),
-		Surname:       foundProvider.Surname(),
-		ProfilePhoto:  foundProvider.ProfilePhoto(),
-		CategoryID:    categoryID(foundProvider),
-		CategoryName:  categoryName(foundProvider),
-		RatingAverage: ratingSummary.Average,
-		RatingCount:   ratingSummary.Count,
-		WorkOrders:    workOrders,
+		ID:               foundProvider.ID(),
+		Name:             foundProvider.Name(),
+		Surname:          foundProvider.Surname(),
+		ProfilePhoto:     foundProvider.ProfilePhoto(),
+		CategoryID:       categoryID(foundProvider),
+		CategoryName:     categoryName(foundProvider),
+		RatingAverage:    ratingSummary.Average,
+		RatingCount:      ratingSummary.Count,
+		IdentityVerified: identityApprovedByProviderID[foundProvider.ID()],
+		WorkOrders:       workOrders,
 	}, nil
 }
 

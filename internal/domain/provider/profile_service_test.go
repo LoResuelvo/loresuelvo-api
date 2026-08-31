@@ -55,6 +55,26 @@ func TestServiceIncludesReviewInPaidWorkOrder(t *testing.T) {
 	assert.Equal(t, review, profile.WorkOrders[0].Review)
 }
 
+func TestServiceIncludesIdentityApprovalInPublicProfile(t *testing.T) {
+	identityReader := &identityApprovalReaderMock{
+		approvedByProviderID: map[int]bool{12: true},
+	}
+	providerService := provider.NewService(
+		&providerRepositoryMock{providerByID: providerForProfileService(t)},
+		categoryFinderWithExistingCategory(),
+		profilePhotoServiceForProfile(t),
+		&providerProfileReaderMock{},
+		nil,
+		identityReader,
+	)
+
+	profile, err := providerService.GetProviderProfileDetail(context.Background(), 12)
+
+	require.NoError(t, err)
+	assert.True(t, profile.IdentityVerified)
+	assert.Equal(t, []int{12}, identityReader.providerIDs)
+}
+
 func TestServicePropagatesRatingStatsError(t *testing.T) {
 	expectedErr := errors.New("rating stats unavailable")
 	repository := &providerRepositoryMock{providerByID: providerForProfileService(t)}
@@ -87,6 +107,22 @@ func TestServicePropagatesPaidWorkHistoryError(t *testing.T) {
 	assert.ErrorIs(t, err, expectedErr)
 }
 
+func TestServicePropagatesIdentityApprovalErrorInPublicProfile(t *testing.T) {
+	expectedErr := errors.New("identity approval unavailable")
+	providerService := provider.NewService(
+		&providerRepositoryMock{providerByID: providerForProfileService(t)},
+		categoryFinderWithExistingCategory(),
+		profilePhotoServiceForProfile(t),
+		&providerProfileReaderMock{},
+		nil,
+		&identityApprovalReaderMock{err: expectedErr},
+	)
+
+	_, err := providerService.GetProviderProfileDetail(context.Background(), 12)
+
+	assert.ErrorIs(t, err, expectedErr)
+}
+
 func newProviderServiceWithProfileReader(t *testing.T, stats provider.RatingStats, workOrders []readmodel.WorkOrder) (*provider.Service, *providerRepositoryMock) {
 	t.Helper()
 	repository := &providerRepositoryMock{providerByID: providerForProfileService(t)}
@@ -96,6 +132,7 @@ func newProviderServiceWithProfileReader(t *testing.T, stats provider.RatingStat
 		profilePhotoServiceForProfile(t),
 		&providerProfileReaderMock{stats: stats, workOrders: workOrders},
 		nil,
+		&identityApprovalReaderMock{},
 	)
 
 	return providerService, repository
