@@ -25,11 +25,12 @@ type providerProfileCategoryResponse struct {
 }
 
 type providerProfileResponse struct {
-	ID           int                             `json:"id"`
-	Name         string                          `json:"name"`
-	Surname      string                          `json:"surname"`
-	ProfilePhoto *providerProfilePhotoResponse   `json:"profile_photo"`
-	Category     providerProfileCategoryResponse `json:"category"`
+	ID               int                             `json:"id"`
+	Name             string                          `json:"name"`
+	Surname          string                          `json:"surname"`
+	ProfilePhoto     *providerProfilePhotoResponse   `json:"profile_photo"`
+	Category         providerProfileCategoryResponse `json:"category"`
+	IdentityVerified bool                            `json:"identity_verified"`
 }
 
 func registerGetProviderProfileSteps(sc *godog.ScenarioContext, suite *testSuite) {

@@ -16,6 +16,28 @@ func registerShowProviderIdentityVerificationSteps(sc *godog.ScenarioContext, su
 	sc.Step(`^mi fecha de verificación no está informada$`, suite.currentUserIdentityVerificationDateIsMissing)
 	sc.Step(`^busco prestadores del rubro "([^"]*)"$`, suite.filterProvidersByCategory)
 	sc.Step(`^"([^"]*)" figura con identidad verificada$`, suite.providerAppearsWithVerifiedIdentity)
+	sc.Step(`^consulto el perfil público de "([^"]*)"$`, suite.requestPublicProviderProfile)
+	sc.Step(`^el perfil indica que la identidad está verificada$`, suite.publicProviderProfileIndicatesVerifiedIdentity)
+}
+
+func (suite *testSuite) requestPublicProviderProfile(email string) error {
+	providerID, err := suite.providerIDByEmail(email)
+	if err != nil {
+		return err
+	}
+	suite.lastProviderProfileID = providerID
+	return suite.getProviderProfile(providerID)
+}
+
+func (suite *testSuite) publicProviderProfileIndicatesVerifiedIdentity() error {
+	profile, err := suite.providerProfileResponseShouldBeOK()
+	if err != nil {
+		return err
+	}
+	if !profile.IdentityVerified {
+		return fmt.Errorf("expected public provider profile to indicate verified identity, got body %s", suite.lastBody)
+	}
+	return nil
 }
 
 func (suite *testSuite) requestCurrentUserProfile() error {
