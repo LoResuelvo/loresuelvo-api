@@ -14,16 +14,25 @@ import (
 
 type IdentityVerificationRepository struct{ db *sql.DB }
 
+type identityVerificationExecutor interface {
+	ExecContext(context.Context, string, ...any) (sql.Result, error)
+	QueryRowContext(context.Context, string, ...any) *sql.Row
+}
+
 func NewIdentityVerificationRepository(db *sql.DB) *IdentityVerificationRepository {
 	return &IdentityVerificationRepository{db: db}
 }
 
 func (repository *IdentityVerificationRepository) Save(ctx context.Context, verification *identityverification.IdentityVerification) error {
+	return repository.saveWithExecutor(ctx, repository.db, verification)
+}
+
+func (repository *IdentityVerificationRepository) saveWithExecutor(ctx context.Context, executor identityVerificationExecutor, verification *identityverification.IdentityVerification) error {
 	riskCodes := verification.RiskCodes
 	if riskCodes == nil {
 		riskCodes = []string{}
 	}
-	_, err := repository.db.ExecContext(ctx, `
+	_, err := executor.ExecContext(ctx, `
 		INSERT INTO identity_verification_sessions (
 			external_session_id, provider_id, verifier, workflow_id, workflow_version, status,
 			risk_codes, last_result_on, verified_on, created_on, updated_on
@@ -48,6 +57,10 @@ func (repository *IdentityVerificationRepository) Save(ctx context.Context, veri
 }
 
 func (repository *IdentityVerificationRepository) FindBySessionID(ctx context.Context, sessionID uuid.UUID) (*identityverification.IdentityVerification, error) {
+	return repository.findBySessionIDWithExecutor(ctx, repository.db, sessionID)
+}
+
+func (repository *IdentityVerificationRepository) findBySessionIDWithExecutor(ctx context.Context, executor identityVerificationExecutor, sessionID uuid.UUID) (*identityverification.IdentityVerification, error) {
 	var providerID, workflowVersion int
 	var verifier, status string
 	var riskCodes []string
@@ -55,7 +68,7 @@ func (repository *IdentityVerificationRepository) FindBySessionID(ctx context.Co
 	var lastResultOn, verifiedOn sql.NullTime
 	var createdOn, updatedOn time.Time
 	var scanner = pgtype.NewMap()
-	err := repository.db.QueryRowContext(ctx, `
+	err := executor.QueryRowContext(ctx, `
 		SELECT provider_id, verifier, workflow_id, workflow_version, status, risk_codes, last_result_on, verified_on, created_on, updated_on
 		FROM identity_verification_sessions WHERE external_session_id = $1`, sessionID).
 		Scan(&providerID, &verifier, &workflowID, &workflowVersion, &status, scanner.SQLScanner(&riskCodes), &lastResultOn, &verifiedOn, &createdOn, &updatedOn)
@@ -74,6 +87,31 @@ func (repository *IdentityVerificationRepository) FindBySessionID(ctx context.Co
 		return nil, fmt.Errorf("rehydrating identity verification: %w", err)
 	}
 	return verification, nil
+}
+
+func (repository *IdentityVerificationRepository) saveEventWithExecutor(ctx context.Context, executor identityVerificationExecutor, event *identityverification.VerificationEvent) (bool, error) {
+	result, err := executor.ExecContext(ctx, `
+		INSERT INTO identity_verification_events (
+			external_event_id, external_session_id, occurred_on, received_on
+		) VALUES ($1, $2, $3, $4)
+		ON CONFLICT (external_event_id) DO NOTHING`,
+		event.EventID, event.SessionID, event.OccurredOn, event.ReceivedOn)
+	if err != nil {
+		return false, fmt.Errorf("saving identity verification event: %w", err)
+	}
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return false, fmt.Errorf("reading saved identity verification event result: %w", err)
+	}
+	return rowsAffected == 1, nil
+}
+
+func (repository *IdentityVerificationRepository) CountEventsByID(ctx context.Context, eventID uuid.UUID) (int, error) {
+	var count int
+	if err := repository.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM identity_verification_events WHERE external_event_id = $1`, eventID).Scan(&count); err != nil {
+		return 0, fmt.Errorf("counting identity verification events: %w", err)
+	}
+	return count, nil
 }
 
 func nullableTime(value sql.NullTime) *time.Time {
