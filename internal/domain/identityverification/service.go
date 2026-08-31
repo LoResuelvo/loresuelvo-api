@@ -23,30 +23,48 @@ type VerificationStatusDetails struct {
 type Service struct {
 	providerFinder ProviderFinder
 	repository     VerificationRepository
+	unitOfWork     UnitOfWork
 	verifier       IdentityVerifier
 	clock          clock.Clock
 }
 
-func NewService(providerFinder ProviderFinder, repository VerificationRepository, verifier IdentityVerifier, systemClock clock.Clock) *Service {
-	return &Service{providerFinder: providerFinder, repository: repository, verifier: verifier, clock: systemClock}
+func NewService(providerFinder ProviderFinder, repository VerificationRepository, unitOfWork UnitOfWork, verifier IdentityVerifier, systemClock clock.Clock) *Service {
+	return &Service{providerFinder: providerFinder, repository: repository, unitOfWork: unitOfWork, verifier: verifier, clock: systemClock}
 }
 
 func (service *Service) ApplyResult(ctx context.Context, result VerificationResult) error {
 	if result.EventID == uuid.Nil || result.SessionID == uuid.Nil || result.ProviderID <= 0 || result.WorkflowID == uuid.Nil || result.WorkflowVersion < 0 || !result.Status.CanApplyResult() || result.OccurredOn.IsZero() {
 		return ErrInvalidVerification
 	}
-	verification, err := service.repository.FindBySessionID(ctx, result.SessionID)
+	now := service.clock.Now()
+	event, err := NewVerificationEvent(result, now)
 	if err != nil {
-		return fmt.Errorf("finding identity verification session: %w", err)
-	}
-	if verification == nil {
-		return ErrSessionNotFound
-	}
-	if err := verification.ApplyResult(result, service.clock.Now()); err != nil {
 		return err
 	}
-	if err := service.repository.Save(ctx, verification); err != nil {
-		return fmt.Errorf("saving identity verification result: %w", err)
+	if err := service.unitOfWork.Execute(ctx, func(store TransactionalStore) error {
+		stored, err := store.SaveEvent(ctx, event)
+		if err != nil {
+			return fmt.Errorf("saving identity verification event: %w", err)
+		}
+		if !stored {
+			return nil
+		}
+		verification, err := store.FindVerificationBySessionID(ctx, result.SessionID)
+		if err != nil {
+			return fmt.Errorf("finding identity verification session: %w", err)
+		}
+		if verification == nil {
+			return ErrSessionNotFound
+		}
+		if err := verification.ApplyResult(result, now); err != nil {
+			return err
+		}
+		if err := store.SaveVerification(ctx, verification); err != nil {
+			return fmt.Errorf("saving identity verification result: %w", err)
+		}
+		return nil
+	}); err != nil {
+		return fmt.Errorf("applying identity verification result: %w", err)
 	}
 	return nil
 }

@@ -23,7 +23,7 @@ func TestServiceStartCreatesSessionAfterVerifierSuccess(t *testing.T) {
 	repo := &verificationRepositoryStub{}
 	sessionID, workflowID := uuid.New(), uuid.New()
 	verifier := &verifierStub{credentials: SessionCredentials{SessionID: sessionID, SessionToken: "secret", VerificationURL: "https://verify.example", Status: StatusNotStarted, Verifier: "fake", WorkflowID: workflowID, WorkflowVersion: 1}}
-	service := NewService(finder, repo, verifier, fixedClock{now})
+	service := NewService(finder, repo, unitOfWorkStub{}, verifier, fixedClock{now})
 
 	result, err := service.Start(context.Background(), foundProvider.AuthID())
 
@@ -36,7 +36,7 @@ func TestServiceStartCreatesSessionAfterVerifierSuccess(t *testing.T) {
 }
 
 func TestServiceStartRejectsConsumer(t *testing.T) {
-	service := NewService(providerFinderStub{err: errors.New("not found")}, &verificationRepositoryStub{}, &verifierStub{}, fixedClock{now: time.Now()})
+	service := NewService(providerFinderStub{err: errors.New("not found")}, &verificationRepositoryStub{}, unitOfWorkStub{}, &verifierStub{}, fixedClock{now: time.Now()})
 	_, err := service.Start(context.Background(), "auth0|consumer")
 	require.ErrorIs(t, err, ErrProviderRequired)
 }
@@ -51,7 +51,7 @@ func TestServiceStartReusesInProgressSession(t *testing.T) {
 	active.Status = StatusInProgress
 	repo := &verificationRepositoryStub{latest: active}
 	verifier := &verifierStub{credentials: SessionCredentials{SessionID: active.ExternalSessionID, SessionToken: "secret", VerificationURL: "https://verify.example", Status: StatusNotStarted, Verifier: "fake", WorkflowID: active.WorkflowID, WorkflowVersion: active.WorkflowVersion}}
-	service := NewService(providerFinderStub{provider: foundProvider}, repo, verifier, fixedClock{now})
+	service := NewService(providerFinderStub{provider: foundProvider}, repo, unitOfWorkStub{}, verifier, fixedClock{now})
 
 	result, err := service.Start(context.Background(), foundProvider.AuthID())
 
@@ -66,8 +66,8 @@ func TestServiceApplyResultMarksSessionInProgress(t *testing.T) {
 	sessionID, workflowID := uuid.New(), uuid.New()
 	verification, err := NewVerification(7, sessionID, workflowID, "fake", 1, now)
 	require.NoError(t, err)
-	repo := &verificationRepositoryStub{byID: verification}
-	service := NewService(providerFinderStub{}, repo, &verifierStub{}, fixedClock{now})
+	store := &transactionalStoreStub{byID: verification}
+	service := NewService(providerFinderStub{}, &verificationRepositoryStub{}, unitOfWorkStub{store: store}, &verifierStub{}, fixedClock{now})
 
 	err = service.ApplyResult(context.Background(), VerificationResult{
 		EventID: uuid.New(), SessionID: sessionID, ProviderID: 7, VendorData: ProviderVendorData(7),
@@ -76,8 +76,9 @@ func TestServiceApplyResultMarksSessionInProgress(t *testing.T) {
 	})
 
 	require.NoError(t, err)
-	require.Equal(t, StatusInProgress, repo.saved.Status)
-	require.Equal(t, now, repo.saved.UpdatedOn)
+	require.Equal(t, StatusInProgress, store.saved.Status)
+	require.Equal(t, now, store.saved.UpdatedOn)
+	require.NotNil(t, store.savedEvent)
 }
 
 func TestServiceApplyResultMarksSessionAwaitingUser(t *testing.T) {
@@ -85,8 +86,8 @@ func TestServiceApplyResultMarksSessionAwaitingUser(t *testing.T) {
 	sessionID, workflowID := uuid.New(), uuid.New()
 	verification, err := NewVerification(7, sessionID, workflowID, "fake", 1, now)
 	require.NoError(t, err)
-	repo := &verificationRepositoryStub{byID: verification}
-	service := NewService(providerFinderStub{}, repo, &verifierStub{}, fixedClock{now})
+	store := &transactionalStoreStub{byID: verification}
+	service := NewService(providerFinderStub{}, &verificationRepositoryStub{}, unitOfWorkStub{store: store}, &verifierStub{}, fixedClock{now})
 
 	err = service.ApplyResult(context.Background(), VerificationResult{
 		EventID: uuid.New(), SessionID: sessionID, ProviderID: 7, VendorData: ProviderVendorData(7),
@@ -95,7 +96,7 @@ func TestServiceApplyResultMarksSessionAwaitingUser(t *testing.T) {
 	})
 
 	require.NoError(t, err)
-	require.Equal(t, StatusAwaitingUser, repo.saved.Status)
+	require.Equal(t, StatusAwaitingUser, store.saved.Status)
 }
 
 func TestServiceApplyResultMarksSessionInReview(t *testing.T) {
@@ -103,8 +104,8 @@ func TestServiceApplyResultMarksSessionInReview(t *testing.T) {
 	sessionID, workflowID := uuid.New(), uuid.New()
 	verification, err := NewVerification(7, sessionID, workflowID, "fake", 1, now)
 	require.NoError(t, err)
-	repo := &verificationRepositoryStub{byID: verification}
-	service := NewService(providerFinderStub{}, repo, &verifierStub{}, fixedClock{now})
+	store := &transactionalStoreStub{byID: verification}
+	service := NewService(providerFinderStub{}, &verificationRepositoryStub{}, unitOfWorkStub{store: store}, &verifierStub{}, fixedClock{now})
 
 	err = service.ApplyResult(context.Background(), VerificationResult{
 		EventID: uuid.New(), SessionID: sessionID, ProviderID: 7, VendorData: ProviderVendorData(7),
@@ -113,7 +114,47 @@ func TestServiceApplyResultMarksSessionInReview(t *testing.T) {
 	})
 
 	require.NoError(t, err)
-	require.Equal(t, StatusInReview, repo.saved.Status)
+	require.Equal(t, StatusInReview, store.saved.Status)
+}
+
+func TestServiceApplyResultAcceptsDuplicateEventWithoutLoadingOrSavingSession(t *testing.T) {
+	now := time.Date(2026, 9, 1, 12, 0, 0, 0, time.UTC)
+	store := &transactionalStoreStub{duplicateEvent: true}
+	service := NewService(providerFinderStub{}, &verificationRepositoryStub{}, unitOfWorkStub{store: store}, &verifierStub{}, fixedClock{now})
+
+	err := service.ApplyResult(context.Background(), VerificationResult{
+		EventID: uuid.New(), SessionID: uuid.New(), ProviderID: 7, VendorData: ProviderVendorData(7),
+		WorkflowID: uuid.New(), WorkflowVersion: 1, Status: StatusApproved, OccurredOn: now,
+	})
+
+	require.NoError(t, err)
+	require.NotNil(t, store.savedEvent)
+	require.Nil(t, store.saved)
+}
+
+func TestServiceApplyResultRecordsStaleEventWithoutChangingCurrentState(t *testing.T) {
+	now := time.Date(2026, 9, 1, 12, 0, 0, 0, time.UTC)
+	sessionID, workflowID := uuid.New(), uuid.New()
+	verification, err := NewVerification(7, sessionID, workflowID, "fake", 1, now.Add(-time.Hour))
+	require.NoError(t, err)
+	require.NoError(t, verification.ApplyResult(VerificationResult{
+		EventID: uuid.New(), SessionID: sessionID, ProviderID: 7, VendorData: ProviderVendorData(7),
+		WorkflowID: workflowID, WorkflowVersion: 1, Status: StatusApproved, OccurredOn: now,
+	}, now))
+	store := &transactionalStoreStub{byID: verification}
+	service := NewService(providerFinderStub{}, &verificationRepositoryStub{}, unitOfWorkStub{store: store}, &verifierStub{}, fixedClock{now: now.Add(time.Minute)})
+
+	err = service.ApplyResult(context.Background(), VerificationResult{
+		EventID: uuid.New(), SessionID: sessionID, ProviderID: 7, VendorData: ProviderVendorData(7),
+		WorkflowID: workflowID, WorkflowVersion: 1, Status: StatusInProgress,
+		OccurredOn: now.Add(-time.Minute),
+	})
+
+	require.NoError(t, err)
+	require.NotNil(t, store.savedEvent)
+	require.Equal(t, StatusApproved, store.saved.Status)
+	require.Equal(t, now, *store.saved.LastResultOn)
+	require.Equal(t, now, *store.saved.VerifiedOn)
 }
 
 func TestServiceCurrentStatusReturnsLatestVerificationStatus(t *testing.T) {
@@ -122,7 +163,7 @@ func TestServiceCurrentStatusReturnsLatestVerificationStatus(t *testing.T) {
 	require.NoError(t, err)
 	verification.Status = StatusInProgress
 	repo := &verificationRepositoryStub{latest: verification}
-	service := NewService(providerFinderStub{}, repo, &verifierStub{}, fixedClock{now})
+	service := NewService(providerFinderStub{}, repo, unitOfWorkStub{}, &verifierStub{}, fixedClock{now})
 
 	status, err := service.CurrentStatus(context.Background(), verification.ProviderID)
 
@@ -131,7 +172,7 @@ func TestServiceCurrentStatusReturnsLatestVerificationStatus(t *testing.T) {
 }
 
 func TestServiceCurrentStatusReturnsUnverifiedWithoutSessions(t *testing.T) {
-	service := NewService(providerFinderStub{}, &verificationRepositoryStub{}, &verifierStub{}, fixedClock{time.Now().UTC()})
+	service := NewService(providerFinderStub{}, &verificationRepositoryStub{}, unitOfWorkStub{}, &verifierStub{}, fixedClock{time.Now().UTC()})
 
 	status, err := service.CurrentStatus(context.Background(), 7)
 
@@ -146,7 +187,7 @@ func TestServiceCurrentStatusDetailsReturnsVerificationDate(t *testing.T) {
 	verification.Status = StatusApproved
 	verification.VerifiedOn = &now
 	repo := &verificationRepositoryStub{latest: verification}
-	service := NewService(providerFinderStub{}, repo, &verifierStub{}, fixedClock{now})
+	service := NewService(providerFinderStub{}, repo, unitOfWorkStub{}, &verifierStub{}, fixedClock{now})
 
 	details, err := service.CurrentStatusDetails(context.Background(), verification.ProviderID)
 

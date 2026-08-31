@@ -393,6 +393,7 @@ func newDependenciesWithPaymentAccountAndCalendarAdapters(
 	identityVerificationService := identityverification.NewService(
 		persistence.UserRepository,
 		persistence.IdentityVerificationRepository,
+		persistence.IdentityVerificationUnitOfWork,
 		identityVerifier,
 		systemClock,
 	)
