@@ -14,6 +14,8 @@ func registerShowProviderIdentityVerificationSteps(sc *godog.ScenarioContext, su
 	sc.Step(`^consulto mi perfil de usuario$`, suite.requestCurrentUserProfile)
 	sc.Step(`^mi estado de verificación de identidad es "([^"]*)"$`, suite.currentUserIdentityVerificationStatusIs)
 	sc.Step(`^mi fecha de verificación no está informada$`, suite.currentUserIdentityVerificationDateIsMissing)
+	sc.Step(`^busco prestadores del rubro "([^"]*)"$`, suite.filterProvidersByCategory)
+	sc.Step(`^"([^"]*)" figura con identidad verificada$`, suite.providerAppearsWithVerifiedIdentity)
 }
 
 func (suite *testSuite) requestCurrentUserProfile() error {
@@ -58,4 +60,25 @@ func (suite *testSuite) currentUserIdentityVerificationProfile() (identityVerifi
 		return profile, fmt.Errorf("decoding current user identity verification profile: %w", err)
 	}
 	return profile, nil
+}
+
+func (suite *testSuite) providerAppearsWithVerifiedIdentity(email string) error {
+	providerID, err := suite.providerIDByEmail(email)
+	if err != nil {
+		return err
+	}
+	providers, err := suite.providerSummaryResponseShouldHaveStatusCode(http.StatusOK)
+	if err != nil {
+		return err
+	}
+	for _, foundProvider := range providers {
+		if foundProvider.ID != providerID {
+			continue
+		}
+		if !foundProvider.IdentityVerified {
+			return fmt.Errorf("expected provider %q to have verified identity, got body %s", email, suite.lastBody)
+		}
+		return nil
+	}
+	return fmt.Errorf("expected provider %q in search results, got body %s", email, suite.lastBody)
 }
