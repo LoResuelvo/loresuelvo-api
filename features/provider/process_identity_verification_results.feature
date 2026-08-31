@@ -53,20 +53,17 @@ Feature: Procesar resultados de verificación de identidad
 
     Rule: Las notificaciones deben ser auténticas, idempotentes y ordenadas
 
-        @wip
         Scenario: 58.1.10 Rechazar una notificación con firma inválida
             When se recibe un resultado "approved" con una firma de verificación inválida
             Then el sistema rechaza la notificación
             And la verificación de "juan.plomero@example.com" permanece en estado "not_started"
 
-        @wip
         Scenario: 58.1.11 Procesar una única vez una notificación repetida
             When el verificador envía dos veces el mismo resultado auténtico "approved"
             Then ambas entregas son aceptadas
             And la identidad de "juan.plomero@example.com" queda aprobada
             And el resultado queda registrado una sola vez
 
-        @wip
         Scenario: 58.1.12 Ignorar un resultado anterior al estado actual
             Given que la identidad de "juan.plomero@example.com" fue aprobada a las "2026-09-01T12:00:00Z"
             When llega un resultado auténtico "in_progress" ocurrido a las "2026-09-01T11:59:00Z"
