@@ -8,6 +8,7 @@ required:
 - category
 - rating_average
 - rating_count
+- identity_verified
 - work_orders
 properties:
   id:
@@ -35,6 +36,9 @@ properties:
     format: int32
     minimum: 0
     example: 2
+  identity_verified:
+    type: boolean
+    example: true
   work_orders:
     type: array
     items:

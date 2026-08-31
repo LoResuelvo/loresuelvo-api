@@ -22,8 +22,9 @@ Feature: Mostrar la verificación de identidad de un prestador
             When busco prestadores del rubro "Plomería"
             Then "juan.plomero@example.com" figura con identidad verificada
 
-        @wip
         Scenario: 59.3 Mostrar la insignia en el perfil de un prestador aprobado
+            Given que existe un consumidor registrado con correo "ana@example.com", nombre "Ana" y apellido "Pérez"
+            And que estoy autenticado como consumidor "ana@example.com"
             Given que la identidad de "juan.plomero@example.com" está aprobada
             When consulto el perfil público de "juan.plomero@example.com"
             Then el perfil indica que la identidad está verificada

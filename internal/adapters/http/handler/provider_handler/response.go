@@ -32,14 +32,15 @@ type providerProfileCategoryResponse struct {
 }
 
 type providerProfileResponse struct {
-	ID            int                                `json:"id"`
-	Name          string                             `json:"name"`
-	Surname       string                             `json:"surname"`
-	ProfilePhoto  providerProfilePhotoResponse       `json:"profile_photo"`
-	Category      providerProfileCategoryResponse    `json:"category"`
-	RatingAverage float64                            `json:"rating_average"`
-	RatingCount   int                                `json:"rating_count"`
-	WorkOrders    []providerProfileWorkOrderResponse `json:"work_orders"`
+	ID               int                                `json:"id"`
+	Name             string                             `json:"name"`
+	Surname          string                             `json:"surname"`
+	ProfilePhoto     providerProfilePhotoResponse       `json:"profile_photo"`
+	Category         providerProfileCategoryResponse    `json:"category"`
+	RatingAverage    float64                            `json:"rating_average"`
+	RatingCount      int                                `json:"rating_count"`
+	IdentityVerified bool                               `json:"identity_verified"`
+	WorkOrders       []providerProfileWorkOrderResponse `json:"work_orders"`
 }
 
 type providerProfileWorkOrderResponse struct {

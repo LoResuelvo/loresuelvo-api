@@ -937,6 +937,7 @@
                                     },
                                     "rating_average": 4.5,
                                     "rating_count": 2,
+                                    "identity_verified": true,
                                     "work_orders": [
                                         {
                                             "id": 84,
@@ -4854,6 +4855,7 @@
                     "category",
                     "rating_average",
                     "rating_count",
+                    "identity_verified",
                     "work_orders"
                 ],
                 "properties": {
@@ -4888,6 +4890,10 @@
                         "format": "int32",
                         "minimum": 0,
                         "example": 2
+                    },
+                    "identity_verified": {
+                        "type": "boolean",
+                        "example": true
                     },
                     "work_orders": {
                         "type": "array",

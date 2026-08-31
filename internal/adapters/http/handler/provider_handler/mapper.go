@@ -85,13 +85,14 @@ func providerProfileResponseFromReadModel(profile readmodel.Profile) providerPro
 	}
 
 	return providerProfileResponse{
-		ID:            profile.ID,
-		Name:          profile.Name,
-		Surname:       profile.Surname,
-		ProfilePhoto:  profilePhoto,
-		Category:      providerProfileCategoryResponse{ID: profile.CategoryID, Name: profile.CategoryName},
-		RatingAverage: profile.RatingAverage,
-		RatingCount:   profile.RatingCount,
-		WorkOrders:    workOrders,
+		ID:               profile.ID,
+		Name:             profile.Name,
+		Surname:          profile.Surname,
+		ProfilePhoto:     profilePhoto,
+		Category:         providerProfileCategoryResponse{ID: profile.CategoryID, Name: profile.CategoryName},
+		RatingAverage:    profile.RatingAverage,
+		RatingCount:      profile.RatingCount,
+		IdentityVerified: profile.IdentityVerified,
+		WorkOrders:       workOrders,
 	}
 }
