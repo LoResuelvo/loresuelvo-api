@@ -21,6 +21,7 @@ func TestWebhookAdapterTranslatesInProgressStatus(t *testing.T) {
 	result, err := adapter.Translate(body)
 
 	require.NoError(t, err)
+	require.Equal(t, eventID, result.EventID)
 	require.Equal(t, sessionID, result.SessionID)
 	require.Equal(t, identityverification.StatusInProgress, result.Status)
 	require.Equal(t, 42, result.ProviderID)

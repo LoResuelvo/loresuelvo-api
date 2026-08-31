@@ -89,7 +89,7 @@ func (adapter *WebhookAdapter) Translate(body []byte) (identityverification.Veri
 		return identityverification.VerificationResult{}, identityverification.ErrInvalidVerification
 	}
 	return identityverification.VerificationResult{
-		SessionID: payload.SessionID, ProviderID: providerID, VendorData: payload.VendorData, WorkflowID: payload.WorkflowID,
+		EventID: payload.EventID, SessionID: payload.SessionID, ProviderID: providerID, VendorData: payload.VendorData, WorkflowID: payload.WorkflowID,
 		WorkflowVersion: payload.WorkflowVersion, Status: status, RiskCodes: payload.RiskCodes,
 		OccurredOn: time.Unix(payload.CreatedAt, 0).UTC(),
 	}, nil
