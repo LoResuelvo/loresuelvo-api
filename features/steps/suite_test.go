@@ -188,6 +188,7 @@ func (s *testSuite) registerAllSteps(sc *godog.ScenarioContext) {
 	registerAIJobRequestImageSteps(sc, s)
 	registerStartIdentityVerificationSteps(sc, s)
 	registerProcessIdentityVerificationResultSteps(sc, s)
+	registerShowProviderIdentityVerificationSteps(sc, s)
 }
 
 func (s *testSuite) cleanup() error {

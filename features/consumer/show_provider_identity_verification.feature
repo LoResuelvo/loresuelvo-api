@@ -9,7 +9,6 @@ Feature: Mostrar la verificación de identidad de un prestador
 
     Rule: El prestador puede consultar su estado detallado
 
-        @wip
         Scenario: 59.1 Mostrar como no verificado a un prestador sin sesiones
             Given que estoy autenticado como prestador "juan.plomero@example.com"
             When consulto mi perfil de usuario

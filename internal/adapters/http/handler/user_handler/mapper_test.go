@@ -61,6 +61,26 @@ func TestWithIdentityVerificationStatusAddsStatusToProviderResponse(t *testing.T
 	require.Equal(t, string(identityverification.StatusInProgress), providerResponse.IdentityVerificationStatus)
 }
 
+func TestWithIdentityVerificationDetailsMapsUnverifiedWithoutApprovalDate(t *testing.T) {
+	currentProvider, err := provider.NewProvider(
+		"auth0|provider", "juan@example.com", "Juan", "Gomez", &category.Category{ID: 2, Name: "Plomeria"}, nil,
+		[]coveragezone.CoverageZone{{ID: 1, Enabled: true}},
+	)
+	require.NoError(t, err)
+	response, err := currentUserResponseFromDomain(currentProvider, "disconnected")
+	require.NoError(t, err)
+
+	response, err = withIdentityVerificationDetails(response, identityverification.VerificationStatusDetails{
+		Status: identityverification.StatusUnverified,
+	})
+
+	require.NoError(t, err)
+	providerResponse, ok := response.(providerCurrentUserResponse)
+	require.True(t, ok)
+	require.Equal(t, string(identityverification.StatusUnverified), providerResponse.IdentityVerificationStatus)
+	require.Nil(t, providerResponse.IdentityVerifiedOn)
+}
+
 func TestWithIdentityVerificationDetailsAddsApprovalDateToProviderResponse(t *testing.T) {
 	currentProvider, err := provider.NewProvider(
 		"auth0|provider", "juan@example.com", "Juan", "Gomez", &category.Category{ID: 2, Name: "Plomeria"}, nil,
