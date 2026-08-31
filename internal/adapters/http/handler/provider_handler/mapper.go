@@ -38,13 +38,14 @@ func providerSearchResponsesFromReadModel(results []readmodel.ProviderSearchResu
 			profilePhotoURL = result.ProfilePhoto.URL
 		}
 		response = append(response, providerSearchResponse{
-			ID:              result.ID,
-			Name:            result.Name,
-			Surname:         result.Surname,
-			CategoryName:    result.CategoryName,
-			ProfilePhotoURL: profilePhotoURL,
-			RatingAverage:   result.RatingAverage,
-			RatingCount:     result.RatingCount,
+			ID:               result.ID,
+			Name:             result.Name,
+			Surname:          result.Surname,
+			CategoryName:     result.CategoryName,
+			ProfilePhotoURL:  profilePhotoURL,
+			RatingAverage:    result.RatingAverage,
+			RatingCount:      result.RatingCount,
+			IdentityVerified: result.IdentityVerified,
 		})
 	}
 

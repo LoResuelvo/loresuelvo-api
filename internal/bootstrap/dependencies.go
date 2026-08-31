@@ -309,6 +309,7 @@ func newDependenciesWithPaymentAccountAndCalendarAdapters(
 		fileService,
 		persistence.WorkOrderRepository,
 		persistence.CoverageZoneRepository,
+		persistence.IdentityVerificationRepository,
 	)
 	consumerService := consumer.NewService(persistence.UserRepository, fileService, addressResolver, coverageZoneResolver)
 	conversationService := conversation.NewService(

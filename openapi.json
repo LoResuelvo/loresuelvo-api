@@ -621,7 +621,8 @@
                                                 "category_name": "Plomería",
                                                 "profile_photo_url": "https://cdn.example/files/2026/06/profile_photo/juan.jpg",
                                                 "rating_average": 4.5,
-                                                "rating_count": 2
+                                                "rating_count": 2,
+                                                "identity_verified": true
                                             },
                                             {
                                                 "id": 2,
@@ -630,7 +631,8 @@
                                                 "category_name": "Plomería",
                                                 "profile_photo_url": "https://cdn.example/files/2026/06/profile_photo/pedro.jpg",
                                                 "rating_average": 0,
-                                                "rating_count": 0
+                                                "rating_count": 0,
+                                                "identity_verified": false
                                             }
                                         ]
                                     },
@@ -4787,7 +4789,8 @@
                     "category_name",
                     "profile_photo_url",
                     "rating_average",
-                    "rating_count"
+                    "rating_count",
+                    "identity_verified"
                 ],
                 "properties": {
                     "id": {
@@ -4831,6 +4834,11 @@
                         "minimum": 0,
                         "description": "Number of reviews associated with the provider.",
                         "example": 2
+                    },
+                    "identity_verified": {
+                        "type": "boolean",
+                        "description": "Whether the provider's current identity verification is approved.",
+                        "example": true
                     }
                 },
                 "additionalProperties": false

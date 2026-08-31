@@ -11,13 +11,14 @@ type providerSummaryResponse struct {
 }
 
 type providerSearchResponse struct {
-	ID              int     `json:"id"`
-	Name            string  `json:"name"`
-	Surname         string  `json:"surname"`
-	CategoryName    string  `json:"category_name"`
-	ProfilePhotoURL string  `json:"profile_photo_url"`
-	RatingAverage   float64 `json:"rating_average"`
-	RatingCount     int     `json:"rating_count"`
+	ID               int     `json:"id"`
+	Name             string  `json:"name"`
+	Surname          string  `json:"surname"`
+	CategoryName     string  `json:"category_name"`
+	ProfilePhotoURL  string  `json:"profile_photo_url"`
+	RatingAverage    float64 `json:"rating_average"`
+	RatingCount      int     `json:"rating_count"`
+	IdentityVerified bool    `json:"identity_verified"`
 }
 
 type providerProfilePhotoResponse struct {

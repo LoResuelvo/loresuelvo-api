@@ -17,7 +17,6 @@ Feature: Mostrar la verificación de identidad de un prestador
 
     Rule: El consumidor sólo debe conocer si la identidad está aprobada
 
-        @wip
         Scenario: 59.2 Mostrar la insignia en la búsqueda de prestadores aprobados
             Given que la identidad de "juan.plomero@example.com" está aprobada
             When busco prestadores del rubro "Plomería"

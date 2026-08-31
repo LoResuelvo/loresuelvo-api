@@ -36,6 +36,7 @@ get:
                 profile_photo_url: https://cdn.example/files/2026/06/profile_photo/juan.jpg
                 rating_average: 4.5
                 rating_count: 2
+                identity_verified: true
               - id: 2
                 name: Pedro
                 surname: Dib
@@ -43,6 +44,7 @@ get:
                 profile_photo_url: https://cdn.example/files/2026/06/profile_photo/pedro.jpg
                 rating_average: 0
                 rating_count: 0
+                identity_verified: false
             noProviders:
               value: []
     '400':

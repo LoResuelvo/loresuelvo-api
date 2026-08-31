@@ -8,6 +8,7 @@ required:
 - profile_photo_url
 - rating_average
 - rating_count
+- identity_verified
 properties:
   id:
     type: integer
@@ -44,4 +45,8 @@ properties:
     minimum: 0
     description: Number of reviews associated with the provider.
     example: 2
+  identity_verified:
+    type: boolean
+    description: Whether the provider's current identity verification is approved.
+    example: true
 additionalProperties: false
