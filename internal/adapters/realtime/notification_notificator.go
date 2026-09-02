@@ -16,13 +16,13 @@ type notificationRecipientFinder interface {
 }
 
 type NotificationNotificator struct {
-	hub            *Hub
+	dispatcher     eventDispatcher
 	userRepository notificationRecipientFinder
 }
 
-func NewNotificationNotificator(hub *Hub, userRepository notificationRecipientFinder) *NotificationNotificator {
+func NewNotificationNotificator(dispatcher eventDispatcher, userRepository notificationRecipientFinder) *NotificationNotificator {
 	return &NotificationNotificator{
-		hub:            hub,
+		dispatcher:     dispatcher,
 		userRepository: userRepository,
 	}
 }
@@ -41,7 +41,9 @@ func (n *NotificationNotificator) Notify(ctx context.Context, notification *noti
 		return fmt.Errorf("building realtime notification event: %w", err)
 	}
 
-	n.hub.BroadcastToParticipant(ctx, recipient.AuthID(), recipient.Role(), recipient.ID(), event)
+	if err := n.dispatcher.Publish(ctx, recipient.AuthID(), recipient.Role(), recipient.ID(), event); err != nil {
+		return fmt.Errorf("publishing distributed realtime notification: %w", err)
+	}
 	return nil
 }
 

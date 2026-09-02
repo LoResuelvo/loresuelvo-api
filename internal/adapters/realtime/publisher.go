@@ -13,14 +13,14 @@ type userAuthIDFinder interface {
 
 // Publisher broadcasts message events to connected clients.
 type Publisher struct {
-	hub            *Hub
+	dispatcher     eventDispatcher
 	userRepository userAuthIDFinder
 }
 
 // NewPublisher creates a new realtime Publisher.
-func NewPublisher(hub *Hub, userRepository userAuthIDFinder) *Publisher {
+func NewPublisher(dispatcher eventDispatcher, userRepository userAuthIDFinder) *Publisher {
 	return &Publisher{
-		hub:            hub,
+		dispatcher:     dispatcher,
 		userRepository: userRepository,
 	}
 }
@@ -54,5 +54,17 @@ func (p *Publisher) PublishMessage(ctx context.Context, conv conversation.Conver
 		return
 	}
 
-	p.hub.BroadcastMessage(ctx, consumerAuthID, workConversation.ConsumerID, providerAuthID, workConversation.ProviderID, senderAuthID, message.SenderRole, event)
+	if consumerAuthID != senderAuthID {
+		p.publishToParticipant(ctx, consumerAuthID, conversation.SenderConsumer, workConversation.ConsumerID, event)
+	}
+	if providerAuthID != senderAuthID {
+		p.publishToParticipant(ctx, providerAuthID, conversation.SenderProvider, workConversation.ProviderID, event)
+	}
+}
+
+func (p *Publisher) publishToParticipant(ctx context.Context, authID, role string, profileID int, payload []byte) {
+	if err := p.dispatcher.Publish(ctx, authID, role, profileID, payload); err != nil {
+		slog.Warn("realtime publisher: failed to publish distributed event",
+			"authID", authID, "role", role, "profileID", profileID, "error", err)
+	}
 }

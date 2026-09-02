@@ -9,27 +9,10 @@ import (
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/consumer"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/notification"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/provider"
-	"github.com/LoResuelvo/loresuelvo-api/internal/domain/user"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
-
-type notificationAuthIDFinderStub struct {
-	authID string
-	role   string
-	err    error
-}
-
-func (s notificationAuthIDFinderStub) FindByID(_ context.Context, id int) (user.User, error) {
-	if s.err != nil {
-		return nil, s.err
-	}
-	base := user.RehydrateBaseUser(id, s.authID, "", "", "", s.role, nil)
-	if s.role == provider.Role {
-		return &provider.Provider{BaseUser: base}, nil
-	}
-	return &consumer.Consumer{BaseUser: base}, nil
-}
 
 func TestNotificationNotificatorSendsNotificationToConnectedConsumer(t *testing.T) {
 	hub := NewHub()
@@ -42,7 +25,10 @@ func TestNotificationNotificatorSendsNotificationToConnectedConsumer(t *testing.
 		profileID: 10,
 	}
 	hub.addConnection(connection)
-	notificator := NewNotificationNotificator(hub, notificationAuthIDFinderStub{authID: authID, role: consumer.Role})
+	eventBus := new(eventBusMock)
+	eventBus.On("Publish", mock.Anything, mock.Anything).Return(nil).Once()
+	dispatcher := NewDispatcher(hub, eventBus)
+	notificator := NewNotificationNotificator(dispatcher, notificationRecipientFinderStub{authID: authID, role: consumer.Role})
 	createdAt := time.Date(2026, 7, 4, 13, 0, 0, 0, time.UTC)
 	notificationToSend := &notification.Notification{
 		ID:                       5,
@@ -57,6 +43,7 @@ func TestNotificationNotificatorSendsNotificationToConnectedConsumer(t *testing.
 	err := notificator.Notify(context.Background(), notificationToSend)
 
 	require.NoError(t, err)
+	eventBus.AssertExpectations(t)
 	payload := <-connection.send
 	var event realtimeNotificationEvent
 	require.NoError(t, json.Unmarshal(payload, &event))
@@ -82,7 +69,10 @@ func TestNotificationNotificatorSendsNotificationToConnectedProvider(t *testing.
 		profileID: 20,
 	}
 	hub.addConnection(connection)
-	notificator := NewNotificationNotificator(hub, notificationAuthIDFinderStub{
+	eventBus := new(eventBusMock)
+	eventBus.On("Publish", mock.Anything, mock.Anything).Return(nil).Once()
+	dispatcher := NewDispatcher(hub, eventBus)
+	notificator := NewNotificationNotificator(dispatcher, notificationRecipientFinderStub{
 		authID: authID,
 		role:   provider.Role,
 	})
@@ -98,6 +88,7 @@ func TestNotificationNotificatorSendsNotificationToConnectedProvider(t *testing.
 	err := notificator.Notify(context.Background(), notificationToSend)
 
 	require.NoError(t, err)
+	eventBus.AssertExpectations(t)
 	payload := <-connection.send
 	var event realtimeNotificationEvent
 	require.NoError(t, json.Unmarshal(payload, &event))
@@ -108,7 +99,10 @@ func TestNotificationNotificatorSendsNotificationToConnectedProvider(t *testing.
 
 func TestNotificationNotificatorIgnoresDisconnectedConsumer(t *testing.T) {
 	hub := NewHub()
-	notificator := NewNotificationNotificator(hub, notificationAuthIDFinderStub{
+	eventBus := new(eventBusMock)
+	eventBus.On("Publish", mock.Anything, mock.Anything).Return(nil).Once()
+	dispatcher := NewDispatcher(hub, eventBus)
+	notificator := NewNotificationNotificator(dispatcher, notificationRecipientFinderStub{
 		authID: "auth0|consumer",
 		role:   consumer.Role,
 	})
@@ -123,4 +117,5 @@ func TestNotificationNotificatorIgnoresDisconnectedConsumer(t *testing.T) {
 	})
 
 	require.NoError(t, err)
+	eventBus.AssertExpectations(t)
 }

@@ -83,11 +83,21 @@ type Dependencies struct {
 	Hub              *realtime.Hub
 	RealtimeHandler  *realtime.Handler
 	MessagePublisher conversation.MessagePublisher
+	realtimeCancel   context.CancelFunc
 
 	Clock *clockadapter.SystemClock
 
 	ConsumerAddressResolver consumer.AddressResolver
 	IdentityVerifier        identityverification.IdentityVerifier
+}
+
+// Close stops process-scoped realtime goroutines owned by the dependency
+// container. It is safe to call more than once.
+func (dependencies *Dependencies) Close() {
+	if dependencies == nil || dependencies.realtimeCancel == nil {
+		return
+	}
+	dependencies.realtimeCancel()
 }
 
 type CalendarEventObserver interface {
@@ -281,14 +291,20 @@ func newDependenciesWithPaymentAccountAndCalendarAdapters(
 	systemClock := clockadapter.NewSystemClock()
 
 	// Realtime infrastructure
+	realtimeEventBus := realtime.NewPostgresEventBus(database)
 	hub := realtime.NewHub()
+	dispatcher := realtime.NewDispatcher(hub, realtimeEventBus)
 	ctx, cancel := context.WithCancel(context.Background())
-	go hub.Run(ctx)
+	go func() {
+		if err := dispatcher.Run(ctx); err != nil && ctx.Err() == nil {
+			slog.Error("realtime dispatcher stopped", "error", err)
+		}
+	}()
 
 	ticketStore := realtime.NewPostgresTicketStore(database)
 
-	messagePublisher := realtime.NewPublisher(hub, persistence.UserRepository)
-	realtimeNotificationNotificator := realtime.NewNotificationNotificator(hub, persistence.UserRepository)
+	messagePublisher := realtime.NewPublisher(dispatcher, persistence.UserRepository)
+	realtimeNotificationNotificator := realtime.NewNotificationNotificator(dispatcher, persistence.UserRepository)
 	notificator := notificationadapter.NewCompositeNotificator(realtimeNotificationNotificator)
 	realtimeHandler := realtime.NewHandler(hub, persistence.UserRepository, ticketStore)
 
@@ -412,8 +428,6 @@ func newDependenciesWithPaymentAccountAndCalendarAdapters(
 	if observer, ok := calendarEventPublisher.(CalendarEventObserver); ok {
 		calendarEventObserver = observer
 	}
-	_ = cancel // TODO: wire shutdown signal to cancel context
-
 	return &Dependencies{
 		Persistence:                 persistence,
 		WorkOrderService:            workOrderService,
@@ -438,6 +452,7 @@ func newDependenciesWithPaymentAccountAndCalendarAdapters(
 		Hub:                         hub,
 		RealtimeHandler:             realtimeHandler,
 		MessagePublisher:            messagePublisher,
+		realtimeCancel:              cancel,
 		Clock:                       systemClock,
 		ConsumerAddressResolver:     addressResolver,
 		IdentityVerifier:            identityVerifier,

@@ -89,7 +89,7 @@ func (h *Handler) Handle(c *gin.Context) {
 	}
 
 	connection := newConnection(h.hub, conn, auth0ID, role, profileID)
-	h.hub.register <- connection
+	h.hub.addConnection(connection)
 
 	go connection.writePump()
 	go connection.readPump()

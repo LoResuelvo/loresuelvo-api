@@ -38,6 +38,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+	defer dependencies.Close()
 	go dependencies.UrgentWorkOrderScheduler.Run(ctx)
 
 	auth0Validator, err := auth0.NewValidatorFromEnv()

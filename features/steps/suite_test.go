@@ -36,6 +36,7 @@ import (
 
 type testSuite struct {
 	server                         *httptest.Server
+	dependencies                   *bootstrap.Dependencies
 	database                       *sql.DB
 	categoryRepository             *repositories.CategoryRepository
 	coverageZoneRepository         *repositories.CoverageZoneRepository
@@ -373,6 +374,7 @@ func newTestSuite(tb testing.TB, database *sql.DB) *testSuite {
 
 	return &testSuite{
 		server:                         server,
+		dependencies:                   dependencies,
 		database:                       database,
 		categoryRepository:             dependencies.Persistence.CategoryRepository,
 		coverageZoneRepository:         dependencies.Persistence.CoverageZoneRepository,
@@ -421,6 +423,11 @@ func newTestSuite(tb testing.TB, database *sql.DB) *testSuite {
 func ScenarioInitializer(sc *godog.ScenarioContext, t *testing.T, database *sql.DB) {
 	testSuite := newTestSuite(t, database)
 	testSuite.registerAllSteps(sc)
+	sc.After(func(ctx context.Context, _ *godog.Scenario, _ error) (context.Context, error) {
+		testSuite.dependencies.Close()
+		testSuite.server.Close()
+		return ctx, nil
+	})
 	sc.Before(func(ctx context.Context, sc *godog.Scenario) (context.Context, error) {
 		if err := testSuite.cleanup(); err != nil {
 			return ctx, fmt.Errorf("could not clean test status: %w", err)
