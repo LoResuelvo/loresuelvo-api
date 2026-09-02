@@ -2,6 +2,7 @@ package chatbot
 
 import (
 	"context"
+	"encoding/json"
 	"strings"
 	"sync"
 
@@ -18,21 +19,22 @@ const (
 
 // FakeChatbot is a deterministic chatbot adapter for acceptance tests.
 type FakeChatbot struct {
-	mu                         sync.Mutex
-	response                   conversation.ChatbotResponse
-	summary                    string
-	requestCount               int
-	summaryRequestCount        int
-	lastQuestion               conversation.ChatbotHomeProblemQuestion
-	lastSummaryMessages        []conversation.Message
-	lastPreviousSummary        string
-	lastAvailableCategories    []category.Category
-	lastProviderRankingRequest conversation.ProviderRankingRequest
-	providerRankingProviderIDs []int
-	providerRankingError       error
-	imageDescriptions          map[string]string
-	selectedImageNames         []string
-	descriptionMode            string
+	mu                          sync.Mutex
+	response                    conversation.ChatbotResponse
+	summary                     string
+	requestCount                int
+	summaryRequestCount         int
+	lastQuestion                conversation.ChatbotHomeProblemQuestion
+	lastSummaryMessages         []conversation.Message
+	lastPreviousSummary         string
+	lastAvailableCategories     []category.Category
+	lastProviderRankingRequest  conversation.ProviderRankingRequest
+	providerRankingRequestCount int
+	providerRankingProviderIDs  []int
+	providerRankingError        error
+	imageDescriptions           map[string]string
+	selectedImageNames          []string
+	descriptionMode             string
 }
 
 func NewFakeChatbot() *FakeChatbot {
@@ -106,6 +108,7 @@ func (chatbot *FakeChatbot) RankProviders(ctx context.Context, request conversat
 	chatbot.mu.Lock()
 	defer chatbot.mu.Unlock()
 
+	chatbot.providerRankingRequestCount++
 	chatbot.lastProviderRankingRequest = copyProviderRankingRequest(request)
 	if chatbot.providerRankingError != nil {
 		return nil, chatbot.providerRankingError
@@ -157,6 +160,18 @@ func (chatbot *FakeChatbot) LastProviderRankingRequest() conversation.ProviderRa
 	return copyProviderRankingRequest(chatbot.lastProviderRankingRequest)
 }
 
+// LastProviderRankingAIInputJSON exposes the same sanitized JSON contract that
+// the Gemini adapter sends to the external ranker. It is intentionally limited
+// to the fake adapter so acceptance tests can verify the adapter boundary
+// without exposing wire DTOs through the domain package.
+func (chatbot *FakeChatbot) LastProviderRankingAIInputJSON() ([]byte, error) {
+	chatbot.mu.Lock()
+	request := copyProviderRankingRequest(chatbot.lastProviderRankingRequest)
+	chatbot.mu.Unlock()
+
+	return json.Marshal(providerRankingRequestPayloadFromDomain(request))
+}
+
 func (chatbot *FakeChatbot) SetResponse(title, content string) {
 	chatbot.SetResponseWithStatus(conversation.ChatbotResponseAnswered, title, content)
 }
@@ -204,6 +219,20 @@ func (chatbot *FakeChatbot) SetConcludedDiagnosisResponse(title, content, recomm
 			ProblemTitle:        title,
 			ProblemDescription:  content,
 			ProblemCategoryName: recommendedCategoryName,
+		},
+	}
+}
+
+func (chatbot *FakeChatbot) SetUnchangedResponse(title, content string) {
+	chatbot.mu.Lock()
+	defer chatbot.mu.Unlock()
+
+	chatbot.response = conversation.ChatbotResponse{
+		Status:  conversation.ChatbotResponseAnswered,
+		Title:   title,
+		Content: content,
+		Assessment: conversation.ChatbotAssessmentResponse{
+			Action: conversation.ChatbotAssessmentUnchanged,
 		},
 	}
 }
@@ -264,6 +293,7 @@ func (chatbot *FakeChatbot) Reset() {
 	chatbot.lastPreviousSummary = ""
 	chatbot.lastAvailableCategories = nil
 	chatbot.lastProviderRankingRequest = conversation.ProviderRankingRequest{}
+	chatbot.providerRankingRequestCount = 0
 	chatbot.providerRankingProviderIDs = nil
 	chatbot.providerRankingError = nil
 	chatbot.imageDescriptions = map[string]string{}
@@ -283,6 +313,13 @@ func (chatbot *FakeChatbot) SummaryRequestCount() int {
 	defer chatbot.mu.Unlock()
 
 	return chatbot.summaryRequestCount
+}
+
+func (chatbot *FakeChatbot) ProviderRankingRequestCount() int {
+	chatbot.mu.Lock()
+	defer chatbot.mu.Unlock()
+
+	return chatbot.providerRankingRequestCount
 }
 
 func (chatbot *FakeChatbot) LastQuestion() conversation.ChatbotHomeProblemQuestion {

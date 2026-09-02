@@ -11,9 +11,11 @@ import (
 	"time"
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/conversation"
+	filedomain "github.com/LoResuelvo/loresuelvo-api/internal/domain/file"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/provider"
 	providerreadmodel "github.com/LoResuelvo/loresuelvo-api/internal/domain/provider/read_model"
 	"github.com/cucumber/godog"
+	"github.com/google/uuid"
 )
 
 type chatbotProviderRecommendationsResponse struct {
@@ -31,12 +33,30 @@ func registerChatbotProviderRecommendationSteps(sc *godog.ScenarioContext, suite
 	sc.Step(`^que la IA recomendará, en este orden, a "([^"]*)", "([^"]*)" y "([^"]*)" con razones fundamentadas en la evidencia$`, suite.aiWillRecommendProviders)
 	sc.Step(`^existe un prestador registrado con correo "([^"]*)", nombre "([^"]*)", apellido "([^"]*)", rubro "([^"]*)" y las zonas de cobertura "([^"]*)" y "([^"]*)"$`, suite.thereIsRegisteredProviderWithCategoryAndCoverageZones)
 	sc.Step(`^existe un prestador elegible de "([^"]*)" llamado "([^"]*)"$`, suite.thereIsEligibleProvider)
+	sc.Step(`^existe un prestador elegible de "([^"]*)" llamado "([^"]*)" con reseñas e informes de finalización$`, suite.thereIsEligibleProviderWithReviewsAndCompletionReports)
 	sc.Step(`^que "([^"]*)" tiene trabajos pagados con ratings y reseñas escritas por consumidores$`, suite.providerHasPaidJobsWithConsumerReviews)
 	sc.Step(`^que "([^"]*)" tiene informes de finalización escritos por él para trabajos pagados$`, suite.providerHasProviderAuthoredReports)
+	sc.Step(`^que sus informes de finalización incluyen imágenes privadas$`, suite.providerReportsIncludePrivateImages)
 	sc.Step(`^existe un prestador elegible de "([^"]*)" llamado "([^"]*)" sin trabajos pagados, ratings, reseñas ni informes de finalización$`, suite.thereIsNewEligibleProvider)
 	sc.Step(`^que el chatbot asistido por IA concluirá el diagnóstico y recomendará el rubro "([^"]*)" con la respuesta:$`, suite.chatbotWillConcludeDiagnosisAndRecommendCategory)
 	sc.Step(`^que el chatbot concluirá que se requiere un profesional del rubro "([^"]*)"$`, suite.chatbotWillConcludeProfessionalRequired)
+	sc.Step(`^que una evaluación vigente requiere un profesional de "([^"]*)"$`, suite.currentAssessmentRequiresProfessional)
+	sc.Step(`^que una evaluación anterior requiere un profesional de "([^"]*)"$`, suite.previousAssessmentRequiresProfessional)
+	sc.Step(`^que sus recomendaciones persistidas son "([^"]*)", "([^"]*)" y "([^"]*)" en ese orden con sus razones$`, suite.persistedProviderRecommendations)
+	sc.Step(`^que sus recomendaciones persistidas son "([^"]*)" y "([^"]*)" en ese orden con sus razones$`, suite.persistedProviderRecommendationsTwo)
+	sc.Step(`^que el ranking vigente tiene a "([^"]*)" como recomendación$`, suite.currentRankingHasProvider)
+	sc.Step(`^que el chatbot responderá sin modificar la evaluación vigente$`, suite.chatbotWillRespondWithoutChangingCurrentAssessment)
+	sc.Step(`^que el chatbot generará una nueva evaluación que requiere un profesional de "([^"]*)"$`, suite.chatbotWillGenerateNewProfessionalAssessment)
+	sc.Step(`^que la IA recomendará a "([^"]*)" para la nueva evaluación$`, suite.aiWillRecommendProviderForNewAssessment)
+	sc.Step(`^que ningún prestador de "([^"]*)" cubre la zona "([^"]*)"$`, suite.noProviderCoversZone)
+	sc.Step(`^consulto el detalle de la conversación$`, suite.requestThatConversationDetail)
+	sc.Step(`^continúo la conversación con información que no modifica el diagnóstico$`, suite.continueWithUnchangedAssessment)
+	sc.Step(`^continúo la conversación con nueva información sobre el problema$`, suite.continueWithNewProblemInformation)
 	sc.Step(`^el sistema muestra a "([^"]*)", "([^"]*)" y "([^"]*)" en ese orden$`, suite.systemShowsProvidersInOrder)
+	sc.Step(`^el detalle muestra "([^"]*)", "([^"]*)" y "([^"]*)" en el orden persistido con sus razones$`, suite.detailShowsPersistedProvidersWithReasons)
+	sc.Step(`^la respuesta conserva a "([^"]*)" y "([^"]*)" en el orden persistido con sus razones$`, suite.responseShowsPersistedProvidersWithReasons)
+	sc.Step(`^el sistema reemplaza el ranking vigente por uno con "([^"]*)" asociado a la nueva evaluación$`, suite.systemReplacesCurrentRanking)
+	sc.Step(`^una consulta posterior devuelve a "([^"]*)" sin reutilizar el ranking anterior$`, suite.subsequentQueryReturnsProviderWithoutReusingPreviousRanking)
 	sc.Step(`^la cantidad de prestadores mostrados no supera el máximo de 3 prestadores recomendados$`, suite.systemShowsAtMostThreeProviders)
 	sc.Step(`^cada prestador recomendado incluye las razones seleccionadas por la IA$`, suite.eachRecommendedProviderHasAIReason)
 	sc.Step(`^persiste el ranking vigente con los candidatos considerados, la selección ordenada y sus razones$`, suite.systemPersistsCurrentProviderRanking)
@@ -47,8 +67,14 @@ func registerChatbotProviderRecommendationSteps(sc *godog.ScenarioContext, suite
 	sc.Step(`^incluye sus reseñas identificadas como opiniones escritas por consumidores$`, suite.evidenceIncludesConsumerReviews)
 	sc.Step(`^incluye sus informes de finalización identificados como evidencia autoescrita por el prestador$`, suite.evidenceIncludesProviderReports)
 	sc.Step(`^la IA de recomendación recibe a "([^"]*)" como candidato$`, suite.aiReceivesProvider)
+	sc.Step(`^la IA de recomendación identifica al candidato mediante una referencia opaca$`, suite.aiIdentifiesCandidateByOpaqueReference)
+	sc.Step(`^la IA de recomendación no recibe datos personales, fotos ni información sensible$`, suite.aiDoesNotReceivePersonalDataPhotosOrSensitiveInformation)
+	sc.Step(`^la IA de recomendación no vuelve a ser invocada$`, suite.providerRankingWasNotInvokedAgain)
+	sc.Step(`^la IA de recomendación no es invocada$`, suite.providerRankingWasNotInvoked)
 	sc.Step(`^su evidencia histórica se representa como vacía$`, suite.providerEvidenceIsEmpty)
 	sc.Step(`^el sistema muestra una lista vacía de prestadores recomendados en la respuesta del chatbot$`, suite.systemShowsEmptyRecommendedProviderListInChatbotResponse)
+	sc.Step(`^el sistema persiste una lista vacía de prestadores recomendados para la evaluación$`, suite.systemPersistsEmptyProviderRecommendation)
+	sc.Step(`^una consulta posterior devuelve la misma lista vacía$`, suite.subsequentQueryReturnsEmptyProviderRecommendation)
 	sc.Step(`^el sistema muestra al prestador recomendado "([^"]*)" en la respuesta del chatbot$`, suite.systemShowsRecommendedProviderInChatbotResponse)
 	sc.Step(`^el sistema no muestra al prestador recomendado "([^"]*)" en la respuesta del chatbot$`, suite.systemDoesNotShowRecommendedProviderInChatbotResponse)
 	sc.Step(`^el sistema no muestra prestadores recomendados en la respuesta del chatbot$`, suite.systemShowsNoRecommendedProvidersInChatbotResponse)
@@ -132,6 +158,136 @@ func (suite *testSuite) aiWillRecommendProviders(first, second, third string) er
 	return nil
 }
 
+func (suite *testSuite) currentAssessmentRequiresProfessional(categoryName string) error {
+	if _, err := suite.categoryIDFor(categoryName); err != nil {
+		return err
+	}
+	suite.lastChatbotRecommendedCategoryName = categoryName
+	return nil
+}
+
+func (suite *testSuite) previousAssessmentRequiresProfessional(categoryName string) error {
+	return suite.currentAssessmentRequiresProfessional(categoryName)
+}
+
+func (suite *testSuite) persistedProviderRecommendations(first, second, third string) error {
+	return suite.prepareChatbotWithProviderRanking([]string{first, second, third})
+}
+
+func (suite *testSuite) persistedProviderRecommendationsTwo(first, second string) error {
+	return suite.prepareChatbotWithProviderRanking([]string{first, second})
+}
+
+func (suite *testSuite) currentRankingHasProvider(providerName string) error {
+	if err := suite.prepareChatbotWithProviderRanking([]string{providerName}); err != nil {
+		return err
+	}
+
+	foundConversation, err := suite.conversationRepository.FindByID(context.Background(), suite.lastConversationID)
+	if err != nil {
+		return fmt.Errorf("finding initial chatbot conversation for provider ranking replacement: %w", err)
+	}
+	chatbotConversation, ok := foundConversation.(*conversation.ChatBotConversation)
+	if !ok || chatbotConversation.CurrentAssessment == nil || chatbotConversation.CurrentRecommendation == nil {
+		return fmt.Errorf("expected initial chatbot conversation to have a current provider ranking")
+	}
+	suite.previousAssessmentID = chatbotConversation.CurrentAssessment.ID
+	return nil
+}
+
+func (suite *testSuite) chatbotWillRespondWithoutChangingCurrentAssessment() error {
+	suite.chatbot.SetUnchangedResponse(
+		"Información recibida",
+		"La información no modifica el diagnóstico preliminar vigente.",
+	)
+	return nil
+}
+
+func (suite *testSuite) chatbotWillGenerateNewProfessionalAssessment(categoryName string) error {
+	if _, err := suite.categoryIDFor(categoryName); err != nil {
+		return err
+	}
+	suite.lastChatbotRecommendedCategoryName = categoryName
+	suite.chatbot.SetConcludedDiagnosisResponse(
+		"Nuevo diagnóstico profesional",
+		"La nueva información modifica el diagnóstico preliminar y requiere revisar la recomendación.",
+		categoryName,
+	)
+	return nil
+}
+
+func (suite *testSuite) aiWillRecommendProviderForNewAssessment(providerName string) error {
+	if err := suite.ensureProviderRegisteredForRecommendation(providerName); err != nil {
+		return err
+	}
+	providerID, err := suite.providerIDForFullName(providerName)
+	if err != nil {
+		return err
+	}
+	suite.chatbot.SetProviderRankingByProviderIDs(providerID)
+	return nil
+}
+
+func (suite *testSuite) noProviderCoversZone(categoryName, coverageZoneName string) error {
+	categoryID, err := suite.categoryIDFor(categoryName)
+	if err != nil {
+		return err
+	}
+	zoneID, err := suite.ensureProviderCoverageZoneByName(coverageZoneName)
+	if err != nil {
+		return err
+	}
+	providers, err := suite.userRepository.FindProvidersByCategoryAndCoverageZoneID(context.Background(), categoryID, zoneID)
+	if err != nil {
+		return fmt.Errorf("finding providers for empty recommendation fixture: %w", err)
+	}
+	if len(providers) != 0 {
+		return fmt.Errorf("expected no provider for category %q in coverage zone %q, got %d", categoryName, coverageZoneName, len(providers))
+	}
+	suite.lastChatbotRecommendedCategoryName = categoryName
+	suite.providerRankingRequestCountBeforeAction = suite.chatbot.ProviderRankingRequestCount()
+	return nil
+}
+
+func (suite *testSuite) prepareChatbotWithProviderRanking(providerNames []string) error {
+	if suite.lastChatbotRecommendedCategoryName == "" {
+		return fmt.Errorf("expected a chatbot professional assessment category before preparing persisted recommendations")
+	}
+	providerIDs := make([]int, 0, len(providerNames))
+	for _, providerName := range providerNames {
+		if err := suite.ensureProviderRegisteredForRecommendation(providerName); err != nil {
+			return err
+		}
+		providerID, err := suite.providerIDForFullName(providerName)
+		if err != nil {
+			return err
+		}
+		providerIDs = append(providerIDs, providerID)
+	}
+
+	suite.chatbot.SetProviderRankingByProviderIDs(providerIDs...)
+	suite.chatbot.SetConcludedDiagnosisResponse(
+		"Diagnóstico persistido",
+		"La evaluación vigente requiere la intervención de un prestador.",
+		suite.lastChatbotRecommendedCategoryName,
+	)
+	if err := suite.requestCreateChatbotConversation(chatbotConversationRequest{Content: "Necesito resolver el problema informado."}); err != nil {
+		return err
+	}
+	if err := suite.rememberCreatedChatbotConversation(); err != nil {
+		return err
+	}
+	suite.providerRankingRequestCountBeforeAction = suite.chatbot.ProviderRankingRequestCount()
+	return nil
+}
+
+func (suite *testSuite) ensureProviderRegisteredForRecommendation(providerName string) error {
+	if _, err := suite.providerEmailForFullName(providerName); err == nil {
+		return nil
+	}
+	return suite.thereIsEligibleProvider(suite.lastChatbotRecommendedCategoryName, providerName)
+}
+
 func (suite *testSuite) thereIsEligibleProvider(categoryName, providerName string) error {
 	name, surname := splitProviderName(providerName)
 	email := suite.generatedProviderEmail(providerName)
@@ -140,6 +296,13 @@ func (suite *testSuite) thereIsEligibleProvider(categoryName, providerName strin
 		return err
 	}
 	return suite.registerProviderFixture(email, name, surname, categoryName, []int{zoneID})
+}
+
+func (suite *testSuite) thereIsEligibleProviderWithReviewsAndCompletionReports(categoryName, providerName string) error {
+	if err := suite.thereIsEligibleProvider(categoryName, providerName); err != nil {
+		return err
+	}
+	return suite.providerHasPaidJobsWithConsumerReviews(providerName)
 }
 
 func (suite *testSuite) thereIsNewEligibleProvider(categoryName, providerName string) error {
@@ -179,6 +342,29 @@ func (suite *testSuite) providerHasProviderAuthoredReports(providerName string) 
 		}
 	}
 	return fmt.Errorf("expected a provider-authored completion report for %q", providerName)
+}
+
+func (suite *testSuite) providerReportsIncludePrivateImages() error {
+	order, err := suite.persistedWorkOrderForLastServiceProposal()
+	if err != nil {
+		return err
+	}
+	report := order.CompletionReport()
+	if report == nil || len(report.ImageFileIDs()) == 0 {
+		return fmt.Errorf("expected the provider completion report to include private images")
+	}
+
+	for _, fileID := range report.ImageFileIDs() {
+		file, err := suite.fileRepository.FindByID(context.Background(), fileID)
+		if err != nil {
+			return fmt.Errorf("finding completion image %q: %w", fileID, err)
+		}
+		if file == nil || !file.IsConfirmed() || file.IsPublic() || !file.HasPurpose(filedomain.PurposeWorkOrderCompletionImage) {
+			return fmt.Errorf("expected completion image %q to be confirmed, private and scoped to completion reports", fileID)
+		}
+	}
+
+	return nil
 }
 
 func (suite *testSuite) providerIDForFullName(providerName string) (int, error) {
@@ -238,6 +424,91 @@ func (suite *testSuite) systemShowsProvidersInOrder(first, second, third string)
 		if providerFullName(providers[index]) != expectedName {
 			return fmt.Errorf("expected provider %q at position %d, got %q with body %s", expectedName, index+1, providerFullName(providers[index]), string(suite.lastBody))
 		}
+	}
+	return nil
+}
+
+func (suite *testSuite) detailShowsPersistedProvidersWithReasons(first, second, third string) error {
+	providers, err := suite.recommendedProvidersFromLastChatbotConversationDetail()
+	if err != nil {
+		return err
+	}
+	return validateProviderOrderAndReasons(providers, []string{first, second, third}, suite.lastBody)
+}
+
+func (suite *testSuite) responseShowsPersistedProvidersWithReasons(first, second string) error {
+	providers, err := suite.recommendedProvidersFromLastChatbotResponse()
+	if err != nil {
+		return err
+	}
+	return validateProviderOrderAndReasons(providers, []string{first, second}, suite.lastBody)
+}
+
+func validateProviderOrderAndReasons(providers []providerSummaryResponse, expected []string, body []byte) error {
+	if len(providers) != len(expected) {
+		return fmt.Errorf("expected providers %v in persisted order, got %v with body %s", expected, providers, string(body))
+	}
+	for index, expectedName := range expected {
+		if providerFullName(providers[index]) != expectedName {
+			return fmt.Errorf("expected provider %q at position %d, got %q with body %s", expectedName, index+1, providerFullName(providers[index]), string(body))
+		}
+		if strings.TrimSpace(providers[index].RecommendationReason) == "" {
+			return fmt.Errorf("expected a persisted recommendation reason for provider %q, got body %s", expectedName, string(body))
+		}
+	}
+	return nil
+}
+
+func (suite *testSuite) systemReplacesCurrentRanking(providerName string) error {
+	if err := suite.lastResponseShouldHaveStatusCode(http.StatusCreated); err != nil {
+		return err
+	}
+	providerID, err := suite.providerIDForFullName(providerName)
+	if err != nil {
+		return err
+	}
+	foundConversation, err := suite.conversationRepository.FindByID(context.Background(), suite.lastConversationID)
+	if err != nil {
+		return fmt.Errorf("finding chatbot conversation after ranking replacement: %w", err)
+	}
+	chatbotConversation, ok := foundConversation.(*conversation.ChatBotConversation)
+	if !ok || chatbotConversation.CurrentAssessment == nil || chatbotConversation.CurrentRecommendation == nil {
+		return fmt.Errorf("expected chatbot conversation to persist the replacement ranking")
+	}
+	if chatbotConversation.CurrentAssessment.ID <= suite.previousAssessmentID {
+		return fmt.Errorf("expected a new assessment after %d, got %d", suite.previousAssessmentID, chatbotConversation.CurrentAssessment.ID)
+	}
+	currentRecommendation := chatbotConversation.CurrentRecommendation
+	if currentRecommendation.AssessmentID != chatbotConversation.CurrentAssessment.ID {
+		return fmt.Errorf("expected replacement ranking assessment %d, got %d", chatbotConversation.CurrentAssessment.ID, currentRecommendation.AssessmentID)
+	}
+	if len(currentRecommendation.CandidateProviderIDs) == 0 || len(currentRecommendation.Recommendations) != 1 {
+		return fmt.Errorf("expected replacement ranking to retain eligible candidates and contain one recommendation for provider %d, got %+v", providerID, currentRecommendation)
+	}
+	item := currentRecommendation.Recommendations[0]
+	if item.ProviderID != providerID || item.Position != 1 || strings.TrimSpace(item.Reason) == "" {
+		return fmt.Errorf("expected replacement recommendation for provider %d, got %+v", providerID, item)
+	}
+	if suite.chatbot.ProviderRankingRequestCount() != suite.providerRankingRequestCountBeforeAction+1 {
+		return fmt.Errorf("expected exactly one new provider ranking invocation, got %d after baseline %d", suite.chatbot.ProviderRankingRequestCount(), suite.providerRankingRequestCountBeforeAction)
+	}
+	return nil
+}
+
+func (suite *testSuite) subsequentQueryReturnsProviderWithoutReusingPreviousRanking(providerName string) error {
+	providerRankingRequestCount := suite.chatbot.ProviderRankingRequestCount()
+	if err := suite.requestThatConversationDetail(); err != nil {
+		return err
+	}
+	providers, err := suite.recommendedProvidersFromLastChatbotConversationDetail()
+	if err != nil {
+		return err
+	}
+	if len(providers) != 1 || providerFullName(providers[0]) != providerName || strings.TrimSpace(providers[0].RecommendationReason) == "" {
+		return fmt.Errorf("expected subsequent detail to return only %q with its reason, got %v and body %s", providerName, providers, string(suite.lastBody))
+	}
+	if suite.chatbot.ProviderRankingRequestCount() != providerRankingRequestCount {
+		return fmt.Errorf("expected subsequent detail not to invoke provider ranking again")
 	}
 	return nil
 }
@@ -417,6 +688,89 @@ func (suite *testSuite) aiReceivesProvider(providerName string) error {
 	return err
 }
 
+func (suite *testSuite) aiIdentifiesCandidateByOpaqueReference() error {
+	request := suite.chatbot.LastProviderRankingRequest()
+	if len(request.Candidates) == 0 {
+		return fmt.Errorf("expected at least one provider ranking candidate")
+	}
+	seenReferences := make(map[string]struct{}, len(request.Candidates))
+	for _, candidate := range request.Candidates {
+		reference := strings.TrimSpace(candidate.Reference)
+		if !strings.HasPrefix(reference, "candidate-") {
+			return fmt.Errorf("expected opaque candidate reference, got %q", reference)
+		}
+		if _, err := uuid.Parse(strings.TrimPrefix(reference, "candidate-")); err != nil {
+			return fmt.Errorf("expected candidate reference %q to contain an opaque UUID: %w", reference, err)
+		}
+		if _, duplicate := seenReferences[reference]; duplicate {
+			return fmt.Errorf("candidate reference %q was repeated", reference)
+		}
+		seenReferences[reference] = struct{}{}
+	}
+	return nil
+}
+
+func (suite *testSuite) aiDoesNotReceivePersonalDataPhotosOrSensitiveInformation() error {
+	payload, err := suite.chatbot.LastProviderRankingAIInputJSON()
+	if err != nil {
+		return fmt.Errorf("encoding provider ranking AI input: %w", err)
+	}
+	serializedPayload := strings.ToLower(string(payload))
+	for _, providerName := range suite.providerNamesForRankingPrivacyCheck() {
+		if strings.Contains(serializedPayload, strings.ToLower(providerName)) {
+			return fmt.Errorf("provider identity %q was included in the AI input: %s", providerName, string(payload))
+		}
+	}
+	for _, providerEmail := range suite.providerEmailsByFullName {
+		if strings.Contains(serializedPayload, strings.ToLower(providerEmail)) {
+			return fmt.Errorf("provider email %q was included in the AI input: %s", providerEmail, string(payload))
+		}
+	}
+	for _, forbiddenField := range []string{
+		"provider_id",
+		"original_name",
+		"file_id",
+		"images",
+		"photo",
+		"profile_photo",
+		"upload",
+		"url",
+	} {
+		if strings.Contains(serializedPayload, forbiddenField) {
+			return fmt.Errorf("private or identifying field %q was included in the AI input: %s", forbiddenField, string(payload))
+		}
+	}
+	if strings.Contains(serializedPayload, "ranking-history.jpg") {
+		return fmt.Errorf("private completion image name was included in the AI input: %s", string(payload))
+	}
+	return nil
+}
+
+func (suite *testSuite) providerNamesForRankingPrivacyCheck() []string {
+	names := make([]string, 0, len(suite.providerEmailsByFullName)*2)
+	for fullName := range suite.providerEmailsByFullName {
+		name, surname := splitProviderName(fullName)
+		names = append(names, name, surname, fullName)
+	}
+	return names
+}
+
+func (suite *testSuite) providerRankingWasNotInvokedAgain() error {
+	return suite.providerRankingInvocationCountEqualsBaseline()
+}
+
+func (suite *testSuite) providerRankingWasNotInvoked() error {
+	return suite.providerRankingInvocationCountEqualsBaseline()
+}
+
+func (suite *testSuite) providerRankingInvocationCountEqualsBaseline() error {
+	actual := suite.chatbot.ProviderRankingRequestCount()
+	if actual != suite.providerRankingRequestCountBeforeAction {
+		return fmt.Errorf("expected provider ranking invocation count to remain %d, got %d", suite.providerRankingRequestCountBeforeAction, actual)
+	}
+	return nil
+}
+
 func (suite *testSuite) onlyProviderName() (string, error) {
 	if len(suite.providerEmailsByFullName) != 1 {
 		return "", fmt.Errorf("expected exactly one registered provider, got %d", len(suite.providerEmailsByFullName))
@@ -534,6 +888,69 @@ func (suite *testSuite) systemShowsEmptyRecommendedProviderListInChatbotResponse
 		return fmt.Errorf("expected empty recommended provider list, got body %s", string(suite.lastBody))
 	}
 
+	return nil
+}
+
+func (suite *testSuite) continueWithUnchangedAssessment() error {
+	return suite.sendNewMessageToExistingChatbotConversation(&godog.DocString{
+		Content: "La pérdida sigue igual, no hay información que cambie el diagnóstico.",
+	})
+}
+
+func (suite *testSuite) continueWithNewProblemInformation() error {
+	return suite.sendNewMessageToExistingChatbotConversation(&godog.DocString{
+		Content: "Ahora también pierde agua cuando la conexión está cerrada.",
+	})
+}
+
+func (suite *testSuite) systemPersistsEmptyProviderRecommendation() error {
+	if err := suite.lastResponseShouldHaveStatusCode(http.StatusCreated); err != nil {
+		return err
+	}
+	var response chatbotProviderRecommendationsResponse
+	if err := json.Unmarshal(suite.lastBody, &response); err != nil {
+		return fmt.Errorf("decoding empty chatbot recommendation response: %w", err)
+	}
+	if response.ID <= 0 || len(response.RecommendedProviders) != 0 {
+		return fmt.Errorf("expected an empty recommendation response, got %+v with body %s", response, string(suite.lastBody))
+	}
+	suite.lastConversationID = response.ID
+
+	foundConversation, err := suite.conversationRepository.FindByID(context.Background(), response.ID)
+	if err != nil {
+		return fmt.Errorf("finding chatbot conversation with empty recommendation: %w", err)
+	}
+	chatbotConversation, ok := foundConversation.(*conversation.ChatBotConversation)
+	if !ok || chatbotConversation.CurrentAssessment == nil || chatbotConversation.CurrentRecommendation == nil {
+		return fmt.Errorf("expected the empty provider recommendation to be persisted with the current assessment")
+	}
+	currentRecommendation := chatbotConversation.CurrentRecommendation
+	if currentRecommendation.AssessmentID != chatbotConversation.CurrentAssessment.ID || len(currentRecommendation.CandidateProviderIDs) != 0 || len(currentRecommendation.Recommendations) != 0 {
+		return fmt.Errorf("expected empty recommendation associated with assessment %d, got %+v", chatbotConversation.CurrentAssessment.ID, currentRecommendation)
+	}
+	suite.previousAssessmentID = chatbotConversation.CurrentAssessment.ID
+	return nil
+}
+
+func (suite *testSuite) subsequentQueryReturnsEmptyProviderRecommendation() error {
+	if err := suite.requestThatConversationDetail(); err != nil {
+		return err
+	}
+	providers, err := suite.recommendedProvidersFromLastChatbotConversationDetail()
+	if err != nil {
+		return err
+	}
+	if len(providers) != 0 {
+		return fmt.Errorf("expected subsequent chatbot detail to return the same empty recommendation, got %+v", providers)
+	}
+	foundConversation, err := suite.conversationRepository.FindByID(context.Background(), suite.lastConversationID)
+	if err != nil {
+		return fmt.Errorf("finding chatbot conversation after empty recommendation query: %w", err)
+	}
+	chatbotConversation, ok := foundConversation.(*conversation.ChatBotConversation)
+	if !ok || chatbotConversation.CurrentRecommendation == nil || chatbotConversation.CurrentRecommendation.AssessmentID != suite.previousAssessmentID {
+		return fmt.Errorf("expected the empty recommendation to remain associated with assessment %d", suite.previousAssessmentID)
+	}
 	return nil
 }
 

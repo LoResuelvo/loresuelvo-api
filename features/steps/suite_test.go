@@ -83,6 +83,7 @@ type testSuite struct {
 	chatbotConversationIDs                  []int
 	chatbotConversationStatuses             []string
 	lastChatbotRecommendedCategoryName      string
+	providerRankingRequestCountBeforeAction int
 	expectedChatbotContextSummary           string
 	expectedRecentChatbotContextMessage     string
 	lastAttemptedChatbotContinuationMessage string
@@ -268,6 +269,7 @@ func (s *testSuite) cleanup() error {
 	s.chatbotConversationIDs = nil
 	s.chatbotConversationStatuses = nil
 	s.lastChatbotRecommendedCategoryName = ""
+	s.providerRankingRequestCountBeforeAction = 0
 	s.expectedChatbotContextSummary = ""
 	s.expectedRecentChatbotContextMessage = ""
 	s.lastAttemptedChatbotContinuationMessage = ""
