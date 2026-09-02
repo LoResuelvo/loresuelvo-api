@@ -1,72 +1,83 @@
 package realtime
 
 import (
+	"context"
 	"crypto/rand"
+	"database/sql"
 	"encoding/hex"
-	"sync"
-	"time"
+	"errors"
+	"fmt"
 )
 
-type TicketStore struct {
-	mu      sync.RWMutex
-	tickets map[string]ticketInfo
+// PostgresTicketStore persists one-time WebSocket authentication tickets.
+// PostgreSQL is the authority for expiration and atomic consumption across
+// every API instance.
+type PostgresTicketStore struct {
+	db *sql.DB
 }
 
-type ticketInfo struct {
-	authID    string
-	expiresAt time.Time
+// NewPostgresTicketStore creates a ticket store backed by PostgreSQL. Tickets
+// written through this store can be issued and consumed by any API instance
+// connected to the same database.
+func NewPostgresTicketStore(db *sql.DB) *PostgresTicketStore {
+	return &PostgresTicketStore{db: db}
 }
 
-func NewTicketStore() *TicketStore {
-	return &TicketStore{
-		tickets: make(map[string]ticketInfo),
+// Issue generates and persists a secure ticket with a one-minute lifetime.
+func (s *PostgresTicketStore) Issue(ctx context.Context, authID string) (string, error) {
+	if s == nil || s.db == nil {
+		return "", fmt.Errorf("issuing websocket ticket: database is required")
 	}
-}
+	if ctx == nil {
+		ctx = context.Background()
+	}
 
-// Issue generates a new secure random ticket that expires in 1 minute
-func (s *TicketStore) Issue(authID string) (string, error) {
 	bytes := make([]byte, 16)
 	if _, err := rand.Read(bytes); err != nil {
-		return "", err
+		return "", fmt.Errorf("generating websocket ticket: %w", err)
 	}
 	ticket := hex.EncodeToString(bytes)
 
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	// Clean up old tickets lazily to avoid memory leaks
-	now := time.Now()
-	for k, v := range s.tickets {
-		if now.After(v.expiresAt) {
-			delete(s.tickets, k)
-		}
+	_, err := s.db.ExecContext(
+		ctx,
+		`WITH expired AS (
+			DELETE FROM websocket_tickets WHERE expires_at <= NOW()
+		)
+		INSERT INTO websocket_tickets (ticket, auth_id, expires_at)
+		VALUES ($1, $2, NOW() + INTERVAL '1 minute')`,
+		ticket,
+		authID,
+	)
+	if err != nil {
+		return "", fmt.Errorf("persisting websocket ticket: %w", err)
 	}
-
-	s.tickets[ticket] = ticketInfo{
-		authID:    authID,
-		expiresAt: now.Add(1 * time.Minute),
-	}
-
 	return ticket, nil
 }
 
-// Consume validates a ticket and returns the associated authID.
-// A ticket can only be consumed once.
-func (s *TicketStore) Consume(ticket string) (string, bool) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	info, ok := s.tickets[ticket]
-	if !ok {
-		return "", false
+// Consume atomically consumes a ticket. PostgreSQL performs the
+// validation and deletion in one statement, so concurrent API instances
+// cannot successfully consume the same ticket.
+func (s *PostgresTicketStore) Consume(ctx context.Context, ticket string) (string, bool, error) {
+	if s == nil || s.db == nil {
+		return "", false, fmt.Errorf("consuming websocket ticket: database is required")
+	}
+	if ctx == nil {
+		ctx = context.Background()
 	}
 
-	// Delete immediately so it's one-time use
-	delete(s.tickets, ticket)
-
-	if time.Now().After(info.expiresAt) {
-		return "", false
+	var authID string
+	err := s.db.QueryRowContext(
+		ctx,
+		`DELETE FROM websocket_tickets
+		WHERE ticket = $1 AND expires_at > NOW()
+		RETURNING auth_id`,
+		ticket,
+	).Scan(&authID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", false, nil
 	}
-
-	return info.authID, true
+	if err != nil {
+		return "", false, fmt.Errorf("consuming websocket ticket: %w", err)
+	}
+	return authID, true, nil
 }

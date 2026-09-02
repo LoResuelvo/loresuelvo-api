@@ -285,7 +285,7 @@ func newDependenciesWithPaymentAccountAndCalendarAdapters(
 	ctx, cancel := context.WithCancel(context.Background())
 	go hub.Run(ctx)
 
-	ticketStore := realtime.NewTicketStore()
+	ticketStore := realtime.NewPostgresTicketStore(database)
 
 	messagePublisher := realtime.NewPublisher(hub, persistence.UserRepository)
 	realtimeNotificationNotificator := realtime.NewNotificationNotificator(hub, persistence.UserRepository)

@@ -1,6 +1,7 @@
 package realtime
 
 import (
+	"context"
 	"net/http"
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/middleware"
@@ -14,13 +15,18 @@ type authenticatedUserFinder interface {
 	FindByAuthID(authID string) (user.User, error)
 }
 
+type websocketTicketStore interface {
+	Issue(context.Context, string) (string, error)
+	Consume(context.Context, string) (string, bool, error)
+}
+
 type Handler struct {
 	hub         *Hub
 	userFinder  authenticatedUserFinder
-	ticketStore *TicketStore
+	ticketStore websocketTicketStore
 }
 
-func NewHandler(hub *Hub, userFinder authenticatedUserFinder, ticketStore *TicketStore) *Handler {
+func NewHandler(hub *Hub, userFinder authenticatedUserFinder, ticketStore websocketTicketStore) *Handler {
 	return &Handler{
 		hub:         hub,
 		userFinder:  userFinder,
@@ -35,7 +41,7 @@ func (h *Handler) IssueTicket(c *gin.Context) {
 		return
 	}
 
-	ticket, err := h.ticketStore.Issue(auth0ID)
+	ticket, err := h.ticketStore.Issue(c.Request.Context(), auth0ID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to issue ticket"})
 		return
@@ -53,7 +59,11 @@ func (h *Handler) Handle(c *gin.Context) {
 		return
 	}
 
-	auth0ID, valid := h.ticketStore.Consume(ticket)
+	auth0ID, valid, err := h.ticketStore.Consume(c.Request.Context(), ticket)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to consume ticket"})
+		return
+	}
 	if !valid || auth0ID == "" {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid or expired ticket"})
 		return
