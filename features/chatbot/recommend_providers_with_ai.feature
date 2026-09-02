@@ -15,7 +15,6 @@ Feature: 13.3 Recomendar prestadores elegibles mediante IA según confianza, rep
 
     Rule: La IA ordena solamente candidatos elegibles, fundamenta la recomendación con evidencia y respeta el máximo de 3 prestadores recomendados
 
-        @wip
         Scenario: 13.3.1-GP Recomendar en el orden elegido por la IA según la evidencia disponible
             Given existen los siguientes prestadores elegibles de "Plomería" en la zona "Comuna 6":
                 | correo                      | nombre  | apellido |
@@ -35,7 +34,6 @@ Feature: 13.3 Recomendar prestadores elegibles mediante IA según confianza, rep
             And cada prestador recomendado incluye las razones seleccionadas por la IA
             And persiste el ranking vigente con los candidatos considerados, la selección ordenada y sus razones
 
-        @wip
         Scenario: 13.3.2-GP Enviar a la IA todos y únicamente los prestadores elegibles por rubro y zona
             Given existe un prestador registrado con correo "juan.plomero@example.com", nombre "Juan", apellido "Gómez", rubro "Plomería" y zona de cobertura "Comuna 6"
             And existe un prestador registrado con correo "pedro.plomero@example.com", nombre "Pedro", apellido "Dib", rubro "Plomería" y zona de cobertura "Comuna 14"
@@ -48,7 +46,6 @@ Feature: 13.3 Recomendar prestadores elegibles mediante IA según confianza, rep
             Then la IA de recomendación recibe como único candidato al prestador "Juan Gómez"
             And la IA de recomendación no recibe a "Pedro Dib" ni a "Laura Suárez"
 
-        @wip
         Scenario: 13.3.3-GP Construir evidencia estructurada distinguiendo su procedencia y confiabilidad
             Given existe un prestador elegible de "Plomería" llamado "Juan Gómez"
             And que "Juan Gómez" tiene trabajos pagados con ratings y reseñas escritas por consumidores
@@ -63,7 +60,6 @@ Feature: 13.3 Recomendar prestadores elegibles mediante IA según confianza, rep
             And incluye sus reseñas identificadas como opiniones escritas por consumidores
             And incluye sus informes de finalización identificados como evidencia autoescrita por el prestador
 
-        @wip
         Scenario: 13.3.4-GP Mantener como candidato a un prestador nuevo sin historial
             Given existe un prestador elegible de "Plomería" llamado "Juan Gómez" sin trabajos pagados, ratings, reseñas ni informes de finalización
             And que el chatbot concluirá que se requiere un profesional del rubro "Plomería"
