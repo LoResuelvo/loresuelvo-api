@@ -122,7 +122,6 @@ Feature: 13.3 Recomendar prestadores elegibles mediante IA según confianza, rep
 
     Rule: Una recomendación inválida o indisponible no produce persistencia parcial
 
-        @wip
         Scenario Outline: 13.3.10-GP Rechazar referencias inválidas devueltas por la IA
             Given que "Juan Gómez" y "Marcela Ruiz" son los únicos candidatos elegibles
             And que el chatbot concluirá que se requiere un profesional del rubro "Plomería"
@@ -140,9 +139,9 @@ Feature: 13.3 Recomendar prestadores elegibles mediante IA según confianza, rep
                 | una referencia duplicada        |
                 | una referencia no elegible      |
 
-        @wip
         Scenario: 13.3.11-GP Evitar persistencia parcial cuando la IA de recomendación no está disponible
-            Given que el chatbot concluirá que se requiere un profesional del rubro "Plomería"
+            Given existe un prestador elegible de "Plomería" llamado "Juan Gómez"
+            And que el chatbot concluirá que se requiere un profesional del rubro "Plomería"
             And que la IA de recomendación de prestadores no está disponible
             When envío un mensaje al chatbot asistido por IA:
                 """
