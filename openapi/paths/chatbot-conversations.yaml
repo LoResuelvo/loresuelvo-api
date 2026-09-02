@@ -57,7 +57,7 @@ post:
   - Conversations
   operationId: createChatbotConversation
   summary: Send a message to the AI-assisted chatbot
-  description: Creates a chatbot conversation for the authenticated consumer and returns the persisted consumer message, chatbot answer, and providers in the recommended category that cover the consumer's active coverage zone when the chatbot concludes a pre-diagnosis. The first consumer message may include text, confirmed private image file ids, or both.
+  description: Creates a chatbot conversation for the authenticated consumer and returns the persisted consumer message, chatbot answer, and AI-ranked providers selected from the diagnosed category and the consumer's active coverage zone when the chatbot concludes a pre-diagnosis. The first consumer message may include text, confirmed private image file ids, or both.
   security:
   - BearerAuth: []
   requestBody:
@@ -146,6 +146,26 @@ post:
             onlyConsumer:
               value:
                 error: Only consumers can send messages to the AI chatbot
+    '502':
+      description: The provider-ranking AI returned an invalid recommendation and the chatbot conversation was not persisted.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            invalidRecommendation:
+              value:
+                error: provider recommendation is invalid
+    '503':
+      description: The provider-ranking AI is temporarily unavailable and the chatbot conversation was not persisted.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            unavailable:
+              value:
+                error: Chatbot is unavailable
     '500':
       description: Unexpected error while creating the chatbot conversation.
       content:

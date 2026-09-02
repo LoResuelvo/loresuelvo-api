@@ -3,7 +3,7 @@ post:
   - Conversations
   operationId: continueChatbotConversation
   summary: Send a message to an existing AI-assisted chatbot conversation
-  description: Adds a consumer message to an existing chatbot conversation, sends the persisted context summary plus recent relevant messages and current-turn images to the stateless chatbot, persists the chatbot response, and returns the messages created for this turn with providers in the recommended category that cover the consumer's active coverage zone when applicable.
+  description: Adds a consumer message to an existing chatbot conversation, sends the persisted context summary plus recent relevant messages and current-turn images to the stateless chatbot, persists the chatbot response, and returns the messages created for this turn with AI-ranked providers selected from the diagnosed category and the consumer's active coverage zone when applicable.
   security:
   - BearerAuth: []
   parameters:
@@ -102,6 +102,26 @@ post:
             processing:
               value:
                 error: Chatbot conversation is already processing another message
+    '502':
+      description: The provider-ranking AI returned an invalid recommendation and the chatbot turn was not persisted.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            invalidRecommendation:
+              value:
+                error: provider recommendation is invalid
+    '503':
+      description: The provider-ranking AI is temporarily unavailable and the chatbot turn was not persisted.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            unavailable:
+              value:
+                error: Chatbot is unavailable
     '500':
       description: Unexpected error while continuing the chatbot conversation.
       content:

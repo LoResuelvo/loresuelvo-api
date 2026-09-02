@@ -20,6 +20,6 @@ properties:
     $ref: '#/components/schemas/ProblemAssessment'
   recommended_providers:
     type: array
-    description: Providers in the recommended category that cover the authenticated consumer's active coverage zone.
+    description: Providers selected by the AI ranker from the deterministic category and coverage-zone eligible candidates, in rank order.
     items:
       $ref: '#/components/schemas/ProviderSummary'

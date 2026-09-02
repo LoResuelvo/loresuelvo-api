@@ -1,4 +1,4 @@
-description: Chatbot conversation turn response, including the chatbot answer and providers in the recommended category that cover the authenticated consumer's active coverage zone when the diagnosis is concluded.
+description: Chatbot conversation turn response, including the chatbot answer and AI-ranked providers selected from the diagnosed category and the authenticated consumer's active coverage zone when the diagnosis is concluded.
 allOf:
 - $ref: '#/components/schemas/ChatbotConversationDetail'
 - type: object
