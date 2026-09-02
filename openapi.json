@@ -86,7 +86,7 @@
         }
     ],
     "paths": {
-        "/health/live": {
+        "/": {
             "get": {
                 "tags": [
                     "Health"

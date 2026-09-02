@@ -157,7 +157,7 @@ func (router *Router) registerCalendarConnectionRoutes(engine *gin.Engine, authM
 }
 
 func (router *Router) registerHealthRoutes(engine *gin.Engine) {
-	engine.GET("/health/live", router.healthHandler.Live)
+	engine.GET("/", router.healthHandler.Live)
 	engine.GET("/health/ready", router.healthHandler.Ready)
 }
 
