@@ -21,7 +21,9 @@ type identityVerificationRepositoryTestContext struct {
 
 func newIdentityVerificationRepositoryTest(t *testing.T) identityVerificationRepositoryTestContext {
 	t.Helper()
-	database, err := db.ConnectPostgres(context.Background(), db.NewTestPostgresConfigFromEnv())
+	config, err := db.NewTestPostgresConfigFromEnv()
+	require.NoError(t, err)
+	database, err := db.ConnectPostgres(context.Background(), config)
 	require.NoError(t, err)
 	testContext := identityVerificationRepositoryTestContext{database: database, repository: repositories.NewIdentityVerificationRepository(database)}
 	_, err = database.Exec(`DELETE FROM identity_verification_sessions`)

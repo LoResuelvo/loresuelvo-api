@@ -23,7 +23,9 @@ type paymentAccountStoreTestContext struct {
 
 func newPaymentAccountRepositoryTest(t *testing.T) paymentAccountStoreTestContext {
 	t.Helper()
-	database, err := db.ConnectPostgres(context.Background(), db.NewTestPostgresConfigFromEnv())
+	config, err := db.NewTestPostgresConfigFromEnv()
+	require.NoError(t, err)
+	database, err := db.ConnectPostgres(context.Background(), config)
 	require.NoError(t, err)
 	t.Cleanup(func() {
 		cleanPaymentAccountRepositoryTestDatabase(t, database)

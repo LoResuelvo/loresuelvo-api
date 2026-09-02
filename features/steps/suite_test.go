@@ -326,7 +326,11 @@ func (s *testSuite) cleanup() error {
 }
 
 func newTestDb() *sql.DB {
-	database, err := db.ConnectPostgres(context.Background(), db.NewTestPostgresConfigFromEnv())
+	config, err := db.NewTestPostgresConfigFromEnv()
+	if err != nil {
+		panic(fmt.Errorf("cannot configure test database: %w", err))
+	}
+	database, err := db.ConnectPostgres(context.Background(), config)
 	if err != nil {
 		panic(fmt.Errorf("cannot connect to test database: %w", err))
 	}

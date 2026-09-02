@@ -47,7 +47,8 @@ type providerRepositoryTestContext struct {
 func newProviderRepositoryTest(t *testing.T) providerRepositoryTestContext {
 	t.Helper()
 
-	config := db.NewTestPostgresConfigFromEnv()
+	config, err := db.NewTestPostgresConfigFromEnv()
+	require.NoError(t, err)
 
 	database, err := db.ConnectPostgres(context.Background(), config)
 	require.NoError(t, err, "could not connect to test database")

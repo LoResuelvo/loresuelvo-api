@@ -23,7 +23,9 @@ type googleCalendarRepositoryTestContext struct {
 
 func newGoogleCalendarRepositoryTest(t *testing.T) googleCalendarRepositoryTestContext {
 	t.Helper()
-	database, err := db.ConnectPostgres(context.Background(), db.NewTestPostgresConfigFromEnv())
+	config, err := db.NewTestPostgresConfigFromEnv()
+	require.NoError(t, err)
+	database, err := db.ConnectPostgres(context.Background(), config)
 	require.NoError(t, err)
 
 	attemptStore := repositories.NewGoogleCalendarAuthorizationAttemptRepository(database)

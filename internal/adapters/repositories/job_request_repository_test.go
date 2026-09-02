@@ -50,7 +50,9 @@ func cleanJobRequestRepositoryTestDatabase(t *testing.T, database *sql.DB) {
 func newJobRequestRepositoryTest(t *testing.T) jobRequestRepositoryTestContext {
 	t.Helper()
 
-	database, err := db.ConnectPostgres(context.Background(), db.NewTestPostgresConfigFromEnv())
+	config, err := db.NewTestPostgresConfigFromEnv()
+	require.NoError(t, err)
+	database, err := db.ConnectPostgres(context.Background(), config)
 	require.NoError(t, err, "could not connect to test database")
 
 	t.Cleanup(func() {

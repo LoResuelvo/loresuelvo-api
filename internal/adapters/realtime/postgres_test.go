@@ -10,7 +10,11 @@ import (
 
 func openRealtimeTestDatabase(t *testing.T) *sql.DB {
 	t.Helper()
-	database, err := databaseadapter.ConnectPostgres(context.Background(), databaseadapter.NewTestPostgresConfigFromEnv())
+	config, err := databaseadapter.NewTestPostgresConfigFromEnv()
+	if err != nil {
+		t.Fatalf("invalid test database configuration: %v", err)
+	}
+	database, err := databaseadapter.ConnectPostgres(context.Background(), config)
 	if err != nil {
 		t.Skipf("PostgreSQL is unavailable: %v", err)
 	}

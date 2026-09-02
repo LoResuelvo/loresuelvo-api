@@ -16,7 +16,8 @@ import (
 func newConsumerRepositoryTest(t *testing.T) (*repositories.UserRepository, *sql.DB) {
 	t.Helper()
 
-	config := db.NewTestPostgresConfigFromEnv()
+	config, err := db.NewTestPostgresConfigFromEnv()
+	require.NoError(t, err)
 
 	database, err := db.ConnectPostgres(context.Background(), config)
 	require.NoError(t, err, "could not connect to test database")
@@ -245,7 +246,8 @@ func TestConsumerRepositoryRollsBackConsumerAddressFailure(t *testing.T) {
 func newConsumerRepositoryTestWithCoverageZone(t *testing.T) (*repositories.UserRepository, *coveragezone.CoverageZone) {
 	t.Helper()
 
-	config := db.NewTestPostgresConfigFromEnv()
+	config, err := db.NewTestPostgresConfigFromEnv()
+	require.NoError(t, err)
 	database, err := db.ConnectPostgres(context.Background(), config)
 	require.NoError(t, err, "could not connect to test database")
 

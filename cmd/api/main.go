@@ -26,7 +26,11 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	database, err := db.ConnectPostgres(ctx, db.NewPostgresConfigFromEnv())
+	databaseConfig, err := db.NewPostgresConfigFromEnv()
+	if err != nil {
+		panic(err)
+	}
+	database, err := db.ConnectPostgres(ctx, databaseConfig)
 	if err != nil {
 		panic(err)
 	}

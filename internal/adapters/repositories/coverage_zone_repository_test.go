@@ -37,7 +37,8 @@ func savedCoverageMarket(t *testing.T, repository *repositories.CoverageZoneRepo
 func newCoverageZoneRepositoryTest(t *testing.T) *repositories.CoverageZoneRepository {
 	t.Helper()
 
-	config := db.NewTestPostgresConfigFromEnv()
+	config, err := db.NewTestPostgresConfigFromEnv()
+	require.NoError(t, err)
 	database, err := db.ConnectPostgres(context.Background(), config)
 	require.NoError(t, err, "could not connect to test database")
 
