@@ -1,0 +1,9 @@
+get:
+  tags:
+    - Health
+  operationId: getHealthLive
+  summary: Check process liveness
+  description: Returns 200 while the API process is serving HTTP requests without checking external dependencies.
+  responses:
+    '200':
+      description: The API process is serving requests.

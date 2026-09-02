@@ -1,0 +1,11 @@
+get:
+  tags:
+    - Health
+  operationId: getHealthReady
+  summary: Check service readiness
+  description: Returns 200 only while the instance accepts traffic and PostgreSQL is reachable.
+  responses:
+    '200':
+      description: The API instance is ready to receive traffic.
+    '503':
+      description: The API instance is draining or PostgreSQL is unavailable.

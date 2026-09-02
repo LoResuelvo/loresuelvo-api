@@ -86,25 +86,35 @@
         }
     ],
     "paths": {
-        "/": {
+        "/health/live": {
             "get": {
                 "tags": [
                     "Health"
                 ],
-                "operationId": "getHealthGreeting",
-                "summary": "Get service greeting",
-                "description": "Returns the plain-text welcome response used as a basic health check.",
+                "operationId": "getHealthLive",
+                "summary": "Check process liveness",
+                "description": "Returns 200 while the API process is serving HTTP requests without checking external dependencies.",
                 "responses": {
                     "200": {
-                        "description": "The API is running.",
-                        "content": {
-                            "text/plain": {
-                                "schema": {
-                                    "type": "string",
-                                    "example": "Hello World"
-                                }
-                            }
-                        }
+                        "description": "The API process is serving requests."
+                    }
+                }
+            }
+        },
+        "/health/ready": {
+            "get": {
+                "tags": [
+                    "Health"
+                ],
+                "operationId": "getHealthReady",
+                "summary": "Check service readiness",
+                "description": "Returns 200 only while the instance accepts traffic and PostgreSQL is reachable.",
+                "responses": {
+                    "200": {
+                        "description": "The API instance is ready to receive traffic."
+                    },
+                    "503": {
+                        "description": "The API instance is draining or PostgreSQL is unavailable."
                     }
                 }
             }

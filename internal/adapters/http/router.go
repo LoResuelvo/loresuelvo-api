@@ -3,7 +3,6 @@ package httpadapter
 import (
 	"fmt"
 	"log/slog"
-	"net/http"
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/calendar_connection_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/category_handler"
@@ -11,6 +10,7 @@ import (
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/conversation_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/coverage_zone_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/file_handler"
+	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/health_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/identity_verification_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/job_request_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/payment_account_handler"
@@ -49,6 +49,7 @@ type RouterConfig struct {
 	PaymentHandler              *payment_handler.PaymentHandler
 	UserHandler                 *user_handler.UserHandler
 	FileHandler                 *file_handler.FileHandler
+	HealthHandler               *health_handler.HealthHandler
 	ServiceProposalHandler      *service_proposal_handler.ServiceProposalHandler
 	WorkOrderHandler            *work_order_handler.WorkOrderHandler
 	TestHandler                 *test_handler.TestHandler
@@ -71,6 +72,7 @@ type Router struct {
 	paymentHandler              *payment_handler.PaymentHandler
 	userHandler                 *user_handler.UserHandler
 	fileHandler                 *file_handler.FileHandler
+	healthHandler               *health_handler.HealthHandler
 	serviceProposalHandler      *service_proposal_handler.ServiceProposalHandler
 	workOrderHandler            *work_order_handler.WorkOrderHandler
 	testHandler                 *test_handler.TestHandler
@@ -99,6 +101,7 @@ func NewRouter(config RouterConfig) *Router {
 		paymentHandler:              config.PaymentHandler,
 		userHandler:                 config.UserHandler,
 		fileHandler:                 config.FileHandler,
+		healthHandler:               config.HealthHandler,
 		serviceProposalHandler:      config.ServiceProposalHandler,
 		workOrderHandler:            config.WorkOrderHandler,
 		testHandler:                 config.TestHandler,
@@ -154,9 +157,8 @@ func (router *Router) registerCalendarConnectionRoutes(engine *gin.Engine, authM
 }
 
 func (router *Router) registerHealthRoutes(engine *gin.Engine) {
-	engine.GET("/", func(context *gin.Context) {
-		context.String(http.StatusOK, "Hello World")
-	})
+	engine.GET("/health/live", router.healthHandler.Live)
+	engine.GET("/health/ready", router.healthHandler.Ready)
 }
 
 func (router *Router) registerCategoryRoutes(engine *gin.Engine) {

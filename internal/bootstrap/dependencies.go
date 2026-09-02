@@ -18,6 +18,7 @@ import (
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/conversation_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/coverage_zone_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/file_handler"
+	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/health_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/identity_verification_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/job_request_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/payment_account_handler"
@@ -53,6 +54,7 @@ import (
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/user"
 	workorder "github.com/LoResuelvo/loresuelvo-api/internal/domain/work_order"
 	workordercalendar "github.com/LoResuelvo/loresuelvo-api/internal/domain/work_order_calendar"
+	"github.com/LoResuelvo/loresuelvo-api/internal/infrastructure/health"
 	"github.com/auth0/go-jwt-middleware/v3/validator"
 	"github.com/google/uuid"
 )
@@ -76,6 +78,7 @@ type Dependencies struct {
 	PaymentHandler              *payment_handler.PaymentHandler
 	UserHandler                 *user_handler.UserHandler
 	FileHandler                 *file_handler.FileHandler
+	HealthHandler               *health_handler.HealthHandler
 	ServiceProposalHandler      *service_proposal_handler.ServiceProposalHandler
 	WorkOrderHandler            *work_order_handler.WorkOrderHandler
 	TestHandler                 *test_handler.TestHandler
@@ -85,7 +88,8 @@ type Dependencies struct {
 	MessagePublisher conversation.MessagePublisher
 	realtimeCancel   context.CancelFunc
 
-	Clock *clockadapter.SystemClock
+	Clock     *clockadapter.SystemClock
+	Readiness *health.Readiness
 
 	ConsumerAddressResolver consumer.AddressResolver
 	IdentityVerifier        identityverification.IdentityVerifier
@@ -123,6 +127,7 @@ func (dependencies *Dependencies) RouterConfig(
 		PaymentHandler:              dependencies.PaymentHandler,
 		UserHandler:                 dependencies.UserHandler,
 		FileHandler:                 dependencies.FileHandler,
+		HealthHandler:               dependencies.HealthHandler,
 		ServiceProposalHandler:      dependencies.ServiceProposalHandler,
 		WorkOrderHandler:            dependencies.WorkOrderHandler,
 		TestHandler:                 dependencies.TestHandler,
@@ -290,6 +295,7 @@ func newDependenciesWithPaymentAccountAndCalendarAdapters(
 	identityWebhooks ...identity_verification_handler.IdentityVerificationWebhook,
 ) *Dependencies {
 	persistence := NewPersistenceAdapters(database)
+	readiness := health.NewReadiness(database)
 
 	var addressResolver consumer.AddressResolver
 	var coverageZoneResolver consumer.CoverageZoneResolver
@@ -462,6 +468,7 @@ func newDependenciesWithPaymentAccountAndCalendarAdapters(
 		PaymentHandler:              payment_handler.NewPaymentHandler(paymentService, webhookVerifier),
 		UserHandler:                 user_handler.NewUserHandlerWithIdentityVerification(userService, calendarConnectionService, identityVerificationService),
 		FileHandler:                 file_handler.NewFileHandler(fileService),
+		HealthHandler:               health_handler.NewHealthHandler(readiness),
 		ServiceProposalHandler:      service_proposal_handler.NewServiceProposalHandler(servicePorposalService),
 		WorkOrderHandler:            work_order_handler.NewWorkOrderHandler(workOrderService),
 		TestHandler:                 test_handler.NewTestHandler(systemClock),
@@ -470,6 +477,7 @@ func newDependenciesWithPaymentAccountAndCalendarAdapters(
 		MessagePublisher:            messagePublisher,
 		realtimeCancel:              cancel,
 		Clock:                       systemClock,
+		Readiness:                   readiness,
 		ConsumerAddressResolver:     addressResolver,
 		IdentityVerifier:            identityVerifier,
 	}

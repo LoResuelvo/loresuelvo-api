@@ -46,8 +46,10 @@ tags:
 - name: Realtime
   description: WebSocket real-time messaging endpoints.
 paths:
-  /:
-    $ref: ./paths/health.yaml
+  /health/live:
+    $ref: ./paths/health-live.yaml
+  /health/ready:
+    $ref: ./paths/health-ready.yaml
   /categories:
     $ref: ./paths/categories.yaml
   /coverage-zones:
