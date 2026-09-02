@@ -72,7 +72,6 @@ Feature: 13.3 Recomendar prestadores elegibles mediante IA según confianza, rep
 
     Rule: La evidencia enviada a la IA protege datos personales y contenido privado
 
-        @wip
         Scenario: 13.3.5-GP Anonimizar candidatos y excluir información privada
             Given existe un prestador elegible de "Plomería" llamado "Juan Gómez" con reseñas e informes de finalización
             And que sus informes de finalización incluyen imágenes privadas
@@ -86,7 +85,6 @@ Feature: 13.3 Recomendar prestadores elegibles mediante IA según confianza, rep
 
     Rule: El ranking vigente se asocia a la evaluación actual y se reutiliza sin recalcularlo
 
-        @wip
         Scenario: 13.3.6-GP Consultar el ranking persistido sin volver a invocar a la IA
             Given que una evaluación vigente requiere un profesional de "Plomería"
             And que sus recomendaciones persistidas son "Marcela Ruiz", "Juan Gómez" y "Pedro Dib" en ese orden con sus razones
@@ -94,7 +92,6 @@ Feature: 13.3 Recomendar prestadores elegibles mediante IA según confianza, rep
             Then el detalle muestra "Marcela Ruiz", "Juan Gómez" y "Pedro Dib" en el orden persistido con sus razones
             And la IA de recomendación no vuelve a ser invocada
 
-        @wip
         Scenario: 13.3.7-GP Reutilizar el ranking cuando la evaluación vigente no cambia
             Given que una evaluación vigente requiere un profesional de "Plomería"
             And que sus recomendaciones persistidas son "Marcela Ruiz" y "Juan Gómez" en ese orden con sus razones
@@ -103,7 +100,6 @@ Feature: 13.3 Recomendar prestadores elegibles mediante IA según confianza, rep
             Then la respuesta conserva a "Marcela Ruiz" y "Juan Gómez" en el orden persistido con sus razones
             And la IA de recomendación no vuelve a ser invocada
 
-        @wip
         Scenario: 13.3.8-GP Reemplazar el ranking vigente cuando cambia la evaluación profesional
             Given que una evaluación anterior requiere un profesional de "Plomería"
             And que el ranking vigente tiene a "Juan Gómez" como recomendación
@@ -113,7 +109,6 @@ Feature: 13.3 Recomendar prestadores elegibles mediante IA según confianza, rep
             Then el sistema reemplaza el ranking vigente por uno con "Marcela Ruiz" asociado a la nueva evaluación
             And una consulta posterior devuelve a "Marcela Ruiz" sin reutilizar el ranking anterior
 
-        @wip
         Scenario: 13.3.9-GP Persistir una recomendación vacía cuando no hay candidatos elegibles
             Given que ningún prestador de "Plomería" cubre la zona "Comuna 6"
             And que el chatbot concluirá que se requiere un profesional del rubro "Plomería"
