@@ -19,22 +19,23 @@ const (
 
 // FakeChatbot is a deterministic chatbot adapter for acceptance tests.
 type FakeChatbot struct {
-	mu                          sync.Mutex
-	response                    conversation.ChatbotResponse
-	summary                     string
-	requestCount                int
-	summaryRequestCount         int
-	lastQuestion                conversation.ChatbotHomeProblemQuestion
-	lastSummaryMessages         []conversation.Message
-	lastPreviousSummary         string
-	lastAvailableCategories     []category.Category
-	lastProviderRankingRequest  conversation.ProviderRankingRequest
-	providerRankingRequestCount int
-	providerRankingProviderIDs  []int
-	providerRankingError        error
-	imageDescriptions           map[string]string
-	selectedImageNames          []string
-	descriptionMode             string
+	mu                             sync.Mutex
+	response                       conversation.ChatbotResponse
+	summary                        string
+	requestCount                   int
+	summaryRequestCount            int
+	lastQuestion                   conversation.ChatbotHomeProblemQuestion
+	lastSummaryMessages            []conversation.Message
+	lastPreviousSummary            string
+	lastAvailableCategories        []category.Category
+	lastProviderRankingRequest     conversation.ProviderRankingRequest
+	providerRankingRequestCount    int
+	providerRankingProviderIDs     []int
+	providerRankingError           error
+	providerRankingResponseFactory func(conversation.ProviderRankingRequest) *conversation.ProviderRankingResponse
+	imageDescriptions              map[string]string
+	selectedImageNames             []string
+	descriptionMode                string
 }
 
 func NewFakeChatbot() *FakeChatbot {
@@ -106,16 +107,23 @@ func (chatbot *FakeChatbot) SummarizeHomeProblemConversation(ctx context.Context
 
 func (chatbot *FakeChatbot) RankProviders(ctx context.Context, request conversation.ProviderRankingRequest) (*conversation.ProviderRankingResponse, error) {
 	chatbot.mu.Lock()
-	defer chatbot.mu.Unlock()
-
 	chatbot.providerRankingRequestCount++
-	chatbot.lastProviderRankingRequest = copyProviderRankingRequest(request)
-	if chatbot.providerRankingError != nil {
-		return nil, chatbot.providerRankingError
+	request = copyProviderRankingRequest(request)
+	chatbot.lastProviderRankingRequest = request
+	providerRankingError := chatbot.providerRankingError
+	providerRankingResponseFactory := chatbot.providerRankingResponseFactory
+	providerRankingProviderIDs := append([]int(nil), chatbot.providerRankingProviderIDs...)
+	chatbot.mu.Unlock()
+
+	if providerRankingError != nil {
+		return nil, providerRankingError
+	}
+	if providerRankingResponseFactory != nil {
+		return copyProviderRankingResponse(providerRankingResponseFactory(request)), nil
 	}
 
 	recommendations := make([]conversation.ProviderRankingRecommendation, 0, len(request.Candidates))
-	if len(chatbot.providerRankingProviderIDs) == 0 {
+	if len(providerRankingProviderIDs) == 0 {
 		for _, candidate := range request.Candidates {
 			recommendations = append(recommendations, conversation.ProviderRankingRecommendation{
 				Reference: candidate.Reference,
@@ -129,7 +137,7 @@ func (chatbot *FakeChatbot) RankProviders(ctx context.Context, request conversat
 	for _, candidate := range request.Candidates {
 		byProviderID[candidate.ProviderID] = candidate
 	}
-	for _, providerID := range chatbot.providerRankingProviderIDs {
+	for _, providerID := range providerRankingProviderIDs {
 		candidate, exists := byProviderID[providerID]
 		if !exists {
 			continue
@@ -152,6 +160,14 @@ func (chatbot *FakeChatbot) SetProviderRankingError(err error) {
 	chatbot.mu.Lock()
 	defer chatbot.mu.Unlock()
 	chatbot.providerRankingError = err
+}
+
+// SetProviderRankingResponseFactory configures a deterministic ranking response
+// based on the opaque candidate references received by the fake adapter.
+func (chatbot *FakeChatbot) SetProviderRankingResponseFactory(factory func(conversation.ProviderRankingRequest) *conversation.ProviderRankingResponse) {
+	chatbot.mu.Lock()
+	defer chatbot.mu.Unlock()
+	chatbot.providerRankingResponseFactory = factory
 }
 
 func (chatbot *FakeChatbot) LastProviderRankingRequest() conversation.ProviderRankingRequest {
@@ -296,6 +312,7 @@ func (chatbot *FakeChatbot) Reset() {
 	chatbot.providerRankingRequestCount = 0
 	chatbot.providerRankingProviderIDs = nil
 	chatbot.providerRankingError = nil
+	chatbot.providerRankingResponseFactory = nil
 	chatbot.imageDescriptions = map[string]string{}
 	chatbot.selectedImageNames = nil
 	chatbot.descriptionMode = ""
@@ -368,6 +385,16 @@ func copyProviderRankingRequest(request conversation.ProviderRankingRequest) con
 		copied.Candidates[index].Evidence.WorkHistory = append([]providerreadmodel.WorkOrder(nil), request.Candidates[index].Evidence.WorkHistory...)
 	}
 	return copied
+}
+
+func copyProviderRankingResponse(response *conversation.ProviderRankingResponse) *conversation.ProviderRankingResponse {
+	if response == nil {
+		return nil
+	}
+
+	copied := *response
+	copied.Recommendations = append([]conversation.ProviderRankingRecommendation(nil), response.Recommendations...)
+	return &copied
 }
 
 func copyMessageImageContents(images []filedomain.MessageImageContent) []filedomain.MessageImageContent {

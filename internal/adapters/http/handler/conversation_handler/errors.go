@@ -87,6 +87,14 @@ func handleCreateChatbotConversationError(c *gin.Context, err error) {
 		httphandler.RespondError(c, http.StatusForbidden, err.Error())
 		return
 	}
+	if errors.Is(err, conversation.ErrProviderRecommendationInvalid) {
+		httphandler.RespondError(c, http.StatusBadGateway, err.Error())
+		return
+	}
+	if errors.Is(err, conversation.ErrChatbotUnavailable) {
+		httphandler.RespondError(c, http.StatusServiceUnavailable, err.Error())
+		return
+	}
 
 	httphandler.RespondError(c, http.StatusInternalServerError, err.Error())
 }
@@ -106,6 +114,14 @@ func handleContinueChatbotConversationError(c *gin.Context, err error) {
 	}
 	if errors.Is(err, conversation.ErrChatbotConversationAlreadyProcessing) {
 		httphandler.RespondError(c, http.StatusConflict, err.Error())
+		return
+	}
+	if errors.Is(err, conversation.ErrProviderRecommendationInvalid) {
+		httphandler.RespondError(c, http.StatusBadGateway, err.Error())
+		return
+	}
+	if errors.Is(err, conversation.ErrChatbotUnavailable) {
+		httphandler.RespondError(c, http.StatusServiceUnavailable, err.Error())
 		return
 	}
 

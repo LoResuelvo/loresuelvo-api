@@ -40,6 +40,9 @@ func registerChatbotProviderRecommendationSteps(sc *godog.ScenarioContext, suite
 	sc.Step(`^existe un prestador elegible de "([^"]*)" llamado "([^"]*)" sin trabajos pagados, ratings, reseñas ni informes de finalización$`, suite.thereIsNewEligibleProvider)
 	sc.Step(`^que el chatbot asistido por IA concluirá el diagnóstico y recomendará el rubro "([^"]*)" con la respuesta:$`, suite.chatbotWillConcludeDiagnosisAndRecommendCategory)
 	sc.Step(`^que el chatbot concluirá que se requiere un profesional del rubro "([^"]*)"$`, suite.chatbotWillConcludeProfessionalRequired)
+	sc.Step(`^que "([^"]*)" y "([^"]*)" son los únicos candidatos elegibles$`, suite.thereAreOnlyEligibleProviders)
+	sc.Step(`^que la IA devolverá una respuesta con (una referencia desconocida|una referencia duplicada|una referencia no elegible)$`, suite.aiWillReturnInvalidProviderRanking)
+	sc.Step(`^que la IA de recomendación de prestadores no está disponible$`, suite.providerRecommendationAIIsUnavailable)
 	sc.Step(`^que una evaluación vigente requiere un profesional de "([^"]*)"$`, suite.currentAssessmentRequiresProfessional)
 	sc.Step(`^que una evaluación anterior requiere un profesional de "([^"]*)"$`, suite.previousAssessmentRequiresProfessional)
 	sc.Step(`^que sus recomendaciones persistidas son "([^"]*)", "([^"]*)" y "([^"]*)" en ese orden con sus razones$`, suite.persistedProviderRecommendations)
@@ -78,10 +81,19 @@ func registerChatbotProviderRecommendationSteps(sc *godog.ScenarioContext, suite
 	sc.Step(`^el sistema muestra al prestador recomendado "([^"]*)" en la respuesta del chatbot$`, suite.systemShowsRecommendedProviderInChatbotResponse)
 	sc.Step(`^el sistema no muestra al prestador recomendado "([^"]*)" en la respuesta del chatbot$`, suite.systemDoesNotShowRecommendedProviderInChatbotResponse)
 	sc.Step(`^el sistema no muestra prestadores recomendados en la respuesta del chatbot$`, suite.systemShowsNoRecommendedProvidersInChatbotResponse)
+	sc.Step(`^el sistema rechaza la recomendación inválida sin aplicar un orden alternativo$`, suite.systemRejectsInvalidProviderRecommendationWithoutFallback)
+	sc.Step(`^el sistema informa que no pudo completar la recomendación$`, suite.systemReportsProviderRecommendationUnavailable)
+	sc.Step(`^no persiste parcialmente el nuevo mensaje, la respuesta, la evaluación ni sus recomendaciones$`, suite.systemDoesNotPersistFailedProviderRecommendation)
+	sc.Step(`^la conversación puede volver a procesarse cuando la IA de recomendación esté disponible$`, suite.conversationCanBeProcessedAgain)
 }
 
 func (suite *testSuite) providerRecommendationAIIsAvailable() error {
 	suite.chatbot.SetProviderRankingError(nil)
+	return nil
+}
+
+func (suite *testSuite) providerRecommendationAIIsUnavailable() error {
+	suite.chatbot.SetProviderRankingError(conversation.ErrChatbotUnavailable)
 	return nil
 }
 
@@ -118,6 +130,50 @@ func (suite *testSuite) thereAreEligibleProviders(categoryName, coverageZoneName
 		}
 	}
 	return nil
+}
+
+func (suite *testSuite) thereAreOnlyEligibleProviders(first, second string) error {
+	for _, providerName := range []string{first, second} {
+		if err := suite.thereIsEligibleProvider("Plomería", providerName); err != nil {
+			return err
+		}
+	}
+	suite.providerRankingRequestCountBeforeAction = suite.chatbot.ProviderRankingRequestCount()
+	return nil
+}
+
+func (suite *testSuite) aiWillReturnInvalidProviderRanking(invalidReference string) error {
+	switch strings.ToLower(strings.TrimSpace(invalidReference)) {
+	case "una referencia desconocida":
+		suite.chatbot.SetProviderRankingResponseFactory(func(_ conversation.ProviderRankingRequest) *conversation.ProviderRankingResponse {
+			return invalidProviderRankingResponse("candidate-unknown")
+		})
+	case "una referencia duplicada":
+		suite.chatbot.SetProviderRankingResponseFactory(func(request conversation.ProviderRankingRequest) *conversation.ProviderRankingResponse {
+			reference := "candidate-duplicate"
+			if len(request.Candidates) > 0 {
+				reference = request.Candidates[0].Reference
+			}
+			return &conversation.ProviderRankingResponse{Recommendations: []conversation.ProviderRankingRecommendation{
+				{Reference: reference, Reason: "La referencia aparece una vez."},
+				{Reference: reference, Reason: "La referencia aparece repetida."},
+			}}
+		})
+	case "una referencia no elegible":
+		suite.chatbot.SetProviderRankingResponseFactory(func(_ conversation.ProviderRankingRequest) *conversation.ProviderRankingResponse {
+			return invalidProviderRankingResponse("candidate-not-eligible")
+		})
+	default:
+		return fmt.Errorf("unsupported invalid provider ranking reference %q", invalidReference)
+	}
+	return nil
+}
+
+func invalidProviderRankingResponse(reference string) *conversation.ProviderRankingResponse {
+	return &conversation.ProviderRankingResponse{Recommendations: []conversation.ProviderRankingRecommendation{{
+		Reference: reference,
+		Reason:    "La referencia no corresponde a un candidato elegible.",
+	}}}
 }
 
 func (suite *testSuite) thoseProvidersHaveDifferentEvidence() error {
@@ -990,6 +1046,78 @@ func (suite *testSuite) systemShowsNoRecommendedProvidersInChatbotResponse() err
 		return fmt.Errorf("expected chatbot response not to include recommended providers, got body %s", string(suite.lastBody))
 	}
 
+	return nil
+}
+
+func (suite *testSuite) systemRejectsInvalidProviderRecommendationWithoutFallback() error {
+	if err := suite.lastResponseShouldHaveStatusCode(http.StatusBadGateway); err != nil {
+		return err
+	}
+	if err := suite.lastErrorResponseShouldSay(conversation.ErrProviderRecommendationInvalid.Error()); err != nil {
+		return err
+	}
+	if actual := suite.chatbot.ProviderRankingRequestCount(); actual != suite.providerRankingRequestCountBeforeAction+1 {
+		return fmt.Errorf("expected exactly one provider ranking invocation, got %d after baseline %d", actual, suite.providerRankingRequestCountBeforeAction)
+	}
+
+	response, err := suite.chatbotConversationResponseFromLastBody()
+	if err == nil && response.ID != 0 {
+		return fmt.Errorf("expected invalid provider recommendation not to create a conversation, got id %d", response.ID)
+	}
+	return nil
+}
+
+func (suite *testSuite) systemReportsProviderRecommendationUnavailable() error {
+	if err := suite.lastResponseShouldHaveStatusCode(http.StatusServiceUnavailable); err != nil {
+		return err
+	}
+	if err := suite.lastErrorResponseShouldSay(conversation.ErrChatbotUnavailable.Error()); err != nil {
+		return err
+	}
+	if actual := suite.chatbot.ProviderRankingRequestCount(); actual != 1 {
+		return fmt.Errorf("expected provider ranking to be invoked once before reporting unavailability, got %d", actual)
+	}
+	return nil
+}
+
+func (suite *testSuite) systemDoesNotPersistFailedProviderRecommendation() error {
+	if len(suite.chatbotConversationIDs) != 0 || suite.lastConversationID != 0 {
+		return fmt.Errorf("expected failed provider recommendation not to register a conversation, got ids %v and last id %d", suite.chatbotConversationIDs, suite.lastConversationID)
+	}
+
+	if err := suite.requestMyChatbotConversations(); err != nil {
+		return err
+	}
+	summaries, err := suite.chatbotConversationSummaryResponsesShouldHaveStatusCode(http.StatusOK)
+	if err != nil {
+		return err
+	}
+	if len(summaries) != 0 {
+		return fmt.Errorf("expected no persisted chatbot conversation after failed provider recommendation, got body %s", string(suite.lastBody))
+	}
+	return nil
+}
+
+func (suite *testSuite) conversationCanBeProcessedAgain() error {
+	failedRequestCount := suite.chatbot.ProviderRankingRequestCount()
+	suite.chatbot.SetProviderRankingError(nil)
+	if err := suite.requestCreateChatbotConversation(chatbotConversationRequest{Content: "Necesito reparar una pérdida debajo de la pileta."}); err != nil {
+		return err
+	}
+	if err := suite.rememberCreatedChatbotConversation(); err != nil {
+		return err
+	}
+	if actual := suite.chatbot.ProviderRankingRequestCount(); actual != failedRequestCount+1 {
+		return fmt.Errorf("expected retry to invoke provider ranking once, got %d after failed attempt count %d", actual, failedRequestCount)
+	}
+
+	providers, err := suite.recommendedProvidersFromLastChatbotResponse()
+	if err != nil {
+		return err
+	}
+	if len(providers) != 1 || providerFullName(providers[0]) != "Juan Gómez" {
+		return fmt.Errorf("expected retry to persist Juan Gómez as the recommendation, got %+v with body %s", providers, string(suite.lastBody))
+	}
 	return nil
 }
 

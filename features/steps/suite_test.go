@@ -462,7 +462,8 @@ func TestFeatures(t *testing.T) {
 				return err
 			}
 			for lineNumber, line := range strings.Split(string(contents), "\n") {
-				if !strings.Contains(line, "Scenario:") || !strings.Contains(strings.ToLower(line), strings.ToLower(scenarioFilter)) {
+				isScenarioDeclaration := strings.Contains(line, "Scenario:") || strings.Contains(line, "Scenario Outline:")
+				if !isScenarioDeclaration || !strings.Contains(strings.ToLower(line), strings.ToLower(scenarioFilter)) {
 					continue
 				}
 				filteredPaths = append(filteredPaths, fmt.Sprintf("%s:%d", path, lineNumber+1))

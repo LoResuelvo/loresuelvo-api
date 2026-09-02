@@ -501,6 +501,8 @@ type chatbotMock struct {
 	summaryMessages     []conversation.Message
 	rankingCalled       bool
 	rankingRequest      conversation.ProviderRankingRequest
+	rankingResponseFunc func(conversation.ProviderRankingRequest) *conversation.ProviderRankingResponse
+	rankingErr          error
 	err                 error
 }
 
@@ -544,8 +546,11 @@ func (m *chatbotMock) SummarizeHomeProblemConversation(ctx context.Context, prev
 func (m *chatbotMock) RankProviders(_ context.Context, request conversation.ProviderRankingRequest) (*conversation.ProviderRankingResponse, error) {
 	m.rankingCalled = true
 	m.rankingRequest = request
-	if m.err != nil {
-		return nil, m.err
+	if m.rankingErr != nil {
+		return nil, m.rankingErr
+	}
+	if m.rankingResponseFunc != nil {
+		return m.rankingResponseFunc(request), nil
 	}
 	recommendations := make([]conversation.ProviderRankingRecommendation, 0, len(request.Candidates))
 	for _, candidate := range request.Candidates {
@@ -887,6 +892,115 @@ func TestCreateChatbotConversationReturnsChatbotErrors(t *testing.T) {
 	assert.Nil(t, createdResult)
 	assert.True(t, chatbot.called)
 	assert.False(t, repo.saveCalled)
+}
+
+func TestCreateChatbotConversationRejectsInvalidProviderRankingsWithoutSaving(t *testing.T) {
+	tests := []struct {
+		name            string
+		rankingResponse func(conversation.ProviderRankingRequest) *conversation.ProviderRankingResponse
+	}{
+		{
+			name: "unknown reference",
+			rankingResponse: func(_ conversation.ProviderRankingRequest) *conversation.ProviderRankingResponse {
+				return &conversation.ProviderRankingResponse{Recommendations: []conversation.ProviderRankingRecommendation{{
+					Reference: "candidate-unknown",
+					Reason:    "Razón de prueba.",
+				}}}
+			},
+		},
+		{
+			name: "duplicate reference",
+			rankingResponse: func(request conversation.ProviderRankingRequest) *conversation.ProviderRankingResponse {
+				reference := request.Candidates[0].Reference
+				return &conversation.ProviderRankingResponse{Recommendations: []conversation.ProviderRankingRecommendation{
+					{Reference: reference, Reason: "Primera razón."},
+					{Reference: reference, Reason: "Segunda razón."},
+				}}
+			},
+		},
+		{
+			name: "ineligible reference",
+			rankingResponse: func(_ conversation.ProviderRankingRequest) *conversation.ProviderRankingResponse {
+				return &conversation.ProviderRankingResponse{Recommendations: []conversation.ProviderRankingRecommendation{{
+					Reference: "candidate-not-eligible",
+					Reason:    "Razón de prueba.",
+				}}}
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			chatbot := professionalRecommendationChatbotMock()
+			chatbot.rankingResponseFunc = test.rankingResponse
+			repo, service := newProfessionalRecommendationService(t, chatbot)
+
+			result, err := service.CreateChatbotConversation(context.Background(), "auth0|consumer", "Pierde agua la bacha")
+
+			assert.ErrorIs(t, err, conversation.ErrProviderRecommendationInvalid)
+			assert.Nil(t, result)
+			assert.True(t, chatbot.rankingCalled)
+			assert.False(t, repo.saveCalled)
+		})
+	}
+}
+
+func TestCreateChatbotConversationReturnsProviderRankingUnavailableWithoutSaving(t *testing.T) {
+	chatbot := professionalRecommendationChatbotMock()
+	chatbot.rankingErr = conversation.ErrChatbotUnavailable
+	repo, service := newProfessionalRecommendationService(t, chatbot)
+
+	result, err := service.CreateChatbotConversation(context.Background(), "auth0|consumer", "Pierde agua la bacha")
+
+	assert.ErrorIs(t, err, conversation.ErrChatbotUnavailable)
+	assert.Nil(t, result)
+	assert.True(t, chatbot.rankingCalled)
+	assert.False(t, repo.saveCalled)
+}
+
+func professionalRecommendationChatbotMock() *chatbotMock {
+	return &chatbotMock{response: &conversation.ChatbotResponse{
+		Status:  conversation.ChatbotResponseAnswered,
+		Title:   "Pérdida de agua",
+		Content: "Contactá a un plomero.",
+		Assessment: conversation.ChatbotAssessmentResponse{
+			Action:              conversation.ChatbotAssessmentReplace,
+			Outcome:             conversation.AssessmentProfessionalRequired,
+			ProblemTitle:        "Pérdida de agua",
+			ProblemDescription:  "Pierde agua la bacha.",
+			ProblemCategoryName: "Plomería",
+		},
+	}}
+}
+
+func newProfessionalRecommendationService(t *testing.T, chatbot *chatbotMock) (*conversationRepositoryMock, *conversation.Service) {
+	t.Helper()
+	repo := &conversationRepositoryMock{}
+	consumerIDFinder := &consumerIDFinderMock{consumerID: 10}
+	plumbingCategory := &category.Category{ID: 3, Name: "Plomería", NormalizedName: "plomería"}
+	recommendedProvider, err := provider.NewProvider(
+		"auth0|provider",
+		"juan@example.com",
+		"Juan",
+		"Gómez",
+		plumbingCategory,
+		nil,
+		[]coveragezone.CoverageZone{{ID: 6, Name: "Comuna 6", Enabled: true}},
+	)
+	require.NoError(t, err)
+	recommendedProvider.SetPersistenceID(20)
+	providerFinder := &providerIDFinderMock{providers: []provider.Provider{*recommendedProvider}}
+	service := newConversationService(
+		repo,
+		newUserRepositoryMock(consumerIDFinder, providerFinder),
+		&conversationReaderMock{},
+		&messagePublisherMock{},
+		chatbot,
+		&recommendationCategoryListerMock{categories: []category.Category{*plumbingCategory}},
+		&fileURLResolverMock{},
+		fixedClock{now: time.Now().UTC()},
+	)
+	return repo, service
 }
 
 func TestContinueChatbotConversationAddsConsumerAndChatbotMessagesToExistingChatbotConversation(t *testing.T) {
