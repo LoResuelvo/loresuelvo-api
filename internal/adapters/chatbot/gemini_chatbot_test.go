@@ -3,9 +3,11 @@ package chatbot
 import (
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/category"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/conversation"
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/provider"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -116,4 +118,41 @@ func TestAnswerPromptRequiresActionableSelfServiceGuide(t *testing.T) {
 	}
 	assert.Contains(t, prompt, "herramientas especiales")
 	assert.Contains(t, prompt, "el resultado no debe ser self_service")
+}
+
+func TestProviderRankingPromptMapsDomainDataToGeminiWireContract(t *testing.T) {
+	recentWork := time.Date(2026, time.August, 20, 12, 0, 0, 0, time.UTC)
+	prompt, err := (&GeminiChatbot{}).providerRankingPrompt(conversation.ProviderRankingRequest{
+		ProblemTitle:       "Pérdida debajo de la pileta",
+		ProblemDescription: "La conexión pierde agua.",
+		MaxResults:         3,
+		Candidates: []conversation.ProviderRecommendationCandidate{{
+			Reference:  "candidate-secret",
+			ProviderID: 42,
+			Evidence: conversation.ProviderRecommendationEvidence{
+				RatingAverage:      4.5,
+				RatingCount:        2,
+				RatingDistribution: provider.RatingDistribution{0, 0, 0, 1, 1},
+				PaidWorkCount:      2,
+				MostRecentPaidWork: recentWork,
+			},
+		}},
+	})
+
+	require.NoError(t, err)
+	assert.Contains(t, prompt, `"problem_title":"Pérdida debajo de la pileta"`)
+	assert.Contains(t, prompt, `"reference":"candidate-secret"`)
+	assert.Contains(t, prompt, `"rating_average":4.5`)
+	assert.Contains(t, prompt, `"most_recent_paid_work":"2026-08-20T12:00:00Z"`)
+	assert.NotContains(t, prompt, `"provider_id"`)
+	assert.NotContains(t, prompt, `"ProviderID"`)
+}
+
+func TestParseProviderRankingResponseMapsGeminiWireContract(t *testing.T) {
+	response, err := parseProviderRankingResponse(`{"recommendations":[{"reference":" candidate-1 ","reason":" experiencia comprobable "}]}`)
+
+	require.NoError(t, err)
+	require.Len(t, response.Recommendations, 1)
+	assert.Equal(t, "candidate-1", response.Recommendations[0].Reference)
+	assert.Equal(t, "experiencia comprobable", response.Recommendations[0].Reason)
 }

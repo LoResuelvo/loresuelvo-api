@@ -59,7 +59,7 @@ func chatbotConversationResponseFromDomain(result conversation.ChatbotConversati
 			Title:                title,
 			ResponseStatus:       string(result.ResponseStatus),
 			Assessment:           assessmentResponse(result.Assessment != nil, assessmentOutcome(result.Assessment), problemCategory),
-			RecommendedProviders: providerSummaryResponsesFromDomain(result.RecommendedProviders),
+			RecommendedProviders: providerSummaryResponsesWithReasons(result.RecommendedProviders, result.RecommendationReasons),
 		},
 		Messages: messages,
 		Response: chatbotResponse,
@@ -159,7 +159,7 @@ func chatbotConversationDetailResponseFromDomain(detail *readmodel.ChatbotConver
 		Title:                detail.Title,
 		ResponseStatus:       detail.ResponseStatus,
 		Assessment:           assessmentResponse(detail.Assessment != nil, readModelAssessmentOutcome(detail.Assessment), problemCategory),
-		RecommendedProviders: providerSummaryResponsesFromDomain(detail.RecommendedProviders),
+		RecommendedProviders: providerSummaryResponsesWithReasons(detail.RecommendedProviders, detail.RecommendationReasons),
 	}
 }
 
@@ -198,10 +198,12 @@ func providerSummaryResponseFromDomain(provider provider.Provider) providerSumma
 	}
 }
 
-func providerSummaryResponsesFromDomain(providers []provider.Provider) []providerSummaryResponse {
+func providerSummaryResponsesWithReasons(providers []provider.Provider, reasons map[int]string) []providerSummaryResponse {
 	response := make([]providerSummaryResponse, 0, len(providers))
 	for _, foundProvider := range providers {
-		response = append(response, providerSummaryResponseFromDomain(foundProvider))
+		providerResponse := providerSummaryResponseFromDomain(foundProvider)
+		providerResponse.RecommendationReason = reasons[foundProvider.ID()]
+		response = append(response, providerResponse)
 	}
 
 	return response

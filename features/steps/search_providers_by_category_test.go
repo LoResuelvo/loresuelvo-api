@@ -14,11 +14,12 @@ import (
 const providerFilterAuth0ID = "auth0|provider-search-test"
 
 type providerSummaryResponse struct {
-	ID               int    `json:"id"`
-	Name             string `json:"name"`
-	Surname          string `json:"surname"`
-	CategoryName     string `json:"category_name"`
-	IdentityVerified bool   `json:"identity_verified"`
+	ID                   int    `json:"id"`
+	Name                 string `json:"name"`
+	Surname              string `json:"surname"`
+	CategoryName         string `json:"category_name"`
+	IdentityVerified     bool   `json:"identity_verified"`
+	RecommendationReason string `json:"recommendation_reason,omitempty"`
 }
 
 func registerFilterProvidersByCategorySteps(sc *godog.ScenarioContext, suite *testSuite) {

@@ -12,6 +12,7 @@ import (
 type Chatbot interface {
 	AnswerHomeProblemQuestion(ctx context.Context, question ChatbotHomeProblemQuestion, availableCategories []category.Category) (*ChatbotResponse, error)
 	SummarizeHomeProblemConversation(ctx context.Context, previousSummary string, messages []Message) (string, error)
+	RankProviders(ctx context.Context, request ProviderRankingRequest) (*ProviderRankingResponse, error)
 }
 
 type ChatbotHomeProblemQuestion struct {
@@ -63,10 +64,12 @@ func ChatbotImageRef(fileID string) string {
 }
 
 type chatbotAnswer struct {
-	response             *ChatbotResponse
-	message              *Message
-	problemCategory      *category.Category
-	recommendedProviders []provider.Provider
+	response              *ChatbotResponse
+	message               *Message
+	problemCategory       *category.Category
+	recommendedProviders  []provider.Provider
+	recommendationReasons map[int]string
+	currentRecommendation *CurrentProviderRecommendation
 }
 
 func ParseChatbotAssessmentAction(value string) (ChatbotAssessmentAction, error) {

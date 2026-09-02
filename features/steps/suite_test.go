@@ -139,6 +139,7 @@ type testSuite struct {
 	categoryIDsByName              map[string]int
 	lastProviderFilterCategoryName string
 	participantRolesByFullName     map[string]string
+	providerEmailsByFullName       map[string]string
 }
 
 func (s *testSuite) registerAllSteps(sc *godog.ScenarioContext) {
@@ -253,6 +254,7 @@ func (s *testSuite) cleanup() error {
 
 	s.categoryIDsByName = map[string]int{}
 	s.participantRolesByFullName = map[string]string{}
+	s.providerEmailsByFullName = map[string]string{}
 	s.realtimeConnections = map[string]*realtimeTestConnection{}
 	s.lastRealtimeEvent = nil
 	s.lastWorkRequestProviderID = 0
@@ -406,6 +408,7 @@ func newTestSuite(tb testing.TB, database *sql.DB) *testSuite {
 
 		categoryIDsByName:                  map[string]int{},
 		participantRolesByFullName:         map[string]string{},
+		providerEmailsByFullName:           map[string]string{},
 		realtimeConnections:                map[string]*realtimeTestConnection{},
 		messageImagesByName:                map[string]messageImageFixture{},
 		messageAudiosByName:                map[string]messageAudioFixture{},

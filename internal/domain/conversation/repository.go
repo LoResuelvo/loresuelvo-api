@@ -4,10 +4,9 @@ import (
 	"context"
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/consumer"
-	"github.com/LoResuelvo/loresuelvo-api/internal/domain/user"
-
 	readmodel "github.com/LoResuelvo/loresuelvo-api/internal/domain/conversation/read_model"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/provider"
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/user"
 )
 
 type Repository interface {
@@ -19,6 +18,7 @@ type Repository interface {
 type UserRepository interface {
 	FindByAuthID(authID string) (user.User, error)
 	FindConsumerByAuthID(ctx context.Context, authID string) (*consumer.Consumer, error)
+	FindProviderByID(ctx context.Context, providerID int) (*provider.Provider, error)
 	FindProvidersByCategoryAndCoverageZoneID(ctx context.Context, categoryID, coverageZoneID int) ([]provider.Provider, error)
 }
 

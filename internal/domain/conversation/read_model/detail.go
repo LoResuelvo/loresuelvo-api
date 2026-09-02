@@ -22,10 +22,11 @@ type WorkConversationDetail struct {
 }
 
 type ChatbotConversationDetail struct {
-	Title                string
-	ResponseStatus       string
-	Assessment           *ProblemAssessmentDetail
-	RecommendedProviders []provider.Provider
+	Title                 string
+	ResponseStatus        string
+	Assessment            *ProblemAssessmentDetail
+	RecommendedProviders  []provider.Provider
+	RecommendationReasons map[int]string
 }
 
 type ProblemAssessmentDetail struct {

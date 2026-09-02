@@ -8,6 +8,7 @@ import (
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/category"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/conversation"
 	filedomain "github.com/LoResuelvo/loresuelvo-api/internal/domain/file"
+	providerreadmodel "github.com/LoResuelvo/loresuelvo-api/internal/domain/provider/read_model"
 )
 
 const (
@@ -17,18 +18,21 @@ const (
 
 // FakeChatbot is a deterministic chatbot adapter for acceptance tests.
 type FakeChatbot struct {
-	mu                      sync.Mutex
-	response                conversation.ChatbotResponse
-	summary                 string
-	requestCount            int
-	summaryRequestCount     int
-	lastQuestion            conversation.ChatbotHomeProblemQuestion
-	lastSummaryMessages     []conversation.Message
-	lastPreviousSummary     string
-	lastAvailableCategories []category.Category
-	imageDescriptions       map[string]string
-	selectedImageNames      []string
-	descriptionMode         string
+	mu                         sync.Mutex
+	response                   conversation.ChatbotResponse
+	summary                    string
+	requestCount               int
+	summaryRequestCount        int
+	lastQuestion               conversation.ChatbotHomeProblemQuestion
+	lastSummaryMessages        []conversation.Message
+	lastPreviousSummary        string
+	lastAvailableCategories    []category.Category
+	lastProviderRankingRequest conversation.ProviderRankingRequest
+	providerRankingProviderIDs []int
+	providerRankingError       error
+	imageDescriptions          map[string]string
+	selectedImageNames         []string
+	descriptionMode            string
 }
 
 func NewFakeChatbot() *FakeChatbot {
@@ -96,6 +100,61 @@ func (chatbot *FakeChatbot) SummarizeHomeProblemConversation(ctx context.Context
 	}
 
 	return fallbackSummary(previousSummary, messages), nil
+}
+
+func (chatbot *FakeChatbot) RankProviders(ctx context.Context, request conversation.ProviderRankingRequest) (*conversation.ProviderRankingResponse, error) {
+	chatbot.mu.Lock()
+	defer chatbot.mu.Unlock()
+
+	chatbot.lastProviderRankingRequest = copyProviderRankingRequest(request)
+	if chatbot.providerRankingError != nil {
+		return nil, chatbot.providerRankingError
+	}
+
+	recommendations := make([]conversation.ProviderRankingRecommendation, 0, len(request.Candidates))
+	if len(chatbot.providerRankingProviderIDs) == 0 {
+		for _, candidate := range request.Candidates {
+			recommendations = append(recommendations, conversation.ProviderRankingRecommendation{
+				Reference: candidate.Reference,
+				Reason:    "La evidencia disponible coincide con el problema diagnosticado.",
+			})
+		}
+		return &conversation.ProviderRankingResponse{Recommendations: recommendations}, nil
+	}
+
+	byProviderID := make(map[int]conversation.ProviderRecommendationCandidate, len(request.Candidates))
+	for _, candidate := range request.Candidates {
+		byProviderID[candidate.ProviderID] = candidate
+	}
+	for _, providerID := range chatbot.providerRankingProviderIDs {
+		candidate, exists := byProviderID[providerID]
+		if !exists {
+			continue
+		}
+		recommendations = append(recommendations, conversation.ProviderRankingRecommendation{
+			Reference: candidate.Reference,
+			Reason:    "La evidencia disponible respalda su experiencia para este problema.",
+		})
+	}
+	return &conversation.ProviderRankingResponse{Recommendations: recommendations}, nil
+}
+
+func (chatbot *FakeChatbot) SetProviderRankingByProviderIDs(providerIDs ...int) {
+	chatbot.mu.Lock()
+	defer chatbot.mu.Unlock()
+	chatbot.providerRankingProviderIDs = append([]int(nil), providerIDs...)
+}
+
+func (chatbot *FakeChatbot) SetProviderRankingError(err error) {
+	chatbot.mu.Lock()
+	defer chatbot.mu.Unlock()
+	chatbot.providerRankingError = err
+}
+
+func (chatbot *FakeChatbot) LastProviderRankingRequest() conversation.ProviderRankingRequest {
+	chatbot.mu.Lock()
+	defer chatbot.mu.Unlock()
+	return copyProviderRankingRequest(chatbot.lastProviderRankingRequest)
 }
 
 func (chatbot *FakeChatbot) SetResponse(title, content string) {
@@ -204,6 +263,9 @@ func (chatbot *FakeChatbot) Reset() {
 	chatbot.lastSummaryMessages = nil
 	chatbot.lastPreviousSummary = ""
 	chatbot.lastAvailableCategories = nil
+	chatbot.lastProviderRankingRequest = conversation.ProviderRankingRequest{}
+	chatbot.providerRankingProviderIDs = nil
+	chatbot.providerRankingError = nil
 	chatbot.imageDescriptions = map[string]string{}
 	chatbot.selectedImageNames = nil
 	chatbot.descriptionMode = ""
@@ -259,6 +321,16 @@ func copyQuestion(question conversation.ChatbotHomeProblemQuestion) conversation
 		Images:            copyMessageImageContents(question.Images),
 		IsNewConversation: question.IsNewConversation,
 	}
+}
+
+func copyProviderRankingRequest(request conversation.ProviderRankingRequest) conversation.ProviderRankingRequest {
+	copied := request
+	copied.Candidates = make([]conversation.ProviderRecommendationCandidate, len(request.Candidates))
+	copy(copied.Candidates, request.Candidates)
+	for index := range copied.Candidates {
+		copied.Candidates[index].Evidence.WorkHistory = append([]providerreadmodel.WorkOrder(nil), request.Candidates[index].Evidence.WorkHistory...)
+	}
+	return copied
 }
 
 func copyMessageImageContents(images []filedomain.MessageImageContent) []filedomain.MessageImageContent {

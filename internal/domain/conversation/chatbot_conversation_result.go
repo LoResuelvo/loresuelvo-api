@@ -6,11 +6,12 @@ import (
 )
 
 type ChatbotConversationTurnResult struct {
-	Conversation         Conversation
-	ResponseStatus       ChatbotResponseStatus
-	Assessment           *ProblemAssessment
-	ProblemCategory      *category.Category
-	RecommendedProviders []provider.Provider
+	Conversation          Conversation
+	ResponseStatus        ChatbotResponseStatus
+	Assessment            *ProblemAssessment
+	ProblemCategory       *category.Category
+	RecommendedProviders  []provider.Provider
+	RecommendationReasons map[int]string
 }
 
 type ChatbotConversationResult = ChatbotConversationTurnResult

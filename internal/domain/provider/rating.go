@@ -2,9 +2,14 @@ package provider
 
 import "math"
 
+const RatingDistributionSize = 5
+
+type RatingDistribution [RatingDistributionSize]int
+
 type RatingStats struct {
-	Total int64
-	Count int
+	Total        int64
+	Count        int
+	Distribution RatingDistribution
 }
 
 type RatingSummary struct {

@@ -132,6 +132,10 @@ func NewDependencies(database *sql.DB) (*Dependencies, error) {
 }
 
 func NewDependenciesWithChatbot(database *sql.DB, chatbot conversation.Chatbot) (*Dependencies, error) {
+	recommendationConfig, err := chatbotadapter.ProviderRecommendationConfigFromEnv()
+	if err != nil {
+		return nil, fmt.Errorf("configuring chatbot provider recommendation: %w", err)
+	}
 	paymentAccountOAuthConnector, err := paymentaccountadapter.NewOAuthConnectorFromEnv()
 	if err != nil {
 		return nil, err
@@ -187,6 +191,7 @@ func NewDependenciesWithChatbot(database *sql.DB, chatbot conversation.Chatbot) 
 		calendarEventPublisher,
 		calendarHandlerConfig,
 		identityVerifier,
+		recommendationConfig,
 		identityWebhook,
 	), nil
 }
@@ -219,6 +224,7 @@ func NewDependenciesWithPaymentAccountAdapters(
 		},
 		identityverificationfake.NewVerifier(),
 		true,
+		conversation.DefaultProviderRecommendationConfig(),
 		newTestIdentityVerificationWebhook(),
 	)
 }
@@ -237,6 +243,7 @@ func NewDependenciesWithPaymentAccountAndCalendarAdapters(
 	calendarEventPublisher workordercalendar.EventPublisher,
 	calendarHandlerConfig calendar_connection_handler.Config,
 	identityVerifier identityverification.IdentityVerifier,
+	recommendationConfig conversation.ProviderRecommendationConfig,
 	identityWebhooks ...identity_verification_handler.IdentityVerificationWebhook,
 ) *Dependencies {
 	return newDependenciesWithPaymentAccountAndCalendarAdapters(
@@ -254,6 +261,7 @@ func NewDependenciesWithPaymentAccountAndCalendarAdapters(
 		calendarHandlerConfig,
 		identityVerifier,
 		false,
+		recommendationConfig,
 		identityWebhooks...,
 	)
 }
@@ -273,6 +281,7 @@ func newDependenciesWithPaymentAccountAndCalendarAdapters(
 	calendarHandlerConfig calendar_connection_handler.Config,
 	identityVerifier identityverification.IdentityVerifier,
 	useFakeLocationResolvers bool,
+	recommendationConfig conversation.ProviderRecommendationConfig,
 	identityWebhooks ...identity_verification_handler.IdentityVerificationWebhook,
 ) *Dependencies {
 	persistence := NewPersistenceAdapters(database)
@@ -337,6 +346,8 @@ func newDependenciesWithPaymentAccountAndCalendarAdapters(
 		persistence.CategoryRepository,
 		fileService,
 		systemClock,
+		recommendationConfig,
+		persistence.WorkOrderRepository,
 	)
 	jobRequestService := jobrequest.NewService(
 		persistence.JobRequestRepository,

@@ -3,6 +3,7 @@ package repositories
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
@@ -20,6 +21,38 @@ const (
 type ConversationRepository struct {
 	db                *sql.DB
 	messageRepository *MessageRepository
+}
+
+// persistedProviderRecommendation is the JSONB representation owned by
+// this adapter. The domain item intentionally has no knowledge of JSON names.
+type persistedProviderRecommendation struct {
+	ProviderID int    `json:"provider_id"`
+	Position   int    `json:"position"`
+	Reason     string `json:"reason"`
+}
+
+func persistedProviderRecommendations(items []conversation.ProviderRecommendation) []persistedProviderRecommendation {
+	persistedItems := make([]persistedProviderRecommendation, 0, len(items))
+	for _, item := range items {
+		persistedItems = append(persistedItems, persistedProviderRecommendation{
+			ProviderID: item.ProviderID,
+			Position:   item.Position,
+			Reason:     item.Reason,
+		})
+	}
+	return persistedItems
+}
+
+func domainProviderRecommendations(items []persistedProviderRecommendation) []conversation.ProviderRecommendation {
+	domainItems := make([]conversation.ProviderRecommendation, 0, len(items))
+	for _, item := range items {
+		domainItems = append(domainItems, conversation.ProviderRecommendation{
+			ProviderID: item.ProviderID,
+			Position:   item.Position,
+			Reason:     item.Reason,
+		})
+	}
+	return domainItems
 }
 
 func NewConversationRepository(db *sql.DB, messageRepository *MessageRepository) *ConversationRepository {
@@ -229,6 +262,9 @@ func (repository *ConversationRepository) updateChatbotConversationWithTx(ctx co
 	}
 
 	if err := repository.saveCurrentAssessmentWithTx(ctx, tx, chatbotConversation); err != nil {
+		return err
+	}
+	if err := repository.saveCurrentRecommendationWithTx(ctx, tx, chatbotConversation); err != nil {
 		return err
 	}
 
@@ -475,6 +511,10 @@ func (repository *ConversationRepository) FindByID(ctx context.Context, conversa
 			if err != nil {
 				return nil, err
 			}
+			chatbotConversation.CurrentRecommendation, err = repository.findCurrentRecommendation(ctx, base.ID(), chatbotConversation.CurrentAssessment.ID)
+			if err != nil {
+				return nil, err
+			}
 		}
 		return chatbotConversation, nil
 	case conversation.TypeWork:
@@ -589,6 +629,9 @@ func (repository *ConversationRepository) saveChatbotConversationWithTx(ctx cont
 	if err := repository.saveCurrentAssessmentWithTx(ctx, tx, conversationToSave); err != nil {
 		return err
 	}
+	if err := repository.saveCurrentRecommendationWithTx(ctx, tx, conversationToSave); err != nil {
+		return err
+	}
 	if conversationToSave.CurrentAssessment == nil {
 		return nil
 	}
@@ -643,6 +686,99 @@ func (repository *ConversationRepository) saveCurrentAssessmentWithTx(ctx contex
 		}
 	}
 	return nil
+}
+
+func (repository *ConversationRepository) saveCurrentRecommendationWithTx(ctx context.Context, tx *sql.Tx, chatbotConversation *conversation.ChatBotConversation) error {
+	if chatbotConversation.CurrentRecommendation == nil {
+		if _, err := tx.ExecContext(ctx,
+			`DELETE FROM chatbot_provider_recommendations WHERE chatbot_conversation_id = $1`,
+			chatbotConversation.ID(),
+		); err != nil {
+			return fmt.Errorf("deleting chatbot provider recommendation: %w", err)
+		}
+		return nil
+	}
+	if chatbotConversation.CurrentAssessment == nil || chatbotConversation.CurrentAssessment.ID <= 0 {
+		return conversation.ErrProviderRecommendationInvalid
+	}
+
+	currentRecommendation := chatbotConversation.CurrentRecommendation
+	currentRecommendation.AssessmentID = chatbotConversation.CurrentAssessment.ID
+	candidateIDs := currentRecommendation.CandidateProviderIDs
+	if candidateIDs == nil {
+		candidateIDs = []int{}
+	}
+	items := currentRecommendation.Recommendations
+	if items == nil {
+		items = []conversation.ProviderRecommendation{}
+	}
+	persistedItems := persistedProviderRecommendations(items)
+	candidateProviderIDs, err := json.Marshal(candidateIDs)
+	if err != nil {
+		return fmt.Errorf("encoding chatbot provider recommendation candidates: %w", err)
+	}
+	recommendations, err := json.Marshal(persistedItems)
+	if err != nil {
+		return fmt.Errorf("encoding chatbot provider recommendations: %w", err)
+	}
+	if _, err := tx.ExecContext(ctx,
+		`INSERT INTO chatbot_provider_recommendations (
+			chatbot_conversation_id, problem_assessment_id, candidate_provider_ids, recommendations
+		) VALUES ($1, $2, $3::jsonb, $4::jsonb)
+		ON CONFLICT (chatbot_conversation_id) DO UPDATE SET
+			problem_assessment_id = EXCLUDED.problem_assessment_id,
+			candidate_provider_ids = EXCLUDED.candidate_provider_ids,
+			recommendations = EXCLUDED.recommendations,
+			created_on = NOW()`,
+		chatbotConversation.ID(),
+		currentRecommendation.AssessmentID,
+		candidateProviderIDs,
+		recommendations,
+	); err != nil {
+		return fmt.Errorf("saving chatbot provider recommendation: %w", err)
+	}
+	return nil
+}
+
+func (repository *ConversationRepository) findCurrentRecommendation(ctx context.Context, conversationID, assessmentID int) (*conversation.CurrentProviderRecommendation, error) {
+	var (
+		persistedAssessmentID int
+		candidateProviderIDs  []byte
+		recommendations       []byte
+	)
+	err := repository.db.QueryRowContext(ctx,
+		`SELECT problem_assessment_id, candidate_provider_ids, recommendations
+		 FROM chatbot_provider_recommendations
+		 WHERE chatbot_conversation_id = $1`,
+		conversationID,
+	).Scan(&persistedAssessmentID, &candidateProviderIDs, &recommendations)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("finding current chatbot provider recommendation: %w", err)
+	}
+	if persistedAssessmentID != assessmentID {
+		return nil, conversation.ErrProviderRecommendationInvalid
+	}
+	var candidateIDs []int
+	if err := json.Unmarshal(candidateProviderIDs, &candidateIDs); err != nil {
+		return nil, fmt.Errorf("decoding chatbot provider recommendation candidates: %w", err)
+	}
+	var persistedItems []persistedProviderRecommendation
+	if err := json.Unmarshal(recommendations, &persistedItems); err != nil {
+		return nil, fmt.Errorf("decoding chatbot provider recommendations: %w", err)
+	}
+	items := domainProviderRecommendations(persistedItems)
+	maxResults := len(items)
+	if maxResults == 0 {
+		maxResults = 1
+	}
+	currentRecommendation, err := conversation.NewCurrentProviderRecommendation(assessmentID, candidateIDs, items, maxResults)
+	if err != nil {
+		return nil, fmt.Errorf("validating current chatbot provider recommendation: %w", err)
+	}
+	return currentRecommendation, nil
 }
 
 func (repository *ConversationRepository) findAssessmentImages(ctx context.Context, assessmentID int) ([]filedomain.MessageImage, error) {

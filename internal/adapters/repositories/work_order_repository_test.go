@@ -68,7 +68,7 @@ func TestWorkOrderRepositoryAggregatesProviderRatingStats(t *testing.T) {
 	stats, err := testContext.workOrderRepository.FindRatingStatsByProviderID(t.Context(), fixture.providerID)
 
 	require.NoError(t, err)
-	assert.Equal(t, provider.RatingStats{Total: 8, Count: 2}, stats)
+	assert.Equal(t, provider.RatingStats{Total: 8, Count: 2, Distribution: provider.RatingDistribution{0, 0, 1, 0, 1}}, stats)
 }
 
 func TestWorkOrderRepositoryAggregatesRatingStatsForMultipleProviders(t *testing.T) {
@@ -87,8 +87,8 @@ func TestWorkOrderRepositoryAggregatesRatingStatsForMultipleProviders(t *testing
 
 	require.NoError(t, err)
 	assert.Equal(t, map[int]provider.RatingStats{
-		firstFixture.providerID:  {Total: 8, Count: 2},
-		secondFixture.providerID: {Total: 2, Count: 1},
+		firstFixture.providerID:  {Total: 8, Count: 2, Distribution: provider.RatingDistribution{0, 0, 1, 0, 1}},
+		secondFixture.providerID: {Total: 2, Count: 1, Distribution: provider.RatingDistribution{0, 1, 0, 0, 0}},
 	}, statsByProviderID)
 }
 
@@ -184,6 +184,28 @@ func TestWorkOrderRepositoryOrdersProviderHistoryByMostRecentScheduledDate(t *te
 	require.NoError(t, err)
 	require.Len(t, history, 2)
 	assert.Equal(t, []int{recentOrder.ID(), olderOrder.ID()}, []int{history[0].ID, history[1].ID})
+}
+
+func TestWorkOrderRepositoryFindsPaidHistoryForMultipleProvidersInOneResult(t *testing.T) {
+	testContext := newServiceProposalRepositoryTest(t)
+	firstFixture := newProviderWorkOrderTestFixture(t, testContext, "history-batch-first")
+	secondFixture := newProviderWorkOrderTestFixture(t, testContext, "history-batch-second")
+	thirdFixture := newProviderWorkOrderTestFixture(t, testContext, "history-batch-empty")
+	baseScheduledOn := time.Now().UTC().Truncate(time.Microsecond).Add(48 * time.Hour)
+	firstOrder := savePaidWorkOrderWithoutReviewForFixture(t, testContext, firstFixture, baseScheduledOn, "99999999-9999-9999-9999-999999999994")
+	secondOrder := savePaidWorkOrderWithoutReviewForFixture(t, testContext, secondFixture, baseScheduledOn, "99999999-9999-9999-9999-999999999995")
+
+	historyByProviderID, err := testContext.workOrderRepository.FindPaidWorkHistoryByProviderIDs(
+		t.Context(),
+		[]int{firstFixture.providerID, secondFixture.providerID, thirdFixture.providerID},
+	)
+
+	require.NoError(t, err)
+	require.Len(t, historyByProviderID[firstFixture.providerID], 1)
+	require.Len(t, historyByProviderID[secondFixture.providerID], 1)
+	require.Empty(t, historyByProviderID[thirdFixture.providerID])
+	assert.Equal(t, firstOrder.ID(), historyByProviderID[firstFixture.providerID][0].ID)
+	assert.Equal(t, secondOrder.ID(), historyByProviderID[secondFixture.providerID][0].ID)
 }
 
 func TestWorkOrderRepositoryRejectsPaidHistoryWithoutCompletionReport(t *testing.T) {

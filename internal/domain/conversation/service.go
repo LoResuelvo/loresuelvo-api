@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/category"
 	domainclock "github.com/LoResuelvo/loresuelvo-api/internal/domain/clock"
@@ -12,6 +13,7 @@ import (
 	readmodel "github.com/LoResuelvo/loresuelvo-api/internal/domain/conversation/read_model"
 	filedomain "github.com/LoResuelvo/loresuelvo-api/internal/domain/file"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/provider"
+	providerreadmodel "github.com/LoResuelvo/loresuelvo-api/internal/domain/provider/read_model"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/user"
 )
 
@@ -24,6 +26,8 @@ type Service struct {
 	categoryRepository     RecommendationCategoryLister
 	fileService            FileService
 	clock                  domainclock.Clock
+	workOrderReader        WorkOrderReader
+	recommendationConfig   ProviderRecommendationConfig
 }
 
 func NewService(
@@ -35,6 +39,8 @@ func NewService(
 	categoryRepository RecommendationCategoryLister,
 	fileService FileService,
 	clock domainclock.Clock,
+	recommendationConfig ProviderRecommendationConfig,
+	workOrderReader WorkOrderReader,
 ) *Service {
 	return &Service{
 		conversationRepository: conversationRepository,
@@ -45,6 +51,8 @@ func NewService(
 		categoryRepository:     categoryRepository,
 		fileService:            fileService,
 		clock:                  clock,
+		workOrderReader:        workOrderReader,
+		recommendationConfig:   recommendationConfig,
 	}
 }
 
@@ -97,7 +105,12 @@ func (s *Service) getChatbotConversationDetail(ctx context.Context, authID strin
 		return nil, err
 	}
 
-	detail, err = s.withRecommendedProviders(ctx, detail, authenticatedConsumer.CoverageZone().ID)
+	if chatbotConversation.CurrentRecommendation != nil && detail.Chatbot != nil {
+		detail.Chatbot.RecommendationReasons = recommendationReasonsForCurrentRecommendation(chatbotConversation.CurrentRecommendation)
+		detail.Chatbot.RecommendedProviders, err = s.providersForCurrentRecommendation(ctx, chatbotConversation.CurrentRecommendation)
+	} else {
+		detail, err = s.withRecommendedProviders(ctx, detail, authenticatedConsumer.CoverageZone().ID)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -247,6 +260,11 @@ func (s *Service) CreateChatbotConversation(ctx context.Context, authID string, 
 	if err := chatbotConversation.ApplyResponse(*answer.response, problemCategoryID(answer.problemCategory), selectedImages...); err != nil {
 		return nil, err
 	}
+	if answer.currentRecommendation != nil {
+		if err := chatbotConversation.SetCurrentRecommendation(answer.currentRecommendation); err != nil {
+			return nil, err
+		}
+	}
 	chatbotConversation.AddMessage(*consumerMessage)
 	chatbotConversation.AddMessage(*answer.message)
 
@@ -312,6 +330,7 @@ func (s *Service) ContinueChatbotConversation(ctx context.Context, authID string
 		if err != nil {
 			return nil, err
 		}
+		answer.recommendationReasons = recommendationReasonsForCurrentRecommendation(chatbotConversation.CurrentRecommendation)
 	}
 
 	savedConversation, err := s.saveChatbotTurn(ctx, chatbotConversation, *consumerMessage, *answer.message, answer, selectedImages)
@@ -341,6 +360,10 @@ func (s *Service) recommendationForCurrentAssessment(ctx context.Context, chatbo
 	}
 	if matched == nil || !assessment.RequiresProfessional() {
 		return matched, nil, nil
+	}
+	if chatbotConversation.CurrentRecommendation != nil {
+		providers, err := s.providersForCurrentRecommendation(ctx, chatbotConversation.CurrentRecommendation)
+		return matched, providers, err
 	}
 	providers, err := s.userRepository.FindProvidersByCategoryAndCoverageZoneID(ctx, matched.ID, coverageZoneID)
 	if err != nil {
@@ -394,16 +417,18 @@ func (s *Service) answerChatbotQuestion(ctx context.Context, question ChatbotHom
 		return nil, err
 	}
 
-	problemCategory, recommendedProviders, err := s.assessmentResult(ctx, *chatbotResponse, availableCategories, coverageZoneID)
+	problemCategory, recommendedProviders, recommendationReasons, currentRecommendation, err := s.assessmentResult(ctx, *chatbotResponse, availableCategories, coverageZoneID)
 	if err != nil {
 		return nil, err
 	}
 
 	return &chatbotAnswer{
-		response:             chatbotResponse,
-		message:              chatbotMessage,
-		problemCategory:      problemCategory,
-		recommendedProviders: recommendedProviders,
+		response:              chatbotResponse,
+		message:               chatbotMessage,
+		problemCategory:       problemCategory,
+		recommendedProviders:  recommendedProviders,
+		recommendationReasons: recommendationReasons,
+		currentRecommendation: currentRecommendation,
 	}, nil
 }
 
@@ -468,6 +493,11 @@ func (s *Service) saveChatbotTurn(ctx context.Context, chatbotConversation *Chat
 	}
 	if err := chatbotConversation.ApplyResponse(*answer.response, problemCategoryID(answer.problemCategory), selectedImages...); err != nil {
 		return nil, err
+	}
+	if answer.currentRecommendation != nil {
+		if err := chatbotConversation.SetCurrentRecommendation(answer.currentRecommendation); err != nil {
+			return nil, err
+		}
 	}
 	chatbotConversation.FinishProcessing()
 
@@ -554,12 +584,35 @@ func (s *Service) summarizeChatbotContext(ctx context.Context, previousSummary s
 
 func chatbotTurnResult(conversation Conversation, answer *chatbotAnswer) *ChatbotConversationTurnResult {
 	return &ChatbotConversationTurnResult{
-		Conversation:         conversation,
-		ResponseStatus:       answer.response.Status,
-		RecommendedProviders: answer.recommendedProviders,
-		Assessment:           copyCurrentAssessment(conversation),
-		ProblemCategory:      answer.problemCategory,
+		Conversation:          conversation,
+		ResponseStatus:        answer.response.Status,
+		RecommendedProviders:  answer.recommendedProviders,
+		RecommendationReasons: copyRecommendationReasons(answer.recommendationReasons),
+		Assessment:            copyCurrentAssessment(conversation),
+		ProblemCategory:       answer.problemCategory,
 	}
+}
+
+func copyRecommendationReasons(reasons map[int]string) map[int]string {
+	if len(reasons) == 0 {
+		return nil
+	}
+	copied := make(map[int]string, len(reasons))
+	for providerID, reason := range reasons {
+		copied[providerID] = reason
+	}
+	return copied
+}
+
+func recommendationReasonsForCurrentRecommendation(currentRecommendation *CurrentProviderRecommendation) map[int]string {
+	if currentRecommendation == nil {
+		return nil
+	}
+	reasons := make(map[int]string, len(currentRecommendation.Recommendations))
+	for _, recommendation := range currentRecommendation.Recommendations {
+		reasons[recommendation.ProviderID] = recommendation.Reason
+	}
+	return reasons
 }
 
 func copyCurrentAssessment(foundConversation Conversation) *ProblemAssessment {
@@ -855,34 +908,139 @@ func (s *Service) withCounterpartProfilePhotoURL(ctx context.Context, detail *re
 	return detail, nil
 }
 
-// TODO: Let the chatbot rank providers using richer provider attributes when recommendation criteria evolve.
-func (s *Service) assessmentResult(ctx context.Context, chatbotResponse ChatbotResponse, availableCategories []category.Category, coverageZoneID int) (*category.Category, []provider.Provider, error) {
+func (s *Service) assessmentResult(ctx context.Context, chatbotResponse ChatbotResponse, availableCategories []category.Category, coverageZoneID int) (*category.Category, []provider.Provider, map[int]string, *CurrentProviderRecommendation, error) {
 	if chatbotResponse.Assessment.Action == ChatbotAssessmentUnchanged {
-		return nil, nil, nil
+		return nil, nil, nil, nil, nil
 	}
 
 	matchedCategory := categoryForChatbotResponse(chatbotResponse, availableCategories)
 	if strings.TrimSpace(chatbotResponse.Assessment.ProblemCategoryName) != "" && matchedCategory == nil {
-		return nil, nil, ErrProblemAssessmentInvalid
+		return nil, nil, nil, nil, ErrProblemAssessmentInvalid
 	}
 	if chatbotResponse.Assessment.Outcome == AssessmentProfessionalRequired && matchedCategory == nil {
-		return nil, nil, ErrProblemAssessmentInvalid
+		return nil, nil, nil, nil, ErrProblemAssessmentInvalid
 	}
 	if chatbotResponse.Assessment.Outcome != AssessmentProfessionalRequired {
-		return matchedCategory, nil, nil
+		return matchedCategory, nil, nil, nil, nil
 	}
 
 	providers, err := s.userRepository.FindProvidersByCategoryAndCoverageZoneID(ctx, matchedCategory.ID, coverageZoneID)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, nil, err
 	}
-
-	summaries, err := s.providersWithProfilePhotoURLs(ctx, providers)
+	orderedProviders, reasons, currentRecommendation, err := s.rankEligibleProviders(ctx, providers, chatbotResponse.Assessment)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, nil, err
+	}
+	return matchedCategory, orderedProviders, reasons, currentRecommendation, nil
+}
+
+func (s *Service) rankEligibleProviders(ctx context.Context, providers []provider.Provider, assessment ChatbotAssessmentResponse) ([]provider.Provider, map[int]string, *CurrentProviderRecommendation, error) {
+	if len(providers) == 0 {
+		emptyRecommendation, err := NewCurrentProviderRecommendation(0, nil, nil, s.recommendationConfig.MaxRecommendedProviders)
+		return []provider.Provider{}, nil, emptyRecommendation, err
 	}
 
-	return matchedCategory, summaries, nil
+	providerIDs := make([]int, 0, len(providers))
+	for _, foundProvider := range providers {
+		providerIDs = append(providerIDs, foundProvider.ID())
+	}
+	evidenceByProviderID, err := s.providerRecommendationEvidence(ctx, providerIDs)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("finding provider recommendation evidence: %w", err)
+	}
+	candidates := make([]ProviderRecommendationCandidate, 0, len(providers))
+	for _, foundProvider := range providers {
+		candidates = append(candidates, ProviderRecommendationCandidate{
+			Reference:  newProviderRecommendationReference(),
+			ProviderID: foundProvider.ID(),
+			Evidence:   evidenceByProviderID[foundProvider.ID()],
+		})
+	}
+
+	ranking, err := s.chatbot.RankProviders(ctx, ProviderRankingRequest{
+		ProblemTitle:       assessment.ProblemTitle,
+		ProblemDescription: assessment.ProblemDescription,
+		MaxResults:         s.recommendationConfig.MaxRecommendedProviders,
+		Candidates:         candidates,
+	})
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	if ranking == nil {
+		return nil, nil, nil, ErrProviderRecommendationInvalid
+	}
+
+	providerByReference := make(map[string]provider.Provider, len(candidates))
+	for index, candidate := range candidates {
+		providerByReference[candidate.Reference] = providers[index]
+	}
+	selectedProviders := make([]provider.Provider, 0, len(ranking.Recommendations))
+	reasons := make(map[int]string, len(ranking.Recommendations))
+	items := make([]ProviderRecommendation, 0, len(ranking.Recommendations))
+	seenReferences := make(map[string]struct{}, len(ranking.Recommendations))
+	for index, recommendation := range ranking.Recommendations {
+		recommendation.Reference = strings.TrimSpace(recommendation.Reference)
+		recommendation.Reason = strings.TrimSpace(recommendation.Reason)
+		if recommendation.Reference == "" || recommendation.Reason == "" {
+			return nil, nil, nil, ErrProviderRecommendationInvalid
+		}
+		if _, duplicate := seenReferences[recommendation.Reference]; duplicate {
+			return nil, nil, nil, ErrProviderRecommendationInvalid
+		}
+		seenReferences[recommendation.Reference] = struct{}{}
+		foundProvider, exists := providerByReference[recommendation.Reference]
+		if !exists {
+			return nil, nil, nil, ErrProviderRecommendationInvalid
+		}
+		selectedProviders = append(selectedProviders, foundProvider)
+		reasons[foundProvider.ID()] = recommendation.Reason
+		items = append(items, ProviderRecommendation{ProviderID: foundProvider.ID(), Position: index + 1, Reason: recommendation.Reason})
+	}
+	currentRecommendation, err := NewCurrentProviderRecommendation(0, providerIDs, items, s.recommendationConfig.MaxRecommendedProviders)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	summaries, err := s.providersWithProfilePhotoURLs(ctx, selectedProviders)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	return summaries, reasons, currentRecommendation, nil
+}
+
+func (s *Service) providerRecommendationEvidence(ctx context.Context, providerIDs []int) (map[int]ProviderRecommendationEvidence, error) {
+	ratingStatsByProviderID, err := s.workOrderReader.FindRatingStatsByProviderIDs(ctx, providerIDs)
+	if err != nil {
+		return nil, fmt.Errorf("finding provider rating stats: %w", err)
+	}
+	workHistoryByProviderID, err := s.workOrderReader.FindPaidWorkHistoryByProviderIDs(ctx, providerIDs)
+	if err != nil {
+		return nil, fmt.Errorf("finding provider paid work history: %w", err)
+	}
+
+	evidenceByProviderID := make(map[int]ProviderRecommendationEvidence, len(providerIDs))
+	for _, providerID := range providerIDs {
+		history := workHistoryByProviderID[providerID]
+		if history == nil {
+			history = []providerreadmodel.WorkOrder{}
+		}
+		stats := ratingStatsByProviderID[providerID]
+		ratingSummary := stats.Summary()
+		mostRecentPaidWork := time.Time{}
+		if len(history) > 0 {
+			mostRecentPaidWork = history[0].ScheduledOn
+		}
+		evidenceByProviderID[providerID] = ProviderRecommendationEvidence{
+			RatingAverage:      ratingSummary.Average,
+			RatingCount:        ratingSummary.Count,
+			RatingDistribution: stats.Distribution,
+			PaidWorkCount:      len(history),
+			MostRecentPaidWork: mostRecentPaidWork,
+			WorkHistory:        append([]providerreadmodel.WorkOrder(nil), history...),
+		}
+	}
+
+	return evidenceByProviderID, nil
 }
 
 func categoryForChatbotResponse(chatbotResponse ChatbotResponse, availableCategories []category.Category) *category.Category {
@@ -915,6 +1073,24 @@ func (s *Service) withRecommendedProviders(ctx context.Context, detail *readmode
 	}
 
 	return detail, nil
+}
+
+func (s *Service) providersForCurrentRecommendation(ctx context.Context, currentRecommendation *CurrentProviderRecommendation) ([]provider.Provider, error) {
+	if currentRecommendation == nil {
+		return nil, nil
+	}
+	providers := make([]provider.Provider, 0, len(currentRecommendation.Recommendations))
+	for _, recommendation := range currentRecommendation.Recommendations {
+		foundProvider, err := s.userRepository.FindProviderByID(ctx, recommendation.ProviderID)
+		if err != nil {
+			return nil, fmt.Errorf("finding persisted recommended provider %d: %w", recommendation.ProviderID, err)
+		}
+		if foundProvider == nil {
+			return nil, fmt.Errorf("finding persisted recommended provider %d: %w", recommendation.ProviderID, ErrProviderRecommendationInvalid)
+		}
+		providers = append(providers, *foundProvider)
+	}
+	return s.providersWithProfilePhotoURLs(ctx, providers)
 }
 
 func (s *Service) providersWithProfilePhotoURLs(ctx context.Context, providers []provider.Provider) ([]provider.Provider, error) {

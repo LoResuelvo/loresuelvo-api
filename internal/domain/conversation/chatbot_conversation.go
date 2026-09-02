@@ -29,12 +29,13 @@ const ChatbotProcessingStaleAfter = 5 * time.Minute
 
 type ChatBotConversation struct {
 	*BaseConversation
-	ConsumerID          int
-	Title               string
-	LastResponseStatus  ChatbotResponseStatus
-	CurrentAssessment   *ProblemAssessment
-	Context             ChatbotConversationContext
-	ProcessingStartedOn *time.Time
+	ConsumerID            int
+	Title                 string
+	LastResponseStatus    ChatbotResponseStatus
+	CurrentAssessment     *ProblemAssessment
+	CurrentRecommendation *CurrentProviderRecommendation
+	Context               ChatbotConversationContext
+	ProcessingStartedOn   *time.Time
 }
 
 func NewChatbotConversation(consumerID int, title string) (Conversation, error) {
@@ -64,6 +65,7 @@ func (conversation *ChatBotConversation) ApplyResponse(response ChatbotResponse,
 	if response.Assessment.Action != ChatbotAssessmentReplace {
 		return ErrProblemAssessmentInvalid
 	}
+	conversation.CurrentRecommendation = nil
 
 	version := 1
 	if conversation.CurrentAssessment != nil {
@@ -92,6 +94,21 @@ func (conversation *ChatBotConversation) UpdateContext(context ChatbotConversati
 	}
 
 	conversation.Context = validatedContext
+	return nil
+}
+
+func (conversation *ChatBotConversation) SetCurrentRecommendation(currentRecommendation *CurrentProviderRecommendation) error {
+	if currentRecommendation == nil {
+		conversation.CurrentRecommendation = nil
+		return nil
+	}
+	if conversation.CurrentAssessment == nil || !conversation.CurrentAssessment.RequiresProfessional() {
+		return ErrProviderRecommendationInvalid
+	}
+	if currentRecommendation.AssessmentID != 0 && currentRecommendation.AssessmentID != conversation.CurrentAssessment.ID {
+		return ErrProviderRecommendationInvalid
+	}
+	conversation.CurrentRecommendation = currentRecommendation.Copy()
 	return nil
 }
 
