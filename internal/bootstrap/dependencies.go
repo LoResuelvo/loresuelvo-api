@@ -187,7 +187,7 @@ func NewDependenciesWithChatbot(database *sql.DB, chatbot conversation.Chatbot) 
 	if err != nil {
 		return nil, fmt.Errorf("configuring identity verification webhook: %w", err)
 	}
-	return NewDependenciesWithPaymentAccountAndCalendarAdapters(
+	return newDependenciesWithPaymentAccountAndCalendarAdapters(
 		database,
 		chatbot,
 		paymentAccountOAuthConnector,
@@ -201,9 +201,10 @@ func NewDependenciesWithChatbot(database *sql.DB, chatbot conversation.Chatbot) 
 		calendarEventPublisher,
 		calendarHandlerConfig,
 		identityVerifier,
+		false,
 		recommendationConfig,
 		identityWebhook,
-	), nil
+	)
 }
 
 func NewDependenciesWithPaymentAccountAdapters(
@@ -215,7 +216,7 @@ func NewDependenciesWithPaymentAccountAdapters(
 	credentialProtector paymentaccount.CredentialProtector,
 	secretGenerator paymentaccount.SecretGenerator,
 	paymentAccountHandlerConfig payment_account_handler.Config,
-) *Dependencies {
+) (*Dependencies, error) {
 	return newDependenciesWithPaymentAccountAndCalendarAdapters(
 		database,
 		chatbot,
@@ -255,7 +256,7 @@ func NewDependenciesWithPaymentAccountAndCalendarAdapters(
 	identityVerifier identityverification.IdentityVerifier,
 	recommendationConfig conversation.ProviderRecommendationConfig,
 	identityWebhooks ...identity_verification_handler.IdentityVerificationWebhook,
-) *Dependencies {
+) (*Dependencies, error) {
 	return newDependenciesWithPaymentAccountAndCalendarAdapters(
 		database,
 		chatbot,
@@ -293,7 +294,7 @@ func newDependenciesWithPaymentAccountAndCalendarAdapters(
 	useFakeLocationResolvers bool,
 	recommendationConfig conversation.ProviderRecommendationConfig,
 	identityWebhooks ...identity_verification_handler.IdentityVerificationWebhook,
-) *Dependencies {
+) (*Dependencies, error) {
 	persistence := NewPersistenceAdapters(database)
 	readiness := health.NewReadiness(database)
 
@@ -307,7 +308,10 @@ func newDependenciesWithPaymentAccountAndCalendarAdapters(
 		coverageZoneResolver = locationadapter.NewGoogleCoverageZoneResolverFromEnv(persistence.CoverageZoneRepository)
 	}
 
-	storageComponents := storage.NewComponentsFromEnv()
+	storageComponents, err := storage.NewComponentsFromEnv()
+	if err != nil {
+		return nil, fmt.Errorf("configuring storage: %w", err)
+	}
 	systemClock := clockadapter.NewSystemClock()
 
 	// Realtime infrastructure
@@ -480,7 +484,7 @@ func newDependenciesWithPaymentAccountAndCalendarAdapters(
 		Readiness:                   readiness,
 		ConsumerAddressResolver:     addressResolver,
 		IdentityVerifier:            identityVerifier,
-	}
+	}, nil
 }
 
 func newTestIdentityVerificationWebhook() identity_verification_handler.IdentityVerificationWebhook {

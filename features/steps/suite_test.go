@@ -345,7 +345,7 @@ func newTestSuite(tb testing.TB, database *sql.DB) *testSuite {
 	checkoutClient := paymentmercadopago.NewFakeCheckoutClient()
 	webhookVerifier, err := paymentmercadopago.NewWebhookVerifier("test-mercado-pago-webhook-secret")
 	require.NoError(tb, err, "could not initialize test webhook verifier")
-	dependencies := bootstrap.NewDependenciesWithPaymentAccountAdapters(
+	dependencies, err := bootstrap.NewDependenciesWithPaymentAccountAdapters(
 		database,
 		chatbot,
 		mercadopago.NewFakeOAuthClient(),
@@ -358,6 +358,7 @@ func newTestSuite(tb testing.TB, database *sql.DB) *testSuite {
 			ConnectionCancelledURL: "http://frontend.loresuelvo.test/provider/register/mercado-pago?result=cancelled",
 		},
 	)
+	require.NoError(tb, err, "could not initialize dependencies")
 	auth0Validator := auth0.NewFakeValidator()
 	tokenBuilder := auth0.NewTokenBuilder()
 

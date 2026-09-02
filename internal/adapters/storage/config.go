@@ -10,6 +10,7 @@ import (
 const defaultPresignExpiration = 10 * time.Minute
 
 type Config struct {
+	Environment       string
 	Provider          string
 	Endpoint          string
 	Region            string
@@ -23,6 +24,7 @@ type Config struct {
 
 func NewConfigFromEnv() Config {
 	return Config{
+		Environment:       envOrDefault("ENVIRONMENT", "development"),
 		Provider:          envOrDefault("STORAGE_PROVIDER", "memory"),
 		Endpoint:          strings.TrimSpace(os.Getenv("STORAGE_ENDPOINT")),
 		Region:            envOrDefault("STORAGE_REGION", "auto"),
