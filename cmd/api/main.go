@@ -3,6 +3,8 @@ package main
 import (
 	"context"
 	"log/slog"
+	"os"
+	"strings"
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/auth0"
 	"github.com/LoResuelvo/loresuelvo-api/internal/bootstrap"
@@ -46,7 +48,7 @@ func main() {
 		panic(err)
 	}
 
-	router := httpadapter.NewRouter(dependencies.RouterConfig(auth0Validator, logger))
+	router := httpadapter.NewRouter(dependencies.RouterConfig(auth0Validator, logger, routerEnvironmentFromEnv()))
 	engine, err := router.SetUp()
 	if err != nil {
 		panic(err)
@@ -54,5 +56,20 @@ func main() {
 
 	if err := engine.Run(":8080"); err != nil {
 		panic(err)
+	}
+}
+
+func routerEnvironmentFromEnv() httpadapter.Environment {
+	switch strings.ToLower(strings.TrimSpace(os.Getenv("ENVIRONMENT"))) {
+	case "dev", "development":
+		return httpadapter.DevelopmentEnvironment
+	case "test":
+		return httpadapter.TestEnvironment
+	case "staging":
+		return httpadapter.StagingEnvironment
+	case "production":
+		return httpadapter.ProductionEnvironment
+	default:
+		return ""
 	}
 }

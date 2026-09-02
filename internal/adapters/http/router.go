@@ -26,7 +26,17 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+type Environment string
+
+const (
+	DevelopmentEnvironment Environment = "development"
+	TestEnvironment        Environment = "test"
+	StagingEnvironment     Environment = "staging"
+	ProductionEnvironment  Environment = "production"
+)
+
 type RouterConfig struct {
+	Environment                 Environment
 	CategoryHandler             *category_handler.CategoryHandler
 	CalendarConnectionHandler   *calendar_connection_handler.CalendarConnectionHandler
 	CoverageZoneHandler         *coverage_zone_handler.CoverageZoneHandler
@@ -48,6 +58,7 @@ type RouterConfig struct {
 }
 
 type Router struct {
+	environment                 Environment
 	categoryHandler             *category_handler.CategoryHandler
 	calendarConnectionHandler   *calendar_connection_handler.CalendarConnectionHandler
 	coverageZoneHandler         *coverage_zone_handler.CoverageZoneHandler
@@ -73,7 +84,9 @@ func NewRouter(config RouterConfig) *Router {
 	if logger == nil {
 		logger = slog.Default()
 	}
+
 	router := &Router{
+		environment:                 config.Environment,
 		categoryHandler:             config.CategoryHandler,
 		calendarConnectionHandler:   config.CalendarConnectionHandler,
 		coverageZoneHandler:         config.CoverageZoneHandler,
@@ -229,6 +242,18 @@ func (router *Router) registerRealtimeRoutes(engine *gin.Engine, authMiddleware 
 }
 
 func (router *Router) registerTestRoutes(engine *gin.Engine) {
+	if !testRoutesEnabled(router.environment) {
+		return
+	}
 	engine.POST("/test/clock", router.testHandler.SetTime)
 	engine.POST("/test/clear", router.testHandler.ClearTestData)
+}
+
+func testRoutesEnabled(environment Environment) bool {
+	switch environment {
+	case DevelopmentEnvironment, TestEnvironment:
+		return true
+	default:
+		return false
+	}
 }

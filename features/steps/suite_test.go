@@ -358,7 +358,7 @@ func newTestSuite(tb testing.TB, database *sql.DB) *testSuite {
 	auth0Validator := auth0.NewFakeValidator()
 	tokenBuilder := auth0.NewTokenBuilder()
 
-	router := httpadapter.NewRouter(dependencies.RouterConfig(auth0Validator, slog.Default()))
+	router := httpadapter.NewRouter(dependencies.RouterConfig(auth0Validator, slog.Default(), httpadapter.TestEnvironment))
 	engine, err := router.SetUp()
 	require.NoError(tb, err, "could not initialize router")
 	var eventDetailsObserver calendarEventDetailsObserver

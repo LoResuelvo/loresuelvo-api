@@ -104,8 +104,13 @@ type CalendarEventObserver interface {
 	HasEventForUser(context.Context, int, int) (bool, error)
 }
 
-func (dependencies *Dependencies) RouterConfig(auth0Validator *validator.Validator, logger *slog.Logger) httpadapter.RouterConfig {
+func (dependencies *Dependencies) RouterConfig(
+	auth0Validator *validator.Validator,
+	logger *slog.Logger,
+	environment httpadapter.Environment,
+) httpadapter.RouterConfig {
 	return httpadapter.RouterConfig{
+		Environment:                 environment,
 		CategoryHandler:             dependencies.CategoryHandler,
 		CalendarConnectionHandler:   dependencies.CalendarConnectionHandler,
 		CoverageZoneHandler:         dependencies.CoverageZoneHandler,
