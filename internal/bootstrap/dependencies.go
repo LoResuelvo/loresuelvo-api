@@ -1,7 +1,6 @@
 package bootstrap
 
 import (
-	"context"
 	"database/sql"
 	"fmt"
 	"log/slog"
@@ -29,7 +28,6 @@ import (
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/user_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/work_order_handler"
 	didit "github.com/LoResuelvo/loresuelvo-api/internal/adapters/identityverification/didit"
-	identityverificationfake "github.com/LoResuelvo/loresuelvo-api/internal/adapters/identityverification/fake"
 	locationadapter "github.com/LoResuelvo/loresuelvo-api/internal/adapters/location"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/locking"
 	mediaadapter "github.com/LoResuelvo/loresuelvo-api/internal/adapters/media"
@@ -60,52 +58,37 @@ import (
 )
 
 type Dependencies struct {
-	Persistence              *PersistenceAdapters
-	WorkOrderService         *workorder.Service
+	Persistence *PersistenceAdapters
+	Runtime     RuntimeDependencies
+	Clock       *clockadapter.SystemClock
+
+	routerConfig httpadapter.RouterConfig
+}
+
+type RuntimeDependencies struct {
 	UrgentWorkOrderScheduler *scheduler.Scheduler
 	CalendarSyncRunner       *scheduler.CalendarSyncRunner
-	CalendarEventObserver    CalendarEventObserver
-
-	CategoryHandler             *category_handler.CategoryHandler
-	CalendarConnectionHandler   *calendar_connection_handler.CalendarConnectionHandler
-	CoverageZoneHandler         *coverage_zone_handler.CoverageZoneHandler
-	ConsumerHandler             *consumer_handler.ConsumerHandler
-	ProviderHandler             *provider_handler.ProviderHandler
-	ConversationHandler         *conversation_handler.ConversationHandler
-	JobRequestHandler           *job_request_handler.JobRequestHandler
-	IdentityVerificationHandler *identity_verification_handler.IdentityVerificationHandler
-	PaymentAccountHandler       *payment_account_handler.PaymentAccountHandler
-	PaymentHandler              *payment_handler.PaymentHandler
-	UserHandler                 *user_handler.UserHandler
-	FileHandler                 *file_handler.FileHandler
-	HealthHandler               *health_handler.HealthHandler
-	ServiceProposalHandler      *service_proposal_handler.ServiceProposalHandler
-	WorkOrderHandler            *work_order_handler.WorkOrderHandler
-	TestHandler                 *test_handler.TestHandler
-
-	Hub              *realtime.Hub
-	RealtimeHandler  *realtime.Handler
-	MessagePublisher conversation.MessagePublisher
-	realtimeCancel   context.CancelFunc
-
-	Clock     *clockadapter.SystemClock
-	Readiness *health.Readiness
-
-	ConsumerAddressResolver consumer.AddressResolver
-	IdentityVerifier        identityverification.IdentityVerifier
+	Hub                      *realtime.Hub
+	RealtimeDispatcher       *realtime.Dispatcher
+	Readiness                *health.Readiness
 }
 
-// Close stops process-scoped realtime goroutines owned by the dependency
-// container. It is safe to call more than once.
-func (dependencies *Dependencies) Close() {
-	if dependencies == nil || dependencies.realtimeCancel == nil {
-		return
-	}
-	dependencies.realtimeCancel()
-}
-
-type CalendarEventObserver interface {
-	HasEventForUser(context.Context, int, int) (bool, error)
+type dependencyAdapters struct {
+	chatbot                      conversation.Chatbot
+	paymentAccountOAuthConnector paymentaccount.OAuthConnector
+	paymentGateway               payment.Gateway
+	webhookVerifier              payment_handler.WebhookVerifier
+	credentialProtector          paymentaccount.CredentialProtector
+	secretGenerator              paymentaccount.SecretGenerator
+	paymentAccountHandlerConfig  payment_account_handler.Config
+	calendarOAuthConnector       calendarconnection.OAuthConnector
+	calendarCredentialProtector  calendarconnection.CredentialProtector
+	calendarEventPublisher       workordercalendar.EventPublisher
+	calendarHandlerConfig        calendar_connection_handler.Config
+	identityVerifier             identityverification.IdentityVerifier
+	addressResolverOverride      consumer.AddressResolver
+	recommendationConfig         conversation.ProviderRecommendationConfig
+	identityWebhook              identity_verification_handler.IdentityVerificationWebhook
 }
 
 func (dependencies *Dependencies) RouterConfig(
@@ -113,35 +96,15 @@ func (dependencies *Dependencies) RouterConfig(
 	logger *slog.Logger,
 	environment httpadapter.Environment,
 ) httpadapter.RouterConfig {
-	return httpadapter.RouterConfig{
-		Environment:                 environment,
-		CategoryHandler:             dependencies.CategoryHandler,
-		CalendarConnectionHandler:   dependencies.CalendarConnectionHandler,
-		CoverageZoneHandler:         dependencies.CoverageZoneHandler,
-		ConsumerHandler:             dependencies.ConsumerHandler,
-		ProviderHandler:             dependencies.ProviderHandler,
-		ConversationHandler:         dependencies.ConversationHandler,
-		JobRequestHandler:           dependencies.JobRequestHandler,
-		IdentityVerificationHandler: dependencies.IdentityVerificationHandler,
-		PaymentAccountHandler:       dependencies.PaymentAccountHandler,
-		PaymentHandler:              dependencies.PaymentHandler,
-		UserHandler:                 dependencies.UserHandler,
-		FileHandler:                 dependencies.FileHandler,
-		HealthHandler:               dependencies.HealthHandler,
-		ServiceProposalHandler:      dependencies.ServiceProposalHandler,
-		WorkOrderHandler:            dependencies.WorkOrderHandler,
-		TestHandler:                 dependencies.TestHandler,
-		RealtimeHandler:             dependencies.RealtimeHandler,
-		Auth0Validator:              auth0Validator,
-		Logger:                      logger,
-	}
+	config := dependencies.routerConfig
+	config.Environment = environment
+	config.Auth0Validator = auth0Validator
+	config.Logger = logger
+	return config
 }
 
 func NewDependencies(database *sql.DB) (*Dependencies, error) {
-	return NewDependenciesWithChatbot(database, chatbotadapter.NewChatbotFromEnv())
-}
-
-func NewDependenciesWithChatbot(database *sql.DB, chatbot conversation.Chatbot) (*Dependencies, error) {
+	chatbot := chatbotadapter.NewChatbotFromEnv()
 	recommendationConfig, err := chatbotadapter.ProviderRecommendationConfigFromEnv()
 	if err != nil {
 		return nil, fmt.Errorf("configuring chatbot provider recommendation: %w", err)
@@ -187,121 +150,32 @@ func NewDependenciesWithChatbot(database *sql.DB, chatbot conversation.Chatbot) 
 	if err != nil {
 		return nil, fmt.Errorf("configuring identity verification webhook: %w", err)
 	}
-	return newDependenciesWithPaymentAccountAndCalendarAdapters(
-		database,
-		chatbot,
-		paymentAccountOAuthConnector,
-		paymentGateway,
-		webhookVerifier,
-		credentialCipher,
-		cryptography.NewSecureSecretGenerator(),
-		paymentAccountHandlerConfig,
-		calendarOAuthConnector,
-		calendarCredentialCipher,
-		calendarEventPublisher,
-		calendarHandlerConfig,
-		identityVerifier,
-		false,
-		recommendationConfig,
-		identityWebhook,
-	)
+	return newDependencies(database, dependencyAdapters{
+		chatbot:                      chatbot,
+		paymentAccountOAuthConnector: paymentAccountOAuthConnector,
+		paymentGateway:               paymentGateway,
+		webhookVerifier:              webhookVerifier,
+		credentialProtector:          credentialCipher,
+		secretGenerator:              cryptography.NewSecureSecretGenerator(),
+		paymentAccountHandlerConfig:  paymentAccountHandlerConfig,
+		calendarOAuthConnector:       calendarOAuthConnector,
+		calendarCredentialProtector:  calendarCredentialCipher,
+		calendarEventPublisher:       calendarEventPublisher,
+		calendarHandlerConfig:        calendarHandlerConfig,
+		identityVerifier:             identityVerifier,
+		recommendationConfig:         recommendationConfig,
+		identityWebhook:              identityWebhook,
+	})
 }
 
-func NewDependenciesWithPaymentAccountAdapters(
-	database *sql.DB,
-	chatbot conversation.Chatbot,
-	paymentAccountOAuthConnector paymentaccount.OAuthConnector,
-	paymentGateway payment.Gateway,
-	webhookVerifier payment_handler.WebhookVerifier,
-	credentialProtector paymentaccount.CredentialProtector,
-	secretGenerator paymentaccount.SecretGenerator,
-	paymentAccountHandlerConfig payment_account_handler.Config,
-) (*Dependencies, error) {
-	return newDependenciesWithPaymentAccountAndCalendarAdapters(
-		database,
-		chatbot,
-		paymentAccountOAuthConnector,
-		paymentGateway,
-		webhookVerifier,
-		credentialProtector,
-		secretGenerator,
-		paymentAccountHandlerConfig,
-		googlecalendar.NewFakeOAuthClient(),
-		credentialProtector,
-		googlecalendar.NewFakeEventPublisher(),
-		calendar_connection_handler.Config{
-			ConnectionSuccessURL:   "/me",
-			ConnectionCancelledURL: "/me",
-		},
-		identityverificationfake.NewVerifier(),
-		true,
-		conversation.DefaultProviderRecommendationConfig(),
-		newTestIdentityVerificationWebhook(),
-	)
-}
-
-func NewDependenciesWithPaymentAccountAndCalendarAdapters(
-	database *sql.DB,
-	chatbot conversation.Chatbot,
-	paymentAccountOAuthConnector paymentaccount.OAuthConnector,
-	paymentGateway payment.Gateway,
-	webhookVerifier payment_handler.WebhookVerifier,
-	credentialProtector paymentaccount.CredentialProtector,
-	secretGenerator paymentaccount.SecretGenerator,
-	paymentAccountHandlerConfig payment_account_handler.Config,
-	calendarOAuthConnector calendarconnection.OAuthConnector,
-	calendarCredentialProtector calendarconnection.CredentialProtector,
-	calendarEventPublisher workordercalendar.EventPublisher,
-	calendarHandlerConfig calendar_connection_handler.Config,
-	identityVerifier identityverification.IdentityVerifier,
-	recommendationConfig conversation.ProviderRecommendationConfig,
-	identityWebhooks ...identity_verification_handler.IdentityVerificationWebhook,
-) (*Dependencies, error) {
-	return newDependenciesWithPaymentAccountAndCalendarAdapters(
-		database,
-		chatbot,
-		paymentAccountOAuthConnector,
-		paymentGateway,
-		webhookVerifier,
-		credentialProtector,
-		secretGenerator,
-		paymentAccountHandlerConfig,
-		calendarOAuthConnector,
-		calendarCredentialProtector,
-		calendarEventPublisher,
-		calendarHandlerConfig,
-		identityVerifier,
-		false,
-		recommendationConfig,
-		identityWebhooks...,
-	)
-}
-
-func newDependenciesWithPaymentAccountAndCalendarAdapters(
-	database *sql.DB,
-	chatbot conversation.Chatbot,
-	paymentAccountOAuthConnector paymentaccount.OAuthConnector,
-	paymentGateway payment.Gateway,
-	webhookVerifier payment_handler.WebhookVerifier,
-	credentialProtector paymentaccount.CredentialProtector,
-	secretGenerator paymentaccount.SecretGenerator,
-	paymentAccountHandlerConfig payment_account_handler.Config,
-	calendarOAuthConnector calendarconnection.OAuthConnector,
-	calendarCredentialProtector calendarconnection.CredentialProtector,
-	calendarEventPublisher workordercalendar.EventPublisher,
-	calendarHandlerConfig calendar_connection_handler.Config,
-	identityVerifier identityverification.IdentityVerifier,
-	useFakeLocationResolvers bool,
-	recommendationConfig conversation.ProviderRecommendationConfig,
-	identityWebhooks ...identity_verification_handler.IdentityVerificationWebhook,
-) (*Dependencies, error) {
+func newDependencies(database *sql.DB, adapters dependencyAdapters) (*Dependencies, error) {
 	persistence := NewPersistenceAdapters(database)
 	readiness := health.NewReadiness(database)
 
 	var addressResolver consumer.AddressResolver
 	var coverageZoneResolver consumer.CoverageZoneResolver
-	if useFakeLocationResolvers {
-		addressResolver = locationadapter.NewFakeAddressResolver()
+	if adapters.addressResolverOverride != nil {
+		addressResolver = adapters.addressResolverOverride
 		coverageZoneResolver = locationadapter.NewFakeCoverageZoneResolver(persistence.CoverageZoneRepository)
 	} else {
 		addressResolver = locationadapter.NewGoogleAddressResolverFromEnv()
@@ -318,12 +192,6 @@ func newDependenciesWithPaymentAccountAndCalendarAdapters(
 	realtimeEventBus := realtime.NewPostgresEventBus(database)
 	hub := realtime.NewHub()
 	dispatcher := realtime.NewDispatcher(hub, realtimeEventBus)
-	ctx, cancel := context.WithCancel(context.Background())
-	go func() {
-		if err := dispatcher.Run(ctx); err != nil && ctx.Err() == nil {
-			slog.Error("realtime dispatcher stopped", "error", err)
-		}
-	}()
 
 	ticketStore := realtime.NewPostgresTicketStore(database)
 
@@ -357,11 +225,11 @@ func newDependenciesWithPaymentAccountAndCalendarAdapters(
 		persistence.UserRepository,
 		persistence.ConversationReader,
 		messagePublisher,
-		chatbot,
+		adapters.chatbot,
 		persistence.CategoryRepository,
 		fileService,
 		systemClock,
-		recommendationConfig,
+		adapters.recommendationConfig,
 		persistence.WorkOrderRepository,
 	)
 	jobRequestService := jobrequest.NewService(
@@ -375,17 +243,17 @@ func newDependenciesWithPaymentAccountAndCalendarAdapters(
 		persistence.UserRepository,
 		persistence.AuthorizationAttemptRepository,
 		persistence.PaymentAccountRepository,
-		paymentAccountOAuthConnector,
-		credentialProtector,
-		secretGenerator,
+		adapters.paymentAccountOAuthConnector,
+		adapters.credentialProtector,
+		adapters.secretGenerator,
 		systemClock,
 	)
 	calendarConnectionService := calendarconnection.NewService(
 		persistence.UserRepository,
 		persistence.CalendarAuthorizationAttemptRepository,
 		persistence.CalendarConnectionRepository,
-		calendarOAuthConnector,
-		calendarCredentialProtector,
+		adapters.calendarOAuthConnector,
+		adapters.calendarCredentialProtector,
 		cryptography.NewSecureSecretGenerator(),
 		systemClock,
 	)
@@ -398,9 +266,9 @@ func newDependenciesWithPaymentAccountAndCalendarAdapters(
 		persistence.PaymentAccountRepository,
 		locking.NewPostgresAdvisoryLock(database),
 		persistence.PaymentUnitOfWork,
-		credentialProtector,
-		paymentGateway,
-		paymentGateway,
+		adapters.credentialProtector,
+		adapters.paymentGateway,
+		adapters.paymentGateway,
 		notificator,
 		uuid.NewString,
 		systemClock,
@@ -413,7 +281,7 @@ func newDependenciesWithPaymentAccountAndCalendarAdapters(
 		notificator,
 		fileService,
 		persistence.PaymentAccountRepository,
-		paymentAccountOAuthConnector.Provider(),
+		adapters.paymentAccountOAuthConnector.Provider(),
 		serviceproposal.NewBookingPolicy(),
 		systemClock)
 	workOrderService := workorder.NewService(
@@ -429,7 +297,7 @@ func newDependenciesWithPaymentAccountAndCalendarAdapters(
 		persistence.WorkOrderRepository,
 		persistence.CalendarConnectionRepository,
 		persistence.WorkOrderCalendarEventRepository,
-		calendarEventPublisher,
+		adapters.calendarEventPublisher,
 		systemClock,
 		notificator,
 	)
@@ -437,60 +305,44 @@ func newDependenciesWithPaymentAccountAndCalendarAdapters(
 		persistence.UserRepository,
 		persistence.IdentityVerificationRepository,
 		persistence.IdentityVerificationUnitOfWork,
-		identityVerifier,
+		adapters.identityVerifier,
 		systemClock,
 	)
-	identityVerificationHandler := identity_verification_handler.NewIdentityVerificationHandler(identityVerificationService)
-	if len(identityWebhooks) > 0 {
-		identityVerificationHandler = identity_verification_handler.NewIdentityVerificationHandlerWithWebhook(
-			identityVerificationService,
-			identityWebhooks[0],
-			systemClock,
-		)
-	}
+	identityVerificationHandler := identity_verification_handler.NewIdentityVerificationHandlerWithWebhook(
+		identityVerificationService,
+		adapters.identityWebhook,
+		systemClock,
+	)
 	urgentWorkOrderScheduler := scheduler.NewScheduler(time.Hour, workOrderService)
 	calendarSyncRunner := scheduler.NewCalendarSyncRunner(calendarSyncService)
-	var calendarEventObserver CalendarEventObserver
-	if observer, ok := calendarEventPublisher.(CalendarEventObserver); ok {
-		calendarEventObserver = observer
-	}
 	return &Dependencies{
-		Persistence:                 persistence,
-		WorkOrderService:            workOrderService,
-		UrgentWorkOrderScheduler:    urgentWorkOrderScheduler,
-		CalendarSyncRunner:          calendarSyncRunner,
-		CalendarEventObserver:       calendarEventObserver,
-		CategoryHandler:             category_handler.NewCategoryHandler(categoryService),
-		CalendarConnectionHandler:   calendar_connection_handler.NewCalendarConnectionHandler(calendarConnectionService, calendarHandlerConfig),
-		CoverageZoneHandler:         coverage_zone_handler.NewCoverageZoneHandler(coverageZoneService),
-		ConsumerHandler:             consumer_handler.NewConsumerHandler(consumerService),
-		ProviderHandler:             provider_handler.NewProviderHandler(providerService),
-		ConversationHandler:         conversation_handler.NewConversationHandler(conversationService),
-		JobRequestHandler:           job_request_handler.NewJobRequestHandler(jobRequestService),
-		IdentityVerificationHandler: identityVerificationHandler,
-		PaymentAccountHandler:       payment_account_handler.NewPaymentAccountHandler(paymentAccountService, paymentAccountHandlerConfig),
-		PaymentHandler:              payment_handler.NewPaymentHandler(paymentService, webhookVerifier),
-		UserHandler:                 user_handler.NewUserHandlerWithIdentityVerification(userService, calendarConnectionService, identityVerificationService),
-		FileHandler:                 file_handler.NewFileHandler(fileService),
-		HealthHandler:               health_handler.NewHealthHandler(readiness),
-		ServiceProposalHandler:      service_proposal_handler.NewServiceProposalHandler(servicePorposalService),
-		WorkOrderHandler:            work_order_handler.NewWorkOrderHandler(workOrderService),
-		TestHandler:                 test_handler.NewTestHandler(systemClock),
-		Hub:                         hub,
-		RealtimeHandler:             realtimeHandler,
-		MessagePublisher:            messagePublisher,
-		realtimeCancel:              cancel,
-		Clock:                       systemClock,
-		Readiness:                   readiness,
-		ConsumerAddressResolver:     addressResolver,
-		IdentityVerifier:            identityVerifier,
+		Persistence: persistence,
+		Runtime: RuntimeDependencies{
+			UrgentWorkOrderScheduler: urgentWorkOrderScheduler,
+			CalendarSyncRunner:       calendarSyncRunner,
+			Hub:                      hub,
+			RealtimeDispatcher:       dispatcher,
+			Readiness:                readiness,
+		},
+		Clock: systemClock,
+		routerConfig: httpadapter.RouterConfig{
+			CategoryHandler:             category_handler.NewCategoryHandler(categoryService),
+			CalendarConnectionHandler:   calendar_connection_handler.NewCalendarConnectionHandler(calendarConnectionService, adapters.calendarHandlerConfig),
+			CoverageZoneHandler:         coverage_zone_handler.NewCoverageZoneHandler(coverageZoneService),
+			ConsumerHandler:             consumer_handler.NewConsumerHandler(consumerService),
+			ProviderHandler:             provider_handler.NewProviderHandler(providerService),
+			ConversationHandler:         conversation_handler.NewConversationHandler(conversationService),
+			JobRequestHandler:           job_request_handler.NewJobRequestHandler(jobRequestService),
+			IdentityVerificationHandler: identityVerificationHandler,
+			PaymentAccountHandler:       payment_account_handler.NewPaymentAccountHandler(paymentAccountService, adapters.paymentAccountHandlerConfig),
+			PaymentHandler:              payment_handler.NewPaymentHandler(paymentService, adapters.webhookVerifier),
+			UserHandler:                 user_handler.NewUserHandlerWithIdentityVerification(userService, calendarConnectionService, identityVerificationService),
+			FileHandler:                 file_handler.NewFileHandler(fileService),
+			HealthHandler:               health_handler.NewHealthHandler(readiness),
+			ServiceProposalHandler:      service_proposal_handler.NewServiceProposalHandler(servicePorposalService),
+			WorkOrderHandler:            work_order_handler.NewWorkOrderHandler(workOrderService),
+			TestHandler:                 test_handler.NewTestHandler(systemClock),
+			RealtimeHandler:             realtimeHandler,
+		},
 	}, nil
-}
-
-func newTestIdentityVerificationWebhook() identity_verification_handler.IdentityVerificationWebhook {
-	webhook, err := didit.NewWebhookAdapter("test-didit-webhook-secret")
-	if err != nil {
-		panic(fmt.Errorf("configuring test identity verification webhook: %w", err))
-	}
-	return webhook
 }

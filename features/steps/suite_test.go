@@ -20,6 +20,7 @@ import (
 	httpadapter "github.com/LoResuelvo/loresuelvo-api/internal/adapters/http"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/payment_account_handler"
 	identityverificationfake "github.com/LoResuelvo/loresuelvo-api/internal/adapters/identityverification/fake"
+	locationadapter "github.com/LoResuelvo/loresuelvo-api/internal/adapters/location"
 	paymentmercadopago "github.com/LoResuelvo/loresuelvo-api/internal/adapters/payment/mercadopago"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/payment_account/mercadopago"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/repositories"
@@ -61,7 +62,7 @@ type testSuite struct {
 	chatbot                        *chatbotadapter.FakeChatbot
 	clock                          *clockadapter.SystemClock
 	checkoutClient                 *paymentmercadopago.FakeCheckoutClient
-	consumerAddressResolver        interface{}
+	consumerAddressResolver        *locationadapter.FakeAddressResolver
 	identityVerificationRepository *repositories.IdentityVerificationRepository
 	identityVerifier               *identityverificationfake.Verifier
 	scenarioContext                context.Context
@@ -248,9 +249,7 @@ func (s *testSuite) cleanup() error {
 	if s.calendarAvailability != nil {
 		s.calendarAvailability.SetAvailable(true)
 	}
-	if controller, ok := s.consumerAddressResolver.(interface{ SetAvailable(bool) }); ok {
-		controller.SetAvailable(true)
-	}
+	s.consumerAddressResolver.SetAvailable(true)
 
 	s.categoryIDsByName = map[string]int{}
 	s.participantRolesByFullName = map[string]string{}
@@ -345,7 +344,7 @@ func newTestSuite(tb testing.TB, database *sql.DB) *testSuite {
 	checkoutClient := paymentmercadopago.NewFakeCheckoutClient()
 	webhookVerifier, err := paymentmercadopago.NewWebhookVerifier("test-mercado-pago-webhook-secret")
 	require.NoError(tb, err, "could not initialize test webhook verifier")
-	dependencies, err := bootstrap.NewDependenciesWithPaymentAccountAdapters(
+	dependencies, doubles, err := bootstrap.NewTestDependencies(
 		database,
 		chatbot,
 		mercadopago.NewFakeOAuthClient(),
@@ -365,15 +364,6 @@ func newTestSuite(tb testing.TB, database *sql.DB) *testSuite {
 	router := httpadapter.NewRouter(dependencies.RouterConfig(auth0Validator, slog.Default(), httpadapter.TestEnvironment))
 	engine, err := router.SetUp()
 	require.NoError(tb, err, "could not initialize router")
-	var eventDetailsObserver calendarEventDetailsObserver
-	if observer, ok := dependencies.CalendarEventObserver.(calendarEventDetailsObserver); ok {
-		eventDetailsObserver = observer
-	}
-	var availabilityController calendarAvailabilityController
-	if controller, ok := dependencies.CalendarEventObserver.(calendarAvailabilityController); ok {
-		availabilityController = controller
-	}
-
 	// httptest.Server wraps the engine — no port needed
 	server := httptest.NewServer(engine)
 	tb.Cleanup(func() {
@@ -397,19 +387,19 @@ func newTestSuite(tb testing.TB, database *sql.DB) *testSuite {
 		calendarConnectionRepository:   dependencies.Persistence.CalendarConnectionRepository,
 		paymentIntentRepository:        dependencies.Persistence.PaymentIntentRepository,
 		paymentTransactionRepository:   dependencies.Persistence.PaymentTransactionRepository,
-		urgentWorkOrderScheduler:       dependencies.UrgentWorkOrderScheduler,
-		calendarSyncRunner:             dependencies.CalendarSyncRunner,
-		calendarEventObserver:          dependencies.CalendarEventObserver,
-		calendarEventDetailsObserver:   eventDetailsObserver,
-		calendarAvailability:           availabilityController,
+		urgentWorkOrderScheduler:       dependencies.Runtime.UrgentWorkOrderScheduler,
+		calendarSyncRunner:             dependencies.Runtime.CalendarSyncRunner,
+		calendarEventObserver:          doubles.CalendarEventPublisher,
+		calendarEventDetailsObserver:   doubles.CalendarEventPublisher,
+		calendarAvailability:           doubles.CalendarEventPublisher,
 		auth0Validator:                 auth0Validator,
 		tokenBuilder:                   tokenBuilder,
 		chatbot:                        chatbot,
 		clock:                          dependencies.Clock,
 		checkoutClient:                 checkoutClient,
-		consumerAddressResolver:        dependencies.ConsumerAddressResolver,
+		consumerAddressResolver:        doubles.ConsumerAddressResolver,
 		identityVerificationRepository: dependencies.Persistence.IdentityVerificationRepository,
-		identityVerifier:               dependencies.IdentityVerifier.(*identityverificationfake.Verifier),
+		identityVerifier:               doubles.IdentityVerifier,
 		scenarioContext:                context.Background(),
 
 		categoryIDsByName:                  map[string]int{},
@@ -433,7 +423,7 @@ func ScenarioInitializer(sc *godog.ScenarioContext, t *testing.T, database *sql.
 	testSuite := newTestSuite(t, database)
 	testSuite.registerAllSteps(sc)
 	sc.After(func(ctx context.Context, _ *godog.Scenario, _ error) (context.Context, error) {
-		testSuite.dependencies.Close()
+		testSuite.dependencies.Runtime.Close()
 		testSuite.server.Close()
 		return ctx, nil
 	})

@@ -159,11 +159,7 @@ func (suite *testSuite) requestConsumerAccountRegistrationWithInvalidAddress(ema
 }
 
 func (suite *testSuite) locationResolutionServiceIsUnavailable() error {
-	controller, ok := suite.consumerAddressResolver.(interface{ SetAvailable(bool) })
-	if !ok {
-		return fmt.Errorf("test address resolver does not expose availability control")
-	}
-	controller.SetAvailable(false)
+	suite.consumerAddressResolver.SetAvailable(false)
 	return nil
 }
 

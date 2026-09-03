@@ -95,7 +95,8 @@ func (c *Connection) readPump() {
 }
 
 type Hub struct {
-	mu sync.RWMutex
+	mu     sync.RWMutex
+	closed bool
 	// map from authID -> role -> profileID -> connections. A set is used at
 	// the final level so multiple tabs/devices can subscribe for the same
 	// authenticated participant without replacing one another.
@@ -163,6 +164,42 @@ func (h *Hub) Deliver(event EventEnvelope) {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
 	h.deliverToAuthIDRoleAndProfile(event.TargetAuthID, event.TargetRole, event.TargetProfileID, event.Payload)
+}
+
+// Close stops every local WebSocket connection owned by the hub. It is safe
+// to call more than once and unblocks both connection pumps.
+func (h *Hub) Close() {
+	if h == nil {
+		return
+	}
+
+	h.mu.Lock()
+	if h.closed {
+		h.mu.Unlock()
+		return
+	}
+	h.closed = true
+	connections := make([]*Connection, 0)
+	for _, roleMap := range h.connections {
+		for _, profileMap := range roleMap {
+			for _, profileConnections := range profileMap {
+				for conn := range profileConnections {
+					connections = append(connections, conn)
+				}
+			}
+		}
+	}
+	h.connections = make(map[string]map[string]map[int]map[*Connection]struct{})
+	for _, conn := range connections {
+		conn.closeOnce.Do(func() { close(conn.send) })
+	}
+	h.mu.Unlock()
+
+	for _, conn := range connections {
+		if conn.conn != nil {
+			_ = conn.conn.Close()
+		}
+	}
 }
 
 func (h *Hub) deliverToAuthIDRoleAndProfile(authID, role string, profileID int, event []byte) {
