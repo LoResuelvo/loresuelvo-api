@@ -45,6 +45,44 @@ func (lock *PostgresAdvisoryLock) WithinLock(
 	return nil
 }
 
+// TryWithinLock executes operation only when the transaction-level advisory
+// lock for resource can be acquired immediately.
+func (lock *PostgresAdvisoryLock) TryWithinLock(
+	ctx context.Context,
+	resource string,
+	operation func() error,
+) (bool, error) {
+	if resource == "" || operation == nil {
+		return false, fmt.Errorf("trying advisory lock: resource and operation are required")
+	}
+	tx, err := lock.db.BeginTx(ctx, nil)
+	if err != nil {
+		return false, fmt.Errorf("beginning try advisory lock transaction: %w", err)
+	}
+
+	var acquired bool
+	if err := tx.QueryRowContext(
+		ctx,
+		`SELECT pg_try_advisory_xact_lock(hashtext($1))`,
+		resource,
+	).Scan(&acquired); err != nil {
+		return false, rollbackAdvisoryLock(tx, fmt.Errorf("trying advisory lock: %w", err))
+	}
+	if !acquired {
+		if err := tx.Rollback(); err != nil {
+			return false, fmt.Errorf("releasing unavailable advisory lock: %w", err)
+		}
+		return false, nil
+	}
+	if err := operation(); err != nil {
+		return false, rollbackAdvisoryLock(tx, err)
+	}
+	if err := tx.Commit(); err != nil {
+		return false, fmt.Errorf("committing try advisory lock transaction: %w", err)
+	}
+	return true, nil
+}
+
 func rollbackAdvisoryLock(tx *sql.Tx, cause error) error {
 	if rollbackErr := tx.Rollback(); rollbackErr != nil {
 		return fmt.Errorf("%w: rolling back advisory lock: %v", cause, rollbackErr)

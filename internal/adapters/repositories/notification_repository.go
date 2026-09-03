@@ -3,6 +3,7 @@ package repositories
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/notification"
@@ -24,6 +25,48 @@ func NewNotificationRepository(db *sql.DB) *NotificationRepository {
 
 func (repository *NotificationRepository) Save(ctx context.Context, notification *notification.Notification) (*notification.Notification, error) {
 	return repository.save(ctx, repository.db, notification)
+}
+
+func (repository *NotificationRepository) SaveIfAbsent(
+	ctx context.Context,
+	notification *notification.Notification,
+) (*notification.Notification, bool, error) {
+	if notification == nil {
+		return nil, false, fmt.Errorf("saving notification if absent: notification is required")
+	}
+
+	saved := *notification
+	err := repository.db.QueryRowContext(
+		ctx,
+		`INSERT INTO notifications (
+			user_id,
+			type,
+			resource_type,
+			resource_id,
+			read_at,
+			created_at,
+			updated_on
+		)
+		VALUES ($1, $2, $3, $4, $5, $6, NOW())
+		ON CONFLICT (user_id, type, resource_id)
+		WHERE type = 'work_order_close_to_scheduled_time'
+		  AND resource_type = 'work_order'
+		DO NOTHING
+		RETURNING id, created_at`,
+		notification.UserID,
+		notification.Type,
+		notification.ResourceType,
+		notification.ResourceID,
+		notification.ReadAt,
+		notification.CreatedAt,
+	).Scan(&saved.ID, &saved.CreatedAt)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, false, nil
+	}
+	if err != nil {
+		return nil, false, fmt.Errorf("saving notification if absent: %w", err)
+	}
+	return &saved, true, nil
 }
 
 func (repository *NotificationRepository) FindLatestByUserAndResource(

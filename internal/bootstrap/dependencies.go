@@ -313,8 +313,16 @@ func newDependencies(database *sql.DB, adapters dependencyAdapters) (*Dependenci
 		adapters.identityWebhook,
 		systemClock,
 	)
-	urgentWorkOrderScheduler := scheduler.NewScheduler(time.Hour, workOrderService)
-	calendarSyncRunner := scheduler.NewCalendarSyncRunner(calendarSyncService)
+	schedulerLock := locking.NewPostgresAdvisoryLock(database)
+	urgentWorkOrderScheduler := scheduler.NewScheduler(
+		time.Hour,
+		workOrderService,
+		scheduler.WithLock(schedulerLock, scheduler.UrgentNotificationLockKey),
+	)
+	calendarSyncRunner := scheduler.NewCalendarSyncRunner(
+		calendarSyncService,
+		scheduler.WithLock(schedulerLock, scheduler.CalendarSyncLockKey),
+	)
 	return &Dependencies{
 		Persistence: persistence,
 		Runtime: RuntimeDependencies{

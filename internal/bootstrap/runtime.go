@@ -23,6 +23,10 @@ func (runtime RuntimeDependencies) lifecycleConfig(
 				runtime.UrgentWorkOrderScheduler.Run(ctx)
 				return nil
 			},
+			func(ctx context.Context) error {
+				runtime.CalendarSyncRunner.Run(ctx)
+				return nil
+			},
 			runtime.RealtimeDispatcher.Run,
 		},
 		Logger: logger,

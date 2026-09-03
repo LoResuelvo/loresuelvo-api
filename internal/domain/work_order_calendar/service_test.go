@@ -145,6 +145,29 @@ func TestSyncReturnsWorkOrderReaderError(t *testing.T) {
 	clock.AssertExpectations(t)
 }
 
+func TestSyncReturnsCalendarConnectionReaderError(t *testing.T) {
+	now := time.Date(2026, time.July, 4, 10, 0, 0, 0, time.UTC)
+	order, consumerUser, _ := workOrderCalendarFixture(t, now)
+	connectionErr := errors.New("calendar connection reader unavailable")
+	workOrders := new(workOrderReaderMock)
+	connections := new(connectionReaderMock)
+	events := new(eventRepositoryMock)
+	publisher := new(eventPublisherMock)
+	clock := new(clockMock)
+	workOrders.On("FindScheduledAfter", mock.Anything, now).Return([]*workorder.WorkOrder{order}, nil).Once()
+	connections.On("FindByUserID", mock.Anything, consumerUser.ID()).Return(nil, connectionErr).Once()
+	clock.On("Now").Return(now).Once()
+	service := workordercalendar.NewService(workOrders, connections, events, publisher, clock, new(notificationNotificatorMock))
+
+	err := service.Sync(context.Background())
+
+	assert.ErrorIs(t, err, connectionErr)
+	publisher.AssertNotCalled(t, "Create", mock.Anything, mock.Anything, mock.Anything)
+	workOrders.AssertExpectations(t)
+	connections.AssertExpectations(t)
+	clock.AssertExpectations(t)
+}
+
 func TestSyncDoesNotSaveWhenPublishingFails(t *testing.T) {
 	now := time.Date(2026, time.July, 4, 10, 0, 0, 0, time.UTC)
 	order, consumerUser, _ := workOrderCalendarFixture(t, now)
@@ -175,6 +198,34 @@ func TestSyncDoesNotSaveWhenPublishingFails(t *testing.T) {
 	connections.AssertExpectations(t)
 	events.AssertExpectations(t)
 	publisher.AssertExpectations(t)
+	clock.AssertExpectations(t)
+}
+
+func TestSyncReturnsCalendarEventRepositoryError(t *testing.T) {
+	now := time.Date(2026, time.July, 4, 10, 0, 0, 0, time.UTC)
+	order, consumerUser, _ := workOrderCalendarFixture(t, now)
+	consumerConnection := calendarConnectionFixture(t, consumerUser.ID(), now)
+	eventErr := errors.New("calendar event repository unavailable")
+	consumerEventKey, err := workordercalendar.NewEventKey(order.ID(), consumerUser.ID())
+	require.NoError(t, err)
+	workOrders := new(workOrderReaderMock)
+	connections := new(connectionReaderMock)
+	events := new(eventRepositoryMock)
+	publisher := new(eventPublisherMock)
+	clock := new(clockMock)
+	workOrders.On("FindScheduledAfter", mock.Anything, now).Return([]*workorder.WorkOrder{order}, nil).Once()
+	connections.On("FindByUserID", mock.Anything, consumerUser.ID()).Return(consumerConnection, nil).Once()
+	events.On("Exists", mock.Anything, consumerEventKey).Return(false, eventErr).Once()
+	clock.On("Now").Return(now).Once()
+	service := workordercalendar.NewService(workOrders, connections, events, publisher, clock, new(notificationNotificatorMock))
+
+	err = service.Sync(context.Background())
+
+	assert.ErrorIs(t, err, eventErr)
+	publisher.AssertNotCalled(t, "Create", mock.Anything, mock.Anything, mock.Anything)
+	workOrders.AssertExpectations(t)
+	connections.AssertExpectations(t)
+	events.AssertExpectations(t)
 	clock.AssertExpectations(t)
 }
 

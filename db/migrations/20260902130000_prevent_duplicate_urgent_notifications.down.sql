@@ -1,0 +1,1 @@
+DROP INDEX IF EXISTS notifications_urgent_work_order_unique_idx;

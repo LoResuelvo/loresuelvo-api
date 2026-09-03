@@ -48,6 +48,17 @@ func (m *notificationRepositoryMock) Save(ctx context.Context, created *notifica
 	return args.Get(0).(*notification.Notification), args.Error(1)
 }
 
+func (m *notificationRepositoryMock) SaveIfAbsent(
+	ctx context.Context,
+	created *notification.Notification,
+) (*notification.Notification, bool, error) {
+	args := m.Called(ctx, created)
+	if args.Get(0) == nil {
+		return nil, args.Bool(1), args.Error(2)
+	}
+	return args.Get(0).(*notification.Notification), args.Bool(1), args.Error(2)
+}
+
 type notificatorMock struct{ mock.Mock }
 
 func (m *notificatorMock) Notify(ctx context.Context, saved *notification.Notification) error {

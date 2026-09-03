@@ -100,6 +100,45 @@ func TestNotificationRepositoryCanSave(t *testing.T) {
 	assert.Equal(t, createdAt, storedCreatedAt.UTC())
 }
 
+func TestNotificationRepositorySaveIfAbsentDoesNotDuplicateUrgentNotification(t *testing.T) {
+	testContext := newNotificationRepositoryTest(t)
+	consumerToSave := consumerWithAddress(t, testContext.database, "auth0|notification-urgent", "notification.urgent@example.com", "Ana", "Perez")
+	_, err := testContext.userRepository.Save(context.Background(), consumerToSave)
+	require.NoError(t, err)
+	consumerID, err := testContext.userRepository.FindIDByEmail(consumerToSave.Email())
+	require.NoError(t, err)
+
+	urgentNotification := &notification.Notification{
+		UserID:       consumerID,
+		Type:         notification.TypeWorkOrderCloseToScheduledTime,
+		ResourceType: notification.ResourceWorkOrder,
+		ResourceID:   987,
+		CreatedAt:    time.Now().UTC().Truncate(time.Microsecond),
+	}
+	first, firstCreated, err := testContext.notificationRepository.SaveIfAbsent(context.Background(), urgentNotification)
+	require.NoError(t, err)
+	require.True(t, firstCreated)
+	require.NotNil(t, first)
+
+	second, secondCreated, err := testContext.notificationRepository.SaveIfAbsent(context.Background(), urgentNotification)
+	require.NoError(t, err)
+	require.False(t, secondCreated)
+	require.Nil(t, second)
+
+	var count int
+	err = testContext.database.QueryRow(
+		`SELECT COUNT(*)
+		FROM notifications
+		WHERE user_id = $1 AND type = $2 AND resource_type = $3 AND resource_id = $4`,
+		consumerID,
+		notification.TypeWorkOrderCloseToScheduledTime,
+		notification.ResourceWorkOrder,
+		987,
+	).Scan(&count)
+	require.NoError(t, err)
+	assert.Equal(t, 1, count)
+}
+
 func TestNotificationRepositoryFindsLatestByUserAndResource(t *testing.T) {
 	testContext := newNotificationRepositoryTest(t)
 	consumerToSave := consumerWithAddress(t, testContext.database, "auth0|notification-reader", "notification.reader@example.com", "Ana", "Perez")

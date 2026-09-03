@@ -278,9 +278,12 @@ func (s *Service) UrgentNotification(ctx context.Context) error {
 	for _, order := range urgentWorkOrders {
 		consumerNotification, providerNotification := s.notificationForUsers(order)
 		for _, createdNotification := range []*notification.Notification{consumerNotification, providerNotification} {
-			savedNotification, saveErr := s.notificationRepository.Save(ctx, createdNotification)
+			savedNotification, created, saveErr := s.notificationRepository.SaveIfAbsent(ctx, createdNotification)
 			if saveErr != nil {
 				notificationErrors = append(notificationErrors, saveErr)
+				continue
+			}
+			if !created {
 				continue
 			}
 

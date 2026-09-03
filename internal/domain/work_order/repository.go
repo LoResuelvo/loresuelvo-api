@@ -17,6 +17,7 @@ type Reader interface {
 
 type NotificationRepository interface {
 	Save(ctx context.Context, notification *notification.Notification) (*notification.Notification, error)
+	SaveIfAbsent(ctx context.Context, notification *notification.Notification) (*notification.Notification, bool, error)
 }
 
 // TransactionalStore persists the aggregates changed by a work-order use case
