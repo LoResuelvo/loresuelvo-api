@@ -10,54 +10,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-type taskMock struct {
-	contexts []context.Context
-	err      error
-	invoked  chan struct{}
-}
-
-type tryLockerMock struct {
-	acquired bool
-	calls    int
-	key      string
-}
-
-func (locker *tryLockerMock) TryWithinLock(_ context.Context, key string, operation func() error) (bool, error) {
-	locker.calls++
-	locker.key = key
-	if !locker.acquired {
-		return false, nil
-	}
-	return true, operation()
-}
-
-type calendarTaskMock struct {
-	calls int
-	err   error
-}
-
-func (task *calendarTaskMock) Sync(context.Context) error {
-	task.calls++
-	return task.err
-}
-
-func (m *taskMock) UrgentNotification(ctx context.Context) error {
-	m.contexts = append(m.contexts, ctx)
-	if m.invoked != nil {
-		m.invoked <- struct{}{}
-	}
-	return m.err
-}
-
-type manualTicker struct {
-	ticks   chan time.Time
-	stopped chan struct{}
-}
-
-func (t *manualTicker) Chan() <-chan time.Time { return t.ticks }
-
-func (t *manualTicker) Stop() { close(t.stopped) }
-
 func TestSchedulerRunOnceInvokesTaskWithContext(t *testing.T) {
 	task := &taskMock{invoked: make(chan struct{}, 1)}
 	scheduler := NewScheduler(time.Hour, task)
