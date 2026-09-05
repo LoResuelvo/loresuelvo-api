@@ -1,8 +1,8 @@
 services:
   api:
-    image: ghcr.io/${GITHUB_REPOSITORY_OWNER}/api:${IMAGE_TAG:-latest}
+    image: ${IMAGE_REF:?IMAGE_REF is required}
     env_file:
-      - .env
+      - /etc/loresuelvo/api/api.env
     restart: unless-stopped
     networks:
       - app-network
@@ -33,7 +33,7 @@ services:
     profiles:
       - tools
     env_file:
-      - .env
+      - /etc/loresuelvo/api/api.env
     working_dir: /work
     volumes:
       - ./seeds:/work/seeds:ro
@@ -46,11 +46,11 @@ services:
       - app-network
 
   seed-db:
-    image: ghcr.io/${GITHUB_REPOSITORY_OWNER}/api:${IMAGE_TAG:-latest}
+    image: ${IMAGE_REF:?IMAGE_REF is required}
     profiles:
       - tools
     env_file:
-      - .env
+      - /etc/loresuelvo/api/api.env
     environment:
       SEEDS_ENABLED: "true"
     command: ["./seed-db"]
@@ -66,21 +66,13 @@ services:
     volumes:
       - ./nginx:/etc/nginx/conf.d:ro
       - ./openapi.json:/etc/nginx/openapi/openapi.json:ro
-      - ./certbot/www:/var/www/certbot:ro
-      - ./certbot/conf:/etc/letsencrypt:ro
+      - /etc/loresuelvo/api/tls/origin.crt:/etc/nginx/tls/origin.crt:ro
+      - /etc/loresuelvo/api/tls/origin.key:/etc/nginx/tls/origin.key:ro
     restart: unless-stopped
     networks:
       - app-network
 
-  certbot:
-    image: certbot/certbot
-    profiles:
-      - certbot
-    volumes:
-      - ./certbot/www:/var/www/certbot
-      - ./certbot/conf:/etc/letsencrypt
-
 networks:
   app-network:
     name: app-network
-    driver: bridge
+    external: true
