@@ -45,6 +45,18 @@ services:
     networks:
       - app-network
 
+  seed-db:
+    image: ghcr.io/${GITHUB_REPOSITORY_OWNER}/api:${IMAGE_TAG:-latest}
+    profiles:
+      - tools
+    env_file:
+      - .env
+    environment:
+      SEEDS_ENABLED: "true"
+    command: ["./seed-db"]
+    networks:
+      - app-network
+
   nginx:
     image: nginx:alpine
     container_name: nginx-proxy

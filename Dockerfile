@@ -4,12 +4,14 @@ WORKDIR /app
 COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
-RUN go build -o app ./cmd/api
+RUN go build -o app ./cmd/api \
+    && go build -o seed-db ./cmd/seed-db
 
 FROM alpine:latest
 RUN apk add --no-cache ca-certificates
 WORKDIR /root/
 COPY --from=builder /app/app .
+COPY --from=builder /app/seed-db .
 COPY --from=builder /app/seeds ./seeds
 EXPOSE 8080
 CMD ["./app"]
