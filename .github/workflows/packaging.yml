@@ -2,10 +2,16 @@ name: Packaging
 
 on:
   workflow_call:
+    outputs:
+      image-ref:
+        description: Immutable image reference published to GHCR
+        value: ${{ jobs.build-and-push.outputs.image-ref }}
 
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
+    outputs:
+      image-ref: ${{ steps.result.outputs.image-ref }}
     steps:
       - uses: actions/checkout@v4
 
@@ -16,10 +22,23 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build y Push de la imagen
-        run: |
-          OWNER_LC=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
-          IMAGE_NAME="ghcr.io/${OWNER_LC}/api:${{ github.ref_name }}"
+      - name: Resolve image repository
+        id: image
+        env:
+          REPOSITORY_OWNER: ${{ github.repository_owner }}
+        run: echo "repository=ghcr.io/${REPOSITORY_OWNER,,}/api" >> "$GITHUB_OUTPUT"
 
-          docker build -t $IMAGE_NAME .
-          docker push $IMAGE_NAME
+      - name: Build y Push de la imagen
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.image.outputs.repository }}:${{ github.ref_name }}
+
+      - name: Expose immutable image reference
+        id: result
+        env:
+          IMAGE_REPOSITORY: ${{ steps.image.outputs.repository }}
+          IMAGE_DIGEST: ${{ steps.build.outputs.digest }}
+        run: echo "image-ref=${IMAGE_REPOSITORY}@${IMAGE_DIGEST}" >> "$GITHUB_OUTPUT"

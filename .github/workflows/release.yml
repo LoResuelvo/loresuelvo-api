@@ -7,23 +7,19 @@ on:
 permissions:
   contents: read
   packages: write
+  id-token: write
 
 jobs:
   run-test:
     uses: ./.github/workflows/ci.yml
-    secrets: inherit
 
   build-and-push:
     needs: run-test
     uses: ./.github/workflows/packaging.yml
-    secrets: inherit
 
-  deploy-staging:
+  deploy:
     needs: build-and-push
-    uses: ./.github/workflows/deploy-staging.yml
-    secrets: inherit
-
-  deploy-prod:
-    needs: deploy-staging
-    uses: ./.github/workflows/deploy-prod.yml
-    secrets: inherit
+    uses: LoResuelvo/infra-devops/.github/workflows/deploy-api.yml@main
+    with:
+      image-ref: ${{ needs.build-and-push.outputs.image-ref }}
+      release-tag: ${{ github.ref_name }}

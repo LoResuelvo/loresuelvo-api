@@ -17,43 +17,13 @@ services:
       - app-network
 
   migrate:
-    image: migrate/migrate
-    profiles:
-      - tools
-    volumes:
-      - ./db/migrations:/migrations:ro
-    command: ["-path", "/migrations", "-database", "${DATABASE_URL}", "up"]
-    networks:
-      - app-network
-
-  seed-assets:
-    # One-shot S3-compatible client used to upload seed profile photos to the
-    # real bucket configured through STORAGE_*; it does not run local storage.
-    image: public.ecr.aws/aws-cli/aws-cli:latest
-    profiles:
-      - tools
-    env_file:
-      - /etc/loresuelvo/api/api.env
-    working_dir: /work
-    volumes:
-      - ./seeds:/work/seeds:ro
-      - ./scripts/upload_seed_assets.sh:/work/scripts/upload_seed_assets.sh:ro
-    environment:
-      SEED_ASSETS_DIR: /work/seeds/assets
-      SEED_ASSET_MANIFEST: /work/seeds/providers-100-assets.tsv
-    entrypoint: ["/bin/sh", "/work/scripts/upload_seed_assets.sh"]
-    networks:
-      - app-network
-
-  seed-db:
     image: ${IMAGE_REF:?IMAGE_REF is required}
     profiles:
       - tools
     env_file:
       - /etc/loresuelvo/api/api.env
-    environment:
-      SEEDS_ENABLED: "true"
-    command: ["./seed-db"]
+    entrypoint: ["/usr/local/bin/migrate"]
+    command: ["-path", "/migrations", "-database", "${DATABASE_URL}", "up"]
     networks:
       - app-network
 
