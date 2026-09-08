@@ -1,8 +1,9 @@
 # US-60 evaluation integration
 
-Status: offline dataset loading, domain mapping, and base-case execution preview
-implemented. Contract execution, scoring, live, replay, compare, and transformations
-are pending. No live model evaluation has been performed.
+Status: offline contracts, local JSON Schema validation, deterministic scoring,
+bounded live execution, incremental journals, replay, and paired model comparison
+are implemented. Metamorphic execution, non-LLM baselines, semantic-review import,
+and final release evidence are pending. No model safety approval is implied.
 
 ## Source and integrity
 
@@ -75,9 +76,9 @@ make evals-plan ARGS='--suite development --model gemini-2.5-flash --max-request
 ```
 
 These commands never create a model client, load credentials, or execute CT
-behaviors. Go validation checks file integrity, case/suite references, and domain
-mapping; use the Python validation above for the complete frozen JSON Schema and
-policy checks. A passed integrity check is not a passed experiment.
+behaviors. Go validation checks file integrity, local Draft 2020-12 schemas, case/suite
+references, and domain mapping; use the Python validation above for the additional
+frozen editorial and policy consistency checks. A passed integrity check is not a passed experiment.
 
 Trial defaults come from `configs/experiment.json`: smoke, baseline development,
 and release for holdout/critical suites. `--trials` explicitly overrides the count.
@@ -86,7 +87,7 @@ Plans exceeding that ceiling are rejected rather than silently truncated.
 `--allow-holdout` is required for holdout or critical_all and any selection
 containing reserve cases. It authorizes planning only, not live calls.
 
-The current preview covers base PD/RK executions only, without implicit CT,
+The base preview covers PD/RK executions only, without implicit CT,
 transformations, or live authorization. Model is requested metadata; no effective
 model configuration or monetary price is claimed. Cost remains null.
 
@@ -107,3 +108,71 @@ Use focused tests during development, then the existing CI-equivalent checks
 before pushing Go changes. Live calls are never part of those checks. Review
 and retain the unchanged baseline before any functional correction. Baseline
 execution still requires explicit model configuration, limits, and live opt-in.
+
+## Execution and evidence
+
+Contract checks are manual and offline:
+
+```bash
+make evals-contract
+```
+
+All twelve specifications have executors. CT-02 validates the service/repository
+boundary but cannot establish real SQL filtering; CT-08 and CT-10 cannot certify
+risk detection or summary semantics with controlled responses. These are reported
+as `unassessed`, not passed. CT-09 exercises timeout persistence and actual replay
+scoring. Production prompts and domain behavior are unchanged.
+
+Before live execution, export `CHATBOT_API_KEY` through your secure local
+credential mechanism. The runner does not load `.env`, and the presence of a key
+alone never authorizes generation. Do not put credential values in arguments,
+commits, reports, or shell history. The model is explicit, not inherited from a
+mutable deployment setting.
+
+Preview without credentials or network:
+
+```bash
+make evals-live ARGS='--dry-run --suite smoke --model gemini-3.5-flash-lite --max-requests 18 --attempt-timeout 90s --global-timeout 15m --min-interval 15s --max-output-tokens 4096'
+```
+
+After authorization, from a clean committed working tree:
+
+```bash
+make evals-live ARGS='--allow-live --suite smoke --model gemini-3.5-flash-lite --max-requests 18 --attempt-timeout 90s --global-timeout 15m --min-interval 15s --max-output-tokens 4096 --out evals/runs/smoke-3.5-UNIQUE'
+```
+
+Use a fresh output directory each time. To compare 3.1, use the same commit and
+settings with `--model gemini-3.1-flash-lite` and another directory. Each invocation
+has its own authorization and hard request ceiling. The initial implementation
+supports concurrency 1; retries default to zero. It blocks SDK retries/redirects,
+stops on rate limiting or persistent provider configuration failures, and records
+remaining cases as `not_executed`. The interval is an operator limit, not a claim
+about the account's actual RPM/TPM/RPD quota. Verify available quota in AI Studio.
+
+Every attempt is synced before proceeding. `run.json` records plan/configuration,
+commit and journal checksum; `attempts.jsonl` retains raw model text, parsed domain
+output, actual SDK inputs/config, media bytes, hashes, request ID when supplied,
+and provider metadata. SDK-decoded provider response is not claimed to be exact
+HTTP wire bytes; secrets and HTTP headers are not persisted. Unspecified provider
+defaults remain unknown. Files are local, mode 0600, inside a mode-0700 directory.
+SIGINT/time limits preserve partial results; an unfinalized journal from an abrupt
+process kill remains available but replay refuses to present it as complete.
+
+```bash
+make evals-replay ARGS='--run evals/runs/smoke-3.5-UNIQUE'
+make evals-compare ARGS='--left evals/runs/smoke-3.1-UNIQUE --right evals/runs/smoke-3.5-UNIQUE'
+```
+
+Replay verifies integrity, planned case/trial coverage, retries and input/prompt
+hashes before scoring historical responses. Compare currently supports a model
+change only: dataset, commit, suite, trials, generation configuration and paired
+inputs must match. Deliberately changed prompts/configurations need a subsequent
+explicit comparison policy; they are rejected rather than silently compared.
+Missing responses, invalid outputs and unassessed semantic criteria remain visible.
+No automatic `release_approved=true` path exists. Cost remains null without verified
+pricing. Summaries are JSON; richer aggregate/Markdown reporting remains pending.
+
+Exit codes: 0 means the command completed without deterministic failures, 1 means
+recorded execution/contract/deterministic failures, and 2 means usage, configuration
+or integrity failure. Code 0 never certifies semantics or safety. Test commands do
+not execute this experimental battery or make model calls.

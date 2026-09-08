@@ -108,3 +108,16 @@ evals-validate:
 
 evals-plan:
 	go run ./cmd/evals plan $(ARGS)
+
+.PHONY: evals-contract evals-live evals-replay evals-compare
+evals-contract:
+	go run ./cmd/evals contract $(ARGS)
+
+evals-live:
+	go run ./cmd/evals live $(ARGS)
+
+evals-replay:
+	go run ./cmd/evals replay $(ARGS)
+
+evals-compare:
+	go run ./cmd/evals compare $(ARGS)
