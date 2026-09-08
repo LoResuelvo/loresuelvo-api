@@ -165,7 +165,7 @@ func (chatbot *GeminiChatbot) RankProviders(ctx context.Context, request convers
 	result, err := chatbot.generateContent(
 		ctx, client, "rank_chatbot_providers",
 		genai.Text(prompt),
-		chatbot.generationConfig(),
+		chatbot.providerRankingGenerationConfig(request.MaxResults),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("generating provider ranking: %w", err)

@@ -62,6 +62,32 @@ func TestGeminiGenerationTraceDoesNotPersistTransportErrorSecrets(t *testing.T) 
 	transport.AssertExpectations(t)
 }
 
+func TestRankProvidersSendsBoundedObjectResponseSchema(t *testing.T) {
+	transport := &generationTransportMock{}
+	transport.On("RoundTrip", mock.Anything).Run(func(args mock.Arguments) {
+		request := args.Get(0).(*http.Request)
+		var body map[string]any
+		require.NoError(t, json.NewDecoder(request.Body).Decode(&body))
+		config := body["generationConfig"].(map[string]any)
+		schema := config["responseSchema"].(map[string]any)
+		require.Equal(t, "OBJECT", schema["type"])
+		require.Equal(t, []any{"recommendations"}, schema["required"])
+		recommendations := schema["properties"].(map[string]any)["recommendations"].(map[string]any)
+		require.Equal(t, "ARRAY", recommendations["type"])
+		require.Equal(t, float64(2), recommendations["maxItems"])
+		item := recommendations["items"].(map[string]any)
+		require.Equal(t, "OBJECT", item["type"])
+		require.ElementsMatch(t, []any{"reference", "reason"}, item["required"])
+	}).Return(&http.Response{StatusCode: 200, Header: make(http.Header), Body: io.NopCloser(strings.NewReader(`{"candidates":[{"content":{"parts":[{"text":"{\"recommendations\":[]}"}]}}]}`))}, nil).Once()
+	bot, err := NewGeminiChatbotWithOptions("model", "key", GeminiOptions{HTTPClient: &http.Client{Transport: transport}})
+	require.NoError(t, err)
+
+	_, err = bot.RankProviders(context.Background(), conversation.ProviderRankingRequest{MaxResults: 2})
+
+	require.NoError(t, err)
+	transport.AssertExpectations(t)
+}
+
 func TestGeminiGenerationDefaultConfigIsUnchanged(t *testing.T) {
 	bot := NewGeminiChatbot("model", "key")
 	encoded, err := json.Marshal(bot.generationConfig())

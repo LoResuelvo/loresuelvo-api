@@ -55,6 +55,33 @@ func (chatbot *GeminiChatbot) generationConfig() *genai.GenerateContentConfig {
 	return &genai.GenerateContentConfig{ResponseMIMEType: "application/json", MaxOutputTokens: chatbot.options.MaxOutputTokens}
 }
 
+func (chatbot *GeminiChatbot) providerRankingGenerationConfig(maxResults int) *genai.GenerateContentConfig {
+	config := chatbot.generationConfig()
+	recommendations := &genai.Schema{
+		Type: genai.TypeArray,
+		Items: &genai.Schema{
+			Type: genai.TypeObject,
+			Properties: map[string]*genai.Schema{
+				"reference": {Type: genai.TypeString},
+				"reason":    {Type: genai.TypeString},
+			},
+			Required: []string{"reference", "reason"},
+		},
+	}
+	if maxResults > 0 {
+		limit := int64(maxResults)
+		recommendations.MaxItems = &limit
+	}
+	config.ResponseSchema = &genai.Schema{
+		Type: genai.TypeObject,
+		Properties: map[string]*genai.Schema{
+			"recommendations": recommendations,
+		},
+		Required: []string{"recommendations"},
+	}
+	return config
+}
+
 func (chatbot *GeminiChatbot) generateContent(ctx context.Context, client *genai.Client, operation string, contents []*genai.Content, config *genai.GenerateContentConfig) (*genai.GenerateContentResponse, error) {
 	// Avoid serialization overhead entirely in the production default path.
 	if chatbot.options.Observer == nil {
