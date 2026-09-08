@@ -1,42 +1,31 @@
-# US-60 evaluation integration
+# Integración de la evaluación US-60
 
-Status: offline contracts, local JSON Schema validation, deterministic scoring,
-bounded live execution, incremental journals, replay, and paired model comparison
-are implemented, including explicit metamorphic transformations, five non-LLM
-baselines, aggregate summaries, and provenance-bound semantic review import.
-Model safety approval is separate and is never inferred from tool completion.
-See the [initial measurement and completion evidence](reports/2026-09-08-us60-completion.md):
-the tool is delivered, but observed model safety failures prevent approval.
+Estado: contratos sin conexión, validación local de esquemas JSON y puntuación determinista,
+ejecución en vivo acotada, diarios incrementales, reproducción y comparación pareada de modelos
+están implementados, incluidas transformaciones metamórficas explícitas, cinco líneas base no LLM,
+resúmenes agregados e importación de revisiones semánticas vinculadas a procedencia.
+La aprobación de seguridad del modelo es independiente y nunca se infiere de la finalización de la herramienta.
+Véase la [evidencia de la medición inicial y la finalización](reports/2026-09-08-us60-completion.md):
+la herramienta fue entregada, pero los fallos de seguridad observados en el modelo impiden la aprobación.
 
-## Source and integrity
+## Fuente e integridad
 
-- Specification: https://github.com/LoResuelvo/loresuelvo-api/issues/205
-- Original archive: `incoming/LoResuelvo_US60_evals_v1.0.0.zip` (local, ignored).
-- Archive SHA-256: `f253e81a18af481f0b91fad3222ac3c7f6de1e9d985c9c8a971eadfcaf276808`.
-- Unmodified package: `datasets/LoResuelvo_US60_evals_v1.0.0/`.
-- Reference backend commit: `2a7f77fda6c6175753f73e095de0a0bd19169a06`.
-- Import commit: `ed787f6e794e8414a5182fce4ea1d67d75876453`.
+- Especificación: https://github.com/LoResuelvo/loresuelvo-api/issues/205
+- Archivo original: `incoming/LoResuelvo_US60_evals_v1.0.0.zip` (local, ignorado).
+- SHA-256 del archivo: `f253e81a18af481f0b91fad3222ac3c7f6de1e9d985c9c8a971eadfcaf276808`.
+- Documentación mantenida: [`DATASET.md`](DATASET.md).
+- Paquete de referencia: `datasets/LoResuelvo_US60_evals_v1.0.0/` (copia histórica inmutable del paquete canónico).
+- Commit de backend de referencia: `2a7f77fda6c6175753f73e095de0a0bd19169a06`.
+- Commit de importación: `ed787f6e794e8414a5182fce4ea1d67d75876453`.
 
-The package's `source_package_sha256` records source-package metadata; it is
-not the checksum of the delivered archive above. The package manifest is not
-a signature or evidence of model quality.
+El 2026-09-08, el validador incluido y las 47 pruebas de Python pasaron:
+48 casos de prediagnóstico, 24 de ranking, 12 especificaciones de contrato, ocho PNG,
+54 casos de desarrollo, 18 de reserva, 18 smoke y 13 críticos.
+Estas comprobaciones no ejecutaron los comportamientos CT ni llamaron a un modelo.
 
-On 2026-09-08, the included validator passed and all 47 Python tests passed:
-48 prediagnosis cases, 24 ranking cases, 12 contract specifications, eight PNGs,
-54 development cases, 18 holdout cases, 18 smoke cases, and 13 critical cases.
-These checks did not execute the CT behaviors or call a model.
+## Reproducir las comprobaciones del paquete
 
-## Scope precedence
-
-Issue #205 supersedes section 7 of the frozen package README regarding CI:
-the evaluation battery remains local/manual, with no CI jobs or deployment
-gates. Deterministic tests of runner code may join the ordinary test suite,
-without model calls or automatic execution of the experimental battery.
-The frozen package is deliberately unchanged.
-
-## Reproduce package checks
-
-From the repository root, using Python 3.10 or later:
+Desde la raíz del repositorio, usando Python 3.10 o posterior:
 
 ```bash
 python3 -m venv evals/.venv
@@ -45,32 +34,26 @@ PYTHONDONTWRITEBYTECODE=1 evals/.venv/bin/python evals/datasets/LoResuelvo_US60_
 PYTHONDONTWRITEBYTECODE=1 evals/.venv/bin/python -m unittest discover -s evals/datasets/LoResuelvo_US60_evals_v1.0.0/tests -v
 ```
 
-Dependency installation may require network access. The checks themselves
-require neither credentials nor network access. Do not regenerate manifests
-to resolve a mismatch.
+La instalación de dependencias puede requerir acceso de red. Las comprobaciones no requieren credenciales ni red. No regenere manifiestos
+para resolver una discrepancia.
 
-## Proposed implementation boundaries
+## Organización de la implementación
 
-- `cmd/evals/`: explicit CLI composition and authorization.
-- `internal/evals/`: dataset mapping, plans, contract harness, execution limits,
-  scoring, transformations, result persistence, replay, and comparison.
-- `internal/adapters/chatbot/`: minimal generation configuration and observation
-  support, reusing production prompts and parsers unchanged.
-- `evals/configs/`: derived experimental configuration, outside the frozen data.
-- `evals/runs/<run_id>/`: local sanitized traces, semantic reviews, and reports.
+- `cmd/evals/`: composición y autorización explícitas de la CLI.
+- `internal/evals/`: mapeo de datos, planes, arnés de contratos y límites de ejecución,
+  puntuación, transformaciones, persistencia de resultados, reproducción y comparación.
+- `internal/adapters/chatbot/`: configuración mínima de generación y soporte de observación,
+  reutilizando sin cambios los prompts y analizadores de producción.
+- `evals/configs/`: configuración experimental derivada, fuera de los datos congelados.
+- `evals/runs/<run_id>/`: trazas locales saneadas, revisiones semánticas e informes.
 
-Implement offline execution and trace serialization first, then live opt-in.
-Record the unchanged development baseline before functional or prompt changes.
-Calibrate on development before explicitly selecting holdout. CT-08 and CT-10
-need separate structural and semantic evidence: a fake response cannot prove
-real risk detection, safe guidance, or preservation of facts by the model.
+La línea base inicial está registrada en el informe enlazado arriba. Las correcciones deben compararse con esa evidencia; la reserva se mantiene fuera del ajuste. CT-08 y CT-10
+necesitan evidencia estructural y semántica separadas: una respuesta simulada no puede demostrar
+detección real de riesgos, orientación segura ni preservación de hechos por el modelo.
 
-No public endpoint, database migration, reporting platform, autonomous judge,
-or additional dataset approval process is planned.
+## Preparación offline en Go
 
-## Offline Go preparation
-
-From the repository root:
+Desde la raíz del repositorio:
 
 ```bash
 make evals-validate
@@ -78,116 +61,78 @@ make evals-plan ARGS='--suite smoke --model gemini-3.5-flash-lite --max-requests
 make evals-plan ARGS='--suite development --model gemini-3.5-flash-lite --max-requests 162'
 ```
 
-These commands never create a model client, load credentials, or execute CT
-behaviors. Go validation checks file integrity, local Draft 2020-12 schemas, case/suite
-references, and domain mapping; use the Python validation above for the additional
-frozen editorial and policy consistency checks. A passed integrity check is not a passed experiment.
+Estos comandos nunca crean un cliente de modelo, cargan credenciales ni ejecutan comportamientos CT. La validación Go comprueba la integridad de archivos, los esquemas Draft 2020-12 locales y las referencias de casos/suites
+y el mapeo de dominio; use la validación Python anterior para las comprobaciones adicionales
+de consistencia editorial y de políticas congeladas. Una comprobación de integridad aprobada no equivale a un experimento aprobado.
 
-Trial defaults come from `configs/experiment.json`: smoke, baseline development,
-and release for holdout/critical suites. `--trials` explicitly overrides the count.
-The request ceiling includes every allowed retry (`--max-retries`, default zero).
-Plans exceeding that ceiling are rejected rather than silently truncated.
-`--allow-holdout` is required for holdout or critical_all and any selection
-containing reserve cases. It authorizes planning only, not live calls.
+Los valores predeterminados de los ensayos provienen de `configs/experiment.json`: la prueba smoke, la línea base de desarrollo
+y la validación de lanzamiento para las suites de reserva/críticas. `--trials` anula explícitamente el recuento.
+El límite de solicitudes incluye cada reintento permitido (`--max-retries`, cero por defecto).
+Los planes que exceden ese límite se rechazan en vez de truncarse silenciosamente.
+`--allow-holdout` es obligatorio para reserva o critical_all y para cualquier selección
+que contenga casos de reserva. Solo autoriza la planificación, no llamadas en vivo.
 
-The base preview covers PD/RK executions only, without implicit CT,
-transformations, or live authorization. Model is requested metadata; no effective
-model configuration or monetary price is claimed. Cost remains null.
+La vista previa base cubre solo ejecuciones PD/RK, sin CT, transformaciones ni autorización en vivo implícitas. El modelo es metadato solicitado;
+no se afirma configuración efectiva ni precio monetario. El costo permanece en null.
 
-## Delivery checkpoints
+## Ejecución y evidencia
 
-Each increment is reviewed and tested before its commit and push. Planned
-commit boundaries (split further only when an independently testable change
-justifies it):
-
-1. `chore[60]: import immutable evaluation dataset`
-2. `feat[60]: add offline dataset mapping and execution preview`
-3. `feat[60]: execute contracts and persist evaluation results`
-4. `feat[60]: add bounded opt-in live evaluation`
-5. `feat[60]: score and compare reproducible evaluation runs`
-6. `docs[60]: record baseline evidence and evaluation limitations`
-
-Use focused tests during development, then the existing CI-equivalent checks
-before pushing Go changes. Live calls are never part of those checks. Review
-and retain the unchanged baseline before any functional correction. Baseline
-execution still requires explicit model configuration, limits, and live opt-in.
-
-## Execution and evidence
-
-Contract checks are manual and offline:
+Las comprobaciones de contratos son manuales y offline:
 
 ```bash
 make evals-contract
 ```
 
-All twelve specifications have executors. CT-02 validates the service/repository
-boundary but cannot establish real SQL filtering; CT-08 and CT-10 cannot certify
-risk detection or summary semantics with controlled responses. These are reported
-as `unassessed`, not passed. CT-09 exercises timeout persistence and actual replay
-scoring. Production prompts and domain behavior are unchanged.
+Las doce especificaciones tienen ejecutores. CT-02 valida el límite servicio/repositorio, pero no puede establecer filtrado SQL real; CT-08 y CT-10 no pueden certificar detección de riesgos ni semántica de resumen con respuestas controladas.
+Se informan como `unassessed`, no aprobadas. CT-09 ejercita persistencia de tiempos de espera y puntuación real de reproducción. Los prompts de producción y el comportamiento de dominio no cambian.
 
-Before live execution, export `CHATBOT_API_KEY` through your secure local
-credential mechanism. The runner does not load `.env`, and the presence of a key
-alone never authorizes generation. Do not put credential values in arguments,
-commits, reports, or shell history. The model is explicit, not inherited from a
-mutable deployment setting.
+Antes de la ejecución en vivo, exporte `CHATBOT_API_KEY` mediante su mecanismo local seguro de credenciales. El ejecutor no carga `.env`, y la sola presencia de una clave nunca autoriza la generación. No incluya credenciales en argumentos,
+commits, informes ni historial de shell. El modelo es explícito, no heredado de una configuración mutable de despliegue.
 
-Preview without credentials or network:
+Vista previa sin credenciales ni red:
 
 ```bash
 make evals-live ARGS='--dry-run --suite smoke --model gemini-3.5-flash-lite --max-requests 18 --attempt-timeout 90s --global-timeout 15m --min-interval 15s --max-output-tokens 4096'
 ```
 
-After authorization, from a clean committed working tree:
+Tras autorizar, desde un árbol de trabajo limpio y versionado:
 
 ```bash
 make evals-live ARGS='--allow-live --suite smoke --model gemini-3.5-flash-lite --max-requests 18 --attempt-timeout 90s --global-timeout 15m --min-interval 15s --max-output-tokens 4096 --out evals/runs/smoke-3.5-UNIQUE'
 ```
 
-Use a fresh output directory each time. To compare 3.1, use the same commit and
-settings with `--model gemini-3.1-flash-lite` and another directory. Each invocation
-has its own authorization and hard request ceiling. The initial implementation
-supports concurrency 1; retries default to zero. It blocks SDK retries/redirects,
-stops on rate limiting or persistent provider configuration failures, and records
-remaining cases as `not_executed`. The interval is an operator limit, not a claim
-about the account's actual RPM/TPM/RPD quota. Verify available quota in AI Studio.
+Use un directorio de salida nuevo cada vez. Para comparar 3.1, use el mismo commit y
+configuración con `--model gemini-3.1-flash-lite` y otro directorio. Cada invocación
+tiene su propia autorización y límite estricto de solicitudes. La implementación inicial
+admite concurrencia 1; los reintentos son cero por defecto. Bloquea reintentos/redirecciones del SDK,
+se detiene ante limitación de tasa o fallos persistentes de configuración del proveedor y registra
+los casos restantes como `not_executed`. El intervalo es un límite operativo, no una afirmación
+sobre la cuota RPM/TPM/RPD real de la cuenta. Verifique la cuota disponible en AI Studio.
 
-Every attempt is synced before proceeding. `run.json` records plan/configuration,
-commit and journal checksum; `attempts.jsonl` retains raw model text, parsed domain
-output, actual SDK inputs/config, media bytes, hashes, request ID when supplied,
-and provider metadata. SDK-decoded provider response is not claimed to be exact
-HTTP wire bytes; secrets and HTTP headers are not persisted. Unspecified provider
-defaults remain unknown. Files are local, mode 0600, inside a mode-0700 directory.
-SIGINT/time limits preserve partial results; an unfinalized journal from an abrupt
-process kill remains available but replay refuses to present it as complete.
+Cada intento se sincroniza antes de continuar. `run.json` registra el plan/configuración, el commit y la suma de comprobación del diario; `attempts.jsonl` conserva el texto bruto del modelo y la salida de dominio analizada, las entradas/configuración reales del SDK, bytes multimedia, hashes e ID de solicitud cuando se proporciona
+y metadatos del proveedor. La respuesta del proveedor decodificada por el SDK no se afirma como bytes HTTP exactos;
+no se persisten secretos ni encabezados HTTP. Los valores predeterminados no especificados siguen siendo desconocidos.
+Los archivos son locales, modo 0600, dentro de un directorio modo 0700. Los límites SIGINT/tiempo conservan resultados parciales;
+un diario sin finalizar por una terminación abrupta permanece disponible, pero la reproducción se niega a presentarlo como completo.
 
 ```bash
 make evals-replay ARGS='--run evals/runs/smoke-3.5-UNIQUE'
 make evals-compare ARGS='--left evals/runs/smoke-3.1-UNIQUE --right evals/runs/smoke-3.5-UNIQUE'
 ```
 
-Replay verifies integrity, planned case/trial coverage, retries and input/prompt
-hashes before scoring historical responses. Compare defaults to a model
-change only: dataset, commit, suite, trials, generation configuration and paired
-inputs must match. Deliberate source, prompt/input, or generation changes require
-the corresponding `--allow-source-change`, `--allow-prompt-change`, or
-`--allow-generation-config-change` flag and a nonempty `--change-description`.
-Observed differences are reported; these flags never relax dataset, suite,
-case/trial coverage, request budget or operational-limit compatibility.
-Missing responses, invalid outputs and unassessed semantic criteria remain visible.
-No automatic `release_approved=true` path exists. Cost remains null without verified
-pricing. Aggregate summaries are JSON; checked-in concise Markdown reports link local evidence.
+La reproducción verifica integridad, cobertura de casos/ensayos, reintentos y hashes de entrada/prompt antes de puntuar respuestas históricas. Por defecto, la comparación solo permite cambiar el modelo: deben coincidir conjunto de datos, commit, suite, ensayos, configuración de generación y entradas pareadas. Los cambios deliberados de origen, prompt/entrada o generación requieren el indicador correspondiente `--allow-source-change`, `--allow-prompt-change` o
+el indicador `--allow-generation-config-change` y una `--change-description` no vacía.
+Las diferencias observadas se informan; estos indicadores nunca relajan el conjunto de datos ni la suite,
+cobertura de casos/ensayos, presupuesto de solicitudes ni compatibilidad de límites operativos.
+Las respuestas faltantes, las salidas no válidas y los criterios semánticos no evaluados siguen visibles.
+No existe una ruta automática de `release_approved=true`. El costo permanece en null sin precios verificados. Los resúmenes agregados son JSON; los informes Markdown concisos versionados enlazan evidencia local.
 
-Exit codes: 0 means the command completed without deterministic failures, 1 means
-recorded execution/contract/deterministic failures, and 2 means usage, configuration
-or integrity failure. Code 0 never certifies semantics or safety. Test commands do
-not execute this experimental battery or make model calls.
+Códigos de salida: 0 significa que el comando terminó sin fallos deterministas, 1 significa fallos de ejecución/contrato/deterministas registrados y 2 significa fallo de uso, configuración o integridad. El código 0 nunca certifica semántica ni seguridad. Los comandos de prueba no ejecutan esta batería experimental ni realizan llamadas al modelo.
 
 
-## Baselines, transformations and review
+## Líneas base, transformaciones y revisión
 
-All commands below are offline unless explicitly labeled `live`. Ordinary tests
-continue to use synthetic fixtures; none executes this experimental battery.
+Todos los comandos siguientes son offline salvo que se etiqueten explícitamente como `live`. Las pruebas ordinarias continúan usando fixtures sintéticos; ninguna ejecuta esta batería experimental.
 
 ```bash
 make evals-baselines ARGS='--suite development'
@@ -198,77 +143,45 @@ make -s evals-review-template ARGS='--run evals/runs/RUN' > evals/runs/RUN/revie
 make evals-review ARGS='--run evals/runs/RUN --reviews evals/runs/RUN/reviews-v1.json'
 ```
 
-Review documents bind the run ID, dataset and attempt-journal hashes, each raw
-output hash, and criterion hash. Assessed entries require evidence, reviewer,
-reviewer kind (`human` or `agent`) and UTC timestamp. Missing responses cannot
-receive positive assessments; unknown, duplicate or stale entries are rejected.
-Agent judgments remain visibly agent-authored and pending human safety review.
-No import can set `release_approved=true`. Review revisions use separate files;
-original journals and the frozen dataset are not edited.
+Los documentos de revisión vinculan el ID de ejecución, el conjunto de datos y los hashes del diario de intentos, cada hash de salida sin procesar y el hash del criterio. Cada juicio sobre una respuesta concreta requiere evidencia (fragmento y justificación), identidad declarada del revisor, tipo de revisor (`human` o `agent`) y marca UTC. Se revisa la respuesta frente al criterio y la entrada del caso, no se vuelve a aprobar el dataset. El tipo identifica quién hizo la revisión; no acredita especialización. Las respuestas faltantes no pueden recibir evaluaciones positivas; las entradas desconocidas, duplicadas u obsoletas se rechazan.
+Los juicios del agente siguen identificados visiblemente como redactados por un agente y pendientes de revisión humana de seguridad.
+Ninguna importación puede establecer `release_approved=true`. Las revisiones se realizan en archivos separados;
+no se editan los diarios originales ni el conjunto de datos congelado.
 
-Ranking policies are frozen in code and serialized in the baseline report:
-seeded random (601), rating average, paid-work count, Bayesian rating (prior mean
-3, prior count 5), and lexical token-set Jaccard. Lexical normalization lowercases,
-removes accents, and splits Unicode letters/digits; no stopwords or stemming.
-The query uses problem title/description; candidate text uses work descriptions,
-completion reports and reviews. Non-random score ties use reference ascending.
-Algorithms receive only eligible input evidence, never expected relevance.
+Las políticas de ranking están congeladas en el código y serializadas en el informe de línea base:
+aleatorio con semilla (601), promedio de calificación, cantidad de trabajos pagados, calificación bayesiana (media previa 3, recuento previo 5) y Jaccard de conjuntos de tokens léxicos. La normalización léxica pasa a minúsculas, elimina acentos y separa letras/dígitos Unicode; no usa palabras vacías ni stemming.
+La consulta usa título/descripción del problema; el texto candidato usa descripciones de trabajos, informes de finalización y revisiones. Los empates no aleatorios usan referencia ascendente.
+Los algoritmos reciben solo evidencia de entrada elegible, nunca la relevancia esperada.
 
-Summaries show base-case weighting, terminal retries, complete trial coverage,
-technical failures, observed latency/token subtotals and unknown coverage. Base
-quality and transformed quality are reported separately. Do not compare mixed
-variants against base-only baselines or treat repeated trials/families as
-independent production samples. Cost stays null without verified prices.
+Los resúmenes muestran ponderación de casos base, reintentos terminales, cobertura completa de ensayos, fallos técnicos, subtotales observados de latencia/tokens y cobertura desconocida. La calidad base y transformada se informan por separado. No compare variantes mixtas con líneas base solo base ni trate ensayos/familias repetidos como
+muestras de producción independientes. El costo permanece en null sin precios verificados.
 
-Explicit transformation preview for one selected development case:
+Vista previa explícita de transformación para un caso de desarrollo seleccionado:
 
 ```bash
 make evals-plan ARGS='--suite development --cases RK-001 --metamorphic --trials 3 --model gemini-3.5-flash-lite --max-requests 30'
 ```
 
-This includes three base trials plus three transformations × three seeds × three
-trials: 30 requests, not 30 independent cases. `--cases` can only narrow the named
-suite. `--metamorphic` uses exact frozen seeds and repeat counts. No counterpart,
-holdout case or retry is selected implicitly. The whole development transform
-plan has 486 variant attempts plus 162 base attempts and must not be mistaken
-for a budget-safe single-day run under a 500-request quota.
+Esto incluye tres ensayos base más tres transformaciones × tres semillas × tres ensayos: 30 solicitudes, no 30 casos independientes. `--cases` solo puede estrechar la suite nombrada. `--metamorphic` usa semillas congeladas y recuentos exactos. No se selecciona implícitamente contraparte, caso de reserva ni reintento. El plan completo de transformación de desarrollo tiene 486 intentos de variantes más 162 intentos base y no debe confundirse con una ejecución diaria segura para el presupuesto bajo una cuota de 500 solicitudes.
 
-After explicit authorization, use that plan with `live`, `--allow-live`, all
-finite limit flags and a new output directory. For example, a 30-request run can
-use `--attempt-timeout 90s --global-timeout 30m --min-interval 5s
---max-output-tokens 4096`. The interval permits at most 12 request starts/minute
-per invocation; concurrent invocations and other applications share provider
-quotas and must be budgeted together. A displayed quota is not a guarantee of
-provider availability. HTTP 503 remains a technical failure, not a quality miss.
+Tras la autorización explícita, use ese plan con `live`, `--allow-live`, todos los indicadores de límite finito y un directorio de salida nuevo. Por ejemplo, una ejecución de 30 solicitudes puede utilizar `--attempt-timeout 90s --global-timeout 30m --min-interval 5s
+--max-output-tokens 4096`. El intervalo permite como máximo 12 inicios de solicitudes por minuto
+por invocación; las invocaciones concurrentes y otras aplicaciones comparten cuotas del proveedor y deben presupuestarse juntas.
+Una cuota mostrada no garantiza disponibilidad del proveedor. HTTP 503 sigue siendo un fallo técnico, no un fallo de calidad.
 
 ```bash
 make evals-metamorphic-report ARGS='--run evals/runs/TRANSFORMED-RUN'
 ```
 
-The original transformed input/output stays in the journal. Scoring reconstructs
-and inverts reference bijections; the report pairs matching trials and records
-seed, parent and split. Top-three membership is compared modulo ties, while
-strict order is checked only by explicit pairwise constraints. No-op transforms
-and missing/invalid outputs remain unassessed. Frozen PD pairs can be compared
-from any run containing both members; absent members stay visible, never added
-implicitly. Matching decisions do not certify injection resistance.
+La entrada/salida transformada original permanece en el diario. La puntuación reconstruye e invierte biyecciones de referencia; el informe empareja ensayos coincidentes y registra semilla, padre y división. La pertenencia al top tres se compara ignorando empates, mientras el orden estricto se comprueba solo mediante restricciones pareadas explícitas. Las transformaciones sin efecto y las salidas faltantes/no válidas siguen sin evaluar. Los pares PD congelados pueden compararse desde cualquier ejecución que contenga ambos miembros; los ausentes permanecen visibles y nunca se añaden implícitamente. Las decisiones coincidentes no certifican resistencia a inyección.
 
-A failing measured baseline is a valid finding. Closing US-60 does not approve a
-model release, prove risk zero, demonstrate real-photo accuracy, or establish
-user-effort reduction. Reserve use remains a separate, conscious operation after
-development decisions are frozen; unexecuted critical reserve cases remain
-unassessed and preclude release approval.
+Una línea base medida que falla es un hallazgo válido. Cerrar US-60 no aprueba un lanzamiento del modelo, no demuestra riesgo cero, exactitud con fotos reales ni reducción del esfuerzo del usuario. El uso de la reserva sigue siendo una operación separada y consciente después de congelar las decisiones de desarrollo; los casos críticos de reserva no ejecutados siguen sin evaluar e impiden la aprobación del lanzamiento.
 
 
-An explicitly authorized new three-trial development baseline can be reproduced
-with the following finite limits (check remaining account quota first):
+Una nueva línea base de desarrollo de tres ensayos, autorizada explícitamente, puede reproducirse con los siguientes límites finitos (compruebe primero la cuota restante de la cuenta):
 
 ```bash
 make evals-live ARGS='--allow-live --suite development --trials 3 --model gemini-3.5-flash-lite --max-requests 162 --max-retries 0 --attempt-timeout 90s --global-timeout 90m --min-interval 5s --max-output-tokens 4096 --out evals/runs/development-3.5-UNIQUE'
 ```
 
-[Initial derived thresholds](configs/initial-development-v1.json) are exploratory
-manual non-regression screens, not automatic release gates or acceptable product
-quality. The configuration is copied beside the source runs and remains separate
-from the frozen corpus. Numerical coverage and actual reviewable critical-output
-coverage must both be inspected; errors never become positive safety evidence.
+Los [umbrales derivados iniciales](configs/initial-development-v1.json) son comprobaciones manuales exploratorias de no regresión, no compuertas automáticas de lanzamiento ni calidad de producto aceptable. La configuración se copia junto a las ejecuciones de origen y permanece separada del corpus congelado. Deben inspeccionarse tanto la cobertura numérica como la cobertura real de salidas críticas revisables; los errores nunca se convierten en evidencia positiva de seguridad.
