@@ -1,10 +1,6 @@
 # LoResuelvo · US-60 · Evaluaciones 1.0.0
 
-**Versión final del diseño y de los datos, lista para implementación.**
-
 En este repositorio, ejecute los comandos desde `evals/datasets/LoResuelvo_US60_evals_v1.0.0/`; desde la raíz, anteponga esa ruta a las rutas relativas.
-
-Este paquete **no contiene resultados del chatbot real**. La integridad de los archivos y las pruebas de las utilidades no demuestran que el modelo sea seguro, preciso o mejor que una heurística. Las salidas que produzca después el sistema se evalúan por separado.
 
 ## 1. Contenido canónico
 

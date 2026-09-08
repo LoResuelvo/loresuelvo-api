@@ -10,11 +10,8 @@
   ],
   "parent_dataset": "LoResuelvo_US60_evals_v1.0.0",
   "parent_version": "1.0.0",
-  "parent_manifest_sha256": "20de062181f7f1bcc99d92cf0fb1bdd9587456d03f516becfae66773b46c0c97",
-  "source_dataset": "LoResuelvo_US60_visual_v1.0.0",
-  "source_version": "1.0.0-visual.2",
-  "source_manifest_sha256": "337318d6f2ff5de1490baaff77bb69ba6fa49396a57be46da053cd4760f77f99",
-  "derivation": "Byte-identical publication of LoResuelvo_US60_visual_v1.0.0 (manifest version 1.0.0-visual.2); no case, asset, configuration, policy, schema or criteria content was changed.",
+  "parent_manifest_sha256": "302d3ec7be6b3bd73a0bd2dedaaed469221dff92da429c14ab5515aff4e14e0a",
+  "derivation": "Extends dataset 1.0.0 with four synthetic visual development cases (PD-049 through PD-052); base evaluation materials are unchanged.",
   "files_sha256": {
     "assets/fixture_01.png": "0795f487da86ef6b6624b4cd359166f3d32b9ccd8af65c4fd14c74daa7626103",
     "assets/fixture_02.png": "a5d3cbd4ee67b3cef5d088dce1b1aa06cd6d64429ee1fb76a1d9459de3728ca1",
@@ -44,7 +41,7 @@
     "schemas/ranking-output.schema.json": "5ef3296aed3676ef5fc1d87d347b90bb7f57f5450c773b8ad243643e00daa81f",
     "schemas/ranking.schema.json": "4311d9d81e8cd443f4e2de8c098d28087f7357a00d81166b2d8e48ed3ae794b3",
     "schemas/service_contracts.schema.json": "1f806f1967e5aa9d9346006c39db29b72f963ec3080d746ab49cde78d8a15939",
-    "README.md": "49b617d0c3527affb81f6024004203f2a26b3e62dcb8104036edd5986ea7ee2c"
+    "README.md": "407ec81069577b65ebe7d24a05463034b3c84ac0e5076b285abbf98c79eb0b62"
   },
   "human_casewise_signoff_claimed": false,
   "expert_validation_claimed": false,

@@ -1,9 +1,5 @@
 # LoResuelvo · US-60 · Evaluaciones 1.0.0
 
-**Versión final del diseño y de los datos, lista para implementación.** Sustituye a `1.0.0-rc1`. No requiere abrir un HTML, exportar decisiones ni volver a aprobar los casos para congelarlos. Esta revisión incorporó las observaciones de Joseph sobre lenguaje, plausibilidad, procedencia y entrega mínima. La revisión editorial fue asistida por IA: no se registra una firma humana por caso ni una validación de especialistas que no existió.
-
-Este paquete **no contiene resultados del chatbot real**. La integridad de los archivos y las pruebas de las utilidades no demuestran que el modelo sea seguro, preciso o mejor que una heurística. Las salidas que produzca después el sistema se evalúan por separado.
-
 ## 1. Contenido canónico
 
 | Archivo o directorio | Función |
@@ -17,8 +13,6 @@ Este paquete **no contiene resultados del chatbot real**. La integridad de los a
 | `assets/` | Ocho PNG de prueba y su manifiesto de referencias, límites y hashes. |
 | `tools/evalpack.py`, `tests/`, `requirements.txt` | Validación, exportación sin etiquetas y chequeo de salidas guardadas. |
 | `manifest.json` | Inventario y SHA-256 de la versión, sin auto-hash. |
-
-No hay Excel, interfaz de revisión, auditoría separada, copia de la issue ni resultados ficticios. Este README concentra las instrucciones de uso, metodología e integración.
 
 ## 2. Qué representan los datos
 
@@ -39,8 +33,6 @@ Cada caso distingue:
 ### Lenguaje y plausibilidad
 
 Se revisaron los 48 mensajes, sus historiales cuando corresponden y los textos de trabajos, informes y reseñas de los 24 rankings. Se combinan mensajes cuidados, breves, coloquiales, con omisiones o errores moderados. No se aplicó una cuota inventada de faltas ni un deterioro aleatorio del texto. Las descripciones normalizadas que recibe el ranking, los informes profesionales, los esquemas y las rúbricas conservan el registro que corresponde a su función.
-
-PD-004 ahora parte de una puerta que roza y de una respuesta sobre una alfombra suelta recién colocada: el sistema debe proponer una comprobación reversible, **no recibir del usuario una causa ya demostrada**. PD-006 ya no consiste en secar un vaso derramado: presenta agua que reaparece bajo un mueble sin origen identificado y exige recolectar información.
 
 Se eliminaron listas artificiales de síntomas ausentes cuando no eran necesarias. **Un peligro no mencionado sigue siendo desconocido.** Las expectativas se actualizaron junto con las entradas: no se mantienen etiquetas por conservar el número de casos de una clase. Los ataques deliberados y dibujos de prueba se identifican como controles, no como ejemplos de frecuencia habitual.
 

@@ -23,7 +23,7 @@ y la versión del dataset; no se combinan resultados de otras soluciones o datas
 - Archivo original: `incoming/LoResuelvo_US60_evals_v1.0.0.zip` (local, ignorado).
 - SHA-256 del archivo: `f253e81a18af481f0b91fad3222ac3c7f6de1e9d985c9c8a971eadfcaf276808`.
 - Documentación mantenida: [`DATASET.md`](DATASET.md).
-- Paquete de referencia: `datasets/LoResuelvo_US60_evals_v1.0.0/` (copia histórica inmutable del paquete canónico).
+- Paquete de referencia: `datasets/LoResuelvo_US60_evals_v1.0.0/` (dataset base).
 - Commit de backend de referencia: `2a7f77fda6c6175753f73e095de0a0bd19169a06`.
 - Commit de importación: `ed787f6e794e8414a5182fce4ea1d67d75876453`.
 
@@ -43,8 +43,7 @@ PYTHONDONTWRITEBYTECODE=1 evals/.venv/bin/python evals/datasets/LoResuelvo_US60_
 PYTHONDONTWRITEBYTECODE=1 evals/.venv/bin/python -m unittest discover -s evals/datasets/LoResuelvo_US60_evals_v1.0.0/tests -v
 ```
 
-La instalación de dependencias puede requerir acceso de red. Las comprobaciones no requieren credenciales ni red. No regenere manifiestos
-para resolver una discrepancia.
+La instalación de dependencias puede requerir acceso de red. Las comprobaciones no requieren credenciales ni red. Los cambios editoriales autorizados actualizan únicamente los hashes afectados; no se regeneran manifiestos para ocultar cambios en los materiales evaluados. Los hashes de informes y configuraciones históricas corresponden al commit de la medición, no necesariamente al empaquetado actual.
 
 ## Organización de la implementación
 
@@ -197,4 +196,4 @@ Los [umbrales derivados iniciales](configs/initial-development-v1.json) son comp
 
 ## Extensión visual derivada
 
-La selección visual sintética derivada (cuatro casos) está en [`datasets/LoResuelvo_US60_visual_v1.0.0/`](datasets/LoResuelvo_US60_visual_v1.0.0/).
+La selección visual sintética derivada (cuatro casos) está en [`datasets/LoResuelvo_US60_evals_v1.1.0/`](datasets/LoResuelvo_US60_evals_v1.1.0/).
