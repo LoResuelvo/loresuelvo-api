@@ -1,7 +1,8 @@
 # US-60 evaluation integration
 
-Status: dataset imported and checked; Go runner not implemented. No live model
-evaluation has been performed.
+Status: offline dataset loading, domain mapping, and base-case execution preview
+implemented. Contract execution, scoring, live, replay, compare, and transformations
+are pending. No live model evaluation has been performed.
 
 ## Source and integrity
 
@@ -10,7 +11,7 @@ evaluation has been performed.
 - Archive SHA-256: `f253e81a18af481f0b91fad3222ac3c7f6de1e9d985c9c8a971eadfcaf276808`.
 - Unmodified package: `datasets/LoResuelvo_US60_evals_v1.0.0/`.
 - Reference backend commit: `2a7f77fda6c6175753f73e095de0a0bd19169a06`.
-- Import commit: pending; no commit has been created for this import.
+- Import commit: `ed787f6e794e8414a5182fce4ea1d67d75876453`.
 
 The package's `source_package_sha256` records source-package metadata; it is
 not the checksum of the delivered archive above. The package manifest is not
@@ -63,18 +64,44 @@ real risk detection, safe guidance, or preservation of facts by the model.
 No public endpoint, database migration, reporting platform, autonomous judge,
 or additional dataset approval process is planned.
 
+## Offline Go preparation
+
+From the repository root:
+
+```bash
+make evals-validate
+make evals-plan ARGS='--suite smoke --model gemini-2.5-flash --max-requests 18'
+make evals-plan ARGS='--suite development --model gemini-2.5-flash --max-requests 162'
+```
+
+These commands never create a model client, load credentials, or execute CT
+behaviors. Go validation checks file integrity, case/suite references, and domain
+mapping; use the Python validation above for the complete frozen JSON Schema and
+policy checks. A passed integrity check is not a passed experiment.
+
+Trial defaults come from `configs/experiment.json`: smoke, baseline development,
+and release for holdout/critical suites. `--trials` explicitly overrides the count.
+The request ceiling includes every allowed retry (`--max-retries`, default zero).
+Plans exceeding that ceiling are rejected rather than silently truncated.
+`--allow-holdout` is required for holdout or critical_all and any selection
+containing reserve cases. It authorizes planning only, not live calls.
+
+The current preview covers base PD/RK executions only, without implicit CT,
+transformations, or live authorization. Model is requested metadata; no effective
+model configuration or monetary price is claimed. Cost remains null.
+
 ## Delivery checkpoints
 
 Each increment is reviewed and tested before its commit and push. Planned
 commit boundaries (split further only when an independently testable change
 justifies it):
 
-1. `chore(us-60): import immutable evaluation dataset`
-2. `feat(us-60): add offline dataset mapping and execution preview`
-3. `feat(us-60): execute contracts and persist evaluation results`
-4. `feat(us-60): add bounded opt-in live evaluation`
-5. `feat(us-60): score and compare reproducible evaluation runs`
-6. `docs(us-60): record baseline evidence and evaluation limitations`
+1. `chore[60]: import immutable evaluation dataset`
+2. `feat[60]: add offline dataset mapping and execution preview`
+3. `feat[60]: execute contracts and persist evaluation results`
+4. `feat[60]: add bounded opt-in live evaluation`
+5. `feat[60]: score and compare reproducible evaluation runs`
+6. `docs[60]: record baseline evidence and evaluation limitations`
 
 Use focused tests during development, then the existing CI-equivalent checks
 before pushing Go changes. Live calls are never part of those checks. Review

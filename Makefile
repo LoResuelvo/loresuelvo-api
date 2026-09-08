@@ -100,3 +100,11 @@ migrate-test-up:
 
 migrate-test-down:
 	docker compose exec $(SERVICE) sh -c 'migrate -path db/migrations -database "$$TEST_DATABASE_URL" down 1'
+
+# Manual preparation only; never prerequisites of the ordinary test targets.
+.PHONY: evals-validate evals-plan
+evals-validate:
+	go run ./cmd/evals validate $(ARGS)
+
+evals-plan:
+	go run ./cmd/evals plan $(ARGS)
