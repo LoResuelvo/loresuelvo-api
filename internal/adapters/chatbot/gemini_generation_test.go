@@ -88,6 +88,56 @@ func TestRankProvidersSendsBoundedObjectResponseSchema(t *testing.T) {
 	transport.AssertExpectations(t)
 }
 
+func TestAnswerUsesCompleteResponseSchemaWithoutChangingSummaryRequest(t *testing.T) {
+	t.Run("answer", func(t *testing.T) {
+		transport := &generationTransportMock{}
+		transport.On("RoundTrip", mock.Anything).Run(func(args mock.Arguments) {
+			request := args.Get(0).(*http.Request)
+			var body map[string]any
+			require.NoError(t, json.NewDecoder(request.Body).Decode(&body))
+			config := body["generationConfig"].(map[string]any)
+			schema := config["responseSchema"].(map[string]any)
+			require.Equal(t, "OBJECT", schema["type"])
+			require.ElementsMatch(t, []any{"status", "title", "content", "image_descriptions", "assessment"}, schema["required"])
+			properties := schema["properties"].(map[string]any)
+			require.ElementsMatch(t, []any{"answered", "out_of_scope"}, properties["status"].(map[string]any)["enum"])
+			imageDescription := properties["image_descriptions"].(map[string]any)["items"].(map[string]any)
+			require.ElementsMatch(t, []any{"image_ref", "description"}, imageDescription["required"])
+			assessment := properties["assessment"].(map[string]any)
+			require.ElementsMatch(t, []any{"action", "outcome", "problem_title", "problem_description", "problem_category_name", "selected_image_refs"}, assessment["required"])
+			assessmentProperties := assessment["properties"].(map[string]any)
+			require.ElementsMatch(t, []any{"unchanged", "replace"}, assessmentProperties["action"].(map[string]any)["enum"])
+			require.ElementsMatch(t, []any{"", "collecting_information", "self_service", "professional_required"}, assessmentProperties["outcome"].(map[string]any)["enum"])
+			require.Equal(t, float64(3), assessmentProperties["selected_image_refs"].(map[string]any)["maxItems"])
+		}).Return(&http.Response{StatusCode: 200, Header: make(http.Header), Body: io.NopCloser(strings.NewReader(`{"candidates":[{"content":{"parts":[{"text":"{\"status\":\"answered\",\"title\":\"\",\"content\":\"Necesito más datos.\",\"image_descriptions\":[],\"assessment\":{\"action\":\"replace\",\"outcome\":\"collecting_information\",\"problem_title\":\"\",\"problem_description\":\"\",\"problem_category_name\":\"\",\"selected_image_refs\":[]}}"}]}}]}`))}, nil).Once()
+		bot, err := NewGeminiChatbotWithOptions("model", "key", GeminiOptions{HTTPClient: &http.Client{Transport: transport}})
+		require.NoError(t, err)
+
+		_, err = bot.AnswerHomeProblemQuestion(context.Background(), conversation.ChatbotHomeProblemQuestion{}, nil)
+
+		require.NoError(t, err)
+		transport.AssertExpectations(t)
+	})
+
+	t.Run("summary", func(t *testing.T) {
+		transport := &generationTransportMock{}
+		transport.On("RoundTrip", mock.Anything).Run(func(args mock.Arguments) {
+			request := args.Get(0).(*http.Request)
+			var body map[string]any
+			require.NoError(t, json.NewDecoder(request.Body).Decode(&body))
+			config := body["generationConfig"].(map[string]any)
+			require.NotContains(t, config, "responseSchema")
+		}).Return(&http.Response{StatusCode: 200, Header: make(http.Header), Body: io.NopCloser(strings.NewReader(`{"candidates":[{"content":{"parts":[{"text":"{\"summary\":\"Resumen\"}"}]}}]}`))}, nil).Once()
+		bot, err := NewGeminiChatbotWithOptions("model", "key", GeminiOptions{HTTPClient: &http.Client{Transport: transport}})
+		require.NoError(t, err)
+
+		_, err = bot.SummarizeHomeProblemConversation(context.Background(), "", nil)
+
+		require.NoError(t, err)
+		transport.AssertExpectations(t)
+	})
+}
+
 func TestGeminiGenerationDefaultConfigIsUnchanged(t *testing.T) {
 	bot := NewGeminiChatbot("model", "key")
 	encoded, err := json.Marshal(bot.generationConfig())

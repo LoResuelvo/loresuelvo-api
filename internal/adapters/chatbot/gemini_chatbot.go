@@ -99,7 +99,7 @@ func (chatbot *GeminiChatbot) AnswerHomeProblemQuestion(ctx context.Context, que
 	result, err := chatbot.generateContent(
 		ctx, client, "answer_home_problem",
 		chatbot.answerContent(question, availableCategories),
-		chatbot.generationConfig(),
+		chatbot.answerGenerationConfig(),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("generating chatbot response: %w", err)

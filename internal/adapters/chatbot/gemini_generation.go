@@ -55,6 +55,57 @@ func (chatbot *GeminiChatbot) generationConfig() *genai.GenerateContentConfig {
 	return &genai.GenerateContentConfig{ResponseMIMEType: "application/json", MaxOutputTokens: chatbot.options.MaxOutputTokens}
 }
 
+func (chatbot *GeminiChatbot) answerGenerationConfig() *genai.GenerateContentConfig {
+	maxSelectedImages := int64(3)
+	config := chatbot.generationConfig()
+	config.ResponseSchema = &genai.Schema{
+		Type: genai.TypeObject,
+		Properties: map[string]*genai.Schema{
+			"status": {
+				Type: genai.TypeString,
+				Enum: []string{"answered", "out_of_scope"},
+			},
+			"title":   {Type: genai.TypeString},
+			"content": {Type: genai.TypeString},
+			"image_descriptions": {
+				Type: genai.TypeArray,
+				Items: &genai.Schema{
+					Type: genai.TypeObject,
+					Properties: map[string]*genai.Schema{
+						"image_ref":   {Type: genai.TypeString},
+						"description": {Type: genai.TypeString},
+					},
+					Required: []string{"image_ref", "description"},
+				},
+			},
+			"assessment": {
+				Type: genai.TypeObject,
+				Properties: map[string]*genai.Schema{
+					"action": {
+						Type: genai.TypeString,
+						Enum: []string{"unchanged", "replace"},
+					},
+					"outcome": {
+						Type: genai.TypeString,
+						Enum: []string{"", "collecting_information", "self_service", "professional_required"},
+					},
+					"problem_title":         {Type: genai.TypeString},
+					"problem_description":   {Type: genai.TypeString},
+					"problem_category_name": {Type: genai.TypeString},
+					"selected_image_refs": {
+						Type:     genai.TypeArray,
+						Items:    &genai.Schema{Type: genai.TypeString},
+						MaxItems: &maxSelectedImages,
+					},
+				},
+				Required: []string{"action", "outcome", "problem_title", "problem_description", "problem_category_name", "selected_image_refs"},
+			},
+		},
+		Required: []string{"status", "title", "content", "image_descriptions", "assessment"},
+	}
+	return config
+}
+
 func (chatbot *GeminiChatbot) providerRankingGenerationConfig(maxResults int) *genai.GenerateContentConfig {
 	config := chatbot.generationConfig()
 	recommendations := &genai.Schema{
