@@ -2,6 +2,7 @@
 certbot/
 coverage.out
 .vscode
+.codex
 credenciales
 /plan.md
 
