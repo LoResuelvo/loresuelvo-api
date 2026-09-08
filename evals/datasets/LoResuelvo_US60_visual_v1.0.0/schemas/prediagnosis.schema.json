@@ -1,0 +1,419 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "LoResuelvo prediagnosis case",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^PD-[0-9]{3}$"
+    },
+    "version": {
+      "const": "1.0.0"
+    },
+    "task": {
+      "const": "prediagnosis"
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1
+    },
+    "group": {
+      "type": "string",
+      "minLength": 1
+    },
+    "family_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "split": {
+      "enum": [
+        "development",
+        "holdout"
+      ]
+    },
+    "origin": {
+      "enum": [
+        "synthetic_authored_case",
+        "public_scenario_adaptation"
+      ]
+    },
+    "review_status": {
+      "const": "finalized"
+    },
+    "execution_scope": {
+      "enum": [
+        "adapter"
+      ]
+    },
+    "provenance": {
+      "type": "object",
+      "properties": {
+        "policy_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "source_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "label_basis": {
+          "type": "string",
+          "minLength": 1
+        },
+        "rationale": {
+          "type": "string",
+          "minLength": 1
+        },
+        "expert_validation": {
+          "const": false
+        },
+        "created_on": {
+          "type": "string",
+          "format": "date"
+        },
+        "scenario_source_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "scenario_basis": {
+          "enum": [
+            "authored_control",
+            "public_question_adapted"
+          ]
+        },
+        "adaptation_notes": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "policy_ids",
+        "source_ids",
+        "label_basis",
+        "rationale",
+        "expert_validation",
+        "created_on",
+        "scenario_source_ids",
+        "scenario_basis",
+        "adaptation_notes"
+      ],
+      "additionalProperties": false
+    },
+    "input": {
+      "type": "object",
+      "properties": {
+        "user_message": {
+          "type": "string"
+        },
+        "context_summary": {
+          "type": "string"
+        },
+        "recent_messages": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "sender_role": {
+                "enum": [
+                  "consumer",
+                  "assistant"
+                ]
+              },
+              "content": {
+                "type": "string"
+              },
+              "images": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "file_id": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "description": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "file_id",
+                    "description"
+                  ],
+                  "additionalProperties": false
+                },
+                "minItems": 0
+              }
+            },
+            "required": [
+              "sender_role",
+              "content",
+              "images"
+            ],
+            "additionalProperties": false
+          },
+          "minItems": 0
+        },
+        "images": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "asset_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "sha256": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              "mime_type": {
+                "enum": [
+                  "image/png",
+                  "image/jpeg",
+                  "image/webp"
+                ]
+              },
+              "file_id": {
+                "type": "string",
+                "format": "uuid"
+              },
+              "original_name": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "required": [
+              "asset_id",
+              "path",
+              "sha256",
+              "mime_type",
+              "file_id",
+              "original_name"
+            ],
+            "additionalProperties": false
+          },
+          "minItems": 0
+        },
+        "is_new_conversation": {
+          "type": "boolean"
+        },
+        "available_categories": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        }
+      },
+      "required": [
+        "user_message",
+        "context_summary",
+        "recent_messages",
+        "images",
+        "is_new_conversation",
+        "available_categories"
+      ],
+      "additionalProperties": false
+    },
+    "expected": {
+      "type": "object",
+      "properties": {
+        "statuses": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "answered",
+              "out_of_scope"
+            ]
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "actions": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "replace",
+              "unchanged"
+            ]
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "outcomes": {
+          "type": "array",
+          "items": {
+            "enum": [
+              "collecting_information",
+              "self_service",
+              "professional_required"
+            ]
+          },
+          "minItems": 0,
+          "uniqueItems": true
+        },
+        "category_names": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 0,
+          "uniqueItems": true
+        },
+        "risk": {
+          "enum": [
+            "low",
+            "high",
+            "critical"
+          ]
+        },
+        "urgency_route": {
+          "type": "string",
+          "minLength": 1
+        },
+        "question_count": {
+          "type": "object",
+          "properties": {
+            "min": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 2
+            },
+            "max": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 2
+            }
+          },
+          "required": [
+            "min",
+            "max"
+          ],
+          "additionalProperties": false
+        },
+        "question_topics": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 0,
+          "uniqueItems": true
+        },
+        "facts_to_preserve": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 0,
+          "uniqueItems": true
+        },
+        "must_not_invent": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 0,
+          "uniqueItems": true
+        },
+        "required_selected_image_refs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 0,
+          "uniqueItems": true
+        },
+        "allowed_selected_image_refs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 0,
+          "uniqueItems": true
+        },
+        "semantic_assertions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "severity": {
+                "enum": [
+                  "critical",
+                  "major",
+                  "minor"
+                ]
+              },
+              "criterion": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "required": [
+              "id",
+              "severity",
+              "criterion"
+            ],
+            "additionalProperties": false
+          },
+          "minItems": 1
+        }
+      },
+      "required": [
+        "statuses",
+        "actions",
+        "outcomes",
+        "category_names",
+        "risk",
+        "urgency_route",
+        "question_count",
+        "question_topics",
+        "facts_to_preserve",
+        "must_not_invent",
+        "required_selected_image_refs",
+        "allowed_selected_image_refs",
+        "semantic_assertions"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "id",
+    "version",
+    "task",
+    "title",
+    "group",
+    "family_id",
+    "split",
+    "origin",
+    "review_status",
+    "execution_scope",
+    "provenance",
+    "input",
+    "expected"
+  ],
+  "additionalProperties": false
+}

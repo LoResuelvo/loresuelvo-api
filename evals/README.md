@@ -185,3 +185,7 @@ make evals-live ARGS='--allow-live --suite development --trials 3 --model gemini
 ```
 
 Los [umbrales derivados iniciales](configs/initial-development-v1.json) son comprobaciones manuales exploratorias de no regresión, no compuertas automáticas de lanzamiento ni calidad de producto aceptable. La configuración se copia junto a las ejecuciones de origen y permanece separada del corpus congelado. Deben inspeccionarse tanto la cobertura numérica como la cobertura real de salidas críticas revisables; los errores nunca se convierten en evidencia positiva de seguridad.
+
+## Extensión visual derivada
+
+La selección visual sintética derivada (cuatro casos) está en [`datasets/LoResuelvo_US60_visual_v1.0.0/`](datasets/LoResuelvo_US60_visual_v1.0.0/).
