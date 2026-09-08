@@ -87,7 +87,7 @@ func (chatbot *GeminiChatbot) answerGenerationConfig() *genai.GenerateContentCon
 					},
 					"outcome": {
 						Type: genai.TypeString,
-						Enum: []string{"", "collecting_information", "self_service", "professional_required"},
+						// Gemini rejects empty enum members; the strict parser validates outcomes.
 					},
 					"problem_title":         {Type: genai.TypeString},
 					"problem_description":   {Type: genai.TypeString},
