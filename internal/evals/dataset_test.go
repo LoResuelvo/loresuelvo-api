@@ -24,6 +24,7 @@ func writeDatasetFixture(t *testing.T) string {
 `,
 		"configs/suites.json": `{"smoke":["PD-001"],"development":["PD-001"],"holdout":["RK-001"],"critical_all":[],"rules":{"live_calls_disabled_by_default":true}}
 `,
+		"configs/metamorphic.json": `{ "ranking": [], "prediagnosis_pairs": [] }`,
 		"configs/experiment.json": `{"trials":{"smoke":1,"baseline_development":3,"release":3}}
 `,
 	}

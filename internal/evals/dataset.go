@@ -45,6 +45,7 @@ type Dataset struct {
 	CT               []CTCase
 	Suites           map[string][]string
 	ExperimentTrials map[string]int
+	Metamorphic      MetamorphicConfig
 	schemaFiles      map[string][]byte
 	assets           map[string]ImageInput
 }
@@ -54,8 +55,8 @@ type datasetManifest struct {
 	Files         map[string]string `json:"files_sha256"`
 }
 
-// LoadDataset checks manifest integrity and harness references. JSON Schema and
-// editorial policy validation remain the responsibility of the frozen evalpack tool.
+// LoadDataset checks manifest integrity, local JSON schemas and harness references.
+// Additional editorial policy checks remain in the frozen evalpack tool.
 func LoadDataset(root string) (*Dataset, error) {
 	directory, err := os.OpenRoot(root)
 	if err != nil {
@@ -88,7 +89,7 @@ func LoadDataset(root string) (*Dataset, error) {
 		}
 		verifiedFiles[name] = data
 	}
-	for _, required := range []string{"datasets/prediagnosis.jsonl", "datasets/ranking.jsonl", "datasets/service_contracts.jsonl", "configs/suites.json", "configs/experiment.json", "assets/manifest.json", "schemas/prediagnosis.schema.json", "schemas/ranking.schema.json", "schemas/service_contracts.schema.json", "schemas/prediagnosis-output.schema.json", "schemas/ranking-output.schema.json"} {
+	for _, required := range []string{"datasets/prediagnosis.jsonl", "datasets/ranking.jsonl", "datasets/service_contracts.jsonl", "configs/suites.json", "configs/experiment.json", "configs/metamorphic.json", "assets/manifest.json", "schemas/prediagnosis.schema.json", "schemas/ranking.schema.json", "schemas/service_contracts.schema.json", "schemas/prediagnosis-output.schema.json", "schemas/ranking-output.schema.json"} {
 		if _, ok := manifest.Files[required]; !ok {
 			return nil, fmt.Errorf("%w: untracked required file %q", ErrInvalidDataset, required)
 		}
@@ -159,6 +160,12 @@ func LoadDataset(root string) (*Dataset, error) {
 		d.assets[asset.AssetID] = asset
 	}
 	if err = d.validateReferences(); err != nil {
+		return nil, err
+	}
+	if err = readJSON(verifiedFiles["configs/metamorphic.json"], "configs/metamorphic.json", &d.Metamorphic); err != nil {
+		return nil, err
+	}
+	if err = ValidateMetamorphicConfig(d); err != nil {
 		return nil, err
 	}
 	for _, c := range d.PD {

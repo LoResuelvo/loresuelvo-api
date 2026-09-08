@@ -20,6 +20,7 @@ func cliDataset(t *testing.T) string {
 		"datasets/ranking.jsonl":           `{"id":"RK-001","task":"ranking","family_id":"synthetic_ranking","split":"holdout","input":{"problem_title":"test","problem_description":"test","max_results":3,"candidates":[]}}` + "\n",
 		"datasets/service_contracts.jsonl": `{"id":"CT-01","target":"test","input":{},"expected":{}}` + "\n",
 		"configs/suites.json":              `{"smoke":["PD-001"],"development":["PD-001"],"holdout":["RK-001"],"critical_all":["PD-001"],"rules":{}}`,
+		"configs/metamorphic.json":         `{ "ranking": [], "prediagnosis_pairs": [] }`,
 		"configs/experiment.json":          `{"trials":{"smoke":1,"baseline_development":3,"release":3}}`,
 		"assets/manifest.json":             `{"assets":[]}`,
 	}

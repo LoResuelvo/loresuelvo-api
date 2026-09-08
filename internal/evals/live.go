@@ -79,14 +79,20 @@ func (t *limitedTransport) RoundTrip(request *http.Request) (*http.Response, err
 func (e *GeminiExecutor) Execute(ctx context.Context, caseID string) (ExecutionOutput, error) {
 	var result ExecutionOutput
 	allowed := false
+	var variant *MetamorphicVariant
 	for _, c := range e.plan.Cases {
 		if c.CaseID == caseID {
 			allowed = true
+			variant = c.Variant
 			break
 		}
 	}
 	if !allowed {
 		return result, &ExecutionError{Kind: "unauthorized_case", Stop: true, Cause: fmt.Errorf("case %q is outside authorized plan", caseID)}
+	}
+	baseCaseID := caseID
+	if variant != nil {
+		baseCaseID = variant.BaseCaseID
 	}
 	transport := &limitedTransport{executor: e}
 	client := &http.Client{Transport: transport, CheckRedirect: func(*http.Request, []*http.Request) error { return fmt.Errorf("redirects disabled for evaluation") }}
@@ -98,7 +104,7 @@ func (e *GeminiExecutor) Execute(ctx context.Context, caseID string) (ExecutionO
 	var parsed any
 	found := false
 	for _, c := range e.dataset.PD {
-		if c.ID == caseID {
+		if c.ID == baseCaseID {
 			found = true
 			question, categories, mapErr := e.dataset.MapPD(c.Input)
 			if mapErr != nil {
@@ -110,9 +116,17 @@ func (e *GeminiExecutor) Execute(ctx context.Context, caseID string) (ExecutionO
 	}
 	if !found {
 		for _, c := range e.dataset.RK {
-			if c.ID == caseID {
+			if c.ID == baseCaseID {
 				found = true
-				request, mapErr := c.Input.DomainRequest()
+				input := c.Input
+				if variant != nil {
+					transformed, transformErr := TransformRanking(input, variant.Transformation, variant.Seed)
+					if transformErr != nil {
+						return result, transformErr
+					}
+					input = transformed.Input
+				}
+				request, mapErr := input.DomainRequest()
 				if mapErr != nil {
 					return result, mapErr
 				}

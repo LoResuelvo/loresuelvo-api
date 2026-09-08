@@ -104,10 +104,12 @@ func TestCompareAllowsOnlyCompatibleModelChange(t *testing.T) {
 	require.Equal(t, "model-b", result.RightModel)
 	require.Len(t, result.Pairs, 1)
 	require.False(t, result.ReleaseApproved)
-	for _, name := range []string{"commit", "limits", "input", "generation_config"} {
+	for _, name := range []string{"commit", "limits", "input", "generation_config", "request_budget"} {
 		t.Run(name, func(t *testing.T) {
 			_, record, a := replayEvidence(t)
 			switch name {
+			case "request_budget":
+				record.Plan.RequestLimit++
 			case "commit":
 				record.Commit = "other"
 			case "limits":
@@ -124,4 +126,31 @@ func TestCompareAllowsOnlyCompatibleModelChange(t *testing.T) {
 			require.Error(t, err)
 		})
 	}
+}
+
+func TestCompareRequiresExplicitDescriptionForHistoricalChanges(t *testing.T) {
+	dataset, left, attempt := replayEvidence(t)
+	leftPath := persistReplayEvidence(t, left, attempt)
+	_, right, other := replayEvidence(t)
+	right.Commit = "new-source"
+	other.GenerationConfig = json.RawMessage(`{"responseMimeType":"application/json","maxOutputTokens":256}`)
+	other.Input = json.RawMessage(`[{"role":"user","parts":[{"text":"changed prompt"}]}]`)
+	other.InputSHA256 = digest(other.Input)
+	var err error
+	other.PromptSHA256, err = promptHash(other.Input)
+	require.NoError(t, err)
+	rightPath := persistReplayEvidence(t, right, other)
+	options := CompareOptions{AllowSourceChange: true, AllowPromptChange: true, AllowGenerationConfigChange: true}
+	_, err = CompareWithOptions(dataset, leftPath, rightPath, options)
+	require.ErrorContains(t, err, "description")
+	options.ChangeDescription = "Controlled prompt and output configuration revision"
+	comparison, err := CompareWithOptions(dataset, leftPath, rightPath, options)
+	require.NoError(t, err)
+	require.Contains(t, comparison.Differences, "source_commit")
+	require.Contains(t, comparison.Differences, "effective_input:RK-test")
+	require.Contains(t, comparison.Differences, "generation_config:RK-test")
+	require.False(t, comparison.ReleaseApproved)
+	options.AllowPromptChange = false
+	_, err = CompareWithOptions(dataset, leftPath, rightPath, options)
+	require.ErrorContains(t, err, "effective inputs differ")
 }

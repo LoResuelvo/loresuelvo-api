@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"reflect"
 	"sort"
+	"strings"
 )
 
 type EvaluatedAttempt struct {
@@ -37,7 +38,7 @@ func Replay(dataset *Dataset, directory string) (RunRecord, Report, error) {
 	}
 	report := Report{RunID: record.RunID, Mode: "replay", ExecutionCounts: map[string]int{}, SemanticStatus: "unassessed", Warning: "Historical outputs only; replay does not test the current model or prompt. Semantic review is required."}
 	for _, a := range attempts {
-		evaluation, evalErr := EvaluateCase(dataset, a.CaseID, json.RawMessage(a.RawOutput))
+		evaluation, evalErr := evaluatePlannedAttempt(dataset, record.Plan, a)
 		if evalErr != nil {
 			return record, report, evalErr
 		}
@@ -60,7 +61,7 @@ func validateRun(dataset *Dataset, record RunRecord, attempts []Attempt) error {
 	if record.Plan.DatasetVersion != dataset.Version || record.Plan.DatasetSHA256 != dataset.ManifestSHA256 {
 		return fmt.Errorf("run dataset version or manifest mismatch")
 	}
-	plan, err := BuildPlan(dataset, PlanOptions{Suite: record.Plan.Suite, Model: record.Plan.Model, Trials: record.Plan.Trials, MaxRetries: record.Plan.MaxRetries, MaxRequests: record.Plan.RequestLimit, AllowHoldout: record.Plan.HoldoutAuthorized})
+	plan, err := BuildPlan(dataset, PlanOptions{Suite: record.Plan.Suite, Model: record.Plan.Model, Trials: record.Plan.Trials, MaxRetries: record.Plan.MaxRetries, MaxRequests: record.Plan.RequestLimit, AllowHoldout: record.Plan.HoldoutAuthorized, Metamorphic: record.Plan.Metamorphic, CaseIDs: record.Plan.SelectedCaseIDs})
 	if err != nil {
 		return err
 	}
@@ -152,7 +153,16 @@ type CaseComparison struct {
 	Left   Evaluation `json:"left"`
 	Right  Evaluation `json:"right"`
 }
+type CompareOptions struct {
+	AllowSourceChange           bool   `json:"allow_source_change"`
+	AllowPromptChange           bool   `json:"allow_prompt_change"`
+	AllowGenerationConfigChange bool   `json:"allow_generation_config_change"`
+	ChangeDescription           string `json:"change_description"`
+}
+
 type Comparison struct {
+	Changes         CompareOptions   `json:"declared_changes"`
+	Differences     []string         `json:"observed_differences"`
 	LeftRunID       string           `json:"left_run_id"`
 	RightRunID      string           `json:"right_run_id"`
 	LeftModel       string           `json:"left_model"`
@@ -165,6 +175,18 @@ type Comparison struct {
 // Compare requires identical evidence and execution settings; a model identifier
 // change is the sole intentional difference supported in this first comparison.
 func Compare(dataset *Dataset, leftDirectory, rightDirectory string) (Comparison, error) {
+	return CompareWithOptions(dataset, leftDirectory, rightDirectory, CompareOptions{})
+}
+
+// CompareWithOptions requires an explicit description for intentional historical
+// source, prompt or generation-setting changes. It never relaxes dataset, cases,
+// trial or operational-limit compatibility.
+func CompareWithOptions(dataset *Dataset, leftDirectory, rightDirectory string, options CompareOptions) (Comparison, error) {
+	if (options.AllowSourceChange || options.AllowPromptChange || options.AllowGenerationConfigChange) && strings.TrimSpace(options.ChangeDescription) == "" {
+		return Comparison{}, fmt.Errorf("declared comparison changes require a description")
+	}
+	differences := []string{}
+
 	left, lr, err := Replay(dataset, leftDirectory)
 	if err != nil {
 		return Comparison{}, err
@@ -173,16 +195,28 @@ func Compare(dataset *Dataset, leftDirectory, rightDirectory string) (Comparison
 	if err != nil {
 		return Comparison{}, err
 	}
-	if left.Commit != right.Commit || left.Plan.Suite != right.Plan.Suite || left.Plan.Trials != right.Plan.Trials || left.Plan.MaxRetries != right.Plan.MaxRetries || left.Limits != right.Limits {
+	if left.Commit != right.Commit {
+		if !options.AllowSourceChange {
+			return Comparison{}, fmt.Errorf("incompatible source commits")
+		}
+		differences = append(differences, "source_commit")
+	}
+	if left.Plan.Model != right.Plan.Model {
+		differences = append(differences, "requested_model")
+	}
+	if left.Plan.Suite != right.Plan.Suite || left.Plan.Trials != right.Plan.Trials || left.Plan.MaxRetries != right.Plan.MaxRetries || left.Plan.RequestLimit != right.Plan.RequestLimit || !reflect.DeepEqual(left.Plan.Cases, right.Plan.Cases) || left.Limits != right.Limits {
 		return Comparison{}, fmt.Errorf("incompatible commits, suites, trials, retries or execution settings")
 	}
-	_, la, err := ReadRun(leftDirectory)
+	leftObserved, la, err := ReadRun(leftDirectory)
 	if err != nil {
 		return Comparison{}, err
 	}
-	_, ra, err := ReadRun(rightDirectory)
+	rightObserved, ra, err := ReadRun(rightDirectory)
 	if err != nil {
 		return Comparison{}, err
+	}
+	if leftObserved.AttemptsSHA256 != left.AttemptsSHA256 || rightObserved.AttemptsSHA256 != right.AttemptsSHA256 {
+		return Comparison{}, fmt.Errorf("run changed during comparison")
 	}
 	inputs := map[string]Attempt{}
 	for _, a := range la {
@@ -202,11 +236,17 @@ func Compare(dataset *Dataset, leftDirectory, rightDirectory string) (Comparison
 				return Comparison{}, err
 			}
 			if !reflect.DeepEqual(leftConfig, rightConfig) {
-				return Comparison{}, fmt.Errorf("generation configurations differ for %s", a.CaseID)
+				if !options.AllowGenerationConfigChange {
+					return Comparison{}, fmt.Errorf("generation configurations differ for %s", a.CaseID)
+				}
+				differences = append(differences, "generation_config:"+a.CaseID)
 			}
 		}
 		if len(a.Input) > 0 && len(other.Input) > 0 && (a.InputSHA256 != other.InputSHA256 || a.PromptSHA256 != other.PromptSHA256) {
-			return Comparison{}, fmt.Errorf("effective inputs differ for %s", a.CaseID)
+			if !options.AllowPromptChange {
+				return Comparison{}, fmt.Errorf("effective inputs differ for %s", a.CaseID)
+			}
+			differences = append(differences, "effective_input:"+a.CaseID)
 		}
 	}
 	lmap := map[string]EvaluatedAttempt{}
@@ -217,7 +257,7 @@ func Compare(dataset *Dataset, leftDirectory, rightDirectory string) (Comparison
 	for _, a := range rr.Attempts {
 		rmap[attemptKey(a.CaseID, a.Trial)] = a
 	}
-	result := Comparison{LeftRunID: left.RunID, RightRunID: right.RunID, LeftModel: left.Plan.Model, RightModel: right.Plan.Model, Warning: "Paired historical base cases; technical failures and unassessed semantics are not wins. All retries remain in source reports."}
+	result := Comparison{Changes: options, Differences: differences, LeftRunID: left.RunID, RightRunID: right.RunID, LeftModel: left.Plan.Model, RightModel: right.Plan.Model, Warning: "Paired historical base cases; technical failures and unassessed semantics are not wins. All retries remain in source reports."}
 	keys := make([]string, 0, len(lmap))
 	for key := range lmap {
 		keys = append(keys, key)

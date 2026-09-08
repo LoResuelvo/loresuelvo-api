@@ -14,14 +14,20 @@ type PlanOptions struct {
 	MaxRetries   int
 	MaxRequests  int
 	AllowHoldout bool
+	Metamorphic  bool
+	CaseIDs      []string
 }
 
 type PlannedCase struct {
-	CaseID string `json:"case_id"`
-	Split  string `json:"split"`
+	CaseID  string              `json:"case_id"`
+	Split   string              `json:"split"`
+	Variant *MetamorphicVariant `json:"variant,omitempty"`
 }
 
 type Plan struct {
+	Metamorphic       bool          `json:"metamorphic,omitempty"`
+	SelectedCaseIDs   []string      `json:"selected_case_ids,omitempty"`
+	VariantExecutions int           `json:"variant_executions,omitempty"`
 	DatasetVersion    string        `json:"dataset_version"`
 	DatasetSHA256     string        `json:"dataset_manifest_sha256"`
 	Suite             string        `json:"suite"`
@@ -58,6 +64,26 @@ func BuildPlan(dataset *Dataset, options PlanOptions) (*Plan, error) {
 	if options.Trials <= 0 || options.MaxRetries < 0 || options.MaxRequests <= 0 {
 		return nil, fmt.Errorf("trials and request limit must be positive; retries cannot be negative")
 	}
+	selected := map[string]bool{}
+	for _, id := range options.CaseIDs {
+		if selected[id] {
+			return nil, fmt.Errorf("duplicate selected case %q", id)
+		}
+		selected[id] = true
+	}
+	if len(selected) > 0 {
+		filtered := make([]string, 0, len(selected))
+		for _, id := range ids {
+			if selected[id] {
+				filtered = append(filtered, id)
+				delete(selected, id)
+			}
+		}
+		if len(selected) > 0 {
+			return nil, fmt.Errorf("selected cases must belong to explicit suite")
+		}
+		ids = filtered
+	}
 	splits := make(map[string]string, len(dataset.PD)+len(dataset.RK))
 	for _, c := range dataset.PD {
 		splits[c.ID] = c.Split
@@ -66,6 +92,10 @@ func BuildPlan(dataset *Dataset, options PlanOptions) (*Plan, error) {
 		splits[c.ID] = c.Split
 	}
 	plan := &Plan{DatasetVersion: dataset.Version, DatasetSHA256: dataset.ManifestSHA256, Suite: options.Suite, Model: strings.TrimSpace(options.Model), Trials: options.Trials, MaxRetries: options.MaxRetries, RequestLimit: options.MaxRequests, HoldoutAuthorized: options.AllowHoldout, CostReason: "verified pricing is not configured", Cases: make([]PlannedCase, 0, len(ids))}
+	plan.Metamorphic = options.Metamorphic
+	if len(options.CaseIDs) > 0 {
+		plan.SelectedCaseIDs = append([]string(nil), ids...)
+	}
 	seen := make(map[string]bool, len(ids))
 	for _, id := range ids {
 		split, exists := splits[id]
@@ -88,10 +118,30 @@ func BuildPlan(dataset *Dataset, options PlanOptions) (*Plan, error) {
 		return nil, fmt.Errorf("execution count overflows")
 	}
 	plan.BaseExecutions = len(ids) * options.Trials
-	if options.MaxRetries == math.MaxInt || plan.BaseExecutions > math.MaxInt/(options.MaxRetries+1) {
+	if options.Metamorphic {
+		variants, err := BuildMetamorphicVariants(dataset, plan.Cases)
+		if err != nil {
+			return nil, err
+		}
+		if len(variants) == 0 {
+			return nil, fmt.Errorf("selected cases contain no ranking transformations")
+		}
+		for _, variant := range variants {
+			if variant.RepeatTrials != options.Trials {
+				return nil, fmt.Errorf("metamorphic trials must match frozen repeat_trials=%d", variant.RepeatTrials)
+			}
+			plan.Cases = append(plan.Cases, PlannedCase{CaseID: variant.ID, Split: variant.Split, Variant: &variant})
+		}
+		if len(plan.Cases) > math.MaxInt/options.Trials {
+			return nil, fmt.Errorf("variant execution count overflows")
+		}
+		plan.VariantExecutions = len(variants) * options.Trials
+	}
+	executions := len(plan.Cases) * options.Trials
+	if options.MaxRetries == math.MaxInt || executions > math.MaxInt/(options.MaxRetries+1) {
 		return nil, fmt.Errorf("request count overflows")
 	}
-	plan.MaximumRequests = plan.BaseExecutions * (options.MaxRetries + 1)
+	plan.MaximumRequests = executions * (options.MaxRetries + 1)
 	if plan.MaximumRequests > options.MaxRequests {
 		return nil, fmt.Errorf("plan requires up to %d requests, exceeding limit %d", plan.MaximumRequests, options.MaxRequests)
 	}
