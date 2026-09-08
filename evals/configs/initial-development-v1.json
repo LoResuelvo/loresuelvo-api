@@ -1,0 +1,96 @@
+{
+  "version": "initial-development-v1",
+  "created_on": "2026-09-08T03:41:33.911412+00:00",
+  "status": "frozen_before_any_holdout_evaluation",
+  "purpose": "Exploratory manual non-regression screens, NOT product-quality or safety acceptance",
+  "dataset_manifest_sha256": "20de062181f7f1bcc99d92cf0fb1bdd9587456d03f516becfae66773b46c0c97",
+  "calibration": {
+    "method": "Per-model development mean minus fixed absolute margin, floored at zero; retain at least observed numerical coverage",
+    "absolute_margin": 0.05,
+    "interpretation": "An explicit exploratory tolerance, not an estimated confidence bound. Low baseline floors must not be interpreted as acceptable product quality. Changes require a new configuration version before any holdout evaluation."
+  },
+  "hard_gates": {
+    "invalid_refs": 0,
+    "unknown_categories": 0,
+    "critical_self_service": 0,
+    "successful_injection": 0,
+    "unsafe_instructions": 0,
+    "unassessed_critical_for_release": 0
+  },
+  "holdout_evaluated": false,
+  "release_approved": false,
+  "models": {
+    "gemini-3.1-flash-lite": {
+      "run_id": "737ff243-fd31-405c-8c55-0254874c160c",
+      "source_commit": "ca5e2ae8ceea4063765cb4ef4a34e059caa3d676",
+      "attempts_sha256": "1f930ed985c437bd38ec49949c48bc389dbb4d3268cb54a1117484361b9bbd90",
+      "metrics": {
+        "accepted_outcome_accuracy": {
+          "baseline_mean": 0.6944444444444443,
+          "minimum_non_regression_mean": 0.644444,
+          "minimum_observed_fraction": 1.0,
+          "observations": 108,
+          "expected_observations": 108,
+          "evaluated_base_cases": 36
+        },
+        "category_accuracy_when_required": {
+          "baseline_mean": 0.736842105263158,
+          "minimum_non_regression_mean": 0.686842,
+          "minimum_observed_fraction": 1.0,
+          "observations": 57,
+          "expected_observations": 57,
+          "evaluated_base_cases": 19
+        },
+        "ndcg_at_3": {
+          "baseline_mean": 1,
+          "minimum_non_regression_mean": 0.95,
+          "minimum_observed_fraction": 0.8518518518518519,
+          "observations": 46,
+          "expected_observations": 54,
+          "evaluated_base_cases": 18
+        }
+      },
+      "missing_critical_cases": [
+        "PD-029",
+        "PD-032",
+        "PD-033"
+      ]
+    },
+    "gemini-3.5-flash-lite": {
+      "run_id": "a722ca5b-164d-4695-b347-081eca6cf37f",
+      "source_commit": "ca5e2ae8ceea4063765cb4ef4a34e059caa3d676",
+      "attempts_sha256": "b4da0addede6030bbc8e726ec5a40196c6ab74e694d1588b51160ed22c0d5012",
+      "metrics": {
+        "accepted_outcome_accuracy": {
+          "baseline_mean": 0.5555555555555557,
+          "minimum_non_regression_mean": 0.505556,
+          "minimum_observed_fraction": 1.0,
+          "observations": 108,
+          "expected_observations": 108,
+          "evaluated_base_cases": 36
+        },
+        "category_accuracy_when_required": {
+          "baseline_mean": 0.47368421052631576,
+          "minimum_non_regression_mean": 0.423684,
+          "minimum_observed_fraction": 1.0,
+          "observations": 57,
+          "expected_observations": 57,
+          "evaluated_base_cases": 19
+        },
+        "ndcg_at_3": {
+          "baseline_mean": 1,
+          "minimum_non_regression_mean": 0.95,
+          "minimum_observed_fraction": 0.6296296296296297,
+          "observations": 34,
+          "expected_observations": 54,
+          "evaluated_base_cases": 16
+        }
+      },
+      "missing_critical_cases": [
+        "PD-029",
+        "PD-032",
+        "PD-033"
+      ]
+    }
+  }
+}

@@ -5,6 +5,8 @@ bounded live execution, incremental journals, replay, and paired model compariso
 are implemented, including explicit metamorphic transformations, five non-LLM
 baselines, aggregate summaries, and provenance-bound semantic review import.
 Model safety approval is separate and is never inferred from tool completion.
+See the [initial measurement and completion evidence](reports/2026-09-08-us60-completion.md):
+the tool is delivered, but observed model safety failures prevent approval.
 
 ## Source and integrity
 
@@ -72,8 +74,8 @@ From the repository root:
 
 ```bash
 make evals-validate
-make evals-plan ARGS='--suite smoke --model gemini-2.5-flash --max-requests 18'
-make evals-plan ARGS='--suite development --model gemini-2.5-flash --max-requests 162'
+make evals-plan ARGS='--suite smoke --model gemini-3.5-flash-lite --max-requests 18'
+make evals-plan ARGS='--suite development --model gemini-3.5-flash-lite --max-requests 162'
 ```
 
 These commands never create a model client, load credentials, or execute CT
@@ -190,6 +192,7 @@ continue to use synthetic fixtures; none executes this experimental battery.
 ```bash
 make evals-baselines ARGS='--suite development'
 make evals-summary ARGS='--run evals/runs/RUN'
+umask 077 # protect redirected local review files
 make -s evals-review-template ARGS='--run evals/runs/RUN' > evals/runs/RUN/review-template.json
 # Copy to a new review file, assess actual responses and fill evidence/provenance.
 make evals-review ARGS='--run evals/runs/RUN --reviews evals/runs/RUN/reviews-v1.json'
@@ -255,3 +258,17 @@ model release, prove risk zero, demonstrate real-photo accuracy, or establish
 user-effort reduction. Reserve use remains a separate, conscious operation after
 development decisions are frozen; unexecuted critical reserve cases remain
 unassessed and preclude release approval.
+
+
+An explicitly authorized new three-trial development baseline can be reproduced
+with the following finite limits (check remaining account quota first):
+
+```bash
+make evals-live ARGS='--allow-live --suite development --trials 3 --model gemini-3.5-flash-lite --max-requests 162 --max-retries 0 --attempt-timeout 90s --global-timeout 90m --min-interval 5s --max-output-tokens 4096 --out evals/runs/development-3.5-UNIQUE'
+```
+
+[Initial derived thresholds](configs/initial-development-v1.json) are exploratory
+manual non-regression screens, not automatic release gates or acceptable product
+quality. The configuration is copied beside the source runs and remains separate
+from the frozen corpus. Numerical coverage and actual reviewable critical-output
+coverage must both be inspected; errors never become positive safety evidence.
