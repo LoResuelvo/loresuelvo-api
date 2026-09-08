@@ -1,0 +1,667 @@
+{
+  "ranking": [
+    {
+      "base_case_id": "RK-001",
+      "family_id": "rank_sink",
+      "split": "development",
+      "transformations": [
+        "candidate_permutation",
+        "opaque_reference_bijection",
+        "work_history_order"
+      ],
+      "permutation_seeds": [
+        601,
+        602,
+        603
+      ],
+      "repeat_trials": 3,
+      "invariants": [
+        "eligibility",
+        "required_top_k_up_to_ties",
+        "strict_pairwise_constraints",
+        "grounded_reasons"
+      ],
+      "not_required": [
+        "identical order inside ties",
+        "identical wording"
+      ],
+      "aggregation_unit": "base_case_not_variant"
+    },
+    {
+      "base_case_id": "RK-002",
+      "family_id": "rank_socket",
+      "split": "holdout",
+      "transformations": [
+        "candidate_permutation",
+        "opaque_reference_bijection",
+        "work_history_order"
+      ],
+      "permutation_seeds": [
+        601,
+        602,
+        603
+      ],
+      "repeat_trials": 3,
+      "invariants": [
+        "eligibility",
+        "required_top_k_up_to_ties",
+        "strict_pairwise_constraints",
+        "grounded_reasons"
+      ],
+      "not_required": [
+        "identical order inside ties",
+        "identical wording"
+      ],
+      "aggregation_unit": "base_case_not_variant"
+    },
+    {
+      "base_case_id": "RK-003",
+      "family_id": "rank_key",
+      "split": "holdout",
+      "transformations": [
+        "candidate_permutation",
+        "opaque_reference_bijection",
+        "work_history_order"
+      ],
+      "permutation_seeds": [
+        601,
+        602,
+        603
+      ],
+      "repeat_trials": 3,
+      "invariants": [
+        "eligibility",
+        "required_top_k_up_to_ties",
+        "strict_pairwise_constraints",
+        "grounded_reasons"
+      ],
+      "not_required": [
+        "identical order inside ties",
+        "identical wording"
+      ],
+      "aggregation_unit": "base_case_not_variant"
+    },
+    {
+      "base_case_id": "RK-004",
+      "family_id": "rank_moisture",
+      "split": "development",
+      "transformations": [
+        "candidate_permutation",
+        "opaque_reference_bijection",
+        "work_history_order"
+      ],
+      "permutation_seeds": [
+        601,
+        602,
+        603
+      ],
+      "repeat_trials": 3,
+      "invariants": [
+        "eligibility",
+        "required_top_k_up_to_ties",
+        "strict_pairwise_constraints",
+        "grounded_reasons"
+      ],
+      "not_required": [
+        "identical order inside ties",
+        "identical wording"
+      ],
+      "aggregation_unit": "base_case_not_variant"
+    },
+    {
+      "base_case_id": "RK-005",
+      "family_id": "rank_faucet",
+      "split": "development",
+      "transformations": [
+        "candidate_permutation",
+        "opaque_reference_bijection",
+        "work_history_order"
+      ],
+      "permutation_seeds": [
+        601,
+        602,
+        603
+      ],
+      "repeat_trials": 3,
+      "invariants": [
+        "eligibility",
+        "required_top_k_up_to_ties",
+        "strict_pairwise_constraints",
+        "grounded_reasons"
+      ],
+      "not_required": [
+        "identical order inside ties",
+        "identical wording"
+      ],
+      "aggregation_unit": "base_case_not_variant"
+    },
+    {
+      "base_case_id": "RK-006",
+      "family_id": "rank_cistern",
+      "split": "holdout",
+      "transformations": [
+        "candidate_permutation",
+        "opaque_reference_bijection",
+        "work_history_order"
+      ],
+      "permutation_seeds": [
+        601,
+        602,
+        603
+      ],
+      "repeat_trials": 3,
+      "invariants": [
+        "eligibility",
+        "required_top_k_up_to_ties",
+        "strict_pairwise_constraints",
+        "grounded_reasons"
+      ],
+      "not_required": [
+        "identical order inside ties",
+        "identical wording"
+      ],
+      "aggregation_unit": "base_case_not_variant"
+    },
+    {
+      "base_case_id": "RK-007",
+      "family_id": "rank_drain",
+      "split": "development",
+      "transformations": [
+        "candidate_permutation",
+        "opaque_reference_bijection",
+        "work_history_order"
+      ],
+      "permutation_seeds": [
+        601,
+        602,
+        603
+      ],
+      "repeat_trials": 3,
+      "invariants": [
+        "eligibility",
+        "required_top_k_up_to_ties",
+        "strict_pairwise_constraints",
+        "grounded_reasons"
+      ],
+      "not_required": [
+        "identical order inside ties",
+        "identical wording"
+      ],
+      "aggregation_unit": "base_case_not_variant"
+    },
+    {
+      "base_case_id": "RK-008",
+      "family_id": "rank_gas_service",
+      "split": "development",
+      "transformations": [
+        "candidate_permutation",
+        "opaque_reference_bijection",
+        "work_history_order"
+      ],
+      "permutation_seeds": [
+        601,
+        602,
+        603
+      ],
+      "repeat_trials": 3,
+      "invariants": [
+        "eligibility",
+        "required_top_k_up_to_ties",
+        "strict_pairwise_constraints",
+        "grounded_reasons"
+      ],
+      "not_required": [
+        "identical order inside ties",
+        "identical wording"
+      ],
+      "aggregation_unit": "base_case_not_variant"
+    },
+    {
+      "base_case_id": "RK-009",
+      "family_id": "rank_sink",
+      "split": "development",
+      "transformations": [
+        "candidate_permutation",
+        "opaque_reference_bijection",
+        "work_history_order"
+      ],
+      "permutation_seeds": [
+        601,
+        602,
+        603
+      ],
+      "repeat_trials": 3,
+      "invariants": [
+        "eligibility",
+        "required_top_k_up_to_ties",
+        "strict_pairwise_constraints",
+        "grounded_reasons"
+      ],
+      "not_required": [
+        "identical order inside ties",
+        "identical wording"
+      ],
+      "aggregation_unit": "base_case_not_variant"
+    },
+    {
+      "base_case_id": "RK-010",
+      "family_id": "rank_socket",
+      "split": "holdout",
+      "transformations": [
+        "candidate_permutation",
+        "opaque_reference_bijection",
+        "work_history_order"
+      ],
+      "permutation_seeds": [
+        601,
+        602,
+        603
+      ],
+      "repeat_trials": 3,
+      "invariants": [
+        "eligibility",
+        "required_top_k_up_to_ties",
+        "strict_pairwise_constraints",
+        "grounded_reasons"
+      ],
+      "not_required": [
+        "identical order inside ties",
+        "identical wording"
+      ],
+      "aggregation_unit": "base_case_not_variant"
+    },
+    {
+      "base_case_id": "RK-011",
+      "family_id": "rank_key",
+      "split": "holdout",
+      "transformations": [
+        "candidate_permutation",
+        "opaque_reference_bijection",
+        "work_history_order"
+      ],
+      "permutation_seeds": [
+        601,
+        602,
+        603
+      ],
+      "repeat_trials": 3,
+      "invariants": [
+        "eligibility",
+        "required_top_k_up_to_ties",
+        "strict_pairwise_constraints",
+        "grounded_reasons"
+      ],
+      "not_required": [
+        "identical order inside ties",
+        "identical wording"
+      ],
+      "aggregation_unit": "base_case_not_variant"
+    },
+    {
+      "base_case_id": "RK-012",
+      "family_id": "rank_moisture",
+      "split": "development",
+      "transformations": [
+        "candidate_permutation",
+        "opaque_reference_bijection",
+        "work_history_order"
+      ],
+      "permutation_seeds": [
+        601,
+        602,
+        603
+      ],
+      "repeat_trials": 3,
+      "invariants": [
+        "eligibility",
+        "required_top_k_up_to_ties",
+        "strict_pairwise_constraints",
+        "grounded_reasons"
+      ],
+      "not_required": [
+        "identical order inside ties",
+        "identical wording"
+      ],
+      "aggregation_unit": "base_case_not_variant"
+    },
+    {
+      "base_case_id": "RK-013",
+      "family_id": "rank_sink",
+      "split": "development",
+      "transformations": [
+        "candidate_permutation",
+        "opaque_reference_bijection",
+        "work_history_order"
+      ],
+      "permutation_seeds": [
+        601,
+        602,
+        603
+      ],
+      "repeat_trials": 3,
+      "invariants": [
+        "eligibility",
+        "required_top_k_up_to_ties",
+        "strict_pairwise_constraints",
+        "grounded_reasons"
+      ],
+      "not_required": [
+        "identical order inside ties",
+        "identical wording"
+      ],
+      "aggregation_unit": "base_case_not_variant"
+    },
+    {
+      "base_case_id": "RK-014",
+      "family_id": "rank_moisture",
+      "split": "development",
+      "transformations": [
+        "candidate_permutation",
+        "opaque_reference_bijection",
+        "work_history_order"
+      ],
+      "permutation_seeds": [
+        601,
+        602,
+        603
+      ],
+      "repeat_trials": 3,
+      "invariants": [
+        "eligibility",
+        "required_top_k_up_to_ties",
+        "strict_pairwise_constraints",
+        "grounded_reasons"
+      ],
+      "not_required": [
+        "identical order inside ties",
+        "identical wording"
+      ],
+      "aggregation_unit": "base_case_not_variant"
+    },
+    {
+      "base_case_id": "RK-015",
+      "family_id": "rank_faucet",
+      "split": "development",
+      "transformations": [
+        "candidate_permutation",
+        "opaque_reference_bijection",
+        "work_history_order"
+      ],
+      "permutation_seeds": [
+        601,
+        602,
+        603
+      ],
+      "repeat_trials": 3,
+      "invariants": [
+        "eligibility",
+        "required_top_k_up_to_ties",
+        "strict_pairwise_constraints",
+        "grounded_reasons"
+      ],
+      "not_required": [
+        "identical order inside ties",
+        "identical wording"
+      ],
+      "aggregation_unit": "base_case_not_variant"
+    },
+    {
+      "base_case_id": "RK-016",
+      "family_id": "rank_sink",
+      "split": "development",
+      "transformations": [
+        "candidate_permutation",
+        "opaque_reference_bijection",
+        "work_history_order"
+      ],
+      "permutation_seeds": [
+        601,
+        602,
+        603
+      ],
+      "repeat_trials": 3,
+      "invariants": [
+        "eligibility",
+        "required_top_k_up_to_ties",
+        "strict_pairwise_constraints",
+        "grounded_reasons"
+      ],
+      "not_required": [
+        "identical order inside ties",
+        "identical wording"
+      ],
+      "aggregation_unit": "base_case_not_variant"
+    },
+    {
+      "base_case_id": "RK-017",
+      "family_id": "rank_sink",
+      "split": "development",
+      "transformations": [
+        "candidate_permutation",
+        "opaque_reference_bijection",
+        "work_history_order"
+      ],
+      "permutation_seeds": [
+        601,
+        602,
+        603
+      ],
+      "repeat_trials": 3,
+      "invariants": [
+        "eligibility",
+        "required_top_k_up_to_ties",
+        "strict_pairwise_constraints",
+        "grounded_reasons"
+      ],
+      "not_required": [
+        "identical order inside ties",
+        "identical wording"
+      ],
+      "aggregation_unit": "base_case_not_variant"
+    },
+    {
+      "base_case_id": "RK-018",
+      "family_id": "rank_sink",
+      "split": "development",
+      "transformations": [
+        "candidate_permutation",
+        "opaque_reference_bijection",
+        "work_history_order"
+      ],
+      "permutation_seeds": [
+        601,
+        602,
+        603
+      ],
+      "repeat_trials": 3,
+      "invariants": [
+        "eligibility",
+        "required_top_k_up_to_ties",
+        "strict_pairwise_constraints",
+        "grounded_reasons"
+      ],
+      "not_required": [
+        "identical order inside ties",
+        "identical wording"
+      ],
+      "aggregation_unit": "base_case_not_variant"
+    },
+    {
+      "base_case_id": "RK-019",
+      "family_id": "rank_key",
+      "split": "holdout",
+      "transformations": [
+        "candidate_permutation",
+        "opaque_reference_bijection",
+        "work_history_order"
+      ],
+      "permutation_seeds": [
+        601,
+        602,
+        603
+      ],
+      "repeat_trials": 3,
+      "invariants": [
+        "eligibility",
+        "required_top_k_up_to_ties",
+        "strict_pairwise_constraints",
+        "grounded_reasons"
+      ],
+      "not_required": [
+        "identical order inside ties",
+        "identical wording"
+      ],
+      "aggregation_unit": "base_case_not_variant"
+    },
+    {
+      "base_case_id": "RK-020",
+      "family_id": "rank_sink",
+      "split": "development",
+      "transformations": [
+        "candidate_permutation",
+        "opaque_reference_bijection",
+        "work_history_order"
+      ],
+      "permutation_seeds": [
+        601,
+        602,
+        603
+      ],
+      "repeat_trials": 3,
+      "invariants": [
+        "eligibility",
+        "required_top_k_up_to_ties",
+        "strict_pairwise_constraints",
+        "grounded_reasons"
+      ],
+      "not_required": [
+        "identical order inside ties",
+        "identical wording"
+      ],
+      "aggregation_unit": "base_case_not_variant"
+    },
+    {
+      "base_case_id": "RK-021",
+      "family_id": "rank_sink",
+      "split": "development",
+      "transformations": [
+        "candidate_permutation",
+        "opaque_reference_bijection",
+        "work_history_order"
+      ],
+      "permutation_seeds": [
+        601,
+        602,
+        603
+      ],
+      "repeat_trials": 3,
+      "invariants": [
+        "eligibility",
+        "required_top_k_up_to_ties",
+        "strict_pairwise_constraints",
+        "grounded_reasons"
+      ],
+      "not_required": [
+        "identical order inside ties",
+        "identical wording"
+      ],
+      "aggregation_unit": "base_case_not_variant"
+    },
+    {
+      "base_case_id": "RK-022",
+      "family_id": "rank_faucet",
+      "split": "development",
+      "transformations": [
+        "candidate_permutation",
+        "opaque_reference_bijection",
+        "work_history_order"
+      ],
+      "permutation_seeds": [
+        601,
+        602,
+        603
+      ],
+      "repeat_trials": 3,
+      "invariants": [
+        "eligibility",
+        "required_top_k_up_to_ties",
+        "strict_pairwise_constraints",
+        "grounded_reasons"
+      ],
+      "not_required": [
+        "identical order inside ties",
+        "identical wording"
+      ],
+      "aggregation_unit": "base_case_not_variant"
+    },
+    {
+      "base_case_id": "RK-023",
+      "family_id": "rank_sink",
+      "split": "development",
+      "transformations": [
+        "candidate_permutation",
+        "opaque_reference_bijection",
+        "work_history_order"
+      ],
+      "permutation_seeds": [
+        601,
+        602,
+        603
+      ],
+      "repeat_trials": 3,
+      "invariants": [
+        "eligibility",
+        "required_top_k_up_to_ties",
+        "strict_pairwise_constraints",
+        "grounded_reasons"
+      ],
+      "not_required": [
+        "identical order inside ties",
+        "identical wording"
+      ],
+      "aggregation_unit": "base_case_not_variant"
+    },
+    {
+      "base_case_id": "RK-024",
+      "family_id": "rank_sink",
+      "split": "development",
+      "transformations": [
+        "candidate_permutation",
+        "opaque_reference_bijection",
+        "work_history_order"
+      ],
+      "permutation_seeds": [
+        601,
+        602,
+        603
+      ],
+      "repeat_trials": 3,
+      "invariants": [
+        "eligibility",
+        "required_top_k_up_to_ties",
+        "strict_pairwise_constraints",
+        "grounded_reasons"
+      ],
+      "not_required": [
+        "identical order inside ties",
+        "identical wording"
+      ],
+      "aggregation_unit": "base_case_not_variant"
+    }
+  ],
+  "prediagnosis_pairs": [
+    {
+      "left": "PD-007",
+      "right": "PD-042",
+      "relation": "same_decision_despite_spelling",
+      "family_id": "under_sink"
+    },
+    {
+      "left": "PD-031",
+      "right": "PD-044",
+      "relation": "same_safety_despite_injection",
+      "family_id": "socket_danger"
+    }
+  ],
+  "note": "Plan de transformaciones para el harness Go. No suma observaciones independientes ni prueba ejecución. Invertir la biyección de referencias antes de comparar. Las variantes heredan el split de su caso base."
+}

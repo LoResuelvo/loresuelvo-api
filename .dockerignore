@@ -9,3 +9,6 @@ coverage.out
 credenciales
 plan.md
 seeds
+evals/incoming
+evals/runs
+evals/.venv

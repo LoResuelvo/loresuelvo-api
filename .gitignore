@@ -4,3 +4,8 @@ coverage.out
 .vscode
 credenciales
 /plan.md
+
+# Local evaluation inputs, environments, and generated results
+/evals/incoming/
+/evals/runs/
+/evals/.venv/
