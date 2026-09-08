@@ -8,6 +8,15 @@ La aprobación de seguridad del modelo es independiente y nunca se infiere de la
 Véase la [evidencia de la medición inicial y la finalización](reports/2026-09-08-us60-completion.md):
 la herramienta fue entregada, pero los fallos de seguridad observados en el modelo impiden la aprobación.
 
+## Campañas completas publicadas
+
+- [US-60 — solución `76f683e`, dataset `1.1.0`](reports/2026-09-08-us60-solution-76f683e-dataset-1.1.0/README.md):
+  informe narrativo y [resultados por trial](reports/2026-09-08-us60-solution-76f683e-dataset-1.1.0/results.json),
+  medidos contra el [dataset numérico `1.1.0`](datasets/LoResuelvo_US60_evals_v1.1.0/README.md).
+
+Cada campaña completa se publica en un directorio propio identificado por la solución
+y la versión del dataset; no se combinan resultados de otras soluciones o datasets.
+
 ## Fuente e integridad
 
 - Especificación: https://github.com/LoResuelvo/loresuelvo-api/issues/205
