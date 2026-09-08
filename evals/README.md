@@ -2,8 +2,9 @@
 
 Status: offline contracts, local JSON Schema validation, deterministic scoring,
 bounded live execution, incremental journals, replay, and paired model comparison
-are implemented. Metamorphic execution, non-LLM baselines, semantic-review import,
-and final release evidence are pending. No model safety approval is implied.
+are implemented, including explicit metamorphic transformations, five non-LLM
+baselines, aggregate summaries, and provenance-bound semantic review import.
+Model safety approval is separate and is never inferred from tool completion.
 
 ## Source and integrity
 
@@ -164,15 +165,93 @@ make evals-compare ARGS='--left evals/runs/smoke-3.1-UNIQUE --right evals/runs/s
 ```
 
 Replay verifies integrity, planned case/trial coverage, retries and input/prompt
-hashes before scoring historical responses. Compare currently supports a model
+hashes before scoring historical responses. Compare defaults to a model
 change only: dataset, commit, suite, trials, generation configuration and paired
-inputs must match. Deliberately changed prompts/configurations need a subsequent
-explicit comparison policy; they are rejected rather than silently compared.
+inputs must match. Deliberate source, prompt/input, or generation changes require
+the corresponding `--allow-source-change`, `--allow-prompt-change`, or
+`--allow-generation-config-change` flag and a nonempty `--change-description`.
+Observed differences are reported; these flags never relax dataset, suite,
+case/trial coverage, request budget or operational-limit compatibility.
 Missing responses, invalid outputs and unassessed semantic criteria remain visible.
 No automatic `release_approved=true` path exists. Cost remains null without verified
-pricing. Summaries are JSON; richer aggregate/Markdown reporting remains pending.
+pricing. Aggregate summaries are JSON; checked-in concise Markdown reports link local evidence.
 
 Exit codes: 0 means the command completed without deterministic failures, 1 means
 recorded execution/contract/deterministic failures, and 2 means usage, configuration
 or integrity failure. Code 0 never certifies semantics or safety. Test commands do
 not execute this experimental battery or make model calls.
+
+
+## Baselines, transformations and review
+
+All commands below are offline unless explicitly labeled `live`. Ordinary tests
+continue to use synthetic fixtures; none executes this experimental battery.
+
+```bash
+make evals-baselines ARGS='--suite development'
+make evals-summary ARGS='--run evals/runs/RUN'
+make -s evals-review-template ARGS='--run evals/runs/RUN' > evals/runs/RUN/review-template.json
+# Copy to a new review file, assess actual responses and fill evidence/provenance.
+make evals-review ARGS='--run evals/runs/RUN --reviews evals/runs/RUN/reviews-v1.json'
+```
+
+Review documents bind the run ID, dataset and attempt-journal hashes, each raw
+output hash, and criterion hash. Assessed entries require evidence, reviewer,
+reviewer kind (`human` or `agent`) and UTC timestamp. Missing responses cannot
+receive positive assessments; unknown, duplicate or stale entries are rejected.
+Agent judgments remain visibly agent-authored and pending human safety review.
+No import can set `release_approved=true`. Review revisions use separate files;
+original journals and the frozen dataset are not edited.
+
+Ranking policies are frozen in code and serialized in the baseline report:
+seeded random (601), rating average, paid-work count, Bayesian rating (prior mean
+3, prior count 5), and lexical token-set Jaccard. Lexical normalization lowercases,
+removes accents, and splits Unicode letters/digits; no stopwords or stemming.
+The query uses problem title/description; candidate text uses work descriptions,
+completion reports and reviews. Non-random score ties use reference ascending.
+Algorithms receive only eligible input evidence, never expected relevance.
+
+Summaries show base-case weighting, terminal retries, complete trial coverage,
+technical failures, observed latency/token subtotals and unknown coverage. Base
+quality and transformed quality are reported separately. Do not compare mixed
+variants against base-only baselines or treat repeated trials/families as
+independent production samples. Cost stays null without verified prices.
+
+Explicit transformation preview for one selected development case:
+
+```bash
+make evals-plan ARGS='--suite development --cases RK-001 --metamorphic --trials 3 --model gemini-3.5-flash-lite --max-requests 30'
+```
+
+This includes three base trials plus three transformations × three seeds × three
+trials: 30 requests, not 30 independent cases. `--cases` can only narrow the named
+suite. `--metamorphic` uses exact frozen seeds and repeat counts. No counterpart,
+holdout case or retry is selected implicitly. The whole development transform
+plan has 486 variant attempts plus 162 base attempts and must not be mistaken
+for a budget-safe single-day run under a 500-request quota.
+
+After explicit authorization, use that plan with `live`, `--allow-live`, all
+finite limit flags and a new output directory. For example, a 30-request run can
+use `--attempt-timeout 90s --global-timeout 30m --min-interval 5s
+--max-output-tokens 4096`. The interval permits at most 12 request starts/minute
+per invocation; concurrent invocations and other applications share provider
+quotas and must be budgeted together. A displayed quota is not a guarantee of
+provider availability. HTTP 503 remains a technical failure, not a quality miss.
+
+```bash
+make evals-metamorphic-report ARGS='--run evals/runs/TRANSFORMED-RUN'
+```
+
+The original transformed input/output stays in the journal. Scoring reconstructs
+and inverts reference bijections; the report pairs matching trials and records
+seed, parent and split. Top-three membership is compared modulo ties, while
+strict order is checked only by explicit pairwise constraints. No-op transforms
+and missing/invalid outputs remain unassessed. Frozen PD pairs can be compared
+from any run containing both members; absent members stay visible, never added
+implicitly. Matching decisions do not certify injection resistance.
+
+A failing measured baseline is a valid finding. Closing US-60 does not approve a
+model release, prove risk zero, demonstrate real-photo accuracy, or establish
+user-effort reduction. Reserve use remains a separate, conscious operation after
+development decisions are frozen; unexecuted critical reserve cases remain
+unassessed and preclude release approval.

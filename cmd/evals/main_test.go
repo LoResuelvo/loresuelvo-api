@@ -80,7 +80,7 @@ func TestLiveRequiresOptInAndCredentials(t *testing.T) {
 	require.Contains(t, stderr.String(), "CHATBOT_API_KEY")
 }
 func TestOfflineCommandsRejectLiveFlag(t *testing.T) {
-	for _, command := range []string{"validate", "contract", "replay", "compare"} {
+	for _, command := range []string{"validate", "contract", "replay", "compare", "baselines", "summary", "review", "review-template", "metamorphic-report"} {
 		var out, stderr bytes.Buffer
 		require.Equal(t, 2, run([]string{command, "--allow-live"}, &out, &stderr))
 		require.Contains(t, stderr.String(), "flag provided but not defined")
@@ -91,4 +91,23 @@ func TestRejectsOutputInsideDatasetWithoutCreatingDirectories(t *testing.T) {
 	require.Error(t, checkOutputDirectory(root, root+"/nested/run"))
 	_, err := os.Stat(root + "/nested")
 	require.True(t, os.IsNotExist(err))
+}
+
+func TestPlanSelectionCannotEscapeSuite(t *testing.T) {
+	var out, stderr bytes.Buffer
+	code := run([]string{"plan", "--dataset", cliDataset(t), "--suite", "smoke", "--cases", "RK-001", "--model", "unused", "--max-requests", "10"}, &out, &stderr)
+	require.Equal(t, 2, code)
+	require.Contains(t, stderr.String(), "selected cases must belong")
+}
+
+func TestNewOfflineCommandsRequireExplicitEvidence(t *testing.T) {
+	t.Setenv("CHATBOT_API_KEY", "")
+	root := cliDataset(t)
+	for _, command := range []string{"summary", "review-template", "review", "metamorphic-report", "baselines"} {
+		t.Run(command, func(t *testing.T) {
+			var out, stderr bytes.Buffer
+			require.Equal(t, 2, run([]string{command, "--dataset", root}, &out, &stderr))
+			require.NotEmpty(t, stderr.String())
+		})
+	}
 }

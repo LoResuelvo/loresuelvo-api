@@ -42,7 +42,7 @@ func runContext(ctx context.Context, args []string, stdout, stderr io.Writer) in
 	}
 	command := args[0]
 	switch command {
-	case "validate", "plan", "contract", "live", "replay", "compare":
+	case "validate", "plan", "contract", "live", "replay", "compare", "baselines", "summary", "review-template", "review", "metamorphic-report":
 	default:
 		fmt.Fprintf(stderr, "unsupported command %q; no model calls were made\n", command)
 		return 2
@@ -51,10 +51,11 @@ func runContext(ctx context.Context, args []string, stdout, stderr io.Writer) in
 	flags.SetOutput(stderr)
 	root := flags.String("dataset", defaultDataset, "immutable dataset directory")
 	var options evals.PlanOptions
+	var comparisonOptions evals.CompareOptions
 	var limits evals.ExecutionLimits
 	var allowLive, dryRun bool
 	var tokens int
-	var output, runDirectory, left, right string
+	var output, runDirectory, left, right, caseIDs, reviewPath string
 	if command == "plan" || command == "live" {
 		flags.StringVar(&options.Suite, "suite", "", "explicit suite: smoke, development, holdout, critical_all")
 		flags.StringVar(&options.Model, "model", "", "explicit requested model identifier")
@@ -62,6 +63,8 @@ func runContext(ctx context.Context, args []string, stdout, stderr io.Writer) in
 		flags.IntVar(&options.MaxRetries, "max-retries", 0, "maximum retries per execution")
 		flags.IntVar(&options.MaxRequests, "max-requests", 0, "positive request ceiling, including retries")
 		flags.BoolVar(&options.AllowHoldout, "allow-holdout", false, "explicitly authorize reserve cases")
+		flags.BoolVar(&options.Metamorphic, "metamorphic", false, "explicitly include frozen ranking transformations; requires frozen repeat count")
+		flags.StringVar(&caseIDs, "cases", "", "optional comma-separated case subset of the selected suite")
 	}
 	if command == "live" {
 		flags.BoolVar(&allowLive, "allow-live", false, "authorize provider calls for this invocation")
@@ -72,11 +75,22 @@ func runContext(ctx context.Context, args []string, stdout, stderr io.Writer) in
 		flags.DurationVar(&limits.MinInterval, "min-interval", 0, "positive minimum interval between attempts")
 		flags.IntVar(&tokens, "max-output-tokens", 0, "positive maximum output tokens per generation")
 		flags.StringVar(&output, "out", "", "new run directory (must not exist)")
-	} else if command == "replay" {
+	} else if command == "replay" || command == "summary" || command == "review-template" || command == "review" || command == "metamorphic-report" {
 		flags.StringVar(&runDirectory, "run", "", "completed run directory")
+		if command == "review" {
+			flags.StringVar(&reviewPath, "reviews", "", "semantic review JSON file")
+		}
 	} else if command == "compare" {
 		flags.StringVar(&left, "left", "", "left completed run directory")
 		flags.StringVar(&right, "right", "", "right completed run directory")
+		flags.BoolVar(&comparisonOptions.AllowSourceChange, "allow-source-change", false, "declare intentional source commit change")
+		flags.BoolVar(&comparisonOptions.AllowPromptChange, "allow-prompt-change", false, "declare intentional effective prompt/input change")
+		flags.BoolVar(&comparisonOptions.AllowGenerationConfigChange, "allow-generation-config-change", false, "declare intentional generation configuration change")
+		flags.StringVar(&comparisonOptions.ChangeDescription, "change-description", "", "explain deliberate comparison changes")
+	}
+	if command == "baselines" {
+		flags.StringVar(&options.Suite, "suite", "", "explicit suite")
+		flags.BoolVar(&options.AllowHoldout, "allow-holdout", false, "authorize reserve scoring")
 	}
 	if err := flags.Parse(args[1:]); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
@@ -130,6 +144,12 @@ func runContext(ctx context.Context, args []string, stdout, stderr io.Writer) in
 			}
 			options.Trials = dataset.ExperimentTrials[key]
 		}
+		if caseIDs != "" {
+			options.CaseIDs = strings.Split(caseIDs, ",")
+			for i := range options.CaseIDs {
+				options.CaseIDs[i] = strings.TrimSpace(options.CaseIDs[i])
+			}
+		}
 		plan, planErr := evals.BuildPlan(dataset, options)
 		if planErr != nil {
 			fmt.Fprintln(stderr, planErr)
@@ -164,12 +184,55 @@ func runContext(ctx context.Context, args []string, stdout, stderr io.Writer) in
 		if report.DeterministicFailures > 0 {
 			code = 1
 		}
+	case "baselines":
+		options.Model = "offline-baselines"
+		options.Trials = 1
+		options.MaxRequests = len(dataset.PD) + len(dataset.RK)
+		var plan *evals.Plan
+		plan, err = evals.BuildPlan(dataset, options)
+		if err == nil {
+			ids := make([]string, 0)
+			for _, c := range plan.Cases {
+				if strings.HasPrefix(c.CaseID, "RK-") {
+					ids = append(ids, c.CaseID)
+				}
+			}
+			result, err = evals.EvaluateRankingBaselines(dataset, ids)
+		}
+	case "summary":
+		result, err = summarizeRun(dataset, runDirectory)
+	case "review-template":
+		result, err = evals.NewSemanticReviewTemplate(dataset, runDirectory)
+	case "review":
+		if reviewPath == "" {
+			fmt.Fprintln(stderr, "--reviews is required")
+			return 2
+		}
+		var document evals.SemanticReviewDocument
+		document, err = evals.ReadSemanticReviews(reviewPath)
+		if err == nil {
+			var reviewed evals.SemanticReviewReport
+			reviewed, err = evals.ApplySemanticReviews(dataset, runDirectory, document)
+			result = reviewed
+			if reviewed.ResultCounts["fail"] > 0 || reviewed.Report.DeterministicFailures > 0 {
+				code = 1
+			}
+		}
+	case "metamorphic-report":
+		var transformed evals.MetamorphicReport
+		transformed, err = evals.ReplayMetamorphic(dataset, runDirectory)
+		result = transformed
+		for _, observation := range transformed.Observations {
+			if observation.Comparison.DeterministicStatus == "failed" {
+				code = 1
+			}
+		}
 	case "compare":
 		if left == "" || right == "" {
 			fmt.Fprintln(stderr, "--left and --right are required")
 			return 2
 		}
-		result, err = evals.Compare(dataset, left, right)
+		result, err = evals.CompareWithOptions(dataset, left, right, comparisonOptions)
 	}
 	if err != nil {
 		fmt.Fprintln(stderr, err)
@@ -293,5 +356,10 @@ func usage(out io.Writer) {
 	fmt.Fprintln(out, "       evals live [plan flags] --allow-live --attempt-timeout D --global-timeout D --min-interval D --max-output-tokens N --out DIR")
 	fmt.Fprintln(out, "       evals live [plan and limit flags] --dry-run")
 	fmt.Fprintln(out, "       evals replay --run DIR | evals compare --left DIR --right DIR")
+	fmt.Fprintln(out, "       evals baselines --suite NAME [--allow-holdout]")
+	fmt.Fprintln(out, "       evals summary|review-template|metamorphic-report --run DIR")
+	fmt.Fprintln(out, "       evals review --run DIR --reviews FILE")
+	fmt.Fprintln(out, "Plan/live: --cases ID,ID limits the suite; --metamorphic adds frozen transformations with --trials 3.")
+	fmt.Fprintln(out, "Compare deliberate changes: --allow-source-change/--allow-prompt-change/--allow-generation-config-change plus --change-description TEXT.")
 	fmt.Fprintln(out, "Offline modes never call a model. Live needs explicit opt-in and CHATBOT_API_KEY. Semantic review is never automatically approved.")
 }

@@ -121,3 +121,15 @@ evals-replay:
 
 evals-compare:
 	go run ./cmd/evals compare $(ARGS)
+
+.PHONY: evals-baselines evals-summary evals-review-template evals-review evals-metamorphic-report
+evals-baselines:
+	go run ./cmd/evals baselines $(ARGS)
+evals-summary:
+	go run ./cmd/evals summary $(ARGS)
+evals-review-template:
+	go run ./cmd/evals review-template $(ARGS)
+evals-review:
+	go run ./cmd/evals review $(ARGS)
+evals-metamorphic-report:
+	go run ./cmd/evals metamorphic-report $(ARGS)
