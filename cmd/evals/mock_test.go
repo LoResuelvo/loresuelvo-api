@@ -23,6 +23,9 @@ func cliDataset(t *testing.T) string {
 		"configs/experiment.json":          `{"trials":{"smoke":1,"baseline_development":3,"release":3}}`,
 		"assets/manifest.json":             `{"assets":[]}`,
 	}
+	for _, name := range []string{"prediagnosis", "ranking", "service_contracts", "prediagnosis-output", "ranking-output"} {
+		files["schemas/"+name+".schema.json"] = `{"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object"}`
+	}
 	hashes := make(map[string]string)
 	for name, content := range files {
 		path := filepath.Join(root, name)

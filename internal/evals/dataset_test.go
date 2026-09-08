@@ -27,6 +27,9 @@ func writeDatasetFixture(t *testing.T) string {
 		"configs/experiment.json": `{"trials":{"smoke":1,"baseline_development":3,"release":3}}
 `,
 	}
+	for _, name := range []string{"prediagnosis", "ranking", "service_contracts", "prediagnosis-output", "ranking-output"} {
+		files["schemas/"+name+".schema.json"] = `{"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object"}`
+	}
 	manifest := datasetManifest{Version: "1.0.0", HashAlgorithm: "SHA-256", Files: make(map[string]string)}
 	for name, data := range files {
 		path := filepath.Join(root, name)

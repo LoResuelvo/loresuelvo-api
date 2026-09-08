@@ -45,6 +45,7 @@ type Dataset struct {
 	CT               []CTCase
 	Suites           map[string][]string
 	ExperimentTrials map[string]int
+	schemaFiles      map[string][]byte
 	assets           map[string]ImageInput
 }
 type datasetManifest struct {
@@ -87,7 +88,7 @@ func LoadDataset(root string) (*Dataset, error) {
 		}
 		verifiedFiles[name] = data
 	}
-	for _, required := range []string{"datasets/prediagnosis.jsonl", "datasets/ranking.jsonl", "datasets/service_contracts.jsonl", "configs/suites.json", "configs/experiment.json", "assets/manifest.json"} {
+	for _, required := range []string{"datasets/prediagnosis.jsonl", "datasets/ranking.jsonl", "datasets/service_contracts.jsonl", "configs/suites.json", "configs/experiment.json", "assets/manifest.json", "schemas/prediagnosis.schema.json", "schemas/ranking.schema.json", "schemas/service_contracts.schema.json", "schemas/prediagnosis-output.schema.json", "schemas/ranking-output.schema.json"} {
 		if _, ok := manifest.Files[required]; !ok {
 			return nil, fmt.Errorf("%w: untracked required file %q", ErrInvalidDataset, required)
 		}
@@ -96,7 +97,10 @@ func LoadDataset(root string) (*Dataset, error) {
 	if err != nil {
 		return nil, fmt.Errorf("resolve dataset root: %w", err)
 	}
-	d := &Dataset{Root: absolute, Version: manifest.Version, ManifestSHA256: digest(raw)}
+	if err := ValidateDatasetSchemas(verifiedFiles); err != nil {
+		return nil, err
+	}
+	d := &Dataset{Root: absolute, Version: manifest.Version, ManifestSHA256: digest(raw), schemaFiles: verifiedFiles}
 	if d.PD, err = readCases[PDCase](verifiedFiles["datasets/prediagnosis.jsonl"], "datasets/prediagnosis.jsonl"); err != nil {
 		return nil, err
 	}
