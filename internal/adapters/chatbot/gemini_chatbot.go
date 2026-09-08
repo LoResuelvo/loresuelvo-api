@@ -18,9 +18,10 @@ import (
 const defaultGeminiModel = "gemini-2.5-flash"
 
 type GeminiChatbot struct {
-	apiKey string
-	model  string
-	client *http.Client
+	apiKey  string
+	model   string
+	client  *http.Client
+	options GeminiOptions
 }
 
 type providerRankingRequestPayload struct {
@@ -95,11 +96,10 @@ func (chatbot *GeminiChatbot) AnswerHomeProblemQuestion(ctx context.Context, que
 		return nil, fmt.Errorf("creating Gemini client: %w", err)
 	}
 
-	result, err := client.Models.GenerateContent(
-		ctx,
-		chatbot.model,
+	result, err := chatbot.generateContent(
+		ctx, client, "answer_home_problem",
 		chatbot.answerContent(question, availableCategories),
-		&genai.GenerateContentConfig{ResponseMIMEType: "application/json"},
+		chatbot.generationConfig(),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("generating chatbot response: %w", err)
@@ -131,11 +131,10 @@ func (chatbot *GeminiChatbot) SummarizeHomeProblemConversation(ctx context.Conte
 		return "", fmt.Errorf("creating Gemini client: %w", err)
 	}
 
-	result, err := client.Models.GenerateContent(
-		ctx,
-		chatbot.model,
+	result, err := chatbot.generateContent(
+		ctx, client, "summarize_home_problem",
 		genai.Text(chatbot.summaryPrompt(previousSummary, messages)),
-		&genai.GenerateContentConfig{ResponseMIMEType: "application/json"},
+		chatbot.generationConfig(),
 	)
 	if err != nil {
 		return "", fmt.Errorf("generating chatbot summary: %w", err)
@@ -163,11 +162,10 @@ func (chatbot *GeminiChatbot) RankProviders(ctx context.Context, request convers
 		return nil, fmt.Errorf("building provider ranking prompt: %w", err)
 	}
 
-	result, err := client.Models.GenerateContent(
-		ctx,
-		chatbot.model,
+	result, err := chatbot.generateContent(
+		ctx, client, "rank_chatbot_providers",
 		genai.Text(prompt),
-		&genai.GenerateContentConfig{ResponseMIMEType: "application/json"},
+		chatbot.generationConfig(),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("generating provider ranking: %w", err)
