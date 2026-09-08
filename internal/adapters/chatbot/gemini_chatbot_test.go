@@ -87,6 +87,8 @@ func TestAnswerPromptRequiresStructuredProfessionalDiagnosis(t *testing.T) {
 	}
 	assert.Contains(t, prompt, "Separá hechos observados de hipótesis")
 	assert.Contains(t, prompt, "nunca presentes una causa como confirmada")
+	assert.Contains(t, prompt, "en title, content y todos los campos de assessment")
+	assert.Contains(t, prompt, "No conviertas un equipo en encendido o utilizado")
 }
 
 func TestAnswerPromptBoundsInformationCollection(t *testing.T) {
@@ -134,11 +136,20 @@ func TestAnswerPromptPrioritizesImmediateCriticalSafetyGuidance(t *testing.T) {
 	for _, rule := range []string{
 		"no lo uses, toques, abras ni desenchufes",
 		"Si hay humo o fuego, retirate",
+		"Incluí explícitamente en la guía eléctrica la contingencia",
+		"aunque todavía no se hayan reportado",
+		"El humo actual requiere contacto inmediato con emergencias",
+		"no esperes a que persista ni a que aparezcan llamas",
 		"salir de inmediato al aire libre",
 		"No demores la salida para apagar, ventilar ni buscar el origen",
 		"olor a gas o un silbido",
 		"no formules preguntas",
 		"content debe comenzar con las medidas inmediatas",
+		"rechazala explícitamente en content",
+		"no sigas rearmándola",
+		"No supongas que existe acceso seguro al tablero",
+		"No pidas desplazarse ni acercarse",
+		"No incluyas números de teléfono de emergencia",
 	} {
 		assert.Contains(t, prompt, rule)
 	}
@@ -155,6 +166,31 @@ func TestAnswerPromptSeparatesImageDescriptionFromEvidenceSelection(t *testing.T
 	assert.Contains(t, prompt, "no aporta evidencia física observable")
 	assert.Contains(t, prompt, "describila, pero no la selecciones")
 	assert.Contains(t, prompt, "un código de error mostrado por el equipo")
+}
+
+func TestAnswerPromptAllowsRelevantDiagramsWithoutTreatingThemAsPhysicalProof(t *testing.T) {
+	prompt := (&GeminiChatbot{}).answerPrompt(
+		conversation.ChatbotHomeProblemQuestion{UserMessage: "Adjunto un boceto del componente."},
+		nil,
+	)
+
+	assert.Contains(t, prompt, "Un esquema o boceto puede seleccionarse")
+	assert.Contains(t, prompt, "representa el componente o síntoma pertinente")
+	assert.Contains(t, prompt, "no prueba un estado físico real")
+	assert.Contains(t, prompt, "temperatura, daño ni causa")
+}
+
+func TestAnswerPromptKeepsRoutineUncertaintyDistinctFromActiveHazards(t *testing.T) {
+	prompt := (&GeminiChatbot{}).answerPrompt(
+		conversation.ChatbotHomeProblemQuestion{UserMessage: "Todavía no sé cuál es el origen."},
+		nil,
+	)
+
+	assert.Contains(t, prompt, "Una posibilidad sin señales concretas no activa por sí sola una regla de riesgo")
+	assert.Contains(t, prompt, "no equivale por sí solo a olor a gas o a quemado")
+	assert.Contains(t, prompt, "agua reaparece pero su origen es desconocido")
+	assert.Contains(t, prompt, "precaución condicional sobre electricidad")
+	assert.Contains(t, prompt, "comprobación externa, reversible y de bajo riesgo")
 }
 
 func TestAnswerPromptRequiresCompleteExactWireShape(t *testing.T) {
@@ -211,6 +247,8 @@ func TestProviderRankingPromptForbidsUnsupportedAvailabilityClaims(t *testing.T)
 	assert.Contains(t, prompt, "identidad, matrícula, precio, tiempo de respuesta")
 	assert.Contains(t, prompt, "sin historial ni reputación registrados")
 	assert.Contains(t, prompt, "no finjas que el orden expresa mérito")
+	assert.Contains(t, prompt, "conservá explícitamente esa incertidumbre en cada razón")
+	assert.Contains(t, prompt, "no afirmes una especialidad única como concluyente")
 }
 
 func TestParseProviderRankingResponseMapsGeminiWireContract(t *testing.T) {
