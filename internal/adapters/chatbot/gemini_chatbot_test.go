@@ -120,6 +120,54 @@ func TestAnswerPromptRequiresActionableSelfServiceGuide(t *testing.T) {
 	assert.Contains(t, prompt, "el resultado no debe ser self_service")
 }
 
+func TestAnswerPromptPrioritizesImmediateCriticalSafetyGuidance(t *testing.T) {
+	prompt := (&GeminiChatbot{}).answerPrompt(
+		conversation.ChatbotHomeProblemQuestion{UserMessage: "Hay una situación peligrosa."},
+		[]category.Category{{Name: "Electricidad"}, {Name: "Gas"}},
+	)
+
+	safetySection := strings.Index(prompt, "Prioridad ante riesgo activo:")
+	sufficiencySection := strings.Index(prompt, "Puerta de suficiencia:")
+	require.NotEqual(t, -1, safetySection)
+	require.NotEqual(t, -1, sufficiencySection)
+	assert.Less(t, safetySection, sufficiencySection)
+	for _, rule := range []string{
+		"no lo uses, toques, abras ni desenchufes",
+		"Si hay humo o fuego, retirate",
+		"salir de inmediato al aire libre",
+		"No demores la salida para apagar, ventilar ni buscar el origen",
+		"olor a gas o un silbido",
+		"no formules preguntas",
+		"content debe comenzar con las medidas inmediatas",
+	} {
+		assert.Contains(t, prompt, rule)
+	}
+}
+
+func TestAnswerPromptSeparatesImageDescriptionFromEvidenceSelection(t *testing.T) {
+	prompt := (&GeminiChatbot{}).answerPrompt(
+		conversation.ChatbotHomeProblemQuestion{UserMessage: "Adjunto una captura."},
+		nil,
+	)
+
+	assert.Contains(t, prompt, "Describir una imagen no implica seleccionarla")
+	assert.Contains(t, prompt, "cuyo único aporte sea texto con instrucciones")
+	assert.Contains(t, prompt, "no aporta evidencia física observable")
+	assert.Contains(t, prompt, "describila, pero no la selecciones")
+	assert.Contains(t, prompt, "un código de error mostrado por el equipo")
+}
+
+func TestAnswerPromptRequiresCompleteExactWireShape(t *testing.T) {
+	prompt := (&GeminiChatbot{}).answerPrompt(
+		conversation.ChatbotHomeProblemQuestion{UserMessage: "Necesito orientación."},
+		nil,
+	)
+
+	assert.Contains(t, prompt, "Todas las claves mostradas en Salida son obligatorias")
+	assert.Contains(t, prompt, "aunque su valor deba ser vacío")
+	assert.Contains(t, prompt, "usá exactamente esos nombres y no claves alternativas")
+}
+
 func TestProviderRankingPromptMapsDomainDataToGeminiWireContract(t *testing.T) {
 	recentWork := time.Date(2026, time.August, 20, 12, 0, 0, 0, time.UTC)
 	prompt, err := (&GeminiChatbot{}).providerRankingPrompt(conversation.ProviderRankingRequest{
@@ -148,6 +196,23 @@ func TestProviderRankingPromptMapsDomainDataToGeminiWireContract(t *testing.T) {
 	assert.NotContains(t, prompt, `"ProviderID"`)
 }
 
+func TestProviderRankingPromptForbidsUnsupportedAvailabilityClaims(t *testing.T) {
+	prompt, err := (&GeminiChatbot{}).providerRankingPrompt(conversation.ProviderRankingRequest{
+		ProblemTitle: "Pérdida bajo pileta",
+		MaxResults:   3,
+		Candidates: []conversation.ProviderRecommendationCandidate{{
+			Reference: "candidate-without-history",
+		}},
+	})
+
+	require.NoError(t, err)
+	assert.Contains(t, prompt, "La ausencia de un campo significa que se desconoce")
+	assert.Contains(t, prompt, "no infieras disponibilidad ni agenda")
+	assert.Contains(t, prompt, "identidad, matrícula, precio, tiempo de respuesta")
+	assert.Contains(t, prompt, "sin historial ni reputación registrados")
+	assert.Contains(t, prompt, "no finjas que el orden expresa mérito")
+}
+
 func TestParseProviderRankingResponseMapsGeminiWireContract(t *testing.T) {
 	response, err := parseProviderRankingResponse(`{"recommendations":[{"reference":" candidate-1 ","reason":" experiencia comprobable "}]}`)
 
@@ -155,4 +220,11 @@ func TestParseProviderRankingResponseMapsGeminiWireContract(t *testing.T) {
 	require.Len(t, response.Recommendations, 1)
 	assert.Equal(t, "candidate-1", response.Recommendations[0].Reference)
 	assert.Equal(t, "experiencia comprobable", response.Recommendations[0].Reason)
+}
+
+func TestParseProviderRankingResponseRejectsRootArray(t *testing.T) {
+	response, err := parseProviderRankingResponse(`[{"reference":"candidate-1","reason":"experiencia"}]`)
+
+	require.Error(t, err)
+	assert.Nil(t, response)
 }
