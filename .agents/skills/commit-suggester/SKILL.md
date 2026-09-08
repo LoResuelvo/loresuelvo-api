@@ -1,6 +1,6 @@
 ---
 name: commit-suggester
-description: Use when the user asks to suggest, draft, choose, or format a git commit message for the current changes. Follow the project's Conventional Commit style: <type>[optional scope]: <description>, with the allowed types and optional us-x scope convention.
+description: Use when the user asks to suggest, draft, choose, or format a git commit message for the current changes. Follow the project's Conventional Commit style: <type>[N°US]: <description>, with the allowed types and bracketed user-story number convention.
 ---
 
 # Commit Suggester
@@ -28,14 +28,14 @@ Do not use `add` as a commit type; use `feat` for added user-facing behavior or 
 
 ## Scope
 
-- Scope is optional.
-- Prefer `us-x` only when the change clearly belongs to a user story or the user explicitly provides it.
-- If no clear story scope exists, omit the scope.
+- For a user story, put its number in square brackets: `feat[60]: description`.
+- Do not use parentheses or a `us-` prefix.
+- If no user story applies, omit the bracketed number.
 
 Examples:
 
 ```text
-feat(us-1): protect consumer registration with auth0 token
+feat[1]: protect consumer registration with auth0 token
 ```
 
 ```text
