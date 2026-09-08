@@ -1,0 +1,77 @@
+{
+  "version": "1.0.0",
+  "approval_status": "finalized_for_implementation",
+  "kind": "proposed_product_safety_messages_not_existing_api_contract",
+  "use": "Textos finales de diseño para implementar una salida de seguridad acotada. Debe evaluarse también la detección de riesgo. No contiene teléfonos: resolver por jurisdicción fuera del LLM.",
+  "routes": [
+    {
+      "route": "gas_emergency_now",
+      "canonical_message": "Salí a un lugar seguro y llamá al servicio de emergencias de tu distribuidora de gas desde afuera. No enciendas llamas ni acciones interruptores o aparatos dentro. No intentes ajustar, reparar ni localizar la pérdida. No retrases la salida para ventilar o cerrar una llave si implica acercarte al peligro. No vuelvas a entrar hasta que el personal de emergencia lo autorice.",
+      "source_ids": [
+        "SRC-GAS-UTILITY",
+        "SRC-GAS-AR"
+      ],
+      "expert_validation": false,
+      "classification": "documentary_grounded_conservative_product_policy"
+    },
+    {
+      "route": "co_emergency_now",
+      "canonical_message": "Salí de inmediato al aire libre y solicitá asistencia del servicio local de emergencias desde un lugar seguro; comunicá la alarma o los síntomas. Si hay síntomas, pedí asistencia médica urgente. No permanezcas dentro buscando el origen, no silencies la alarma para seguir usando el ambiente y no reingreses hasta recibir autorización. No vuelvas a usar el artefacto sospechoso sin revisión competente.",
+      "source_ids": [
+        "SRC-CO-ALARM",
+        "SRC-CO-AR"
+      ],
+      "expert_validation": false,
+      "classification": "documentary_grounded_conservative_product_policy"
+    },
+    {
+      "route": "urgent_electrical",
+      "canonical_message": "Dejá de usar el punto o equipo afectado. No lo toques ni lo abras y no sigas rearmando una protección que dispara. Mantené distancia y pedí asistencia eléctrica urgente. No te acerques al riesgo ni atravieses agua para cortar la energía. Si hay humo o fuego, retirate y llamá al servicio local de emergencias desde un lugar seguro.",
+      "source_ids": [
+        "SRC-ELECTRIC",
+        "SRC-WATER-ELECTRIC"
+      ],
+      "expert_validation": false,
+      "classification": "documentary_grounded_conservative_product_policy"
+    },
+    {
+      "route": "electrical_emergency_now",
+      "canonical_message": "Alejate de la zona y mantené a otras personas fuera. No toques el agua, cables, enchufes ni equipos mojados; no cruces el agua para alcanzar el tablero ni intentes desenchufarlos. Pedí asistencia de emergencia desde un lugar seguro e indicá que hay agua junto a electricidad. No vuelvas a usar la instalación afectada hasta su inspección competente.",
+      "source_ids": [
+        "SRC-WATER-ELECTRIC",
+        "SRC-FLOOD"
+      ],
+      "expert_validation": false,
+      "classification": "documentary_grounded_conservative_product_policy"
+    },
+    {
+      "route": "structural_emergency_now",
+      "canonical_message": "Salí del área situada bajo el cielorraso afectado y mantené a otras personas lejos. No lo pinches, empujes ni apuntales y no subas a revisarlo. Pedí asistencia urgente al servicio local correspondiente e informá el abombamiento, el agua y los ruidos. No vuelvas al área hasta que se determine que es segura.",
+      "source_ids": [
+        "SRC-CEILING"
+      ],
+      "expert_validation": false,
+      "classification": "documentary_grounded_conservative_product_policy"
+    },
+    {
+      "route": "flood_emergency_now",
+      "canonical_message": "Retirate del área que se está inundando y pedí asistencia urgente desde un lugar seguro. No atravieses agua para alcanzar llaves o tableros y no toques equipos, cables o conexiones mojadas. La seguridad inmediata tiene prioridad; después habrá que resolver la pérdida y revisar las instalaciones afectadas.",
+      "source_ids": [
+        "SRC-FLOOD",
+        "SRC-WATER-ELECTRIC"
+      ],
+      "expert_validation": false,
+      "classification": "documentary_grounded_conservative_product_policy"
+    },
+    {
+      "route": "fire_emergency_now",
+      "canonical_message": "Retirate del área con humo o fuego, mantené a otras personas fuera y llamá al servicio local de emergencias desde un lugar seguro. No intentes abrir, reparar ni probar la instalación afectada y no te acerques al peligro para cortar la energía. No reingreses hasta recibir autorización.",
+      "source_ids": [
+        "SRC-ELECTRIC",
+        "SRC-WATER-ELECTRIC"
+      ],
+      "expert_validation": false,
+      "classification": "documentary_grounded_conservative_product_policy"
+    }
+  ]
+}

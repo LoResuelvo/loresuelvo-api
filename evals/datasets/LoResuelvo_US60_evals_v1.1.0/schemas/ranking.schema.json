@@ -1,0 +1,400 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "LoResuelvo ranking case",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^RK-[0-9]{3}$"
+    },
+    "version": {
+      "const": "1.0.0"
+    },
+    "task": {
+      "const": "ranking"
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1
+    },
+    "group": {
+      "type": "string",
+      "minLength": 1
+    },
+    "family_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "split": {
+      "enum": [
+        "development",
+        "holdout"
+      ]
+    },
+    "origin": {
+      "enum": [
+        "synthetic_authored_case",
+        "public_scenario_adaptation"
+      ]
+    },
+    "review_status": {
+      "const": "finalized"
+    },
+    "execution_scope": {
+      "enum": [
+        "adapter"
+      ]
+    },
+    "provenance": {
+      "type": "object",
+      "properties": {
+        "policy_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "source_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "label_basis": {
+          "type": "string",
+          "minLength": 1
+        },
+        "rationale": {
+          "type": "string",
+          "minLength": 1
+        },
+        "expert_validation": {
+          "const": false
+        },
+        "created_on": {
+          "type": "string",
+          "format": "date"
+        },
+        "scenario_source_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "scenario_basis": {
+          "enum": [
+            "authored_control",
+            "public_question_adapted"
+          ]
+        },
+        "adaptation_notes": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "policy_ids",
+        "source_ids",
+        "label_basis",
+        "rationale",
+        "expert_validation",
+        "created_on",
+        "scenario_source_ids",
+        "scenario_basis",
+        "adaptation_notes"
+      ],
+      "additionalProperties": false
+    },
+    "input": {
+      "type": "object",
+      "properties": {
+        "problem_title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "problem_description": {
+          "type": "string",
+          "minLength": 1
+        },
+        "max_results": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 3
+        },
+        "candidates": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "reference": {
+                "type": "string",
+                "minLength": 1
+              },
+              "evidence": {
+                "type": "object",
+                "properties": {
+                  "rating_average": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 5
+                  },
+                  "rating_count": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "rating_distribution": {
+                    "type": "array",
+                    "minItems": 5,
+                    "maxItems": 5,
+                    "items": {
+                      "type": "integer",
+                      "minimum": 0
+                    }
+                  },
+                  "paid_work_count": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "most_recent_paid_work": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "work_history": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "integer",
+                          "minimum": 1
+                        },
+                        "scheduled_on": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "description": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "status": {
+                          "enum": [
+                            "paid"
+                          ]
+                        },
+                        "completion_report": {
+                          "type": "object",
+                          "properties": {
+                            "description": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "reported_on": {
+                              "type": "string",
+                              "format": "date-time"
+                            }
+                          },
+                          "required": [
+                            "description",
+                            "reported_on"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "review": {
+                          "type": "object",
+                          "properties": {
+                            "rating": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 5
+                            },
+                            "description": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "rating",
+                            "description"
+                          ],
+                          "additionalProperties": false
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "scheduled_on",
+                        "description",
+                        "status"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "minItems": 0
+                  }
+                },
+                "required": [
+                  "rating_average",
+                  "rating_count",
+                  "rating_distribution",
+                  "paid_work_count",
+                  "most_recent_paid_work",
+                  "work_history"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "reference",
+              "evidence"
+            ],
+            "additionalProperties": false
+          },
+          "minItems": 0
+        }
+      },
+      "required": [
+        "problem_title",
+        "problem_description",
+        "max_results",
+        "candidates"
+      ],
+      "additionalProperties": false
+    },
+    "expected": {
+      "type": "object",
+      "properties": {
+        "eligible_references": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 0,
+          "uniqueItems": true
+        },
+        "relevance": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 3
+          }
+        },
+        "pairwise_constraints": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "higher": {
+                "type": "string",
+                "minLength": 1
+              },
+              "lower": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "required": [
+              "higher",
+              "lower"
+            ],
+            "additionalProperties": false
+          },
+          "minItems": 0
+        },
+        "tie_groups": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "minItems": 2,
+            "uniqueItems": true
+          },
+          "minItems": 0
+        },
+        "required_top_k": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 0,
+          "uniqueItems": true
+        },
+        "min_results": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "semantic_assertions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "severity": {
+                "enum": [
+                  "critical",
+                  "major",
+                  "minor"
+                ]
+              },
+              "criterion": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "required": [
+              "id",
+              "severity",
+              "criterion"
+            ],
+            "additionalProperties": false
+          },
+          "minItems": 1
+        }
+      },
+      "required": [
+        "eligible_references",
+        "relevance",
+        "pairwise_constraints",
+        "tie_groups",
+        "required_top_k",
+        "min_results",
+        "semantic_assertions"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "id",
+    "version",
+    "task",
+    "title",
+    "group",
+    "family_id",
+    "split",
+    "origin",
+    "review_status",
+    "execution_scope",
+    "provenance",
+    "input",
+    "expected"
+  ],
+  "additionalProperties": false
+}
