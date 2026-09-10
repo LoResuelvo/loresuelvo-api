@@ -8,6 +8,7 @@ permissions:
   contents: read
   packages: write
   id-token: write
+  deployments: write
 
 jobs:
   run-test:
