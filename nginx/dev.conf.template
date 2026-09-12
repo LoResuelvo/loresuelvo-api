@@ -70,10 +70,15 @@ server {
 
     # Mercado Pago return URLs: redirect to localhost so the browser keeps
     # its session cookies instead of landing on the tunnel domain.
-    location ^~ /payments/ {
-        return 302 http://localhost:3000$request_uri;
+    location = /.well-known/assetlinks.json {
+        alias /etc/nginx/assetlinks/assetlinks.json;
+        default_type application/json;
     }
 
+    location ^~ /payments/ {
+        proxy_pass http://dev_web;
+    }
+    
     # Browser routes go to the web app.
     location / {
         proxy_pass http://dev_web;

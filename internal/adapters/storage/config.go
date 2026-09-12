@@ -13,6 +13,20 @@ type Config struct {
 	Environment       string
 	Provider          string
 	Endpoint          string
+	// PresignEndpoint is the host the presigned S3 URLs are signed
+	// against. When empty, the presign client uses [Endpoint]
+	// (which works when the API container and the storage live on
+	// the same network — Docker Compose, single-host deploy).
+	//
+	// Set this to a host the *client* (browser, Android device,
+	// webapp) can reach when the API's storage host is a
+	// Docker-internal alias the client can't resolve (e.g. the
+	// default `minio.localhost` alias). The signature is bound
+	// to the host header, so the presign endpoint and the URL
+	// the client PUTs to must agree; a separate presign client
+	// lets the API keep using the internal alias for its own
+	// `GetObject` / `HeadObject` calls.
+	PresignEndpoint   string
 	Region            string
 	PublicBucket      string
 	PrivateBucket     string
@@ -27,6 +41,7 @@ func NewConfigFromEnv() Config {
 		Environment:       envOrDefault("ENVIRONMENT", "development"),
 		Provider:          envOrDefault("STORAGE_PROVIDER", "memory"),
 		Endpoint:          strings.TrimSpace(os.Getenv("STORAGE_ENDPOINT")),
+		PresignEndpoint:   strings.TrimSpace(os.Getenv("STORAGE_PRESIGN_ENDPOINT")),
 		Region:            envOrDefault("STORAGE_REGION", "auto"),
 		PublicBucket:      envOrDefault("STORAGE_PUBLIC_BUCKET", "loresuelvo-public-local"),
 		PrivateBucket:     envOrDefault("STORAGE_PRIVATE_BUCKET", "loresuelvo-private-local"),

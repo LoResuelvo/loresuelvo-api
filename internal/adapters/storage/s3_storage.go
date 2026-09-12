@@ -35,9 +35,32 @@ func NewS3Storage(config Config) *S3Storage {
 		}
 	})
 
+	// AWS SigV4 binds the signature to the host header. When the
+	// API container talks to MinIO via a Docker-internal alias
+	// (`minio.localhost`) but the device must reach MinIO via a
+	// LAN address (`192.168.0.12`), the URL the presign client
+	// generates must be signed against the LAN host — otherwise
+	// the device PUTs succeed at the network layer but the
+	// storage signature is invalid (403 SignatureDoesNotMatch).
+	//
+	// We therefore spin up a second S3 client whose endpoint is
+	// [Config.PresignEndpoint] (when set). Falling back to the
+	// primary client keeps staging / prod unaffected — they
+	// already serve storage on the same host the API uses.
+	presignClient := s3.NewPresignClient(client)
+	if strings.TrimSpace(config.PresignEndpoint) != "" &&
+		!strings.EqualFold(strings.TrimSpace(config.PresignEndpoint), strings.TrimSpace(config.Endpoint)) {
+		presignClient = s3.NewPresignClient(
+			s3.NewFromConfig(awsConfig, func(options *s3.Options) {
+				options.BaseEndpoint = aws.String(config.PresignEndpoint)
+				options.UsePathStyle = true
+			}),
+		)
+	}
+
 	return &S3Storage{
 		client:           client,
-		presignClient:    s3.NewPresignClient(client),
+		presignClient:    presignClient,
 		publicBaseURL:    strings.TrimRight(config.PublicBaseURL, "/"),
 		presignExpiresIn: func(options *s3.PresignOptions) { options.Expires = config.PresignExpiration },
 	}
