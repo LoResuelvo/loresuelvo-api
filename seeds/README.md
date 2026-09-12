@@ -33,30 +33,4 @@ SEEDS_FILE=seeds/providers-100.yaml
 
 To upload only the assets manually, use `make seed-assets-local`.
 
-## Production S3/R2 upload
-
-Upload the image objects before enabling the DB seed:
-
-```bash
-docker compose -f compose.prod.yml --profile tools run --rm seed-assets
-```
-
-Required environment variables:
-
-```bash
-STORAGE_PUBLIC_BUCKET=<public bucket>
-STORAGE_ENDPOINT=<optional S3-compatible endpoint>
-STORAGE_REGION=<region>
-STORAGE_ACCESS_KEY_ID=<access key>
-STORAGE_SECRET_ACCESS_KEY=<secret key>
-```
-
-After the upload, deploy or restart the API with:
-
-```bash
-SEEDS_ENABLED=true
-SEEDS_FILE=seeds/providers-100.yaml
-```
-
-The seed is idempotent. Disable `SEEDS_ENABLED` after verification if the
-environment should not keep reapplying seed data on startup.
+Production and staging deployment configuration is owned by `infra-devops`.

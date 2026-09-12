@@ -10,7 +10,7 @@ description: Use when managing Docker setup, docker-compose configurations, or p
 - `Dockerfile` — multi-stage build (builder + alpine runtime).
 - `Dockerfile.dev` — development with live reloading.
 - `docker-compose.yml` — local dev: api-dev, swagger-ui, dev-db, test-db.
-- `compose.prod.yml` — production: api, nginx, certbot.
+- Production deployment is owned by the `infra-devops` repository.
 
 ## Key Services
 
@@ -19,11 +19,6 @@ description: Use when managing Docker setup, docker-compose configurations, or p
 - `swagger-ui` : OpenAPI docs
 - `dev-db` : PostgreSQL 16 for development
 - `test-db` : PostgreSQL 16 for tests
-
-### Production (`compose.prod.yml`)
-- `api` : Go API (no exposed port — internal)
-- `nginx` : Reverse proxy with SSL (Let's Encrypt)
-- `certbot` : TLS certificate management
 
 ## Common Commands
 
@@ -38,13 +33,12 @@ make swagger      # Start Swagger UI standalone
 
 ## Nginx
 
-- Location: `nginx/default.conf`
-- SSL/TLS 1.2+ only.
-- Proxies: api (8080), web (3000), gestion (3000).
-- Server names: api.loresuelvo.com.ar, loresuelvo.com.ar, gestion.loresuelvo.com.ar.
+- Local development only: `nginx/dev.conf.template`.
+- Serves local Android App Links configuration and proxies the API and web app.
+- Production gateway configuration lives in `infra-devops`.
 
 ## Adding a New Service
 
-1. Add service definition to `docker-compose.yml` / `compose.prod.yml`.
+1. Add local services to `docker-compose.yml`; add deployed services to `infra-devops`.
 2. If new env vars needed, add to `.env.example` and document.
 3. Update `Makefile` if new targets required.
