@@ -67,12 +67,4 @@ Los fallos semánticos por slot en primary fueron 52/162 para 3.1 y 60/162 para 
 - `USD 6.366080` es el **accounted conservador**, que incluye reservas ante usage metadata desconocida. Ninguna cifra representa costo observado en factura ni cargo facturado.
 - `provider_usage_complete=false`; por eso `report.json` deja `cost=null` en las operaciones.
 
-## Gráficas
-
-- `coverage.svg`: cobertura terminal, evaluable y semántica.
-- `quality.svg`: calidad por modelo y tarea.
-- `operations.svg`: latencia y completitud de telemetría.
-- `ranking.svg`: métricas de ranking frente a baselines.
-- `variability.svg`: variación entre trials.
-
 El bundle es transcript-free: no contiene prompts, imágenes, respuestas crudas, provider payloads, rutas privadas ni secretos. `report.json` conserva únicamente agregados y filas por caso/trial con hashes, estados, métricas y códigos necesarios para analizar failure modes.
