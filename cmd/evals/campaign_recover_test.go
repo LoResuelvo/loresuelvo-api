@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
@@ -37,4 +38,44 @@ func TestCampaignRecoveryUpperBoundUsesHighestConfiguredPrice(t *testing.T) {
 	config := evals.CampaignExecutionConfig{Prices: []evals.CampaignPrice{{InputUSDPerMillion: .25, OutputUSDPerMillion: 1.5}, {InputUSDPerMillion: .3, OutputUSDPerMillion: 2.5}}}
 	require.InDelta(t, .01624, campaignRecoveryUpperBound(1, config), .000001)
 	require.InDelta(t, .06496, campaignRecoveryUpperBound(4, config), .000001)
+}
+
+func TestWriteRecoveryEvidenceOverlayResolvesOriginalRelativePaths(t *testing.T) {
+	originalDir := t.TempDir()
+	outputDir := filepath.Join(t.TempDir(), "recovery-output")
+	require.NoError(t, os.MkdirAll(outputDir, 0700))
+	originalPath := filepath.Join(originalDir, "evidence.json")
+	document := map[string]any{
+		"phases": []any{map[string]any{
+			"runs": []any{map[string]any{
+				"run_directory":             "runs/model-run",
+				"semantic_reviews":          "reviews/agent.json",
+				"recovery_semantic_reviews": "reviews/recovery-agent.json",
+			}},
+		}},
+	}
+	data, err := json.Marshal(document)
+	require.NoError(t, err)
+	require.NoError(t, os.WriteFile(originalPath, data, 0600))
+	recoveryPath := filepath.Join(outputDir, "recovery", "model-run.json")
+	require.NoError(t, writeRecoveryEvidenceOverlay(originalPath, filepath.Join(outputDir, "evidence-with-recovery.json"), map[string]string{
+		filepath.Join(originalDir, "runs/model-run"): recoveryPath,
+	}))
+
+	data, err = os.ReadFile(filepath.Join(outputDir, "evidence-with-recovery.json"))
+	require.NoError(t, err)
+	var written map[string]any
+	require.NoError(t, json.Unmarshal(data, &written))
+	phases, ok := written["phases"].([]any)
+	require.True(t, ok)
+	phase, ok := phases[0].(map[string]any)
+	require.True(t, ok)
+	runs, ok := phase["runs"].([]any)
+	require.True(t, ok)
+	run, ok := runs[0].(map[string]any)
+	require.True(t, ok)
+	require.Equal(t, filepath.Join(originalDir, "runs/model-run"), run["run_directory"])
+	require.Equal(t, filepath.Join(originalDir, "reviews/agent.json"), run["semantic_reviews"])
+	require.Equal(t, filepath.Join(originalDir, "reviews/recovery-agent.json"), run["recovery_semantic_reviews"])
+	require.Equal(t, "recovery/model-run.json", run["recovery_evidence"])
 }

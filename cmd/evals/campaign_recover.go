@@ -494,17 +494,40 @@ func writeRecoveryEvidenceOverlay(originalPath, output string, recoveryByRun map
 			if rel == "" {
 				continue
 			}
-			resolved := rel
-			if !filepath.IsAbs(resolved) {
-				resolved, _ = filepath.Abs(filepath.Join(filepath.Dir(originalPath), rel))
+			resolved, resolveErr := resolveOriginalEvidencePath(originalPath, rel)
+			if resolveErr != nil {
+				return resolveErr
 			}
+			run["run_directory"] = resolved
 			if recovery, found := recoveryByRun[resolved]; found {
 				relRecovery, _ := filepath.Rel(filepath.Dir(output), recovery)
 				run["recovery_evidence"] = filepath.ToSlash(relRecovery)
 			}
+			for _, field := range []string{"semantic_reviews", "recovery_semantic_reviews"} {
+				value, _ := run[field].(string)
+				if value == "" {
+					continue
+				}
+				resolvedReview, resolveErr := resolveOriginalEvidencePath(originalPath, value)
+				if resolveErr != nil {
+					return resolveErr
+				}
+				run[field] = resolvedReview
+			}
 		}
 	}
 	return writeExclusiveJSON(output, document)
+}
+
+func resolveOriginalEvidencePath(originalPath, target string) (string, error) {
+	if filepath.IsAbs(target) {
+		return filepath.Clean(target), nil
+	}
+	base, err := filepath.Abs(filepath.Dir(originalPath))
+	if err != nil {
+		return "", fmt.Errorf("resolve original evidence path: %w", err)
+	}
+	return filepath.Clean(filepath.Join(base, target)), nil
 }
 
 func newRecoveryID() string { return "campaign-recovery-" + uuid.NewString() }
