@@ -12,7 +12,7 @@ func TestCapturedBodyAttributesRedactsSensitiveIdentityFieldsRecursively(t *test
 	original := []byte(`{
 		"email":"sensitive@example.invalid",
 		"profile":{"Auth-ID":"auth0|redact-me","user_id":42},
-		"metadata":[{"ADMIN-SEED-EMAIL":"seed@example.invalid"},{"admin.seed.auth.id":"auth0|seed-redact-me"}]
+		"contacts":[{"EMAIL":"contact@example.invalid"},{"auth.id":"auth0|contact-redact-me"}]
 	}`)
 	_, err := capture.Write(original)
 	require.NoError(t, err)
@@ -28,10 +28,10 @@ func TestCapturedBodyAttributesRedactsSensitiveIdentityFieldsRecursively(t *test
 	require.True(t, ok)
 	require.Equal(t, "[REDACTED]", profile["Auth-ID"])
 	require.Equal(t, json.Number("42"), profile["user_id"])
-	metadata, ok := redacted["metadata"].([]any)
+	contacts, ok := redacted["contacts"].([]any)
 	require.True(t, ok)
-	require.Equal(t, "[REDACTED]", metadata[0].(map[string]any)["ADMIN-SEED-EMAIL"])
-	require.Equal(t, "[REDACTED]", metadata[1].(map[string]any)["admin.seed.auth.id"])
+	require.Equal(t, "[REDACTED]", contacts[0].(map[string]any)["EMAIL"])
+	require.Equal(t, "[REDACTED]", contacts[1].(map[string]any)["auth.id"])
 }
 
 func TestRedactJSONValueDoesNotMutateOriginalValue(t *testing.T) {

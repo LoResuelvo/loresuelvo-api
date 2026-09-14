@@ -17,23 +17,21 @@ const maximumLoggedBodyBytes = 8 * 1024
 var errAdditionalJSONValue = errors.New("additional JSON value")
 
 var sensitiveJSONFields = map[string]struct{}{
-	"admin_seed_auth_id": {},
-	"admin_seed_email":   {},
-	"access_token":       {},
-	"auth_id":            {},
-	"authorization":      {},
-	"client_secret":      {},
-	"code":               {},
-	"code_verifier":      {},
-	"email":              {},
-	"headers":            {},
-	"id_token":           {},
-	"password":           {},
-	"refresh_token":      {},
-	"signature":          {},
-	"state":              {},
-	"token":              {},
-	"upload_url":         {},
+	"access_token":  {},
+	"auth_id":       {},
+	"authorization": {},
+	"client_secret": {},
+	"code":          {},
+	"code_verifier": {},
+	"email":         {},
+	"headers":       {},
+	"id_token":      {},
+	"password":      {},
+	"refresh_token": {},
+	"signature":     {},
+	"state":         {},
+	"token":         {},
+	"upload_url":    {},
 }
 
 type limitedBodyCapture struct {
