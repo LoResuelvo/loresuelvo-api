@@ -3,12 +3,12 @@
 This folder contains optional seed data for fake provider profiles used to
 hydrate local, staging, or production environments. The administrator profile
 is deliberately **not** stored here: its Auth0 identity and e-mail are
-per-environment secrets and are provisioned by the API's mandatory startup
+per-environment secrets and are provisioned by the API's optional startup
 seed.
 
-## Mandatory admin profile
+## Optional admin profile
 
-Every API environment must provide these variables before startup:
+To provision an administrator during startup, provide all four variables:
 
 ```bash
 # Sensitive values: inject from the environment's secret manager.
@@ -23,9 +23,10 @@ ADMIN_SEED_SURNAME=<admin-surname>
 logs, or copied between tenants. Auth0 creates the identity; the API creates
 the corresponding local `users` row with `role = 'admin'`. This seed runs
 before the API accepts requests, independently of `SEEDS_ENABLED`, and is
-idempotent for the same values. Missing, invalid, or conflicting values fail
-startup rather than promoting or overwriting an existing user. Do not add the
-admin to a YAML seed file or provision it with a manual SQL query.
+idempotent for the same values. When all four variables are absent, the API
+skips the admin seed. A partial configuration, invalid values, or conflicting
+values fail startup rather than promoting or overwriting an existing user. Do
+not add the admin to a YAML seed file or provision it with a manual SQL query.
 
 ## Generate provider seeds
 
@@ -58,5 +59,5 @@ SEEDS_FILE=seeds/providers-100.yaml
 To upload only the assets manually, use `make seed-assets-local`.
 
 Production and staging deployment configuration is owned by `infra-devops`.
-That repository must map the two sensitive values to its secret store and the
-name/surname values to ordinary deployment configuration for each environment.
+Environments that use the admin seed must map the two sensitive values to its
+secret store and the name/surname values to ordinary deployment configuration.

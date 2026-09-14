@@ -48,7 +48,7 @@ func NewApplication(ctx context.Context, database *sql.DB, logger *slog.Logger) 
 
 func seedApplicationDataFromEnv(ctx context.Context, database *sql.DB) error {
 	if err := SeedAdminFromEnv(ctx, database); err != nil {
-		return fmt.Errorf("seeding mandatory administrator: %w", err)
+		return fmt.Errorf("seeding configured administrator: %w", err)
 	}
 	if err := SeedDefaultDataFromEnv(ctx, database); err != nil {
 		return fmt.Errorf("seeding default data: %w", err)

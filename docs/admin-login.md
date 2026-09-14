@@ -81,10 +81,10 @@ manual mínima de `GET /me` es:
 Para el tercer caso usar una identidad temporal sin aprovisionamiento local;
 no borrar ni modificar el administrador real para fabricar la prueba.
 
-## 3. Configurar la semilla obligatoria por entorno
+## 3. Configurar la semilla opcional por entorno
 
-Antes de iniciar la API, configurar estas variables en el mecanismo de
-secretos/configuración del entorno:
+Para aprovisionar un administrador al iniciar la API, configurar estas cuatro
+variables en el mecanismo de secretos/configuración del entorno:
 
 | Variable | Tipo | Uso |
 | --- | --- | --- |
@@ -102,10 +102,11 @@ entornos.
 La API lee las cuatro variables y ejecuta la semilla dentro de una transacción
 antes de abrir el servidor HTTP. La semilla:
 
+- se omite cuando las cuatro variables están ausentes;
 - crea el perfil con `role = 'admin'` cuando no existe;
 - no depende de `SEEDS_ENABLED` ni de ningún archivo YAML de proveedores;
 - repetir el arranque con los mismos valores es un no-op;
-- falla el arranque si falta una variable, un valor no es válido, el
+- falla el arranque si la configuración es parcial, un valor no es válido, el
   `auth_id` ya pertenece a otro correo/rol, o el correo ya pertenece a otra
   identidad;
 - nunca promueve, reasigna ni sobrescribe un usuario existente.

@@ -16,7 +16,16 @@ const (
 	testAdminSeedSurname = "Administrator"
 )
 
-func TestAdminSeedConfigFromEnvRequiresEveryValue(t *testing.T) {
+func TestAdminSeedConfigFromEnvAllowsEveryValueToBeAbsent(t *testing.T) {
+	clearAdminSeedEnvironment(t)
+
+	config, err := adminSeedConfigFromEnv()
+
+	require.NoError(t, err)
+	assert.Equal(t, adminSeedConfig{}, config)
+}
+
+func TestAdminSeedConfigFromEnvRequiresEveryValueWhenConfigured(t *testing.T) {
 	variables := []string{adminSeedAuthIDEnv, adminSeedEmailEnv, adminSeedNameEnv, adminSeedSurnameEnv}
 	for _, missingVariable := range variables {
 		t.Run(missingVariable, func(t *testing.T) {
@@ -29,6 +38,23 @@ func TestAdminSeedConfigFromEnvRequiresEveryValue(t *testing.T) {
 			assert.ErrorContains(t, err, missingVariable)
 		})
 	}
+}
+
+func TestSeedAdminFromEnvSkipsSeedingWhenConfigurationIsAbsent(t *testing.T) {
+	clearAdminSeedEnvironment(t)
+
+	err := SeedAdminFromEnv(context.Background(), nil)
+
+	require.NoError(t, err)
+}
+
+func TestApplicationSeedingSucceedsWithoutAdminConfiguration(t *testing.T) {
+	clearAdminSeedEnvironment(t)
+	t.Setenv("SEEDS_ENABLED", "false")
+
+	err := seedApplicationDataFromEnv(context.Background(), nil)
+
+	require.NoError(t, err)
 }
 
 func TestAdminSeedConfigFromEnvTrimsValues(t *testing.T) {
@@ -102,4 +128,12 @@ func setValidAdminSeedEnvironment(t *testing.T) {
 	t.Setenv(adminSeedEmailEnv, testAdminSeedEmail)
 	t.Setenv(adminSeedNameEnv, testAdminSeedName)
 	t.Setenv(adminSeedSurnameEnv, testAdminSeedSurname)
+}
+
+func clearAdminSeedEnvironment(t *testing.T) {
+	t.Helper()
+	t.Setenv(adminSeedAuthIDEnv, "")
+	t.Setenv(adminSeedEmailEnv, "")
+	t.Setenv(adminSeedNameEnv, "")
+	t.Setenv(adminSeedSurnameEnv, "")
 }

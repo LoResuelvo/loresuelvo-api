@@ -37,6 +37,9 @@ func SeedAdminFromEnv(ctx context.Context, database *sql.DB) error {
 	if err != nil {
 		return err
 	}
+	if config == (adminSeedConfig{}) {
+		return nil
+	}
 
 	configuredAdmin, err := admin.NewAdmin(config.authID, config.email, config.name, config.surname, nil)
 	if err != nil {
@@ -45,7 +48,7 @@ func SeedAdminFromEnv(ctx context.Context, database *sql.DB) error {
 
 	repository := repositories.NewUserRepository(database)
 	if err := repository.EnsureAdmin(ctx, configuredAdmin); err != nil {
-		return fmt.Errorf("ensuring mandatory administrator: %w", err)
+		return fmt.Errorf("ensuring configured administrator: %w", err)
 	}
 	return nil
 }
@@ -56,6 +59,9 @@ func adminSeedConfigFromEnv() (adminSeedConfig, error) {
 		email:   strings.TrimSpace(os.Getenv(adminSeedEmailEnv)),
 		name:    strings.TrimSpace(os.Getenv(adminSeedNameEnv)),
 		surname: strings.TrimSpace(os.Getenv(adminSeedSurnameEnv)),
+	}
+	if config == (adminSeedConfig{}) {
+		return config, nil
 	}
 
 	requiredValues := []struct {

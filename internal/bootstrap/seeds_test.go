@@ -145,7 +145,7 @@ func TestSeedDefaultDataRollsBackWhenProviderCoverageZoneDoesNotExist(t *testing
 	assert.Zero(t, userCount)
 }
 
-func TestApplicationSeedsMandatoryAdminWhenDefaultSeedsAreDisabledAndRejectsProviderTakeover(t *testing.T) {
+func TestApplicationSeedsConfiguredAdminWhenDefaultSeedsAreDisabledAndRejectsProviderTakeover(t *testing.T) {
 	tests := []struct {
 		name         string
 		providerAuth string
