@@ -1,8 +1,24 @@
 # Evaluaciones US-60
 
-**Estado: golden dataset preparado; el bundle canónico de Campaign 1 está pendiente
-de exportación y validación.** No hay umbrales empíricos calibrados: la validación
+**Estado: golden dataset preparado; Campaign 1 publicada y Campaign 2 congelada para ejecución (`frozen_for_execution`).** No hay umbrales empíricos de release calibrados: la validación
 de los materiales no demuestra calidad ni seguridad del chatbot.
+
+## Análisis y Campaign 2
+
+- [Failure modes de Campaign 1](analysis/campaign-1-failure-modes-v1.md)
+- [Auditoría limitada de revisiones](analysis/campaign-1-review-audit-v1.jsonl)
+- [Protocolo Campaign 2](protocols/campaign-2.json) y [recovery addendum](protocols/campaign-2-recovery-addendum.json)
+- `calibration/assessments-independent-v1.json` registra cinco controles agente independientes: 5/5 aciertos de clasificación (2 expected pass y 3 expected fail), 0 falsos positivos, 0 falsos negativos y 0 unassessed; no es certificación ni demuestra que todo el evaluador esté calibrado. `assessments-reference-v1.json` es sólo referencia contractual y no gate.
+
+El protocolo de Campaign 2 fija como baseline de solución el commit
+`e2c9c5b3ae58470c3d9a094fc82a9dc86b8068ab` y los hashes de sus seis archivos
+del adaptador chatbot. El `execution_source_commit` de las evidencias debe ser
+el commit exacto desde el que se ejecute la campaña, que además contiene este
+protocolo congelado. El recovery addendum versionado aquí es sólo un borrador
+provisional ligado al commit de solución para evitar una referencia circular:
+si existen slots recuperables, antes de llamar nuevamente al proveedor se debe
+versionar otro addendum que apunte al `execution_source_commit` real de la
+campaña y preserve los diarios originales.
 
 ## Dataset canónico
 

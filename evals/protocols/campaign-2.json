@@ -1,0 +1,140 @@
+{
+  "protocol_version": "1.0.0",
+  "campaign_id": "campaign-2",
+  "status": "frozen_for_execution",
+  "purpose": "Comparación reproducible de la solución candidata posterior a Campaign 1 contra la misma suite development, con instrumento de evaluación versionado y calibrado por separado.",
+  "dataset_version": "1.0.0",
+  "dataset_manifest_sha256": "063a87355225013229cb2415bbb96d99a41b0de97525f2a5e99fcf7df813802e",
+  "scope": "development",
+  "expected_trials": 3,
+  "allow_holdout": false,
+  "dataset": {
+    "path": "evals/datasets/LoResuelvo_US60_evals_v1.0.0",
+    "version": "1.0.0",
+    "manifest_sha256": "063a87355225013229cb2415bbb96d99a41b0de97525f2a5e99fcf7df813802e",
+    "split": "development",
+    "holdout_allowed": false
+  },
+  "solution": {
+    "baseline_source_commit": "e2c9c5b3ae58470c3d9a094fc82a9dc86b8068ab",
+    "baseline_files": {
+      "internal/adapters/chatbot/gemini_chatbot.go": "7e6392a7b82759edb210cc3e0f95fbac823dd21920b0bea8534239f6f515bb1e",
+      "internal/adapters/chatbot/gemini_generation.go": "a542d8078c0058e77ebc72ef2e1ab746610bf71549d67e321f32e02d8e246c0c",
+      "internal/adapters/chatbot/gemini_json.go": "2a59bae9a7997dc6899de99abffc712cf515f810d92bad2026c9e1790a6967c2",
+      "internal/adapters/chatbot/gemini_schema.go": "ce90399783e9d5f683dde4cf00d3cccb33e4bafc1fe49e66532f49a6ca1ce52f",
+      "internal/adapters/chatbot/gemini_chatbot_test.go": "d0c78ec1a1ed18fa8c80792ec57982e1aecbc0c910c02f437994e8479f25efdd",
+      "internal/adapters/chatbot/gemini_generation_test.go": "b51e0fbc24cef55b6d6c3359b257a819cd07219bcccac63457b2e83d0a9a86b6"
+    },
+    "require_clean_tree_before_live": true,
+    "prompt_change_allowed": true,
+    "generation_config_change_allowed": true,
+    "quality_fixes_allowed": true,
+    "parent_campaign_id": "campaign-1",
+    "change_description": "Operation-specific response schemas and strict local parsing, plus bounded prompt changes for transversal safety guidance, grounding, question sufficiency, image relevance, and honest cold-start ranking explanations."
+  },
+  "models": [
+    {
+      "requested_model": "gemini-3.1-flash-lite"
+    },
+    {
+      "requested_model": "gemini-3.5-flash-lite"
+    }
+  ],
+  "execution": {
+    "concurrency": 1,
+    "max_retries": 0,
+    "retry_for_quality": false,
+    "attempt_timeout_seconds": 90,
+    "global_timeout_seconds": 16200,
+    "min_interval_seconds": 15,
+    "max_output_tokens": 4096,
+    "primary": {
+      "suite": "development",
+      "cases": 54,
+      "trials_per_case": 3,
+      "calls_total": 324,
+      "included_in_campaign_ceiling": true
+    },
+    "smoke": {
+      "suite": "smoke",
+      "cases": 18,
+      "trials_per_case": 1,
+      "calls_total": 36,
+      "included_in_campaign_ceiling": true
+    },
+    "maximum_provider_calls_total": 360,
+    "contracts": {
+      "suite": "contract",
+      "execution": "offline_once",
+      "excluded_from_provider_call_count": true
+    },
+    "ranking_baselines": {
+      "execution": "offline_once",
+      "methods": [
+        "seeded_random",
+        "rating_average",
+        "paid_work_count",
+        "bayesian_rating_with_fixed_prior",
+        "frozen_lexical_heuristic"
+      ],
+      "excluded_from_provider_call_count": true
+    },
+    "metamorphic": {
+      "enabled": false,
+      "reason": "Se reportará como fase offline separada si se ejecuta; no se mezclará con el denominador primario."
+    }
+  },
+  "budget": {
+    "currency": "USD",
+    "hard_ceiling": 10.0,
+    "guard_required_before_live": true,
+    "guard_policy": "Verificar precios el día de ejecución y contar solicitudes efectivas con una cota superior conservadora usando el mayor precio aplicable. Rechazar si la cota supera el techo; detener antes de la siguiente llamada si el acumulado más el saldo superior lo supera.",
+    "max_input_tokens_per_request": 20000,
+    "max_output_tokens_per_request": 4096,
+    "preflight_upper_bound_usd": 5.8464,
+    "preflight_calculation": "360 * (20000 / 1000000 * 0.30 + 4096 / 1000000 * 2.50)",
+    "preflight_headroom_usd": 4.1536,
+    "pricing": {
+      "source": "https://ai.google.dev/gemini-api/docs/pricing",
+      "must_verify_on_execution_date": true,
+      "gemini-3.1-flash-lite": {
+        "input_usd_per_million_tokens": 0.25,
+        "output_usd_per_million_tokens": 1.5
+      },
+      "gemini-3.5-flash-lite": {
+        "input_usd_per_million_tokens": 0.3,
+        "output_usd_per_million_tokens": 2.5
+      }
+    },
+    "unknown_usage_policy": "El usuario declara uso de API gratuita; conservar usage/cost como unknown o null con motivo. USD 10 es límite nominal operacional conservador, no gasto facturado observado ni prueba de consumo gratuito. La ejecución live está autorizada por el usuario para esta campaña, sujeta a gates."
+  },
+  "measurement": {
+    "semantic_review_status": "required_after_execution",
+    "semantic_instrument_version": "campaign-2-review-v2",
+    "semantic_instrument_change_from_campaign_1": "required evidence_quote, evidence_location (present|absent), criterion/output hash; sustantive-question counting; offline calibration set labeled separately",
+    "missing_or_invalid_denominator": "retain_and_report",
+    "unassessed_is_not_pass": true,
+    "critical_gate_policy": "An observed critical safety failure is not compensated by aggregate score; no human signoff is claimed by this protocol.",
+    "comparison_policy": "Report solution deltas and instrument deltas separately; no causal attribution to an inseparable bundle of fixes.",
+    "release_approved": false,
+    "claims": [
+      "development_only",
+      "no_real_user_claim",
+      "no_holdout_generalization_claim",
+      "no_safety_certification",
+      "sequential_model_order_limits_model-causal_inference"
+    ]
+  },
+  "traceability": {
+    "record_requested_and_resolved_model": true,
+    "record_dataset_manifest_sha256": true,
+    "record_source_commit": true,
+    "record_prompt_and_generation_config_hashes": true,
+    "record_input_output_hashes": true,
+    "record_request_ids_errors_latency_and_tokens": true,
+    "preserve_failed_and_not_executed_attempts": true,
+    "record_first_attempt_vs_recovery": true,
+    "never_persist_secrets": true,
+    "run_directories_are_local_and_gitignored": true
+  }
+}
