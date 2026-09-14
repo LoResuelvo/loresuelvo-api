@@ -348,6 +348,8 @@ components:
       $ref: ./components/schemas/consumer-current-user-response.yaml
     ProviderCurrentUserResponse:
       $ref: ./components/schemas/provider-current-user-response.yaml
+    AdminCurrentUserResponse:
+      $ref: ./components/schemas/admin-current-user-response.yaml
     CurrentUserProfilePhoto:
       $ref: ./components/schemas/current-user-profile-photo.yaml
     CreateCategoryRequest:

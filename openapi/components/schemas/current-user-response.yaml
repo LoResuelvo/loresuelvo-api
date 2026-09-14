@@ -2,8 +2,10 @@ description: Complete authenticated profile discriminated by role.
 oneOf:
 - $ref: '#/components/schemas/ConsumerCurrentUserResponse'
 - $ref: '#/components/schemas/ProviderCurrentUserResponse'
+- $ref: '#/components/schemas/AdminCurrentUserResponse'
 discriminator:
   propertyName: role
   mapping:
     consumer: '#/components/schemas/ConsumerCurrentUserResponse'
     provider: '#/components/schemas/ProviderCurrentUserResponse'
+    admin: '#/components/schemas/AdminCurrentUserResponse'

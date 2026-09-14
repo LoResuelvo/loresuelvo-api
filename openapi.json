@@ -4435,7 +4435,7 @@
                 ],
                 "operationId": "getCurrentUser",
                 "summary": "Get the authenticated user",
-                "description": "Returns the complete consumer or provider profile associated with the Auth0 subject contained in the Bearer JWT. The role property discriminates the concrete response schema.",
+                "description": "Returns the complete consumer, provider, or administrator profile associated with the Auth0 subject contained in the Bearer JWT. The role property discriminates the concrete response schema.",
                 "security": [
                     {
                         "BearerAuth": []
@@ -4484,6 +4484,17 @@
                                                 "id": 1,
                                                 "name": "Plomería"
                                             }
+                                        }
+                                    },
+                                    "admin": {
+                                        "summary": "Admin user",
+                                        "value": {
+                                            "id": 1,
+                                            "name": "Ana",
+                                            "surname": "Pérez",
+                                            "email": "admin@example.com",
+                                            "role": "admin",
+                                            "calendar_connection_status": "disconnected"
                                         }
                                     }
                                 }
@@ -7110,13 +7121,17 @@
                     },
                     {
                         "$ref": "#/components/schemas/ProviderCurrentUserResponse"
+                    },
+                    {
+                        "$ref": "#/components/schemas/AdminCurrentUserResponse"
                     }
                 ],
                 "discriminator": {
                     "propertyName": "role",
                     "mapping": {
                         "consumer": "#/components/schemas/ConsumerCurrentUserResponse",
-                        "provider": "#/components/schemas/ProviderCurrentUserResponse"
+                        "provider": "#/components/schemas/ProviderCurrentUserResponse",
+                        "admin": "#/components/schemas/AdminCurrentUserResponse"
                     }
                 }
             },
@@ -7154,7 +7169,8 @@
                         "type": "string",
                         "enum": [
                             "consumer",
-                            "provider"
+                            "provider",
+                            "admin"
                         ]
                     },
                     "calendar_connection_status": {
@@ -7276,6 +7292,28 @@
                                 "format": "date-time",
                                 "nullable": true,
                                 "description": "Timestamp at which the provider's identity was approved, or null when it is not approved."
+                            }
+                        }
+                    }
+                ]
+            },
+            "AdminCurrentUserResponse": {
+                "description": "Complete authenticated Admin profile.",
+                "allOf": [
+                    {
+                        "$ref": "#/components/schemas/BaseCurrentUserResponse"
+                    },
+                    {
+                        "type": "object",
+                        "required": [
+                            "role"
+                        ],
+                        "properties": {
+                            "role": {
+                                "type": "string",
+                                "enum": [
+                                    "admin"
+                                ]
                             }
                         }
                     }

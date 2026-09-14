@@ -27,6 +27,7 @@ properties:
     enum:
     - consumer
     - provider
+    - admin
   calendar_connection_status:
     type: string
     enum:
