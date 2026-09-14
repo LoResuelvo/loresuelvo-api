@@ -52,6 +52,7 @@ func TestRecoverableNoResponseRejectsMalformedAndQualityContent(t *testing.T) {
 		require.False(t, RecoverableNoResponse(candidate))
 	}
 	require.True(t, RecoverableNoResponse(Attempt{Status: "execution_error", RequestCount: 1, Error: "context deadline exceeded"}))
+	require.True(t, RecoverableNoResponse(Attempt{Status: "execution_error", RequestCount: 1, Error: "DEADLINE_EXCEEDED"}))
 }
 
 func TestRecoveryBudgetChargesUnknownPriorSpendConservatively(t *testing.T) {

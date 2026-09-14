@@ -255,7 +255,7 @@ func RecoverableNoResponse(a Attempt) bool {
 	if message == "" {
 		return false
 	}
-	return strings.Contains(message, "503") || strings.Contains(message, "deadline exceeded") || strings.Contains(message, "timed out") || strings.Contains(message, "timeout")
+	return strings.Contains(message, "503") || strings.Contains(message, "deadline exceeded") || strings.Contains(message, "deadline_exceeded") || strings.Contains(message, "timed out") || strings.Contains(message, "timeout")
 }
 
 func RecoveryReason(a Attempt) string {
