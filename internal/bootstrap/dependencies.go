@@ -45,6 +45,7 @@ import (
 	filedomain "github.com/LoResuelvo/loresuelvo-api/internal/domain/file"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/identityverification"
 	jobrequest "github.com/LoResuelvo/loresuelvo-api/internal/domain/job_request"
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/notification"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/payment"
 	paymentaccount "github.com/LoResuelvo/loresuelvo-api/internal/domain/payment_account"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/provider"
@@ -103,7 +104,7 @@ func (dependencies *Dependencies) RouterConfig(
 	return config
 }
 
-func NewDependencies(database *sql.DB) (*Dependencies, error) {
+func NewDependencies(database *sql.DB, paymentsDemoMode bool) (*Dependencies, error) {
 	chatbot := chatbotadapter.NewChatbotFromEnv()
 	recommendationConfig, err := chatbotadapter.ProviderRecommendationConfigFromEnv()
 	if err != nil {
@@ -165,10 +166,10 @@ func NewDependencies(database *sql.DB) (*Dependencies, error) {
 		identityVerifier:             identityVerifier,
 		recommendationConfig:         recommendationConfig,
 		identityWebhook:              identityWebhook,
-	})
+	}, paymentsDemoMode)
 }
 
-func newDependencies(database *sql.DB, adapters dependencyAdapters) (*Dependencies, error) {
+func newDependencies(database *sql.DB, adapters dependencyAdapters, paymentsDemoMode bool) (*Dependencies, error) {
 	persistence := NewPersistenceAdapters(database)
 	readiness := health.NewReadiness(database)
 
@@ -257,7 +258,7 @@ func newDependencies(database *sql.DB, adapters dependencyAdapters) (*Dependenci
 		cryptography.NewSecureSecretGenerator(),
 		systemClock,
 	)
-	paymentService := payment.NewService(
+	paymentService := buildPaymentService(
 		persistence.PaymentIntentRepository,
 		persistence.PaymentTransactionRepository,
 		persistence.ServiceProposalRepository,
@@ -272,6 +273,7 @@ func newDependencies(database *sql.DB, adapters dependencyAdapters) (*Dependenci
 		notificator,
 		uuid.NewString,
 		systemClock,
+		paymentsDemoMode,
 	)
 	servicePorposalService := serviceproposal.NewService(
 		persistence.ServiceProposalRepository,
@@ -343,14 +345,73 @@ func newDependencies(database *sql.DB, adapters dependencyAdapters) (*Dependenci
 			JobRequestHandler:           job_request_handler.NewJobRequestHandler(jobRequestService),
 			IdentityVerificationHandler: identityVerificationHandler,
 			PaymentAccountHandler:       payment_account_handler.NewPaymentAccountHandler(paymentAccountService, adapters.paymentAccountHandlerConfig),
-			PaymentHandler:              payment_handler.NewPaymentHandler(paymentService, adapters.webhookVerifier),
+			PaymentHandler:              payment_handler.NewPaymentHandler(paymentService, adapters.webhookVerifier).
+				WithSellerAccountResolver(persistence.PaymentAccountRepository),
 			UserHandler:                 user_handler.NewUserHandlerWithIdentityVerification(userService, calendarConnectionService, identityVerificationService),
 			FileHandler:                 file_handler.NewFileHandler(fileService),
 			HealthHandler:               health_handler.NewHealthHandler(readiness),
 			ServiceProposalHandler:      service_proposal_handler.NewServiceProposalHandler(servicePorposalService),
-			WorkOrderHandler:            work_order_handler.NewWorkOrderHandler(workOrderService),
-			TestHandler:                 test_handler.NewTestHandler(systemClock),
-			RealtimeHandler:             realtimeHandler,
+		WorkOrderHandler:            work_order_handler.NewWorkOrderHandler(workOrderService),
+		TestHandler:                 test_handler.NewTestHandler(systemClock),
+		RealtimeHandler:             realtimeHandler,
 		},
 	}, nil
+}
+
+// buildPaymentService constructs the payment Service, opting into the demo
+// simulator (see internal/domain/payment.SimulateApprovedDemoPayment) when
+// the application was started with PAYMENTS_DEMO_MODE=true. Keeping the
+// decision at this seam ensures the rest of the wiring is unchanged whether
+// demo mode is enabled or not.
+func buildPaymentService(
+	intentRepository payment.IntentRepository,
+	transactionRepository payment.TransactionRepository,
+	serviceProposalFinder payment.ServiceProposalFinder,
+	workOrderFinder payment.WorkOrderFinder,
+	userFinder payment.UserFinder,
+	paymentAccountFinder payment.PaymentAccountFinder,
+	lockManager payment.LockManager,
+	unitOfWork payment.UnitOfWork,
+	credentialDecryptor paymentaccount.CredentialProtector,
+	checkoutGateway payment.CheckoutGateway,
+	paymentVerifier payment.PaymentVerifier,
+	notificator notification.Notificator,
+	idGenerator payment.IDGenerator,
+	clock *clockadapter.SystemClock,
+	paymentsDemoMode bool,
+) *payment.Service {
+	if paymentsDemoMode {
+		return payment.NewServiceWithDemoMode(
+			intentRepository,
+			transactionRepository,
+			serviceProposalFinder,
+			workOrderFinder,
+			userFinder,
+			paymentAccountFinder,
+			lockManager,
+			unitOfWork,
+			credentialDecryptor,
+			checkoutGateway,
+			paymentVerifier,
+			notificator,
+			idGenerator,
+			clock,
+		)
+	}
+	return payment.NewService(
+		intentRepository,
+		transactionRepository,
+		serviceProposalFinder,
+		workOrderFinder,
+		userFinder,
+		paymentAccountFinder,
+		lockManager,
+		unitOfWork,
+		credentialDecryptor,
+		checkoutGateway,
+		paymentVerifier,
+		notificator,
+		idGenerator,
+		clock,
+	)
 }

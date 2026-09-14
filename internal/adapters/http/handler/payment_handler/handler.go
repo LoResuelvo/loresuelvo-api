@@ -1,6 +1,7 @@
 package payment_handler
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -17,8 +18,9 @@ import (
 )
 
 type PaymentHandler struct {
-	service         *payment.Service
-	webhookVerifier WebhookVerifier
+	service              *payment.Service
+	webhookVerifier      WebhookVerifier
+	sellerAccountResolver ProviderAccountIDResolver
 }
 
 type WebhookVerifier interface {
@@ -27,6 +29,24 @@ type WebhookVerifier interface {
 
 func NewPaymentHandler(service *payment.Service, webhookVerifier WebhookVerifier) *PaymentHandler {
 	return &PaymentHandler{service: service, webhookVerifier: webhookVerifier}
+}
+
+// WithSellerAccountResolver wires the dependency that lets the payment demo
+// simulator resolve the connected seller's Mercado Pago external account ID
+// from a service proposal. When demo mode is disabled the resolver is never
+// called, so leaving it nil is safe.
+func (handler *PaymentHandler) WithSellerAccountResolver(resolver ProviderAccountIDResolver) *PaymentHandler {
+	handler.sellerAccountResolver = resolver
+	return handler
+}
+
+// ProviderAccountIDResolver returns the Mercado Pago external account ID
+// associated with the connected seller of the given service proposal. The
+// payment demo simulator needs this value to populate the demo ExternalPayment
+// in a way that satisfies the verified-payment validation (matching
+// seller account ID + correct intent reference + frozen pricing).
+type ProviderAccountIDResolver interface {
+	FindSellerAccountIDByProposalID(ctx context.Context, serviceProposalID int) (string, error)
 }
 
 func (handler *PaymentHandler) StartBookingCheckout(context *gin.Context) {
@@ -110,7 +130,60 @@ func (handler *PaymentHandler) GetIntent(context *gin.Context) {
 		}
 		return
 	}
+	if intent.Status == payment.StatusCheckoutReady && handler.demoModeCanSimulate(context, intent) {
+		if err := handler.simulateDemoApproval(context, authID, intent); err != nil {
+			httphandler.RespondError(context, http.StatusInternalServerError, "Could not simulate demo payment")
+			return
+		}
+		intent, err = handler.service.GetIntent(
+			context.Request.Context(),
+			authID,
+			intent.ID,
+		)
+		if err != nil {
+			httphandler.RespondError(context, http.StatusInternalServerError, "Could not get payment intent")
+			return
+		}
+	}
 	context.JSON(http.StatusOK, paymentIntentResponseFromDomain(intent))
+}
+
+// demoModeCanSimulate reports whether the current request is allowed to
+// trigger the demo simulator for the given intent. The service is the source
+// of truth for "is demo mode enabled" (i.e. was the app started with
+// PAYMENTS_DEMO_MODE=true in a permitted environment); the handler additionally
+// guarantees the seller account lookup dependency is wired so we never panic
+// with a nil pointer when demo mode is misconfigured.
+func (handler *PaymentHandler) demoModeCanSimulate(
+	context *gin.Context,
+	intent *payment.Intent,
+) bool {
+	if !handler.service.IsDemoModeEnabled() {
+		return false
+	}
+	if handler.sellerAccountResolver == nil {
+		return false
+	}
+	return intent.ServiceProposalID > 0
+}
+
+func (handler *PaymentHandler) simulateDemoApproval(
+	context *gin.Context,
+	authID string,
+	intent *payment.Intent,
+) error {
+	sellerAccountID, err := handler.sellerAccountResolver.FindSellerAccountIDByProposalID(
+		context.Request.Context(),
+		intent.ServiceProposalID,
+	)
+	if err != nil {
+		return fmt.Errorf("resolving seller account for demo payment: %w", err)
+	}
+	return handler.service.SimulateApprovedDemoPayment(
+		context.Request.Context(),
+		intent,
+		sellerAccountID,
+	)
 }
 
 type mercadoPagoNotification struct {

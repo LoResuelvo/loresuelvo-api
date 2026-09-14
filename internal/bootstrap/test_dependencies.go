@@ -63,7 +63,7 @@ func NewTestDependencies(
 		addressResolverOverride: consumerAddressResolver,
 		recommendationConfig:    conversation.DefaultProviderRecommendationConfig(),
 		identityWebhook:         newTestIdentityVerificationWebhook(),
-	})
+	}, false)
 	if err != nil {
 		return nil, TestDoubles{}, err
 	}

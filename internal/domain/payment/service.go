@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"strings"
 	"time"
 
@@ -37,6 +38,7 @@ type Service struct {
 	idGenerator           IDGenerator
 	clock                 clock.Clock
 	checkoutPolicy        BookingCheckoutPolicy
+	demoMode              bool
 }
 
 func NewService(
@@ -71,6 +73,47 @@ func NewService(
 		idGenerator:           idGenerator,
 		clock:                 clock,
 	}
+}
+
+// NewServiceWithDemoMode is identical to NewService but additionally enables
+// the in-process payment demo simulator. The demo simulator is a development-
+// only fallback that completes the post-checkout flow without requiring an
+// external webhook from the payment gateway; see SimulateApprovedDemoPayment
+// for the exact contract.
+func NewServiceWithDemoMode(
+	intentRepository IntentRepository,
+	transactionRepository TransactionRepository,
+	serviceProposalFinder ServiceProposalFinder,
+	workOrderFinder WorkOrderFinder,
+	userFinder UserFinder,
+	paymentAccountFinder PaymentAccountFinder,
+	lockManager LockManager,
+	unitOfWork UnitOfWork,
+	credentialDecryptor CredentialDecryptor,
+	checkoutGateway CheckoutGateway,
+	paymentVerifier PaymentVerifier,
+	notificator notification.Notificator,
+	idGenerator IDGenerator,
+	clock clock.Clock,
+) *Service {
+	service := NewService(
+		intentRepository,
+		transactionRepository,
+		serviceProposalFinder,
+		workOrderFinder,
+		userFinder,
+		paymentAccountFinder,
+		lockManager,
+		unitOfWork,
+		credentialDecryptor,
+		checkoutGateway,
+		paymentVerifier,
+		notificator,
+		idGenerator,
+		clock,
+	)
+	service.demoMode = true
+	return service
 }
 
 func (service *Service) StartBookingCheckout(
@@ -361,6 +404,76 @@ func (service *Service) applyVerifiedPayment(ctx context.Context, verified Verif
 		return err
 	}
 	return outcome.Accept(&paymentOutcomePersistence{service: service, ctx: ctx})
+}
+
+// ProcessVerifiedPayment applies a pre-built VerifiedPayment through the
+// standard persistence pipeline (lock by external payment ID, idempotency
+// check, transition, transactional persistence). It is the public entry
+// point used by the demo simulator — and any future in-process integrations
+// — to drive the same downstream side effects (intent status, transaction,
+// work order, notification) that ProcessPaymentNotification produces for a
+// real Mercado Pago webhook.
+func (service *Service) ProcessVerifiedPayment(ctx context.Context, verified VerifiedPayment) error {
+	return service.lockManager.WithinLock(
+		ctx,
+		ExternalPaymentLockKey(service.checkoutGateway.Provider(), verified.ExternalID()),
+		func() error {
+			return service.applyVerifiedPayment(ctx, verified)
+		},
+	)
+}
+
+// IsDemoModeEnabled reports whether this service instance was constructed with
+// the payment demo simulator enabled. Used by handlers to decide whether the
+// polling flow can self-complete an intent.
+func (service *Service) IsDemoModeEnabled() bool {
+	return service != nil && service.demoMode
+}
+
+// SimulateApprovedDemoPayment drives the post-checkout pipeline for the given
+// PaymentIntent by synthesising an approved ExternalPayment (with a stable,
+// demo-only identifier) and routing it through ProcessVerifiedPayment. The
+// resulting side effects are exactly the same as a real Mercado Pago webhook
+// for an approved payment: intent transitions to Paid, ServiceProposal is
+// Accepted, a WorkOrder is scheduled, a Transaction is persisted and the
+// provider receives an accepted-proposal notification. Re-invocation is safe
+// — the inner pipeline is idempotent on the demo external payment ID.
+//
+// The caller must already have authorised the operation (e.g. the HTTP
+// handler verified the authenticated user is the intent's consumer); this
+// method does not re-check authorization.
+func (service *Service) SimulateApprovedDemoPayment(
+	ctx context.Context,
+	intent *Intent,
+	sellerAccountID string,
+) error {
+	if !service.demoMode {
+		return ErrDemoPaymentDisabled
+	}
+	if intent == nil {
+		return ErrInvalidIntent
+	}
+	if intent.Status != StatusCheckoutReady {
+		if intent.Status == StatusPaid {
+			return nil
+		}
+		return ErrDemoPaymentIntentNotReady
+	}
+	if strings.TrimSpace(sellerAccountID) == "" {
+		return fmt.Errorf("simulating demo payment: seller account id is required")
+	}
+	external := buildDemoExternalPayment(intent, sellerAccountID, service.clock.Now().UTC())
+	verified, err := NewVerifiedPayment(external)
+	if err != nil {
+		return fmt.Errorf("building demo verified payment: %w", err)
+	}
+	log.Printf(
+		"⚠️ DEMO PAYMENT APPROVED - payment_intent_id=%s external_payment_id=%s seller_account_id=%s",
+		intent.ID,
+		external.ID,
+		sellerAccountID,
+	)
+	return service.ProcessVerifiedPayment(ctx, verified)
 }
 
 type paymentOutcomePersistence struct {

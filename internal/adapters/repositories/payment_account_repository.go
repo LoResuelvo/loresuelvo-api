@@ -104,6 +104,34 @@ func (repository *PaymentAccountRepository) FindByExternalAccountID(
 	))
 }
 
+// FindSellerAccountIDByProposalID returns the Mercado Pago external account
+// ID connected to the provider of the given service proposal. It is used
+// exclusively by the in-process payment demo simulator (which is gated to
+// dev/test environments) to populate a demo ExternalPayment in a way that
+// mirrors what a real webhook would carry.
+func (repository *PaymentAccountRepository) FindSellerAccountIDByProposalID(
+	ctx context.Context,
+	serviceProposalID int,
+) (string, error) {
+	var externalAccountID string
+	err := repository.db.QueryRowContext(
+		ctx,
+		`SELECT ppa.external_account_id
+		FROM provider_payment_accounts ppa
+		JOIN service_proposals sp ON sp.provider_id = ppa.provider_id
+		WHERE sp.id = $1 AND ppa.payment_provider = $2`,
+		serviceProposalID,
+		paymentaccount.PaymentProvider("mercado_pago"),
+	).Scan(&externalAccountID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", paymentaccount.ErrConnectionNotFound
+	}
+	if err != nil {
+		return "", fmt.Errorf("finding seller account for proposal: %w", err)
+	}
+	return externalAccountID, nil
+}
+
 func scanPaymentAccount(row *sql.Row) (*paymentaccount.PaymentAccount, error) {
 	var providerID int
 	var paymentProvider paymentaccount.PaymentProvider

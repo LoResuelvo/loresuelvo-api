@@ -3,6 +3,7 @@ package mercadopago
 import (
 	"context"
 	"fmt"
+	"log"
 	"math"
 	"strconv"
 	"strings"
@@ -100,6 +101,11 @@ func (client *CheckoutClient) CreateCheckout(
 		!checkoutRequest.ExpiresOn.After(checkoutRequest.StartsOn) {
 		return payment.ExternalCheckout{}, fmt.Errorf("creating Mercado Pago preference: invalid checkout request")
 	}
+	log.Printf(
+		"Mercado Pago checkout: notification_url=%q environment=%q",
+		client.config.NotificationURL,
+		client.config.Environment,
+	)
 	request := preference.Request{
 		Items: []preference.ItemRequest{{
 			ID:         checkoutRequest.ExternalReference,
@@ -118,13 +124,13 @@ func (client *CheckoutClient) CreateCheckout(
 		PaymentMethods: &preference.PaymentMethodsRequest{
 			ExcludedPaymentTypes: []preference.ExcludedPaymentTypeRequest{{ID: "ticket"}},
 		},
-		ExternalReference:  checkoutRequest.ExternalReference,
-		NotificationURL:    client.config.NotificationURL,
-		MarketplaceFee:     sdkAmountFromCents(checkoutRequest.PlatformFeeCents),
-		AutoReturn:       "approved",
-		BinaryMode:       false,
-		Expires:          true,
-		ExpirationDateTo: &checkoutRequest.ExpiresOn,
+		ExternalReference: checkoutRequest.ExternalReference,
+		NotificationURL:   client.config.NotificationURL,
+		MarketplaceFee:    sdkAmountFromCents(checkoutRequest.PlatformFeeCents),
+		AutoReturn:        "approved",
+		BinaryMode:        false,
+		Expires:           true,
+		ExpirationDateTo:  &checkoutRequest.ExpiresOn,
 	}
 	preferenceClient, err := client.preferenceClientFactory(accessToken)
 	if err != nil {
@@ -137,6 +143,12 @@ func (client *CheckoutClient) CreateCheckout(
 	if preferenceResponse == nil || strings.TrimSpace(preferenceResponse.ID) == "" {
 		return payment.ExternalCheckout{}, fmt.Errorf("decoding Mercado Pago preference response: required checkout data is missing")
 	}
+
+	log.Printf(
+		"Mercado Pago preference created: id=%s notification_url=%q",
+		preferenceResponse.ID,
+		client.config.NotificationURL,
+	)
 	checkoutURL := checkoutURLForEnvironment(client.config.Environment, preferenceResponse)
 	if strings.TrimSpace(checkoutURL) == "" {
 		return payment.ExternalCheckout{}, fmt.Errorf("decoding Mercado Pago preference response: required checkout data is missing")
