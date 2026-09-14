@@ -67,7 +67,7 @@ func (resolver *GoogleAddressResolver) Resolve(ctx context.Context, address cons
 		return consumer.GeoPoint{}, fmt.Errorf("building geocoding request URL: %w", err)
 	}
 	query := requestURL.Query()
-	query.Set("address", address.Query()+", Argentina")
+	query.Set("address", address.Query()+", Buenos Aires,  Argentina")
 	query.Set("key", resolver.apiKey)
 	requestURL.RawQuery = query.Encode()
 

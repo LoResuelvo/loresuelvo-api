@@ -31,7 +31,7 @@ func (stub *coverageZoneFinderStub) FindByExternalReferenceInMarket(_ context.Co
 func TestGoogleAddressResolverReturnsOnlyRooftopOrInterpolatedCoordinates(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		require.Equal(t, "test-key", request.URL.Query().Get("key"))
-		require.Equal(t, "Av. Rivadavia 5100, Argentina", request.URL.Query().Get("address"))
+		require.Equal(t, "Av. Rivadavia 5100, Buenos Aires,  Argentina", request.URL.Query().Get("address"))
 		_ = json.NewEncoder(writer).Encode(map[string]any{
 			"status": "OK",
 			"results": []any{map[string]any{
