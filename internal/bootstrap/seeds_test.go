@@ -4,12 +4,15 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/infrastructure/db"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v3"
 )
 
 var expectedGoogleCommunePlaceIDs = []string{
@@ -140,6 +143,100 @@ func TestSeedDefaultDataRollsBackWhenProviderCoverageZoneDoesNotExist(t *testing
 	var userCount int
 	require.NoError(t, database.QueryRow("SELECT COUNT(*) FROM users WHERE auth_id = $1", seed.Providers[0].AuthID).Scan(&userCount))
 	assert.Zero(t, userCount)
+}
+
+func TestApplicationSeedsMandatoryAdminWhenDefaultSeedsAreDisabledAndRejectsProviderTakeover(t *testing.T) {
+	tests := []struct {
+		name         string
+		providerAuth string
+		providerMail string
+	}{
+		{name: "same auth ID", providerAuth: testAdminSeedAuthID, providerMail: testAdminSeedEmail},
+		{name: "same email", providerAuth: "different-provider-seed-identity", providerMail: testAdminSeedEmail},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			config, err := db.NewTestPostgresConfigFromEnv()
+			require.NoError(t, err)
+			database, err := db.ConnectPostgres(context.Background(), config)
+			require.NoError(t, err)
+			t.Cleanup(func() { require.NoError(t, database.Close()) })
+
+			seed := providerCoverageSeedData(test.providerAuth, test.providerMail, []string{"CABA-COMMUNE-01"})
+			cleanupProviderCoverageSeed(t, database, seed)
+			_, err = database.Exec("DELETE FROM users WHERE auth_id = $1", testAdminSeedAuthID)
+			require.NoError(t, err)
+			t.Cleanup(func() {
+				_, cleanupErr := database.Exec("DELETE FROM users WHERE auth_id = $1", testAdminSeedAuthID)
+				require.NoError(t, cleanupErr)
+				cleanupProviderCoverageSeed(t, database, seed)
+			})
+			setValidAdminSeedEnvironment(t)
+			t.Setenv("SEEDS_ENABLED", "false")
+
+			require.NoError(t, seedApplicationDataFromEnv(context.Background(), database))
+			before := findSeededUser(t, database, testAdminSeedAuthID)
+			require.Equal(t, "admin", before.role)
+
+			seedContent, err := yaml.Marshal(seed)
+			require.NoError(t, err)
+			seedPath := filepath.Join(t.TempDir(), "provider-collision.yaml")
+			require.NoError(t, os.WriteFile(seedPath, seedContent, 0o600))
+			t.Setenv("SEEDS_ENABLED", "true")
+			t.Setenv("SEEDS_FILE", seedPath)
+
+			err = seedApplicationDataFromEnv(context.Background(), database)
+
+			require.ErrorIs(t, err, errDefaultProviderSeedUserPersistence)
+			assert.NotContains(t, err.Error(), test.providerAuth)
+			assert.NotContains(t, err.Error(), test.providerMail)
+			assert.Equal(t, before, findSeededUser(t, database, testAdminSeedAuthID))
+			var providerCount int
+			require.NoError(t, database.QueryRow(
+				"SELECT COUNT(*) FROM providers WHERE user_id = $1",
+				before.id,
+			).Scan(&providerCount))
+			assert.Zero(t, providerCount)
+			var fileCount int
+			require.NoError(t, database.QueryRow(
+				"SELECT COUNT(*) FROM files WHERE id = $1",
+				seed.Providers[0].ProfilePhotoFileID,
+			).Scan(&fileCount))
+			assert.Zero(t, fileCount, "the failed optional seed transaction must roll back")
+		})
+	}
+}
+
+type seededUser struct {
+	id        int
+	authID    string
+	email     string
+	name      string
+	surname   string
+	role      string
+	createdOn string
+	updatedOn string
+}
+
+func findSeededUser(t *testing.T, database *sql.DB, authID string) seededUser {
+	t.Helper()
+	var persisted seededUser
+	err := database.QueryRow(
+		`SELECT id, auth_id, email, name, surname, role, created_on::text, updated_on::text
+		FROM users WHERE auth_id = $1`,
+		authID,
+	).Scan(
+		&persisted.id,
+		&persisted.authID,
+		&persisted.email,
+		&persisted.name,
+		&persisted.surname,
+		&persisted.role,
+		&persisted.createdOn,
+		&persisted.updatedOn,
+	)
+	require.NoError(t, err)
+	return persisted
 }
 
 func providerCoverageSeedData(authID, email string, providerCoverageZones []string) seedData {

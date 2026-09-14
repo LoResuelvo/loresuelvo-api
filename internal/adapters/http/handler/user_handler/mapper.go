@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/admin"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/consumer"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/identityverification"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/provider"
@@ -41,6 +42,8 @@ func currentUserResponseFromDomain(currentUser user.User, calendarConnectionStat
 				Name: typedUser.Category.Name,
 			},
 		}, nil
+	case *admin.Admin:
+		return baseResponse, nil
 	default:
 		return nil, fmt.Errorf("mapping unsupported current user type %T", currentUser)
 	}

@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/admin"
 	"github.com/cucumber/godog"
 )
 
@@ -36,9 +37,11 @@ func registerLoginSteps(sc *godog.ScenarioContext, suite *testSuite) {
 	sc.Step(`^que cargué una foto de perfil válida para mi registro como prestador$`, suite.uploadValidLoginProviderProfilePhoto)
 	sc.Step(`^que existe un prestador registrado con correo "([^"]*)", nombre "([^"]*)", apellido "([^"]*)", rubro "([^"]*)" y la foto de perfil cargada$`, suite.thereIsRegisteredProviderWithProfilePhoto)
 	sc.Step(`^que estoy autenticado con una identidad que no pertenece a un usuario registrado$`, suite.iAmAuthenticatedAsUnregisteredUser)
+	sc.Step(`^que existe un administrador provisionado con correo "([^"]*)", nombre "([^"]*)" y apellido "([^"]*)"$`, suite.thereIsProvisionedAdmin)
+	sc.Step(`^que estoy autenticado como administrador "([^"]*)"$`, suite.iAmAuthenticatedAsAdmin)
 	sc.Step(`^que no tengo una sesión válida$`, suite.iDoNotHaveAValidSession)
 	sc.Step(`^consulto mi información de usuario autenticado$`, suite.requestAuthenticatedUserInfo)
-	sc.Step(`^el sistema devuelve mi perfil de (consumidor|prestador)$`, suite.systemReturnsMyUserProfile)
+	sc.Step(`^el sistema devuelve mi perfil de (consumidor|prestador|administrador)$`, suite.systemReturnsMyUserProfile)
 	sc.Step(`^el perfil contiene el nombre "([^"]*)", apellido "([^"]*)" y correo "([^"]*)"$`, suite.profileContainsPersonalInformation)
 	sc.Step(`^el perfil informa el rol "([^"]*)"$`, suite.profileReportsRole)
 	sc.Step(`^el perfil no incluye una foto de perfil$`, suite.profileDoesNotIncludeProfilePhoto)
@@ -46,6 +49,28 @@ func registerLoginSteps(sc *godog.ScenarioContext, suite *testSuite) {
 	sc.Step(`^el perfil incluye el rubro "([^"]*)"$`, suite.profileIncludesCategory)
 	sc.Step(`^el sistema deniega el acceso$`, suite.systemDeniesAccess)
 	sc.Step(`^el sistema informa que el usuario no fue encontrado$`, suite.systemReportsUserNotFound)
+}
+
+func (suite *testSuite) thereIsProvisionedAdmin(email, name, surname string) error {
+	adminUser, err := admin.NewAdmin(auth0IDForAdminEmail(email), email, name, surname, nil)
+	if err != nil {
+		return fmt.Errorf("could not build admin fixture: %w", err)
+	}
+
+	if _, err := suite.userRepository.Save(suite.scenarioContext, adminUser); err != nil {
+		return fmt.Errorf("could not provision admin fixture: %w", err)
+	}
+
+	return nil
+}
+
+func (suite *testSuite) iAmAuthenticatedAsAdmin(email string) error {
+	suite.currentAuth0ID = auth0IDForAdminEmail(email)
+	return nil
+}
+
+func auth0IDForAdminEmail(email string) string {
+	return auth0IDForEmail("admin-login", email)
 }
 
 func (suite *testSuite) thereIsRegisteredConsumerWithoutProfilePhoto(email, name, surname string) error {
@@ -157,7 +182,7 @@ func (suite *testSuite) systemReturnsMyUserProfile(userType string) error {
 		return err
 	}
 
-	expectedRole := map[string]string{"consumidor": "consumer", "prestador": "provider"}[userType]
+	expectedRole := map[string]string{"consumidor": "consumer", "prestador": "provider", "administrador": "admin"}[userType]
 	return suite.profileReportsRole(expectedRole)
 }
 

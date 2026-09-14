@@ -19,8 +19,8 @@ type Application struct {
 }
 
 func NewApplication(ctx context.Context, database *sql.DB, logger *slog.Logger) (*Application, error) {
-	if err := SeedDefaultDataFromEnv(ctx, database); err != nil {
-		return nil, fmt.Errorf("seeding default data: %w", err)
+	if err := seedApplicationDataFromEnv(ctx, database); err != nil {
+		return nil, err
 	}
 
 	dependencies, err := NewDependencies(database)
@@ -44,6 +44,16 @@ func NewApplication(ctx context.Context, database *sql.DB, logger *slog.Logger) 
 		return nil, fmt.Errorf("configuring application lifecycle: %w", err)
 	}
 	return &Application{coordinator: coordinator}, nil
+}
+
+func seedApplicationDataFromEnv(ctx context.Context, database *sql.DB) error {
+	if err := SeedAdminFromEnv(ctx, database); err != nil {
+		return fmt.Errorf("seeding mandatory administrator: %w", err)
+	}
+	if err := SeedDefaultDataFromEnv(ctx, database); err != nil {
+		return fmt.Errorf("seeding default data: %w", err)
+	}
+	return nil
 }
 
 func (application *Application) Run(ctx context.Context) error {

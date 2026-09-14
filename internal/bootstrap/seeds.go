@@ -27,6 +27,8 @@ const (
 	seedPublicFileVisibility = "public"
 )
 
+var errDefaultProviderSeedUserPersistence = errors.New("default provider user could not be seeded")
+
 type seedData struct {
 	CoverageMarkets []coverageMarketSeed `yaml:"coverage_markets"`
 	CoverageZones   []coverageZoneSeed   `yaml:"coverage_zones"`
@@ -428,9 +430,9 @@ func upsertSeedProviderUser(ctx context.Context, tx *sql.Tx, seed providerSeed) 
 		SET email = EXCLUDED.email,
 			name = EXCLUDED.name,
 			surname = EXCLUDED.surname,
-			role = EXCLUDED.role,
 			profile_photo_file_id = EXCLUDED.profile_photo_file_id,
 			updated_on = NOW()
+		WHERE users.role = EXCLUDED.role
 		RETURNING id`,
 		seed.AuthID,
 		seed.Email,
@@ -440,7 +442,10 @@ func upsertSeedProviderUser(ctx context.Context, tx *sql.Tx, seed providerSeed) 
 		seed.ProfilePhotoFileID,
 	).Scan(&userID)
 	if err != nil {
-		return 0, fmt.Errorf("seeding provider user %q: %w", seed.AuthID, err)
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			return 0, errors.Join(errDefaultProviderSeedUserPersistence, ctxErr)
+		}
+		return 0, errDefaultProviderSeedUserPersistence
 	}
 
 	return userID, nil

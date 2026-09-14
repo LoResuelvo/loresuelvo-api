@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/admin"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/category"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/consumer"
 	coveragezone "github.com/LoResuelvo/loresuelvo-api/internal/domain/coverage_zone"
@@ -56,6 +57,10 @@ func (repository *UserRepository) Save(ctx context.Context, userToSave user.User
 	userToSave.SetPersistenceID(userID)
 
 	switch typedUser := userToSave.(type) {
+	case *admin.Admin:
+		if typedUser.Role() != admin.Role {
+			err = fmt.Errorf("admin has role %q", typedUser.Role())
+		}
 	case *consumer.Consumer:
 		if typedUser.Role() != consumer.Role {
 			err = fmt.Errorf("consumer has role %q", typedUser.Role())
@@ -262,6 +267,8 @@ func scanUserWithProfile(row rowScanner, lookup string) (user.User, error) {
 	}
 	base := user.RehydrateBaseUser(id, authID, email, name, surname, role, imageFromPersistence(profilePhotoFileID, profilePhotoOriginalName))
 	switch role {
+	case admin.Role:
+		return admin.RehydrateAdmin(base), nil
 	case consumer.Role:
 		if !consumerID.Valid {
 			return nil, fmt.Errorf("finding user by %s: consumer profile is missing", lookup)

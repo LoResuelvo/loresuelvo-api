@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/admin"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/category"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/consumer"
 	coveragezone "github.com/LoResuelvo/loresuelvo-api/internal/domain/coverage_zone"
@@ -11,6 +12,24 @@ import (
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/provider"
 	"github.com/stretchr/testify/require"
 )
+
+func TestCurrentUserResponseMapsAdminProfile(t *testing.T) {
+	currentAdmin, err := admin.NewAdmin("auth0|admin", "admin@example.com", "Ana", "Perez", nil)
+	require.NoError(t, err)
+	currentAdmin.SetPersistenceID(42)
+
+	response, err := currentUserResponseFromDomain(currentAdmin, "disconnected")
+
+	require.NoError(t, err)
+	require.Equal(t, currentUserResponse{
+		ID:                       42,
+		Name:                     "Ana",
+		Surname:                  "Perez",
+		Email:                    "admin@example.com",
+		Role:                     admin.Role,
+		CalendarConnectionStatus: "disconnected",
+	}, response)
+}
 
 func TestCurrentUserResponseIncludesConsumerAddressForItsOwner(t *testing.T) {
 	address, err := consumer.NewAddress("Av. Rivadavia", "5100", "4", "B")
