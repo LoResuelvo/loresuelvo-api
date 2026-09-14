@@ -42,7 +42,7 @@ func runContext(ctx context.Context, args []string, stdout, stderr io.Writer) in
 	}
 	command := args[0]
 	switch command {
-	case "validate", "plan", "contract", "live", "replay", "compare", "baselines", "summary", "review-template", "review", "metamorphic-report":
+	case "validate", "plan", "contract", "live", "replay", "compare", "baselines", "summary", "review-template", "review", "metamorphic-report", "campaign-report", "campaign-live":
 	default:
 		fmt.Fprintf(stderr, "unsupported command %q; no model calls were made\n", command)
 		return 2
@@ -55,7 +55,7 @@ func runContext(ctx context.Context, args []string, stdout, stderr io.Writer) in
 	var limits evals.ExecutionLimits
 	var allowLive, dryRun bool
 	var tokens int
-	var output, runDirectory, left, right, caseIDs, reviewPath string
+	var output, runDirectory, left, right, caseIDs, reviewPath, protocolPath, evidencePath, pricingVerifiedOn string
 	if command == "plan" || command == "live" {
 		flags.StringVar(&options.Suite, "suite", "", "explicit suite: smoke, development, holdout, critical_all")
 		flags.StringVar(&options.Model, "model", "", "explicit requested model identifier")
@@ -91,6 +91,18 @@ func runContext(ctx context.Context, args []string, stdout, stderr io.Writer) in
 	if command == "baselines" {
 		flags.StringVar(&options.Suite, "suite", "", "explicit suite")
 		flags.BoolVar(&options.AllowHoldout, "allow-holdout", false, "authorize reserve scoring")
+	}
+	if command == "campaign-report" {
+		flags.StringVar(&protocolPath, "protocol", "", "frozen versioned campaign protocol")
+		flags.StringVar(&evidencePath, "evidence", "", "local campaign evidence manifest")
+		flags.StringVar(&output, "out", "", "new campaign report directory (must not exist)")
+	}
+	if command == "campaign-live" {
+		flags.StringVar(&protocolPath, "protocol", "", "frozen versioned campaign protocol")
+		flags.StringVar(&output, "out", "", "new local campaign evidence directory")
+		flags.StringVar(&pricingVerifiedOn, "pricing-verified-on", "", "UTC date of independent pricing verification (YYYY-MM-DD)")
+		flags.BoolVar(&allowLive, "allow-live", false, "authorize the bounded campaign and token-count preflight")
+		flags.BoolVar(&dryRun, "dry-run", false, "validate protocol and show all plans without provider calls")
 	}
 	if err := flags.Parse(args[1:]); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
@@ -227,6 +239,58 @@ func runContext(ctx context.Context, args []string, stdout, stderr io.Writer) in
 				code = 1
 			}
 		}
+	case "campaign-report":
+		if protocolPath == "" || evidencePath == "" || output == "" {
+			fmt.Fprintln(stderr, "--protocol, --evidence and --out are required")
+			return 2
+		}
+		if err = checkOutputDirectory(dataset.Root, output); err != nil {
+			break
+		}
+		var spec evals.CampaignReportSpec
+		spec, err = evals.ReadCampaignReportSpec(dataset, protocolPath, evidencePath)
+		if err == nil {
+			var campaign evals.CampaignReport
+			campaign, err = evals.BuildCampaignReport(ctx, dataset, spec)
+			if err == nil {
+				err = writeCampaignArtifacts(output, campaign)
+				result = campaign
+			}
+		}
+	case "campaign-live":
+		if protocolPath == "" {
+			fmt.Fprintln(stderr, "--protocol is required")
+			return 2
+		}
+		var config evals.CampaignExecutionConfig
+		config, err = evals.ReadCampaignExecutionConfig(dataset, protocolPath)
+		if err != nil {
+			break
+		}
+		if dryRun {
+			result = map[string]any{"campaign": config, "live_model_calls": 0, "count_token_calls": 0}
+			break
+		}
+		if !allowLive || output == "" || pricingVerifiedOn == "" {
+			fmt.Fprintln(stderr, "campaign-live requires --allow-live, --out and --pricing-verified-on; no provider calls were made")
+			return 2
+		}
+		if _, statErr := os.Lstat(output); statErr == nil {
+			fmt.Fprintln(stderr, "campaign output directory already exists; no provider calls were made")
+			return 2
+		} else if !os.IsNotExist(statErr) {
+			fmt.Fprintln(stderr, statErr)
+			return 2
+		}
+		if err = checkOutputDirectory(dataset.Root, output); err != nil {
+			break
+		}
+		key := strings.TrimSpace(os.Getenv("CHATBOT_API_KEY"))
+		if key == "" {
+			fmt.Fprintln(stderr, "CHATBOT_API_KEY is required for campaign-live; no provider calls were made")
+			return 2
+		}
+		result, err = executeCampaignLive(ctx, dataset, config, output, key, pricingVerifiedOn)
 	case "compare":
 		if left == "" || right == "" {
 			fmt.Fprintln(stderr, "--left and --right are required")
@@ -359,6 +423,8 @@ func usage(out io.Writer) {
 	fmt.Fprintln(out, "       evals baselines --suite NAME [--allow-holdout]")
 	fmt.Fprintln(out, "       evals summary|review-template|metamorphic-report --run DIR")
 	fmt.Fprintln(out, "       evals review --run DIR --reviews FILE")
+	fmt.Fprintln(out, "       evals campaign-report --protocol FILE --evidence FILE --out DIR")
+	fmt.Fprintln(out, "       evals campaign-live --protocol FILE --allow-live --pricing-verified-on YYYY-MM-DD --out DIR")
 	fmt.Fprintln(out, "Plan/live: --cases ID,ID limits the suite; --metamorphic adds frozen transformations with --trials 3.")
 	fmt.Fprintln(out, "Compare deliberate changes: --allow-source-change/--allow-prompt-change/--allow-generation-config-change plus --change-description TEXT.")
 	fmt.Fprintln(out, "Offline modes never call a model. Live needs explicit opt-in and CHATBOT_API_KEY. Semantic review is never automatically approved.")

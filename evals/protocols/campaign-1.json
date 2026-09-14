@@ -1,0 +1,129 @@
+{
+  "protocol_version": "1.0.0",
+  "campaign_id": "campaign-1",
+  "status": "frozen_for_review",
+  "purpose": "Primera medición reproducible de la solución original sobre el golden dataset.",
+  "dataset_version": "1.0.0",
+  "dataset_manifest_sha256": "063a87355225013229cb2415bbb96d99a41b0de97525f2a5e99fcf7df813802e",
+  "scope": "development",
+  "expected_trials": 3,
+  "allow_holdout": false,
+  "dataset": {
+    "path": "evals/datasets/LoResuelvo_US60_evals_v1.0.0",
+    "version": "1.0.0",
+    "manifest_sha256": "063a87355225013229cb2415bbb96d99a41b0de97525f2a5e99fcf7df813802e",
+    "split": "development",
+    "holdout_allowed": false
+  },
+  "solution": {
+    "baseline_source_commit": "ca5e2ae",
+    "baseline_files": {
+      "internal/adapters/chatbot/gemini_chatbot.go": "865d4bac8787cb774e0d6575671710427115154a355585f0989277aebc4301c0",
+      "internal/adapters/chatbot/gemini_generation.go": "7ed4dc97f4dc1ab3b3471190212cd752dc90ebac7323d38794c64461d061ce73",
+      "internal/adapters/chatbot/gemini_chatbot_test.go": "400b70ab7d7db43c94dcf4cdd91cc310478452b85e316ccb240d33a38f1119f6",
+      "internal/adapters/chatbot/gemini_generation_test.go": "fded926bf129f5ac3a9c3454d8388f8c48b4aca716eb28b9c0fd4c6659bed83d"
+    },
+    "require_clean_tree_before_live": true,
+    "prompt_change_allowed": false,
+    "generation_config_change_allowed": false,
+    "quality_fixes_allowed": false
+  },
+  "models": [
+    {
+      "requested_model": "gemini-3.1-flash-lite"
+    },
+    {
+      "requested_model": "gemini-3.5-flash-lite"
+    }
+  ],
+  "execution": {
+    "concurrency": 1,
+    "max_retries": 0,
+    "retry_for_quality": false,
+    "attempt_timeout_seconds": 90,
+    "global_timeout_seconds": 16200,
+    "min_interval_seconds": 15,
+    "max_output_tokens": 4096,
+    "primary": {
+      "suite": "development",
+      "cases": 54,
+      "trials_per_case": 3,
+      "calls_total": 324
+    },
+    "smoke": {
+      "suite": "smoke",
+      "cases": 18,
+      "trials_per_case": 1,
+      "calls_total": 36,
+      "included_in_campaign_ceiling": true
+    },
+    "maximum_provider_calls_total": 360,
+    "contracts": {
+      "suite": "contract",
+      "execution": "offline_once",
+      "excluded_from_provider_call_count": true
+    },
+    "ranking_baselines": {
+      "execution": "offline_once",
+      "methods": [
+        "seeded_random",
+        "rating_average",
+        "paid_work_count",
+        "bayesian_rating_with_fixed_prior",
+        "frozen_lexical_heuristic"
+      ],
+      "excluded_from_provider_call_count": true
+    },
+    "metamorphic": {
+      "enabled": false,
+      "reason": "Fuera del alcance y presupuesto de la campaña 1; se conserva para una fase posterior preautorizada."
+    }
+  },
+  "budget": {
+    "currency": "USD",
+    "hard_ceiling": 10.0,
+    "guard_required_before_live": true,
+    "guard_policy": "Contar solicitudes efectivas y calcular un límite superior conservador con el precio vigente más alto entre los modelos. Rechazar el plan si el límite supera el techo; detener antes de la siguiente solicitud si el gasto acumulado observado más el límite restante lo supera.",
+    "max_input_tokens_per_request": 20000,
+    "max_output_tokens_per_request": 4096,
+    "preflight_upper_bound_usd": 5.8464,
+    "preflight_calculation": "360 * (20000 / 1000000 * 0.30 + 4096 / 1000000 * 2.50)",
+    "preflight_headroom_usd": 4.1536,
+    "pricing": {
+      "source": "https://ai.google.dev/gemini-api/docs/pricing",
+      "must_verify_on_execution_date": true,
+      "gemini-3.1-flash-lite": {
+        "input_usd_per_million_tokens": 0.25,
+        "output_usd_per_million_tokens": 1.5
+      },
+      "gemini-3.5-flash-lite": {
+        "input_usd_per_million_tokens": 0.3,
+        "output_usd_per_million_tokens": 2.5
+      }
+    },
+    "unknown_usage_policy": "Si el proveedor no informa tokens o precios vigentes, conservar el campo como unknown y no declarar el techo cumplido sin un límite superior verificable."
+  },
+  "measurement": {
+    "semantic_review_status": "required_after_execution",
+    "missing_or_invalid_denominator": "retain_and_report",
+    "unassessed_is_not_pass": true,
+    "release_approved": false,
+    "claims": [
+      "development_only",
+      "no_real_user_claim",
+      "no_holdout_generalization_claim",
+      "no_safety_certification"
+    ]
+  },
+  "traceability": {
+    "record_requested_and_resolved_model": true,
+    "record_dataset_manifest_sha256": true,
+    "record_source_commit": true,
+    "record_prompt_and_generation_config_hashes": true,
+    "record_input_output_hashes": true,
+    "record_request_ids_errors_latency_and_tokens": true,
+    "preserve_failed_and_not_executed_attempts": true,
+    "never_persist_secrets": true,
+    "run_directories_are_local_and_gitignored": true
+  }
+}

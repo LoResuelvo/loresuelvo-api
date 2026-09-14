@@ -23,6 +23,7 @@ type GeminiExecutor struct {
 	apiKey    string
 	transport http.RoundTripper
 	requests  atomic.Int64
+	budget    *CampaignBudgetGuard
 }
 
 // NewGeminiExecutor validates opt-in before constructing any live dependency.
@@ -76,6 +77,72 @@ func (t *limitedTransport) RoundTrip(request *http.Request) (*http.Response, err
 	}
 	return response, err
 }
+
+type singleRequestTransport struct {
+	base http.RoundTripper
+	used atomic.Bool
+}
+
+func (t *singleRequestTransport) RoundTrip(request *http.Request) (*http.Response, error) {
+	if t.used.Swap(true) {
+		return nil, fmt.Errorf("implicit SDK retry blocked during token counting")
+	}
+	return t.base.RoundTrip(request)
+}
+
+// CountInputTokens counts the exact prompt for one planned case, including
+// image bytes for prediagnosis. It uses the provider CountTokens endpoint and
+// never generates a response.
+func (e *GeminiExecutor) CountInputTokens(ctx context.Context, caseID string) (int64, error) {
+	if e == nil || e.dataset == nil || e.plan == nil {
+		return 0, fmt.Errorf("validated execution plan is required")
+	}
+	baseCaseID := caseID
+	var variant *MetamorphicVariant
+	for _, planned := range e.plan.Cases {
+		if planned.CaseID == caseID {
+			variant = planned.Variant
+			if variant != nil {
+				baseCaseID = variant.BaseCaseID
+			}
+			break
+		}
+	}
+	bot, err := chatbot.NewGeminiChatbotWithOptions(e.plan.Model, e.apiKey, chatbot.GeminiOptions{HTTPClient: &http.Client{Transport: &singleRequestTransport{base: e.transport}, CheckRedirect: func(*http.Request, []*http.Request) error { return fmt.Errorf("redirects disabled for token counting") }}})
+	if err != nil {
+		return 0, err
+	}
+	for _, c := range e.dataset.PD {
+		if c.ID != baseCaseID {
+			continue
+		}
+		question, categories, mapErr := e.dataset.MapPD(c.Input)
+		if mapErr != nil {
+			return 0, mapErr
+		}
+		return bot.CountAnswerInputTokens(ctx, question, categories)
+	}
+	for _, c := range e.dataset.RK {
+		if c.ID != baseCaseID {
+			continue
+		}
+		input := c.Input
+		if variant != nil {
+			transformed, transformErr := TransformRanking(input, variant.Transformation, variant.Seed)
+			if transformErr != nil {
+				return 0, transformErr
+			}
+			input = transformed.Input
+		}
+		request, mapErr := input.DomainRequest()
+		if mapErr != nil {
+			return 0, mapErr
+		}
+		return bot.CountRankingInputTokens(ctx, request)
+	}
+	return 0, fmt.Errorf("unknown case %q", caseID)
+}
+
 func (e *GeminiExecutor) Execute(ctx context.Context, caseID string) (ExecutionOutput, error) {
 	var result ExecutionOutput
 	allowed := false
@@ -100,6 +167,11 @@ func (e *GeminiExecutor) Execute(ctx context.Context, caseID string) (ExecutionO
 	bot, err := chatbot.NewGeminiChatbotWithOptions(e.plan.Model, e.apiKey, chatbot.GeminiOptions{HTTPClient: client, MaxOutputTokens: e.limits.MaxOutputTokens, Observer: func(_ context.Context, t chatbot.GenerationTrace) { trace = t }})
 	if err != nil {
 		return result, err
+	}
+	if e.budget != nil {
+		if err := e.budget.BeforeRequest(e.plan); err != nil {
+			return result, &ExecutionError{Kind: "budget_exhausted", Stop: true, Cause: err}
+		}
 	}
 	var parsed any
 	found := false
@@ -139,6 +211,19 @@ func (e *GeminiExecutor) Execute(ctx context.Context, caseID string) (ExecutionO
 		return result, fmt.Errorf("unknown case %q", caseID)
 	}
 	result = ExecutionOutput{RequestID: transport.requestID, Input: trace.Contents, GenerationConfig: trace.Config, RawOutput: trace.RawText, ProviderResponse: trace.Response, RequestCount: transport.count}
+	if e.budget != nil && transport.count > 0 {
+		inputTokens, outputTokens, usageErr := observedUsage(trace.Response)
+		if usageErr != nil {
+			// The response and its original error remain intact. Consume the
+			// preflight maximum instead of converting a valid model result into
+			// an execution failure solely because usage metadata is absent.
+			if reserveErr := e.budget.RecordUnknown(e.plan); reserveErr != nil {
+				return result, &ExecutionError{Kind: "budget_exhausted", Stop: true, Cause: reserveErr}
+			}
+		} else if usageErr = e.budget.RecordObserved(e.plan, inputTokens, outputTokens); usageErr != nil {
+			return result, &ExecutionError{Kind: "budget_exhausted", Stop: true, Cause: usageErr}
+		}
+	}
 	if len(trace.Contents) > 0 {
 		hash, hashErr := promptHash(trace.Contents)
 		if hashErr != nil {
@@ -155,6 +240,23 @@ func (e *GeminiExecutor) Execute(ctx context.Context, caseID string) (ExecutionO
 	}
 	return result, nil
 }
+func observedUsage(raw json.RawMessage) (int64, int64, error) {
+	var response struct {
+		Usage *struct {
+			Input    *int64 `json:"promptTokenCount"`
+			Output   *int64 `json:"candidatesTokenCount"`
+			Thoughts *int64 `json:"thoughtsTokenCount"`
+		} `json:"usageMetadata"`
+	}
+	if len(raw) == 0 || json.Unmarshal(raw, &response) != nil || response.Usage == nil || response.Usage.Input == nil || response.Usage.Output == nil {
+		return 0, 0, fmt.Errorf("provider token usage is missing")
+	}
+	if *response.Usage.Input < 0 || *response.Usage.Output < 0 || response.Usage.Thoughts == nil || *response.Usage.Thoughts < 0 {
+		return 0, 0, fmt.Errorf("provider token usage is invalid or incomplete")
+	}
+	return *response.Usage.Input, *response.Usage.Output + *response.Usage.Thoughts, nil
+}
+
 func classifyExecutionError(err error, status int) error {
 	if errors.Is(err, ErrRequestBudget) {
 		return &ExecutionError{Kind: "budget_exhausted", Stop: true, Cause: err}
@@ -172,4 +274,15 @@ func classifyExecutionError(err error, status int) error {
 	var networkError net.Error
 	retryable := status >= 500 || errors.Is(err, context.DeadlineExceeded) || errors.As(err, &networkError)
 	return &ExecutionError{Kind: "execution_error", Retryable: retryable, Cause: err}
+}
+
+// CampaignBudgetSnapshot exposes the final shared guard counters without
+// exposing the guard or credentials. ok is false when this executor was not
+// attached to a campaign preflight guard.
+func (e *GeminiExecutor) CampaignBudgetSnapshot() (used int, spentUSD float64, ok bool) {
+	if e == nil || e.budget == nil {
+		return 0, 0, false
+	}
+	used, spentUSD = e.budget.Snapshot()
+	return used, spentUSD, true
 }

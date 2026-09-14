@@ -102,9 +102,14 @@ migrate-test-down:
 	docker compose exec $(SERVICE) sh -c 'migrate -path db/migrations -database "$$TEST_DATABASE_URL" down 1'
 
 # Manual preparation only; never prerequisites of the ordinary test targets.
-.PHONY: evals-validate evals-plan
+.PHONY: evals-validate evals-python-validate evals-plan
+EVALS_PYTHON ?= python3
 evals-validate:
 	go run ./cmd/evals validate $(ARGS)
+
+evals-python-validate:
+	$(EVALS_PYTHON) evals/datasets/LoResuelvo_US60_evals_v1.0.0/tools/evalpack.py validate
+	$(EVALS_PYTHON) -m unittest discover -s evals/datasets/LoResuelvo_US60_evals_v1.0.0/tests -v
 
 evals-plan:
 	go run ./cmd/evals plan $(ARGS)
