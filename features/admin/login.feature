@@ -1,4 +1,3 @@
-@wip
 Feature: Obtener el perfil del administrador autenticado
 
   Como administrador
