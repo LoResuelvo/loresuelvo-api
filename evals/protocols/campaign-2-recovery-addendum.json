@@ -3,10 +3,10 @@
   "addendum_id": "campaign-2-recovery-1",
   "campaign_id": "campaign-2",
   "parent_protocol": "evals/protocols/campaign-2.json",
-  "purpose": "Borrador provisional para completar únicamente slots sin respuesta de Campaign 2 sin alterar sus diarios. La referencia de solución apunta al commit Q sin autorreferencia circular; si se requiere recovery, debe versionarse después de la ejecución un addendum nuevo ligado al execution_source_commit exacto de Campaign 2.",
+  "purpose": "Completar únicamente slots con respuesta vacía por errores transitorios de Campaign 2, preservando inmutables los diarios y resultados originales y reportando toda evidencia de recovery por separado.",
   "scope": {
     "dataset_manifest_sha256": "063a87355225013229cb2415bbb96d99a41b0de97525f2a5e99fcf7df813802e",
-    "execution_source_commit": "e2c9c5b3ae58470c3d9a094fc82a9dc86b8068ab",
+    "execution_source_commit": "55023900f2044f1da227fe20d2f01ce0f12cf0e5",
     "allow_holdout": false,
     "quality_or_malformed_retries": false
   },

@@ -51,6 +51,74 @@ func TestCampaignRecoveryUpperBoundUsesHighestConfiguredPrice(t *testing.T) {
 	require.InDelta(t, .06496, campaignRecoveryUpperBound(4, config), .000001)
 }
 
+func TestCampaignRecoveryMaximumAdditionalAttemptsExcludesOriginalAndHonorsCap(t *testing.T) {
+	var addendum campaignRecoveryAddendum
+	addendum.Execution.MaxAttemptsPerOriginalSlot = 5
+	addendum.Execution.AdditionalAttemptsIncludeOriginalAttempt = false
+	addendum.Execution.MaxRecoveryAttemptsTotal = 360
+
+	perSlot, additional, err := campaignRecoveryAttemptLimits(38, addendum)
+	require.NoError(t, err)
+	require.Equal(t, 5, perSlot)
+	require.Equal(t, 152, additional)
+
+	// The manifest uses one uniform per-slot policy. If the global cap cannot
+	// fund the declared maximum for every target, lower the effective per-slot
+	// maximum rather than overrun the cap or omit eligible targets.
+	addendum.Execution.MaxRecoveryAttemptsTotal = 360
+	perSlot, additional, err = campaignRecoveryAttemptLimits(100, addendum)
+	require.NoError(t, err)
+	require.Equal(t, 4, perSlot)
+	require.Equal(t, 300, additional)
+
+	perSlot, additional, err = campaignRecoveryAttemptLimits(0, addendum)
+	require.NoError(t, err)
+	require.Zero(t, perSlot)
+	require.Zero(t, additional)
+}
+
+func TestCampaignRecoveryAttemptLimitsRejectCapThatCannotRetryEveryCandidate(t *testing.T) {
+	var addendum campaignRecoveryAddendum
+	addendum.Execution.MaxAttemptsPerOriginalSlot = 5
+	addendum.Execution.MaxRecoveryAttemptsTotal = 360
+
+	_, _, err := campaignRecoveryAttemptLimits(361, addendum)
+	require.ErrorContains(t, err, "cannot fund one attempt per recovery candidate")
+}
+
+func TestCampaignRecoveryWorkPlansUseEffectiveManifestPolicy(t *testing.T) {
+	candidates := make([]recoveryCandidate, 100)
+	for i := range candidates {
+		candidates[i] = recoveryCandidate{CaseID: "PD-001", Trial: i + 1}
+	}
+	plans, err := campaignRecoveryWorkPlans(candidates, 4)
+	require.NoError(t, err)
+	require.Len(t, plans, 100)
+	total := 0
+	for _, plan := range plans {
+		require.Equal(t, 3, plan.AdditionalAttempts)
+		total += plan.AdditionalAttempts
+	}
+	require.Equal(t, 300, total)
+}
+
+func TestReadCampaignRecoveryAddendumRejectsOriginalCountedAsAdditionalAttempt(t *testing.T) {
+	canonical, err := os.ReadFile(filepath.Join("..", "..", "evals", "protocols", "campaign-1-recovery-addendum.json"))
+	require.NoError(t, err)
+	var document map[string]any
+	require.NoError(t, json.Unmarshal(canonical, &document))
+	execution, ok := document["execution"].(map[string]any)
+	require.True(t, ok)
+	execution["additional_attempts_include_original_attempt"] = true
+	data, err := json.Marshal(document)
+	require.NoError(t, err)
+	path := filepath.Join(t.TempDir(), "addendum.json")
+	require.NoError(t, os.WriteFile(path, data, 0600))
+
+	_, err = readCampaignRecoveryAddendum(path)
+	require.ErrorContains(t, err, "invalid recovery execution bounds")
+}
+
 func TestWriteRecoveryEvidenceOverlayResolvesOriginalRelativePaths(t *testing.T) {
 	originalDir := t.TempDir()
 	outputDir := filepath.Join(t.TempDir(), "recovery-output")

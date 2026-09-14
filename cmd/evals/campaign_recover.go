@@ -92,6 +92,12 @@ type recoveryCandidate struct {
 	Reason                string `json:"reason"`
 	OriginalAttemptSHA256 string `json:"original_attempt_sha256"`
 }
+
+type campaignRecoveryWorkPlan struct {
+	Candidate          recoveryCandidate
+	AdditionalAttempts int
+}
+
 type campaignRecoveryResult struct {
 	CampaignID                    string              `json:"campaign_id"`
 	AddendumID                    string              `json:"addendum_id"`
@@ -102,6 +108,7 @@ type campaignRecoveryResult struct {
 	Candidates                    []recoveryCandidate `json:"candidates"`
 	AdditionalAttempts            int                 `json:"additional_attempts"`
 	MaximumAdditionalAttempts     int                 `json:"maximum_additional_attempts"`
+	EffectiveMaxAttemptsPerSlot   int                 `json:"effective_max_attempts_per_original_slot"`
 	RecoveryUpperBoundUSD         float64             `json:"recovery_upper_bound_usd"`
 	ReleaseApproved               bool                `json:"release_approved"`
 	EvidencePath                  string              `json:"evidence_path,omitempty"`
@@ -136,7 +143,7 @@ func readCampaignRecoveryAddendum(path string) (campaignRecoveryAddendum, error)
 	if !a.Selection.RequiresEmptyRawAndParsedOutput || !a.Selection.NeverRetryExecutedResponse || !a.Selection.NeverMutateOriginalJournal || len(a.Selection.EligibleStatuses) != 1 || a.Selection.EligibleStatuses[0] != "execution_error" || len(a.Selection.EligibleTransientErrors) != 3 || a.Selection.EligibleTransientErrors[0] != "http_503" || a.Selection.EligibleTransientErrors[1] != "timeout" || a.Selection.EligibleTransientErrors[2] != "deadline_exceeded" {
 		return a, errors.New("recovery addendum selection policy is unsafe")
 	}
-	if a.Execution.MaxAttemptsPerOriginalSlot < 2 || a.Execution.MaxAttemptsPerOriginalSlot > evals.RecoveryDefaultMaxAttempts || a.Execution.MaxRecoveryAttemptsTotal <= 0 || a.Execution.Concurrency != 1 || a.Execution.MaxRetries != 0 {
+	if a.Execution.MaxAttemptsPerOriginalSlot < 2 || a.Execution.MaxAttemptsPerOriginalSlot > evals.RecoveryDefaultMaxAttempts || a.Execution.AdditionalAttemptsIncludeOriginalAttempt || a.Execution.MaxRecoveryAttemptsTotal <= 0 || a.Execution.Concurrency != 1 || a.Execution.MaxRetries != 0 {
 		return a, errors.New("invalid recovery execution bounds")
 	}
 	if a.Execution.MinIntervalSeconds < 15 || a.Execution.Backoff.Strategy != "exponential" || a.Execution.Backoff.InitialSeconds != 30 || a.Execution.Backoff.Multiplier != 2 || a.Execution.Backoff.MaxSeconds != 300 || a.Execution.Backoff.Jitter {
@@ -215,6 +222,41 @@ func campaignRecoveryUpperBound(calls int, config evals.CampaignExecutionConfig)
 	return float64(calls) * (float64(evals.CampaignBudgetMaxInputTokens)*input + float64(evals.CampaignBudgetMaxOutputTokens)*output) / 1_000_000
 }
 
+// campaignRecoveryAttemptLimits returns the uniform per-slot policy and the
+// corresponding conservative call bound used by both dry-run and live
+// recovery. MaxAttemptsPerOriginalSlot includes the immutable original
+// attempt; MaxRecoveryAttemptsTotal counts additional attempts only.
+func campaignRecoveryAttemptLimits(candidateCount int, addendum campaignRecoveryAddendum) (int, int, error) {
+	if candidateCount <= 0 {
+		return 0, 0, nil
+	}
+	declaredAdditionalPerSlot := addendum.Execution.MaxAttemptsPerOriginalSlot - 1
+	if declaredAdditionalPerSlot <= 0 || addendum.Execution.MaxRecoveryAttemptsTotal <= 0 {
+		return 0, 0, errors.New("invalid recovery attempt limits")
+	}
+	effectiveAdditionalPerSlot := addendum.Execution.MaxRecoveryAttemptsTotal / candidateCount
+	if effectiveAdditionalPerSlot == 0 {
+		return 0, 0, errors.New("global recovery cap cannot fund one attempt per recovery candidate")
+	}
+	if effectiveAdditionalPerSlot > declaredAdditionalPerSlot {
+		effectiveAdditionalPerSlot = declaredAdditionalPerSlot
+	}
+	effectiveMaxAttemptsPerSlot := effectiveAdditionalPerSlot + 1
+	return effectiveMaxAttemptsPerSlot, candidateCount * effectiveAdditionalPerSlot, nil
+}
+
+func campaignRecoveryWorkPlans(candidates []recoveryCandidate, effectiveMaxAttemptsPerSlot int) ([]campaignRecoveryWorkPlan, error) {
+	additionalAttempts := effectiveMaxAttemptsPerSlot - 1
+	if len(candidates) > 0 && additionalAttempts <= 0 {
+		return nil, errors.New("invalid effective recovery attempts per slot")
+	}
+	plans := make([]campaignRecoveryWorkPlan, 0, len(candidates))
+	for _, candidate := range candidates {
+		plans = append(plans, campaignRecoveryWorkPlan{Candidate: candidate, AdditionalAttempts: additionalAttempts})
+	}
+	return plans, nil
+}
+
 func maxCampaignInputPrice(prices []evals.CampaignPrice) float64 {
 	var max float64
 	for _, price := range prices {
@@ -245,14 +287,11 @@ func executeCampaignRecovery(ctx context.Context, dataset *evals.Dataset, config
 	if len(candidates) == 0 {
 		return result, errors.New("no eligible no-response transient attempts found")
 	}
-	if len(candidates) > addendum.Execution.MaxRecoveryAttemptsTotal {
-		candidates = candidates[:addendum.Execution.MaxRecoveryAttemptsTotal]
+	effectiveMaxAttemptsPerSlot, maxCalls, err := campaignRecoveryAttemptLimits(len(candidates), addendum)
+	if err != nil {
+		return result, err
 	}
-	maxExtra := addendum.Execution.MaxAttemptsPerOriginalSlot - 1
-	maxCalls := len(candidates) * maxExtra
-	if maxCalls > addendum.Execution.MaxRecoveryAttemptsTotal {
-		maxCalls = addendum.Execution.MaxRecoveryAttemptsTotal
-	}
+	result.EffectiveMaxAttemptsPerSlot = effectiveMaxAttemptsPerSlot
 	priorUpper := spec.Budget.AccountedSpendUSD
 	if !spec.Budget.ProviderUsageComplete {
 		priorUpper = spec.Budget.ReservedTotalUSD
@@ -269,7 +308,7 @@ func executeCampaignRecovery(ctx context.Context, dataset *evals.Dataset, config
 	if ctx == nil {
 		return result, errors.New("recovery context is required")
 	}
-	policy := evals.RecoveryPolicy{MaxAttemptsPerSlot: addendum.Execution.MaxAttemptsPerOriginalSlot, InitialBackoff: time.Duration(addendum.Execution.Backoff.InitialSeconds) * time.Second, MaxBackoff: time.Duration(addendum.Execution.Backoff.MaxSeconds) * time.Second}
+	policy := evals.RecoveryPolicy{MaxAttemptsPerSlot: effectiveMaxAttemptsPerSlot, InitialBackoff: time.Duration(addendum.Execution.Backoff.InitialSeconds) * time.Second, MaxBackoff: time.Duration(addendum.Execution.Backoff.MaxSeconds) * time.Second}
 	if err := policy.Validate(); err != nil {
 		return result, err
 	}
@@ -319,19 +358,24 @@ func executeCampaignRecovery(ctx context.Context, dataset *evals.Dataset, config
 		candidate recoveryCandidate
 		executors []*evals.GeminiExecutor
 	}
-	works := make([]recoveryWork, 0, len(candidates))
+	workPlans, err := campaignRecoveryWorkPlans(candidates, effectiveMaxAttemptsPerSlot)
+	if err != nil {
+		return result, err
+	}
+	works := make([]recoveryWork, 0, len(workPlans))
 	allExecutors := make([]*evals.GeminiExecutor, 0, maxCalls)
 	prices := append([]evals.CampaignPrice(nil), config.Prices...)
 	for i := range prices {
 		prices[i].Verified = true
 	}
-	for _, candidate := range candidates {
+	for _, workPlan := range workPlans {
+		candidate := workPlan.Candidate
 		suite := "development"
 		if candidate.Phase == "smoke" {
 			suite = "smoke"
 		}
-		work := recoveryWork{candidate: candidate, executors: make([]*evals.GeminiExecutor, 0, maxExtra)}
-		for n := 0; n < maxExtra; n++ {
+		work := recoveryWork{candidate: candidate, executors: make([]*evals.GeminiExecutor, 0, workPlan.AdditionalAttempts)}
+		for n := 0; n < workPlan.AdditionalAttempts; n++ {
 			plan, planErr := evals.BuildPlan(dataset, evals.PlanOptions{Suite: suite, Model: candidate.RequestedModel, Trials: 1, MaxRetries: 0, MaxRequests: 1, CaseIDs: []string{candidate.CaseID}})
 			if planErr != nil {
 				return result, planErr
