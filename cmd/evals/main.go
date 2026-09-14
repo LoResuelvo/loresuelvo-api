@@ -42,7 +42,7 @@ func runContext(ctx context.Context, args []string, stdout, stderr io.Writer) in
 	}
 	command := args[0]
 	switch command {
-	case "validate", "plan", "contract", "live", "replay", "compare", "baselines", "summary", "review-template", "review", "metamorphic-report", "campaign-report", "campaign-live":
+	case "validate", "plan", "contract", "live", "replay", "compare", "baselines", "summary", "review-template", "review", "metamorphic-report", "campaign-report", "campaign-live", "campaign-recover":
 	default:
 		fmt.Fprintf(stderr, "unsupported command %q; no model calls were made\n", command)
 		return 2
@@ -55,7 +55,7 @@ func runContext(ctx context.Context, args []string, stdout, stderr io.Writer) in
 	var limits evals.ExecutionLimits
 	var allowLive, dryRun bool
 	var tokens int
-	var output, runDirectory, left, right, caseIDs, reviewPath, protocolPath, evidencePath, pricingVerifiedOn string
+	var output, runDirectory, left, right, caseIDs, reviewPath, protocolPath, evidencePath, pricingVerifiedOn, addendumPath string
 	if command == "plan" || command == "live" {
 		flags.StringVar(&options.Suite, "suite", "", "explicit suite: smoke, development, holdout, critical_all")
 		flags.StringVar(&options.Model, "model", "", "explicit requested model identifier")
@@ -103,6 +103,15 @@ func runContext(ctx context.Context, args []string, stdout, stderr io.Writer) in
 		flags.StringVar(&pricingVerifiedOn, "pricing-verified-on", "", "UTC date of independent pricing verification (YYYY-MM-DD)")
 		flags.BoolVar(&allowLive, "allow-live", false, "authorize the bounded campaign and token-count preflight")
 		flags.BoolVar(&dryRun, "dry-run", false, "validate protocol and show all plans without provider calls")
+	}
+	if command == "campaign-recover" {
+		flags.StringVar(&protocolPath, "protocol", "", "frozen versioned campaign protocol")
+		flags.StringVar(&addendumPath, "addendum", "", "versioned append-only recovery policy")
+		flags.StringVar(&evidencePath, "evidence", "", "local immutable campaign evidence manifest")
+		flags.StringVar(&output, "out", "", "new private recovery evidence directory")
+		flags.StringVar(&pricingVerifiedOn, "pricing-verified-on", "", "UTC date of independent pricing verification (YYYY-MM-DD)")
+		flags.BoolVar(&allowLive, "allow-live", false, "authorize bounded recovery provider calls")
+		flags.BoolVar(&dryRun, "dry-run", false, "validate selection and budget without credentials or provider calls")
 	}
 	if err := flags.Parse(args[1:]); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
@@ -291,6 +300,75 @@ func runContext(ctx context.Context, args []string, stdout, stderr io.Writer) in
 			return 2
 		}
 		result, err = executeCampaignLive(ctx, dataset, config, output, key, pricingVerifiedOn)
+	case "campaign-recover":
+		if protocolPath == "" || addendumPath == "" || evidencePath == "" {
+			fmt.Fprintln(stderr, "--protocol, --addendum and --evidence are required")
+			return 2
+		}
+		config, configErr := evals.ReadCampaignExecutionConfig(dataset, protocolPath)
+		if configErr != nil {
+			err = configErr
+			break
+		}
+		addendum, addendumErr := readCampaignRecoveryAddendum(addendumPath)
+		if addendumErr != nil {
+			err = addendumErr
+			break
+		}
+		if filepath.Clean(addendum.ParentProtocol) != filepath.Clean(protocolPath) && filepath.Base(addendum.ParentProtocol) != filepath.Base(protocolPath) {
+			err = fmt.Errorf("recovery addendum parent protocol does not match --protocol")
+			break
+		}
+		spec, specErr := evals.ReadCampaignReportSpec(dataset, protocolPath, evidencePath)
+		if specErr != nil {
+			err = specErr
+			break
+		}
+		if dryRun {
+			candidates, selectionErr := collectRecoveryCandidates(dataset, spec, addendum)
+			if selectionErr != nil {
+				err = selectionErr
+				break
+			}
+			result = map[string]any{"campaign_id": config.CampaignID, "addendum_id": addendum.AddendumID, "protocol_sha256": config.ProtocolSHA256, "dataset_manifest_sha256": dataset.ManifestSHA256, "candidates": candidates, "additional_attempts": len(candidates), "recovery_upper_bound_usd": campaignRecoveryUpperBound(len(candidates), config), "live_model_calls": 0, "release_approved": false}
+			break
+		}
+		if !allowLive || output == "" || pricingVerifiedOn == "" {
+			fmt.Fprintln(stderr, "campaign-recover requires --allow-live, --out and --pricing-verified-on; no provider calls were made")
+			return 2
+		}
+		if pricingVerifiedOn != time.Now().UTC().Format(time.DateOnly) {
+			fmt.Fprintln(stderr, "pricing must be independently verified on the current UTC execution date")
+			return 2
+		}
+		if _, statErr := os.Lstat(output); statErr == nil {
+			fmt.Fprintln(stderr, "recovery output directory already exists; no provider calls were made")
+			return 2
+		} else if !os.IsNotExist(statErr) {
+			fmt.Fprintln(stderr, statErr)
+			return 2
+		}
+		if err = checkOutputDirectory(dataset.Root, output); err != nil {
+			break
+		}
+		key := strings.TrimSpace(os.Getenv("CHATBOT_API_KEY"))
+		if key == "" {
+			fmt.Fprintln(stderr, "CHATBOT_API_KEY is required for campaign-recover; no provider calls were made")
+			return 2
+		}
+		if err = verifyCampaignBaseline(config); err != nil {
+			break
+		}
+		commit, commitErr := cleanCommit()
+		if commitErr != nil {
+			err = commitErr
+			break
+		}
+		if spec.SourceCommit != addendum.Scope.ExecutionSourceCommit {
+			err = fmt.Errorf("addendum original source commit differs from immutable campaign evidence")
+			break
+		}
+		result, err = executeCampaignRecovery(ctx, dataset, config, addendum, spec, evidencePath, output, key, commit)
 	case "compare":
 		if left == "" || right == "" {
 			fmt.Fprintln(stderr, "--left and --right are required")
@@ -425,6 +503,7 @@ func usage(out io.Writer) {
 	fmt.Fprintln(out, "       evals review --run DIR --reviews FILE")
 	fmt.Fprintln(out, "       evals campaign-report --protocol FILE --evidence FILE --out DIR")
 	fmt.Fprintln(out, "       evals campaign-live --protocol FILE --allow-live --pricing-verified-on YYYY-MM-DD --out DIR")
+	fmt.Fprintln(out, "       evals campaign-recover --protocol FILE --addendum FILE --evidence FILE --allow-live --pricing-verified-on YYYY-MM-DD --out DIR")
 	fmt.Fprintln(out, "Plan/live: --cases ID,ID limits the suite; --metamorphic adds frozen transformations with --trials 3.")
 	fmt.Fprintln(out, "Compare deliberate changes: --allow-source-change/--allow-prompt-change/--allow-generation-config-change plus --change-description TEXT.")
 	fmt.Fprintln(out, "Offline modes never call a model. Live needs explicit opt-in and CHATBOT_API_KEY. Semantic review is never automatically approved.")

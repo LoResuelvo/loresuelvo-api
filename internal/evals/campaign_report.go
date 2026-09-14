@@ -54,9 +54,11 @@ type CampaignPhaseSpec struct {
 }
 
 type CampaignRunSpec struct {
-	RequestedModel  string `json:"requested_model"`
-	RunDirectory    string `json:"run_directory"`
-	SemanticReviews string `json:"semantic_reviews,omitempty"`
+	RequestedModel          string `json:"requested_model"`
+	RunDirectory            string `json:"run_directory"`
+	SemanticReviews         string `json:"semantic_reviews,omitempty"`
+	RecoveryEvidence        string `json:"recovery_evidence,omitempty"`
+	RecoverySemanticReviews string `json:"recovery_semantic_reviews,omitempty"`
 }
 
 // CampaignEvidence is the local, post-commit binding between a frozen protocol
@@ -221,6 +223,7 @@ type CampaignCoverage struct {
 	SemanticFailedSlots  int  `json:"semantic_failed_slots"`
 	AgentReviewedSlots   int  `json:"agent_reviewed_slots"`
 	HumanReviewedSlots   int  `json:"human_reviewed_slots"`
+	RecoveredSlots       int  `json:"recovered_slots"`
 	EvidenceComplete     bool `json:"evidence_complete"`
 	ResponsesComplete    bool `json:"responses_complete"`
 	SemanticsComplete    bool `json:"semantics_complete"`
@@ -299,6 +302,54 @@ type CampaignModelReport struct {
 	Tasks      map[string]CampaignTaskReport `json:"tasks"`
 	Operations OperationalSummary            `json:"operations"`
 	Semantic   CampaignSemanticSummary       `json:"semantic"`
+	Recovery   *CampaignRecoverySummary      `json:"recovery,omitempty"`
+}
+
+// CampaignRecoverySummary reports the append-only overlay without replacing
+// the immutable base journal or folding recovery calls into base operations.
+type CampaignRecoverySummary struct {
+	RecoveryID              string         `json:"recovery_id"`
+	EvidenceSHA256          string         `json:"evidence_sha256"`
+	TargetSlots             int            `json:"target_slots"`
+	RecoveryAttempts        int            `json:"recovery_attempts"`
+	RecoveredSlots          int            `json:"recovered_slots"`
+	MissingSlots            []string       `json:"missing_slots"`
+	AttemptStatuses         map[string]int `json:"attempt_statuses"`
+	ReservedAdditionalCalls int            `json:"reserved_additional_calls"`
+	AdditionalUpperBoundUSD float64        `json:"additional_upper_bound_usd"`
+	AccountedAdditionalUSD  float64        `json:"accounted_additional_spend_usd"`
+	ProviderUsageComplete   bool           `json:"provider_usage_complete"`
+	SemanticReviewSHA256    string         `json:"semantic_review_sha256,omitempty"`
+	SemanticReviewerKinds   []string       `json:"semantic_reviewer_kinds"`
+	SemanticPendingHuman    int            `json:"semantic_pending_human_checks"`
+}
+
+type CampaignRecoveryReport struct {
+	EvidenceDocuments        int     `json:"evidence_documents"`
+	TargetSlots              int     `json:"target_slots"`
+	RecoveryAttempts         int     `json:"recovery_attempts"`
+	RecoveredSlots           int     `json:"recovered_slots"`
+	MissingSlots             int     `json:"missing_slots"`
+	ReservedAdditionalCalls  int     `json:"reserved_additional_calls"`
+	AdditionalUpperBoundUSD  float64 `json:"additional_upper_bound_usd"`
+	OriginalReservedUpperUSD float64 `json:"original_reserved_upper_bound_usd"`
+	CombinedUpperBoundUSD    float64 `json:"combined_upper_bound_usd"`
+	OriginalAccountedUSD     float64 `json:"original_accounted_spend_usd"`
+	AdditionalAccountedUSD   float64 `json:"additional_accounted_spend_usd"`
+	CombinedAccountedUSD     float64 `json:"combined_accounted_spend_usd"`
+	ProviderUsageComplete    bool    `json:"provider_usage_complete"`
+	HardCeilingUSD           float64 `json:"hard_ceiling_usd"`
+	WithinHardCeiling        bool    `json:"within_hard_ceiling"`
+}
+
+type campaignRecoveryOverlay struct {
+	slots                map[string]RecoveredAttempt
+	evidence             CampaignRecoveryEvidence
+	evidenceSHA256       string
+	reviewsByCriterion   map[string]SemanticReview
+	reviewerKindsBySlot  map[string]map[string]bool
+	semanticReviewSHA256 string
+	semanticPendingHuman int
 }
 
 type CampaignPhaseReport struct {
@@ -313,37 +364,46 @@ type CampaignPhaseReport struct {
 // CampaignCaseTrial is deliberately transcript-free. It supports failure-mode
 // analysis while binding every row to the exact output and reviewed criteria.
 type CampaignCaseTrial struct {
-	Phase               string         `json:"phase"`
-	RequestedModel      string         `json:"requested_model"`
-	CaseID              string         `json:"case_id"`
-	BaseCaseID          string         `json:"base_case_id"`
-	Task                string         `json:"task"`
-	FamilyID            string         `json:"family_id"`
-	Split               string         `json:"split"`
-	Trial               int            `json:"trial"`
-	TerminalRetry       int            `json:"terminal_retry"`
-	Attempts            int            `json:"attempts_including_retries"`
-	ExecutionStatus     string         `json:"execution_status"`
-	DeterministicStatus string         `json:"deterministic_status"`
-	OverallStatus       string         `json:"overall_status"`
-	SemanticStatus      string         `json:"semantic_status"`
-	FailureCodes        []string       `json:"failure_codes"`
-	Metrics             map[string]any `json:"metrics"`
-	SemanticCounts      map[string]int `json:"semantic_criterion_counts"`
-	ReviewerKinds       []string       `json:"reviewer_kinds"`
-	OutputSHA256        string         `json:"output_sha256,omitempty"`
+	Phase                   string         `json:"phase"`
+	RequestedModel          string         `json:"requested_model"`
+	CaseID                  string         `json:"case_id"`
+	BaseCaseID              string         `json:"base_case_id"`
+	Task                    string         `json:"task"`
+	FamilyID                string         `json:"family_id"`
+	Split                   string         `json:"split"`
+	Trial                   int            `json:"trial"`
+	TerminalRetry           int            `json:"terminal_retry"`
+	Attempts                int            `json:"attempts_including_retries"`
+	ExecutionStatus         string         `json:"execution_status"`
+	OriginalExecutionStatus string         `json:"original_execution_status"`
+	OriginalFailureCodes    []string       `json:"original_failure_codes"`
+	Recovered               bool           `json:"recovered"`
+	RecoveryReason          string         `json:"recovery_reason,omitempty"`
+	RecoveryAttempts        int            `json:"recovery_attempts"`
+	OriginalAttemptSHA256   string         `json:"original_attempt_sha256,omitempty"`
+	RecoveryEvidenceSHA256  string         `json:"recovery_evidence_sha256,omitempty"`
+	RecoveryAttemptStatuses []string       `json:"recovery_attempt_statuses,omitempty"`
+	DeterministicStatus     string         `json:"deterministic_status"`
+	OverallStatus           string         `json:"overall_status"`
+	SemanticStatus          string         `json:"semantic_status"`
+	FailureCodes            []string       `json:"failure_codes"`
+	Metrics                 map[string]any `json:"metrics"`
+	SemanticCounts          map[string]int `json:"semantic_criterion_counts"`
+	ReviewerKinds           []string       `json:"reviewer_kinds"`
+	OutputSHA256            string         `json:"output_sha256,omitempty"`
 }
 
 type CampaignReport struct {
-	FormatVersion   string                 `json:"format_version"`
-	Campaign        CampaignProvenance     `json:"campaign"`
-	Status          CampaignStatus         `json:"status"`
-	Phases          []CampaignPhaseReport  `json:"phases"`
-	Cases           []CampaignCaseTrial    `json:"case_trials"`
-	Offline         CampaignOfflineReport  `json:"offline"`
-	Budget          CampaignBudgetEvidence `json:"budget"`
-	ReleaseApproved bool                   `json:"release_approved"`
-	Warnings        []string               `json:"warnings"`
+	FormatVersion   string                  `json:"format_version"`
+	Campaign        CampaignProvenance      `json:"campaign"`
+	Status          CampaignStatus          `json:"status"`
+	Phases          []CampaignPhaseReport   `json:"phases"`
+	Cases           []CampaignCaseTrial     `json:"case_trials"`
+	Offline         CampaignOfflineReport   `json:"offline"`
+	Budget          CampaignBudgetEvidence  `json:"budget"`
+	Recovery        *CampaignRecoveryReport `json:"recovery,omitempty"`
+	ReleaseApproved bool                    `json:"release_approved"`
+	Warnings        []string                `json:"warnings"`
 }
 
 // ReadCampaignReportSpec combines a versioned protocol with a local evidence
@@ -391,6 +451,12 @@ func ReadCampaignReportSpec(dataset *Dataset, protocolPath, evidencePath string)
 			run.RunDirectory = resolveEvidencePath(evidencePath, run.RunDirectory)
 			if run.SemanticReviews != "" {
 				run.SemanticReviews = resolveEvidencePath(evidencePath, run.SemanticReviews)
+			}
+			if run.RecoveryEvidence != "" {
+				run.RecoveryEvidence = resolveEvidencePath(evidencePath, run.RecoveryEvidence)
+			}
+			if run.RecoverySemanticReviews != "" {
+				run.RecoverySemanticReviews = resolveEvidencePath(evidencePath, run.RecoverySemanticReviews)
 			}
 			runsByModel[run.RequestedModel] = run
 		}
@@ -704,6 +770,20 @@ func BuildCampaignReport(ctx context.Context, dataset *Dataset, spec CampaignRep
 				return report, err
 			}
 			phase.Models = append(phase.Models, model)
+			if model.Recovery != nil {
+				if report.Recovery == nil {
+					report.Recovery = &CampaignRecoveryReport{OriginalReservedUpperUSD: spec.Budget.ReservedTotalUSD, OriginalAccountedUSD: spec.Budget.AccountedSpendUSD, HardCeilingUSD: spec.Budget.HardCeilingUSD, ProviderUsageComplete: spec.Budget.ProviderUsageComplete}
+				}
+				report.Recovery.EvidenceDocuments++
+				report.Recovery.TargetSlots += model.Recovery.TargetSlots
+				report.Recovery.RecoveryAttempts += model.Recovery.RecoveryAttempts
+				report.Recovery.RecoveredSlots += model.Recovery.RecoveredSlots
+				report.Recovery.MissingSlots += len(model.Recovery.MissingSlots)
+				report.Recovery.ReservedAdditionalCalls += model.Recovery.ReservedAdditionalCalls
+				report.Recovery.AdditionalUpperBoundUSD += model.Recovery.AdditionalUpperBoundUSD
+				report.Recovery.AdditionalAccountedUSD += model.Recovery.AccountedAdditionalUSD
+				report.Recovery.ProviderUsageComplete = report.Recovery.ProviderUsageComplete && model.Recovery.ProviderUsageComplete
+			}
 			mergeCampaignCoverage(&phase.Coverage, model.Coverage)
 			report.Cases = append(report.Cases, cases...)
 		}
@@ -714,6 +794,14 @@ func BuildCampaignReport(ctx context.Context, dataset *Dataset, spec CampaignRep
 	}
 	report.Status.Phases = len(report.Phases)
 	finalizeCampaignCoverage(&report.Status.CampaignCoverage)
+	if report.Recovery != nil {
+		report.Recovery.CombinedUpperBoundUSD = report.Recovery.OriginalReservedUpperUSD + report.Recovery.AdditionalUpperBoundUSD
+		report.Recovery.CombinedAccountedUSD = report.Recovery.OriginalAccountedUSD + report.Recovery.AdditionalAccountedUSD
+		report.Recovery.WithinHardCeiling = report.Recovery.CombinedUpperBoundUSD <= report.Recovery.HardCeilingUSD+1e-9
+		if !report.Recovery.WithinHardCeiling || report.Recovery.CombinedAccountedUSD > report.Recovery.HardCeilingUSD+1e-9 {
+			return report, fmt.Errorf("%w: original plus recovery upper bound exceeds campaign ceiling", ErrInvalidCampaignReport)
+		}
+	}
 	actualRequests := 0
 	for _, phase := range report.Phases {
 		for _, model := range phase.Models {
@@ -780,6 +868,98 @@ func validateCampaignSpec(dataset *Dataset, spec CampaignReportSpec) error {
 	return nil
 }
 
+func loadCampaignRecoveryOverlay(dataset *Dataset, spec CampaignReportSpec, runSpec CampaignRunSpec) (campaignRecoveryOverlay, error) {
+	overlay := campaignRecoveryOverlay{
+		slots:               map[string]RecoveredAttempt{},
+		reviewsByCriterion:  map[string]SemanticReview{},
+		reviewerKindsBySlot: map[string]map[string]bool{},
+	}
+	if runSpec.RecoveryEvidence == "" {
+		if runSpec.RecoverySemanticReviews != "" {
+			return overlay, fmt.Errorf("%w: recovery reviews require recovery evidence", ErrInvalidCampaignReport)
+		}
+		return overlay, nil
+	}
+	data, err := readBoundedFile(runSpec.RecoveryEvidence, 64*1024*1024)
+	if err != nil {
+		return overlay, fmt.Errorf("read campaign recovery evidence: %w", err)
+	}
+	evidence, err := ReadCampaignRecovery(runSpec.RecoveryEvidence)
+	if err != nil {
+		return overlay, err
+	}
+	expectedPriorSpend := spec.Budget.AccountedSpendUSD
+	if !spec.Budget.ProviderUsageComplete {
+		expectedPriorSpend = spec.Budget.ReservedTotalUSD
+	}
+	if evidence.Manifest.BaseProtocolSHA256 != spec.ProtocolSHA256 ||
+		!maps.Equal(evidence.Manifest.Binding.BaselineFilesSHA256, spec.BaselineFilesSHA256) ||
+		evidence.Manifest.Budget.HardCeilingUSD != spec.Budget.HardCeilingUSD ||
+		!evidence.Manifest.Budget.PriorRequestsKnown ||
+		evidence.Manifest.Budget.PriorRequests != spec.Budget.ObservedGenerationCalls ||
+		evidence.Manifest.Budget.PriorSpentUSD == nil ||
+		math.Abs(*evidence.Manifest.Budget.PriorSpentUSD-expectedPriorSpend) > 1e-9 {
+		return overlay, fmt.Errorf("%w: recovery protocol, baseline or prior budget binding mismatch", ErrInvalidCampaignReport)
+	}
+	overlay.slots, err = ApplyCampaignRecovery(dataset, runSpec.RunDirectory, evidence)
+	if err != nil {
+		return overlay, err
+	}
+	overlay.evidence = evidence
+	overlay.evidenceSHA256 = digest(data)
+	if runSpec.RecoverySemanticReviews == "" {
+		return overlay, nil
+	}
+	reviewData, err := readBoundedFile(runSpec.RecoverySemanticReviews, maxSemanticReviewBytes)
+	if err != nil {
+		return overlay, fmt.Errorf("read recovery semantic review evidence: %w", err)
+	}
+	var document RecoverySemanticReviewDocument
+	if err = decodeCampaignJSON(reviewData, &document); err != nil {
+		return overlay, fmt.Errorf("decode recovery semantic review evidence: %w", err)
+	}
+	reviewed, err := ApplyRecoverySemanticReviews(dataset, runSpec.RunDirectory, evidence, document)
+	if err != nil {
+		return overlay, err
+	}
+	overlay.semanticReviewSHA256 = digest(reviewData)
+	overlay.semanticPendingHuman = reviewed.PendingHumanChecks
+	for _, review := range reviewed.Reviews {
+		overlay.reviewsByCriterion[semanticReviewKey(review)] = review
+		if review.ReviewerKind == "" {
+			continue
+		}
+		key := attemptKey(review.CaseID, review.Trial)
+		if overlay.reviewerKindsBySlot[key] == nil {
+			overlay.reviewerKindsBySlot[key] = map[string]bool{}
+		}
+		overlay.reviewerKindsBySlot[key][review.ReviewerKind] = true
+	}
+	return overlay, nil
+}
+
+func campaignRecoveryAccounted(evidence CampaignRecoveryEvidence) (float64, bool, error) {
+	budget := evidence.Manifest.Budget
+	complete := true
+	var total float64
+	for _, item := range evidence.Attempts {
+		if item.Attempt.RequestCount == 0 {
+			continue
+		}
+		input, output, err := observedUsage(item.Attempt.ProviderResponse)
+		if err != nil {
+			complete = false
+			input = budget.MaxInputTokensPerCall
+			output = budget.MaxOutputTokensPerCall
+		}
+		total += float64(input)*budget.InputUSDPerMillion/1_000_000 + float64(output)*budget.OutputUSDPerMillion/1_000_000
+	}
+	if !finite(total) || total < 0 || total > evidence.Manifest.Reservation.AdditionalUpperUSD+1e-9 {
+		return 0, false, fmt.Errorf("%w: recovery accounted spend exceeds its reservation", ErrInvalidCampaignReport)
+	}
+	return total, complete, nil
+}
+
 func buildCampaignModel(dataset *Dataset, spec CampaignReportSpec, phase CampaignPhaseSpec, runSpec CampaignRunSpec) (CampaignModelReport, []CampaignCaseTrial, error) {
 	model := CampaignModelReport{Tasks: map[string]CampaignTaskReport{}}
 	record, replay, err := Replay(dataset, runSpec.RunDirectory)
@@ -839,18 +1019,54 @@ func buildCampaignModel(dataset *Dataset, spec CampaignReportSpec, phase Campaig
 		return model, nil, fmt.Errorf("%w: evaluated attempts do not match journal", ErrInvalidCampaignReport)
 	}
 
-	summary, err := Summarize(dataset, record.Plan, attempts, evaluations)
+	baseSummary, err := Summarize(dataset, record.Plan, attempts, evaluations)
 	if err != nil {
 		return model, nil, err
 	}
-	model.Operations = summary.Operations
+	model.Operations = baseSummary.Operations
 	model.Semantic = semantic
 	model.Provenance = campaignRunProvenance(record, attempts)
-	model.Tasks = campaignTaskReports(summary)
+	overlay, err := loadCampaignRecoveryOverlay(dataset, spec, runSpec)
+	if err != nil {
+		return model, nil, err
+	}
+	if runSpec.RecoveryEvidence != "" {
+		accounted, usageComplete, accountErr := campaignRecoveryAccounted(overlay.evidence)
+		if accountErr != nil {
+			return model, nil, accountErr
+		}
+		model.Recovery = &CampaignRecoverySummary{
+			RecoveryID: overlay.evidence.Manifest.RecoveryID, EvidenceSHA256: overlay.evidenceSHA256,
+			TargetSlots: len(overlay.evidence.Manifest.Targets), RecoveryAttempts: len(overlay.evidence.Attempts),
+			AttemptStatuses: map[string]int{}, ReservedAdditionalCalls: overlay.evidence.Manifest.Reservation.AdditionalCalls,
+			AdditionalUpperBoundUSD: overlay.evidence.Manifest.Reservation.AdditionalUpperUSD,
+			AccountedAdditionalUSD:  accounted, ProviderUsageComplete: usageComplete,
+			SemanticReviewSHA256: overlay.semanticReviewSHA256, SemanticPendingHuman: overlay.semanticPendingHuman,
+		}
+		allRecoveryKinds := map[string]bool{}
+		for _, item := range overlay.evidence.Attempts {
+			model.Recovery.AttemptStatuses[item.Attempt.Status]++
+		}
+		for _, kinds := range overlay.reviewerKindsBySlot {
+			for kind := range kinds {
+				allRecoveryKinds[kind] = true
+			}
+		}
+		model.Recovery.SemanticReviewerKinds = sortedSet(allRecoveryKinds)
+		if overlay.semanticReviewSHA256 != "" {
+			if model.Semantic.ReviewSource == "imported" {
+				model.Semantic.ReviewSource = "base_and_recovery"
+			} else {
+				model.Semantic.ReviewSource = "recovery"
+			}
+		}
+	}
 
 	reviewKindsBySlot := map[string]map[string]bool{}
 	allReviewKinds := map[string]bool{}
+	baseReviewsByCriterion := map[string]SemanticReview{}
 	for _, review := range reviews {
+		baseReviewsByCriterion[semanticReviewKey(review)] = review
 		if review.ReviewerKind == "" {
 			continue
 		}
@@ -861,7 +1077,17 @@ func buildCampaignModel(dataset *Dataset, spec CampaignReportSpec, phase Campaig
 		reviewKindsBySlot[key][review.ReviewerKind] = true
 		allReviewKinds[review.ReviewerKind] = true
 	}
+	for key, kinds := range overlay.reviewerKindsBySlot {
+		if reviewKindsBySlot[key] == nil {
+			reviewKindsBySlot[key] = map[string]bool{}
+		}
+		for kind := range kinds {
+			reviewKindsBySlot[key][kind] = true
+			allReviewKinds[kind] = true
+		}
+	}
 	model.Semantic.ReviewerKinds = sortedSet(allReviewKinds)
+	model.Semantic.PendingHumanChecks = 0
 
 	evaluated := make(map[string]EvaluatedAttempt, len(evaluations))
 	for _, item := range evaluations {
@@ -897,20 +1123,73 @@ func buildCampaignModel(dataset *Dataset, spec CampaignReportSpec, phase Campaig
 		return model, nil, fmt.Errorf("%w: missing or duplicate terminal slots", ErrInvalidCampaignReport)
 	}
 
-	cases := make([]CampaignCaseTrial, 0, len(order))
+	effectiveAttempts := make([]Attempt, 0, expectedSlots)
+	effectiveEvaluations := make([]EvaluatedAttempt, 0, expectedSlots)
+	effectiveBySlot := make(map[string]Attempt, expectedSlots)
+	evaluationBySlot := make(map[string]EvaluatedAttempt, expectedSlots)
 	for _, key := range order {
-		terminalItem := terminal[key]
-		attempt := terminalItem.attempt
-		item, exists := evaluated[summaryAttemptKey(attempt.CaseID, attempt.Trial, attempt.Retry)]
+		original := terminal[key].attempt
+		effective := original
+		item, exists := evaluated[summaryAttemptKey(original.CaseID, original.Trial, original.Retry)]
 		if !exists {
 			return model, nil, fmt.Errorf("%w: missing terminal evaluation %s", ErrInvalidCampaignReport, key)
 		}
+		if recovered, ok := overlay.slots[key]; ok {
+			if recovered.OriginalAttemptSHA256 != AttemptSHA256(original) {
+				return model, nil, fmt.Errorf("%w: recovery original attempt mismatch %s", ErrInvalidCampaignReport, key)
+			}
+			effective = recovered.Effective
+			if effective.Retry > original.Retry {
+				item, err = evaluateCampaignRecoveredAttempt(dataset, record.Plan, effective, overlay.reviewsByCriterion)
+				if err != nil {
+					return model, nil, err
+				}
+				if effective.Status == "executed" {
+					model.Recovery.RecoveredSlots++
+				} else {
+					model.Recovery.MissingSlots = append(model.Recovery.MissingSlots, key)
+				}
+			} else if RecoverableNoResponse(original) {
+				model.Recovery.MissingSlots = append(model.Recovery.MissingSlots, key)
+			}
+		}
+		effectiveBySlot[key] = effective
+		evaluationBySlot[key] = item
+		normalized := effective
+		normalized.Retry = original.Retry
+		normalizedEvaluation := item
+		normalizedEvaluation.Retry = original.Retry
+		effectiveAttempts = append(effectiveAttempts, normalized)
+		effectiveEvaluations = append(effectiveEvaluations, normalizedEvaluation)
+	}
+	effectiveSummary, err := Summarize(dataset, record.Plan, effectiveAttempts, effectiveEvaluations)
+	if err != nil {
+		return model, nil, err
+	}
+	model.Tasks = campaignTaskReports(effectiveSummary)
+
+	cases := make([]CampaignCaseTrial, 0, len(order))
+	for _, key := range order {
+		terminalItem := terminal[key]
+		original := terminalItem.attempt
+		attempt := effectiveBySlot[key]
+		item := evaluationBySlot[key]
 		baseID := baseFor[attempt.CaseID]
 		metadata, exists := baseMetadata[baseID]
 		if !exists || metadata.Split == "holdout" {
 			return model, nil, fmt.Errorf("%w: unknown or holdout case %s", ErrInvalidCampaignReport, baseID)
 		}
 		semanticStatus, semanticCounts := campaignSemanticStatus(item.Evaluation.SemanticChecks)
+		for _, check := range item.Evaluation.SemanticChecks {
+			keyReview := semanticReviewKey(SemanticReview{CaseID: attempt.CaseID, Trial: attempt.Trial, Retry: attempt.Retry, CriterionID: check.ID})
+			review, reviewed := baseReviewsByCriterion[keyReview]
+			if attempt.Retry > original.Retry {
+				review, reviewed = overlay.reviewsByCriterion[keyReview]
+			}
+			if !reviewed || review.Result == "unassessed" || review.ReviewerKind != "human" {
+				model.Semantic.PendingHumanChecks++
+			}
+		}
 		for result, count := range semanticCounts {
 			model.Semantic.CriterionCounts[result] += count
 		}
@@ -921,9 +1200,28 @@ func buildCampaignModel(dataset *Dataset, spec CampaignReportSpec, phase Campaig
 			FamilyID: metadata.FamilyID, Split: metadata.Split, Trial: attempt.Trial,
 			TerminalRetry: attempt.Retry, Attempts: terminalItem.count,
 			ExecutionStatus: attempt.Status, DeterministicStatus: item.Evaluation.DeterministicStatus,
+			OriginalExecutionStatus: original.Status, OriginalAttemptSHA256: AttemptSHA256(original),
 			OverallStatus: item.Evaluation.OverallStatus, SemanticStatus: semanticStatus,
 			FailureCodes: append([]string(nil), item.Evaluation.Errors...), Metrics: campaignCaseMetrics(dataset, baseID, attempt, item.Evaluation),
 			SemanticCounts: semanticCounts, ReviewerKinds: kinds,
+		}
+		if originalItem, ok := evaluated[summaryAttemptKey(original.CaseID, original.Trial, original.Retry)]; ok {
+			row.OriginalFailureCodes = append([]string(nil), originalItem.Evaluation.Errors...)
+		}
+		if recovered, ok := overlay.slots[key]; ok && len(recovered.RecoveryAttempts) > 0 {
+			row.RecoveryAttempts = len(recovered.RecoveryAttempts)
+			row.Attempts += row.RecoveryAttempts
+			row.RecoveryEvidenceSHA256 = overlay.evidenceSHA256
+			for _, target := range overlay.evidence.Manifest.Targets {
+				if target.CaseID == row.CaseID && target.Trial == row.Trial {
+					row.RecoveryReason = target.Reason
+					break
+				}
+			}
+			for _, recoveryAttempt := range recovered.RecoveryAttempts {
+				row.RecoveryAttemptStatuses = append(row.RecoveryAttemptStatuses, recoveryAttempt.Attempt.Status)
+			}
+			row.Recovered = attempt.Status == "executed" && attempt.Retry > original.Retry
 		}
 		if strings.TrimSpace(attempt.RawOutput) != "" {
 			row.OutputSHA256 = digest([]byte(attempt.RawOutput))
@@ -934,9 +1232,6 @@ func buildCampaignModel(dataset *Dataset, spec CampaignReportSpec, phase Campaig
 		model.Tasks[metadata.Task] = task
 		cases = append(cases, row)
 	}
-	if model.Semantic.ReviewSource == "none" {
-		model.Semantic.PendingHumanChecks = model.Semantic.CriterionCounts["unassessed"]
-	}
 	finalizeCampaignCoverage(&model.Coverage)
 	for name, task := range model.Tasks {
 		finalizeCampaignCoverage(&task.Coverage)
@@ -944,6 +1239,44 @@ func buildCampaignModel(dataset *Dataset, spec CampaignReportSpec, phase Campaig
 		model.Tasks[name] = task
 	}
 	return model, cases, nil
+}
+
+func evaluateCampaignRecoveredAttempt(dataset *Dataset, plan *Plan, attempt Attempt, reviews map[string]SemanticReview) (EvaluatedAttempt, error) {
+	evaluation, err := evaluatePlannedAttempt(dataset, plan, attempt)
+	if err != nil {
+		return EvaluatedAttempt{}, fmt.Errorf("evaluate recovered campaign output %s/%d: %w", attempt.CaseID, attempt.Trial, err)
+	}
+	if attempt.Status != "executed" {
+		evaluation.Errors = append(evaluation.Errors, attempt.Status)
+		evaluation.DeterministicStatus = "failed"
+		evaluation.OverallStatus = "failed"
+		return EvaluatedAttempt{CaseID: attempt.CaseID, Trial: attempt.Trial, Retry: attempt.Retry, ExecutionStatus: attempt.Status, Evaluation: evaluation}, nil
+	}
+	humanComplete := len(evaluation.SemanticChecks) > 0
+	semanticFail := false
+	for i := range evaluation.SemanticChecks {
+		check := &evaluation.SemanticChecks[i]
+		review, exists := reviews[semanticReviewKey(SemanticReview{CaseID: attempt.CaseID, Trial: attempt.Trial, Retry: attempt.Retry, CriterionID: check.ID})]
+		if exists {
+			check.Result = review.Result
+		}
+		if !exists || review.Result == "unassessed" || review.ReviewerKind != "human" {
+			humanComplete = false
+		}
+		if check.Result == "fail" {
+			semanticFail = true
+		}
+	}
+	switch {
+	case evaluation.DeterministicStatus == "failed" || semanticFail:
+		evaluation.OverallStatus = "failed"
+	case humanComplete:
+		evaluation.OverallStatus = "human_reviewed"
+	default:
+		evaluation.OverallStatus = "needs_semantic_review"
+	}
+	evaluation.ReleaseApproved = false
+	return EvaluatedAttempt{CaseID: attempt.CaseID, Trial: attempt.Trial, Retry: attempt.Retry, ExecutionStatus: attempt.Status, Evaluation: evaluation}, nil
 }
 
 func campaignRunProvenance(record RunRecord, attempts []Attempt) CampaignRunProvenance {
@@ -1185,6 +1518,9 @@ func addCampaignSlot(coverage *CampaignCoverage, row CampaignCaseTrial, reviewer
 	if row.OverallStatus == "human_reviewed" {
 		coverage.HumanReviewedSlots++
 	}
+	if row.Recovered {
+		coverage.RecoveredSlots++
+	}
 }
 
 func mergeCampaignCoverage(target *CampaignCoverage, source CampaignCoverage) {
@@ -1198,6 +1534,7 @@ func mergeCampaignCoverage(target *CampaignCoverage, source CampaignCoverage) {
 	target.SemanticFailedSlots += source.SemanticFailedSlots
 	target.AgentReviewedSlots += source.AgentReviewedSlots
 	target.HumanReviewedSlots += source.HumanReviewedSlots
+	target.RecoveredSlots += source.RecoveredSlots
 }
 
 func finalizeCampaignCoverage(coverage *CampaignCoverage) {

@@ -1,0 +1,70 @@
+{
+  "protocol_version": "1.0.0",
+  "addendum_id": "campaign-1-recovery-1",
+  "campaign_id": "campaign-1",
+  "parent_protocol": "evals/protocols/campaign-1.json",
+  "purpose": "Completar únicamente trials sin respuesta de la campaña 1 sin alterar sus diarios.",
+  "scope": {
+    "dataset_manifest_sha256": "063a87355225013229cb2415bbb96d99a41b0de97525f2a5e99fcf7df813802e",
+    "execution_source_commit": "7c2c88a43b2f3d7c2b1909b3bf5c50fb507eb169",
+    "allow_holdout": false,
+    "quality_or_malformed_retries": false
+  },
+  "selection": {
+    "unit": "original run trial slot",
+    "eligible_statuses": ["execution_error"],
+    "requires_empty_raw_and_parsed_output": true,
+    "eligible_transient_errors": [
+      "http_503",
+      "timeout",
+      "deadline_exceeded"
+    ],
+    "exclude_errors": [
+      "malformed_response",
+      "invalid_json",
+      "schema_error",
+      "provider_configuration_error",
+      "asset_error",
+      "quality_failure"
+    ],
+    "never_retry_executed_response": true,
+    "never_mutate_original_journal": true
+  },
+  "execution": {
+    "max_attempts_per_original_slot": 5,
+    "additional_attempts_include_original_attempt": false,
+    "max_recovery_attempts_total": 360,
+    "concurrency": 1,
+    "max_retries": 0,
+    "attempt_timeout_seconds": 90,
+    "min_interval_seconds": 15,
+    "backoff": {
+      "strategy": "exponential",
+      "initial_seconds": 30,
+      "multiplier": 2,
+      "max_seconds": 300,
+      "jitter": false
+    }
+  },
+  "budget": {
+    "currency": "USD",
+    "hard_ceiling_global_original_plus_recovery": 10.0,
+    "requires_original_evidence_budget": true,
+    "requires_recovery_preflight_before_provider_call": true,
+    "reserve_max_output_tokens": 4096,
+    "reserve_max_input_tokens_per_request": 20000,
+    "stop_before_next_request_if_global_upper_bound_exceeds_ceiling": true,
+    "unknown_usage_policy": "Conservar unknown y detener si no existe límite superior verificable; nunca reemplazar unknown por cero.",
+    "additional_attempts_are_reported_separately": true
+  },
+  "evidence": {
+    "output_directory_must_be_new_private_path": true,
+    "original_runs_are_read_only": true,
+    "record_parent_run_id_and_attempt_key": true,
+    "record_attempt_number_and_reason": true,
+    "record_selection_exclusion_reason": true,
+    "preserve_failed_not_executed_and_malformed_originals": true,
+    "semantic_review_after_recovery": true,
+    "release_approved": false
+  }
+}

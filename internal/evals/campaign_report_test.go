@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"testing"
@@ -139,6 +140,126 @@ func TestBuildCampaignReportMakesExplicitUnexecutedSlotsVisible(t *testing.T) {
 	require.False(t, coverage.SemanticsComplete)
 	require.False(t, report.Status.ResponsesComplete)
 	require.Equal(t, "not_executed", report.Cases[0].ExecutionStatus)
+}
+
+func TestBuildCampaignReportOverlaysFirstEffectiveRecoveryWithoutErasingOriginalFailure(t *testing.T) {
+	dataset, runDirectory := campaignReportFixture(t, "executed")
+	record, attempts, err := ReadRun(runDirectory)
+	require.NoError(t, err)
+	require.Len(t, attempts, 1)
+	dataset.ManifestSHA256 = recoveryHash('m')
+	record.Plan.DatasetSHA256 = dataset.ManifestSHA256
+
+	success := attempts[0]
+	failure := success
+	failure.Status = "execution_error"
+	failure.Error = "execution_error: Error 503, Status: UNAVAILABLE"
+	failure.RawOutput = ""
+	failure.ParsedOutput = nil
+	failure.ProviderResponse = nil
+	runDirectory = persistReplayEvidence(t, record, failure)
+	record, attempts, err = ReadRun(runDirectory)
+	require.NoError(t, err)
+
+	slot := attemptKey(failure.CaseID, failure.Trial)
+	binding := RecoveryBinding{
+		DatasetVersion: dataset.Version, DatasetManifestSHA256: dataset.ManifestSHA256,
+		SourceCommit: record.Commit, RequestedModel: record.Plan.Model,
+		BaselineFilesSHA256: map[string]string{
+			"baseline-1.go": recoveryHash('a'), "baseline-2.go": recoveryHash('b'),
+			"baseline-3.go": recoveryHash('c'), "baseline-4.go": recoveryHash('d'),
+		},
+		PromptSHA256BySlot:           map[string]string{slot: failure.PromptSHA256},
+		GenerationConfigSHA256BySlot: map[string]string{slot: digest(failure.GenerationConfig)},
+	}
+	priorSpent := 0.01
+	budget := RecoveryBudget{HardCeilingUSD: 10, PriorRequests: 1, PriorRequestsKnown: true, PriorSpentUSD: &priorSpent, MaxInputTokensPerCall: CampaignBudgetMaxInputTokens, MaxOutputTokensPerCall: CampaignBudgetMaxOutputTokens, InputUSDPerMillion: .3, OutputUSDPerMillion: 2.5}
+	manifest, err := BuildRecoveryManifest(record, attempts, binding, DefaultRecoveryPolicy(), budget, "recovery-1")
+	require.NoError(t, err)
+	manifest.BaseProtocolSHA256 = "protocol-hash"
+	success.Retry = 1
+	require.Equal(t, digest(success.Input), success.InputSHA256)
+	require.Equal(t, binding.PromptSHA256BySlot[slot], success.PromptSHA256)
+	require.Equal(t, binding.GenerationConfigSHA256BySlot[slot], digest(success.GenerationConfig))
+	recovery := CampaignRecoveryEvidence{Manifest: manifest, Attempts: []RecoveryAttempt{{Attempt: success, BaseAttemptSHA256: manifest.Targets[0].OriginalAttemptSHA256, RecoveryNumber: 1}}}
+	recoveryPath := filepath.Join(t.TempDir(), "recovery.json")
+	require.NoError(t, WriteCampaignRecovery(recoveryPath, recovery))
+	loadedRecovery, err := ReadCampaignRecovery(recoveryPath)
+	require.NoError(t, err)
+	require.Equal(t, digest(loadedRecovery.Attempts[0].Attempt.Input), loadedRecovery.Attempts[0].Attempt.InputSHA256)
+	require.Equal(t, binding.PromptSHA256BySlot[slot], loadedRecovery.Attempts[0].Attempt.PromptSHA256)
+	require.Equal(t, binding.GenerationConfigSHA256BySlot[slot], digest(loadedRecovery.Attempts[0].Attempt.GenerationConfig))
+
+	spec := campaignReportSpec(t, dataset, runDirectory)
+	spec.Budget.AccountedSpendUSD = priorSpent
+	spec.BaselineFilesSHA256 = maps.Clone(binding.BaselineFilesSHA256)
+	spec.Phases[0].Runs[0].RecoveryEvidence = recoveryPath
+	report, err := BuildCampaignReport(context.Background(), dataset, spec)
+	require.NoError(t, err)
+	model := report.Phases[0].Models[0]
+	require.True(t, model.Coverage.ResponsesComplete)
+	require.Equal(t, 1, model.Coverage.RecoveredSlots)
+	require.NotNil(t, model.Recovery)
+	require.Equal(t, 1, model.Recovery.TargetSlots)
+	require.Equal(t, 1, model.Recovery.RecoveredSlots)
+	require.Equal(t, "executed", report.Cases[0].ExecutionStatus)
+	require.Equal(t, "execution_error", report.Cases[0].OriginalExecutionStatus)
+	require.True(t, report.Cases[0].Recovered)
+	require.Equal(t, 2, report.Cases[0].Attempts)
+	require.Equal(t, manifest.Targets[0].OriginalAttemptSHA256, report.Cases[0].OriginalAttemptSHA256)
+	require.NotEmpty(t, report.Cases[0].RecoveryEvidenceSHA256)
+	require.NotNil(t, report.Recovery)
+	require.Equal(t, 1, report.Recovery.EvidenceDocuments)
+	require.True(t, report.Recovery.WithinHardCeiling)
+	// Recovery does not inherit a semantic judgment bound to the empty output.
+	require.Equal(t, "unassessed", report.Cases[0].SemanticStatus)
+	require.False(t, model.Coverage.HumanReviewComplete)
+
+	// When any original provider usage is unknown (as with this real 503-shaped
+	// no-response), recovery must bind to the original full reservation rather
+	// than the smaller observed/accounted value.
+	incompletePrior := 0.02
+	incompleteBudget := budget
+	incompleteBudget.PriorSpentUSD = &incompletePrior
+	incompleteManifest, err := BuildRecoveryManifest(record, attempts, binding, DefaultRecoveryPolicy(), incompleteBudget, "recovery-incomplete-usage")
+	require.NoError(t, err)
+	incompleteManifest.BaseProtocolSHA256 = spec.ProtocolSHA256
+	incompleteRecovery := CampaignRecoveryEvidence{Manifest: incompleteManifest, Attempts: []RecoveryAttempt{{Attempt: success, BaseAttemptSHA256: incompleteManifest.Targets[0].OriginalAttemptSHA256, RecoveryNumber: 1}}}
+	incompleteRecoveryPath := filepath.Join(t.TempDir(), "recovery-incomplete-usage.json")
+	require.NoError(t, WriteCampaignRecovery(incompleteRecoveryPath, incompleteRecovery))
+	incompleteSpec := spec
+	incompleteSpec.Budget.ProviderUsageComplete = false
+	incompleteSpec.Budget.ReservedTotalUSD = incompletePrior
+	incompleteSpec.Phases[0].Runs[0].RecoveryEvidence = incompleteRecoveryPath
+	_, err = BuildCampaignReport(context.Background(), dataset, incompleteSpec)
+	require.NoError(t, err)
+	spec.Phases[0].Runs[0].RecoveryEvidence = recoveryPath
+
+	template, err := NewRecoverySemanticReviewTemplate(dataset, runDirectory, loadedRecovery)
+	require.NoError(t, err)
+	now := time.Date(2026, 9, 14, 12, 0, 0, 0, time.UTC)
+	for i := range template.Reviews {
+		template.Reviews[i].Result = "pass"
+		template.Reviews[i].Evidence = "Recovered response satisfies this criterion."
+		template.Reviews[i].Reviewer = "campaign-recovery-review-agent"
+		template.Reviews[i].ReviewerKind = "agent"
+		template.Reviews[i].ReviewedOn = &now
+	}
+	reviewData, err := json.MarshalIndent(template, "", "  ")
+	require.NoError(t, err)
+	reviewPath := filepath.Join(t.TempDir(), "recovery-reviews.json")
+	require.NoError(t, os.WriteFile(reviewPath, reviewData, 0600))
+	spec.Phases[0].Runs[0].RecoverySemanticReviews = reviewPath
+	reviewedReport, err := BuildCampaignReport(context.Background(), dataset, spec)
+	require.NoError(t, err)
+	reviewedModel := reviewedReport.Phases[0].Models[0]
+	require.True(t, reviewedModel.Coverage.SemanticsComplete)
+	require.Equal(t, 1, reviewedModel.Coverage.AgentReviewedSlots)
+	require.False(t, reviewedModel.Coverage.HumanReviewComplete)
+	require.Equal(t, "recovery", reviewedModel.Semantic.ReviewSource)
+	require.NotEmpty(t, reviewedModel.Recovery.SemanticReviewSHA256)
+	require.Equal(t, []string{"agent"}, reviewedModel.Recovery.SemanticReviewerKinds)
+	require.Positive(t, reviewedModel.Recovery.SemanticPendingHuman)
 }
 
 func TestBuildCampaignReportRejectsUndeclaredOrUnsafeEvidence(t *testing.T) {

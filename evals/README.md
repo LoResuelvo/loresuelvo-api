@@ -118,6 +118,22 @@ Después de completar las revisiones, generar el informe exclusivamente con
 go run ./cmd/evals campaign-report --protocol evals/protocols/campaign-1.json --evidence PRIVATE_NEW_DIR/evidence.json --out PRIVATE_REPORT_DIR
 ```
 
+### Recuperación acotada
+
+[`protocols/campaign-1-recovery-addendum.json`](protocols/campaign-1-recovery-addendum.json)
+autoriza únicamente completar trials sin respuesta. Nunca se reintentan respuestas
+recibidas aunque sean inválidas o de baja calidad. Se admiten errores transitorios
+sin cuerpo (por ejemplo 503 y timeouts); los errores de esquema, JSON,
+configuración, assets y calidad quedan como evidencia original. El máximo es de
+cinco intentos por slot, con backoff exponencial sin jitter y un techo global de
+USD 10 que incluye la campaña original y la recuperación. Los diarios originales
+son de sólo lectura y los intentos adicionales se guardan en una salida privada
+nueva, vinculados a su run y slot de origen.
+
+```bash
+go run ./cmd/evals campaign-recover --protocol evals/protocols/campaign-1.json --addendum evals/protocols/campaign-1-recovery-addendum.json --evidence PRIVATE_NEW_DIR/evidence.json --allow-live --pricing-verified-on YYYY-MM-DD --out PRIVATE_RECOVERY_DIR
+```
+
 Use una ruta nueva por ejecución. La concurrencia admitida es uno; la CLI bloquea
 reintentos/redirecciones ocultos del SDK y conserva los intentos fallidos. Ante
 límites de tasa o errores persistentes de configuración, las posiciones restantes
