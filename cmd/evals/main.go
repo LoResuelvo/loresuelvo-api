@@ -42,7 +42,7 @@ func runContext(ctx context.Context, args []string, stdout, stderr io.Writer) in
 	}
 	command := args[0]
 	switch command {
-	case "validate", "plan", "contract", "live", "replay", "compare", "baselines", "summary", "review-template", "review", "metamorphic-report", "campaign-report", "campaign-live", "campaign-recover":
+	case "validate", "plan", "contract", "live", "replay", "compare", "baselines", "summary", "review-template", "review", "metamorphic-report", "campaign-report", "campaign-export", "campaign-live", "campaign-recover":
 	default:
 		fmt.Fprintf(stderr, "unsupported command %q; no model calls were made\n", command)
 		return 2
@@ -96,6 +96,12 @@ func runContext(ctx context.Context, args []string, stdout, stderr io.Writer) in
 		flags.StringVar(&protocolPath, "protocol", "", "frozen versioned campaign protocol")
 		flags.StringVar(&evidencePath, "evidence", "", "local campaign evidence manifest")
 		flags.StringVar(&output, "out", "", "new campaign report directory (must not exist)")
+	}
+	if command == "campaign-export" {
+		flags.StringVar(&protocolPath, "protocol", "", "frozen versioned campaign protocol")
+		flags.StringVar(&evidencePath, "evidence", "", "local campaign evidence manifest")
+		flags.StringVar(&addendumPath, "recovery-addendum", "", "versioned append-only recovery policy")
+		flags.StringVar(&output, "out", "", "new longitudinal campaign data directory")
 	}
 	if command == "campaign-live" {
 		flags.StringVar(&protocolPath, "protocol", "", "frozen versioned campaign protocol")
@@ -265,6 +271,33 @@ func runContext(ctx context.Context, args []string, stdout, stderr io.Writer) in
 				err = writeCampaignArtifacts(output, campaign)
 				result = campaign
 			}
+		}
+	case "campaign-export":
+		if protocolPath == "" || evidencePath == "" || output == "" {
+			fmt.Fprintln(stderr, "--protocol, --evidence and --out are required")
+			return 2
+		}
+		if err = checkOutputDirectory(dataset.Root, output); err != nil {
+			break
+		}
+		var spec evals.CampaignReportSpec
+		spec, err = evals.ReadCampaignReportSpec(dataset, protocolPath, evidencePath)
+		if err != nil {
+			break
+		}
+		var exporterCommit string
+		exporterCommit, err = campaignExporterCommit()
+		if err != nil {
+			break
+		}
+		var bundle evals.CampaignExport
+		bundle, err = evals.BuildCampaignExport(ctx, dataset, evals.CampaignExportSpec{
+			Report: spec, ProtocolPath: protocolPath, EvidencePath: evidencePath,
+			RecoveryAddendumPath: addendumPath, ExporterSourceCommit: exporterCommit,
+		})
+		if err == nil {
+			err = writeCampaignExport(output, bundle)
+			result = map[string]any{"campaign_id": bundle.Manifest.CampaignID, "counts": bundle.Manifest.Counts, "privacy_scan": bundle.Manifest.PrivacyScan, "live_model_calls": 0, "release_approved": false}
 		}
 	case "campaign-live":
 		if protocolPath == "" {
@@ -502,6 +535,7 @@ func usage(out io.Writer) {
 	fmt.Fprintln(out, "       evals summary|review-template|metamorphic-report --run DIR")
 	fmt.Fprintln(out, "       evals review --run DIR --reviews FILE")
 	fmt.Fprintln(out, "       evals campaign-report --protocol FILE --evidence FILE --out DIR")
+	fmt.Fprintln(out, "       evals campaign-export --protocol FILE --evidence FILE --recovery-addendum FILE --out DIR")
 	fmt.Fprintln(out, "       evals campaign-live --protocol FILE --allow-live --pricing-verified-on YYYY-MM-DD --out DIR")
 	fmt.Fprintln(out, "       evals campaign-recover --protocol FILE --addendum FILE --evidence FILE --allow-live --pricing-verified-on YYYY-MM-DD --out DIR")
 	fmt.Fprintln(out, "Plan/live: --cases ID,ID limits the suite; --metamorphic adds frozen transformations with --trials 3.")

@@ -80,7 +80,7 @@ func TestLiveRequiresOptInAndCredentials(t *testing.T) {
 	require.Contains(t, stderr.String(), "CHATBOT_API_KEY")
 }
 func TestOfflineCommandsRejectLiveFlag(t *testing.T) {
-	for _, command := range []string{"validate", "contract", "replay", "compare", "baselines", "summary", "review", "review-template", "metamorphic-report", "campaign-report"} {
+	for _, command := range []string{"validate", "contract", "replay", "compare", "baselines", "summary", "review", "review-template", "metamorphic-report", "campaign-report", "campaign-export"} {
 		var out, stderr bytes.Buffer
 		require.Equal(t, 2, run([]string{command, "--allow-live"}, &out, &stderr))
 		require.Contains(t, stderr.String(), "flag provided but not defined")
@@ -103,7 +103,7 @@ func TestPlanSelectionCannotEscapeSuite(t *testing.T) {
 func TestNewOfflineCommandsRequireExplicitEvidence(t *testing.T) {
 	t.Setenv("CHATBOT_API_KEY", "")
 	root := cliDataset(t)
-	for _, command := range []string{"summary", "review-template", "review", "metamorphic-report", "baselines", "campaign-report"} {
+	for _, command := range []string{"summary", "review-template", "review", "metamorphic-report", "baselines", "campaign-report", "campaign-export"} {
 		t.Run(command, func(t *testing.T) {
 			var out, stderr bytes.Buffer
 			require.Equal(t, 2, run([]string{command, "--dataset", root}, &out, &stderr))

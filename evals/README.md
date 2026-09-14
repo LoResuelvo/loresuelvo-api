@@ -1,8 +1,8 @@
 # Evaluaciones US-60
 
-**Estado: golden dataset preparado; ninguna campaña ejecutada sobre este dataset.**
-No hay resultados publicados ni umbrales empíricos calibrados. La validación de los
-materiales no demuestra calidad ni seguridad del chatbot.
+**Estado: golden dataset preparado; el bundle canónico de Campaign 1 está pendiente
+de exportación y validación.** No hay umbrales empíricos calibrados: la validación
+de los materiales no demuestra calidad ni seguridad del chatbot.
 
 ## Dataset canónico
 
@@ -147,6 +147,64 @@ Los defaults desconocidos y el coste sin precios verificados permanecen desconoc
 no cero. Los directorios son privados (0700), con archivos 0600 y escritura incremental.
 Una interrupción conserva evidencia parcial; un diario sin finalizar no se presenta
 como completo.
+
+### Bundle canónico versionado
+
+Cuando una campaña pasa el gate de publicación, la CLI de exportación genera un
+bundle autocontenido en `evals/campaigns/<campaign-id>/`. Para Campaign 1, la
+ubicación canónica es `evals/campaigns/campaign-1/`; no se debe construir
+copiando manualmente directorios privados.
+
+La exportación se ejecuta sólo después de comprometer el exporter y validar las
+rutas privadas de evidencia. La salida debe ser un directorio nuevo; es un modo
+offline y no realiza llamadas al proveedor:
+
+```bash
+go run ./cmd/evals campaign-export \
+  --protocol evals/protocols/campaign-1.json \
+  --evidence PRIVATE_NEW_DIR/evidence.json \
+  --recovery-addendum evals/protocols/campaign-1-recovery-addendum.json \
+  --out evals/campaigns/campaign-1
+```
+
+Si no hubo recuperación, se omite `--recovery-addendum`. El comando rechaza una
+exportación sin respuesta física, exige hashes de fuentes y genera el inventario
+cerrado y `SHA256SUMS`; no copia rutas privadas al bundle.
+
+El formato del bundle es versionado y contiene exactamente:
+
+- `manifest.json`: identidad de campaña, dataset/protocolo/commits, conteos,
+  hashes de fuentes y declaración explícita de datos faltantes.
+- `responses.jsonl`: una respuesta efectiva por slot, ligada a su
+  `attempt_id`, `response_id` y `output_sha256`. Conserva el contenido de la
+  respuesta sin normalizarlo. Una respuesta física ausente hace fallar la
+  exportación; no se inventan ni se omiten respuestas.
+- `attempts.jsonl`: todos los intentos originales y de recuperación, incluidos
+  estado, retry, latencia, usage disponible y vínculos de procedencia. La
+  recuperación es append-only y no reemplaza el intento original.
+- `reviews.jsonl`: juicios semánticos ligados por slot, respuesta y criterio,
+  con `reviewer_kind` (`agent` o `human`), evidencia y fecha UTC.
+- `results.jsonl`: resultado determinista y observado frente a la expectativa,
+  sin duplicar el contenido raw de `responses.jsonl`.
+- `summary.json`: métricas agregadas, cobertura, missingness, variabilidad,
+  operaciones, presupuesto y estado de aprobación.
+- `README.md`: guía humana del bundle y sus limitaciones.
+- `SHA256SUMS`: integridad de cada archivo publicado.
+
+Los identificadores de slot son la tupla `(phase, model, case_id, trial)`.
+`results.jsonl` y `reviews.jsonl` referencian la respuesta mediante IDs y hashes;
+`attempts.jsonl` permite reconstruir la secuencia original más recuperación sin
+duplicar una respuesta efectiva. El manifest debe declarar la versión del
+formato, la fuente de exportación y cualquier ausencia de usage, revisión humana
+o coste facturado.
+
+Antes de versionar el bundle se valida su inventario, JSONL, hashes, symlinks y
+privacidad. No se permiten credenciales, URLs con secretos, rutas absolutas
+privadas, prompts auxiliares del evaluador ni fixtures binarios no declarados.
+Las respuestas y medios se conservan sólo cuando pertenecen al contrato
+explícito del bundle y pasan la validación de privacidad; ningún dato del bundle
+autoriza nuevas llamadas al proveedor. La versión pública no sustituye los
+diarios privados ni convierte una revisión de agente en certificación humana.
 
 ## Reproducción, revisión y comparación
 
