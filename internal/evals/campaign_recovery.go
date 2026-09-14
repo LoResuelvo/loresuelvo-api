@@ -90,8 +90,8 @@ func (b RecoveryBinding) Validate() error {
 	if strings.TrimSpace(b.DatasetVersion) == "" || len(b.DatasetManifestSHA256) != 64 || strings.TrimSpace(b.SourceCommit) == "" || strings.TrimSpace(b.RequestedModel) == "" {
 		return fmt.Errorf("%w: incomplete recovery identity", ErrInvalidCampaignRecovery)
 	}
-	if len(b.BaselineFilesSHA256) != 4 {
-		return fmt.Errorf("%w: exactly four baseline file attestations are required", ErrInvalidCampaignRecovery)
+	if len(b.BaselineFilesSHA256) == 0 {
+		return fmt.Errorf("%w: at least one baseline file attestation is required", ErrInvalidCampaignRecovery)
 	}
 	for path, hash := range b.BaselineFilesSHA256 {
 		if strings.TrimSpace(path) == "" || len(hash) != 64 {

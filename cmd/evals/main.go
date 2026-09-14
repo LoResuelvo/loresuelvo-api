@@ -378,12 +378,12 @@ func runContext(ctx context.Context, args []string, stdout, stderr io.Writer) in
 				err = selectionErr
 				break
 			}
-			effectiveMaxAttemptsPerSlot, maximumAdditionalAttempts, limitsErr := campaignRecoveryAttemptLimits(len(candidates), addendum)
-			if limitsErr != nil {
-				err = limitsErr
+			preparation, preparationErr := prepareCampaignRecovery(dataset, config, addendum, spec, candidates, "dry-run")
+			if preparationErr != nil {
+				err = preparationErr
 				break
 			}
-			result = map[string]any{"campaign_id": config.CampaignID, "addendum_id": addendum.AddendumID, "protocol_sha256": config.ProtocolSHA256, "dataset_manifest_sha256": dataset.ManifestSHA256, "candidates": candidates, "effective_max_attempts_per_original_slot": effectiveMaxAttemptsPerSlot, "additional_attempts": maximumAdditionalAttempts, "maximum_additional_attempts": maximumAdditionalAttempts, "recovery_upper_bound_usd": campaignRecoveryUpperBound(maximumAdditionalAttempts, config), "live_model_calls": 0, "release_approved": false}
+			result = map[string]any{"campaign_id": config.CampaignID, "addendum_id": addendum.AddendumID, "protocol_sha256": config.ProtocolSHA256, "dataset_manifest_sha256": dataset.ManifestSHA256, "candidates": candidates, "effective_max_attempts_per_original_slot": preparation.EffectiveMaxAttemptsPerSlot, "additional_attempts": preparation.MaximumAdditionalAttempts, "maximum_additional_attempts": preparation.MaximumAdditionalAttempts, "recovery_upper_bound_usd": preparation.RecoveryUpperBoundUSD, "live_model_calls": 0, "release_approved": false}
 			break
 		}
 		if !allowLive || output == "" || pricingVerifiedOn == "" {

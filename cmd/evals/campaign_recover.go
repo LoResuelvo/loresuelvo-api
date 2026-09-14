@@ -98,6 +98,17 @@ type campaignRecoveryWorkPlan struct {
 	AdditionalAttempts int
 }
 
+type campaignRecoveryPreparation struct {
+	EffectiveMaxAttemptsPerSlot int
+	MaximumAdditionalAttempts   int
+	RecoveryUpperBoundUSD       float64
+	PriorUpperBoundUSD          float64
+	Policy                      evals.RecoveryPolicy
+	ManifestByRun               map[string]evals.RecoveryManifest
+	BaseAttemptsByRun           map[string][]evals.Attempt
+	BaseRecordsByRun            map[string]evals.RunRecord
+}
+
 type campaignRecoveryResult struct {
 	CampaignID                    string              `json:"campaign_id"`
 	AddendumID                    string              `json:"addendum_id"`
@@ -277,56 +288,49 @@ func maxCampaignOutputPrice(prices []evals.CampaignPrice) float64 {
 	return max
 }
 
-func executeCampaignRecovery(ctx context.Context, dataset *evals.Dataset, config evals.CampaignExecutionConfig, addendum campaignRecoveryAddendum, spec evals.CampaignReportSpec, originalEvidencePath, output, apiKey, runnerCommit string) (campaignRecoveryResult, error) {
-	result := campaignRecoveryResult{CampaignID: config.CampaignID, AddendumID: addendum.AddendumID, ProtocolSHA256: config.ProtocolSHA256, DatasetManifestSHA256: dataset.ManifestSHA256, ExecutionSourceCommit: runnerCommit, OriginalExecutionSourceCommit: addendum.Scope.ExecutionSourceCommit, Candidates: []recoveryCandidate{}}
-	candidates, err := collectRecoveryCandidates(dataset, spec, addendum)
-	if err != nil {
-		return result, err
+func prepareCampaignRecovery(dataset *evals.Dataset, config evals.CampaignExecutionConfig, addendum campaignRecoveryAddendum, spec evals.CampaignReportSpec, candidates []recoveryCandidate, runnerCommit string) (campaignRecoveryPreparation, error) {
+	preparation := campaignRecoveryPreparation{
+		ManifestByRun:     map[string]evals.RecoveryManifest{},
+		BaseAttemptsByRun: map[string][]evals.Attempt{},
+		BaseRecordsByRun:  map[string]evals.RunRecord{},
 	}
-	result.Candidates = candidates
 	if len(candidates) == 0 {
-		return result, errors.New("no eligible no-response transient attempts found")
+		return preparation, errors.New("no eligible no-response transient attempts found")
 	}
 	effectiveMaxAttemptsPerSlot, maxCalls, err := campaignRecoveryAttemptLimits(len(candidates), addendum)
 	if err != nil {
-		return result, err
+		return preparation, err
 	}
-	result.EffectiveMaxAttemptsPerSlot = effectiveMaxAttemptsPerSlot
+	preparation.EffectiveMaxAttemptsPerSlot = effectiveMaxAttemptsPerSlot
+	preparation.MaximumAdditionalAttempts = maxCalls
+	preparation.RecoveryUpperBoundUSD = campaignRecoveryUpperBound(maxCalls, config)
 	priorUpper := spec.Budget.AccountedSpendUSD
 	if !spec.Budget.ProviderUsageComplete {
 		priorUpper = spec.Budget.ReservedTotalUSD
 	}
 	if priorUpper <= 0 || priorUpper > config.HardCeilingUSD {
-		return result, errors.New("original evidence has no verifiable global budget bound")
+		return preparation, errors.New("original evidence has no verifiable global budget bound")
 	}
-	result.AdditionalAttempts = maxCalls
-	result.MaximumAdditionalAttempts = maxCalls
-	result.RecoveryUpperBoundUSD = campaignRecoveryUpperBound(maxCalls, config)
-	if result.RecoveryUpperBoundUSD+priorUpper > config.HardCeilingUSD {
-		return result, fmt.Errorf("recovery conservative upper bound exceeds global ceiling")
+	preparation.PriorUpperBoundUSD = priorUpper
+	if preparation.RecoveryUpperBoundUSD+priorUpper > config.HardCeilingUSD {
+		return preparation, fmt.Errorf("recovery conservative upper bound exceeds global ceiling")
 	}
-	if ctx == nil {
-		return result, errors.New("recovery context is required")
-	}
-	policy := evals.RecoveryPolicy{MaxAttemptsPerSlot: effectiveMaxAttemptsPerSlot, InitialBackoff: time.Duration(addendum.Execution.Backoff.InitialSeconds) * time.Second, MaxBackoff: time.Duration(addendum.Execution.Backoff.MaxSeconds) * time.Second}
-	if err := policy.Validate(); err != nil {
-		return result, err
+	preparation.Policy = evals.RecoveryPolicy{MaxAttemptsPerSlot: effectiveMaxAttemptsPerSlot, InitialBackoff: time.Duration(addendum.Execution.Backoff.InitialSeconds) * time.Second, MaxBackoff: time.Duration(addendum.Execution.Backoff.MaxSeconds) * time.Second}
+	if err := preparation.Policy.Validate(); err != nil {
+		return preparation, err
 	}
 	priorRequests := spec.Budget.ObservedGenerationCalls
 	if priorRequests <= 0 {
 		priorRequests = spec.Budget.ExpectedGenerationCalls
 	}
 	priorSpent := priorUpper
-	manifestByRun := map[string]evals.RecoveryManifest{}
-	baseAttemptsByRun := map[string][]evals.Attempt{}
-	baseRecordsByRun := map[string]evals.RunRecord{}
 	for _, candidate := range candidates {
-		if _, exists := manifestByRun[candidate.RunDirectory]; exists {
+		if _, exists := preparation.ManifestByRun[candidate.RunDirectory]; exists {
 			continue
 		}
 		base, baseAttempts, readErr := evals.ReadRun(candidate.RunDirectory)
 		if readErr != nil {
-			return result, readErr
+			return preparation, readErr
 		}
 		promptHashes, configHashes := map[string]string{}, map[string]string{}
 		for _, attempt := range baseAttempts {
@@ -340,30 +344,51 @@ func executeCampaignRecovery(ctx context.Context, dataset *evals.Dataset, config
 		}
 		budget := evals.RecoveryBudget{HardCeilingUSD: config.HardCeilingUSD, PriorRequests: priorRequests, PriorRequestsKnown: true, PriorSpentUSD: &priorSpent, MaxInputTokensPerCall: evals.CampaignBudgetMaxInputTokens, MaxOutputTokensPerCall: evals.CampaignBudgetMaxOutputTokens, InputUSDPerMillion: maxCampaignInputPrice(config.Prices), OutputUSDPerMillion: maxCampaignOutputPrice(config.Prices)}
 		binding := evals.RecoveryBinding{DatasetVersion: dataset.Version, DatasetManifestSHA256: dataset.ManifestSHA256, SourceCommit: base.Commit, RequestedModel: base.Plan.Model, BaselineFilesSHA256: config.BaselineFiles, PromptSHA256BySlot: promptHashes, GenerationConfigSHA256BySlot: configHashes}
-		manifest, buildErr := evals.BuildRecoveryManifest(base, baseAttempts, binding, policy, budget, newRecoveryID())
+		manifest, buildErr := evals.BuildRecoveryManifest(base, baseAttempts, binding, preparation.Policy, budget, newRecoveryID())
 		if buildErr != nil {
-			return result, buildErr
+			return preparation, buildErr
 		}
 		manifest.BaseProtocolSHA256 = config.ProtocolSHA256
 		manifest.AddendumSHA256 = addendum.hash
 		manifest.RecoverySourceCommit = runnerCommit
 		if validateErr := evals.ValidateRecovery(evals.RecoveryBundle{Manifest: manifest}, base, baseAttempts); validateErr != nil {
-			return result, validateErr
+			return preparation, validateErr
 		}
-		manifestByRun[candidate.RunDirectory] = manifest
-		baseAttemptsByRun[candidate.RunDirectory] = baseAttempts
-		baseRecordsByRun[candidate.RunDirectory] = base
+		preparation.ManifestByRun[candidate.RunDirectory] = manifest
+		preparation.BaseAttemptsByRun[candidate.RunDirectory] = baseAttempts
+		preparation.BaseRecordsByRun[candidate.RunDirectory] = base
+	}
+	return preparation, nil
+}
+
+func executeCampaignRecovery(ctx context.Context, dataset *evals.Dataset, config evals.CampaignExecutionConfig, addendum campaignRecoveryAddendum, spec evals.CampaignReportSpec, originalEvidencePath, output, apiKey, runnerCommit string) (campaignRecoveryResult, error) {
+	result := campaignRecoveryResult{CampaignID: config.CampaignID, AddendumID: addendum.AddendumID, ProtocolSHA256: config.ProtocolSHA256, DatasetManifestSHA256: dataset.ManifestSHA256, ExecutionSourceCommit: runnerCommit, OriginalExecutionSourceCommit: addendum.Scope.ExecutionSourceCommit, Candidates: []recoveryCandidate{}}
+	candidates, err := collectRecoveryCandidates(dataset, spec, addendum)
+	if err != nil {
+		return result, err
+	}
+	result.Candidates = candidates
+	preparation, err := prepareCampaignRecovery(dataset, config, addendum, spec, candidates, runnerCommit)
+	if err != nil {
+		return result, err
+	}
+	result.EffectiveMaxAttemptsPerSlot = preparation.EffectiveMaxAttemptsPerSlot
+	result.AdditionalAttempts = preparation.MaximumAdditionalAttempts
+	result.MaximumAdditionalAttempts = preparation.MaximumAdditionalAttempts
+	result.RecoveryUpperBoundUSD = preparation.RecoveryUpperBoundUSD
+	if ctx == nil {
+		return result, errors.New("recovery context is required")
 	}
 	type recoveryWork struct {
 		candidate recoveryCandidate
 		executors []*evals.GeminiExecutor
 	}
-	workPlans, err := campaignRecoveryWorkPlans(candidates, effectiveMaxAttemptsPerSlot)
+	workPlans, err := campaignRecoveryWorkPlans(candidates, preparation.EffectiveMaxAttemptsPerSlot)
 	if err != nil {
 		return result, err
 	}
 	works := make([]recoveryWork, 0, len(workPlans))
-	allExecutors := make([]*evals.GeminiExecutor, 0, maxCalls)
+	allExecutors := make([]*evals.GeminiExecutor, 0, preparation.MaximumAdditionalAttempts)
 	prices := append([]evals.CampaignPrice(nil), config.Prices...)
 	for i := range prices {
 		prices[i].Verified = true
@@ -390,7 +415,7 @@ func executeCampaignRecovery(ctx context.Context, dataset *evals.Dataset, config
 		works = append(works, work)
 	}
 	// CountTokens and the shared guard are installed before any GenerateContent call.
-	if _, err := evals.PreflightGeminiCampaignBudget(ctx, allExecutors, prices, config.HardCeilingUSD-priorUpper, config.PricingSource); err != nil {
+	if _, err := evals.PreflightGeminiCampaignBudget(ctx, allExecutors, prices, config.HardCeilingUSD-preparation.PriorUpperBoundUSD, config.PricingSource); err != nil {
 		return result, err
 	}
 	if err := checkOutputDirectory(dataset.Root, output); err != nil {
@@ -476,8 +501,8 @@ func executeCampaignRecovery(ctx context.Context, dataset *evals.Dataset, config
 	result.AdditionalAttempts = actualAttempts
 	pathByRun := map[string]string{}
 	for runDir, attempts := range byRun {
-		record, baseAttempts := baseRecordsByRun[runDir], baseAttemptsByRun[runDir]
-		manifest, manifestOK := manifestByRun[runDir]
+		record, baseAttempts := preparation.BaseRecordsByRun[runDir], preparation.BaseAttemptsByRun[runDir]
+		manifest, manifestOK := preparation.ManifestByRun[runDir]
 		if !manifestOK {
 			return result, fmt.Errorf("missing recovery manifest for %s", runDir)
 		}

@@ -37,6 +37,28 @@ func TestBuildRecoveryManifestSelectsOnlyTransientNoResponse(t *testing.T) {
 	require.InDelta(t, 5.8464+4*.01624, manifest.Reservation.TotalUpperBoundUSD, 0.000001)
 }
 
+func TestBuildRecoveryManifestAcceptsCompleteSixFileCampaignBaseline(t *testing.T) {
+	record, attempts, binding, budget := recoveryFixture(t)
+	binding.BaselineFilesSHA256["baseline-5.go"] = recoveryHash('g')
+	binding.BaselineFilesSHA256["baseline-6.go"] = recoveryHash('h')
+
+	manifest, err := BuildRecoveryManifest(record, attempts, binding, DefaultRecoveryPolicy(), budget, "recovery-campaign-2")
+	require.NoError(t, err)
+	require.Equal(t, binding.BaselineFilesSHA256, manifest.Binding.BaselineFilesSHA256)
+	require.NoError(t, ValidateRecovery(RecoveryBundle{Manifest: manifest}, record, attempts))
+}
+
+func TestRecoveryBindingRequiresNonEmptyWellFormedBaselineAttestations(t *testing.T) {
+	_, _, binding, _ := recoveryFixture(t)
+	require.NoError(t, binding.Validate())
+
+	binding.BaselineFilesSHA256 = nil
+	require.ErrorContains(t, binding.Validate(), "at least one baseline file attestation")
+
+	binding.BaselineFilesSHA256 = map[string]string{"baseline.go": "short"}
+	require.ErrorContains(t, binding.Validate(), "invalid baseline file hash")
+}
+
 func TestRecoverableNoResponseRejectsMalformedAndQualityContent(t *testing.T) {
 	base := Attempt{CaseID: "PD-001", Trial: 1, Status: "execution_error", RequestCount: 1, Error: "503 UNAVAILABLE"}
 	require.True(t, RecoverableNoResponse(base))
