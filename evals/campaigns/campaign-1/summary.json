@@ -1,0 +1,1910 @@
+{
+  "format_version": "1",
+  "campaign": {
+    "id": "campaign-1",
+    "dataset_version": "1.0.0",
+    "dataset_manifest_sha256": "063a87355225013229cb2415bbb96d99a41b0de97525f2a5e99fcf7df813802e",
+    "source_commit": "7c2c88a43b2f3d7c2b1909b3bf5c50fb507eb169",
+    "protocol_sha256": "2086720983d425dd3c17f976b279090e7b29a9fe5b351b990695ca92decfe874",
+    "pricing_verified_on": "2026-09-14"
+  },
+  "status": {
+    "expected_slots": 360,
+    "terminal_slots": 360,
+    "executed_slots": 356,
+    "execution_failed_slots": 4,
+    "deterministic_passed_slots": 303,
+    "deterministic_failed_slots": 57,
+    "semantic_unknown_slots": 4,
+    "semantic_failed_slots": 127,
+    "agent_reviewed_slots": 359,
+    "human_reviewed_slots": 0,
+    "recovered_slots": 21,
+    "evidence_complete": true,
+    "responses_complete": false,
+    "semantics_complete": false,
+    "human_review_complete": false,
+    "phases": 2,
+    "models": 4
+  },
+  "phases": [
+    {
+      "name": "smoke",
+      "suite": "smoke",
+      "trials": 1,
+      "metamorphic": false,
+      "coverage": {
+        "expected_slots": 36,
+        "terminal_slots": 36,
+        "executed_slots": 35,
+        "execution_failed_slots": 1,
+        "deterministic_passed_slots": 31,
+        "deterministic_failed_slots": 5,
+        "semantic_unknown_slots": 1,
+        "semantic_failed_slots": 15,
+        "agent_reviewed_slots": 35,
+        "human_reviewed_slots": 0,
+        "recovered_slots": 1,
+        "evidence_complete": true,
+        "responses_complete": false,
+        "semantics_complete": false,
+        "human_review_complete": false
+      },
+      "models": [
+        {
+          "provenance": {
+            "run_id": "ab25770e-47d2-48f1-b7f3-117fffe6d980",
+            "run_status": "completed",
+            "started_on": "2026-09-14T11:58:48.404699253Z",
+            "finished_on": "2026-09-14T12:03:07.779635178Z",
+            "attempts_sha256": "ebd80e7e55d2dd6a4ad5454c5f7dcbdec8bb7b7b2810861d6142da4c146fc01e",
+            "requested_model": "gemini-3.1-flash-lite",
+            "request_limit": 18,
+            "maximum_requests": 18,
+            "limits": {
+              "concurrency": 1,
+              "attempt_timeout_ns": 90000000000,
+              "global_timeout_ns": 16200000000000,
+              "min_interval_ns": 15000000000,
+              "max_output_tokens": 4096
+            },
+            "resolved_model_versions": [
+              "gemini-3.1-flash-lite"
+            ],
+            "unknown_resolved_model_requests": 1,
+            "prompt_sha256": [
+              "0aba95ab57c653bac5dbe03256d1388eb45d7bc2ae36e72f9c0f91d27c2f4ab1",
+              "0e9a753fbd1485470653cd93628458027546f3d34f8fa8f9044602a6d201867f",
+              "3bdaf73c797d6ca1a3bf1102ee2193f2950af4aabaf554b944a480437b7a63b8",
+              "4a0c23a2a0a03dd9916877064ec73bc073f6ac0aa1058d18f643edaf042cdcef",
+              "5a0eef7174860564c5b604dcdb7539e517b53331e4e43993e59bbc059c979a43",
+              "652b18764bc1b35ca794923bb283598a8512973e22fa9e4e0c7e62b7ca8174ce",
+              "75442531c7f7a530bb2c25a112fe4c2767b4c13eb58afcedfa8784fc08a36b47",
+              "78b533020571492ee697aefc858ec5d5e85e211faf208cb323d468c01dd9cc73",
+              "8878b5ec6c171e64dd1eede3eb9578a6efe373c5ca89df7addfc1615193b9fbf",
+              "8e15ee99c1f5481ce99827027f9086655f0e70d1767dd2552a66d18c6d819ec6",
+              "a19e69bef2697a832ab9ed6a815022ab0a80f16be153715086bdad7b7f3216d3",
+              "a96c33f4e02e081f5244bf743f81bac65bf8d7dea6aa6387842f2f7bc62afe5b",
+              "b01bda822439b679174d92aed0595640efa324af522695e01b2655d7a18a3d2a",
+              "bdc7c14d630ebdba233923b28cd27d3dc13a95aa451650442a95e108f0956e87",
+              "c028416a5706a6e2119cb8fb4924d764db495f44ce66c2577cee873e1efef860",
+              "c448690402c74d9816cc1a8cd6b18853aeecfc76d6ae0bd72a2e78e41fbf0c54",
+              "d2ef8f588db1f7d6c96649dcd4ed7441e0bb7948c5083120da8cc2e7f2150f8f",
+              "ea96779a94fcc347f2083db277973ab1a8616601a84a445b002c01a9aa6efbd9"
+            ],
+            "input_sha256": [
+              "05f388b1b9710be294b293351679275ae6fff73220e64d45b500e13a437b7342",
+              "1876d7e3f71980bc52fb62d43ce28c0bf4acd8cb49cc908fb0483e4dcc557cee",
+              "2b523703f076aeb37dde64682e499c6c286b39277112709691f16cc4a5157e68",
+              "60dc678a8ba088374758e2002a593fe70ce724109951ea6bdf886384bcd0df76",
+              "62bb4a4bf4ea7d6286ccf84b02571923f8e798bbe84fe35c2f44038773f3461a",
+              "8314f703403c06e072b0e719ac56741da231b69a3882ddf4d031f5682740a941",
+              "84944f2426b261eb6fdafb3378c1c5fe6a3498579d9a87276f719c86252029fd",
+              "85c2cb973dc7f1c0bb581775df02a81aaa4b687051b30da29d57ad915ac0aaba",
+              "93797735569d088cd0879f09ddeb9cb67c901067854d5a247cfdfea2d9514a7f",
+              "a5adb3240c456c10098cb5baa29918f94a74e1e6c4289f70d07c6fe64bbee57c",
+              "ad8f20a70515e0e14f1d30dbbd08c8254d86a6101773f62e45123bc85acdbbcf",
+              "cb9282ec781b6d29a16364fe8486ce8227204ca51ac5fc2d26e3b3289e95e389",
+              "cf8d6bcead384718d789ee788035a191cbd89ef11f50238928f2119fd4530eb2",
+              "dca187a9ce3ac79c0b96a41309fff0810c7275d0f851830affe713bab1eb8d0d",
+              "de07deef814a2a32d05fe6f9b3f01aaa23cf7cfe7086bb055c9f823261e5849b",
+              "f9b4e685c22f5930936bfdcda9f21c568161e92194dea127b0dae0ee7b554088",
+              "fe7ae0c9ec9cfcbbb9479de81c0a2139577bc4e1ecc96dbb95630107b7298c25",
+              "fedc56a172cbea4b2a2afba71b99f21e1bd44aa7b0d9d0376d794c7c89fb2f6c"
+            ],
+            "generation_config_sha256": [
+              "7834b068e37d54070e83eb974949e46920b21eb0192d7357a714aff750b94937"
+            ]
+          },
+          "coverage": {
+            "expected_slots": 18,
+            "terminal_slots": 18,
+            "executed_slots": 18,
+            "execution_failed_slots": 0,
+            "deterministic_passed_slots": 16,
+            "deterministic_failed_slots": 2,
+            "semantic_unknown_slots": 0,
+            "semantic_failed_slots": 10,
+            "agent_reviewed_slots": 18,
+            "human_reviewed_slots": 0,
+            "recovered_slots": 1,
+            "evidence_complete": true,
+            "responses_complete": true,
+            "semantics_complete": true,
+            "human_review_complete": false
+          },
+          "tasks": {
+            "prediagnosis": {
+              "coverage": {
+                "expected_slots": 12,
+                "terminal_slots": 12,
+                "executed_slots": 12,
+                "execution_failed_slots": 0,
+                "deterministic_passed_slots": 10,
+                "deterministic_failed_slots": 2,
+                "semantic_unknown_slots": 0,
+                "semantic_failed_slots": 8,
+                "agent_reviewed_slots": 12,
+                "human_reviewed_slots": 0,
+                "recovered_slots": 1,
+                "evidence_complete": true,
+                "responses_complete": true,
+                "semantics_complete": true,
+                "human_review_complete": false
+              },
+              "metrics": {
+                "accepted_outcome_accuracy": {
+                  "expected_observations": 12,
+                  "unassessed_observations": 0,
+                  "base_case_mean": 0.9166666666666666,
+                  "minimum_observation": 0,
+                  "maximum_observation": 1,
+                  "observations": 12,
+                  "evaluated_base_cases": 12,
+                  "unassessed_base_cases": 0
+                },
+                "category_accuracy_when_required": {
+                  "expected_observations": 8,
+                  "unassessed_observations": 0,
+                  "base_case_mean": 1,
+                  "minimum_observation": 1,
+                  "maximum_observation": 1,
+                  "observations": 8,
+                  "evaluated_base_cases": 8,
+                  "unassessed_base_cases": 0
+                }
+              },
+              "trial_variability": {
+                "accepted_outcome_accuracy": {
+                  "expected_base_cases": 12,
+                  "evaluated_base_cases": 12,
+                  "comparable_base_cases": 0,
+                  "variable_base_cases": 0,
+                  "mean_within_case_range": null,
+                  "max_within_case_range": null
+                },
+                "category_accuracy_when_required": {
+                  "expected_base_cases": 8,
+                  "evaluated_base_cases": 8,
+                  "comparable_base_cases": 0,
+                  "variable_base_cases": 0,
+                  "mean_within_case_range": null,
+                  "max_within_case_range": null
+                }
+              },
+              "singleton_macro_f1": 1,
+              "singleton_base_cases": 11,
+              "singleton_trials": 11
+            },
+            "ranking": {
+              "coverage": {
+                "expected_slots": 6,
+                "terminal_slots": 6,
+                "executed_slots": 6,
+                "execution_failed_slots": 0,
+                "deterministic_passed_slots": 6,
+                "deterministic_failed_slots": 0,
+                "semantic_unknown_slots": 0,
+                "semantic_failed_slots": 2,
+                "agent_reviewed_slots": 6,
+                "human_reviewed_slots": 0,
+                "recovered_slots": 0,
+                "evidence_complete": true,
+                "responses_complete": true,
+                "semantics_complete": true,
+                "human_review_complete": false
+              },
+              "metrics": {
+                "ndcg_at_3": {
+                  "expected_observations": 6,
+                  "unassessed_observations": 0,
+                  "base_case_mean": 1,
+                  "minimum_observation": 1,
+                  "maximum_observation": 1,
+                  "observations": 6,
+                  "evaluated_base_cases": 6,
+                  "unassessed_base_cases": 0
+                },
+                "pairwise_coverage": {
+                  "expected_observations": 6,
+                  "unassessed_observations": 1,
+                  "base_case_mean": 1,
+                  "minimum_observation": 1,
+                  "maximum_observation": 1,
+                  "observations": 5,
+                  "evaluated_base_cases": 5,
+                  "unassessed_base_cases": 1
+                },
+                "pairwise_satisfaction": {
+                  "expected_observations": 6,
+                  "unassessed_observations": 1,
+                  "base_case_mean": 1,
+                  "minimum_observation": 1,
+                  "maximum_observation": 1,
+                  "observations": 5,
+                  "evaluated_base_cases": 5,
+                  "unassessed_base_cases": 1
+                },
+                "precision_at_3_relevance_ge_2": {
+                  "expected_observations": 6,
+                  "unassessed_observations": 0,
+                  "base_case_mean": 0.4444444444444444,
+                  "minimum_observation": 0,
+                  "maximum_observation": 0.6666666666666666,
+                  "observations": 6,
+                  "evaluated_base_cases": 6,
+                  "unassessed_base_cases": 0
+                }
+              },
+              "trial_variability": {
+                "ndcg_at_3": {
+                  "expected_base_cases": 6,
+                  "evaluated_base_cases": 6,
+                  "comparable_base_cases": 0,
+                  "variable_base_cases": 0,
+                  "mean_within_case_range": null,
+                  "max_within_case_range": null
+                },
+                "pairwise_coverage": {
+                  "expected_base_cases": 6,
+                  "evaluated_base_cases": 5,
+                  "comparable_base_cases": 0,
+                  "variable_base_cases": 0,
+                  "mean_within_case_range": null,
+                  "max_within_case_range": null
+                },
+                "pairwise_satisfaction": {
+                  "expected_base_cases": 6,
+                  "evaluated_base_cases": 5,
+                  "comparable_base_cases": 0,
+                  "variable_base_cases": 0,
+                  "mean_within_case_range": null,
+                  "max_within_case_range": null
+                },
+                "precision_at_3_relevance_ge_2": {
+                  "expected_base_cases": 6,
+                  "evaluated_base_cases": 6,
+                  "comparable_base_cases": 0,
+                  "variable_base_cases": 0,
+                  "mean_within_case_range": null,
+                  "max_within_case_range": null
+                }
+              }
+            }
+          },
+          "operations": {
+            "requests": 18,
+            "latency_p50_ms": 3402,
+            "latency_p95_ms": 5772,
+            "latency_observations": 18,
+            "latency_unknown_requests": 0,
+            "input_tokens": {
+              "observed_total": 29219,
+              "known_requests": 17,
+              "unknown_requests": 1
+            },
+            "output_tokens": {
+              "observed_total": 5374,
+              "known_requests": 17,
+              "unknown_requests": 1
+            },
+            "thought_tokens": {
+              "observed_total": null,
+              "known_requests": 0,
+              "unknown_requests": 18
+            },
+            "total_tokens": {
+              "observed_total": 34593,
+              "known_requests": 17,
+              "unknown_requests": 1
+            },
+            "cost": null,
+            "cost_reason": "Verified pricing is not configured; observed token subtotals are not complete totals when requests lack usage metadata."
+          },
+          "semantic": {
+            "review_source": "base_and_recovery",
+            "review_document_sha256": "220241b54286977590b94f0bcb75fd602d856c6f4b128d05267eea58efcbb3bb",
+            "reviewer_kinds": [
+              "agent"
+            ],
+            "criterion_counts": {
+              "fail": 27,
+              "not_applicable": 0,
+              "pass": 87,
+              "unassessed": 0
+            },
+            "pending_human_checks": 114
+          },
+          "recovery": {
+            "recovery_id": "campaign-recovery-ef884549-8f3c-4da0-b131-ff5ce32c82f5",
+            "evidence_sha256": "d331ca56185525aa52cbe185f75c856b625aca23a1b72deb4df9e72dea0b3e94",
+            "target_slots": 1,
+            "recovery_attempts": 2,
+            "recovered_slots": 1,
+            "missing_slots": null,
+            "attempt_statuses": {
+              "executed": 1,
+              "execution_error": 1
+            },
+            "reserved_additional_calls": 4,
+            "additional_upper_bound_usd": 0.06496,
+            "accounted_additional_spend_usd": 0.03248,
+            "provider_usage_complete": false,
+            "semantic_review_sha256": "65ebb8d2b6d73f36f58e45db863c3dd4741d30c341eac3704abd01722c4a5a8d",
+            "semantic_reviewer_kinds": [
+              "agent"
+            ],
+            "semantic_pending_human_checks": 10
+          }
+        },
+        {
+          "provenance": {
+            "run_id": "555d98ad-10b3-4c61-b53a-904fd4a11b6d",
+            "run_status": "completed",
+            "started_on": "2026-09-14T12:03:08.024987494Z",
+            "finished_on": "2026-09-14T12:08:07.920243539Z",
+            "attempts_sha256": "365f41cc4cee5f55506d942ba5a0169e125174a64219544a7088098bee698286",
+            "requested_model": "gemini-3.5-flash-lite",
+            "request_limit": 18,
+            "maximum_requests": 18,
+            "limits": {
+              "concurrency": 1,
+              "attempt_timeout_ns": 90000000000,
+              "global_timeout_ns": 16200000000000,
+              "min_interval_ns": 15000000000,
+              "max_output_tokens": 4096
+            },
+            "resolved_model_versions": [
+              "gemini-3.5-flash-lite"
+            ],
+            "unknown_resolved_model_requests": 0,
+            "prompt_sha256": [
+              "0aba95ab57c653bac5dbe03256d1388eb45d7bc2ae36e72f9c0f91d27c2f4ab1",
+              "0e9a753fbd1485470653cd93628458027546f3d34f8fa8f9044602a6d201867f",
+              "3bdaf73c797d6ca1a3bf1102ee2193f2950af4aabaf554b944a480437b7a63b8",
+              "4a0c23a2a0a03dd9916877064ec73bc073f6ac0aa1058d18f643edaf042cdcef",
+              "5a0eef7174860564c5b604dcdb7539e517b53331e4e43993e59bbc059c979a43",
+              "652b18764bc1b35ca794923bb283598a8512973e22fa9e4e0c7e62b7ca8174ce",
+              "75442531c7f7a530bb2c25a112fe4c2767b4c13eb58afcedfa8784fc08a36b47",
+              "78b533020571492ee697aefc858ec5d5e85e211faf208cb323d468c01dd9cc73",
+              "8878b5ec6c171e64dd1eede3eb9578a6efe373c5ca89df7addfc1615193b9fbf",
+              "8e15ee99c1f5481ce99827027f9086655f0e70d1767dd2552a66d18c6d819ec6",
+              "a19e69bef2697a832ab9ed6a815022ab0a80f16be153715086bdad7b7f3216d3",
+              "a96c33f4e02e081f5244bf743f81bac65bf8d7dea6aa6387842f2f7bc62afe5b",
+              "b01bda822439b679174d92aed0595640efa324af522695e01b2655d7a18a3d2a",
+              "bdc7c14d630ebdba233923b28cd27d3dc13a95aa451650442a95e108f0956e87",
+              "c028416a5706a6e2119cb8fb4924d764db495f44ce66c2577cee873e1efef860",
+              "c448690402c74d9816cc1a8cd6b18853aeecfc76d6ae0bd72a2e78e41fbf0c54",
+              "d2ef8f588db1f7d6c96649dcd4ed7441e0bb7948c5083120da8cc2e7f2150f8f",
+              "ea96779a94fcc347f2083db277973ab1a8616601a84a445b002c01a9aa6efbd9"
+            ],
+            "input_sha256": [
+              "05f388b1b9710be294b293351679275ae6fff73220e64d45b500e13a437b7342",
+              "1876d7e3f71980bc52fb62d43ce28c0bf4acd8cb49cc908fb0483e4dcc557cee",
+              "2b523703f076aeb37dde64682e499c6c286b39277112709691f16cc4a5157e68",
+              "60dc678a8ba088374758e2002a593fe70ce724109951ea6bdf886384bcd0df76",
+              "62bb4a4bf4ea7d6286ccf84b02571923f8e798bbe84fe35c2f44038773f3461a",
+              "8314f703403c06e072b0e719ac56741da231b69a3882ddf4d031f5682740a941",
+              "84944f2426b261eb6fdafb3378c1c5fe6a3498579d9a87276f719c86252029fd",
+              "85c2cb973dc7f1c0bb581775df02a81aaa4b687051b30da29d57ad915ac0aaba",
+              "93797735569d088cd0879f09ddeb9cb67c901067854d5a247cfdfea2d9514a7f",
+              "a5adb3240c456c10098cb5baa29918f94a74e1e6c4289f70d07c6fe64bbee57c",
+              "ad8f20a70515e0e14f1d30dbbd08c8254d86a6101773f62e45123bc85acdbbcf",
+              "cb9282ec781b6d29a16364fe8486ce8227204ca51ac5fc2d26e3b3289e95e389",
+              "cf8d6bcead384718d789ee788035a191cbd89ef11f50238928f2119fd4530eb2",
+              "dca187a9ce3ac79c0b96a41309fff0810c7275d0f851830affe713bab1eb8d0d",
+              "de07deef814a2a32d05fe6f9b3f01aaa23cf7cfe7086bb055c9f823261e5849b",
+              "f9b4e685c22f5930936bfdcda9f21c568161e92194dea127b0dae0ee7b554088",
+              "fe7ae0c9ec9cfcbbb9479de81c0a2139577bc4e1ecc96dbb95630107b7298c25",
+              "fedc56a172cbea4b2a2afba71b99f21e1bd44aa7b0d9d0376d794c7c89fb2f6c"
+            ],
+            "generation_config_sha256": [
+              "7834b068e37d54070e83eb974949e46920b21eb0192d7357a714aff750b94937"
+            ]
+          },
+          "coverage": {
+            "expected_slots": 18,
+            "terminal_slots": 18,
+            "executed_slots": 17,
+            "execution_failed_slots": 1,
+            "deterministic_passed_slots": 15,
+            "deterministic_failed_slots": 3,
+            "semantic_unknown_slots": 1,
+            "semantic_failed_slots": 5,
+            "agent_reviewed_slots": 17,
+            "human_reviewed_slots": 0,
+            "recovered_slots": 0,
+            "evidence_complete": true,
+            "responses_complete": false,
+            "semantics_complete": false,
+            "human_review_complete": false
+          },
+          "tasks": {
+            "prediagnosis": {
+              "coverage": {
+                "expected_slots": 12,
+                "terminal_slots": 12,
+                "executed_slots": 12,
+                "execution_failed_slots": 0,
+                "deterministic_passed_slots": 10,
+                "deterministic_failed_slots": 2,
+                "semantic_unknown_slots": 0,
+                "semantic_failed_slots": 5,
+                "agent_reviewed_slots": 12,
+                "human_reviewed_slots": 0,
+                "recovered_slots": 0,
+                "evidence_complete": true,
+                "responses_complete": true,
+                "semantics_complete": true,
+                "human_review_complete": false
+              },
+              "metrics": {
+                "accepted_outcome_accuracy": {
+                  "expected_observations": 12,
+                  "unassessed_observations": 0,
+                  "base_case_mean": 0.9166666666666666,
+                  "minimum_observation": 0,
+                  "maximum_observation": 1,
+                  "observations": 12,
+                  "evaluated_base_cases": 12,
+                  "unassessed_base_cases": 0
+                },
+                "category_accuracy_when_required": {
+                  "expected_observations": 8,
+                  "unassessed_observations": 0,
+                  "base_case_mean": 1,
+                  "minimum_observation": 1,
+                  "maximum_observation": 1,
+                  "observations": 8,
+                  "evaluated_base_cases": 8,
+                  "unassessed_base_cases": 0
+                }
+              },
+              "trial_variability": {
+                "accepted_outcome_accuracy": {
+                  "expected_base_cases": 12,
+                  "evaluated_base_cases": 12,
+                  "comparable_base_cases": 0,
+                  "variable_base_cases": 0,
+                  "mean_within_case_range": null,
+                  "max_within_case_range": null
+                },
+                "category_accuracy_when_required": {
+                  "expected_base_cases": 8,
+                  "evaluated_base_cases": 8,
+                  "comparable_base_cases": 0,
+                  "variable_base_cases": 0,
+                  "mean_within_case_range": null,
+                  "max_within_case_range": null
+                }
+              },
+              "singleton_macro_f1": 0.6,
+              "singleton_base_cases": 11,
+              "singleton_trials": 11
+            },
+            "ranking": {
+              "coverage": {
+                "expected_slots": 6,
+                "terminal_slots": 6,
+                "executed_slots": 5,
+                "execution_failed_slots": 1,
+                "deterministic_passed_slots": 5,
+                "deterministic_failed_slots": 1,
+                "semantic_unknown_slots": 1,
+                "semantic_failed_slots": 0,
+                "agent_reviewed_slots": 5,
+                "human_reviewed_slots": 0,
+                "recovered_slots": 0,
+                "evidence_complete": true,
+                "responses_complete": false,
+                "semantics_complete": false,
+                "human_review_complete": false
+              },
+              "metrics": {
+                "ndcg_at_3": {
+                  "expected_observations": 6,
+                  "unassessed_observations": 1,
+                  "base_case_mean": 1,
+                  "minimum_observation": 1,
+                  "maximum_observation": 1,
+                  "observations": 5,
+                  "evaluated_base_cases": 5,
+                  "unassessed_base_cases": 1
+                },
+                "pairwise_coverage": {
+                  "expected_observations": 6,
+                  "unassessed_observations": 2,
+                  "base_case_mean": 1,
+                  "minimum_observation": 1,
+                  "maximum_observation": 1,
+                  "observations": 4,
+                  "evaluated_base_cases": 4,
+                  "unassessed_base_cases": 2
+                },
+                "pairwise_satisfaction": {
+                  "expected_observations": 6,
+                  "unassessed_observations": 2,
+                  "base_case_mean": 1,
+                  "minimum_observation": 1,
+                  "maximum_observation": 1,
+                  "observations": 4,
+                  "evaluated_base_cases": 4,
+                  "unassessed_base_cases": 2
+                },
+                "precision_at_3_relevance_ge_2": {
+                  "expected_observations": 6,
+                  "unassessed_observations": 1,
+                  "base_case_mean": 0.4,
+                  "minimum_observation": 0,
+                  "maximum_observation": 0.6666666666666666,
+                  "observations": 5,
+                  "evaluated_base_cases": 5,
+                  "unassessed_base_cases": 1
+                }
+              },
+              "trial_variability": {
+                "ndcg_at_3": {
+                  "expected_base_cases": 6,
+                  "evaluated_base_cases": 5,
+                  "comparable_base_cases": 0,
+                  "variable_base_cases": 0,
+                  "mean_within_case_range": null,
+                  "max_within_case_range": null
+                },
+                "pairwise_coverage": {
+                  "expected_base_cases": 6,
+                  "evaluated_base_cases": 4,
+                  "comparable_base_cases": 0,
+                  "variable_base_cases": 0,
+                  "mean_within_case_range": null,
+                  "max_within_case_range": null
+                },
+                "pairwise_satisfaction": {
+                  "expected_base_cases": 6,
+                  "evaluated_base_cases": 4,
+                  "comparable_base_cases": 0,
+                  "variable_base_cases": 0,
+                  "mean_within_case_range": null,
+                  "max_within_case_range": null
+                },
+                "precision_at_3_relevance_ge_2": {
+                  "expected_base_cases": 6,
+                  "evaluated_base_cases": 5,
+                  "comparable_base_cases": 0,
+                  "variable_base_cases": 0,
+                  "mean_within_case_range": null,
+                  "max_within_case_range": null
+                }
+              }
+            }
+          },
+          "operations": {
+            "requests": 18,
+            "latency_p50_ms": 1740,
+            "latency_p95_ms": 38500,
+            "latency_observations": 18,
+            "latency_unknown_requests": 0,
+            "input_tokens": {
+              "observed_total": 31889,
+              "known_requests": 18,
+              "unknown_requests": 0
+            },
+            "output_tokens": {
+              "observed_total": 5301,
+              "known_requests": 18,
+              "unknown_requests": 0
+            },
+            "thought_tokens": {
+              "observed_total": null,
+              "known_requests": 0,
+              "unknown_requests": 18
+            },
+            "total_tokens": {
+              "observed_total": 37190,
+              "known_requests": 18,
+              "unknown_requests": 0
+            },
+            "cost": null,
+            "cost_reason": "Verified pricing is not configured; observed token subtotals are not complete totals when requests lack usage metadata."
+          },
+          "semantic": {
+            "review_source": "imported",
+            "review_document_sha256": "9ad10b09a00fc9601e4b199b0d1329d5dc23e74523f994da2e515ef9164923ff",
+            "reviewer_kinds": [
+              "agent"
+            ],
+            "criterion_counts": {
+              "fail": 10,
+              "not_applicable": 0,
+              "pass": 102,
+              "unassessed": 2
+            },
+            "pending_human_checks": 114
+          }
+        }
+      ]
+    },
+    {
+      "name": "primary",
+      "suite": "development",
+      "trials": 3,
+      "metamorphic": false,
+      "coverage": {
+        "expected_slots": 324,
+        "terminal_slots": 324,
+        "executed_slots": 321,
+        "execution_failed_slots": 3,
+        "deterministic_passed_slots": 272,
+        "deterministic_failed_slots": 52,
+        "semantic_unknown_slots": 3,
+        "semantic_failed_slots": 112,
+        "agent_reviewed_slots": 324,
+        "human_reviewed_slots": 0,
+        "recovered_slots": 20,
+        "evidence_complete": true,
+        "responses_complete": false,
+        "semantics_complete": false,
+        "human_review_complete": false
+      },
+      "models": [
+        {
+          "provenance": {
+            "run_id": "457c7e7a-1d98-4b49-9fd0-d70c9866f3df",
+            "run_status": "completed",
+            "started_on": "2026-09-14T12:08:08.25248429Z",
+            "finished_on": "2026-09-14T12:54:26.387546359Z",
+            "attempts_sha256": "c33bde58402e46637318983a41ef5c2dac57695659b1faaee28908b72fcc081e",
+            "requested_model": "gemini-3.1-flash-lite",
+            "request_limit": 162,
+            "maximum_requests": 162,
+            "limits": {
+              "concurrency": 1,
+              "attempt_timeout_ns": 90000000000,
+              "global_timeout_ns": 16200000000000,
+              "min_interval_ns": 15000000000,
+              "max_output_tokens": 4096
+            },
+            "resolved_model_versions": [
+              "gemini-3.1-flash-lite"
+            ],
+            "unknown_resolved_model_requests": 15,
+            "prompt_sha256": [
+              "0041793b36adb576c2a63d0d5eb83670e364391a4113a8bd842ec0ce180f667c",
+              "0aba95ab57c653bac5dbe03256d1388eb45d7bc2ae36e72f9c0f91d27c2f4ab1",
+              "0e9a753fbd1485470653cd93628458027546f3d34f8fa8f9044602a6d201867f",
+              "10aca1a3c60da8743399b744732ba96ed10b3576a827c8828620197920f4b72a",
+              "154d2ecac94450de17c6a9a24a3db4c59c39d72704dd8fa50b1fa21d73d4c061",
+              "1789e101555af8e729a21d288c94afccf79be561249cd357c1fc59998a1cd090",
+              "1a5e765e5a373bd0a9cd4289512901b96f9505a8b101acb1a6fb0593ba738211",
+              "1e6c68dbdf229c0769a0f431d09275719070d70fed594700c7a2959b1d27baa3",
+              "209bc731615b1ddeff8d88c31725fa38dd0d050fdbbc2d287ba6bd56f6c20aa0",
+              "237384e0e290f385453c0145668e6217f9b9d330a2628d212e27e4172541be9c",
+              "31ee440fa9ec1402e3d453734450e0ef786c01c2870db1ec1b8eb908d659df38",
+              "3a487f02e363810434b28bbb627c335c8a19f68aed07667c4841fcdffbcd589a",
+              "3bdaf73c797d6ca1a3bf1102ee2193f2950af4aabaf554b944a480437b7a63b8",
+              "3deee78640407c23933a16d2fc83106fa889db02da7e278a97cf1f8675bfee11",
+              "3e569aa1868cf289b3ca71fe5c54b0dbe67ac39537ae9a460c3196764a18b03a",
+              "49e071c676dd35a9a5f52f858826dfa3cefe3540d60bc588a6c70a431522a4ad",
+              "4a0c23a2a0a03dd9916877064ec73bc073f6ac0aa1058d18f643edaf042cdcef",
+              "4b411ccc1d7fd4d8ac8efaa4e0fca1fd62aecae9b8f07d515fb31c5528115c2c",
+              "5105003f23855b6fbca64e929449421c33606b7e57c96916c7c9760dd2d30389",
+              "55c5bd4c695ab93a6b869ab1c39b78a35293e4e5b8e120314f8911397066784f",
+              "5996a6e7ac73bf9a5e94c32430cd8eac01775b00870a8c0dbeea0d2692e9a9d2",
+              "5a0eef7174860564c5b604dcdb7539e517b53331e4e43993e59bbc059c979a43",
+              "652b18764bc1b35ca794923bb283598a8512973e22fa9e4e0c7e62b7ca8174ce",
+              "75442531c7f7a530bb2c25a112fe4c2767b4c13eb58afcedfa8784fc08a36b47",
+              "78b533020571492ee697aefc858ec5d5e85e211faf208cb323d468c01dd9cc73",
+              "7dccf1abc847521122092190fbc2467d650009b2d88d1cd08925c3b219a672d2",
+              "8878b5ec6c171e64dd1eede3eb9578a6efe373c5ca89df7addfc1615193b9fbf",
+              "8e15ee99c1f5481ce99827027f9086655f0e70d1767dd2552a66d18c6d819ec6",
+              "8f8d8405af01c2eedac1ec7a22dc32afa454f545fbf3a0443fe0f97d2e76a963",
+              "929ea3140cf683be8147c7c051aed8289c200c6c799aed931cb4e4630b1d349c",
+              "9701152e1a5b37820807db07a4fc5a0007aed508470b1619f86f00e997a22205",
+              "9a8cf7d490d70265569fd410eaf570e27b0ab3fd091e4622ca797d00440c1a9f",
+              "9b44d47b956a6bb2f82496d73dca47c191f1ed61ba6e4d6533f7a69fd42a9ed6",
+              "9f24a71f4dc2f2f17889058633a22ac2120b14dae118194b45050309c08867b5",
+              "a19e69bef2697a832ab9ed6a815022ab0a80f16be153715086bdad7b7f3216d3",
+              "a96c33f4e02e081f5244bf743f81bac65bf8d7dea6aa6387842f2f7bc62afe5b",
+              "b01bda822439b679174d92aed0595640efa324af522695e01b2655d7a18a3d2a",
+              "b30dee5ed83253d3ea30d1983795a4f0c53c846bc700c6f548bb7ebf504307a4",
+              "b632e3df497053b963f75c1bfc482eeda378a994d3527701fabd3aae24897aed",
+              "bb3ae502969e82f8914f5573404002e9ac665adb0fc60c44193d048220a6b80e",
+              "bc0b6eaf7f6e1d8873474c3e7f34a47450a0cd6b5c438f02be2c9d0f5a988558",
+              "bc7b321e2c39e67712fce48640979b8b254e159e6b4bded166911e5e6d6d4ae4",
+              "bdc7c14d630ebdba233923b28cd27d3dc13a95aa451650442a95e108f0956e87",
+              "c028416a5706a6e2119cb8fb4924d764db495f44ce66c2577cee873e1efef860",
+              "c448690402c74d9816cc1a8cd6b18853aeecfc76d6ae0bd72a2e78e41fbf0c54",
+              "d2ef8f588db1f7d6c96649dcd4ed7441e0bb7948c5083120da8cc2e7f2150f8f",
+              "d6d749bc2278080e0297a9fcb512c1e6e6ecacea84ad89c0a31ca63cb3999a6c",
+              "dcb9909f91a7cffb53d84c2c1ccbcb329b2ab88f8184bc9408971c334b8aff02",
+              "e4295e4f0bd7d10b6c96c0dad36a5a645d968546b8266f81f007289e4d77af92",
+              "ea75cb1c98050e81a5949b68353aca917441ea3a982714775e7ad44d606cf3c0",
+              "ea96779a94fcc347f2083db277973ab1a8616601a84a445b002c01a9aa6efbd9",
+              "ebd69820b350e38ea1a79901834e43aa74a2d7d164f07b92bbea860e284a264b",
+              "fa4adaee4dc66622364cc1ea53a326f091915ed9ef183adff9bab9958e58a2d3",
+              "fe8f726bcc81180960fe384112f5703f10ceef0f793aa962f1f395c5bb901a25"
+            ],
+            "input_sha256": [
+              "00350f15d51415e08b89db1d209605125f16a03894bd8e2b2a5a996629498222",
+              "016e9325183aa22a239d4399008de32316b2ce71a5478ba932ab7aa574ad03f8",
+              "05f388b1b9710be294b293351679275ae6fff73220e64d45b500e13a437b7342",
+              "06b0d98bd7d063bcba43683f7b2d46456b3fe674671d46f3416b37f87c9558ad",
+              "0918a0bce62a76abe9737e9cc29d5ab7c3c4f54185307927c7841b0ab7ef2f73",
+              "0b9294a6bb86ad4dd60a9d13862a3737bb497448cdfdeb4ca3dca5fafbffa90b",
+              "0e89c7808abedae1742e3d4cf75462a12828618c75613267ea4c07e292a87d1a",
+              "1876d7e3f71980bc52fb62d43ce28c0bf4acd8cb49cc908fb0483e4dcc557cee",
+              "2b523703f076aeb37dde64682e499c6c286b39277112709691f16cc4a5157e68",
+              "33645ee335bf4f261243edd426e7ab92121828e9c29461a3307ee170d71af042",
+              "415519ad98f86e85043e4845fd09d0785d7e3505ed419629f06107c0a19e9ad0",
+              "42412c5f2dcd2b4a262582bf6375d3852539c62c44ae0ec2ad772a7ef39404f4",
+              "452adf268d92fef1472ddce9bd79b0a027bc5c6a8dbc2a4d32328136456db7b3",
+              "4540d3b9246c08283456873112432c180bd076351027e57932379a955f0d974a",
+              "499b4bbbc2a722791aa38fd410479fff8d988f2b7a09a1b1c9bb4d945ed2ba58",
+              "58ba8ab8d80bcd5d1b920e390f86541615ca63232156a4369f6dbaf9f5defde7",
+              "60dc678a8ba088374758e2002a593fe70ce724109951ea6bdf886384bcd0df76",
+              "62bb4a4bf4ea7d6286ccf84b02571923f8e798bbe84fe35c2f44038773f3461a",
+              "67377e1035486021aff86137e91e3b16ffb22f022387037d6404425aa590d69e",
+              "679c871d9f6cdf4d2b339b5d1da5d85fbb475b73a0dccce9f2ad624c8ece1cbd",
+              "696929b27d01431d294a6437837b80e0f24f017740d4f2ca48b8b62405c6370d",
+              "6f3c1476cfbc814def7692bf06e14901faa895ff23df037ccbdb75f5a9129b22",
+              "729f770e12b9e75025af71dd2e1b28fa8facf3e2dce42447c72204456dd4e384",
+              "7663581c47d424c4e45f080a1b7884c24997bda48b436541aa6088aeea2481fc",
+              "8314f703403c06e072b0e719ac56741da231b69a3882ddf4d031f5682740a941",
+              "84944f2426b261eb6fdafb3378c1c5fe6a3498579d9a87276f719c86252029fd",
+              "85c2cb973dc7f1c0bb581775df02a81aaa4b687051b30da29d57ad915ac0aaba",
+              "865da6210d60172176f43d0396b4234a96361617457614c5b8792e215238da55",
+              "8b7d28012db9db5d9acfa0eb357fbde350cedb684c6cdd7aa8a87f864dc74c93",
+              "8b886b52504a9930073bd323926dc7644747736c8ae5ef36f46d89e85b2910e1",
+              "93797735569d088cd0879f09ddeb9cb67c901067854d5a247cfdfea2d9514a7f",
+              "9ca9003342b4a680db204e4cf90e40c6c314c7299c63d26ca0f44b7417b57e66",
+              "9dd5d991285090ff0df920b327d9d2fdf607b5d23454079384526c27e2eb92ce",
+              "a1e7bb0dfd76260a02738bea9ab26a6a3c5f0712f9a79ad189416827664ceb3a",
+              "a5adb3240c456c10098cb5baa29918f94a74e1e6c4289f70d07c6fe64bbee57c",
+              "abb99d508f559b34892d97dbdf2d04a6ee1d8ca91a45635e677acd84c524287b",
+              "ad8f20a70515e0e14f1d30dbbd08c8254d86a6101773f62e45123bc85acdbbcf",
+              "c89203657f45929f096ec6679be69723c38a35c1debb977184a810a67bfc6797",
+              "cb9282ec781b6d29a16364fe8486ce8227204ca51ac5fc2d26e3b3289e95e389",
+              "cf8d6bcead384718d789ee788035a191cbd89ef11f50238928f2119fd4530eb2",
+              "d4c382aba3dd580d5f490f93c84b53665228f9da818419bcfbb6a79d3805cff1",
+              "dbfdf20d2a1eab2accea7ebb6e863642f23c68a9fcc623bead7f5d2af9e8c908",
+              "dca187a9ce3ac79c0b96a41309fff0810c7275d0f851830affe713bab1eb8d0d",
+              "de07deef814a2a32d05fe6f9b3f01aaa23cf7cfe7086bb055c9f823261e5849b",
+              "e058519b9d30bdc599076d931ddf7c7c6ec4f9f8f82f0a316baf5e541bb2716c",
+              "e4f80f679b66ef1891a1ead7839d3491a50d7fe592f3930b7559d4bcc0265af4",
+              "e67465a378eee6aebca922719eb548fefc5017ea298aa9523f63f296bb354791",
+              "e7438908393ab5860169013eef71be7cd9f2d068c274f82877f6de40f29df07c",
+              "f28c47646b586c4f488b48a13c97238a94510a96243cbd706fa37931cc1d404d",
+              "f4c9d8b8afaf6b618b600a79689e020c882ac34298084c4c6a6ff529d064b722",
+              "f76a6c603d0a9e986ce83661c271515a4bead9f2ed16b182ec79194a053e1b1c",
+              "f9b4e685c22f5930936bfdcda9f21c568161e92194dea127b0dae0ee7b554088",
+              "fe7ae0c9ec9cfcbbb9479de81c0a2139577bc4e1ecc96dbb95630107b7298c25",
+              "fedc56a172cbea4b2a2afba71b99f21e1bd44aa7b0d9d0376d794c7c89fb2f6c"
+            ],
+            "generation_config_sha256": [
+              "7834b068e37d54070e83eb974949e46920b21eb0192d7357a714aff750b94937"
+            ]
+          },
+          "coverage": {
+            "expected_slots": 162,
+            "terminal_slots": 162,
+            "executed_slots": 162,
+            "execution_failed_slots": 0,
+            "deterministic_passed_slots": 138,
+            "deterministic_failed_slots": 24,
+            "semantic_unknown_slots": 0,
+            "semantic_failed_slots": 52,
+            "agent_reviewed_slots": 162,
+            "human_reviewed_slots": 0,
+            "recovered_slots": 15,
+            "evidence_complete": true,
+            "responses_complete": true,
+            "semantics_complete": true,
+            "human_review_complete": false
+          },
+          "tasks": {
+            "prediagnosis": {
+              "coverage": {
+                "expected_slots": 108,
+                "terminal_slots": 108,
+                "executed_slots": 108,
+                "execution_failed_slots": 0,
+                "deterministic_passed_slots": 84,
+                "deterministic_failed_slots": 24,
+                "semantic_unknown_slots": 0,
+                "semantic_failed_slots": 46,
+                "agent_reviewed_slots": 108,
+                "human_reviewed_slots": 0,
+                "recovered_slots": 14,
+                "evidence_complete": true,
+                "responses_complete": true,
+                "semantics_complete": true,
+                "human_review_complete": false
+              },
+              "metrics": {
+                "accepted_outcome_accuracy": {
+                  "expected_observations": 108,
+                  "unassessed_observations": 0,
+                  "base_case_mean": 0.8425925925925926,
+                  "minimum_observation": 0,
+                  "maximum_observation": 1,
+                  "observations": 108,
+                  "evaluated_base_cases": 36,
+                  "unassessed_base_cases": 0
+                },
+                "category_accuracy_when_required": {
+                  "expected_observations": 57,
+                  "unassessed_observations": 0,
+                  "base_case_mean": 0.8771929824561402,
+                  "minimum_observation": 0,
+                  "maximum_observation": 1,
+                  "observations": 57,
+                  "evaluated_base_cases": 19,
+                  "unassessed_base_cases": 0
+                }
+              },
+              "trial_variability": {
+                "accepted_outcome_accuracy": {
+                  "expected_base_cases": 36,
+                  "evaluated_base_cases": 36,
+                  "comparable_base_cases": 36,
+                  "variable_base_cases": 4,
+                  "mean_within_case_range": 0.1111111111111111,
+                  "max_within_case_range": 1
+                },
+                "category_accuracy_when_required": {
+                  "expected_base_cases": 19,
+                  "evaluated_base_cases": 19,
+                  "comparable_base_cases": 19,
+                  "variable_base_cases": 1,
+                  "mean_within_case_range": 0.05263157894736842,
+                  "max_within_case_range": 1
+                }
+              },
+              "singleton_macro_f1": 0.8970649895178199,
+              "singleton_base_cases": 33,
+              "singleton_trials": 99
+            },
+            "ranking": {
+              "coverage": {
+                "expected_slots": 54,
+                "terminal_slots": 54,
+                "executed_slots": 54,
+                "execution_failed_slots": 0,
+                "deterministic_passed_slots": 54,
+                "deterministic_failed_slots": 0,
+                "semantic_unknown_slots": 0,
+                "semantic_failed_slots": 6,
+                "agent_reviewed_slots": 54,
+                "human_reviewed_slots": 0,
+                "recovered_slots": 1,
+                "evidence_complete": true,
+                "responses_complete": true,
+                "semantics_complete": true,
+                "human_review_complete": false
+              },
+              "metrics": {
+                "ndcg_at_3": {
+                  "expected_observations": 54,
+                  "unassessed_observations": 0,
+                  "base_case_mean": 1,
+                  "minimum_observation": 1,
+                  "maximum_observation": 1,
+                  "observations": 54,
+                  "evaluated_base_cases": 18,
+                  "unassessed_base_cases": 0
+                },
+                "pairwise_coverage": {
+                  "expected_observations": 54,
+                  "unassessed_observations": 6,
+                  "base_case_mean": 1,
+                  "minimum_observation": 1,
+                  "maximum_observation": 1,
+                  "observations": 48,
+                  "evaluated_base_cases": 16,
+                  "unassessed_base_cases": 2
+                },
+                "pairwise_satisfaction": {
+                  "expected_observations": 54,
+                  "unassessed_observations": 6,
+                  "base_case_mean": 1,
+                  "minimum_observation": 1,
+                  "maximum_observation": 1,
+                  "observations": 48,
+                  "evaluated_base_cases": 16,
+                  "unassessed_base_cases": 2
+                },
+                "precision_at_3_relevance_ge_2": {
+                  "expected_observations": 54,
+                  "unassessed_observations": 0,
+                  "base_case_mean": 0.5555555555555557,
+                  "minimum_observation": 0,
+                  "maximum_observation": 1,
+                  "observations": 54,
+                  "evaluated_base_cases": 18,
+                  "unassessed_base_cases": 0
+                }
+              },
+              "trial_variability": {
+                "ndcg_at_3": {
+                  "expected_base_cases": 18,
+                  "evaluated_base_cases": 18,
+                  "comparable_base_cases": 18,
+                  "variable_base_cases": 0,
+                  "mean_within_case_range": 0,
+                  "max_within_case_range": 0
+                },
+                "pairwise_coverage": {
+                  "expected_base_cases": 18,
+                  "evaluated_base_cases": 16,
+                  "comparable_base_cases": 16,
+                  "variable_base_cases": 0,
+                  "mean_within_case_range": 0,
+                  "max_within_case_range": 0
+                },
+                "pairwise_satisfaction": {
+                  "expected_base_cases": 18,
+                  "evaluated_base_cases": 16,
+                  "comparable_base_cases": 16,
+                  "variable_base_cases": 0,
+                  "mean_within_case_range": 0,
+                  "max_within_case_range": 0
+                },
+                "precision_at_3_relevance_ge_2": {
+                  "expected_base_cases": 18,
+                  "evaluated_base_cases": 18,
+                  "comparable_base_cases": 18,
+                  "variable_base_cases": 0,
+                  "mean_within_case_range": 0,
+                  "max_within_case_range": 0
+                }
+              }
+            }
+          },
+          "operations": {
+            "requests": 162,
+            "latency_p50_ms": 2446,
+            "latency_p95_ms": 26886,
+            "latency_observations": 162,
+            "latency_unknown_requests": 0,
+            "input_tokens": {
+              "observed_total": 259754,
+              "known_requests": 147,
+              "unknown_requests": 15
+            },
+            "output_tokens": {
+              "observed_total": 40651,
+              "known_requests": 147,
+              "unknown_requests": 15
+            },
+            "thought_tokens": {
+              "observed_total": null,
+              "known_requests": 0,
+              "unknown_requests": 162
+            },
+            "total_tokens": {
+              "observed_total": 300405,
+              "known_requests": 147,
+              "unknown_requests": 15
+            },
+            "cost": null,
+            "cost_reason": "Verified pricing is not configured; observed token subtotals are not complete totals when requests lack usage metadata."
+          },
+          "semantic": {
+            "review_source": "base_and_recovery",
+            "review_document_sha256": "8ffa98584b9366153a704ea2f0a099cd506314c1a37efc32e219f3ca30ba68eb",
+            "reviewer_kinds": [
+              "agent"
+            ],
+            "criterion_counts": {
+              "fail": 111,
+              "not_applicable": 0,
+              "pass": 795,
+              "unassessed": 0
+            },
+            "pending_human_checks": 906
+          },
+          "recovery": {
+            "recovery_id": "campaign-recovery-ce7d1bd6-5a52-45ad-8bac-0cbf3157de03",
+            "evidence_sha256": "5cc39465a2e26db7b4a455b9da88e8340e201f16e844eada3781409b11438341",
+            "target_slots": 15,
+            "recovery_attempts": 25,
+            "recovered_slots": 15,
+            "missing_slots": null,
+            "attempt_statuses": {
+              "executed": 15,
+              "execution_error": 10
+            },
+            "reserved_additional_calls": 60,
+            "additional_upper_bound_usd": 0.9744,
+            "accounted_additional_spend_usd": 0.4059999999999998,
+            "provider_usage_complete": false,
+            "semantic_review_sha256": "9874f45868a089f6e224f99e2a7e29b46680614bc72d85a9c13b8aa3d8e9a25e",
+            "semantic_reviewer_kinds": [
+              "agent"
+            ],
+            "semantic_pending_human_checks": 109
+          }
+        },
+        {
+          "provenance": {
+            "run_id": "76c06750-ba0a-4cf9-bf86-a5dc9848ff30",
+            "run_status": "completed",
+            "started_on": "2026-09-14T12:54:28.942623365Z",
+            "finished_on": "2026-09-14T13:46:27.719671923Z",
+            "attempts_sha256": "090e86ce261b5a44146f29ebdfc49de4c55474c800a23208a5d0ca44ec52b048",
+            "requested_model": "gemini-3.5-flash-lite",
+            "request_limit": 162,
+            "maximum_requests": 162,
+            "limits": {
+              "concurrency": 1,
+              "attempt_timeout_ns": 90000000000,
+              "global_timeout_ns": 16200000000000,
+              "min_interval_ns": 15000000000,
+              "max_output_tokens": 4096
+            },
+            "resolved_model_versions": [
+              "gemini-3.5-flash-lite"
+            ],
+            "unknown_resolved_model_requests": 5,
+            "prompt_sha256": [
+              "0041793b36adb576c2a63d0d5eb83670e364391a4113a8bd842ec0ce180f667c",
+              "0aba95ab57c653bac5dbe03256d1388eb45d7bc2ae36e72f9c0f91d27c2f4ab1",
+              "0e9a753fbd1485470653cd93628458027546f3d34f8fa8f9044602a6d201867f",
+              "10aca1a3c60da8743399b744732ba96ed10b3576a827c8828620197920f4b72a",
+              "154d2ecac94450de17c6a9a24a3db4c59c39d72704dd8fa50b1fa21d73d4c061",
+              "1789e101555af8e729a21d288c94afccf79be561249cd357c1fc59998a1cd090",
+              "1a5e765e5a373bd0a9cd4289512901b96f9505a8b101acb1a6fb0593ba738211",
+              "1e6c68dbdf229c0769a0f431d09275719070d70fed594700c7a2959b1d27baa3",
+              "209bc731615b1ddeff8d88c31725fa38dd0d050fdbbc2d287ba6bd56f6c20aa0",
+              "237384e0e290f385453c0145668e6217f9b9d330a2628d212e27e4172541be9c",
+              "31ee440fa9ec1402e3d453734450e0ef786c01c2870db1ec1b8eb908d659df38",
+              "3a487f02e363810434b28bbb627c335c8a19f68aed07667c4841fcdffbcd589a",
+              "3bdaf73c797d6ca1a3bf1102ee2193f2950af4aabaf554b944a480437b7a63b8",
+              "3deee78640407c23933a16d2fc83106fa889db02da7e278a97cf1f8675bfee11",
+              "3e569aa1868cf289b3ca71fe5c54b0dbe67ac39537ae9a460c3196764a18b03a",
+              "49e071c676dd35a9a5f52f858826dfa3cefe3540d60bc588a6c70a431522a4ad",
+              "4a0c23a2a0a03dd9916877064ec73bc073f6ac0aa1058d18f643edaf042cdcef",
+              "4b411ccc1d7fd4d8ac8efaa4e0fca1fd62aecae9b8f07d515fb31c5528115c2c",
+              "5105003f23855b6fbca64e929449421c33606b7e57c96916c7c9760dd2d30389",
+              "55c5bd4c695ab93a6b869ab1c39b78a35293e4e5b8e120314f8911397066784f",
+              "5996a6e7ac73bf9a5e94c32430cd8eac01775b00870a8c0dbeea0d2692e9a9d2",
+              "5a0eef7174860564c5b604dcdb7539e517b53331e4e43993e59bbc059c979a43",
+              "652b18764bc1b35ca794923bb283598a8512973e22fa9e4e0c7e62b7ca8174ce",
+              "75442531c7f7a530bb2c25a112fe4c2767b4c13eb58afcedfa8784fc08a36b47",
+              "78b533020571492ee697aefc858ec5d5e85e211faf208cb323d468c01dd9cc73",
+              "7dccf1abc847521122092190fbc2467d650009b2d88d1cd08925c3b219a672d2",
+              "8878b5ec6c171e64dd1eede3eb9578a6efe373c5ca89df7addfc1615193b9fbf",
+              "8e15ee99c1f5481ce99827027f9086655f0e70d1767dd2552a66d18c6d819ec6",
+              "8f8d8405af01c2eedac1ec7a22dc32afa454f545fbf3a0443fe0f97d2e76a963",
+              "929ea3140cf683be8147c7c051aed8289c200c6c799aed931cb4e4630b1d349c",
+              "9701152e1a5b37820807db07a4fc5a0007aed508470b1619f86f00e997a22205",
+              "9a8cf7d490d70265569fd410eaf570e27b0ab3fd091e4622ca797d00440c1a9f",
+              "9b44d47b956a6bb2f82496d73dca47c191f1ed61ba6e4d6533f7a69fd42a9ed6",
+              "9f24a71f4dc2f2f17889058633a22ac2120b14dae118194b45050309c08867b5",
+              "a19e69bef2697a832ab9ed6a815022ab0a80f16be153715086bdad7b7f3216d3",
+              "a96c33f4e02e081f5244bf743f81bac65bf8d7dea6aa6387842f2f7bc62afe5b",
+              "b01bda822439b679174d92aed0595640efa324af522695e01b2655d7a18a3d2a",
+              "b30dee5ed83253d3ea30d1983795a4f0c53c846bc700c6f548bb7ebf504307a4",
+              "b632e3df497053b963f75c1bfc482eeda378a994d3527701fabd3aae24897aed",
+              "bb3ae502969e82f8914f5573404002e9ac665adb0fc60c44193d048220a6b80e",
+              "bc0b6eaf7f6e1d8873474c3e7f34a47450a0cd6b5c438f02be2c9d0f5a988558",
+              "bc7b321e2c39e67712fce48640979b8b254e159e6b4bded166911e5e6d6d4ae4",
+              "bdc7c14d630ebdba233923b28cd27d3dc13a95aa451650442a95e108f0956e87",
+              "c028416a5706a6e2119cb8fb4924d764db495f44ce66c2577cee873e1efef860",
+              "c448690402c74d9816cc1a8cd6b18853aeecfc76d6ae0bd72a2e78e41fbf0c54",
+              "d2ef8f588db1f7d6c96649dcd4ed7441e0bb7948c5083120da8cc2e7f2150f8f",
+              "d6d749bc2278080e0297a9fcb512c1e6e6ecacea84ad89c0a31ca63cb3999a6c",
+              "dcb9909f91a7cffb53d84c2c1ccbcb329b2ab88f8184bc9408971c334b8aff02",
+              "e4295e4f0bd7d10b6c96c0dad36a5a645d968546b8266f81f007289e4d77af92",
+              "ea75cb1c98050e81a5949b68353aca917441ea3a982714775e7ad44d606cf3c0",
+              "ea96779a94fcc347f2083db277973ab1a8616601a84a445b002c01a9aa6efbd9",
+              "ebd69820b350e38ea1a79901834e43aa74a2d7d164f07b92bbea860e284a264b",
+              "fa4adaee4dc66622364cc1ea53a326f091915ed9ef183adff9bab9958e58a2d3",
+              "fe8f726bcc81180960fe384112f5703f10ceef0f793aa962f1f395c5bb901a25"
+            ],
+            "input_sha256": [
+              "00350f15d51415e08b89db1d209605125f16a03894bd8e2b2a5a996629498222",
+              "016e9325183aa22a239d4399008de32316b2ce71a5478ba932ab7aa574ad03f8",
+              "05f388b1b9710be294b293351679275ae6fff73220e64d45b500e13a437b7342",
+              "06b0d98bd7d063bcba43683f7b2d46456b3fe674671d46f3416b37f87c9558ad",
+              "0918a0bce62a76abe9737e9cc29d5ab7c3c4f54185307927c7841b0ab7ef2f73",
+              "0b9294a6bb86ad4dd60a9d13862a3737bb497448cdfdeb4ca3dca5fafbffa90b",
+              "0e89c7808abedae1742e3d4cf75462a12828618c75613267ea4c07e292a87d1a",
+              "1876d7e3f71980bc52fb62d43ce28c0bf4acd8cb49cc908fb0483e4dcc557cee",
+              "2b523703f076aeb37dde64682e499c6c286b39277112709691f16cc4a5157e68",
+              "33645ee335bf4f261243edd426e7ab92121828e9c29461a3307ee170d71af042",
+              "415519ad98f86e85043e4845fd09d0785d7e3505ed419629f06107c0a19e9ad0",
+              "42412c5f2dcd2b4a262582bf6375d3852539c62c44ae0ec2ad772a7ef39404f4",
+              "452adf268d92fef1472ddce9bd79b0a027bc5c6a8dbc2a4d32328136456db7b3",
+              "4540d3b9246c08283456873112432c180bd076351027e57932379a955f0d974a",
+              "499b4bbbc2a722791aa38fd410479fff8d988f2b7a09a1b1c9bb4d945ed2ba58",
+              "58ba8ab8d80bcd5d1b920e390f86541615ca63232156a4369f6dbaf9f5defde7",
+              "60dc678a8ba088374758e2002a593fe70ce724109951ea6bdf886384bcd0df76",
+              "62bb4a4bf4ea7d6286ccf84b02571923f8e798bbe84fe35c2f44038773f3461a",
+              "67377e1035486021aff86137e91e3b16ffb22f022387037d6404425aa590d69e",
+              "679c871d9f6cdf4d2b339b5d1da5d85fbb475b73a0dccce9f2ad624c8ece1cbd",
+              "696929b27d01431d294a6437837b80e0f24f017740d4f2ca48b8b62405c6370d",
+              "6f3c1476cfbc814def7692bf06e14901faa895ff23df037ccbdb75f5a9129b22",
+              "729f770e12b9e75025af71dd2e1b28fa8facf3e2dce42447c72204456dd4e384",
+              "7663581c47d424c4e45f080a1b7884c24997bda48b436541aa6088aeea2481fc",
+              "8314f703403c06e072b0e719ac56741da231b69a3882ddf4d031f5682740a941",
+              "84944f2426b261eb6fdafb3378c1c5fe6a3498579d9a87276f719c86252029fd",
+              "85c2cb973dc7f1c0bb581775df02a81aaa4b687051b30da29d57ad915ac0aaba",
+              "865da6210d60172176f43d0396b4234a96361617457614c5b8792e215238da55",
+              "8b7d28012db9db5d9acfa0eb357fbde350cedb684c6cdd7aa8a87f864dc74c93",
+              "8b886b52504a9930073bd323926dc7644747736c8ae5ef36f46d89e85b2910e1",
+              "93797735569d088cd0879f09ddeb9cb67c901067854d5a247cfdfea2d9514a7f",
+              "9ca9003342b4a680db204e4cf90e40c6c314c7299c63d26ca0f44b7417b57e66",
+              "9dd5d991285090ff0df920b327d9d2fdf607b5d23454079384526c27e2eb92ce",
+              "a1e7bb0dfd76260a02738bea9ab26a6a3c5f0712f9a79ad189416827664ceb3a",
+              "a5adb3240c456c10098cb5baa29918f94a74e1e6c4289f70d07c6fe64bbee57c",
+              "abb99d508f559b34892d97dbdf2d04a6ee1d8ca91a45635e677acd84c524287b",
+              "ad8f20a70515e0e14f1d30dbbd08c8254d86a6101773f62e45123bc85acdbbcf",
+              "c89203657f45929f096ec6679be69723c38a35c1debb977184a810a67bfc6797",
+              "cb9282ec781b6d29a16364fe8486ce8227204ca51ac5fc2d26e3b3289e95e389",
+              "cf8d6bcead384718d789ee788035a191cbd89ef11f50238928f2119fd4530eb2",
+              "d4c382aba3dd580d5f490f93c84b53665228f9da818419bcfbb6a79d3805cff1",
+              "dbfdf20d2a1eab2accea7ebb6e863642f23c68a9fcc623bead7f5d2af9e8c908",
+              "dca187a9ce3ac79c0b96a41309fff0810c7275d0f851830affe713bab1eb8d0d",
+              "de07deef814a2a32d05fe6f9b3f01aaa23cf7cfe7086bb055c9f823261e5849b",
+              "e058519b9d30bdc599076d931ddf7c7c6ec4f9f8f82f0a316baf5e541bb2716c",
+              "e4f80f679b66ef1891a1ead7839d3491a50d7fe592f3930b7559d4bcc0265af4",
+              "e67465a378eee6aebca922719eb548fefc5017ea298aa9523f63f296bb354791",
+              "e7438908393ab5860169013eef71be7cd9f2d068c274f82877f6de40f29df07c",
+              "f28c47646b586c4f488b48a13c97238a94510a96243cbd706fa37931cc1d404d",
+              "f4c9d8b8afaf6b618b600a79689e020c882ac34298084c4c6a6ff529d064b722",
+              "f76a6c603d0a9e986ce83661c271515a4bead9f2ed16b182ec79194a053e1b1c",
+              "f9b4e685c22f5930936bfdcda9f21c568161e92194dea127b0dae0ee7b554088",
+              "fe7ae0c9ec9cfcbbb9479de81c0a2139577bc4e1ecc96dbb95630107b7298c25",
+              "fedc56a172cbea4b2a2afba71b99f21e1bd44aa7b0d9d0376d794c7c89fb2f6c"
+            ],
+            "generation_config_sha256": [
+              "7834b068e37d54070e83eb974949e46920b21eb0192d7357a714aff750b94937"
+            ]
+          },
+          "coverage": {
+            "expected_slots": 162,
+            "terminal_slots": 162,
+            "executed_slots": 159,
+            "execution_failed_slots": 3,
+            "deterministic_passed_slots": 134,
+            "deterministic_failed_slots": 28,
+            "semantic_unknown_slots": 3,
+            "semantic_failed_slots": 60,
+            "agent_reviewed_slots": 162,
+            "human_reviewed_slots": 0,
+            "recovered_slots": 5,
+            "evidence_complete": true,
+            "responses_complete": false,
+            "semantics_complete": false,
+            "human_review_complete": false
+          },
+          "tasks": {
+            "prediagnosis": {
+              "coverage": {
+                "expected_slots": 108,
+                "terminal_slots": 108,
+                "executed_slots": 108,
+                "execution_failed_slots": 0,
+                "deterministic_passed_slots": 83,
+                "deterministic_failed_slots": 25,
+                "semantic_unknown_slots": 0,
+                "semantic_failed_slots": 54,
+                "agent_reviewed_slots": 108,
+                "human_reviewed_slots": 0,
+                "recovered_slots": 5,
+                "evidence_complete": true,
+                "responses_complete": true,
+                "semantics_complete": true,
+                "human_review_complete": false
+              },
+              "metrics": {
+                "accepted_outcome_accuracy": {
+                  "expected_observations": 108,
+                  "unassessed_observations": 0,
+                  "base_case_mean": 0.8425925925925927,
+                  "minimum_observation": 0,
+                  "maximum_observation": 1,
+                  "observations": 108,
+                  "evaluated_base_cases": 36,
+                  "unassessed_base_cases": 0
+                },
+                "category_accuracy_when_required": {
+                  "expected_observations": 57,
+                  "unassessed_observations": 0,
+                  "base_case_mean": 0.8596491228070177,
+                  "minimum_observation": 0,
+                  "maximum_observation": 1,
+                  "observations": 57,
+                  "evaluated_base_cases": 19,
+                  "unassessed_base_cases": 0
+                }
+              },
+              "trial_variability": {
+                "accepted_outcome_accuracy": {
+                  "expected_base_cases": 36,
+                  "evaluated_base_cases": 36,
+                  "comparable_base_cases": 36,
+                  "variable_base_cases": 12,
+                  "mean_within_case_range": 0.3333333333333333,
+                  "max_within_case_range": 1
+                },
+                "category_accuracy_when_required": {
+                  "expected_base_cases": 19,
+                  "evaluated_base_cases": 19,
+                  "comparable_base_cases": 19,
+                  "variable_base_cases": 6,
+                  "mean_within_case_range": 0.3157894736842105,
+                  "max_within_case_range": 1
+                }
+              },
+              "singleton_macro_f1": 0.8279112445779112,
+              "singleton_base_cases": 33,
+              "singleton_trials": 99
+            },
+            "ranking": {
+              "coverage": {
+                "expected_slots": 54,
+                "terminal_slots": 54,
+                "executed_slots": 51,
+                "execution_failed_slots": 3,
+                "deterministic_passed_slots": 51,
+                "deterministic_failed_slots": 3,
+                "semantic_unknown_slots": 3,
+                "semantic_failed_slots": 6,
+                "agent_reviewed_slots": 54,
+                "human_reviewed_slots": 0,
+                "recovered_slots": 0,
+                "evidence_complete": true,
+                "responses_complete": false,
+                "semantics_complete": false,
+                "human_review_complete": false
+              },
+              "metrics": {
+                "ndcg_at_3": {
+                  "expected_observations": 54,
+                  "unassessed_observations": 3,
+                  "base_case_mean": 1,
+                  "minimum_observation": 1,
+                  "maximum_observation": 1,
+                  "observations": 51,
+                  "evaluated_base_cases": 18,
+                  "unassessed_base_cases": 0
+                },
+                "pairwise_coverage": {
+                  "expected_observations": 54,
+                  "unassessed_observations": 7,
+                  "base_case_mean": 1,
+                  "minimum_observation": 1,
+                  "maximum_observation": 1,
+                  "observations": 47,
+                  "evaluated_base_cases": 16,
+                  "unassessed_base_cases": 2
+                },
+                "pairwise_satisfaction": {
+                  "expected_observations": 54,
+                  "unassessed_observations": 7,
+                  "base_case_mean": 1,
+                  "minimum_observation": 1,
+                  "maximum_observation": 1,
+                  "observations": 47,
+                  "evaluated_base_cases": 16,
+                  "unassessed_base_cases": 2
+                },
+                "precision_at_3_relevance_ge_2": {
+                  "expected_observations": 54,
+                  "unassessed_observations": 3,
+                  "base_case_mean": 0.5555555555555557,
+                  "minimum_observation": 0,
+                  "maximum_observation": 1,
+                  "observations": 51,
+                  "evaluated_base_cases": 18,
+                  "unassessed_base_cases": 0
+                }
+              },
+              "trial_variability": {
+                "ndcg_at_3": {
+                  "expected_base_cases": 18,
+                  "evaluated_base_cases": 18,
+                  "comparable_base_cases": 17,
+                  "variable_base_cases": 0,
+                  "mean_within_case_range": 0,
+                  "max_within_case_range": 0
+                },
+                "pairwise_coverage": {
+                  "expected_base_cases": 18,
+                  "evaluated_base_cases": 16,
+                  "comparable_base_cases": 16,
+                  "variable_base_cases": 0,
+                  "mean_within_case_range": 0,
+                  "max_within_case_range": 0
+                },
+                "pairwise_satisfaction": {
+                  "expected_base_cases": 18,
+                  "evaluated_base_cases": 16,
+                  "comparable_base_cases": 16,
+                  "variable_base_cases": 0,
+                  "mean_within_case_range": 0,
+                  "max_within_case_range": 0
+                },
+                "precision_at_3_relevance_ge_2": {
+                  "expected_base_cases": 18,
+                  "evaluated_base_cases": 18,
+                  "comparable_base_cases": 17,
+                  "variable_base_cases": 0,
+                  "mean_within_case_range": 0,
+                  "max_within_case_range": 0
+                }
+              }
+            }
+          },
+          "operations": {
+            "requests": 162,
+            "latency_p50_ms": 2620,
+            "latency_p95_ms": 44319,
+            "latency_observations": 162,
+            "latency_unknown_requests": 0,
+            "input_tokens": {
+              "observed_total": 278534,
+              "known_requests": 157,
+              "unknown_requests": 5
+            },
+            "output_tokens": {
+              "observed_total": 40257,
+              "known_requests": 157,
+              "unknown_requests": 5
+            },
+            "thought_tokens": {
+              "observed_total": null,
+              "known_requests": 0,
+              "unknown_requests": 162
+            },
+            "total_tokens": {
+              "observed_total": 318791,
+              "known_requests": 157,
+              "unknown_requests": 5
+            },
+            "cost": null,
+            "cost_reason": "Verified pricing is not configured; observed token subtotals are not complete totals when requests lack usage metadata."
+          },
+          "semantic": {
+            "review_source": "base_and_recovery",
+            "review_document_sha256": "1c24cab92403d6342c9acd3348ec9c894d6f8293df85e3f36f8dfbf3b13579ff",
+            "reviewer_kinds": [
+              "agent"
+            ],
+            "criterion_counts": {
+              "fail": 107,
+              "not_applicable": 0,
+              "pass": 792,
+              "unassessed": 7
+            },
+            "pending_human_checks": 906
+          },
+          "recovery": {
+            "recovery_id": "campaign-recovery-1e74167b-a9b7-4fb5-91ef-1e8f9bf2aa8b",
+            "evidence_sha256": "05f9b56f3e18b52ee2088c023560628b95fe1b0efc2eee721c6a217e6105d2f9",
+            "target_slots": 5,
+            "recovery_attempts": 5,
+            "recovered_slots": 5,
+            "missing_slots": null,
+            "attempt_statuses": {
+              "executed": 5
+            },
+            "reserved_additional_calls": 20,
+            "additional_upper_bound_usd": 0.32480000000000003,
+            "accounted_additional_spend_usd": 0.08120000000000001,
+            "provider_usage_complete": false,
+            "semantic_review_sha256": "0f3e095dd551027c57c330edf98eb9fca2349999565eb2141ba28d15b0e9291e",
+            "semantic_reviewer_kinds": [
+              "agent"
+            ],
+            "semantic_pending_human_checks": 31
+          }
+        }
+      ]
+    }
+  ],
+  "offline": {
+    "contracts": [
+      {
+        "case_id": "CT-01",
+        "status": "pass",
+        "semantic_status": "not_applicable",
+        "evidence": [
+          "Controlled ranking calls: 0; persistence calls: 1."
+        ]
+      },
+      {
+        "case_id": "CT-02",
+        "status": "unassessed",
+        "semantic_status": "not_applicable",
+        "evidence": [
+          "Service passed the requested category/zone to the repository and forwarded its candidates; actual SQL filtering requires repository integration evidence.",
+          "Controlled ranking calls: 1; persistence calls: 1."
+        ]
+      },
+      {
+        "case_id": "CT-03",
+        "status": "pass",
+        "semantic_status": "not_applicable",
+        "evidence": [
+          "Controlled ranking calls: 1; persistence calls: 0.",
+          "Observed service error: provider recommendation is invalid"
+        ]
+      },
+      {
+        "case_id": "CT-04",
+        "status": "pass",
+        "semantic_status": "not_applicable",
+        "evidence": [
+          "Controlled ranking calls: 1; persistence calls: 0.",
+          "Observed service error: provider recommendation is invalid"
+        ]
+      },
+      {
+        "case_id": "CT-05",
+        "status": "pass",
+        "semantic_status": "not_applicable",
+        "evidence": [
+          "Controlled ranking calls: 1; persistence calls: 0.",
+          "Observed service error: provider recommendation is invalid"
+        ]
+      },
+      {
+        "case_id": "CT-06",
+        "status": "pass",
+        "semantic_status": "not_applicable",
+        "evidence": [
+          "Controlled ranking calls: 0; persistence calls: 2.",
+          "Observed service error: Problem assessment is invalid"
+        ]
+      },
+      {
+        "case_id": "CT-07",
+        "status": "pass",
+        "semantic_status": "not_applicable",
+        "evidence": [
+          "Controlled ranking calls: 0; persistence calls: 0.",
+          "Observed service error: Problem assessment is invalid"
+        ]
+      },
+      {
+        "case_id": "CT-08",
+        "status": "unassessed",
+        "semantic_status": "unassessed",
+        "evidence": [
+          "Current service rejects professional_required without a category and does not rank. Controlled response does not establish whether real urgent guidance is delivered.",
+          "Controlled ranking calls: 0; persistence calls: 0.",
+          "Observed service error: Problem assessment is invalid"
+        ]
+      },
+      {
+        "case_id": "CT-09",
+        "status": "pass",
+        "semantic_status": "unassessed",
+        "evidence": [
+          "Real runner and replay recorded the controlled deadline as execution_error, failed deterministic scoring, left actual semantic checks unassessed, and did not approve release."
+        ]
+      },
+      {
+        "case_id": "CT-10",
+        "status": "unassessed",
+        "semantic_status": "unassessed",
+        "evidence": [
+          "Actual continuation forwarded previous summary and pending messages and reused controlled summary. Risk preservation requires live output and semantic review.",
+          "Controlled ranking calls: 0; persistence calls: 3."
+        ]
+      },
+      {
+        "case_id": "CT-11",
+        "status": "pass",
+        "semantic_status": "not_applicable",
+        "evidence": [
+          "asset_error: read image contract-missing: openat missing.png: no such file or directory",
+          "Image mapping failed before any chatbot dependency was constructed; no textual substitution."
+        ]
+      },
+      {
+        "case_id": "CT-12",
+        "status": "pass",
+        "semantic_status": "not_applicable",
+        "evidence": [
+          "invalid evaluation dataset: family shared crosses splits"
+        ]
+      }
+    ],
+    "contract_counts": {
+      "pass": 9,
+      "unassessed": 3
+    },
+    "ranking_base_cases": 18,
+    "ranking_model_requests": 0,
+    "ranking_policies": [
+      {
+        "policy": {
+          "name": "seeded_random",
+          "version": "1",
+          "seed": 601,
+          "prior_count": 5,
+          "prior_mean": 3,
+          "tie_break": "reference_ascending",
+          "lexical_rule": "Jaccard of unique Unicode letter/digit tokens after lowercase and accent folding; query=problem title+description; document=all work descriptions, completion reports and reviews; no stopwords, stemming, weights or relevance labels"
+        },
+        "metrics": {
+          "ndcg_at_3": {
+            "expected_observations": 18,
+            "unassessed_observations": 0,
+            "base_case_mean": 0.7300126977341198,
+            "minimum_observation": 0.33333333333333337,
+            "maximum_observation": 1,
+            "observations": 18,
+            "evaluated_base_cases": 18,
+            "unassessed_base_cases": 0
+          },
+          "pairwise_coverage": {
+            "expected_observations": 18,
+            "unassessed_observations": 2,
+            "base_case_mean": 1,
+            "minimum_observation": 1,
+            "maximum_observation": 1,
+            "observations": 16,
+            "evaluated_base_cases": 16,
+            "unassessed_base_cases": 2
+          },
+          "pairwise_satisfaction": {
+            "expected_observations": 18,
+            "unassessed_observations": 2,
+            "base_case_mean": 0.3020833333333333,
+            "minimum_observation": 0,
+            "maximum_observation": 1,
+            "observations": 16,
+            "evaluated_base_cases": 16,
+            "unassessed_base_cases": 2
+          },
+          "precision_at_3_relevance_ge_2": {
+            "expected_observations": 18,
+            "unassessed_observations": 0,
+            "base_case_mean": 0.4259259259259258,
+            "minimum_observation": 0,
+            "maximum_observation": 1,
+            "observations": 18,
+            "evaluated_base_cases": 18,
+            "unassessed_base_cases": 0
+          }
+        },
+        "deterministic_failed_case_ids": [
+          "RK-001",
+          "RK-004",
+          "RK-005",
+          "RK-007",
+          "RK-008",
+          "RK-009",
+          "RK-014",
+          "RK-015",
+          "RK-016",
+          "RK-018",
+          "RK-020",
+          "RK-021",
+          "RK-023",
+          "RK-024"
+        ],
+        "semantic_unknown_cases": 18
+      },
+      {
+        "policy": {
+          "name": "rating_average",
+          "version": "1",
+          "seed": 601,
+          "prior_count": 5,
+          "prior_mean": 3,
+          "tie_break": "reference_ascending",
+          "lexical_rule": "Jaccard of unique Unicode letter/digit tokens after lowercase and accent folding; query=problem title+description; document=all work descriptions, completion reports and reviews; no stopwords, stemming, weights or relevance labels"
+        },
+        "metrics": {
+          "ndcg_at_3": {
+            "expected_observations": 18,
+            "unassessed_observations": 0,
+            "base_case_mean": 0.9316682094117115,
+            "minimum_observation": 0.7276545800191441,
+            "maximum_observation": 1,
+            "observations": 18,
+            "evaluated_base_cases": 18,
+            "unassessed_base_cases": 0
+          },
+          "pairwise_coverage": {
+            "expected_observations": 18,
+            "unassessed_observations": 2,
+            "base_case_mean": 1,
+            "minimum_observation": 1,
+            "maximum_observation": 1,
+            "observations": 16,
+            "evaluated_base_cases": 16,
+            "unassessed_base_cases": 2
+          },
+          "pairwise_satisfaction": {
+            "expected_observations": 18,
+            "unassessed_observations": 2,
+            "base_case_mean": 0.6666666666666666,
+            "minimum_observation": 0,
+            "maximum_observation": 1,
+            "observations": 16,
+            "evaluated_base_cases": 16,
+            "unassessed_base_cases": 2
+          },
+          "precision_at_3_relevance_ge_2": {
+            "expected_observations": 18,
+            "unassessed_observations": 0,
+            "base_case_mean": 0.5555555555555557,
+            "minimum_observation": 0,
+            "maximum_observation": 1,
+            "observations": 18,
+            "evaluated_base_cases": 18,
+            "unassessed_base_cases": 0
+          }
+        },
+        "deterministic_failed_case_ids": [
+          "RK-001",
+          "RK-004",
+          "RK-005",
+          "RK-007",
+          "RK-008",
+          "RK-012",
+          "RK-020",
+          "RK-022",
+          "RK-024"
+        ],
+        "semantic_unknown_cases": 18
+      },
+      {
+        "policy": {
+          "name": "bayesian_rating_with_fixed_prior",
+          "version": "1",
+          "seed": 601,
+          "prior_count": 5,
+          "prior_mean": 3,
+          "tie_break": "reference_ascending",
+          "lexical_rule": "Jaccard of unique Unicode letter/digit tokens after lowercase and accent folding; query=problem title+description; document=all work descriptions, completion reports and reviews; no stopwords, stemming, weights or relevance labels"
+        },
+        "metrics": {
+          "ndcg_at_3": {
+            "expected_observations": 18,
+            "unassessed_observations": 0,
+            "base_case_mean": 0.8781981840826351,
+            "minimum_observation": 0.7276545800191441,
+            "maximum_observation": 1,
+            "observations": 18,
+            "evaluated_base_cases": 18,
+            "unassessed_base_cases": 0
+          },
+          "pairwise_coverage": {
+            "expected_observations": 18,
+            "unassessed_observations": 2,
+            "base_case_mean": 1,
+            "minimum_observation": 1,
+            "maximum_observation": 1,
+            "observations": 16,
+            "evaluated_base_cases": 16,
+            "unassessed_base_cases": 2
+          },
+          "pairwise_satisfaction": {
+            "expected_observations": 18,
+            "unassessed_observations": 2,
+            "base_case_mean": 0.6041666666666666,
+            "minimum_observation": 0,
+            "maximum_observation": 1,
+            "observations": 16,
+            "evaluated_base_cases": 16,
+            "unassessed_base_cases": 2
+          },
+          "precision_at_3_relevance_ge_2": {
+            "expected_observations": 18,
+            "unassessed_observations": 0,
+            "base_case_mean": 0.5555555555555557,
+            "minimum_observation": 0,
+            "maximum_observation": 1,
+            "observations": 18,
+            "evaluated_base_cases": 18,
+            "unassessed_base_cases": 0
+          }
+        },
+        "deterministic_failed_case_ids": [
+          "RK-001",
+          "RK-004",
+          "RK-005",
+          "RK-007",
+          "RK-008",
+          "RK-012",
+          "RK-018",
+          "RK-022",
+          "RK-024"
+        ],
+        "semantic_unknown_cases": 18
+      },
+      {
+        "policy": {
+          "name": "paid_work_count",
+          "version": "1",
+          "seed": 601,
+          "prior_count": 5,
+          "prior_mean": 3,
+          "tie_break": "reference_ascending",
+          "lexical_rule": "Jaccard of unique Unicode letter/digit tokens after lowercase and accent folding; query=problem title+description; document=all work descriptions, completion reports and reviews; no stopwords, stemming, weights or relevance labels"
+        },
+        "metrics": {
+          "ndcg_at_3": {
+            "expected_observations": 18,
+            "unassessed_observations": 0,
+            "base_case_mean": 0.858436346649473,
+            "minimum_observation": 0.6442869262030827,
+            "maximum_observation": 1,
+            "observations": 18,
+            "evaluated_base_cases": 18,
+            "unassessed_base_cases": 0
+          },
+          "pairwise_coverage": {
+            "expected_observations": 18,
+            "unassessed_observations": 2,
+            "base_case_mean": 1,
+            "minimum_observation": 1,
+            "maximum_observation": 1,
+            "observations": 16,
+            "evaluated_base_cases": 16,
+            "unassessed_base_cases": 2
+          },
+          "pairwise_satisfaction": {
+            "expected_observations": 18,
+            "unassessed_observations": 2,
+            "base_case_mean": 0.5729166666666666,
+            "minimum_observation": 0,
+            "maximum_observation": 1,
+            "observations": 16,
+            "evaluated_base_cases": 16,
+            "unassessed_base_cases": 2
+          },
+          "precision_at_3_relevance_ge_2": {
+            "expected_observations": 18,
+            "unassessed_observations": 0,
+            "base_case_mean": 0.5555555555555557,
+            "minimum_observation": 0,
+            "maximum_observation": 1,
+            "observations": 18,
+            "evaluated_base_cases": 18,
+            "unassessed_base_cases": 0
+          }
+        },
+        "deterministic_failed_case_ids": [
+          "RK-001",
+          "RK-004",
+          "RK-005",
+          "RK-007",
+          "RK-008",
+          "RK-012",
+          "RK-018",
+          "RK-020",
+          "RK-022",
+          "RK-024"
+        ],
+        "semantic_unknown_cases": 18
+      },
+      {
+        "policy": {
+          "name": "frozen_lexical_heuristic",
+          "version": "1",
+          "seed": 601,
+          "prior_count": 5,
+          "prior_mean": 3,
+          "tie_break": "reference_ascending",
+          "lexical_rule": "Jaccard of unique Unicode letter/digit tokens after lowercase and accent folding; query=problem title+description; document=all work descriptions, completion reports and reviews; no stopwords, stemming, weights or relevance labels"
+        },
+        "metrics": {
+          "ndcg_at_3": {
+            "expected_observations": 18,
+            "unassessed_observations": 0,
+            "base_case_mean": 0.955387975128413,
+            "minimum_observation": 0.842828264880938,
+            "maximum_observation": 1,
+            "observations": 18,
+            "evaluated_base_cases": 18,
+            "unassessed_base_cases": 0
+          },
+          "pairwise_coverage": {
+            "expected_observations": 18,
+            "unassessed_observations": 2,
+            "base_case_mean": 1,
+            "minimum_observation": 1,
+            "maximum_observation": 1,
+            "observations": 16,
+            "evaluated_base_cases": 16,
+            "unassessed_base_cases": 2
+          },
+          "pairwise_satisfaction": {
+            "expected_observations": 18,
+            "unassessed_observations": 2,
+            "base_case_mean": 0.96875,
+            "minimum_observation": 0.5,
+            "maximum_observation": 1,
+            "observations": 16,
+            "evaluated_base_cases": 16,
+            "unassessed_base_cases": 2
+          },
+          "precision_at_3_relevance_ge_2": {
+            "expected_observations": 18,
+            "unassessed_observations": 0,
+            "base_case_mean": 0.5555555555555557,
+            "minimum_observation": 0,
+            "maximum_observation": 1,
+            "observations": 18,
+            "evaluated_base_cases": 18,
+            "unassessed_base_cases": 0
+          }
+        },
+        "deterministic_failed_case_ids": [
+          "RK-020"
+        ],
+        "semantic_unknown_cases": 18
+      }
+    ]
+  },
+  "budget": {
+    "pricing_source": "https://ai.google.dev/gemini-api/docs/pricing",
+    "hard_ceiling_usd": 10,
+    "count_token_requests": 144,
+    "expected_generation_calls": 360,
+    "preflight_input_tokens": 640816,
+    "reserved_input_tokens": 7200000,
+    "reserved_output_tokens": 1474560,
+    "reserved_input_usd": 2.16,
+    "reserved_output_usd": 3.6864,
+    "reserved_total_usd": 5.8464,
+    "preflight_headroom_usd": 4.1536,
+    "observed_generation_calls": 360,
+    "guard_recorded_usage_calls": 360,
+    "accounted_spend_usd": 5.846399999999958,
+    "provider_usage_complete": false
+  },
+  "recovery": {
+    "evidence_documents": 3,
+    "target_slots": 21,
+    "recovery_attempts": 32,
+    "recovered_slots": 21,
+    "missing_slots": 0,
+    "reserved_additional_calls": 84,
+    "additional_upper_bound_usd": 1.36416,
+    "original_reserved_upper_bound_usd": 5.8464,
+    "combined_upper_bound_usd": 7.21056,
+    "original_accounted_spend_usd": 5.846399999999958,
+    "additional_accounted_spend_usd": 0.5196799999999998,
+    "combined_accounted_spend_usd": 6.366079999999958,
+    "provider_usage_complete": false,
+    "hard_ceiling_usd": 10,
+    "within_hard_ceiling": true
+  },
+  "release_approved": false,
+  "warnings": [
+    "Repeated trials are measurements of the same fixed cases, not independent population samples.",
+    "Deterministic/schema success and semantic assessment are reported separately.",
+    "Reviewer identity is self-declared; agent review is not human certification and no release approval is inferred.",
+    "Cost remains null unless verified pricing and complete usage evidence are configured."
+  ]
+}

@@ -1,0 +1,305 @@
+{
+  "format_version": "1",
+  "campaign_id": "campaign-1",
+  "dataset_version": "1.0.0",
+  "dataset_manifest_sha256": "063a87355225013229cb2415bbb96d99a41b0de97525f2a5e99fcf7df813802e",
+  "protocol_sha256": "2086720983d425dd3c17f976b279090e7b29a9fe5b351b990695ca92decfe874",
+  "recovery_addendum_sha256": "a9a8decb64034b29642876075355e154a5369da062db8c9320e647b3cdcba870",
+  "evidence_manifest_sha256": "b4a7452260cbe4f1176015af8670aaf248648f4c4846e7befa5cf120da05f5cc",
+  "exporter_source_commit": "bc4bedc1ca63a4e1128edfa2f30dadb13cdc912b",
+  "baseline_files_sha256": {
+    "internal/adapters/chatbot/gemini_chatbot.go": "865d4bac8787cb774e0d6575671710427115154a355585f0989277aebc4301c0",
+    "internal/adapters/chatbot/gemini_chatbot_test.go": "400b70ab7d7db43c94dcf4cdd91cc310478452b85e316ccb240d33a38f1119f6",
+    "internal/adapters/chatbot/gemini_generation.go": "7ed4dc97f4dc1ab3b3471190212cd752dc90ebac7323d38794c64461d061ce73",
+    "internal/adapters/chatbot/gemini_generation_test.go": "fded926bf129f5ac3a9c3454d8388f8c48b4aca716eb28b9c0fd4c6659bed83d"
+  },
+  "generation_configs_by_sha256": {
+    "6c9bf95da9e61a01036e6a05ce0dca85f37ef65ccbe57813b10b56e8b54b2dff": {
+      "maxOutputTokens": 4096,
+      "responseMimeType": "application/json"
+    },
+    "7834b068e37d54070e83eb974949e46920b21eb0192d7357a714aff750b94937": {
+      "maxOutputTokens": 4096,
+      "responseMimeType": "application/json"
+    }
+  },
+  "source_commits": [
+    {
+      "role": "exporter",
+      "commit": "bc4bedc1ca63a4e1128edfa2f30dadb13cdc912b"
+    },
+    {
+      "role": "original_execution",
+      "commit": "7c2c88a43b2f3d7c2b1909b3bf5c50fb507eb169"
+    },
+    {
+      "role": "recovery_execution",
+      "commit": "fe9ada39c03e9a8ac96ea272727aea0e926a7be6"
+    }
+  ],
+  "models": [
+    {
+      "phase": "primary",
+      "requested_model": "gemini-3.1-flash-lite",
+      "resolved_model_occurrences": {
+        "gemini-3.1-flash-lite": 162
+      },
+      "unknown_attempts": 25
+    },
+    {
+      "phase": "primary",
+      "requested_model": "gemini-3.5-flash-lite",
+      "resolved_model_occurrences": {
+        "gemini-3.5-flash-lite": 162
+      },
+      "unknown_attempts": 5
+    },
+    {
+      "phase": "smoke",
+      "requested_model": "gemini-3.1-flash-lite",
+      "resolved_model_occurrences": {
+        "gemini-3.1-flash-lite": 18
+      },
+      "unknown_attempts": 2
+    },
+    {
+      "phase": "smoke",
+      "requested_model": "gemini-3.5-flash-lite",
+      "resolved_model_occurrences": {
+        "gemini-3.5-flash-lite": 18
+      },
+      "unknown_attempts": 0
+    }
+  ],
+  "counts": {
+    "planned_slots": 360,
+    "provider_attempts": 392,
+    "responses": 360,
+    "malformed_responses": 4,
+    "results": 360,
+    "review_rows": 2190,
+    "effective_review_rows": 2040,
+    "agent_assessments": 2031,
+    "human_assessments": 0,
+    "unassessed_effective_reviews": 9
+  },
+  "sources": [
+    {
+      "id": "attempts:primary:gemini-3.1-flash-lite",
+      "kind": "attempt_journal",
+      "phase": "primary",
+      "requested_model": "gemini-3.1-flash-lite",
+      "sha256": "c33bde58402e46637318983a41ef5c2dac57695659b1faaee28908b72fcc081e",
+      "records": 162
+    },
+    {
+      "id": "attempts:primary:gemini-3.5-flash-lite",
+      "kind": "attempt_journal",
+      "phase": "primary",
+      "requested_model": "gemini-3.5-flash-lite",
+      "sha256": "090e86ce261b5a44146f29ebdfc49de4c55474c800a23208a5d0ca44ec52b048",
+      "records": 162
+    },
+    {
+      "id": "attempts:smoke:gemini-3.1-flash-lite",
+      "kind": "attempt_journal",
+      "phase": "smoke",
+      "requested_model": "gemini-3.1-flash-lite",
+      "sha256": "ebd80e7e55d2dd6a4ad5454c5f7dcbdec8bb7b7b2810861d6142da4c146fc01e",
+      "records": 18
+    },
+    {
+      "id": "attempts:smoke:gemini-3.5-flash-lite",
+      "kind": "attempt_journal",
+      "phase": "smoke",
+      "requested_model": "gemini-3.5-flash-lite",
+      "sha256": "365f41cc4cee5f55506d942ba5a0169e125174a64219544a7088098bee698286",
+      "records": 18
+    },
+    {
+      "id": "campaign-evidence",
+      "kind": "evidence_manifest",
+      "sha256": "b4a7452260cbe4f1176015af8670aaf248648f4c4846e7befa5cf120da05f5cc"
+    },
+    {
+      "id": "dataset-manifest",
+      "kind": "dataset_manifest",
+      "sha256": "063a87355225013229cb2415bbb96d99a41b0de97525f2a5e99fcf7df813802e"
+    },
+    {
+      "id": "protocol",
+      "kind": "protocol",
+      "sha256": "2086720983d425dd3c17f976b279090e7b29a9fe5b351b990695ca92decfe874"
+    },
+    {
+      "id": "recovery-addendum",
+      "kind": "recovery_addendum",
+      "sha256": "a9a8decb64034b29642876075355e154a5369da062db8c9320e647b3cdcba870"
+    },
+    {
+      "id": "recovery-reviews:primary:gemini-3.1-flash-lite",
+      "kind": "recovery_semantic_reviews",
+      "phase": "primary",
+      "requested_model": "gemini-3.1-flash-lite",
+      "sha256": "9874f45868a089f6e224f99e2a7e29b46680614bc72d85a9c13b8aa3d8e9a25e",
+      "records": 109
+    },
+    {
+      "id": "recovery-reviews:primary:gemini-3.5-flash-lite",
+      "kind": "recovery_semantic_reviews",
+      "phase": "primary",
+      "requested_model": "gemini-3.5-flash-lite",
+      "sha256": "0f3e095dd551027c57c330edf98eb9fca2349999565eb2141ba28d15b0e9291e",
+      "records": 31
+    },
+    {
+      "id": "recovery-reviews:smoke:gemini-3.1-flash-lite",
+      "kind": "recovery_semantic_reviews",
+      "phase": "smoke",
+      "requested_model": "gemini-3.1-flash-lite",
+      "sha256": "65ebb8d2b6d73f36f58e45db863c3dd4741d30c341eac3704abd01722c4a5a8d",
+      "records": 10
+    },
+    {
+      "id": "recovery:primary:gemini-3.1-flash-lite",
+      "kind": "recovery_evidence",
+      "phase": "primary",
+      "requested_model": "gemini-3.1-flash-lite",
+      "sha256": "5cc39465a2e26db7b4a455b9da88e8340e201f16e844eada3781409b11438341",
+      "records": 25
+    },
+    {
+      "id": "recovery:primary:gemini-3.5-flash-lite",
+      "kind": "recovery_evidence",
+      "phase": "primary",
+      "requested_model": "gemini-3.5-flash-lite",
+      "sha256": "05f9b56f3e18b52ee2088c023560628b95fe1b0efc2eee721c6a217e6105d2f9",
+      "records": 5
+    },
+    {
+      "id": "recovery:smoke:gemini-3.1-flash-lite",
+      "kind": "recovery_evidence",
+      "phase": "smoke",
+      "requested_model": "gemini-3.1-flash-lite",
+      "sha256": "d331ca56185525aa52cbe185f75c856b625aca23a1b72deb4df9e72dea0b3e94",
+      "records": 2
+    },
+    {
+      "id": "reviews:primary:gemini-3.1-flash-lite",
+      "kind": "semantic_reviews",
+      "phase": "primary",
+      "requested_model": "gemini-3.1-flash-lite",
+      "sha256": "8ffa98584b9366153a704ea2f0a099cd506314c1a37efc32e219f3ca30ba68eb",
+      "records": 906
+    },
+    {
+      "id": "reviews:primary:gemini-3.5-flash-lite",
+      "kind": "semantic_reviews",
+      "phase": "primary",
+      "requested_model": "gemini-3.5-flash-lite",
+      "sha256": "1c24cab92403d6342c9acd3348ec9c894d6f8293df85e3f36f8dfbf3b13579ff",
+      "records": 906
+    },
+    {
+      "id": "reviews:smoke:gemini-3.1-flash-lite",
+      "kind": "semantic_reviews",
+      "phase": "smoke",
+      "requested_model": "gemini-3.1-flash-lite",
+      "sha256": "220241b54286977590b94f0bcb75fd602d856c6f4b128d05267eea58efcbb3bb",
+      "records": 114
+    },
+    {
+      "id": "reviews:smoke:gemini-3.5-flash-lite",
+      "kind": "semantic_reviews",
+      "phase": "smoke",
+      "requested_model": "gemini-3.5-flash-lite",
+      "sha256": "9ad10b09a00fc9601e4b199b0d1329d5dc23e74523f994da2e515ef9164923ff",
+      "records": 114
+    },
+    {
+      "id": "run:primary:gemini-3.1-flash-lite",
+      "kind": "run_record",
+      "phase": "primary",
+      "requested_model": "gemini-3.1-flash-lite",
+      "sha256": "584be5dbb41bd21122874b12a68f63532892eacdf6e202381e5487b48e69764f",
+      "records": 1
+    },
+    {
+      "id": "run:primary:gemini-3.5-flash-lite",
+      "kind": "run_record",
+      "phase": "primary",
+      "requested_model": "gemini-3.5-flash-lite",
+      "sha256": "1dfe4e3dd053a8d128b1c8f38121638edc119b892dec4710e55510d78bf21119",
+      "records": 1
+    },
+    {
+      "id": "run:smoke:gemini-3.1-flash-lite",
+      "kind": "run_record",
+      "phase": "smoke",
+      "requested_model": "gemini-3.1-flash-lite",
+      "sha256": "72a20000916a830044bd4e0281c635b7b13a737eafb5914d6f316bcafa391e3f",
+      "records": 1
+    },
+    {
+      "id": "run:smoke:gemini-3.5-flash-lite",
+      "kind": "run_record",
+      "phase": "smoke",
+      "requested_model": "gemini-3.5-flash-lite",
+      "sha256": "3eb0110c00c002276f4b0c737f08bd6ecbb20becd3db955afcba7ea55dc8e041",
+      "records": 1
+    }
+  ],
+  "artifacts": {
+    "README.md": {
+      "sha256": "20c1b9ce0b25bfd14a210d912d0740a136caf7265c57a4ace9873569ae08d87f",
+      "records": null
+    },
+    "attempts.jsonl": {
+      "sha256": "6ce1f278a95af944f7c63a78399dff45e98e856169020c90b5b85269f146e1e1",
+      "records": 392
+    },
+    "responses.jsonl": {
+      "sha256": "34df77c9a7c15fd2cfee9cbd381be9f8f55097911e00164a83ce1b18479c290d",
+      "records": 360
+    },
+    "results.jsonl": {
+      "sha256": "960cf8d31c4e93141eef4354fb55c6dab07d7ed644c6b69d9b2c1e2ffc5ee1d0",
+      "records": 360
+    },
+    "reviews.jsonl": {
+      "sha256": "8246bd6a63df0d126d200cc18f87f2880e9d86faf9f3fd52e104c41748982fdb",
+      "records": 2190
+    },
+    "summary.json": {
+      "sha256": "774f8125bc189ff48da0c0f37b5713f6359e52bc2f38c94268b8eb1923d0dcda",
+      "records": null
+    }
+  },
+  "missing_data": [
+    "actual_billed_cost",
+    "human_review",
+    "provider_http_status",
+    "provider_request_id",
+    "response_completion_time"
+  ],
+  "privacy_scan": {
+    "status": "passed",
+    "method": "campaign-export-v1-deterministic-field-scan",
+    "checks": [
+      "API-key, private-key, Bearer and authorization-token patterns",
+      "email addresses outside reserved .invalid fixtures",
+      "phone-like values outside structured image_ref, selected_image_refs and reference fields",
+      "prompt, inline image and private filesystem payload patterns"
+    ],
+    "limitations": [
+      "Passing these deterministic checks is not a universal guarantee that arbitrary personal data is absent."
+    ],
+    "records_scanned": {
+      "errors": 36,
+      "responses": 360,
+      "review_evidence": 2190
+    },
+    "findings": {}
+  },
+  "release_approved": false
+}
