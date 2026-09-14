@@ -68,6 +68,24 @@ func TestRenderCampaignExportRejectsSecretOrImagePayload(t *testing.T) {
 	require.ErrorContains(t, err, "image payload")
 }
 
+func TestRenderCampaignExportREADMEExplainsPrimaryAndSmokeDenominators(t *testing.T) {
+	manifest := evals.CampaignExportManifest{CampaignID: "campaign-1", Counts: evals.CampaignExportCounts{
+		PlannedSlots: 360, ProviderAttempts: 392, Responses: 360, MalformedResponses: 4,
+		EffectiveReviews: 2040, AgentAssessments: 2031, UnassessedReviews: 9,
+	}}
+	summary := evals.CampaignExportSummary{Phases: []evals.CampaignPhaseReport{
+		{Name: "smoke", Trials: 1, Coverage: evals.CampaignCoverage{ExpectedSlots: 36}, Models: make([]evals.CampaignModelReport, 2)},
+		{Name: "primary", Trials: 3, Coverage: evals.CampaignCoverage{ExpectedSlots: 324}, Models: make([]evals.CampaignModelReport, 2)},
+	}}
+	readme := string(renderCampaignExportREADME(manifest, summary))
+	require.Contains(t, readme, "54 casos × 3 trials × 2 modelos = 324 slots")
+	require.Contains(t, readme, "18 casos × 2 modelos = 36 slots (1 ejecución por caso y modelo)")
+	require.Contains(t, readme, "no son casos nuevos ni observaciones independientes")
+	require.Contains(t, readme, "`raw_output`")
+	require.Contains(t, readme, "`dataset_case_id`, `requested_model` y `trial`")
+	require.Contains(t, readme, "Una revisión de agente no certifica seguridad")
+}
+
 func TestRenderCampaignOneExternalEvidencePassesPublicationSafety(t *testing.T) {
 	evidencePath := os.Getenv("CAMPAIGN_ONE_EVIDENCE")
 	if evidencePath == "" {
