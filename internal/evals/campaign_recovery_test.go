@@ -151,7 +151,9 @@ func TestRecoverySemanticReviewsBindOnlyRecoveredOutput(t *testing.T) {
 	judged.Reviews = append([]SemanticReview(nil), template.Reviews...)
 	for i := range judged.Reviews {
 		judged.Reviews[i].Result = "pass"
-		judged.Reviews[i].Evidence = "La respuesta recuperada contiene evidencia verificable del criterio."
+		judged.Reviews[i].EvidenceLocation = "present"
+		judged.Reviews[i].EvidenceQuote = recovery.RawOutput
+		judged.Reviews[i].Reason = "The recovered response satisfies the bound criterion."
 		judged.Reviews[i].Reviewer = "recovery-agent"
 		judged.Reviews[i].ReviewerKind = "agent"
 		timestamp := time.Date(2026, 9, 14, 15, 0, 0, 0, time.UTC)

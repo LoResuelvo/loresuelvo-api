@@ -244,7 +244,7 @@ func (t *unknownUsageTransport) RoundTrip(req *http.Request) (*http.Response, er
 		return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(`{"totalTokens":123}`)), Header: make(http.Header), Request: req}, nil
 	}
 	t.generate.Add(1)
-	body := `{"candidates":[{"content":{"parts":[{"text":"{\"recommendations\":[{\"reference\":\"a\"},{\"reference\":\"b\"},{\"reference\":\"c\"}]}"}]}}]}`
+	body := `{"candidates":[{"content":{"parts":[{"text":"{\"recommendations\":[{\"reference\":\"a\",\"reason\":\"a\"},{\"reference\":\"b\",\"reason\":\"b\"},{\"reference\":\"c\",\"reason\":\"c\"}]}"}]}}]}`
 	if t.invalid {
 		body = `{"candidates":[{"content":{"parts":[{"text":"not json"}]}}]}`
 	}

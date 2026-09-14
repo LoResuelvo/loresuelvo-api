@@ -767,7 +767,7 @@ func ApplyRecoverySemanticReviews(dataset *Dataset, originalRunDirectory string,
 	if err != nil {
 		return RecoverySemanticReviewReport{}, err
 	}
-	if document.FormatVersion != template.FormatVersion || document.BaseRunID != template.BaseRunID || document.BaseAttemptsSHA256 != template.BaseAttemptsSHA256 || document.RecoveryID != template.RecoveryID || document.RecoveryEvidenceSHA256 != template.RecoveryEvidenceSHA256 {
+	if !supportedSemanticReviewVersion(document.FormatVersion) || document.BaseRunID != template.BaseRunID || document.BaseAttemptsSHA256 != template.BaseAttemptsSHA256 || document.RecoveryID != template.RecoveryID || document.RecoveryEvidenceSHA256 != template.RecoveryEvidenceSHA256 {
 		return RecoverySemanticReviewReport{}, fmt.Errorf("%w: recovery review identity mismatch", ErrInvalidSemanticReview)
 	}
 	expected := make(map[string]SemanticReview, len(template.Reviews))
@@ -779,6 +779,13 @@ func ApplyRecoverySemanticReviews(dataset *Dataset, originalRunDirectory string,
 		expected[key] = review
 	}
 	imported := make(map[string]SemanticReview, len(document.Reviews))
+	recoveredOutputs := make(map[string]string, len(evidence.Attempts))
+	recoveredParsedOutputs := make(map[string]json.RawMessage, len(evidence.Attempts))
+	for _, item := range evidence.Attempts {
+		key := semanticAttemptKey(item.Attempt.CaseID, item.Attempt.Trial, item.Attempt.Retry)
+		recoveredOutputs[key] = item.Attempt.RawOutput
+		recoveredParsedOutputs[key] = item.Attempt.ParsedOutput
+	}
 	for _, review := range document.Reviews {
 		key := semanticReviewKey(review)
 		original, exists := expected[key]
@@ -788,7 +795,8 @@ func ApplyRecoverySemanticReviews(dataset *Dataset, originalRunDirectory string,
 		if _, duplicate := imported[key]; duplicate {
 			return RecoverySemanticReviewReport{}, fmt.Errorf("%w: duplicate recovered criterion %s", ErrInvalidSemanticReview, key)
 		}
-		if err := validateSemanticReview(original, review, "executed"); err != nil {
+		attemptKey := semanticAttemptKey(review.CaseID, review.Trial, review.Retry)
+		if err := validateSemanticReview(document.FormatVersion, original, review, "executed", recoveredOutputs[attemptKey], recoveredParsedOutputs[attemptKey]); err != nil {
 			return RecoverySemanticReviewReport{}, fmt.Errorf("%s: %w", key, err)
 		}
 		imported[key] = review

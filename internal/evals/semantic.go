@@ -1,6 +1,7 @@
 package evals
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"slices"
@@ -8,26 +9,32 @@ import (
 	"time"
 )
 
-const semanticReviewVersion = "1"
+const (
+	semanticReviewVersion       = "2"
+	legacySemanticReviewVersion = "1"
+)
 
 var ErrInvalidSemanticReview = errors.New("invalid semantic review")
 
 // SemanticReview binds a judgment to one exact response and criterion. Reviewer
 // identity is declared provenance, not authenticated or specialist certification.
 type SemanticReview struct {
-	CaseID          string     `json:"case_id"`
-	Trial           int        `json:"trial"`
-	Retry           int        `json:"retry"`
-	OutputSHA256    string     `json:"output_sha256"`
-	CriterionID     string     `json:"criterion_id"`
-	CriterionSHA256 string     `json:"criterion_sha256"`
-	Criterion       string     `json:"criterion"`
-	Severity        string     `json:"severity"`
-	Result          string     `json:"result"`
-	Evidence        string     `json:"evidence"`
-	Reviewer        string     `json:"reviewer"`
-	ReviewerKind    string     `json:"reviewer_kind"`
-	ReviewedOn      *time.Time `json:"reviewed_on"`
+	CaseID           string     `json:"case_id"`
+	Trial            int        `json:"trial"`
+	Retry            int        `json:"retry"`
+	OutputSHA256     string     `json:"output_sha256"`
+	CriterionID      string     `json:"criterion_id"`
+	CriterionSHA256  string     `json:"criterion_sha256"`
+	Criterion        string     `json:"criterion"`
+	Severity         string     `json:"severity"`
+	Result           string     `json:"result"`
+	Evidence         string     `json:"evidence,omitempty"` // format_version 1 only
+	EvidenceQuote    string     `json:"evidence_quote,omitempty"`
+	EvidenceLocation string     `json:"evidence_location,omitempty"`
+	Reason           string     `json:"reason,omitempty"`
+	Reviewer         string     `json:"reviewer"`
+	ReviewerKind     string     `json:"reviewer_kind"`
+	ReviewedOn       *time.Time `json:"reviewed_on"`
 }
 type SemanticReviewDocument struct {
 	FormatVersion  string           `json:"format_version"`
@@ -75,7 +82,7 @@ func ApplySemanticReviews(dataset *Dataset, runDirectory string, document Semant
 	if err != nil {
 		return SemanticReviewReport{}, err
 	}
-	if document.FormatVersion != template.FormatVersion || document.RunID != template.RunID || document.DatasetSHA256 != template.DatasetSHA256 || document.AttemptsSHA256 != template.AttemptsSHA256 {
+	if !supportedSemanticReviewVersion(document.FormatVersion) || document.RunID != template.RunID || document.DatasetSHA256 != template.DatasetSHA256 || document.AttemptsSHA256 != template.AttemptsSHA256 {
 		return SemanticReviewReport{}, fmt.Errorf("%w: document does not match verified run", ErrInvalidSemanticReview)
 	}
 	record, report, err := Replay(dataset, runDirectory)
@@ -101,13 +108,18 @@ func ApplySemanticReviews(dataset *Dataset, runDirectory string, document Semant
 		return SemanticReviewReport{}, fmt.Errorf("%w: run changed during review", ErrInvalidSemanticReview)
 	}
 	statuses := make(map[string]string, len(rawAttempts))
+	rawOutputs := make(map[string]string, len(rawAttempts))
+	parsedOutputs := make(map[string]json.RawMessage, len(rawAttempts))
 	for _, attempt := range rawAttempts {
 		status := attempt.Status
 		raw := strings.TrimSpace(attempt.RawOutput)
 		if raw == "" || raw == "null" {
 			status = "missing_output"
 		}
-		statuses[semanticAttemptKey(attempt.CaseID, attempt.Trial, attempt.Retry)] = status
+		key := semanticAttemptKey(attempt.CaseID, attempt.Trial, attempt.Retry)
+		statuses[key] = status
+		rawOutputs[key] = attempt.RawOutput
+		parsedOutputs[key] = attempt.ParsedOutput
 	}
 	imported := make(map[string]SemanticReview, len(document.Reviews))
 	for _, review := range document.Reviews {
@@ -119,7 +131,8 @@ func ApplySemanticReviews(dataset *Dataset, runDirectory string, document Semant
 		if _, duplicate := imported[key]; duplicate {
 			return SemanticReviewReport{}, fmt.Errorf("%w: duplicate criterion %s", ErrInvalidSemanticReview, key)
 		}
-		if err = validateSemanticReview(original, review, statuses[semanticAttemptKey(review.CaseID, review.Trial, review.Retry)]); err != nil {
+		attemptKey := semanticAttemptKey(review.CaseID, review.Trial, review.Retry)
+		if err = validateSemanticReview(document.FormatVersion, original, review, statuses[attemptKey], rawOutputs[attemptKey], parsedOutputs[attemptKey]); err != nil {
 			return SemanticReviewReport{}, fmt.Errorf("%s: %w", key, err)
 		}
 		imported[key] = review
@@ -192,7 +205,11 @@ func semanticCriterionHash(check SemanticCheck) string {
 	// Length-prefix each component to avoid ambiguous concatenations.
 	return digest([]byte(fmt.Sprintf("%d:%s%d:%s%d:%s", len(check.ID), check.ID, len(check.Severity), check.Severity, len(check.Criterion), check.Criterion)))
 }
-func validateSemanticReview(expected, review SemanticReview, status string) error {
+func supportedSemanticReviewVersion(version string) bool {
+	return version == semanticReviewVersion || version == legacySemanticReviewVersion
+}
+
+func validateSemanticReview(version string, expected, review SemanticReview, status, rawOutput string, parsedOutput json.RawMessage) error {
 	if expected.OutputSHA256 != review.OutputSHA256 || expected.CriterionSHA256 != review.CriterionSHA256 || expected.Criterion != review.Criterion || expected.Severity != review.Severity {
 		return fmt.Errorf("%w: response or criterion mismatch", ErrInvalidSemanticReview)
 	}
@@ -205,8 +222,29 @@ func validateSemanticReview(expected, review SemanticReview, status string) erro
 	if status != "executed" {
 		return fmt.Errorf("%w: missing or failed execution cannot receive assessed semantics", ErrInvalidSemanticReview)
 	}
-	if strings.TrimSpace(review.Evidence) == "" || strings.TrimSpace(review.Reviewer) == "" || review.ReviewedOn == nil || review.ReviewedOn.IsZero() {
-		return fmt.Errorf("%w: evidence, reviewer and review time required", ErrInvalidSemanticReview)
+	if strings.TrimSpace(review.Reviewer) == "" || review.ReviewedOn == nil || review.ReviewedOn.IsZero() {
+		return fmt.Errorf("%w: reviewer and review time required", ErrInvalidSemanticReview)
+	}
+	if version == legacySemanticReviewVersion {
+		if strings.TrimSpace(review.Evidence) == "" {
+			return fmt.Errorf("%w: legacy evidence required", ErrInvalidSemanticReview)
+		}
+	} else {
+		if strings.TrimSpace(review.Reason) == "" {
+			return fmt.Errorf("%w: criterion-specific reason required", ErrInvalidSemanticReview)
+		}
+		switch review.EvidenceLocation {
+		case "present":
+			if review.EvidenceQuote == "" || !semanticEvidenceContains(rawOutput, parsedOutput, review.EvidenceQuote) {
+				return fmt.Errorf("%w: evidence quote must occur verbatim in the bound response", ErrInvalidSemanticReview)
+			}
+		case "absent":
+			if review.EvidenceQuote != "" {
+				return fmt.Errorf("%w: omitted evidence cannot include a quote", ErrInvalidSemanticReview)
+			}
+		default:
+			return fmt.Errorf("%w: evidence location must be present or absent", ErrInvalidSemanticReview)
+		}
 	}
 	if review.ReviewerKind != "human" && review.ReviewerKind != "agent" {
 		return fmt.Errorf("%w: reviewer kind must be human or agent", ErrInvalidSemanticReview)
@@ -216,4 +254,43 @@ func validateSemanticReview(expected, review SemanticReview, status string) erro
 		return fmt.Errorf("%w: review time must use UTC", ErrInvalidSemanticReview)
 	}
 	return nil
+}
+
+func semanticEvidenceContains(rawOutput string, parsedOutput json.RawMessage, quote string) bool {
+	if quote == "" {
+		return false
+	}
+	if strings.Contains(rawOutput, quote) || strings.Contains(string(parsedOutput), quote) {
+		return true
+	}
+	for _, data := range []json.RawMessage{json.RawMessage(rawOutput), parsedOutput} {
+		var value any
+		if len(data) == 0 || json.Unmarshal(data, &value) != nil {
+			continue
+		}
+		if semanticJSONValueContains(value, quote) {
+			return true
+		}
+	}
+	return false
+}
+
+func semanticJSONValueContains(value any, quote string) bool {
+	switch typed := value.(type) {
+	case string:
+		return strings.Contains(typed, quote)
+	case []any:
+		for _, item := range typed {
+			if semanticJSONValueContains(item, quote) {
+				return true
+			}
+		}
+	case map[string]any:
+		for _, item := range typed {
+			if semanticJSONValueContains(item, quote) {
+				return true
+			}
+		}
+	}
+	return false
 }

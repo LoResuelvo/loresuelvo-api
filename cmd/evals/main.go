@@ -42,7 +42,7 @@ func runContext(ctx context.Context, args []string, stdout, stderr io.Writer) in
 	}
 	command := args[0]
 	switch command {
-	case "validate", "plan", "contract", "live", "replay", "compare", "baselines", "summary", "review-template", "review", "metamorphic-report", "campaign-report", "campaign-export", "campaign-live", "campaign-recover":
+	case "validate", "plan", "contract", "live", "replay", "compare", "baselines", "summary", "review-template", "review", "review-calibrate", "metamorphic-report", "campaign-report", "campaign-export", "campaign-live", "campaign-recover":
 	default:
 		fmt.Fprintf(stderr, "unsupported command %q; no model calls were made\n", command)
 		return 2
@@ -55,7 +55,7 @@ func runContext(ctx context.Context, args []string, stdout, stderr io.Writer) in
 	var limits evals.ExecutionLimits
 	var allowLive, dryRun bool
 	var tokens int
-	var output, runDirectory, left, right, caseIDs, reviewPath, protocolPath, evidencePath, pricingVerifiedOn, addendumPath string
+	var output, runDirectory, left, right, caseIDs, reviewPath, calibrationPath, protocolPath, evidencePath, pricingVerifiedOn, addendumPath string
 	if command == "plan" || command == "live" {
 		flags.StringVar(&options.Suite, "suite", "", "explicit suite: smoke, development, holdout, critical_all")
 		flags.StringVar(&options.Model, "model", "", "explicit requested model identifier")
@@ -87,6 +87,10 @@ func runContext(ctx context.Context, args []string, stdout, stderr io.Writer) in
 		flags.BoolVar(&comparisonOptions.AllowPromptChange, "allow-prompt-change", false, "declare intentional effective prompt/input change")
 		flags.BoolVar(&comparisonOptions.AllowGenerationConfigChange, "allow-generation-config-change", false, "declare intentional generation configuration change")
 		flags.StringVar(&comparisonOptions.ChangeDescription, "change-description", "", "explain deliberate comparison changes")
+	}
+	if command == "review-calibrate" {
+		flags.StringVar(&calibrationPath, "calibration", "", "explicit gold calibration suite JSON")
+		flags.StringVar(&reviewPath, "reviews", "", "independently produced calibration reviews JSON")
 	}
 	if command == "baselines" {
 		flags.StringVar(&options.Suite, "suite", "", "explicit suite")
@@ -244,6 +248,17 @@ func runContext(ctx context.Context, args []string, stdout, stderr io.Writer) in
 			if reviewed.ResultCounts["fail"] > 0 || reviewed.Report.DeterministicFailures > 0 {
 				code = 1
 			}
+		}
+	case "review-calibrate":
+		if calibrationPath == "" || reviewPath == "" {
+			fmt.Fprintln(stderr, "--calibration and --reviews are required")
+			return 2
+		}
+		var calibration evals.SemanticCalibrationReport
+		calibration, err = evals.EvaluateSemanticCalibrationFiles(calibrationPath, reviewPath)
+		result = calibration
+		if calibration.Counts.FalsePass > 0 || calibration.Counts.FalseFail > 0 || calibration.Counts.Unassessed > 0 {
+			code = 1
 		}
 	case "metamorphic-report":
 		var transformed evals.MetamorphicReport
@@ -534,6 +549,7 @@ func usage(out io.Writer) {
 	fmt.Fprintln(out, "       evals baselines --suite NAME [--allow-holdout]")
 	fmt.Fprintln(out, "       evals summary|review-template|metamorphic-report --run DIR")
 	fmt.Fprintln(out, "       evals review --run DIR --reviews FILE")
+	fmt.Fprintln(out, "       evals review-calibrate --calibration FILE --reviews FILE")
 	fmt.Fprintln(out, "       evals campaign-report --protocol FILE --evidence FILE --out DIR")
 	fmt.Fprintln(out, "       evals campaign-export --protocol FILE --evidence FILE --recovery-addendum FILE --out DIR")
 	fmt.Fprintln(out, "       evals campaign-live --protocol FILE --allow-live --pricing-verified-on YYYY-MM-DD --out DIR")

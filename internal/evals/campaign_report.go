@@ -126,6 +126,8 @@ type campaignProtocolModel struct {
 type campaignProtocolSolution struct {
 	BaselineSourceCommit          string            `json:"baseline_source_commit"`
 	BaselineFiles                 map[string]string `json:"baseline_files"`
+	ParentCampaignID              string            `json:"parent_campaign_id,omitempty"`
+	ChangeDescription             string            `json:"change_description,omitempty"`
 	RequireCleanTreeBeforeLive    bool              `json:"require_clean_tree_before_live"`
 	PromptChangeAllowed           bool              `json:"prompt_change_allowed"`
 	GenerationConfigChangeAllowed bool              `json:"generation_config_change_allowed"`
@@ -201,6 +203,8 @@ type CampaignExecutionConfig struct {
 	Prices                 []CampaignPrice          `json:"prices"`
 	BaselineSourceCommit   string                   `json:"baseline_source_commit"`
 	BaselineFiles          map[string]string        `json:"baseline_files_sha256"`
+	ParentCampaignID       string                   `json:"parent_campaign_id,omitempty"`
+	ChangeDescription      string                   `json:"change_description,omitempty"`
 }
 
 type CampaignProvenance struct {
@@ -489,7 +493,7 @@ func ReadCampaignReportSpec(dataset *Dataset, protocolPath, evidencePath string)
 }
 
 // ReadCampaignExecutionConfig verifies the frozen protocol before any provider
-// interaction and returns exactly the four declared phase/model plans.
+// interaction and returns every declared phase/model plan.
 func ReadCampaignExecutionConfig(dataset *Dataset, protocolPath string) (CampaignExecutionConfig, error) {
 	var result CampaignExecutionConfig
 	data, err := readBoundedFile(protocolPath, maxCampaignSpecBytes)
@@ -519,6 +523,8 @@ func ReadCampaignExecutionConfig(dataset *Dataset, protocolPath string) (Campaig
 		HardCeilingUSD:         protocol.Budget.HardCeiling, PricingSource: source, Prices: prices,
 		BaselineSourceCommit: protocol.Solution.BaselineSourceCommit,
 		BaselineFiles:        maps.Clone(protocol.Solution.BaselineFiles),
+		ParentCampaignID:     strings.TrimSpace(protocol.Solution.ParentCampaignID),
+		ChangeDescription:    strings.TrimSpace(protocol.Solution.ChangeDescription),
 		Phases:               []CampaignExecutionPhase{{Name: "smoke", Suite: protocol.Execution.Smoke.Suite, Trials: protocol.Execution.Smoke.TrialsPerCase}, {Name: "primary", Suite: protocol.Execution.Primary.Suite, Trials: protocol.Execution.Primary.TrialsPerCase, Metamorphic: protocol.Execution.Metamorphic.Enabled}},
 	}
 	for _, model := range protocol.Models {
@@ -622,8 +628,12 @@ func validateCampaignProtocolDefinition(dataset *Dataset, protocol campaignProto
 	if protocol.DatasetVersion != dataset.Version || protocol.DatasetManifestSHA256 != dataset.ManifestSHA256 {
 		return fmt.Errorf("%w: protocol dataset mismatch", ErrInvalidCampaignReport)
 	}
-	if strings.TrimSpace(protocol.Solution.BaselineSourceCommit) == "" || len(protocol.Solution.BaselineFiles) == 0 || !protocol.Solution.RequireCleanTreeBeforeLive || protocol.Solution.PromptChangeAllowed || protocol.Solution.GenerationConfigChangeAllowed || protocol.Solution.QualityFixesAllowed {
+	if strings.TrimSpace(protocol.Solution.BaselineSourceCommit) == "" || len(protocol.Solution.BaselineFiles) == 0 || !protocol.Solution.RequireCleanTreeBeforeLive {
 		return fmt.Errorf("%w: baseline solution declaration is incomplete", ErrInvalidCampaignReport)
+	}
+	changedSolution := protocol.Solution.PromptChangeAllowed || protocol.Solution.GenerationConfigChangeAllowed || protocol.Solution.QualityFixesAllowed
+	if changedSolution && (strings.TrimSpace(protocol.Solution.ParentCampaignID) == "" || strings.TrimSpace(protocol.Solution.ChangeDescription) == "") {
+		return fmt.Errorf("%w: changed solution must identify its parent campaign and change description", ErrInvalidCampaignReport)
 	}
 	for path, hash := range protocol.Solution.BaselineFiles {
 		if !filepath.IsLocal(path) || len(hash) != 64 {

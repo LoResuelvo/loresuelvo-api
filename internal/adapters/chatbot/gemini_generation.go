@@ -51,8 +51,12 @@ func NewGeminiChatbotWithOptions(model, apiKey string, options GeminiOptions) (*
 	return chatbot, nil
 }
 
-func (chatbot *GeminiChatbot) generationConfig() *genai.GenerateContentConfig {
-	return &genai.GenerateContentConfig{ResponseMIMEType: "application/json", MaxOutputTokens: chatbot.options.MaxOutputTokens}
+func (chatbot *GeminiChatbot) generationConfig(responseJSONSchema any) *genai.GenerateContentConfig {
+	return &genai.GenerateContentConfig{
+		ResponseMIMEType:   "application/json",
+		ResponseJsonSchema: responseJSONSchema,
+		MaxOutputTokens:    chatbot.options.MaxOutputTokens,
+	}
 }
 
 func (chatbot *GeminiChatbot) generateContent(ctx context.Context, client *genai.Client, operation string, contents []*genai.Content, config *genai.GenerateContentConfig) (*genai.GenerateContentResponse, error) {

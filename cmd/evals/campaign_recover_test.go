@@ -22,6 +22,17 @@ func TestReadCampaignRecoveryAddendumRejectsUnknownFieldsAndUnsafeScope(t *testi
 	require.Error(t, err)
 }
 
+func TestCampaignTwoRecoveryAddendumMatchesReusableLoader(t *testing.T) {
+	path := filepath.Join("..", "..", "evals", "protocols", "campaign-2-recovery-addendum.json")
+	addendum, err := readCampaignRecoveryAddendum(path)
+	require.NoError(t, err)
+	require.Equal(t, "campaign-2-recovery-1", addendum.AddendumID)
+	require.Equal(t, "campaign-2", addendum.CampaignID)
+	require.Equal(t, filepath.Join("evals", "protocols", "campaign-2.json"), addendum.ParentProtocol)
+	require.False(t, addendum.Scope.QualityOrMalformedRetries)
+	require.True(t, addendum.Selection.NeverRetryExecutedResponse)
+}
+
 func TestRecoverySelectionNeverIncludesContentOrNonTransientErrors(t *testing.T) {
 	base := evals.Attempt{CaseID: "PD-001", Trial: 1, Retry: 0, Status: "execution_error", Error: "503 UNAVAILABLE", RequestCount: 1}
 	require.Equal(t, "transient_provider_unavailable", recoveryTransientReason(base))

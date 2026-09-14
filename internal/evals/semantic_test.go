@@ -30,7 +30,9 @@ func TestSemanticHumanReviewDoesNotApproveRelease(t *testing.T) {
 	require.NoError(t, err)
 	now := time.Now().UTC()
 	document.Reviews[0].Result = "pass"
-	document.Reviews[0].Evidence = "Reasons match supplied evidence."
+	document.Reviews[0].EvidenceLocation = "present"
+	document.Reviews[0].EvidenceQuote = attempt.RawOutput
+	document.Reviews[0].Reason = "Reasons match supplied evidence."
 	document.Reviews[0].Reviewer = "team-member"
 	document.Reviews[0].ReviewerKind = "human"
 	document.Reviews[0].ReviewedOn = &now
@@ -52,7 +54,9 @@ func TestSemanticAgentObservationRemainsVisibleWithoutCertification(t *testing.T
 	require.NoError(t, err)
 	now := time.Now().UTC()
 	document.Reviews[0].Result = "pass"
-	document.Reviews[0].Evidence = "Observed grounded reasons."
+	document.Reviews[0].EvidenceLocation = "present"
+	document.Reviews[0].EvidenceQuote = attempt.RawOutput
+	document.Reviews[0].Reason = "Observed grounded reasons."
 	document.Reviews[0].Reviewer = "codex"
 	document.Reviews[0].ReviewerKind = "agent"
 	document.Reviews[0].ReviewedOn = &now
@@ -79,7 +83,9 @@ func TestSemanticReviewRejectsInvalidBindingsAndProvenance(t *testing.T) {
 		{"unknown", func(d *SemanticReviewDocument) { d.Reviews[0].CriterionID = "other" }},
 		{"duplicate", func(d *SemanticReviewDocument) { d.Reviews = append(d.Reviews, d.Reviews[0]) }},
 		{"result", func(d *SemanticReviewDocument) { d.Reviews[0].Result = "approved" }},
-		{"evidence", func(d *SemanticReviewDocument) { d.Reviews[0].Evidence = "" }},
+		{"quote", func(d *SemanticReviewDocument) { d.Reviews[0].EvidenceQuote = "not in the response" }},
+		{"location", func(d *SemanticReviewDocument) { d.Reviews[0].EvidenceLocation = "somewhere" }},
+		{"reason", func(d *SemanticReviewDocument) { d.Reviews[0].Reason = "" }},
 		{"reviewer", func(d *SemanticReviewDocument) { d.Reviews[0].Reviewer = "" }},
 		{"kind", func(d *SemanticReviewDocument) { d.Reviews[0].ReviewerKind = "expert-guessed" }},
 		{"time", func(d *SemanticReviewDocument) { d.Reviews[0].ReviewedOn = nil }},
@@ -91,7 +97,9 @@ func TestSemanticReviewRejectsInvalidBindingsAndProvenance(t *testing.T) {
 			now := time.Now().UTC()
 			review := &document.Reviews[0]
 			review.Result = "pass"
-			review.Evidence = "evidence"
+			review.EvidenceLocation = "present"
+			review.EvidenceQuote = attempt.RawOutput
+			review.Reason = "The cited response supports the criterion judgment."
 			review.Reviewer = "reviewer"
 			review.ReviewerKind = "human"
 			review.ReviewedOn = &now
@@ -121,7 +129,9 @@ func TestSemanticFailureOverridesDeterministicPass(t *testing.T) {
 	now := time.Now().UTC()
 	review := &document.Reviews[0]
 	review.Result = "fail"
-	review.Evidence = "Unsupported fact in reason."
+	review.EvidenceLocation = "present"
+	review.EvidenceQuote = attempt.RawOutput
+	review.Reason = "Unsupported fact in reason."
 	review.Reviewer = "reviewer"
 	review.ReviewerKind = "agent"
 	review.ReviewedOn = &now
@@ -169,7 +179,8 @@ func TestSemanticNotApplicableRequiresExplainedProvenance(t *testing.T) {
 	now := time.Now().UTC()
 	review := &document.Reviews[0]
 	review.Result = "not_applicable"
-	review.Evidence = "Criterion does not apply to this response because it makes no factual assertion."
+	review.EvidenceLocation = "absent"
+	review.Reason = "Criterion does not apply to this response because it makes no factual assertion."
 	review.Reviewer = "reviewer"
 	review.ReviewerKind = "human"
 	review.ReviewedOn = &now
@@ -192,7 +203,8 @@ func TestSemanticAbsentExecutedOutputRemainsUnassessed(t *testing.T) {
 			require.Equal(t, 1, report.ResultCounts["unassessed"])
 			now := time.Now().UTC()
 			review := &document.Reviews[0]
-			review.Evidence = "No response to evaluate."
+			review.EvidenceLocation = "absent"
+			review.Reason = "No response to evaluate."
 			review.Reviewer = "reviewer"
 			review.ReviewerKind = "human"
 			review.ReviewedOn = &now
@@ -213,7 +225,9 @@ func TestSemanticMeaningfulSchemaInvalidOutputRemainsReviewable(t *testing.T) {
 	now := time.Now().UTC()
 	review := &document.Reviews[0]
 	review.Result = "fail"
-	review.Evidence = "Unsupported experience assertion in response."
+	review.EvidenceLocation = "present"
+	review.EvidenceQuote = attempt.RawOutput
+	review.Reason = "Unsupported experience assertion in response."
 	review.Reviewer = "reviewer"
 	review.ReviewerKind = "human"
 	review.ReviewedOn = &now
@@ -221,4 +235,48 @@ func TestSemanticMeaningfulSchemaInvalidOutputRemainsReviewable(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, 1, report.ResultCounts["fail"])
 	require.Equal(t, "failed", report.Report.Attempts[0].Evaluation.DeterministicStatus)
+}
+
+func TestSemanticReviewAllowsExplicitAbsenceForOmissionJudgment(t *testing.T) {
+	dataset, record, attempt := replayEvidence(t)
+	attempt.RawOutput = `{"recommendations":[]}`
+	directory := persistReplayEvidence(t, record, attempt)
+	document, err := NewSemanticReviewTemplate(dataset, directory)
+	require.NoError(t, err)
+	now := time.Now().UTC()
+	review := &document.Reviews[0]
+	review.Result = "fail"
+	review.EvidenceLocation = "absent"
+	review.Reason = "The response omits the explanation required by this criterion."
+	review.Reviewer = "reviewer"
+	review.ReviewerKind = "agent"
+	review.ReviewedOn = &now
+
+	_, err = ApplySemanticReviews(dataset, directory, document)
+	require.NoError(t, err)
+}
+
+func TestSemanticReviewVersionOneRemainsReadableForCampaignOne(t *testing.T) {
+	dataset, record, attempt := replayEvidence(t)
+	attempt.RawOutput = `{"recommendations":[]}`
+	directory := persistReplayEvidence(t, record, attempt)
+	document, err := NewSemanticReviewTemplate(dataset, directory)
+	require.NoError(t, err)
+	document.FormatVersion = "1"
+	now := time.Now().UTC()
+	review := &document.Reviews[0]
+	review.Result = "fail"
+	review.Evidence = "Legacy campaign-one evidence."
+	review.Reviewer = "legacy-reviewer"
+	review.ReviewerKind = "agent"
+	review.ReviewedOn = &now
+
+	_, err = ApplySemanticReviews(dataset, directory, document)
+	require.NoError(t, err)
+}
+
+func TestSemanticEvidenceQuoteMayMatchDecodedJSONContent(t *testing.T) {
+	raw := `{"content":"first\nsecond"}`
+	require.NotContains(t, raw, "first\nsecond")
+	require.True(t, semanticEvidenceContains(raw, nil, "first\nsecond"))
 }

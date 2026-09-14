@@ -7,6 +7,7 @@ import (
 	"maps"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -105,7 +106,8 @@ func TestBuildCampaignReportLabelsAgentReviewWithoutHumanCertification(t *testin
 	require.NoError(t, err)
 	now := time.Date(2026, 9, 14, 11, 0, 0, 0, time.UTC)
 	document.Reviews[0].Result = "pass"
-	document.Reviews[0].Evidence = "Reason is grounded in the supplied provider facts."
+	document.Reviews[0].EvidenceLocation = "absent"
+	document.Reviews[0].Reason = "The response contains no unsupported provider facts relevant to this criterion."
 	document.Reviews[0].Reviewer = "campaign-review-agent"
 	document.Reviews[0].ReviewerKind = "agent"
 	document.Reviews[0].ReviewedOn = &now
@@ -240,7 +242,8 @@ func TestBuildCampaignReportOverlaysFirstEffectiveRecoveryWithoutErasingOriginal
 	now := time.Date(2026, 9, 14, 12, 0, 0, 0, time.UTC)
 	for i := range template.Reviews {
 		template.Reviews[i].Result = "pass"
-		template.Reviews[i].Evidence = "Recovered response satisfies this criterion."
+		template.Reviews[i].EvidenceLocation = "absent"
+		template.Reviews[i].Reason = "No violation of this criterion occurs in the recovered response."
 		template.Reviews[i].Reviewer = "campaign-recovery-review-agent"
 		template.Reviews[i].ReviewerKind = "agent"
 		template.Reviews[i].ReviewedOn = &now
@@ -353,6 +356,30 @@ func TestReadCampaignReportSpecAcceptsFrozenCampaignProtocol(t *testing.T) {
 	for _, price := range execution.Prices {
 		require.False(t, price.Verified)
 	}
+}
+
+func TestReadCampaignExecutionConfigAcceptsVersionedChangedSolution(t *testing.T) {
+	protocolPath := filepath.Join("..", "..", "evals", "protocols", "campaign-1.json")
+	dataset, err := LoadDataset(filepath.Join("..", "..", "evals", "datasets", "LoResuelvo_US60_evals_v1.0.0"))
+	require.NoError(t, err)
+	data, err := os.ReadFile(protocolPath)
+	require.NoError(t, err)
+	changed := strings.Replace(string(data), `"campaign_id": "campaign-1"`, `"campaign_id": "campaign-2"`, 1)
+	changed = strings.Replace(changed, `"baseline_source_commit": "ca5e2ae",`, `"baseline_source_commit": "candidate-commit",
+    "parent_campaign_id": "campaign-1",
+    "change_description": "Bounded safety, grounding and response-contract fixes.",`, 1)
+	changed = strings.Replace(changed, `"prompt_change_allowed": false`, `"prompt_change_allowed": true`, 1)
+	changed = strings.Replace(changed, `"generation_config_change_allowed": false`, `"generation_config_change_allowed": true`, 1)
+	changed = strings.Replace(changed, `"quality_fixes_allowed": false`, `"quality_fixes_allowed": true`, 1)
+	path := filepath.Join(t.TempDir(), "campaign-2.json")
+	require.NoError(t, os.WriteFile(path, []byte(changed), 0600))
+
+	config, err := ReadCampaignExecutionConfig(dataset, path)
+	require.NoError(t, err)
+	require.Equal(t, "campaign-2", config.CampaignID)
+	require.Equal(t, "campaign-1", config.ParentCampaignID)
+	require.Contains(t, config.ChangeDescription, "safety")
+	require.Equal(t, 360, config.MaximumGenerationCalls)
 }
 
 func TestCampaignTrialVariabilityUsesWithinCaseRanges(t *testing.T) {

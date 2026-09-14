@@ -9,7 +9,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/category"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/conversation"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
@@ -28,6 +30,8 @@ func TestGeminiGenerationTracePreservesInvalidOutputAndMetadata(t *testing.T) {
 		config := body["generationConfig"].(map[string]any)
 		require.Equal(t, float64(128), config["maxOutputTokens"])
 		require.Equal(t, "application/json", config["responseMimeType"])
+		schema := config["responseJsonSchema"].(map[string]any)
+		require.Equal(t, []any{"recommendations"}, schema["required"])
 	}).Return(&http.Response{StatusCode: 200, Header: http.Header{"Secret": {"credential"}}, Body: io.NopCloser(strings.NewReader(`{"candidates":[{"content":{"parts":[{"text":"invalid JSON"}],"role":"model"}}],"modelVersion":"observed-model","responseId":"response-1","usageMetadata":{"promptTokenCount":12,"candidatesTokenCount":3,"totalTokenCount":15}}`))}, nil).Once()
 	var traces []GenerationTrace
 	bot, err := NewGeminiChatbotWithOptions("requested-model", "credential", GeminiOptions{HTTPClient: &http.Client{Transport: transport}, MaxOutputTokens: 128, Observer: func(_ context.Context, trace GenerationTrace) { traces = append(traces, trace) }})
@@ -62,12 +66,35 @@ func TestGeminiGenerationTraceDoesNotPersistTransportErrorSecrets(t *testing.T) 
 	transport.AssertExpectations(t)
 }
 
-func TestGeminiGenerationDefaultConfigIsUnchanged(t *testing.T) {
+func TestGeminiGenerationConfigIncludesOperationSchema(t *testing.T) {
 	bot := NewGeminiChatbot("model", "key")
-	encoded, err := json.Marshal(bot.generationConfig())
+	encoded, err := json.Marshal(bot.generationConfig(summaryResponseJSONSchema()))
 	require.NoError(t, err)
-	require.JSONEq(t, `{"responseMimeType":"application/json"}`, string(encoded))
+	require.JSONEq(t, `{
+		"responseMimeType":"application/json",
+		"responseJsonSchema":{
+			"type":"object",
+			"additionalProperties":false,
+			"required":["summary"],
+			"properties":{"summary":{"type":"string","minLength":1}}
+		}
+	}`, string(encoded))
 	require.Nil(t, bot.options.Observer)
+}
+
+func TestOperationSchemasConstrainTheirOwnResponseShape(t *testing.T) {
+	answer := answerResponseJSONSchema(true, 2, []category.Category{{Name: "Electricidad"}})
+	answerProperties := answer["properties"].(map[string]any)
+	assert.Equal(t, []string{"answered", "out_of_scope"}, answerProperties["status"].(map[string]any)["enum"])
+	assert.Equal(t, 2, answerProperties["image_descriptions"].(map[string]any)["minItems"])
+	assert.Equal(t, 2, answerProperties["image_descriptions"].(map[string]any)["maxItems"])
+	assessmentProperties := answerProperties["assessment"].(map[string]any)["properties"].(map[string]any)
+	assert.Equal(t, []string{"", "Electricidad"}, assessmentProperties["problem_category_name"].(map[string]any)["enum"])
+
+	ranking := providerRankingResponseJSONSchema(3)
+	rankingProperties := ranking["properties"].(map[string]any)
+	assert.Equal(t, 3, rankingProperties["recommendations"].(map[string]any)["maxItems"])
+	assert.NotContains(t, rankingProperties, "assessment")
 }
 
 func TestGeminiGenerationObserverPreservesRequestForEachOperation(t *testing.T) {

@@ -13,7 +13,7 @@ import (
 	"time"
 )
 
-const campaignExportVersion = "1"
+const campaignExportVersion = "2"
 
 var ErrInvalidCampaignExport = errors.New("invalid campaign export")
 
@@ -213,27 +213,31 @@ type CampaignExportResult struct {
 }
 
 type CampaignExportReview struct {
-	ReviewID           string     `json:"review_id"`
-	SlotID             string     `json:"slot_id"`
-	AttemptID          string     `json:"attempt_id"`
-	ResponseID         *string    `json:"response_id"`
-	Phase              string     `json:"phase"`
-	RequestedModel     string     `json:"requested_model"`
-	CaseID             string     `json:"case_id"`
-	Trial              int        `json:"trial"`
-	Retry              int        `json:"retry"`
-	Source             string     `json:"source"`
-	EffectiveForResult bool       `json:"effective_for_result"`
-	OutputSHA256       string     `json:"output_sha256"`
-	CriterionID        string     `json:"criterion_id"`
-	CriterionSHA256    string     `json:"criterion_sha256"`
-	Criterion          string     `json:"criterion"`
-	Severity           string     `json:"severity"`
-	Result             string     `json:"result"`
-	Evidence           string     `json:"evidence"`
-	Reviewer           string     `json:"reviewer"`
-	ReviewerKind       string     `json:"reviewer_kind"`
-	ReviewedOn         *time.Time `json:"reviewed_on"`
+	ReviewID            string     `json:"review_id"`
+	SlotID              string     `json:"slot_id"`
+	AttemptID           string     `json:"attempt_id"`
+	ResponseID          *string    `json:"response_id"`
+	Phase               string     `json:"phase"`
+	RequestedModel      string     `json:"requested_model"`
+	CaseID              string     `json:"case_id"`
+	Trial               int        `json:"trial"`
+	Retry               int        `json:"retry"`
+	Source              string     `json:"source"`
+	ReviewFormatVersion string     `json:"review_format_version"`
+	EffectiveForResult  bool       `json:"effective_for_result"`
+	OutputSHA256        string     `json:"output_sha256"`
+	CriterionID         string     `json:"criterion_id"`
+	CriterionSHA256     string     `json:"criterion_sha256"`
+	Criterion           string     `json:"criterion"`
+	Severity            string     `json:"severity"`
+	Result              string     `json:"result"`
+	Evidence            string     `json:"evidence,omitempty"`
+	EvidenceQuote       string     `json:"evidence_quote,omitempty"`
+	EvidenceLocation    string     `json:"evidence_location,omitempty"`
+	Reason              string     `json:"reason,omitempty"`
+	Reviewer            string     `json:"reviewer"`
+	ReviewerKind        string     `json:"reviewer_kind"`
+	ReviewedOn          *time.Time `json:"reviewed_on"`
 }
 
 // BuildCampaignExport validates all source evidence again and materializes a
@@ -553,7 +557,7 @@ func appendCampaignExportRun(dataset *Dataset, spec CampaignExportSpec, phase Ca
 }
 
 func appendCampaignExportReviews(dataset *Dataset, runSpec CampaignRunSpec, phase, campaignID string, effective map[string]Attempt, attemptIDs map[string]string, export *CampaignExport) error {
-	appendReviews := func(document []SemanticReview, source string) {
+	appendReviews := func(document []SemanticReview, source, formatVersion string) {
 		for _, review := range document {
 			slotID := campaignExportSlotID(campaignID, phase, runSpec.RequestedModel, review.CaseID, review.Trial)
 			attemptID := attemptIDs[semanticAttemptKey(review.CaseID, review.Trial, review.Retry)]
@@ -568,10 +572,13 @@ func appendCampaignExportReviews(dataset *Dataset, runSpec CampaignRunSpec, phas
 				ReviewID: attemptID + ":criterion:" + review.CriterionID, SlotID: slotID, AttemptID: attemptID,
 				ResponseID: responseID, Phase: phase, RequestedModel: runSpec.RequestedModel,
 				CaseID: review.CaseID, Trial: review.Trial, Retry: review.Retry, Source: source,
-				EffectiveForResult: effectiveReview, OutputSHA256: review.OutputSHA256,
+				ReviewFormatVersion: formatVersion,
+				EffectiveForResult:  effectiveReview, OutputSHA256: review.OutputSHA256,
 				CriterionID: review.CriterionID, CriterionSHA256: review.CriterionSHA256,
 				Criterion: review.Criterion, Severity: review.Severity, Result: review.Result,
-				Evidence: review.Evidence, Reviewer: review.Reviewer, ReviewerKind: review.ReviewerKind,
+				Evidence: review.Evidence, EvidenceQuote: review.EvidenceQuote,
+				EvidenceLocation: review.EvidenceLocation, Reason: review.Reason,
+				Reviewer: review.Reviewer, ReviewerKind: review.ReviewerKind,
 				ReviewedOn: review.ReviewedOn,
 			})
 			export.Manifest.PrivacyScan.RecordsScanned["review_evidence"]++
@@ -590,7 +597,7 @@ func appendCampaignExportReviews(dataset *Dataset, runSpec CampaignRunSpec, phas
 			return err
 		}
 		for _, review := range document.Reviews {
-			if err = validateCampaignExportSensitiveText(review.Evidence, false); err != nil {
+			if err = validateCampaignExportReviewText(review); err != nil {
 				return fmt.Errorf("%w: unsafe semantic review evidence", err)
 			}
 			if err = validateCampaignExportSensitiveText(review.Reviewer, false); err != nil {
@@ -599,7 +606,7 @@ func appendCampaignExportReviews(dataset *Dataset, runSpec CampaignRunSpec, phas
 		}
 		sourceID := campaignExportSourceID("reviews", phase, runSpec.RequestedModel)
 		export.Manifest.Sources = append(export.Manifest.Sources, CampaignExportSource{ID: sourceID, Kind: "semantic_reviews", Phase: phase, Model: runSpec.RequestedModel, SHA256: digest(data), Records: len(document.Reviews)})
-		appendReviews(document.Reviews, "original")
+		appendReviews(document.Reviews, "original", document.FormatVersion)
 	}
 	if runSpec.RecoverySemanticReviews != "" {
 		data, err := readBoundedFile(runSpec.RecoverySemanticReviews, maxSemanticReviewBytes)
@@ -618,7 +625,7 @@ func appendCampaignExportReviews(dataset *Dataset, runSpec CampaignRunSpec, phas
 			return err
 		}
 		for _, review := range document.Reviews {
-			if err = validateCampaignExportSensitiveText(review.Evidence, false); err != nil {
+			if err = validateCampaignExportReviewText(review); err != nil {
 				return fmt.Errorf("%w: unsafe recovery review evidence", err)
 			}
 			if err = validateCampaignExportSensitiveText(review.Reviewer, false); err != nil {
@@ -627,7 +634,16 @@ func appendCampaignExportReviews(dataset *Dataset, runSpec CampaignRunSpec, phas
 		}
 		sourceID := campaignExportSourceID("recovery-reviews", phase, runSpec.RequestedModel)
 		export.Manifest.Sources = append(export.Manifest.Sources, CampaignExportSource{ID: sourceID, Kind: "recovery_semantic_reviews", Phase: phase, Model: runSpec.RequestedModel, SHA256: digest(data), Records: len(document.Reviews)})
-		appendReviews(document.Reviews, "recovery")
+		appendReviews(document.Reviews, "recovery", document.FormatVersion)
+	}
+	return nil
+}
+
+func validateCampaignExportReviewText(review SemanticReview) error {
+	for _, value := range []string{review.Evidence, review.EvidenceQuote, review.Reason} {
+		if err := validateCampaignExportSensitiveText(value, false); err != nil {
+			return err
+		}
 	}
 	return nil
 }
