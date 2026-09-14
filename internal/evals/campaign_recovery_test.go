@@ -194,5 +194,5 @@ func TestWriteCampaignRecoveryCanonicalizesRawMessageHashes(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, prompt, stored.PromptSHA256)
 	require.Equal(t, digest(stored.GenerationConfig), loaded.Manifest.Binding.GenerationConfigSHA256BySlot["PD-001/1"])
-	require.NoError(t, ValidateRecovery(RecoveryBundle{Manifest: loaded.Manifest, Attempts: loaded.Attempts}, record, attempts))
+	require.NoError(t, ValidateRecovery(RecoveryBundle(loaded), record, attempts))
 }

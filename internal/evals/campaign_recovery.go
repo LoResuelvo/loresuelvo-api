@@ -594,7 +594,7 @@ func ApplyCampaignRecovery(dataset *Dataset, originalRunDirectory string, eviden
 	if err := validateRun(dataset, record, baseAttempts); err != nil {
 		return nil, fmt.Errorf("validate immutable base run: %w", err)
 	}
-	bundle := RecoveryBundle{Manifest: evidence.Manifest, Attempts: evidence.Attempts}
+	bundle := RecoveryBundle(evidence)
 	if err := ValidateRecovery(bundle, record, baseAttempts); err != nil {
 		return nil, err
 	}
