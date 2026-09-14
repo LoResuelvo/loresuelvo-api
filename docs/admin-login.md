@@ -22,10 +22,11 @@ sustituye al otro.
 
 En el tenant de cada entorno:
 
-1. Usar una aplicación separada para la web Admin como **Single Page
-   Application**, con Authorization Code + PKCE. No colocar secretos de cliente
-   en el navegador. Configurar en la aplicación las URLs exactas de callback,
-   logout y origen web de cada entorno; no usar comodines en producción.
+1. Usar una aplicación separada para la web Admin como **Regular Web
+   Application (RWA)**, con Authorization Code. Mantener el `client_secret`
+   exclusivamente en el servidor y no exponerlo en el navegador. Configurar en
+   la aplicación las URLs exactas de callback, logout y origen web de cada
+   entorno; no usar comodines en producción.
 2. Habilitar únicamente la conexión destinada a administradores, mantener el
    registro público deshabilitado y usar usuarios individuales (sin
    Organizations) para este caso.
@@ -45,10 +46,11 @@ En el tenant de cada entorno:
 No convertir automáticamente en administrador al primer usuario que inicie
 sesión ni reutilizar una cuenta existente sólo porque coincide el correo.
 
-La SPA usa el **access token** con la audiencia de nuestra API en las llamadas
-al backend. El **ID token** sólo representa la sesión y contiene información de
-identidad para la aplicación cliente; no debe enviarse a la API como token de
-autorización. Referencias: [Authorization Code + PKCE para SPAs](https://auth0.com/docs/get-started/authentication-and-authorization-flow/authorization-code-flow-with-pkce/add-login-using-the-authorization-code-flow-with-pkce),
+El servidor de la RWA usa el **access token** con la audiencia de nuestra API en
+las llamadas al backend; el navegador no recibe ni envía ese token directamente.
+El **ID token** sólo representa la sesión y contiene información de identidad
+para la aplicación cliente; no debe enviarse a la API como token de autorización.
+Referencias: [Authorization Code para Regular Web Apps](https://auth0.com/docs/get-started/authentication-and-authorization-flow/authorization-code-flow/add-login-auth-code-flow),
 [configuración de URLs de la aplicación](https://auth0.com/docs/get-started/applications/application-settings),
 [RBAC y permisos en el access token](https://auth0.com/docs/get-started/apis/enable-role-based-access-control-for-apis),
 y [asignación de roles a usuarios](https://auth0.com/docs/manage-users/access-control/configure-core-rbac/rbac-users/assign-roles-to-users).
@@ -62,12 +64,12 @@ usuario ni su `auth_id` de producción a staging (ni al revés). Crear o
 verificar la cuenta en el tenant correspondiente y copiar el User ID desde su
 propia vista de usuario antes de ejecutar la vinculación local.
 
-Desplegar la API y la SPA con la configuración del entorno antes de hacer una
+Desplegar la API y la RWA con la configuración del entorno antes de hacer una
 prueba real. La API debe tener `AUTH0_DOMAIN` y `AUTH0_AUDIENCE` del mismo
 tenant/API que emitió el access token.
 
 Las pruebas automatizadas usan el validador falso del proyecto y fixtures; no
-prueban el tenant, MFA ni una SPA real. Después del despliegue, la comprobación
+prueban el tenant, MFA ni una RWA real. Después del despliegue, la comprobación
 manual mínima de `GET /me` es:
 
 | Caso | Resultado esperado |
@@ -114,11 +116,11 @@ a iniciar la aplicación; no resolverlo mediante un `UPDATE` directo.
 
 ## 4. Verificación funcional
 
-Iniciar sesión en la SPA Admin con la cuenta creada y MFA, obtener un token
-para la API y consultar `GET /me` con `Authorization: Bearer <token>`. La
-respuesta debe corresponder al perfil local creado. Un token válido sin fila
-local debe responder como usuario no encontrado; no se debe crear el perfil
-implícitamente.
+Iniciar sesión en la RWA Admin con la cuenta creada y MFA. El servidor debe
+obtener un access token para la API y consultar `GET /me` con
+`Authorization: Bearer <token>`. La respuesta debe corresponder al perfil local
+creado. Un token válido sin fila local debe responder como usuario no
+encontrado; no se debe crear el perfil implícitamente.
 
 Después, validar por separado los permisos de cada endpoint administrativo
 cuando se implementen las US 61 y 38.1. Un `role` devuelto por `/me` es dato de
