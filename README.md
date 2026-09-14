@@ -31,3 +31,8 @@ Variables opcionales:
 - Las variables específicas `MERCADO_PAGO_REDIRECT_URI`,
   `MERCADO_PAGO_NOTIFICATION_URL` y `PAYMENT_*_URL` tienen prioridad sobre los
   valores derivados de `DEV_PUBLIC_URL`.
+
+## Evaluaciones del chatbot
+
+El [golden dataset y las instrucciones de evaluación US-60](evals/README.md)
+se mantienen separados de las pruebas funcionales de la API.

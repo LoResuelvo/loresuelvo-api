@@ -51,6 +51,5 @@
     "frozen_lexical_heuristic"
   ],
   "no_real_user_claim": true,
-  "model_oracle_leakage_prohibited": true,
-  "dataset_closure": "Etapas de diseño y congelación cerradas. Baseline, umbrales empíricos y evaluación de salidas pertenecen a la implementación, no a otra revisión pendiente de estos casos."
+  "model_oracle_leakage_prohibited": true
 }

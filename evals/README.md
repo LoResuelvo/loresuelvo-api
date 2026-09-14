@@ -1,199 +1,189 @@
-# Integración de la evaluación US-60
+# Evaluaciones US-60
 
-Estado: contratos sin conexión, validación local de esquemas JSON y puntuación determinista,
-ejecución en vivo acotada, diarios incrementales, reproducción y comparación pareada de modelos
-están implementados, incluidas transformaciones metamórficas explícitas, cinco líneas base no LLM,
-resúmenes agregados e importación de revisiones semánticas vinculadas a procedencia.
-La aprobación de seguridad del modelo es independiente y nunca se infiere de la finalización de la herramienta.
-Véase la [evidencia de la medición inicial y la finalización](reports/2026-09-08-us60-completion.md):
-la herramienta fue entregada, pero los fallos de seguridad observados en el modelo impiden la aprobación.
+**Estado: golden dataset preparado; ninguna campaña ejecutada sobre este dataset.**
+No hay resultados publicados ni umbrales empíricos calibrados. La validación de los
+materiales no demuestra calidad ni seguridad del chatbot.
 
-## Campañas completas publicadas
+## Dataset canónico
 
-- [US-60 — solución `76f683e`, dataset `1.1.0`](reports/2026-09-08-us60-solution-76f683e-dataset-1.1.0/README.md):
-  informe narrativo y [resultados por trial](reports/2026-09-08-us60-solution-76f683e-dataset-1.1.0/results.json),
-  medidos contra el [dataset numérico `1.1.0`](datasets/LoResuelvo_US60_evals_v1.1.0/README.md).
+[`datasets/LoResuelvo_US60_evals_v1.0.0/`](datasets/LoResuelvo_US60_evals_v1.0.0/README.md)
+es la única fuente de casos, imágenes, expectativas, políticas y particiones.
+Su `manifest.json` identifica el contenido mediante SHA-256; las campañas deben
+registrar ese hash, no identificar el corpus sólo por su nombre o versión.
 
-Cada campaña completa se publica en un directorio propio identificado por la solución
-y la versión del dataset; no se combinan resultados de otras soluciones o datasets.
+- 48 casos de prediagnóstico y 24 de ranking: 54 de desarrollo y 18 de reserva.
+- 12 especificaciones de contrato, separadas de las observaciones de calidad del LLM.
+- Ocho imágenes: seis escenas sintéticas fotorrealistas, un control blanco y uno de texto adversarial.
+- Smoke: 18 casos de desarrollo. `critical_all`: 13 casos de prediagnóstico de riesgo crítico, incluidos casos de reserva.
 
-## Fuente e integridad
+El [README del dataset](datasets/LoResuelvo_US60_evals_v1.0.0/README.md) documenta
+procedencia, criterios y métricas. Durante una comparación no se modifican las
+entradas, los adjuntos ni las expectativas. El ajuste utiliza desarrollo, no
+reserva; los casos de reserva utilizados para ajustar una solución no constituyen
+una prueba independiente de generalización.
 
-- Especificación: https://github.com/LoResuelvo/loresuelvo-api/issues/205
-- Archivo original: `incoming/LoResuelvo_US60_evals_v1.0.0.zip` (local, ignorado).
-- SHA-256 del archivo: `f253e81a18af481f0b91fad3222ac3c7f6de1e9d985c9c8a971eadfcaf276808`.
-- Documentación mantenida: [`DATASET.md`](DATASET.md).
-- Paquete de referencia: `datasets/LoResuelvo_US60_evals_v1.0.0/` (dataset base).
-- Commit de backend de referencia: `2a7f77fda6c6175753f73e095de0a0bd19169a06`.
-- Commit de importación: `ed787f6e794e8414a5182fce4ea1d67d75876453`.
+## Validación offline
 
-El 2026-09-08, el validador incluido y las 47 pruebas de Python pasaron:
-48 casos de prediagnóstico, 24 de ranking, 12 especificaciones de contrato, ocho PNG,
-54 casos de desarrollo, 18 de reserva, 18 smoke y 13 críticos.
-Estas comprobaciones no ejecutaron los comportamientos CT ni llamaron a un modelo.
-
-## Reproducir las comprobaciones del paquete
-
-Desde la raíz del repositorio, usando Python 3.10 o posterior:
+Desde la raíz del repositorio:
 
 ```bash
 python3 -m venv evals/.venv
 evals/.venv/bin/python -m pip install -r evals/datasets/LoResuelvo_US60_evals_v1.0.0/requirements.txt
 PYTHONDONTWRITEBYTECODE=1 evals/.venv/bin/python evals/datasets/LoResuelvo_US60_evals_v1.0.0/tools/evalpack.py validate
 PYTHONDONTWRITEBYTECODE=1 evals/.venv/bin/python -m unittest discover -s evals/datasets/LoResuelvo_US60_evals_v1.0.0/tests -v
-```
-
-La instalación de dependencias puede requerir acceso de red. Las comprobaciones no requieren credenciales ni red. Los cambios editoriales autorizados actualizan únicamente los hashes afectados; no se regeneran manifiestos para ocultar cambios en los materiales evaluados. Los hashes de informes y configuraciones históricas corresponden al commit de la medición, no necesariamente al empaquetado actual.
-
-## Organización de la implementación
-
-- `cmd/evals/`: composición y autorización explícitas de la CLI.
-- `internal/evals/`: mapeo de datos, planes, arnés de contratos y límites de ejecución,
-  puntuación, transformaciones, persistencia de resultados, reproducción y comparación.
-- `internal/adapters/chatbot/`: configuración mínima de generación y soporte de observación,
-  reutilizando sin cambios los prompts y analizadores de producción.
-- `evals/configs/`: configuración experimental derivada, fuera de los datos congelados.
-- `evals/runs/<run_id>/`: trazas locales saneadas, revisiones semánticas e informes.
-
-La línea base inicial está registrada en el informe enlazado arriba. Las correcciones deben compararse con esa evidencia; la reserva se mantiene fuera del ajuste. CT-08 y CT-10
-necesitan evidencia estructural y semántica separadas: una respuesta simulada no puede demostrar
-detección real de riesgos, orientación segura ni preservación de hechos por el modelo.
-
-## Preparación offline en Go
-
-Desde la raíz del repositorio:
-
-```bash
 make evals-validate
-make evals-plan ARGS='--suite smoke --model gemini-3.5-flash-lite --max-requests 18'
-make evals-plan ARGS='--suite development --model gemini-3.5-flash-lite --max-requests 162'
 ```
 
-Estos comandos nunca crean un cliente de modelo, cargan credenciales ni ejecutan comportamientos CT. La validación Go comprueba la integridad de archivos, los esquemas Draft 2020-12 locales y las referencias de casos/suites
-y el mapeo de dominio; use la validación Python anterior para las comprobaciones adicionales
-de consistencia editorial y de políticas congeladas. Una comprobación de integridad aprobada no equivale a un experimento aprobado.
+La instalación puede necesitar red; los validadores no cargan credenciales ni
+llaman al modelo. Python verifica integridad y consistencia editorial; Go verifica
+integridad, esquemas locales, referencias y mapeo a contratos de dominio.
+Las pruebas unitarias usan salidas sintéticas controladas, no resultados de campañas.
 
-Los valores predeterminados de los ensayos provienen de `configs/experiment.json`: la prueba smoke, la línea base de desarrollo
-y la validación de lanzamiento para las suites de reserva/críticas. `--trials` anula explícitamente el recuento.
-El límite de solicitudes incluye cada reintento permitido (`--max-retries`, cero por defecto).
-Los planes que exceden ese límite se rechazan en vez de truncarse silenciosamente.
-`--allow-holdout` es obligatorio para reserva o critical_all y para cualquier selección
-que contenga casos de reserva. Solo autoriza la planificación, no llamadas en vivo.
+## Implementación y límites
 
-La vista previa base cubre solo ejecuciones PD/RK, sin CT, transformaciones ni autorización en vivo implícitas. El modelo es metadato solicitado;
-no se afirma configuración efectiva ni precio monetario. El costo permanece en null.
+- `cmd/evals/`: CLI, selección explícita de comandos y autorización de llamadas.
+- `internal/evals/`: carga, planificación, contratos, puntuación, diarios, reproducción y comparación.
+- `internal/adapters/chatbot/`: adaptadores de producción, configuración de generación y observación.
+- `evals/runs/<run_id>/`: salidas locales generadas, ignoradas por Git.
 
-## Ejecución y evidencia
-
-Las comprobaciones de contratos son manuales y offline:
+PD/RK utilizan los adaptadores y prompts de producción, sin un prompt alternativo
+para aprobar el benchmark. Los metadatos del evaluador y las expectativas nunca
+se envían al modelo. Las imágenes nuevas se cargan como bytes verificados; una
+imagen ausente no se sustituye por su descripción esperada. Las imágenes históricas
+conservan su ID y descripción y no se reenvían como adjuntos nuevos.
 
 ```bash
 make evals-contract
 ```
 
-Las doce especificaciones tienen ejecutores. CT-02 valida el límite servicio/repositorio, pero no puede establecer filtrado SQL real; CT-08 y CT-10 no pueden certificar detección de riesgos ni semántica de resumen con respuestas controladas.
-Se informan como `unassessed`, no aprobadas. CT-09 ejercita persistencia de tiempos de espera y puntuación real de reproducción. Los prompts de producción y el comportamiento de dominio no cambian.
+Los contratos son offline. CT-02 verifica el límite servicio/repositorio, no el
+filtrado SQL real. CT-08 y CT-10 distinguen evidencia estructural de semántica:
+las respuestas controladas no certifican detección de riesgo ni fidelidad de un
+resumen generado. Los aspectos no demostrados permanecen `unassessed`.
 
-Antes de la ejecución en vivo, exporte `CHATBOT_API_KEY` mediante su mecanismo local seguro de credenciales. El ejecutor no carga `.env`, y la sola presencia de una clave nunca autoriza la generación. No incluya credenciales en argumentos,
-commits, informes ni historial de shell. El modelo es explícito, no heredado de una configuración mutable de despliegue.
+## Planificación
 
-Vista previa sin credenciales ni red:
+Defina `MODEL` con el identificador explícito del modelo que se vaya a evaluar.
+El modelo no se toma implícitamente de la configuración del despliegue.
+
+### Protocolo de campaña 1
+
+[`protocols/campaign-1.json`](protocols/campaign-1.json) es la especificación
+declarativa de la primera campaña. Evalúa únicamente el split `development` del
+golden dataset y la solución original identificada por `ca5e2ae`, sin cambios de
+prompt, configuración de generación ni correcciones orientadas a calidad.
+
+Incluye dos modelos (`gemini-3.1-flash-lite` y `gemini-3.5-flash-lite`), tres
+ensayos por cada uno de los 54 casos de desarrollo (324 llamadas en total) y un
+smoke de 18 casos por modelo (36 llamadas adicionales). La batería metamórfica
+queda fuera de esta campaña. Los contratos y los cinco baselines de ranking se
+ejecutan offline una sola vez y no consumen llamadas al proveedor.
+
+El techo duro de la campaña es USD 10, incluyendo smoke y cualquier reintento
+autorizado. Antes de la primera llamada se debe verificar un límite superior
+conservador usando el precio vigente y el máximo de tokens de entrada/salida; si
+no puede demostrarse que el plan cabe en el techo, no se llama al proveedor.
+Tokens, precios o costes no informados se registran como desconocidos, no como
+cero. Las respuestas inválidas, errores operativos y posiciones no ejecutadas se
+conservan en el denominador y no se repiten para mejorar calidad.
+
+Los comandos de planificación genérica no ejecutan esta campaña. Los ensayos
+predeterminados proceden de
+`configs/experiment.json` dentro del dataset: uno para smoke y tres para desarrollo
+y reserva. `--trials` permite una anulación explícita. El presupuesto incluye
+reintentos; `--max-retries` vale cero por defecto. Un plan que excede el presupuesto
+se rechaza, no se trunca silenciosamente.
+
+`--allow-holdout` es obligatorio para reserva o `critical_all` y no sustituye la
+autorización live. `--cases` sólo restringe los miembros de la suite elegida.
+
+## Ejecución autorizada y trazas
+
+Antes de llamar al proveedor se requiere un árbol limpio y versionado, un protocolo
+acordado y autorización explícita. Configure `CHATBOT_API_KEY` mediante el mecanismo
+local de credenciales; la CLI no carga `.env`. No incluya secretos en argumentos,
+commits o informes. La existencia de la clave no autoriza llamadas.
+
+La única ruta autorizada para ejecutar la campaña es `campaign-live`, con el
+protocolo versionado, verificación de precios y una salida privada nueva:
 
 ```bash
-make evals-live ARGS='--dry-run --suite smoke --model gemini-3.5-flash-lite --max-requests 18 --attempt-timeout 90s --global-timeout 15m --min-interval 15s --max-output-tokens 4096'
+go run ./cmd/evals campaign-live --protocol evals/protocols/campaign-1.json --allow-live --pricing-verified-on YYYY-MM-DD --out PRIVATE_NEW_DIR
 ```
 
-Tras autorizar, desde un árbol de trabajo limpio y versionado:
+Después de completar las revisiones, generar el informe exclusivamente con
+`campaign-report`, manteniendo la evidencia y el informe fuera de Git:
 
 ```bash
-make evals-live ARGS='--allow-live --suite smoke --model gemini-3.5-flash-lite --max-requests 18 --attempt-timeout 90s --global-timeout 15m --min-interval 15s --max-output-tokens 4096 --out evals/runs/smoke-3.5-UNIQUE'
+go run ./cmd/evals campaign-report --protocol evals/protocols/campaign-1.json --evidence PRIVATE_NEW_DIR/evidence.json --out PRIVATE_REPORT_DIR
 ```
 
-Use un directorio de salida nuevo cada vez. Para comparar 3.1, use el mismo commit y
-configuración con `--model gemini-3.1-flash-lite` y otro directorio. Cada invocación
-tiene su propia autorización y límite estricto de solicitudes. La implementación inicial
-admite concurrencia 1; los reintentos son cero por defecto. Bloquea reintentos/redirecciones del SDK,
-se detiene ante limitación de tasa o fallos persistentes de configuración del proveedor y registra
-los casos restantes como `not_executed`. El intervalo es un límite operativo, no una afirmación
-sobre la cuota RPM/TPM/RPD real de la cuenta. Verifique la cuota disponible en AI Studio.
+Use una ruta nueva por ejecución. La concurrencia admitida es uno; la CLI bloquea
+reintentos/redirecciones ocultos del SDK y conserva los intentos fallidos. Ante
+límites de tasa o errores persistentes de configuración, las posiciones restantes
+quedan `not_executed`. Los límites operativos no garantizan cuota ni disponibilidad.
 
-Cada intento se sincroniza antes de continuar. `run.json` registra el plan/configuración, el commit y la suma de comprobación del diario; `attempts.jsonl` conserva el texto bruto del modelo y la salida de dominio analizada, las entradas/configuración reales del SDK, bytes multimedia, hashes e ID de solicitud cuando se proporciona
-y metadatos del proveedor. La respuesta del proveedor decodificada por el SDK no se afirma como bytes HTTP exactos;
-no se persisten secretos ni encabezados HTTP. Los valores predeterminados no especificados siguen siendo desconocidos.
-Los archivos son locales, modo 0600, dentro de un directorio modo 0700. Los límites SIGINT/tiempo conservan resultados parciales;
-un diario sin finalizar por una terminación abrupta permanece disponible, pero la reproducción se niega a presentarlo como completo.
+`run.json` registra plan, configuración, commit y hash del diario.
+`attempts.jsonl` conserva entradas/configuración efectivas, medios, hashes,
+respuesta cruda y parseada, request ID cuando existe, errores, latencia y tokens.
+No se afirma que la respuesta decodificada por el SDK sean bytes HTTP exactos.
+Los defaults desconocidos y el coste sin precios verificados permanecen desconocidos,
+no cero. Los directorios son privados (0700), con archivos 0600 y escritura incremental.
+Una interrupción conserva evidencia parcial; un diario sin finalizar no se presenta
+como completo.
+
+## Reproducción, revisión y comparación
 
 ```bash
-make evals-replay ARGS='--run evals/runs/smoke-3.5-UNIQUE'
-make evals-compare ARGS='--left evals/runs/smoke-3.1-UNIQUE --right evals/runs/smoke-3.5-UNIQUE'
+make evals-replay ARGS='--run evals/runs/RUN'
+make evals-summary ARGS='--run evals/runs/RUN'
+umask 077
+make -s evals-review-template ARGS='--run evals/runs/RUN' > evals/runs/RUN/review-template.json
+# Complete a separate review file using actual responses and supporting evidence.
+make evals-review ARGS='--run evals/runs/RUN --reviews evals/runs/RUN/reviews.json'
+make evals-compare ARGS='--left evals/runs/BASELINE --right evals/runs/CANDIDATE'
 ```
 
-La reproducción verifica integridad, cobertura de casos/ensayos, reintentos y hashes de entrada/prompt antes de puntuar respuestas históricas. Por defecto, la comparación solo permite cambiar el modelo: deben coincidir conjunto de datos, commit, suite, ensayos, configuración de generación y entradas pareadas. Los cambios deliberados de origen, prompt/entrada o generación requieren el indicador correspondiente `--allow-source-change`, `--allow-prompt-change` o
-el indicador `--allow-generation-config-change` y una `--change-description` no vacía.
-Las diferencias observadas se informan; estos indicadores nunca relajan el conjunto de datos ni la suite,
-cobertura de casos/ensayos, presupuesto de solicitudes ni compatibilidad de límites operativos.
-Las respuestas faltantes, las salidas no válidas y los criterios semánticos no evaluados siguen visibles.
-No existe una ruta automática de `release_approved=true`. El costo permanece en null sin precios verificados. Los resúmenes agregados son JSON; los informes Markdown concisos versionados enlazan evidencia local.
+La reproducción verifica integridad, cobertura, reintentos y hashes antes de puntuar.
+Cada juicio semántico identifica ejecución, dataset, diario, salida, criterio,
+evidencia, revisor (`human` o `agent`) y fecha UTC. Las revisiones de agentes quedan
+identificadas como tales y pendientes de revisión humana de seguridad. No se
+sobrescriben diarios ni se alteran expectativas para acomodar una respuesta.
 
-Códigos de salida: 0 significa que el comando terminó sin fallos deterministas, 1 significa fallos de ejecución/contrato/deterministas registrados y 2 significa fallo de uso, configuración o integridad. El código 0 nunca certifica semántica ni seguridad. Los comandos de prueba no ejecutan esta batería experimental ni realizan llamadas al modelo.
+Por defecto sólo puede cambiar el modelo entre ejecuciones comparadas. Los cambios
+deliberados de solución, prompt o generación requieren `--allow-source-change`,
+`--allow-prompt-change` o `--allow-generation-config-change`, respectivamente, y
+`--change-description`. Esos indicadores no permiten cambiar el dataset ni omitir
+incompatibilidades de suite, cobertura o límites.
 
+Las respuestas faltantes y las salidas inválidas no desaparecen del denominador.
+Los criterios no evaluados permanecen visibles. Una ejecución completa no implica
+aprobación de calidad; ningún comando establece automáticamente `release_approved=true`.
+Código de salida: 0 sin fallos deterministas, 1 con fallos registrados y 2 ante error
+de uso/configuración/integridad. Un código 0 no certifica semántica ni seguridad.
 
-## Líneas base, transformaciones y revisión
-
-Todos los comandos siguientes son offline salvo que se etiqueten explícitamente como `live`. Las pruebas ordinarias continúan usando fixtures sintéticos; ninguna ejecuta esta batería experimental.
+## Baselines y transformaciones
 
 ```bash
 make evals-baselines ARGS='--suite development'
-make evals-summary ARGS='--run evals/runs/RUN'
-umask 077 # protect redirected local review files
-make -s evals-review-template ARGS='--run evals/runs/RUN' > evals/runs/RUN/review-template.json
-# Copy to a new review file, assess actual responses and fill evidence/provenance.
-make evals-review ARGS='--run evals/runs/RUN --reviews evals/runs/RUN/reviews-v1.json'
-```
-
-Los documentos de revisión vinculan el ID de ejecución, el conjunto de datos y los hashes del diario de intentos, cada hash de salida sin procesar y el hash del criterio. Cada juicio sobre una respuesta concreta requiere evidencia (fragmento y justificación), identidad declarada del revisor, tipo de revisor (`human` o `agent`) y marca UTC. Se revisa la respuesta frente al criterio y la entrada del caso, no se vuelve a aprobar el dataset. El tipo identifica quién hizo la revisión; no acredita especialización. Las respuestas faltantes no pueden recibir evaluaciones positivas; las entradas desconocidas, duplicadas u obsoletas se rechazan.
-Los juicios del agente siguen identificados visiblemente como redactados por un agente y pendientes de revisión humana de seguridad.
-Ninguna importación puede establecer `release_approved=true`. Las revisiones se realizan en archivos separados;
-no se editan los diarios originales ni el conjunto de datos congelado.
-
-Las políticas de ranking están congeladas en el código y serializadas en el informe de línea base:
-aleatorio con semilla (601), promedio de calificación, cantidad de trabajos pagados, calificación bayesiana (media previa 3, recuento previo 5) y Jaccard de conjuntos de tokens léxicos. La normalización léxica pasa a minúsculas, elimina acentos y separa letras/dígitos Unicode; no usa palabras vacías ni stemming.
-La consulta usa título/descripción del problema; el texto candidato usa descripciones de trabajos, informes de finalización y revisiones. Los empates no aleatorios usan referencia ascendente.
-Los algoritmos reciben solo evidencia de entrada elegible, nunca la relevancia esperada.
-
-Los resúmenes muestran ponderación de casos base, reintentos terminales, cobertura completa de ensayos, fallos técnicos, subtotales observados de latencia/tokens y cobertura desconocida. La calidad base y transformada se informan por separado. No compare variantes mixtas con líneas base solo base ni trate ensayos/familias repetidos como
-muestras de producción independientes. El costo permanece en null sin precios verificados.
-
-Vista previa explícita de transformación para un caso de desarrollo seleccionado:
-
-```bash
-make evals-plan ARGS='--suite development --cases RK-001 --metamorphic --trials 3 --model gemini-3.5-flash-lite --max-requests 30'
-```
-
-Esto incluye tres ensayos base más tres transformaciones × tres semillas × tres ensayos: 30 solicitudes, no 30 casos independientes. `--cases` solo puede estrechar la suite nombrada. `--metamorphic` usa semillas congeladas y recuentos exactos. No se selecciona implícitamente contraparte, caso de reserva ni reintento. El plan completo de transformación de desarrollo tiene 486 intentos de variantes más 162 intentos base y no debe confundirse con una ejecución diaria segura para el presupuesto bajo una cuota de 500 solicitudes.
-
-Tras la autorización explícita, use ese plan con `live`, `--allow-live`, todos los indicadores de límite finito y un directorio de salida nuevo. Por ejemplo, una ejecución de 30 solicitudes puede utilizar `--attempt-timeout 90s --global-timeout 30m --min-interval 5s
---max-output-tokens 4096`. El intervalo permite como máximo 12 inicios de solicitudes por minuto
-por invocación; las invocaciones concurrentes y otras aplicaciones comparten cuotas del proveedor y deben presupuestarse juntas.
-Una cuota mostrada no garantiza disponibilidad del proveedor. HTTP 503 sigue siendo un fallo técnico, no un fallo de calidad.
-
-```bash
+make evals-plan ARGS="--suite development --cases RK-001 --metamorphic --trials 3 --model $MODEL --max-requests 30"
 make evals-metamorphic-report ARGS='--run evals/runs/TRANSFORMED-RUN'
 ```
 
-La entrada/salida transformada original permanece en el diario. La puntuación reconstruye e invierte biyecciones de referencia; el informe empareja ensayos coincidentes y registra semilla, padre y división. La pertenencia al top tres se compara ignorando empates, mientras el orden estricto se comprueba solo mediante restricciones pareadas explícitas. Las transformaciones sin efecto y las salidas faltantes/no válidas siguen sin evaluar. Los pares PD congelados pueden compararse desde cualquier ejecución que contenga ambos miembros; los ausentes permanecen visibles y nunca se añaden implícitamente. Las decisiones coincidentes no certifican resistencia a inyección.
+Los cinco baselines de ranking son aleatorio reproducible (semilla 601), rating,
+cantidad de trabajos, rating bayesiano (media previa 3, recuento previo 5) y
+similitud léxica Jaccard. Reciben sólo evidencia, nunca relevancias esperadas.
+La normalización léxica elimina acentos, pasa a minúsculas y separa letras/dígitos;
+no aplica stemming ni elimina palabras vacías. Los empates no aleatorios usan
+referencia ascendente.
 
-Una línea base medida que falla es un hallazgo válido. Cerrar US-60 no aprueba un lanzamiento del modelo, no demuestra riesgo cero, exactitud con fotos reales ni reducción del esfuerzo del usuario. El uso de la reserva sigue siendo una operación separada y consciente después de congelar las decisiones de desarrollo; los casos críticos de reserva no ejecutados siguen sin evaluar e impiden la aprobación del lanzamiento.
+Las transformaciones permutan candidatos, cambian referencias por biyección y
+reordenan historial con semillas congeladas. Se invierte la biyección al comparar;
+los empates no requieren orden arbitrario. El ejemplo incluye tres ensayos base y
+27 de variantes, no 30 casos independientes. La calidad base y transformada se
+reportan por separado, con cobertura, errores y variabilidad explícitos.
 
-
-Una nueva línea base de desarrollo de tres ensayos, autorizada explícitamente, puede reproducirse con los siguientes límites finitos (compruebe primero la cuota restante de la cuenta):
-
-```bash
-make evals-live ARGS='--allow-live --suite development --trials 3 --model gemini-3.5-flash-lite --max-requests 162 --max-retries 0 --attempt-timeout 90s --global-timeout 90m --min-interval 5s --max-output-tokens 4096 --out evals/runs/development-3.5-UNIQUE'
-```
-
-Los [umbrales derivados iniciales](configs/initial-development-v1.json) son comprobaciones manuales exploratorias de no regresión, no compuertas automáticas de lanzamiento ni calidad de producto aceptable. La configuración se copia junto a las ejecuciones de origen y permanece separada del corpus congelado. Deben inspeccionarse tanto la cobertura numérica como la cobertura real de salidas críticas revisables; los errores nunca se convierten en evidencia positiva de seguridad.
-
-## Extensión visual derivada
-
-La selección visual sintética derivada (cuatro casos) está en [`datasets/LoResuelvo_US60_evals_v1.1.0/`](datasets/LoResuelvo_US60_evals_v1.1.0/).
+Los resultados definitivos de cada campaña deben identificar solución, dataset y
+configuración. Las trazas privadas, borradores y dictámenes de preparación no se
+versionan. Los umbrales de calidad se fijan con desarrollo antes de usar reserva;
+los fallos críticos no se compensan con promedios altos.

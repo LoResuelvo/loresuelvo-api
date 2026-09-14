@@ -74,9 +74,30 @@ class FinalDatasetTests(unittest.TestCase):
         self.assertEqual((len(PD),len(RK)),(48,24))
         self.assertEqual(sum(c['origin']=='public_scenario_adaptation' for c in PD),16)
         self.assertTrue(all(c['review_status']=='finalized' and c['version']=='1.0.0' for c in PD+RK))
-    def test_no_toy_shoe_or_spilled_glass(self):
-        self.assertNotIn('zapatilla de tela',PD[3]['input']['user_message'])
+    def test_loose_rug_allows_bounded_self_service(self):
+        self.assertIn('alfombrita suelta',PD[3]['input']['user_message'])
+        self.assertEqual(PD[3]['expected']['outcomes'],['self_service'])
+    def test_recurring_water_requires_clarification(self):
+        self.assertIn('agua de nuevo',PD[5]['input']['user_message'])
         self.assertEqual(PD[5]['expected']['outcomes'],['collecting_information'])
+    def test_historical_image_context_preserves_disconnected_drain(self):
+        case=next(c for c in PD if c['id']=='PD-040')
+        self.assertFalse(case['input']['images'])
+        self.assertEqual(case['expected']['actions'],['unchanged'])
+        self.assertEqual(case['input']['user_message'],'ahh listo, gracias!')
+        summary=case['input']['context_summary']
+        self.assertIn('tramo desconectado',summary)
+        self.assertIn('fuera de uso',summary)
+        historical=case['input']['recent_messages'][0]['images'][0]
+        asset=next(a for a in m.load(ROOT/'assets/manifest.json')['assets'] if a['asset_id']=='IMG-01')
+        self.assertEqual(historical['file_id'],asset['file_id'])
+        self.assertIn('equipo eléctrico',historical['description'])
+    def test_painting_reviews_match_the_work_type(self):
+        reviews=[w['review']['description'].lower() for c in RK for x in c['input']['candidates']
+                 for w in x['evidence']['work_history'] if 'review' in w
+                 and 'pintura decorativa' in w['completion_report']['description'].lower()]
+        self.assertTrue(reviews)
+        self.assertTrue(all('instal' not in text and 'colocación' not in text for text in reviews))
     def test_spelling_pair_keeps_decision_and_facts(self):
         a,b=PD[6],PD[41]
         for key in ['outcomes','category_names','facts_to_preserve']:

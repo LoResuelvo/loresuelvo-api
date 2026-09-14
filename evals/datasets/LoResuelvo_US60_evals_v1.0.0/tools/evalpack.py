@@ -297,7 +297,6 @@ def hashed_files(root: Path) -> list[Path]:
 
 def make_manifest(root: Path, version: str, status: str) -> dict[str,Any]:
     return {'version':version,'status':status,'hash_algorithm':'SHA-256','excluded':['manifest.json','reports/**','__pycache__/**','.venv/**'],
-            'repository_snapshot':'2a7f77fda6c6175753f73e095de0a0bd19169a06',
             'files_sha256':{p.relative_to(root).as_posix():digest(p) for p in hashed_files(root)}}
 
 def suite_ids(root: Path, suite: str) -> list[str]:

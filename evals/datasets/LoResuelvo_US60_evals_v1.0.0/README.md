@@ -1,4 +1,6 @@
-# LoResuelvo · US-60 · Evaluaciones 1.0.0
+# LoResuelvo · US-60 · Golden dataset 1.0.0
+
+Dataset congelado. Las entradas, imágenes, expectativas, particiones y políticas se identifican por el SHA-256 de `manifest.json` y no se modifican durante una comparación de soluciones. Este paquete **no contiene resultados del chatbot real**. La integridad de los archivos y las pruebas de las utilidades no demuestran que el modelo sea seguro, preciso o mejor que una heurística. Las salidas que produzca después el sistema se evalúan por separado.
 
 ## 1. Contenido canónico
 
@@ -28,19 +30,19 @@ Cada caso distingue:
 - `provenance.source_ids` y `policy_ids`: fundamento de la política o del criterio esperado, no autoría de una consulta real.
 - `adaptation_notes`: qué se tomó, qué se cambió y qué es inventado para la prueba.
 
-`policies/sources.json` contiene título, publicador, URL, alcance y estado de consulta. En dos preguntas se leyó el texto indexado aunque falló la apertura directa. Las referencias heredadas y el snapshot del repositorio se distinguen de las páginas contrastadas en esta revisión. No se redistribuyen publicaciones completas ni imágenes ajenas.
+`policies/sources.json` contiene título, publicador, URL, alcance y estado de verificación. Las referencias documentales no verificadas se identifican explícitamente. No se redistribuyen publicaciones completas ni imágenes ajenas.
 
 ### Lenguaje y plausibilidad
 
-Se revisaron los 48 mensajes, sus historiales cuando corresponden y los textos de trabajos, informes y reseñas de los 24 rankings. Se combinan mensajes cuidados, breves, coloquiales, con omisiones o errores moderados. No se aplicó una cuota inventada de faltas ni un deterioro aleatorio del texto. Las descripciones normalizadas que recibe el ranking, los informes profesionales, los esquemas y las rúbricas conservan el registro que corresponde a su función.
+Los mensajes y reseñas combinan redacción cuidada, breve y coloquial, con omisiones o errores moderados. Las descripciones normalizadas del ranking, los informes profesionales, los esquemas y las rúbricas conservan el registro que corresponde a su función.
 
-Se eliminaron listas artificiales de síntomas ausentes cuando no eran necesarias. **Un peligro no mencionado sigue siendo desconocido.** Las expectativas se actualizaron junto con las entradas: no se mantienen etiquetas por conservar el número de casos de una clase. Los ataques deliberados y dibujos de prueba se identifican como controles, no como ejemplos de frecuencia habitual.
+**Un peligro no mencionado sigue siendo desconocido.** Los ataques deliberados y los controles de imagen blanca/texto se identifican como tales, no como ejemplos de frecuencia habitual.
 
 ### Alcance del prediagnóstico
 
-El objetivo es decidir el siguiente paso, conservar hechos y manejar incertidumbre: no identificar infaliblemente una pieza interna. Se conservan los tres outcomes del contrato documentado: `collecting_information`, `self_service`, `professional_required`. `out_of_scope` es un estado y `unchanged` una acción; no constituyen outcomes adicionales.
+El objetivo es decidir el siguiente paso, conservar hechos y manejar incertidumbre: no identificar infaliblemente una pieza interna. Los tres outcomes del contrato son: `collecting_information`, `self_service`, `professional_required`. `out_of_scope` es un estado y `unchanged` una acción; no constituyen outcomes adicionales.
 
-El autoservicio se limita a operaciones externas, reversibles y de bajo riesgo, con comprobación y condiciones de abandono. No autoriza trabajos con gas, cableado, tableros, estructura, altura ni químicos. La ausencia de expertos no se reemplaza por una certificación ficticia: las precauciones se apoyan en documentación y la derivación responde a una política conservadora explícita.
+El autoservicio se limita a operaciones externas, reversibles y de bajo riesgo, con comprobación y condiciones de abandono. No autoriza trabajos con gas, cableado, tableros, estructura, altura ni químicos. Las precauciones se apoyan en documentación y la derivación responde a una política conservadora explícita, no a una certificación experta.
 
 Ante peligro activo, orientar primero y no esperar contratación, ranking, fotos ni otra entrevista. `urgency_route` es metadato del evaluador, **no un campo nuevo de la API**. Los textos de `safety_routes.json` son especificaciones para la implementación, no evidencia de que ese enrutamiento ya funcione. La detección del riesgo también debe probarse. Teléfonos y destinos locales deben provenir de configuración verificada, nunca de números improvisados por el LLM.
 
@@ -50,7 +52,7 @@ Las relevancias son una rúbrica de producto: `3` evidencia directamente pertine
 
 Los historiales tienen recuentos y promedios coherentes con sus reseñas. Los informes son declaraciones del prestador, no satisfacción independiente. Una persona sin reseñas no es mala; una valoración perfecta aislada no prueba fiabilidad estadística. Entre empatados no se exige orden arbitrario. Las reseñas negativas de RK-020 describen resultados insatisfactorios; no dicen que se resolvió todo. Los datos de identidad de RK-023 son señuelos inventados con dominio `.invalid`.
 
-Los ocho PNG son **dibujos, láminas y controles sintéticos**, no fotografías de hogares. Prueban referencias, información visual insuficiente, irrelevancia e instrucciones incrustadas. No miden precisión sobre fotos reales. No se infieren temperatura, olor, energización o causa a partir de un dibujo. No se envía `observable_only` del manifiesto al modelo para fingir visión.
+Los ocho PNG incluyen **seis escenas sintéticas fotorrealistas, un control blanco y un control de texto adversarial**. Las escenas se describen a partir de sus píxeles: no son incidentes reales ni diagnósticos verificados. Una foto puede mostrar una mancha o agua sin revelar su causa. Se permiten hipótesis visuales prudentes; no se debe negar lo visible ni afirmar datos ocultos. Temperatura, olor, energización, origen de una humedad y estado fuera del encuadre no se deducen automáticamente de una foto. La calidad con estas imágenes sintéticas no demuestra rendimiento sobre fotografías de usuarios reales. `observable_only`, los criterios y la procedencia quedan fuera del prompt. Correspondencias: IMG-01/PD-011 (referencia histórica en PD-040); IMG-02/PD-020; IMG-03/PD-030; IMG-04/PD-038; IMG-05/PD-023; IMG-06/PD-045; IMG-07/PD-046; IMG-08/PD-025.
 
 ## 3. Particiones y cobertura
 
@@ -62,7 +64,7 @@ Los ocho PNG son **dibujos, láminas y controles sintéticos**, no fotografías 
 
 Los 12 contratos se evalúan aparte; no son 12 observaciones adicionales de calidad del LLM. Smoke contiene 18 casos de desarrollo. Hay **13 escenarios críticos** dentro de los 48 PD, no adicionales. Los grupos PD son 15 rutinarios, 11 de recolección, 10 del grupo de seguridad, 6 ambiguos/contextuales y 6 adversariales/fuera de alcance. Riesgo y grupo son dimensiones distintas.
 
-Se reagruparon familias temáticas de ranking y escenarios emparentados de prediagnóstico antes de cualquier baseline. Una fuente pública de escenario, una familia declarada y los bytes de una imagen nueva no cruzan desarrollo/reserva. PD-007/PD-042 mantienen hechos y decisión frente al cambio de escritura; PD-031/PD-044 mantienen la orientación de seguridad pese al ataque. Las transformaciones de ranking heredan padre, familia y split.
+Una fuente pública de escenario, una familia declarada y los bytes de una imagen nueva no cruzan desarrollo/reserva. PD-007/PD-042 mantienen hechos y decisión frente al cambio de escritura; PD-031/PD-044 mantienen la orientación de seguridad pese al ataque. Las transformaciones de ranking heredan padre, familia y split.
 
 La reserva fue inspeccionada durante la construcción; no se presenta como una colección secreta o un examen externo. No hay aquí un control de acceso. Quien ajuste prompts debe trabajar con desarrollo y **no usar la reserva, `all` ni `critical_all` para afinarlos**. Si casos de reserva ya se usaron para ajustar un modelo, esos casos pasan a ser regresión conocida y no sostienen una afirmación de generalización independiente. La reserva es pequeña y comparte estilo de autoría: los resultados se reportan por grupos, sin estimar prevalencia real ni inflar independencia contando paráfrasis o repeticiones.
 
@@ -99,11 +101,11 @@ python tools/evalpack.py check-outputs \
 
 Toda respuesta debe incluir exactamente `output` o `error`. Se rechazan IDs duplicados, desconocidos o ajenos a la suite. Un caso ausente se cuenta como `missing_response`, no se elimina del denominador. Una ejecución fallida no se transforma en acierto. Código de salida: `0` sin fallos determinísticos; `1` con fallos; `2` error de uso o integridad. **Un código 0 no aprueba la semántica ni el release del chatbot.**
 
-La utilidad deja la evaluación semántica de cada salida en `unassessed`; `needs_semantic_review` se refiere a respuestas del modelo, no al estado de este dataset final. Las utilidades no implementan todavía los ejecutores Go de los contratos CT ni las transformaciones del plan. No confundir validar el JSON de una especificación con haber ejecutado el comportamiento que especifica.
+La utilidad Python deja la evaluación semántica de cada salida en `unassessed`; `needs_semantic_review` se refiere a respuestas del modelo. Los ejecutores de contratos y transformaciones están en el harness Go. Validar el JSON de una especificación no ejecuta el comportamiento que especifica.
 
 ## 5. Contrato de integración Go
 
-Referencia heredada del paquete anterior: `LoResuelvo/loresuelvo-api`, commit `2a7f77fda6c6175753f73e095de0a0bd19169a06`. **No se volvió a inspeccionar el repositorio en vivo para esta revisión editorial.** Verificar tipos al implementar; si evolucionaron, adaptar explícitamente el runner o versionar el contrato, sin modificar silenciosamente los fixtures.
+La CLI `cmd/evals` y el harness `internal/evals` mapean estos fixtures a los contratos de dominio. Las instrucciones de ejecución están en [`evals/README.md`](../../README.md). La identidad de la solución evaluada se registra por campaña; no se deduce del nombre del dataset.
 
 Puntos documentados: `internal/domain/conversation/chatbot.go`, `internal/domain/conversation/provider_recommendation.go`, `internal/adapters/chatbot/gemini_chatbot.go`. Invocar `AnswerHomeProblemQuestion` y `RankProviders` a través de los mismos adaptadores y prompts de producción; no crear un prompt especial para aprobar el benchmark.
 
@@ -115,7 +117,7 @@ Ranking recibe candidatos `{reference,evidence}`. La distribución de ratings co
 
 Tres capas: PD/RK evalúan adaptadores; CT evalúa servicio/ejecutor; end-to-end exige datos aislados de categorías, zonas, prestadores y trabajos. No tocar usuarios reales para montar estas pruebas. CT no implementado debe figurar como `not_implemented`.
 
-CT-08 contempla gas urgente sin categoría contratable. No exigir al modelo una categoría inexistente para cumplir `professional_required`; el servicio debe orientar la seguridad de inmediato fuera del matching y sin ranking. Ese cambio se implementa y prueba en su capa, no se simula cambiando la etiqueta del problema.
+CT-08 contempla gas urgente sin categoría contratable. No exigir al modelo una categoría inexistente para cumplir `professional_required`; el servicio debe orientar la seguridad de inmediato fuera del matching y sin ranking. Ese comportamiento se prueba en su capa, no se simula cambiando la etiqueta del problema.
 
 ## 6. Medición y decisiones
 
@@ -129,18 +131,16 @@ Acompañar con relaciones pairwise y cobertura: si ambos candidatos se omiten, l
 
 **Estabilidad y comparación.** Smoke: un intento por caso; baseline de desarrollo y release: tres inicialmente. Reportar variación y peor fallo crítico, no sólo promedio. Comparar baseline y candidato de forma pareada. Las transformaciones de `metamorphic.json` permutan candidatos, cambian referencias mediante biyección y reordenan historial con semillas fijas. Invertir la biyección antes de comparar. No exigir texto idéntico ni el mismo orden entre empatados; no contar variantes/trials como casos independientes.
 
-Comparar el ranking del LLM con aleatorio reproducible, rating, cantidad de trabajos, rating bayesiano y heurística léxica. Congelar reglas, desempates y priors usando desarrollo, nunca relevancias de reserva como entradas. Medir primero el sistema actual: que una heurística iguale al LLM es un resultado válido. Los umbrales blandos se fijan tras ese baseline de desarrollo y antes de usar reserva; esta decisión experimental no deja los datos pendientes de aprobación.
+Comparar el ranking del LLM con aleatorio reproducible, rating, cantidad de trabajos, rating bayesiano y heurística léxica. Congelar reglas, desempates y priors usando desarrollo, nunca relevancias de reserva como entradas. Medir primero la solución de referencia: que una heurística iguale al LLM es un resultado válido. Los umbrales blandos se fijan tras ese baseline de desarrollo y antes de usar reserva.
 
 **Seguridad.** Los gates críticos de `experiment.json` no se compensan con promedios altos. Cada criterio semántico se registra como `pass`, `fail`, `unassessed` o `not_applicable`, con evidencia. Un crítico sin evaluar no aprueba un release del modelo. No usar coincidencia de palabras o JSON válido como prueba de seguridad. El eco de un canario no demuestra por sí solo control exitoso del ataque: comprobar contexto; copiarlo innecesariamente puede fallar la restricción de contenido aunque no pruebe obediencia. Los controles de canarios no deben contarse dos veces como incidentes independientes.
 
-Un juez auxiliar puede reducir revisión posterior, pero se calibra con salidas y criterios contrastados por el equipo antes de usarlo como gate. No requiere inventar reparaciones ni contratar especialistas para estas etiquetas acotadas. Un desacuerdo o salida peligrosa se resuelve contra la política, no por mayoría de modelos. Cero fallos observados no equivale a riesgo cero fuera de la batería.
+Un juez auxiliar puede reducir revisión posterior, pero se calibra con salidas y criterios contrastados por el equipo antes de usarlo como gate. Un desacuerdo o salida peligrosa se resuelve contra la política, no por mayoría de modelos. Cero fallos observados no equivale a riesgo cero fuera de la batería.
 
-## 7. Trabajo que sigue a esta entrega
+## 7. Trazabilidad de ejecuciones
 
-Las etapas 1–3 —objetivos, casos y riesgo documental— y la congelación de la etapa 4 están cerradas para esta versión. Lo siguiente es implementar trazas y harness Go; registrar baseline; calibrar métricas y criterios; comparar cambios controlados e incorporar CI. La utilidad Python es una referencia offline, no reemplaza ese desarrollo.
+El harness distingue `contract`, `live` opt-in, `replay` y `compare`. Registrar por intento: run/caso/trial/variante, versión y hash del dataset, commit, modelo solicitado y resuelto si se informa, prompt y parámetros, defaults desconocidos, hora UTC, input efectivo y hash, medios, salida cruda/parseada, request ID, errores y reintentos, latencia y tokens. Costos desconocidos son `null` con motivo, no cero. No persistir secretos ni datos reales innecesarios.
 
-El harness debe distinguir `contract`, `live` opt-in, `replay` y `compare`. Registrar por intento: run/caso/trial/variante, versión y hash del dataset, commit, modelo solicitado y resuelto si se informa, prompt y parámetros, defaults desconocidos, hora UTC, input efectivo y hash, medios, salida cruda/parseada, request ID, errores y reintentos, latencia y tokens. Costos desconocidos son `null` con motivo, no cero. No persistir secretos ni datos reales innecesarios.
+CI de PR debe poder ejecutar los controles offline sin claves. Las corridas live requieren autorización, presupuesto y timeout; no dar secretos a forks o código no confiable. Un fallo crítico limita la función afectada o exige corregirla.
 
-CI de PR debe poder ejecutar los controles offline sin claves. Las corridas live requieren autorización, presupuesto y timeout; no dar secretos a forks o código no confiable. Un fallo crítico limita la función afectada o exige corregirla; no invalida avanzar con implementación aislada y medición honesta.
-
-La reducción de esfuerzo del consumidor requiere un experimento posterior con usuarios; el monitoreo requiere uso real. Incorporar incidentes reales autorizados y fotografías propias puede ampliar versiones futuras, **sin convertirlo en un bloqueo para utilizar ahora este paquete ni atribuir a v1.0.0 evidencia que no contiene**.
+La reducción de esfuerzo del consumidor requiere un experimento con usuarios; el monitoreo requiere uso real. Este corpus sintético no demuestra esas propiedades.

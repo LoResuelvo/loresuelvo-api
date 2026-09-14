@@ -32,7 +32,7 @@
       "supported_summary": "Ante síntomas compatibles: salir del ambiente contaminado y buscar asistencia médica. La revisión del artefacto corresponde a un gasista matriculado.",
       "kind": "domain_safety",
       "accessed_on": "2026-09-07",
-      "verification": "inherited_rc1_reference"
+      "verification": "reference_not_independently_verified"
     },
     {
       "id": "SRC-CO-ALARM",
@@ -76,7 +76,7 @@
       "supported_summary": "Evitar agua potencialmente electrificada y retirarse ante ascenso peligroso; no esperar una contratación para ponerse a salvo.",
       "kind": "domain_safety",
       "accessed_on": "2026-09-07",
-      "verification": "inherited_rc1_reference"
+      "verification": "reference_not_independently_verified"
     },
     {
       "id": "SRC-CEILING",
@@ -120,7 +120,7 @@
       "supported_summary": "El paquete declara explícitamente el dialecto y usa esquemas para validar estructuras.",
       "kind": "format",
       "accessed_on": "2026-09-07",
-      "verification": "inherited_rc1_reference"
+      "verification": "reference_not_independently_verified"
     },
     {
       "id": "SRC-REPO",
@@ -130,19 +130,8 @@
       "applicability": "Snapshot de código inspeccionado",
       "supported_summary": "Tres outcomes, dos status y dos acciones; máximo dos preguntas; referencias opacas; ranking basado sólo en evidencia.",
       "kind": "repository_contract",
-      "accessed_on": "2026-09-07",
-      "verification": "upstream_snapshot_as_documented_in_rc1_not_live_rechecked"
-    },
-    {
-      "id": "SRC-ATTACHMENT",
-      "publisher": "Material aportado por el usuario",
-      "title": "Diseño experimental y decisiones para revisión; paquete US-60 v1.0.0-rc1 adjuntos por Joseph",
-      "url": null,
-      "applicability": "Documento de trabajo, no fuente experta",
-      "supported_summary": "Objetivos, contrato de evaluación y alcance del corpus sintético previo. No contiene observaciones de usuarios reales ni validación experta.",
-      "kind": "project_document",
-      "accessed_on": "2026-09-07",
-      "verification": "attached_material_read"
+      "accessed_on": "2026-09-14",
+      "verification": "local_git_snapshot_read"
     },
     {
       "id": "Q-AERATOR",
