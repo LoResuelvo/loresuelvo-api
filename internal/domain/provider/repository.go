@@ -33,3 +33,7 @@ type ProviderProfileReader interface {
 type IdentityApprovalReader interface {
 	FindApprovedByProviderIDs(ctx context.Context, providerIDs []int) (map[int]bool, error)
 }
+
+type ProviderSearchReader interface {
+	FindByCategoryID(ctx context.Context, categoryID int) ([]readmodel.ProviderSearchResult, error)
+}

@@ -13,6 +13,7 @@ import (
 )
 
 type Service struct {
+	searchReader           ProviderSearchReader
 	userRepository         UserRepository
 	categoryFinder         CategoryFinder
 	coverageZoneFinder     CoverageZoneFinder
@@ -22,6 +23,7 @@ type Service struct {
 }
 
 func NewService(
+	searchReader ProviderSearchReader,
 	repository UserRepository,
 	categoryFinder CategoryFinder,
 	fileService FileService,
@@ -30,6 +32,7 @@ func NewService(
 	identityApprovalReaders ...IdentityApprovalReader,
 ) *Service {
 	service := &Service{
+		searchReader:       searchReader,
 		userRepository:     repository,
 		categoryFinder:     categoryFinder,
 		coverageZoneFinder: coverageZoneFinder,
@@ -143,51 +146,34 @@ func (s *Service) FilterProvidersByCategoryID(ctx context.Context, categoryID in
 }
 
 func (s *Service) SearchProvidersByCategoryID(ctx context.Context, categoryID int) ([]readmodel.ProviderSearchResult, error) {
-	providers, err := s.FilterProvidersByCategoryID(ctx, categoryID)
-	if err != nil {
+	if _, err := s.validateCategory(categoryID); err != nil {
 		return nil, err
 	}
-
-	results := make([]readmodel.ProviderSearchResult, 0, len(providers))
-	if len(providers) == 0 {
+	if s.searchReader == nil {
+		return nil, ErrSearchReaderNotConfigured
+	}
+	results, err := s.searchReader.FindByCategoryID(ctx, categoryID)
+	if err != nil {
+		return nil, fmt.Errorf("finding providers for search: %w", err)
+	}
+	fileIDs := make([]string, 0, len(results))
+	for _, result := range results {
+		if result.ProfilePhoto != nil && result.ProfilePhoto.FileID != "" {
+			fileIDs = append(fileIDs, result.ProfilePhoto.FileID)
+		}
+	}
+	if len(fileIDs) == 0 {
 		return results, nil
 	}
-	if s.profileReader == nil {
-		return nil, ErrProfileReaderNotConfigured
-	}
-
-	providerIDs := make([]int, 0, len(providers))
-	for index := range providers {
-		providerIDs = append(providerIDs, providers[index].ID())
-	}
-
-	ratingStatsByProviderID, err := s.profileReader.FindRatingStatsByProviderIDs(ctx, providerIDs)
+	urls, err := s.fileService.ResolvePublicURLs(ctx, fileIDs)
 	if err != nil {
-		return nil, fmt.Errorf("finding provider rating stats for search: %w", err)
+		return nil, fmt.Errorf("resolving provider profile photo urls: %w", err)
 	}
-	if s.identityApprovalReader == nil {
-		return nil, ErrIdentityApprovalReaderNotConfigured
+	for i := range results {
+		if results[i].ProfilePhoto != nil {
+			results[i].ProfilePhoto.URL = urls[results[i].ProfilePhoto.FileID]
+		}
 	}
-	identityApprovedByProviderID, err := s.identityApprovalReader.FindApprovedByProviderIDs(ctx, providerIDs)
-	if err != nil {
-		return nil, fmt.Errorf("finding approved provider identities for search: %w", err)
-	}
-
-	for index := range providers {
-		foundProvider := providers[index]
-		ratingSummary := ratingStatsByProviderID[foundProvider.ID()].Summary()
-		results = append(results, readmodel.ProviderSearchResult{
-			ID:               foundProvider.ID(),
-			Name:             foundProvider.Name(),
-			Surname:          foundProvider.Surname(),
-			CategoryName:     categoryName(&foundProvider),
-			ProfilePhoto:     foundProvider.ProfilePhoto(),
-			RatingAverage:    ratingSummary.Average,
-			RatingCount:      ratingSummary.Count,
-			IdentityVerified: identityApprovedByProviderID[foundProvider.ID()],
-		})
-	}
-
 	return results, nil
 }
 

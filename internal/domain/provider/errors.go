@@ -9,3 +9,5 @@ var ErrProfileReaderNotConfigured = errors.New("provider profile reader is not c
 var ErrCoverageZoneFinderNotConfigured = errors.New("provider coverage zone finder is not configured")
 
 var ErrIdentityApprovalReaderNotConfigured = errors.New("provider identity approval reader is not configured")
+
+var ErrSearchReaderNotConfigured = errors.New("provider search reader is not configured")

@@ -212,6 +212,7 @@ func newDependencies(database *sql.DB, adapters dependencyAdapters) (*Dependenci
 	categoryService := category.NewService(persistence.CategoryRepository)
 	coverageZoneService := coveragezone.NewService(persistence.CoverageZoneRepository)
 	providerService := provider.NewService(
+		persistence.ProviderSearchReader,
 		persistence.UserRepository,
 		persistence.CategoryRepository,
 		fileService,

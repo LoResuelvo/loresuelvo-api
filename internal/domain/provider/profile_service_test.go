@@ -60,6 +60,7 @@ func TestServiceIncludesIdentityApprovalInPublicProfile(t *testing.T) {
 		approvedByProviderID: map[int]bool{12: true},
 	}
 	providerService := provider.NewService(
+		nil,
 		&providerRepositoryMock{providerByID: providerForProfileService(t)},
 		categoryFinderWithExistingCategory(),
 		profilePhotoServiceForProfile(t),
@@ -79,6 +80,7 @@ func TestServicePropagatesRatingStatsError(t *testing.T) {
 	expectedErr := errors.New("rating stats unavailable")
 	repository := &providerRepositoryMock{providerByID: providerForProfileService(t)}
 	providerService := provider.NewService(
+		nil,
 		repository,
 		categoryFinderWithExistingCategory(),
 		profilePhotoServiceForProfile(t),
@@ -95,6 +97,7 @@ func TestServicePropagatesPaidWorkHistoryError(t *testing.T) {
 	expectedErr := errors.New("work history unavailable")
 	repository := &providerRepositoryMock{providerByID: providerForProfileService(t)}
 	providerService := provider.NewService(
+		nil,
 		repository,
 		categoryFinderWithExistingCategory(),
 		profilePhotoServiceForProfile(t),
@@ -110,6 +113,7 @@ func TestServicePropagatesPaidWorkHistoryError(t *testing.T) {
 func TestServicePropagatesIdentityApprovalErrorInPublicProfile(t *testing.T) {
 	expectedErr := errors.New("identity approval unavailable")
 	providerService := provider.NewService(
+		nil,
 		&providerRepositoryMock{providerByID: providerForProfileService(t)},
 		categoryFinderWithExistingCategory(),
 		profilePhotoServiceForProfile(t),
@@ -127,6 +131,7 @@ func newProviderServiceWithProfileReader(t *testing.T, stats provider.RatingStat
 	t.Helper()
 	repository := &providerRepositoryMock{providerByID: providerForProfileService(t)}
 	providerService := provider.NewService(
+		nil,
 		repository,
 		categoryFinderWithExistingCategory(),
 		profilePhotoServiceForProfile(t),

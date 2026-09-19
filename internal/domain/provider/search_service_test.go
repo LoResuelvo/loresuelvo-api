@@ -5,181 +5,79 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/category"
 	coveragezone "github.com/LoResuelvo/loresuelvo-api/internal/domain/coverage_zone"
 	filedomain "github.com/LoResuelvo/loresuelvo-api/internal/domain/file"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/provider"
-	"github.com/LoResuelvo/loresuelvo-api/internal/domain/provider/read_model"
-	"github.com/stretchr/testify/assert"
+	readmodel "github.com/LoResuelvo/loresuelvo-api/internal/domain/provider/read_model"
 	"github.com/stretchr/testify/require"
 )
 
-func TestServiceComposesRatingSummaryForEachProviderSearchResult(t *testing.T) {
-	providerCategory := existingCategory()
-	juan, err := provider.NewProvider(
-		"auth0|juan",
-		"juan@example.com",
-		"Juan",
-		"Pérez",
-		&providerCategory,
-		&filedomain.Image{FileID: "juan-photo", URL: "https://cdn.example/juan.jpg"},
-		[]coveragezone.CoverageZone{defaultCoverageZone()},
-	)
+func TestProviderSearchResolvesPhotosAndPreservesReadModel(t *testing.T) {
+	reader := &providerSearchReaderMock{}
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	expected := []readmodel.ProviderSearchResult{{ID: 12, Name: "Ana", Surname: "Perez", CategoryName: "Plumbing",
+		CoverageZones: []coveragezone.CoverageZone{defaultCoverageZone()},
+		ProfilePhoto:  &filedomain.Image{FileID: "photo", OriginalName: "photo.jpg"}, RatingAverage: 4.7, RatingCount: 3, IdentityVerified: true}, {ID: 13}}
+	reader.On("FindByCategoryID", ctx, 1).Return(expected, nil).Once()
+	files := &profilePhotoValidatorMock{profilePhotoURLsByFile: map[string]string{"photo": "https://cdn.example/photo.jpg"}}
+	service := provider.NewService(reader, nil, categoryFinderWithExistingCategory(), files, nil, nil)
+	results, err := service.SearchProvidersByCategoryID(ctx, 1)
 	require.NoError(t, err)
-	juan.SetPersistenceID(12)
+	require.Equal(t, expected, results)
+	require.Equal(t, "https://cdn.example/photo.jpg", results[0].ProfilePhoto.URL)
+	require.Equal(t, []string{"photo"}, files.resolvedFileIDs)
+	reader.AssertExpectations(t)
+}
 
-	pedro, err := provider.NewProvider(
-		"auth0|pedro",
-		"pedro@example.com",
-		"Pedro",
-		"Dib",
-		&providerCategory,
-		&filedomain.Image{FileID: "pedro-photo", URL: "https://cdn.example/pedro.jpg"},
-		[]coveragezone.CoverageZone{defaultCoverageZone()},
-	)
-	require.NoError(t, err)
-	pedro.SetPersistenceID(15)
-
-	profileReader := &providerProfileReaderMock{
-		statsByProviderID: map[int]provider.RatingStats{
-			juan.ID():  {Total: 9, Count: 2},
-			pedro.ID(): {Total: 2, Count: 1},
-		},
+func TestProviderSearchValidatesCategoryBeforeReading(t *testing.T) {
+	for _, id := range []int{-1, 0, 2} {
+		service := provider.NewService(nil, nil, categoryFinderWithExistingCategory(), nil, nil, nil)
+		results, err := service.SearchProvidersByCategoryID(t.Context(), id)
+		require.Nil(t, results)
+		if id <= 0 {
+			require.ErrorIs(t, err, category.ErrIDRequired)
+		} else {
+			require.ErrorIs(t, err, category.ErrDoesNotExist)
+		}
 	}
-	identityApprovalReader := &identityApprovalReaderMock{approvedByProviderID: map[int]bool{
-		juan.ID(): true,
-	}}
-	repository := &providerRepositoryMock{
-		providersByCategoryID: map[int][]provider.Provider{
-			providerCategory.ID: {*juan, *pedro},
-		},
+}
+
+func TestProviderSearchSkipsFilesWithoutPhotos(t *testing.T) {
+	for _, results := range [][]readmodel.ProviderSearchResult{{}, {{ID: 1, ProfilePhoto: &filedomain.Image{}}}, {{ID: 1}}} {
+		reader := &providerSearchReaderMock{}
+		reader.On("FindByCategoryID", t.Context(), 1).Return(results, nil).Once()
+		service := provider.NewService(reader, nil, categoryFinderWithExistingCategory(), nil, nil, nil)
+		actual, err := service.SearchProvidersByCategoryID(t.Context(), 1)
+		require.NoError(t, err)
+		require.Equal(t, results, actual)
+		reader.AssertExpectations(t)
 	}
-	providerService := provider.NewService(
-		repository,
-		categoryFinderWithExistingCategory(),
-		&profilePhotoValidatorMock{
-			profilePhotoURLsByFile: map[string]string{
-				"juan-photo":  "https://cdn.example/juan.jpg",
-				"pedro-photo": "https://cdn.example/pedro.jpg",
-			},
-		},
-		profileReader,
-		nil,
-		identityApprovalReader,
-	)
-
-	results, err := providerService.SearchProvidersByCategoryID(context.Background(), providerCategory.ID)
-
-	require.NoError(t, err)
-	require.Len(t, results, 2)
-	assert.Equal(t, []int{juan.ID(), pedro.ID()}, profileReader.providerIDs)
-	assert.Equal(t, []int{juan.ID(), pedro.ID()}, identityApprovalReader.providerIDs)
-	assert.Equal(t, readmodel.ProviderSearchResult{
-		ID:               juan.ID(),
-		Name:             "Juan",
-		Surname:          "Pérez",
-		CategoryName:     "Plomería",
-		ProfilePhoto:     juan.ProfilePhoto(),
-		RatingAverage:    4.5,
-		RatingCount:      2,
-		IdentityVerified: true,
-	}, results[0])
-	assert.Equal(t, 2.0, results[1].RatingAverage)
-	assert.Equal(t, 1, results[1].RatingCount)
 }
 
-func TestServiceUsesZeroRatingSummaryWhenProviderHasNoRatings(t *testing.T) {
-	providerCategory := existingCategory()
-	foundProvider, err := provider.NewProvider(
-		"auth0|juan",
-		"juan@example.com",
-		"Juan",
-		"Pérez",
-		&providerCategory,
-		&filedomain.Image{FileID: "juan-photo"},
-		[]coveragezone.CoverageZone{defaultCoverageZone()},
-	)
-	require.NoError(t, err)
-	foundProvider.SetPersistenceID(12)
-	profileReader := &providerProfileReaderMock{statsByProviderID: map[int]provider.RatingStats{}}
-	providerService := provider.NewService(
-		&providerRepositoryMock{providersByCategoryID: map[int][]provider.Provider{
-			providerCategory.ID: {*foundProvider},
-		}},
-		categoryFinderWithExistingCategory(),
-		&profilePhotoValidatorMock{},
-		profileReader,
-		nil,
-		&identityApprovalReaderMock{},
-	)
-
-	results, err := providerService.SearchProvidersByCategoryID(context.Background(), providerCategory.ID)
-
-	require.NoError(t, err)
-	require.Len(t, results, 1)
-	assert.Equal(t, 0.0, results[0].RatingAverage)
-	assert.Equal(t, 0, results[0].RatingCount)
+func TestProviderSearchPropagatesErrors(t *testing.T) {
+	failure := errors.New("unavailable")
+	for _, stage := range []string{"reader", "files"} {
+		t.Run(stage, func(t *testing.T) {
+			reader := &providerSearchReaderMock{}
+			var readErr error
+			if stage == "reader" {
+				readErr = failure
+			}
+			reader.On("FindByCategoryID", t.Context(), 1).Return([]readmodel.ProviderSearchResult{{ID: 1, ProfilePhoto: &filedomain.Image{FileID: "photo"}}}, readErr).Once()
+			service := provider.NewService(reader, nil, categoryFinderWithExistingCategory(), &profilePhotoValidatorMock{resolveErr: failure}, nil, nil)
+			results, err := service.SearchProvidersByCategoryID(t.Context(), 1)
+			require.ErrorIs(t, err, failure)
+			require.Nil(t, results)
+			reader.AssertExpectations(t)
+		})
+	}
 }
 
-func TestServicePropagatesProviderSearchRatingReaderError(t *testing.T) {
-	providerCategory := existingCategory()
-	foundProvider, err := provider.NewProvider(
-		"auth0|juan",
-		"juan@example.com",
-		"Juan",
-		"Pérez",
-		&providerCategory,
-		&filedomain.Image{FileID: "juan-photo"},
-		[]coveragezone.CoverageZone{defaultCoverageZone()},
-	)
-	require.NoError(t, err)
-	foundProvider.SetPersistenceID(12)
-	expectedErr := errors.New("rating reader unavailable")
-	providerService := provider.NewService(
-		&providerRepositoryMock{providersByCategoryID: map[int][]provider.Provider{
-			providerCategory.ID: {*foundProvider},
-		}},
-		categoryFinderWithExistingCategory(),
-		&profilePhotoValidatorMock{},
-		&providerProfileReaderMock{batchStatsErr: expectedErr},
-		nil,
-		&identityApprovalReaderMock{},
-	)
-
-	results, err := providerService.SearchProvidersByCategoryID(context.Background(), providerCategory.ID)
-
-	assert.Nil(t, results)
-	assert.ErrorIs(t, err, expectedErr)
-	assert.ErrorContains(t, err, "finding provider rating stats for search")
-}
-
-func TestServicePropagatesProviderSearchIdentityApprovalReaderError(t *testing.T) {
-	providerCategory := existingCategory()
-	foundProvider, err := provider.NewProvider(
-		"auth0|juan",
-		"juan@example.com",
-		"Juan",
-		"Pérez",
-		&providerCategory,
-		&filedomain.Image{FileID: "juan-photo"},
-		[]coveragezone.CoverageZone{defaultCoverageZone()},
-	)
-	require.NoError(t, err)
-	foundProvider.SetPersistenceID(12)
-	expectedErr := errors.New("identity approval reader unavailable")
-	providerService := provider.NewService(
-		&providerRepositoryMock{providersByCategoryID: map[int][]provider.Provider{
-			providerCategory.ID: {*foundProvider},
-		}},
-		categoryFinderWithExistingCategory(),
-		&profilePhotoValidatorMock{},
-		&providerProfileReaderMock{statsByProviderID: map[int]provider.RatingStats{}},
-		nil,
-		&identityApprovalReaderMock{err: expectedErr},
-	)
-
-	results, err := providerService.SearchProvidersByCategoryID(context.Background(), providerCategory.ID)
-
-	assert.Nil(t, results)
-	assert.ErrorIs(t, err, expectedErr)
-	assert.ErrorContains(t, err, "finding approved provider identities for search")
+func TestProviderSearchRequiresReader(t *testing.T) {
+	service := provider.NewService(nil, nil, categoryFinderWithExistingCategory(), nil, nil, nil)
+	results, err := service.SearchProvidersByCategoryID(t.Context(), 1)
+	require.Nil(t, results)
+	require.ErrorIs(t, err, provider.ErrSearchReaderNotConfigured)
 }

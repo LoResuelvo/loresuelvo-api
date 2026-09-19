@@ -5,6 +5,7 @@ import (
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/provider"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/provider/read_model"
+	"github.com/stretchr/testify/mock"
 )
 
 type providerProfileReaderMock struct {
@@ -39,4 +40,11 @@ func (reader *providerProfileReaderMock) FindRatingStatsByProviderIDs(_ context.
 
 func (reader *providerProfileReaderMock) FindPaidWorkHistoryByProviderID(_ context.Context, _ int) ([]readmodel.WorkOrder, error) {
 	return reader.workOrders, reader.workHistoryErr
+}
+
+type providerSearchReaderMock struct{ mock.Mock }
+
+func (reader *providerSearchReaderMock) FindByCategoryID(ctx context.Context, categoryID int) ([]readmodel.ProviderSearchResult, error) {
+	args := reader.Called(ctx, categoryID)
+	return args.Get(0).([]readmodel.ProviderSearchResult), args.Error(1)
 }
