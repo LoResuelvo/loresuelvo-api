@@ -1,0 +1,40 @@
+type: object
+description: Consumer account visible in the administrative user directory.
+additionalProperties: false
+required:
+- id
+- role
+- name
+- surname
+- email
+- profile_photo_url
+- created_on
+properties:
+  id:
+    type: integer
+    format: int32
+    example: 10
+  role:
+    type: string
+    enum:
+    - consumer
+  name:
+    type: string
+    example: Ana
+  surname:
+    type: string
+    example: Pérez
+  email:
+    type: string
+    format: email
+    example: ana@example.com
+  profile_photo_url:
+    type: string
+    format: uri
+    nullable: true
+    description: Public profile photo URL, or null when the consumer has no available public photo.
+    example: https://cdn.example/profile.jpg
+  created_on:
+    type: string
+    format: date-time
+    example: '2026-09-19T12:00:00Z'

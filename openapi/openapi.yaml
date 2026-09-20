@@ -41,6 +41,8 @@ tags:
   description: Work order endpoints.
 - name: Users
   description: Authenticated user session endpoints.
+- name: Administration
+  description: Administrative marketplace supervision endpoints.
 - name: IdentityVerification
   description: Identity-verification status processing endpoints.
 - name: Realtime
@@ -56,6 +58,8 @@ paths:
     $ref: ./paths/coverage-zones.yaml
   /consumers:
     $ref: ./paths/consumers.yaml
+  /admin/consumers:
+    $ref: ./paths/admin-consumers.yaml
   /providers:
     $ref: ./paths/providers.yaml
   /providers/{providerID}:
@@ -228,6 +232,8 @@ components:
       $ref: ./components/schemas/consumer-address-input.yaml
     ConsumerSummary:
       $ref: ./components/schemas/consumer-summary.yaml
+    AdminConsumerDirectoryItem:
+      $ref: ./components/schemas/admin-consumer-directory-item.yaml
     RegisterProviderRequest:
       $ref: ./components/schemas/register-provider-request.yaml
     ProviderSummary:

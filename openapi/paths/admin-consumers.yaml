@@ -1,0 +1,51 @@
+get:
+  tags:
+  - Administration
+  operationId: listAdminConsumers
+  summary: List registered consumers
+  description: Returns every registered consumer. Requires the `read:consumers` permission in the Bearer JWT.
+  security:
+  - BearerAuth: []
+  responses:
+    '200':
+      description: Consumer directory returned successfully. The array is empty when no consumers are registered.
+      content:
+        application/json:
+          schema:
+            type: array
+            items:
+              $ref: '#/components/schemas/AdminConsumerDirectoryItem'
+          examples:
+            consumers:
+              value:
+              - id: 10
+                role: consumer
+                name: Ana
+                surname: Pérez
+                email: ana@example.com
+                profile_photo_url: https://cdn.example/profile.jpg
+                created_on: '2026-09-19T12:00:00Z'
+            empty:
+              value: []
+    '401':
+      description: The Bearer token is missing or invalid.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/AuthErrorResponse'
+    '403':
+      description: The Bearer token does not contain the `read:consumers` permission.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: insufficient permissions
+    '500':
+      description: The consumer directory could not be prepared.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: internal server error
