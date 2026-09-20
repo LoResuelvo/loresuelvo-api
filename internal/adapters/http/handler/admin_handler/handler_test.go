@@ -1,0 +1,46 @@
+package admin_handler
+
+import (
+	"errors"
+	"net/http"
+	"net/http/httptest"
+	"testing"
+
+	"github.com/gin-gonic/gin"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
+)
+
+func TestAdminHandlerReturnsInternalErrorWhenConsumerDirectoryFails(t *testing.T) {
+	service := new(serviceMock)
+	service.On("ListConsumers", mock.Anything).Return(nil, errors.New("database unavailable")).Once()
+	handler := NewAdminHandler(service)
+	context, recorder := adminHandlerTestContext(http.MethodGet, "/admin/consumers")
+
+	handler.ListConsumers(context)
+
+	assert.Equal(t, http.StatusInternalServerError, recorder.Code)
+	assert.JSONEq(t, `{"error":"internal server error"}`, recorder.Body.String())
+	service.AssertExpectations(t)
+}
+
+func TestAdminHandlerReturnsInternalErrorWhenProviderDirectoryFails(t *testing.T) {
+	service := new(serviceMock)
+	service.On("ListProviders", mock.Anything).Return(nil, errors.New("database unavailable")).Once()
+	handler := NewAdminHandler(service)
+	context, recorder := adminHandlerTestContext(http.MethodGet, "/admin/providers")
+
+	handler.ListProviders(context)
+
+	assert.Equal(t, http.StatusInternalServerError, recorder.Code)
+	assert.JSONEq(t, `{"error":"internal server error"}`, recorder.Body.String())
+	service.AssertExpectations(t)
+}
+
+func adminHandlerTestContext(method, path string) (*gin.Context, *httptest.ResponseRecorder) {
+	gin.SetMode(gin.TestMode)
+	recorder := httptest.NewRecorder()
+	context, _ := gin.CreateTestContext(recorder)
+	context.Request = httptest.NewRequest(method, path, nil)
+	return context, recorder
+}

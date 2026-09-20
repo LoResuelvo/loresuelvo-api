@@ -7,30 +7,25 @@ import (
 	readmodel "github.com/LoResuelvo/loresuelvo-api/internal/domain/admin/read_model"
 )
 
-type ConsumerDirectoryReader interface {
-	FindConsumers(ctx context.Context) ([]readmodel.Consumer, error)
-}
-
-type ProfilePhotoURLResolver interface {
-	ResolvePublicURLs(ctx context.Context, fileIDs []string) (map[string]string, error)
-}
-
-type DirectoryService struct {
+type Service struct {
 	consumerReader          ConsumerDirectoryReader
+	providerReader          ProviderDirectoryReader
 	profilePhotoURLResolver ProfilePhotoURLResolver
 }
 
-func NewDirectoryService(
+func NewService(
 	consumerReader ConsumerDirectoryReader,
+	providerReader ProviderDirectoryReader,
 	profilePhotoURLResolver ProfilePhotoURLResolver,
-) *DirectoryService {
-	return &DirectoryService{
+) *Service {
+	return &Service{
 		consumerReader:          consumerReader,
+		providerReader:          providerReader,
 		profilePhotoURLResolver: profilePhotoURLResolver,
 	}
 }
 
-func (service *DirectoryService) ListConsumers(ctx context.Context) ([]readmodel.Consumer, error) {
+func (service *Service) ListConsumers(ctx context.Context) ([]readmodel.Consumer, error) {
 	consumers, err := service.consumerReader.FindConsumers(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("finding consumers for administrative directory: %w", err)
@@ -58,4 +53,34 @@ func (service *DirectoryService) ListConsumers(ctx context.Context) ([]readmodel
 	}
 
 	return consumers, nil
+}
+
+func (service *Service) ListProviders(ctx context.Context) ([]readmodel.Provider, error) {
+	providers, err := service.providerReader.FindProviders(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("finding providers for administrative directory: %w", err)
+	}
+	if len(providers) == 0 {
+		return []readmodel.Provider{}, nil
+	}
+
+	profilePhotoFileIDs := make([]string, 0, len(providers))
+	for _, provider := range providers {
+		if provider.ProfilePhotoFileID != "" {
+			profilePhotoFileIDs = append(profilePhotoFileIDs, provider.ProfilePhotoFileID)
+		}
+	}
+	if len(profilePhotoFileIDs) == 0 {
+		return providers, nil
+	}
+
+	profilePhotoURLs, err := service.profilePhotoURLResolver.ResolvePublicURLs(ctx, profilePhotoFileIDs)
+	if err != nil {
+		return nil, fmt.Errorf("resolving provider profile photo URLs: %w", err)
+	}
+	for index := range providers {
+		providers[index].ProfilePhotoURL = profilePhotoURLs[providers[index].ProfilePhotoFileID]
+	}
+
+	return providers, nil
 }

@@ -17,6 +17,16 @@ func (reader *consumerDirectoryReaderMock) FindConsumers(ctx context.Context) ([
 	return args.Get(0).([]readmodel.Consumer), args.Error(1)
 }
 
+type providerDirectoryReaderMock struct{ mock.Mock }
+
+func (reader *providerDirectoryReaderMock) FindProviders(ctx context.Context) ([]readmodel.Provider, error) {
+	args := reader.Called(ctx)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]readmodel.Provider), args.Error(1)
+}
+
 type profilePhotoURLResolverMock struct{ mock.Mock }
 
 func (resolver *profilePhotoURLResolverMock) ResolvePublicURLs(

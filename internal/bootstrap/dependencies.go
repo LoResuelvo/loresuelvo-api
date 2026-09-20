@@ -242,7 +242,11 @@ func newDependencies(database *sql.DB, adapters dependencyAdapters) (*Dependenci
 		fileService,
 	)
 	userService := user.NewService(persistence.UserRepository, fileService)
-	adminDirectoryService := admin.NewDirectoryService(persistence.AdminDirectoryReader, fileService)
+	adminService := admin.NewService(
+		persistence.AdminDirectoryReader,
+		persistence.AdminDirectoryReader,
+		fileService,
+	)
 	paymentAccountService := paymentaccount.NewService(
 		persistence.UserRepository,
 		persistence.AuthorizationAttemptRepository,
@@ -338,7 +342,7 @@ func newDependencies(database *sql.DB, adapters dependencyAdapters) (*Dependenci
 		},
 		Clock: systemClock,
 		routerConfig: httpadapter.RouterConfig{
-			AdminHandler:                admin_handler.NewAdminHandler(adminDirectoryService),
+			AdminHandler:                admin_handler.NewAdminHandler(adminService),
 			CategoryHandler:             category_handler.NewCategoryHandler(categoryService),
 			CalendarConnectionHandler:   calendar_connection_handler.NewCalendarConnectionHandler(calendarConnectionService, adapters.calendarHandlerConfig),
 			CoverageZoneHandler:         coverage_zone_handler.NewCoverageZoneHandler(coverageZoneService),

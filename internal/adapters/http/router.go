@@ -28,6 +28,7 @@ import (
 )
 
 const readConsumersPermission = "read:consumers"
+const readProvidersPermission = "read:providers"
 
 type Environment string
 
@@ -163,6 +164,12 @@ func (router *Router) registerAdminRoutes(engine *gin.Engine, authMiddleware gin
 		authMiddleware,
 		middleware.RequirePermissionLayer(readConsumersPermission),
 		router.adminHandler.ListConsumers,
+	)
+	engine.GET(
+		"/admin/providers",
+		authMiddleware,
+		middleware.RequirePermissionLayer(readProvidersPermission),
+		router.adminHandler.ListProviders,
 	)
 }
 

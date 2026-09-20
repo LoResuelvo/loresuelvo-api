@@ -1,27 +1,43 @@
 package admin_handler
 
 import (
+	"context"
 	"net/http"
 
 	httphandler "github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler"
-	"github.com/LoResuelvo/loresuelvo-api/internal/domain/admin"
+	readmodel "github.com/LoResuelvo/loresuelvo-api/internal/domain/admin/read_model"
 	"github.com/gin-gonic/gin"
 )
 
-type AdminHandler struct {
-	directoryService *admin.DirectoryService
+type service interface {
+	ListConsumers(ctx context.Context) ([]readmodel.Consumer, error)
+	ListProviders(ctx context.Context) ([]readmodel.Provider, error)
 }
 
-func NewAdminHandler(directoryService *admin.DirectoryService) *AdminHandler {
-	return &AdminHandler{directoryService: directoryService}
+type AdminHandler struct {
+	service service
+}
+
+func NewAdminHandler(service service) *AdminHandler {
+	return &AdminHandler{service: service}
 }
 
 func (handler *AdminHandler) ListConsumers(c *gin.Context) {
-	consumers, err := handler.directoryService.ListConsumers(c.Request.Context())
+	consumers, err := handler.service.ListConsumers(c.Request.Context())
 	if err != nil {
 		httphandler.RespondError(c, http.StatusInternalServerError, "internal server error")
 		return
 	}
 
 	c.JSON(http.StatusOK, consumerDirectoryResponsesFromReadModel(consumers))
+}
+
+func (handler *AdminHandler) ListProviders(c *gin.Context) {
+	providers, err := handler.service.ListProviders(c.Request.Context())
+	if err != nil {
+		httphandler.RespondError(c, http.StatusInternalServerError, "internal server error")
+		return
+	}
+
+	c.JSON(http.StatusOK, providerDirectoryResponsesFromReadModel(providers))
 }
