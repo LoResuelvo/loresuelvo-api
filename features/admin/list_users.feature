@@ -38,7 +38,6 @@ Feature: Listar usuarios registrados
             When consulto el directorio de consumidores
             Then el sistema devuelve un directorio de consumidores vacío
 
-    @wip
     Rule: El directorio de prestadores debe incluir su información operativa
 
         Scenario: 61.4-LU Listar todos los prestadores registrados
@@ -60,8 +59,7 @@ Feature: Listar usuarios registrados
         Scenario: 61.5-LU Informar el rubro y todas las zonas de cobertura del prestador
             Given que existe el rubro "Plomería"
             And que están habilitadas las zonas de cobertura "Comuna 6" y "Comuna 14"
-            And existe un prestador registrado con correo "juan@example.com", nombre "Juan", apellido "Gómez" y rubro "Plomería"
-            And que "juan@example.com" cubre las zonas "Comuna 6" y "Comuna 14"
+            And existe un prestador registrado con correo "juan@example.com", nombre "Juan", apellido "Gómez", rubro "Plomería" y las zonas de cobertura "Comuna 6" y "Comuna 14"
             And que estoy autenticado como administrador "supervisor@example.com" con el permiso "read:providers"
             When consulto el directorio de prestadores
             Then el prestador "juan@example.com" incluye el rubro "Plomería"
@@ -73,8 +71,7 @@ Feature: Listar usuarios registrados
 
         Scenario: 61.6-LU Informar la foto y el último estado de verificación del prestador
             Given que existe el rubro "Plomería"
-            And existe un prestador registrado con correo "juan@example.com", nombre "Juan", apellido "Gómez" y rubro "Plomería"
-            And que "juan@example.com" tiene una foto de perfil pública
+            And que existe un prestador registrado con correo "juan@example.com", nombre "Juan", apellido "Gómez", rubro "Plomería" y la foto de perfil cargada
             And que la verificación de "juan@example.com" estuvo "in_review" el "2026-09-18T14:00:00Z"
             And que la identidad de "juan@example.com" fue aprobada el "2026-09-18T15:30:00Z"
             And que estoy autenticado como administrador "supervisor@example.com" con el permiso "read:providers"
