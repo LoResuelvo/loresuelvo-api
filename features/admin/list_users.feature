@@ -1,4 +1,3 @@
-@wip
 Feature: Listar usuarios registrados
     Como administrador de LoResuelvo
     quiero consultar por separado a consumidores y prestadores
@@ -26,8 +25,7 @@ Feature: Listar usuarios registrados
             And el directorio de consumidores no incluye a "juan@example.com"
 
         Scenario: 61.2-LU Informar los datos administrativos de cada consumidor
-            Given que existe un consumidor registrado con correo "ana@example.com", nombre "Ana" y apellido "Pérez"
-            And que "ana@example.com" tiene una foto de perfil pública
+            Given que existe un consumidor registrado con correo "ana@example.com", nombre "Ana" y apellido "Pérez" con la foto de perfil cargada
             And que estoy autenticado como administrador "supervisor@example.com" con el permiso "read:consumers"
             When consulto el directorio de consumidores
             Then el consumidor "ana@example.com" incluye su identificador, rol, nombre, apellido, correo y fecha de registro
@@ -40,6 +38,7 @@ Feature: Listar usuarios registrados
             When consulto el directorio de consumidores
             Then el sistema devuelve un directorio de consumidores vacío
 
+    @wip
     Rule: El directorio de prestadores debe incluir su información operativa
 
         Scenario: 61.4-LU Listar todos los prestadores registrados
@@ -101,6 +100,7 @@ Feature: Listar usuarios registrados
             When consulto el directorio de prestadores
             Then el sistema devuelve un directorio de prestadores vacío
 
+    @wip
     Rule: El administrador puede buscar usuarios por nombre, apellido o correo sin distinguir mayúsculas
 
         Background:
@@ -134,6 +134,7 @@ Feature: Listar usuarios registrados
                 | consumidores    | read:consumers |
                 | prestadores     | read:providers |
 
+    @wip
     Rule: El administrador puede filtrar prestadores por sus atributos operativos
 
         Background:
@@ -167,6 +168,7 @@ Feature: Listar usuarios registrados
                 | declined   | laura@example.com |
                 | unverified | pedro@example.com |
 
+    @wip
     Rule: Los filtros inválidos deben rechazarse
 
         Scenario Outline: 61.14-LU Rechazar un filtro inválido de prestadores
