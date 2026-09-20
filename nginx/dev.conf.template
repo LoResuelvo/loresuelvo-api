@@ -56,7 +56,7 @@ server {
         proxy_pass http://dev_api;
     }
 
-    location ~ ^/(categories|consumers|providers|job-requests|conversations|chatbot|service-proposals|payment-intents|work-orders|me|files|ws-tickets)(/|$) {
+    location ~ ^/(admin|categories|consumers|providers|job-requests|conversations|chatbot|service-proposals|payment-intents|work-orders|me|files|ws-tickets)(/|$) {
         proxy_pass http://dev_api;
     }
 
