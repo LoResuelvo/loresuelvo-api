@@ -1,0 +1,75 @@
+type: object
+description: Provider account and operational information visible in the administrative user directory.
+additionalProperties: false
+required:
+- id
+- role
+- name
+- surname
+- email
+- profile_photo_url
+- created_on
+- category
+- coverage_zones
+- identity_verification_status
+- identity_verified_on
+properties:
+  id:
+    type: integer
+    format: int32
+    example: 12
+  role:
+    type: string
+    enum:
+    - provider
+  name:
+    type: string
+    example: Juan
+  surname:
+    type: string
+    example: Gómez
+  email:
+    type: string
+    format: email
+    example: juan@example.com
+  profile_photo_url:
+    type:
+    - string
+    - 'null'
+    format: uri
+    description: Public profile photo URL, or null when no public photo is available.
+    example: https://cdn.example/profile.jpg
+  created_on:
+    type: string
+    format: date-time
+    example: '2026-09-18T12:00:00Z'
+  category:
+    $ref: '#/components/schemas/CategoryListItem'
+  coverage_zones:
+    type: array
+    description: All coverage zones assigned to the provider, including currently disabled zones.
+    items:
+      $ref: '#/components/schemas/AdminProviderCoverageZone'
+  identity_verification_status:
+    type: string
+    enum:
+    - unverified
+    - not_started
+    - in_progress
+    - awaiting_user
+    - in_review
+    - approved
+    - declined
+    - resubmitted
+    - abandoned
+    - expired
+    - kyc_expired
+    description: Latest identity-verification status, or unverified when the provider has no verification sessions.
+    example: approved
+  identity_verified_on:
+    type:
+    - string
+    - 'null'
+    format: date-time
+    description: Timestamp at which the latest approved verification was recorded, or null when the current status is not approved or no verification session exists.
+    example: '2026-09-18T15:30:00Z'

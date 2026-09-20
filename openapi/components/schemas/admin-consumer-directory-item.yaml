@@ -29,9 +29,10 @@ properties:
     format: email
     example: ana@example.com
   profile_photo_url:
-    type: string
+    type:
+    - string
+    - 'null'
     format: uri
-    nullable: true
     description: Public profile photo URL, or null when the consumer has no available public photo.
     example: https://cdn.example/profile.jpg
   created_on:

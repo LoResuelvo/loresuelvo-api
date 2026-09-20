@@ -60,6 +60,8 @@ paths:
     $ref: ./paths/consumers.yaml
   /admin/consumers:
     $ref: ./paths/admin-consumers.yaml
+  /admin/providers:
+    $ref: ./paths/admin-providers.yaml
   /providers:
     $ref: ./paths/providers.yaml
   /providers/{providerID}:
@@ -234,6 +236,10 @@ components:
       $ref: ./components/schemas/consumer-summary.yaml
     AdminConsumerDirectoryItem:
       $ref: ./components/schemas/admin-consumer-directory-item.yaml
+    AdminProviderDirectoryItem:
+      $ref: ./components/schemas/admin-provider-directory-item.yaml
+    AdminProviderCoverageZone:
+      $ref: ./components/schemas/admin-provider-coverage-zone.yaml
     RegisterProviderRequest:
       $ref: ./components/schemas/register-provider-request.yaml
     ProviderSummary:

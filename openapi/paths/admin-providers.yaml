@@ -1,0 +1,79 @@
+get:
+  tags:
+  - Administration
+  operationId: listAdminProviders
+  summary: List registered providers
+  description: Returns every registered provider with its operational information. Requires the `read:providers` permission in the Bearer JWT.
+  security:
+  - BearerAuth: []
+  responses:
+    '200':
+      description: Provider directory returned successfully. The array is empty when no providers are registered.
+      content:
+        application/json:
+          schema:
+            type: array
+            items:
+              $ref: '#/components/schemas/AdminProviderDirectoryItem'
+          examples:
+            providers:
+              value:
+              - id: 12
+                role: provider
+                name: Juan
+                surname: Gómez
+                email: juan@example.com
+                profile_photo_url: https://cdn.example/profile.jpg
+                created_on: '2026-09-18T12:00:00Z'
+                category:
+                  id: 1
+                  name: Plomería
+                coverage_zones:
+                - id: 6
+                  market_id: 1
+                  code: CABA-COMUNA-6
+                  name: Comuna 6
+                  kind: COMMUNE
+                  parent_zone_id: null
+                  enabled: true
+                identity_verification_status: approved
+                identity_verified_on: '2026-09-18T15:30:00Z'
+            unverifiedProvider:
+              value:
+              - id: 13
+                role: provider
+                name: Laura
+                surname: Díaz
+                email: laura@example.com
+                profile_photo_url: null
+                created_on: '2026-09-18T13:00:00Z'
+                category:
+                  id: 1
+                  name: Plomería
+                coverage_zones: []
+                identity_verification_status: unverified
+                identity_verified_on: null
+            empty:
+              value: []
+    '401':
+      description: The Bearer token is missing or invalid.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/AuthErrorResponse'
+    '403':
+      description: The Bearer token does not contain the `read:providers` permission.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: insufficient permissions
+    '500':
+      description: The provider directory could not be prepared.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: internal server error
