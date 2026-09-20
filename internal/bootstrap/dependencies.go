@@ -11,6 +11,7 @@ import (
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/cryptography"
 	googlecalendar "github.com/LoResuelvo/loresuelvo-api/internal/adapters/google_calendar"
 	httpadapter "github.com/LoResuelvo/loresuelvo-api/internal/adapters/http"
+	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/admin_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/calendar_connection_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/category_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/consumer_handler"
@@ -37,6 +38,7 @@ import (
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/realtime"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/scheduler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/storage"
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/admin"
 	calendarconnection "github.com/LoResuelvo/loresuelvo-api/internal/domain/calendar_connection"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/category"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/consumer"
@@ -240,6 +242,7 @@ func newDependencies(database *sql.DB, adapters dependencyAdapters) (*Dependenci
 		fileService,
 	)
 	userService := user.NewService(persistence.UserRepository, fileService)
+	adminDirectoryService := admin.NewDirectoryService(persistence.AdminDirectoryReader, fileService)
 	paymentAccountService := paymentaccount.NewService(
 		persistence.UserRepository,
 		persistence.AuthorizationAttemptRepository,
@@ -335,6 +338,7 @@ func newDependencies(database *sql.DB, adapters dependencyAdapters) (*Dependenci
 		},
 		Clock: systemClock,
 		routerConfig: httpadapter.RouterConfig{
+			AdminHandler:                admin_handler.NewAdminHandler(adminDirectoryService),
 			CategoryHandler:             category_handler.NewCategoryHandler(categoryService),
 			CalendarConnectionHandler:   calendar_connection_handler.NewCalendarConnectionHandler(calendarConnectionService, adapters.calendarHandlerConfig),
 			CoverageZoneHandler:         coverage_zone_handler.NewCoverageZoneHandler(coverageZoneService),

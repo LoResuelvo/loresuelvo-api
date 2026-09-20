@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log/slog"
 
+	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/admin_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/calendar_connection_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/category_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/consumer_handler"
@@ -26,6 +27,8 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+const readConsumersPermission = "read:consumers"
+
 type Environment string
 
 const (
@@ -37,6 +40,7 @@ const (
 
 type RouterConfig struct {
 	Environment                 Environment
+	AdminHandler                *admin_handler.AdminHandler
 	CategoryHandler             *category_handler.CategoryHandler
 	CalendarConnectionHandler   *calendar_connection_handler.CalendarConnectionHandler
 	CoverageZoneHandler         *coverage_zone_handler.CoverageZoneHandler
@@ -60,6 +64,7 @@ type RouterConfig struct {
 
 type Router struct {
 	environment                 Environment
+	adminHandler                *admin_handler.AdminHandler
 	categoryHandler             *category_handler.CategoryHandler
 	calendarConnectionHandler   *calendar_connection_handler.CalendarConnectionHandler
 	coverageZoneHandler         *coverage_zone_handler.CoverageZoneHandler
@@ -89,6 +94,7 @@ func NewRouter(config RouterConfig) *Router {
 
 	router := &Router{
 		environment:                 config.Environment,
+		adminHandler:                config.AdminHandler,
 		categoryHandler:             config.CategoryHandler,
 		calendarConnectionHandler:   config.CalendarConnectionHandler,
 		coverageZoneHandler:         config.CoverageZoneHandler,
@@ -129,6 +135,7 @@ func (router *Router) SetUp() (*gin.Engine, error) {
 	engine.Use(middleware.CORSLayer(middleware.NewCORSConfigFromEnv()))
 
 	router.registerHealthRoutes(engine)
+	router.registerAdminRoutes(engine, authMiddleware)
 	router.registerCategoryRoutes(engine)
 	router.registerCalendarConnectionRoutes(engine, authMiddleware)
 	router.registerCoverageZoneRoutes(engine, authMiddleware)
@@ -148,6 +155,15 @@ func (router *Router) SetUp() (*gin.Engine, error) {
 	router.registerTestRoutes(engine)
 
 	return engine, nil
+}
+
+func (router *Router) registerAdminRoutes(engine *gin.Engine, authMiddleware gin.HandlerFunc) {
+	engine.GET(
+		"/admin/consumers",
+		authMiddleware,
+		middleware.RequirePermissionLayer(readConsumersPermission),
+		router.adminHandler.ListConsumers,
+	)
 }
 
 func (router *Router) registerCalendarConnectionRoutes(engine *gin.Engine, authMiddleware gin.HandlerFunc) {

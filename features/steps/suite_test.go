@@ -72,6 +72,7 @@ type testSuite struct {
 	expectedCoverageZoneRegistrationError   string
 	lastLocation                            string
 	currentAuth0ID                          string
+	currentPermissions                      []string
 	lastConversationID                      int
 	lastJobRequestID                        int
 	lastWorkRequestProviderID               int
@@ -193,6 +194,7 @@ func (s *testSuite) registerAllSteps(sc *godog.ScenarioContext) {
 	registerStartIdentityVerificationSteps(sc, s)
 	registerProcessIdentityVerificationResultSteps(sc, s)
 	registerShowProviderIdentityVerificationSteps(sc, s)
+	registerAdminListUsersSteps(sc, s)
 }
 
 func (s *testSuite) cleanup() error {
@@ -320,6 +322,7 @@ func (s *testSuite) cleanup() error {
 	s.expectedIdentityVerificationSessionID = uuid.Nil
 	s.lastIdentityVerificationEventID = uuid.Nil
 	s.identityVerificationWebhookStatuses = nil
+	s.currentPermissions = nil
 	return nil
 }
 
