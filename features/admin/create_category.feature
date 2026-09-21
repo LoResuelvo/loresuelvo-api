@@ -6,7 +6,6 @@ Feature: Crear rubros de prestadores
     Background:
         Given que existe un administrador provisionado con correo "supervisor@example.com", nombre "Sofía" y apellido "López"
 
-    @wip
     Rule: Un administrador autorizado puede crear un rubro válido
 
         Background:
@@ -19,7 +18,6 @@ Feature: Crear rubros de prestadores
             And la respuesta contiene el identificador, el nombre "Plomería" y el nombre normalizado "plomería"
             And la ubicación del recurso creado corresponde al identificador del rubro
 
-    @wip
     Rule: El nombre del rubro debe ser válido
 
         Background:
@@ -44,7 +42,6 @@ Feature: Crear rubros de prestadores
             When intento crear un rubro con un nombre numérico
             Then el sistema rechaza la creación porque el nombre del rubro debe ser texto
 
-    @wip
     Rule: El nombre normalizado del rubro debe ser único
 
         Background:
@@ -61,7 +58,6 @@ Feature: Crear rubros de prestadores
                 | "PLOMERÍA"       |
                 | "  plomería  "   |
 
-    @wip
     Rule: Solo los usuarios con el permiso requerido pueden crear rubros
 
         Scenario: 38.1.6-CR Rechazar la creación sin autenticación

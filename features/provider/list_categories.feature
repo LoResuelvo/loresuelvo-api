@@ -18,7 +18,6 @@ Feature: Listar rubros de prestador
             When consulto el listado de rubros
             Then el sistema muestra un listado de rubros vacío
 
-    @wip
     Rule: El listado debe respetar el contrato público del catálogo
 
         Scenario: 38.1.8-LR Listar los rubros por nombre en orden ascendente
@@ -42,7 +41,6 @@ Feature: Listar rubros de prestador
             Then cada rubro incluye solamente su identificador y su nombre visible
             And el listado no expone el nombre normalizado ni datos internos de persistencia
 
-    @wip
     Rule: Solo los usuarios autenticados pueden consultar el catálogo
 
         Scenario: 38.1.10-LR Rechazar el listado sin autenticación
