@@ -61,6 +61,20 @@ func TestCategoryRepositoryCanSaveACategory(t *testing.T) {
 	assert.NotNil(t, foundCategory, "Category should be saved on database")
 }
 
+func TestCategoryRepositoryTranslatesNormalizedNameConflict(t *testing.T) {
+	repo := newCategoryRepositoryTest(t)
+
+	_, err := repo.Save(validCategory())
+	require.NoError(t, err)
+	duplicate, err := category.New("  PLOMERÍA ")
+	require.NoError(t, err)
+
+	createdCategory, err := repo.Save(*duplicate)
+
+	assert.ErrorIs(t, err, category.ErrAlreadyExists)
+	assert.Nil(t, createdCategory)
+}
+
 func TestCategoryRepositoryCanFindByNormalizedName(t *testing.T) {
 	repo := newCategoryRepositoryTest(t)
 	savedCategory := validCategory()

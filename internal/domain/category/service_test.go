@@ -1,112 +1,118 @@
 package category_test
 
 import (
+	"errors"
+	"strings"
 	"testing"
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/category"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
-type categoryRepositoryMock struct {
-	savedCategory                   category.Category
-	categories                      []category.Category
-	saveCalled                      bool
-	existsByNormalizedNameValue     bool
-	findByNormalizedNameCalled      bool
-	requestedCategoryNormalizedName string
-}
+func TestCreateCategoryStoresNormalizedCategory(t *testing.T) {
+	repository := new(categoryRepositoryMock)
+	repository.On("Save", mock.MatchedBy(func(categoryToSave category.Category) bool {
+		return categoryToSave.Name == "Plomería" && categoryToSave.NormalizedName == "plomería"
+	})).Return(&category.Category{ID: 1, Name: "Plomería", NormalizedName: "plomería"}, nil).Once()
+	service := category.NewService(repository)
 
-func (repository *categoryRepositoryMock) Save(categoryToSave category.Category) (*category.Category, error) {
-	categoryToSave.ID = 1
-	repository.savedCategory = categoryToSave
-	repository.saveCalled = true
-	return &repository.savedCategory, nil
-}
-
-func (repository *categoryRepositoryMock) ListAll() ([]category.Category, error) {
-	return repository.categories, nil
-}
-
-func (repository *categoryRepositoryMock) FindByNormalizedName(normalizedName string) *category.Category {
-	repository.findByNormalizedNameCalled = true
-	repository.requestedCategoryNormalizedName = normalizedName
-	if repository.existsByNormalizedNameValue {
-		return &repository.savedCategory
-	}
-	return nil
-}
-
-func (repository *categoryRepositoryMock) FindByID(_ int) *category.Category {
-	return nil
-}
-
-func TestCreateCategoryWithValidName(t *testing.T) {
-	repository := &categoryRepositoryMock{}
-	categoryManager := category.NewService(repository)
-
-	createdCategory, err := categoryManager.CreateCategory("Plomería")
+	createdCategory, err := service.CreateCategory("  Plomería  ")
 
 	require.NoError(t, err)
 	require.NotNil(t, createdCategory)
 	assert.Equal(t, 1, createdCategory.ID)
 	assert.Equal(t, "Plomería", createdCategory.Name)
 	assert.Equal(t, "plomería", createdCategory.NormalizedName)
-	assert.True(t, repository.saveCalled, "category should be saved")
-	assert.Equal(t, "Plomería", repository.savedCategory.Name)
-	assert.Equal(t, "plomería", repository.savedCategory.NormalizedName)
-	assert.True(t, repository.findByNormalizedNameCalled, "category existence should be checked")
-	assert.Equal(t, "plomería", repository.requestedCategoryNormalizedName)
+	repository.AssertExpectations(t)
 }
 
-func TestListCategories(t *testing.T) {
-	repository := &categoryRepositoryMock{
-		categories: []category.Category{
-			{ID: 1, Name: "Electricidad", NormalizedName: "electricidad"},
-			{ID: 2, Name: "Plomería", NormalizedName: "plomería"},
-		},
-	}
-	categoryManager := category.NewService(repository)
+func TestCreateCategoryRejectsEmptyNameWithoutPersistence(t *testing.T) {
+	repository := new(categoryRepositoryMock)
+	service := category.NewService(repository)
 
-	categories, err := categoryManager.ListCategories()
-
-	require.NoError(t, err)
-	assert.Len(t, categories, 2)
-	assert.Equal(t, "Electricidad", categories[0].Name)
-	assert.Equal(t, "Plomería", categories[1].Name)
-}
-
-func TestListCategoriesWhenThereAreNoCategories(t *testing.T) {
-	repository := &categoryRepositoryMock{categories: []category.Category{}}
-	categoryManager := category.NewService(repository)
-
-	categories, err := categoryManager.ListCategories()
-
-	require.NoError(t, err)
-	assert.Empty(t, categories)
-}
-
-func TestCreateCategoryWithEmptyName(t *testing.T) {
-	repository := &categoryRepositoryMock{}
-	categoryManager := category.NewService(repository)
-
-	createdCategory, err := categoryManager.CreateCategory("   ")
+	createdCategory, err := service.CreateCategory("   ")
 
 	assert.ErrorIs(t, err, category.ErrNameRequired)
 	assert.Nil(t, createdCategory)
-	assert.False(t, repository.saveCalled, "category should not be saved when name is empty")
-	assert.False(t, repository.findByNormalizedNameCalled, "empty category name should not be searched")
+	repository.AssertNotCalled(t, "Save", mock.Anything)
 }
 
-func TestCreateCategoryWithAlreadyExistingName(t *testing.T) {
-	repository := &categoryRepositoryMock{existsByNormalizedNameValue: true}
-	categoryManager := category.NewService(repository)
+func TestCreateCategoryRejectsTooLongNameWithoutPersistence(t *testing.T) {
+	repository := new(categoryRepositoryMock)
+	service := category.NewService(repository)
 
-	createdCategory, err := categoryManager.CreateCategory("  PLOMERÍA  ")
+	createdCategory, err := service.CreateCategory(strings.Repeat("a", 101))
+
+	assert.ErrorIs(t, err, category.ErrNameTooLong)
+	assert.Nil(t, createdCategory)
+	repository.AssertNotCalled(t, "Save", mock.Anything)
+}
+
+func TestCreateCategoryPropagatesDuplicateError(t *testing.T) {
+	repository := new(categoryRepositoryMock)
+	repository.On("Save", mock.Anything).Return((*category.Category)(nil), category.ErrAlreadyExists).Once()
+	service := category.NewService(repository)
+
+	createdCategory, err := service.CreateCategory("PLOMERÍA")
 
 	assert.ErrorIs(t, err, category.ErrAlreadyExists)
 	assert.Nil(t, createdCategory)
-	assert.False(t, repository.saveCalled, "category should not be saved when name already exists")
-	assert.True(t, repository.findByNormalizedNameCalled, "category existence should be checked")
-	assert.Equal(t, "plomería", repository.requestedCategoryNormalizedName)
+	repository.AssertExpectations(t)
+}
+
+func TestCreateCategoryWrapsRepositoryError(t *testing.T) {
+	repositoryError := errors.New("repository unavailable")
+	repository := new(categoryRepositoryMock)
+	repository.On("Save", mock.Anything).Return((*category.Category)(nil), repositoryError).Once()
+	service := category.NewService(repository)
+
+	createdCategory, err := service.CreateCategory("Plomería")
+
+	assert.ErrorIs(t, err, repositoryError)
+	assert.Nil(t, createdCategory)
+	repository.AssertExpectations(t)
+}
+
+func TestListCategoriesReturnsRepositoryCategories(t *testing.T) {
+	expected := []category.Category{
+		{ID: 1, Name: "Electricidad", NormalizedName: "electricidad"},
+		{ID: 2, Name: "Plomería", NormalizedName: "plomería"},
+	}
+	repository := new(categoryRepositoryMock)
+	repository.On("ListAll").Return(expected, nil).Once()
+	service := category.NewService(repository)
+
+	categories, err := service.ListCategories()
+
+	require.NoError(t, err)
+	assert.Equal(t, expected, categories)
+	repository.AssertExpectations(t)
+}
+
+func TestListCategoriesReturnsEmptyCollection(t *testing.T) {
+	repository := new(categoryRepositoryMock)
+	repository.On("ListAll").Return([]category.Category{}, nil).Once()
+	service := category.NewService(repository)
+
+	categories, err := service.ListCategories()
+
+	require.NoError(t, err)
+	assert.Empty(t, categories)
+	assert.NotNil(t, categories)
+	repository.AssertExpectations(t)
+}
+
+func TestListCategoriesWrapsRepositoryError(t *testing.T) {
+	repositoryError := errors.New("repository unavailable")
+	repository := new(categoryRepositoryMock)
+	repository.On("ListAll").Return(([]category.Category)(nil), repositoryError).Once()
+	service := category.NewService(repository)
+
+	categories, err := service.ListCategories()
+
+	assert.ErrorIs(t, err, repositoryError)
+	assert.Nil(t, categories)
+	repository.AssertExpectations(t)
 }

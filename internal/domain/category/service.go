@@ -1,5 +1,7 @@
 package category
 
+import "fmt"
+
 type Service struct {
 	categoryRepository Repository
 }
@@ -14,13 +16,19 @@ func (s *Service) CreateCategory(name string) (*Category, error) {
 		return nil, err
 	}
 
-	if s.categoryRepository.FindByNormalizedName(category.NormalizedName) != nil {
-		return nil, ErrAlreadyExists
+	savedCategory, err := s.categoryRepository.Save(*category)
+	if err != nil {
+		return nil, fmt.Errorf("saving category: %w", err)
 	}
 
-	return s.categoryRepository.Save(*category)
+	return savedCategory, nil
 }
 
 func (s *Service) ListCategories() ([]Category, error) {
-	return s.categoryRepository.ListAll()
+	categories, err := s.categoryRepository.ListAll()
+	if err != nil {
+		return nil, fmt.Errorf("listing categories: %w", err)
+	}
+
+	return categories, nil
 }

@@ -1,6 +1,11 @@
 package category
 
-import "strings"
+import (
+	"strings"
+	"unicode/utf8"
+)
+
+const maximumNameLength = 100
 
 type Category struct {
 	ID             int
@@ -12,6 +17,9 @@ func New(name string) (*Category, error) {
 	trimmedName := strings.TrimSpace(name)
 	if trimmedName == "" {
 		return nil, ErrNameRequired
+	}
+	if utf8.RuneCountInString(trimmedName) > maximumNameLength {
+		return nil, ErrNameTooLong
 	}
 
 	return &Category{

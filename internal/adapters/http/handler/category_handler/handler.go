@@ -1,6 +1,9 @@
 package category_handler
 
 import (
+	"encoding/json"
+	"errors"
+	"fmt"
 	"net/http"
 
 	httphandler "github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler"
@@ -20,7 +23,13 @@ func (h *CategoryHandler) CreateCategory(c *gin.Context) {
 	var req createCategoryRequest
 
 	if err := c.ShouldBindJSON(&req); err != nil {
-		httphandler.RespondError(c, http.StatusBadRequest, err.Error())
+		var typeError *json.UnmarshalTypeError
+		if errors.As(err, &typeError) && typeError.Field == "name" {
+			httphandler.RespondError(c, http.StatusBadRequest, errCategoryNameMustBeText.Error())
+			return
+		}
+
+		httphandler.RespondError(c, http.StatusBadRequest, errInvalidRequestBody.Error())
 		return
 	}
 
@@ -30,13 +39,14 @@ func (h *CategoryHandler) CreateCategory(c *gin.Context) {
 		return
 	}
 
+	c.Header("Location", fmt.Sprintf("/categories/%d", createdCategory.ID))
 	c.JSON(http.StatusCreated, categoryResponseFromDomain(*createdCategory))
 }
 
 func (h *CategoryHandler) ListCategories(c *gin.Context) {
 	categories, err := h.categoryService.ListCategories()
 	if err != nil {
-		httphandler.RespondError(c, http.StatusInternalServerError, err.Error())
+		httphandler.RespondError(c, http.StatusInternalServerError, http.StatusText(http.StatusInternalServerError))
 		return
 	}
 

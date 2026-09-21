@@ -2,9 +2,14 @@ package repositories
 
 import (
 	"database/sql"
+	"errors"
+	"fmt"
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/category"
+	"github.com/jackc/pgx/v5/pgconn"
 )
+
+const categoryNormalizedNameUniqueConstraint = "categories_normalized_name_unique"
 
 type CategoryRepository struct {
 	db *sql.DB
@@ -24,7 +29,12 @@ func (repository *CategoryRepository) Save(categoryToSave category.Category) (*c
 		categoryToSave.NormalizedName,
 	).Scan(&savedCategory.ID, &savedCategory.Name, &savedCategory.NormalizedName)
 	if err != nil {
-		return nil, err
+		var postgresError *pgconn.PgError
+		if errors.As(err, &postgresError) && postgresError.Code == "23505" && postgresError.ConstraintName == categoryNormalizedNameUniqueConstraint {
+			return nil, category.ErrAlreadyExists
+		}
+
+		return nil, fmt.Errorf("inserting category: %w", err)
 	}
 
 	return &savedCategory, nil
@@ -35,7 +45,7 @@ func (repository *CategoryRepository) ListAll() ([]category.Category, error) {
 		`SELECT id, name, normalized_name FROM categories ORDER BY name ASC`,
 	)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("querying categories: %w", err)
 	}
 	defer func() {
 		_ = rows.Close()
@@ -45,14 +55,14 @@ func (repository *CategoryRepository) ListAll() ([]category.Category, error) {
 	for rows.Next() {
 		var category category.Category
 		if err := rows.Scan(&category.ID, &category.Name, &category.NormalizedName); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("scanning category: %w", err)
 		}
 
 		categories = append(categories, category)
 	}
 
 	if err := rows.Err(); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("iterating categories: %w", err)
 	}
 
 	return categories, nil

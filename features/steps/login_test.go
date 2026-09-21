@@ -158,6 +158,8 @@ func (suite *testSuite) iAmAuthenticatedAsUnregisteredUser() error {
 
 func (suite *testSuite) iDoNotHaveAValidSession() error {
 	suite.currentAuth0ID = ""
+	suite.currentPermissions = nil
+	suite.invalidSession = true
 	return nil
 }
 

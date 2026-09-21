@@ -4,6 +4,8 @@ import "errors"
 
 var ErrNameRequired = errors.New("Category name is required")
 
+var ErrNameTooLong = errors.New("Category name is too long")
+
 var ErrIDRequired = errors.New("Category id is required")
 
 var ErrAlreadyExists = errors.New("Category already exists")

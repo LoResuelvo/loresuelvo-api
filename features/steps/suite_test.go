@@ -73,6 +73,7 @@ type testSuite struct {
 	lastLocation                            string
 	currentAuth0ID                          string
 	currentPermissions                      []string
+	invalidSession                          bool
 	lastConversationID                      int
 	lastJobRequestID                        int
 	lastWorkRequestProviderID               int
@@ -323,6 +324,8 @@ func (s *testSuite) cleanup() error {
 	s.lastIdentityVerificationEventID = uuid.Nil
 	s.identityVerificationWebhookStatuses = nil
 	s.currentPermissions = nil
+	s.currentAuth0ID = ""
+	s.invalidSession = false
 	return nil
 }
 

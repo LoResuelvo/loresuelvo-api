@@ -29,6 +29,7 @@ import (
 
 const readConsumersPermission = "read:consumers"
 const readProvidersPermission = "read:providers"
+const createCategoriesPermission = "create:categories"
 
 type Environment string
 
@@ -137,7 +138,7 @@ func (router *Router) SetUp() (*gin.Engine, error) {
 
 	router.registerHealthRoutes(engine)
 	router.registerAdminRoutes(engine, authMiddleware)
-	router.registerCategoryRoutes(engine)
+	router.registerCategoryRoutes(engine, authMiddleware)
 	router.registerCalendarConnectionRoutes(engine, authMiddleware)
 	router.registerCoverageZoneRoutes(engine, authMiddleware)
 	router.registerConsumerRoutes(engine, authMiddleware)
@@ -184,9 +185,14 @@ func (router *Router) registerHealthRoutes(engine *gin.Engine) {
 	engine.GET("/health/ready", router.healthHandler.Ready)
 }
 
-func (router *Router) registerCategoryRoutes(engine *gin.Engine) {
-	engine.GET("/categories", router.categoryHandler.ListCategories)
-	engine.POST("/categories", router.categoryHandler.CreateCategory)
+func (router *Router) registerCategoryRoutes(engine *gin.Engine, authMiddleware gin.HandlerFunc) {
+	engine.GET("/categories", authMiddleware, router.categoryHandler.ListCategories)
+	engine.POST(
+		"/categories",
+		authMiddleware,
+		middleware.RequirePermissionLayer(createCategoriesPermission),
+		router.categoryHandler.CreateCategory,
+	)
 }
 
 func (router *Router) registerCoverageZoneRoutes(engine *gin.Engine, authMiddleware gin.HandlerFunc) {
