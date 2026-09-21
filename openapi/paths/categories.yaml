@@ -55,15 +55,15 @@ get:
           examples:
             repositoryError:
               value:
-                error: database error
+                error: Internal Server Error
 post:
   tags:
   - Categories
   operationId: createCategory
   summary: Create a service category
   description: Creates a category using the provided name. The domain trims surrounding
-    whitespace and stores a lowercase normalized_name for duplicate checks. Unknown
-    JSON properties are ignored by the current handler.
+    whitespace, enforces a maximum of 100 Unicode characters, and stores a lowercase
+    normalized_name for duplicate checks. Requires the create:categories permission.
   security:
   - BearerAuth: []
   requestBody:
@@ -80,6 +80,12 @@ post:
   responses:
     '201':
       description: Category created successfully.
+      headers:
+        Location:
+          description: Relative URI of the created category.
+          schema:
+            type: string
+          example: /categories/1
       content:
         application/json:
           schema:
@@ -91,8 +97,8 @@ post:
                 name: Plomería
                 normalized_name: plomería
     '400':
-      description: The request body is not valid JSON, cannot be bound to the expected
-        payload, or the category name is empty after trimming.
+      description: The request body is invalid, the name is not text, the name is empty
+        after trimming, or it exceeds 100 Unicode characters.
       content:
         application/json:
           schema:
@@ -104,7 +110,15 @@ post:
             invalidJson:
               summary: Invalid JSON body
               value:
-                error: invalid character '}' looking for beginning of object key string
+                error: Invalid request body
+            nameMustBeText:
+              summary: Category name has the wrong JSON type
+              value:
+                error: Category name must be text
+            nameTooLong:
+              summary: Category name exceeds 100 characters
+              value:
+                error: Category name is too long
     '401':
       description: Authentication failed or the authenticated user id could not be
         obtained from the request context.
@@ -136,3 +150,19 @@ post:
             categoryAlreadyExists:
               value:
                 error: Category already exists
+    '403':
+      description: The authenticated principal does not have the create:categories permission.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: insufficient permissions
+    '500':
+      description: An unexpected persistence error occurred while creating the category.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: Internal Server Error

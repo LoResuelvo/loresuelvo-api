@@ -6,6 +6,8 @@ required:
 properties:
   name:
     type: string
+    maxLength: 100
     description: Category display name. Must be non-empty after trimming. Duplicate
-      detection uses a lowercase normalized version.
+      detection uses a lowercase normalized version. Length is measured in Unicode
+      characters after trimming.
     example: Plomería
