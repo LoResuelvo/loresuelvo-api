@@ -3,12 +3,55 @@ get:
   - Administration
   operationId: listAdminProviders
   summary: List registered providers
-  description: Returns every registered provider with its operational information. Requires the `read:providers` permission in the Bearer JWT.
+  description: Returns registered providers with their operational information, optionally filtered by name, surname, or email and provider attributes. Multiple filters are combined with AND. Requires the `read:providers` permission in the Bearer JWT.
   security:
   - BearerAuth: []
+  parameters:
+  - name: q
+    in: query
+    required: false
+    description: Case-insensitive substring to match against provider name, surname, or email. Omit or leave empty to match all providers.
+    schema:
+      type: string
+    example: GÓMEZ
+  - name: category_id
+    in: query
+    required: false
+    description: Match providers registered in this category. Must be one positive integer; an ID with no matches returns an empty array.
+    schema:
+      type: integer
+      minimum: 1
+    example: 1
+  - name: coverage_zone_id
+    in: query
+    required: false
+    description: Match providers assigned to this coverage zone. Must be one positive integer; all of each matched provider's coverage zones remain in the response.
+    schema:
+      type: integer
+      minimum: 1
+    example: 6
+  - name: identity_verification_status
+    in: query
+    required: false
+    description: Match the provider's latest verification status; providers without verification sessions match unverified. Must be supplied once with a supported status.
+    schema:
+      type: string
+      enum:
+      - unverified
+      - not_started
+      - in_progress
+      - awaiting_user
+      - in_review
+      - approved
+      - declined
+      - resubmitted
+      - abandoned
+      - expired
+      - kyc_expired
+    example: approved
   responses:
     '200':
-      description: Provider directory returned successfully. The array is empty when no providers are registered.
+      description: Provider directory returned successfully. The array is empty when no providers match.
       content:
         application/json:
           schema:
@@ -55,6 +98,14 @@ get:
                 identity_verified_on: null
             empty:
               value: []
+    '400':
+      description: A category, coverage-zone, or verification-status filter is empty, repeated, or invalid (a non-positive or non-integer ID, or an unsupported status). An empty `q` is allowed.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: invalid filter
     '401':
       description: The Bearer token is missing or invalid.
       content:

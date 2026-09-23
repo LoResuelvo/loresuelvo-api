@@ -3,12 +3,20 @@ get:
   - Administration
   operationId: listAdminConsumers
   summary: List registered consumers
-  description: Returns every registered consumer. Requires the `read:consumers` permission in the Bearer JWT.
+  description: Returns registered consumers, optionally filtered by a case-insensitive substring of their name, surname, or email. Requires the `read:consumers` permission in the Bearer JWT. Provider-only filters are not accepted.
   security:
   - BearerAuth: []
+  parameters:
+  - name: q
+    in: query
+    required: false
+    description: Case-insensitive substring to match against consumer name, surname, or email. Omit or leave empty to return all consumers.
+    schema:
+      type: string
+    example: PÉREZ
   responses:
     '200':
-      description: Consumer directory returned successfully. The array is empty when no consumers are registered.
+      description: Consumer directory returned successfully. The array is empty when no consumers match.
       content:
         application/json:
           schema:
@@ -27,6 +35,14 @@ get:
                 created_on: '2026-09-19T12:00:00Z'
             empty:
               value: []
+    '400':
+      description: A provider-only filter (`category_id`, `coverage_zone_id`, or `identity_verification_status`) was supplied, including an empty value.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: invalid filter
     '401':
       description: The Bearer token is missing or invalid.
       content:
