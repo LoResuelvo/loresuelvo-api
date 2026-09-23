@@ -27,7 +27,6 @@ Feature: Crear rubros de prestadores
             Given que estoy autenticado como administrador "supervisor@example.com" con el permiso "create:categories"
             And que no existen rubros registrados
 
-        @wip
         Scenario: 62.1.1-CR No confirmar el rubro si falla el registro de auditoría
             Given que falla el almacenamiento del evento de auditoría de esta creación
             When intento crear el rubro "Plomería"
@@ -35,7 +34,6 @@ Feature: Crear rubros de prestadores
             And no existe el rubro "Plomería"
             And no queda registrado un evento exitoso de creación de esta solicitud
 
-        @wip
         Scenario: 62.1.2-CR No registrar un alta si falla la persistencia del rubro
             Given que falla el almacenamiento del rubro durante esta creación
             When intento crear el rubro "Plomería"
