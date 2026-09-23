@@ -386,6 +386,16 @@ func (repository *UserRepository) FindIDByAuthID(authID string) (int, error) {
 	return foundUser.ID(), nil
 }
 
+// FindOperatorIDByAuthID resolves the authenticated subject without loading a
+// profile or making an authorization decision.
+func (repository *UserRepository) FindOperatorIDByAuthID(ctx context.Context, authID string) (int, error) {
+	var id int
+	if err := repository.db.QueryRowContext(ctx, `SELECT id FROM users WHERE auth_id = $1`, authID).Scan(&id); err != nil {
+		return 0, fmt.Errorf("finding operator ID by auth ID: %w", err)
+	}
+	return id, nil
+}
+
 func rollbackUserTx(tx *sql.Tx, originalErr error) error {
 	if rollbackErr := tx.Rollback(); rollbackErr != nil {
 		return fmt.Errorf("%w; additionally could not rollback user transaction: %v", originalErr, rollbackErr)

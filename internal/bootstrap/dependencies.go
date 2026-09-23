@@ -91,6 +91,7 @@ type dependencyAdapters struct {
 	addressResolverOverride      consumer.AddressResolver
 	recommendationConfig         conversation.ProviderRecommendationConfig
 	identityWebhook              identity_verification_handler.IdentityVerificationWebhook
+	categoryUnitOfWorkDecorator  func(category.UnitOfWork) category.UnitOfWork
 }
 
 func (dependencies *Dependencies) RouterConfig(
@@ -211,7 +212,11 @@ func newDependencies(database *sql.DB, adapters dependencyAdapters) (*Dependenci
 		mediaadapter.NewWebMAudioParser(),
 		mediaadapter.NewMP4VideoParser(),
 	)
-	categoryService := category.NewService(persistence.CategoryRepository)
+	categoryUnitOfWork := category.UnitOfWork(persistence.CategoryUnitOfWork)
+	if adapters.categoryUnitOfWorkDecorator != nil {
+		categoryUnitOfWork = adapters.categoryUnitOfWorkDecorator(categoryUnitOfWork)
+	}
+	categoryService := category.NewService(persistence.CategoryRepository, categoryUnitOfWork, persistence.UserRepository, systemClock)
 	coverageZoneService := coveragezone.NewService(persistence.CoverageZoneRepository)
 	providerService := provider.NewService(
 		persistence.ProviderSearchReader,

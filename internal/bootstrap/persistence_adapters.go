@@ -11,6 +11,8 @@ type PersistenceAdapters struct {
 	ProviderSearchReader                   *repositories.ProviderSearchReader
 	UserRepository                         *repositories.UserRepository
 	CategoryRepository                     *repositories.CategoryRepository
+	AuditEventRepository                   *repositories.AuditEventRepository
+	CategoryUnitOfWork                     *repositories.CategoryUnitOfWork
 	CoverageZoneRepository                 *repositories.CoverageZoneRepository
 	ConversationRepository                 *repositories.ConversationRepository
 	MessageRepository                      *repositories.MessageRepository
@@ -39,6 +41,8 @@ type PersistenceAdapters struct {
 func NewPersistenceAdapters(database *sql.DB) *PersistenceAdapters {
 	userRepository := repositories.NewUserRepository(database)
 	categoryRepository := repositories.NewCategoryRepository(database)
+	auditEventRepository := repositories.NewAuditEventRepository(database)
+	categoryUnitOfWork := repositories.NewCategoryUnitOfWork(database, categoryRepository, auditEventRepository)
 	coverageZoneRepository := repositories.NewCoverageZoneRepository(database)
 	messageImageRepository := repositories.NewMessageImageRepository(database)
 	messageAudioRepository := repositories.NewMessageAudioRepository(database)
@@ -81,6 +85,8 @@ func NewPersistenceAdapters(database *sql.DB) *PersistenceAdapters {
 		ProviderSearchReader:                   repositories.NewProviderSearchReader(database),
 		UserRepository:                         userRepository,
 		CategoryRepository:                     categoryRepository,
+		AuditEventRepository:                   auditEventRepository,
+		CategoryUnitOfWork:                     categoryUnitOfWork,
 		CoverageZoneRepository:                 coverageZoneRepository,
 		ConversationRepository:                 conversationRepository,
 		MessageRepository:                      messageRepository,

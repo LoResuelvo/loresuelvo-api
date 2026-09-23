@@ -16,12 +16,14 @@ import (
 )
 
 const requestIDHeader = "X-Request-ID"
+const contextKeyRequestID = "requestID"
 
 var validRequestID = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$`)
 
 func RequestLogger(logger *slog.Logger) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		requestID := requestIDFromHeader(c.GetHeader(requestIDHeader))
+		c.Set(contextKeyRequestID, requestID)
 		requestLogger := logger.With("request_id", requestID)
 		c.Request = c.Request.WithContext(observability.ContextWithLogger(c.Request.Context(), requestLogger))
 		c.Header(requestIDHeader, requestID)
@@ -74,6 +76,18 @@ func RequestLogger(logger *slog.Logger) gin.HandlerFunc {
 		}
 		requestLogger.Log(c.Request.Context(), httpLogLevel(status), "http.request.completed", attributes...)
 	}
+}
+
+// GetRequestID returns the validated request ID assigned by RequestLogger.
+// Callers must not read X-Request-ID directly because invalid client values are
+// replaced before the request reaches application code.
+func GetRequestID(c *gin.Context) (string, bool) {
+	value, exists := c.Get(contextKeyRequestID)
+	if !exists {
+		return "", false
+	}
+	requestID, ok := value.(string)
+	return requestID, ok && requestID != ""
 }
 
 func Recovery(logger *slog.Logger) gin.HandlerFunc {

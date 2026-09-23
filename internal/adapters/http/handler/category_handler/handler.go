@@ -7,6 +7,7 @@ import (
 	"net/http"
 
 	httphandler "github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler"
+	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/middleware"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/category"
 	"github.com/gin-gonic/gin"
 )
@@ -33,7 +34,17 @@ func (h *CategoryHandler) CreateCategory(c *gin.Context) {
 		return
 	}
 
-	createdCategory, err := h.categoryService.CreateCategory(req.Name)
+	authSubject, ok := httphandler.GetAuthenticatedUserID(c)
+	if !ok {
+		return
+	}
+	correlationID, ok := middleware.GetRequestID(c)
+	if !ok {
+		httphandler.RespondError(c, http.StatusInternalServerError, http.StatusText(http.StatusInternalServerError))
+		return
+	}
+
+	createdCategory, err := h.categoryService.CreateCategory(c.Request.Context(), req.Name, authSubject, correlationID)
 	if err != nil {
 		handleCreateCategoryError(c, err)
 		return

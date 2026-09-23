@@ -12,6 +12,7 @@ import (
 	didit "github.com/LoResuelvo/loresuelvo-api/internal/adapters/identityverification/didit"
 	identityverificationfake "github.com/LoResuelvo/loresuelvo-api/internal/adapters/identityverification/fake"
 	locationadapter "github.com/LoResuelvo/loresuelvo-api/internal/adapters/location"
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/category"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/conversation"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/payment"
 	paymentaccount "github.com/LoResuelvo/loresuelvo-api/internal/domain/payment_account"
@@ -40,10 +41,18 @@ func NewTestDependencies(
 	credentialProtector paymentaccount.CredentialProtector,
 	secretGenerator paymentaccount.SecretGenerator,
 	paymentAccountHandlerConfig payment_account_handler.Config,
+	categoryUnitOfWorkDecorator ...func(category.UnitOfWork) category.UnitOfWork,
 ) (*Dependencies, TestDoubles, error) {
+	if len(categoryUnitOfWorkDecorator) > 1 {
+		return nil, TestDoubles{}, fmt.Errorf("configuring test category unit of work: at most one decorator is allowed")
+	}
 	calendarEventPublisher := googlecalendar.NewFakeEventPublisher()
 	consumerAddressResolver := locationadapter.NewFakeAddressResolver()
 	identityVerifier := identityverificationfake.NewVerifier()
+	var categoryDecorator func(category.UnitOfWork) category.UnitOfWork
+	if len(categoryUnitOfWorkDecorator) == 1 {
+		categoryDecorator = categoryUnitOfWorkDecorator[0]
+	}
 	dependencies, err := newDependencies(database, dependencyAdapters{
 		chatbot:                      chatbot,
 		paymentAccountOAuthConnector: paymentAccountOAuthConnector,
@@ -59,10 +68,11 @@ func NewTestDependencies(
 			ConnectionSuccessURL:   "/me",
 			ConnectionCancelledURL: "/me",
 		},
-		identityVerifier:        identityVerifier,
-		addressResolverOverride: consumerAddressResolver,
-		recommendationConfig:    conversation.DefaultProviderRecommendationConfig(),
-		identityWebhook:         newTestIdentityVerificationWebhook(),
+		identityVerifier:            identityVerifier,
+		addressResolverOverride:     consumerAddressResolver,
+		recommendationConfig:        conversation.DefaultProviderRecommendationConfig(),
+		identityWebhook:             newTestIdentityVerificationWebhook(),
+		categoryUnitOfWorkDecorator: categoryDecorator,
 	})
 	if err != nil {
 		return nil, TestDoubles{}, err

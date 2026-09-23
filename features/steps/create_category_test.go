@@ -8,9 +8,12 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"time"
 
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/audit"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/category"
 	"github.com/cucumber/godog"
+	"github.com/google/uuid"
 )
 
 type categoryCreationRequest struct {
@@ -36,6 +39,8 @@ func registerCreateCategorySteps(sc *godog.ScenarioContext, suite *testSuite) {
 	sc.Step(`^el sistema crea el rubro$`, suite.systemCreatesCategory)
 	sc.Step(`^la respuesta contiene el identificador, el nombre "([^"]*)" y el nombre normalizado "([^"]*)"$`, suite.categoryCreationResponseContains)
 	sc.Step(`^la ubicación del recurso creado corresponde al identificador del rubro$`, suite.createdCategoryLocationMatchesID)
+	sc.Step(`^queda registrado un único evento de creación exitosa para este rubro por "([^"]*)"$`, suite.categoryCreationAuditEventIsRecorded)
+	sc.Step(`^ese evento contiene la fecha y hora "([^"]*)" en UTC y la correlación de esta solicitud$`, suite.categoryCreationAuditEventHasExpectedTimeAndCorrelation)
 	sc.Step(`^el sistema rechaza la creación porque el nombre del rubro es obligatorio$`, suite.systemRejectsRequiredCategoryName)
 	sc.Step(`^el sistema rechaza la creación porque el nombre del rubro es demasiado largo$`, suite.systemRejectsTooLongCategoryName)
 	sc.Step(`^el sistema rechaza la creación porque el nombre del rubro debe ser texto$`, suite.systemRejectsNonTextCategoryName)
@@ -88,6 +93,8 @@ func (suite *testSuite) tryCreateCategoryWithNumericName() error {
 }
 
 func (suite *testSuite) requestCategoryCreation(payload any) error {
+	suite.categoryAuditCapture.reset()
+	suite.lastCategoryAuditEventIDs = nil
 	response, err := suite.postCategoryCreation(payload)
 	if err != nil {
 		return err
@@ -102,7 +109,66 @@ func (suite *testSuite) requestCategoryCreation(payload any) error {
 	suite.lastStatus = response.StatusCode
 	suite.lastBody = body
 	suite.lastLocation = response.Header.Get("Location")
+	suite.lastRequestID = response.Header.Get("X-Request-ID")
+	suite.lastCategoryAuditEventIDs = suite.categoryAuditCapture.snapshot()
 	return nil
+}
+
+func (suite *testSuite) categoryCreationAuditEventIsRecorded(email string) error {
+	if len(suite.lastCategoryAuditEventIDs) != 1 {
+		return fmt.Errorf("expected exactly one committed category audit event for this request, got %d", len(suite.lastCategoryAuditEventIDs))
+	}
+
+	categoryResponse, err := suite.categoryCreationResponse()
+	if err != nil {
+		return err
+	}
+	event, err := suite.categoryAuditEvent(suite.lastCategoryAuditEventIDs[0])
+	if err != nil {
+		return err
+	}
+	operatorID, err := suite.userRepository.FindOperatorIDByAuthID(suite.scenarioContext, auth0IDForAdminEmail(email))
+	if err != nil {
+		return fmt.Errorf("finding audit event operator for %q: %w", email, err)
+	}
+	if event.OperatorID() != operatorID || event.Action() != audit.ActionCreate ||
+		event.ResourceType() != "category" || event.ResourceID() != fmt.Sprintf("%d", categoryResponse.ID) ||
+		event.Result() != audit.ResultSucceeded {
+		return fmt.Errorf(
+			"category audit event mismatch: operator_id=%d action=%q resource_type=%q resource_id=%q result=%q",
+			event.OperatorID(), event.Action(), event.ResourceType(), event.ResourceID(), event.Result(),
+		)
+	}
+	if event.Reason() != nil || event.StateChange() != nil {
+		return fmt.Errorf("category creation audit event unexpectedly contains optional metadata")
+	}
+	return nil
+}
+
+func (suite *testSuite) categoryCreationAuditEventHasExpectedTimeAndCorrelation(expectedTime string) error {
+	if len(suite.lastCategoryAuditEventIDs) != 1 {
+		return fmt.Errorf("expected exactly one committed category audit event for this request, got %d", len(suite.lastCategoryAuditEventIDs))
+	}
+	event, err := suite.categoryAuditEvent(suite.lastCategoryAuditEventIDs[0])
+	if err != nil {
+		return err
+	}
+	parsedExpectedTime, err := time.Parse(time.RFC3339Nano, expectedTime)
+	if err != nil {
+		return fmt.Errorf("parsing expected category audit timestamp %q: %w", expectedTime, err)
+	}
+	_, offset := event.OccurredOn().Zone()
+	if offset != 0 || !event.OccurredOn().Equal(parsedExpectedTime.UTC()) {
+		return fmt.Errorf("expected category audit timestamp %s in UTC, got %s", parsedExpectedTime.UTC().Format(time.RFC3339Nano), event.OccurredOn().Format(time.RFC3339Nano))
+	}
+	if suite.lastRequestID == "" || event.CorrelationID() != suite.lastRequestID {
+		return fmt.Errorf("expected audit correlation %q from response X-Request-ID, got %q", suite.lastRequestID, event.CorrelationID())
+	}
+	return nil
+}
+
+func (suite *testSuite) categoryAuditEvent(id uuid.UUID) (*audit.Event, error) {
+	return suite.auditEvents.FindByID(suite.scenarioContext, id)
 }
 
 func (suite *testSuite) systemCreatesCategory() error {

@@ -28,6 +28,7 @@ import (
 	"github.com/LoResuelvo/loresuelvo-api/internal/bootstrap"
 	filedomain "github.com/LoResuelvo/loresuelvo-api/internal/domain/file"
 	"github.com/LoResuelvo/loresuelvo-api/internal/infrastructure/db"
+	"github.com/LoResuelvo/loresuelvo-api/internal/testsupport"
 	"github.com/auth0/go-jwt-middleware/v3/validator"
 	"github.com/cucumber/godog"
 	"github.com/google/uuid"
@@ -40,6 +41,7 @@ type testSuite struct {
 	dependencies                   *bootstrap.Dependencies
 	database                       *sql.DB
 	categoryRepository             *repositories.CategoryRepository
+	auditEvents                    testsupport.AuditEvents
 	coverageZoneRepository         *repositories.CoverageZoneRepository
 	conversationRepository         *repositories.ConversationRepository
 	messageRepository              *repositories.MessageRepository
@@ -71,6 +73,9 @@ type testSuite struct {
 	lastBody                                []byte
 	expectedCoverageZoneRegistrationError   string
 	lastLocation                            string
+	lastRequestID                           string
+	categoryAuditCapture                    *categoryAuditEventCapture
+	lastCategoryAuditEventIDs               []uuid.UUID
 	currentAuth0ID                          string
 	currentPermissions                      []string
 	invalidSession                          bool
@@ -352,6 +357,7 @@ func newTestSuite(tb testing.TB, database *sql.DB) *testSuite {
 	checkoutClient := paymentmercadopago.NewFakeCheckoutClient()
 	webhookVerifier, err := paymentmercadopago.NewWebhookVerifier("test-mercado-pago-webhook-secret")
 	require.NoError(tb, err, "could not initialize test webhook verifier")
+	auditCapture := &categoryAuditEventCapture{}
 	dependencies, doubles, err := bootstrap.NewTestDependencies(
 		database,
 		chatbot,
@@ -364,6 +370,7 @@ func newTestSuite(tb testing.TB, database *sql.DB) *testSuite {
 			ConnectionSuccessURL:   "http://frontend.loresuelvo.test/provider/register/mercado-pago?result=success",
 			ConnectionCancelledURL: "http://frontend.loresuelvo.test/provider/register/mercado-pago?result=cancelled",
 		},
+		auditCapture.decorate,
 	)
 	require.NoError(tb, err, "could not initialize dependencies")
 	auth0Validator := auth0.NewFakeValidator()
@@ -383,6 +390,7 @@ func newTestSuite(tb testing.TB, database *sql.DB) *testSuite {
 		dependencies:                   dependencies,
 		database:                       database,
 		categoryRepository:             dependencies.Persistence.CategoryRepository,
+		auditEvents:                    testsupport.AuditEvents{Reader: dependencies.Persistence.AuditEventRepository},
 		coverageZoneRepository:         dependencies.Persistence.CoverageZoneRepository,
 		conversationRepository:         dependencies.Persistence.ConversationRepository,
 		messageRepository:              dependencies.Persistence.MessageRepository,
@@ -408,6 +416,7 @@ func newTestSuite(tb testing.TB, database *sql.DB) *testSuite {
 		consumerAddressResolver:        doubles.ConsumerAddressResolver,
 		identityVerificationRepository: dependencies.Persistence.IdentityVerificationRepository,
 		identityVerifier:               doubles.IdentityVerifier,
+		categoryAuditCapture:           auditCapture,
 		scenarioContext:                context.Background(),
 
 		categoryIDsByName:                   map[string]int{},

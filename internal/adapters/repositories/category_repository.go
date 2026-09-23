@@ -1,6 +1,7 @@
 package repositories
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"fmt"
@@ -20,8 +21,16 @@ func NewCategoryRepository(db *sql.DB) *CategoryRepository {
 }
 
 func (repository *CategoryRepository) Save(categoryToSave category.Category) (*category.Category, error) {
+	return repository.saveWithExecutor(context.Background(), repository.db, categoryToSave)
+}
+
+type categoryInsertExecutor interface {
+	QueryRowContext(context.Context, string, ...any) *sql.Row
+}
+
+func (repository *CategoryRepository) saveWithExecutor(ctx context.Context, executor categoryInsertExecutor, categoryToSave category.Category) (*category.Category, error) {
 	var savedCategory category.Category
-	err := repository.db.QueryRow(
+	err := executor.QueryRowContext(ctx,
 		`INSERT INTO categories (name, normalized_name, created_on, updated_on)
 		VALUES ($1, $2, NOW(), NOW())
 		RETURNING id, name, normalized_name`,
