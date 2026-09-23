@@ -13,13 +13,13 @@ Feature: Crear rubros de prestadores
             And que no existen rubros registrados
 
         Scenario: 38.1.1-CR Crear un rubro
-            # US-62.1: Given que la fecha y hora actual del sistema es "2026-08-15T14:00:00Z"
+            Given que la fecha y hora actual del sistema es "2026-08-15T14:00:00Z"
             When creo el rubro "Plomería"
             Then el sistema crea el rubro
             And la respuesta contiene el identificador, el nombre "Plomería" y el nombre normalizado "plomería"
             And la ubicación del recurso creado corresponde al identificador del rubro
-            # US-62.1: And queda registrado un único evento de creación exitosa para este rubro por "supervisor@example.com"
-            # US-62.1: And ese evento contiene la fecha y hora "2026-08-15T14:00:00Z" en UTC y la correlación de esta solicitud
+            And queda registrado un único evento de creación exitosa para este rubro por "supervisor@example.com"
+            And ese evento contiene la fecha y hora "2026-08-15T14:00:00Z" en UTC y la correlación de esta solicitud
 
     Rule: El rubro y su auditoría se confirman conjuntamente
 
