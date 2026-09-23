@@ -13,7 +13,6 @@ import (
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/audit"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/category"
 	"github.com/cucumber/godog"
-	"github.com/google/uuid"
 )
 
 type categoryCreationRequest struct {
@@ -161,8 +160,14 @@ func (suite *testSuite) categoryDoesNotExist(name string) error {
 }
 
 func (suite *testSuite) categoryCreationHasNoSuccessfulAuditEvent() error {
-	if committedIDs := suite.categoryAuditCapture.snapshot(); len(committedIDs) != 0 {
-		return fmt.Errorf("expected no committed category audit event for this request, got %d", len(committedIDs))
+	for _, eventID := range suite.categoryAuditCapture.snapshot() {
+		event, err := suite.auditEvents.FindByID(suite.scenarioContext, eventID)
+		if err != nil {
+			return fmt.Errorf("checking committed category audit event: %w", err)
+		}
+		if isSuccessfulCategoryCreationAuditEvent(event) {
+			return fmt.Errorf("expected no successful category creation audit event for this request")
+		}
 	}
 	if suite.categoryAuditCapture.failureMode() == categoryAuditFailureSaveCategory && suite.categoryAuditCapture.saveCategoryAttemptCount() != 1 {
 		return fmt.Errorf("expected exactly one category persistence attempt in the injected-failure scenario, got %d", suite.categoryAuditCapture.saveCategoryAttemptCount())
@@ -183,16 +188,17 @@ func (suite *testSuite) categoryCreationHasNoSuccessfulAuditEvent() error {
 	return nil
 }
 
-func (suite *testSuite) categoryCreationAuditEventIsRecorded(email string) error {
-	if len(suite.lastCategoryAuditEventIDs) != 1 {
-		return fmt.Errorf("expected exactly one committed category audit event for this request, got %d", len(suite.lastCategoryAuditEventIDs))
-	}
+func isSuccessfulCategoryCreationAuditEvent(event *audit.Event) bool {
+	return event != nil && event.Action() == audit.ActionCreate &&
+		event.Result() == audit.ResultSucceeded && event.ResourceType() == "category"
+}
 
+func (suite *testSuite) categoryCreationAuditEventIsRecorded(email string) error {
 	categoryResponse, err := suite.categoryCreationResponse()
 	if err != nil {
 		return err
 	}
-	event, err := suite.categoryAuditEvent(suite.lastCategoryAuditEventIDs[0])
+	event, err := suite.successfulCategoryCreationAuditEvent(categoryResponse.ID)
 	if err != nil {
 		return err
 	}
@@ -215,10 +221,11 @@ func (suite *testSuite) categoryCreationAuditEventIsRecorded(email string) error
 }
 
 func (suite *testSuite) categoryCreationAuditEventHasExpectedTimeAndCorrelation(expectedTime string) error {
-	if len(suite.lastCategoryAuditEventIDs) != 1 {
-		return fmt.Errorf("expected exactly one committed category audit event for this request, got %d", len(suite.lastCategoryAuditEventIDs))
+	categoryResponse, err := suite.categoryCreationResponse()
+	if err != nil {
+		return err
 	}
-	event, err := suite.categoryAuditEvent(suite.lastCategoryAuditEventIDs[0])
+	event, err := suite.successfulCategoryCreationAuditEvent(categoryResponse.ID)
 	if err != nil {
 		return err
 	}
@@ -236,8 +243,23 @@ func (suite *testSuite) categoryCreationAuditEventHasExpectedTimeAndCorrelation(
 	return nil
 }
 
-func (suite *testSuite) categoryAuditEvent(id uuid.UUID) (*audit.Event, error) {
-	return suite.auditEvents.FindByID(suite.scenarioContext, id)
+func (suite *testSuite) successfulCategoryCreationAuditEvent(categoryID int) (*audit.Event, error) {
+	var matchingEvent *audit.Event
+	matchingEvents := 0
+	for _, eventID := range suite.lastCategoryAuditEventIDs {
+		event, err := suite.auditEvents.FindByID(suite.scenarioContext, eventID)
+		if err != nil {
+			return nil, fmt.Errorf("reading category audit event: %w", err)
+		}
+		if isSuccessfulCategoryCreationAuditEvent(event) && event.ResourceID() == fmt.Sprintf("%d", categoryID) {
+			matchingEvent = event
+			matchingEvents++
+		}
+	}
+	if matchingEvents != 1 {
+		return nil, fmt.Errorf("expected exactly one successful creation event for this category, got %d", matchingEvents)
+	}
+	return matchingEvent, nil
 }
 
 func (suite *testSuite) systemCreatesCategory() error {
