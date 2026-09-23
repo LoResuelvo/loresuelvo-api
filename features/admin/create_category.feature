@@ -50,12 +50,12 @@ Feature: Crear rubros de prestadores
         Scenario: 38.1.2-CR Rechazar la creación sin nombre
             When intento crear un rubro sin nombre
             Then el sistema rechaza la creación porque el nombre del rubro es obligatorio
-            # US-62.1: And no queda registrado un evento exitoso de creación de esta solicitud
+            And no queda registrado un evento exitoso de creación de esta solicitud
 
         Scenario Outline: 38.1.3-CR Rechazar un nombre con una longitud inválida
             When intento crear un rubro con <nombre>
             Then el sistema rechaza la creación porque <motivo>
-            # US-62.1: And no queda registrado un evento exitoso de creación de esta solicitud
+            And no queda registrado un evento exitoso de creación de esta solicitud
 
             Examples:
                 | nombre                      | motivo                                 |
@@ -66,7 +66,7 @@ Feature: Crear rubros de prestadores
         Scenario: 38.1.4-CR Rechazar un nombre cuyo tipo no es texto
             When intento crear un rubro con un nombre numérico
             Then el sistema rechaza la creación porque el nombre del rubro debe ser texto
-            # US-62.1: And no queda registrado un evento exitoso de creación de esta solicitud
+            And no queda registrado un evento exitoso de creación de esta solicitud
 
     Rule: El nombre normalizado del rubro debe ser único
 
@@ -77,7 +77,7 @@ Feature: Crear rubros de prestadores
             Given que existe el rubro "Plomería"
             When intento crear el rubro <nombre duplicado>
             Then el sistema rechaza la creación porque el rubro ya existe
-            # US-62.1: And no queda registrado un evento exitoso de creación de esta solicitud
+            And no queda registrado un evento exitoso de creación de esta solicitud
 
             Examples:
                 | nombre duplicado |
@@ -91,10 +91,10 @@ Feature: Crear rubros de prestadores
             Given que no tengo una sesión válida
             When intento crear el rubro "Plomería"
             Then el sistema deniega el acceso
-            # US-62.1: And no queda registrado un evento exitoso de creación de esta solicitud
+            And no queda registrado un evento exitoso de creación de esta solicitud
 
         Scenario: 38.1.7-CR Rechazar la creación sin el permiso requerido
             Given que estoy autenticado como administrador "supervisor@example.com" solamente con el permiso "read:providers"
             When intento crear el rubro "Plomería"
             Then el sistema responde con estado 403
-            # US-62.1: And no queda registrado un evento exitoso de creación de esta solicitud
+            And no queda registrado un evento exitoso de creación de esta solicitud
