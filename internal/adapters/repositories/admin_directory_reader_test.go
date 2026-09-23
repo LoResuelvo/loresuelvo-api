@@ -52,7 +52,7 @@ func TestAdminDirectoryReaderFindsOnlyConsumers(t *testing.T) {
 	require.NoError(t, err)
 
 	reader := repositories.NewAdminDirectoryReader(database)
-	consumers, err := reader.FindConsumers(t.Context())
+	consumers, err := reader.FindConsumers(t.Context(), "")
 
 	require.NoError(t, err)
 	require.Len(t, consumers, 2)
@@ -71,7 +71,7 @@ func TestAdminDirectoryReaderReturnsNonNilEmptyConsumers(t *testing.T) {
 	_, database := newUserRepositoryTest(t)
 	reader := repositories.NewAdminDirectoryReader(database)
 
-	consumers, err := reader.FindConsumers(t.Context())
+	consumers, err := reader.FindConsumers(t.Context(), "")
 
 	require.NoError(t, err)
 	assert.NotNil(t, consumers)
@@ -84,7 +84,7 @@ func TestAdminDirectoryReaderHonorsContextCancellation(t *testing.T) {
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 
-	consumers, err := reader.FindConsumers(ctx)
+	consumers, err := reader.FindConsumers(ctx, "")
 
 	assert.Nil(t, consumers)
 	assert.ErrorIs(t, err, context.Canceled)
@@ -170,7 +170,7 @@ func TestAdminDirectoryReaderFindsProvidersWithOperationalDataAndLatestVerificat
 	require.NoError(t, verificationRepository.Save(t.Context(), declinedWithStaleVerifiedOn))
 
 	reader := repositories.NewAdminDirectoryReader(database)
-	providers, err := reader.FindProviders(t.Context())
+	providers, err := reader.FindProviders(t.Context(), "")
 
 	require.NoError(t, err)
 	require.Len(t, providers, 3)
@@ -199,7 +199,7 @@ func TestAdminDirectoryReaderReturnsNonNilEmptyProviders(t *testing.T) {
 	require.NoError(t, userRepository.DeleteAll())
 	reader := repositories.NewAdminDirectoryReader(database)
 
-	providers, err := reader.FindProviders(t.Context())
+	providers, err := reader.FindProviders(t.Context(), "")
 
 	require.NoError(t, err)
 	assert.NotNil(t, providers)
@@ -212,8 +212,83 @@ func TestAdminDirectoryReaderFindProvidersHonorsContextCancellation(t *testing.T
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 
-	providers, err := reader.FindProviders(ctx)
+	providers, err := reader.FindProviders(ctx, "")
 
 	assert.Nil(t, providers)
 	assert.ErrorIs(t, err, context.Canceled)
+}
+
+func TestAdminDirectoryReaderSearchesConsumersByNameSurnameAndEmail(t *testing.T) {
+	userRepository, database := newUserRepositoryTest(t)
+	require.NoError(t, userRepository.DeleteAll())
+	ana := consumerWithAddress(t, database, "auth0|admin-search-ana", "ana.perez@example.com", "Ana", "Pérez")
+	beatriz := consumerWithAddress(t, database, "auth0|admin-search-beatriz", "beatriz@example.com", "Beatriz", "Suárez")
+	_, err := userRepository.Save(t.Context(), ana)
+	require.NoError(t, err)
+	_, err = userRepository.Save(t.Context(), beatriz)
+	require.NoError(t, err)
+	reader := repositories.NewAdminDirectoryReader(database)
+
+	for _, query := range []string{"ANA", "PÉREZ", "ANA.PEREZ@EXAMPLE.COM", "ana.perez", "aNa"} {
+		t.Run(query, func(t *testing.T) {
+			found, err := reader.FindConsumers(t.Context(), query)
+
+			require.NoError(t, err)
+			require.Len(t, found, 1)
+			assert.Equal(t, ana.ID(), found[0].ID)
+		})
+	}
+	for _, query := range []string{"inexistente", "%", "_"} {
+		t.Run(query, func(t *testing.T) {
+			found, err := reader.FindConsumers(t.Context(), query)
+
+			require.NoError(t, err)
+			assert.NotNil(t, found)
+			assert.Empty(t, found)
+		})
+	}
+}
+
+func TestAdminDirectoryReaderSearchesProvidersWithoutTrimmingCoverageZones(t *testing.T) {
+	userRepository, database := newUserRepositoryTest(t)
+	require.NoError(t, userRepository.DeleteAll())
+	categoryRepository := repositories.NewCategoryRepository(database)
+	firstZone := savedCoverageZoneForProvider(t, database, "Comuna 6")
+	secondZone := savedCoverageZoneForProvider(t, database, "Comuna 14")
+	juan := validProviderWithCoverageZones(
+		t, categoryRepository, database,
+		"auth0|admin-search-juan", "juan.gomez@example.com", "Juan", "Gómez", "Plomería",
+		[]coveragezone.CoverageZone{*firstZone, *secondZone},
+	)
+	laura := validProviderWithData(
+		t, categoryRepository, database,
+		"auth0|admin-search-laura", "laura@example.com", "Laura", "Díaz", "Plomería",
+	)
+	_, err := userRepository.Save(t.Context(), juan)
+	require.NoError(t, err)
+	_, err = userRepository.Save(t.Context(), laura)
+	require.NoError(t, err)
+	reader := repositories.NewAdminDirectoryReader(database)
+
+	for _, query := range []string{"JUAN", "GÓMEZ", "JUAN.GOMEZ@EXAMPLE.COM", "juan.gomez"} {
+		t.Run(query, func(t *testing.T) {
+			found, err := reader.FindProviders(t.Context(), query)
+
+			require.NoError(t, err)
+			require.Len(t, found, 1)
+			assert.Equal(t, juan.ID(), found[0].ID)
+			require.Len(t, found[0].CoverageZones, 2)
+			assert.Equal(t, firstZone.ID, found[0].CoverageZones[0].ID)
+			assert.Equal(t, secondZone.ID, found[0].CoverageZones[1].ID)
+		})
+	}
+	for _, query := range []string{"inexistente", "%", "_"} {
+		t.Run(query, func(t *testing.T) {
+			found, err := reader.FindProviders(t.Context(), query)
+
+			require.NoError(t, err)
+			assert.NotNil(t, found)
+			assert.Empty(t, found)
+		})
+	}
 }

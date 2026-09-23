@@ -7,9 +7,9 @@ import (
 )
 
 type ConsumerDirectoryReader interface {
-	FindConsumers(ctx context.Context) ([]readmodel.Consumer, error)
+	FindConsumers(ctx context.Context, query string) ([]readmodel.Consumer, error)
 }
 
 type ProviderDirectoryReader interface {
-	FindProviders(ctx context.Context) ([]readmodel.Provider, error)
+	FindProviders(ctx context.Context, query string) ([]readmodel.Provider, error)
 }

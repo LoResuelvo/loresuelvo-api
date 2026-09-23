@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	readmodel "github.com/LoResuelvo/loresuelvo-api/internal/domain/admin/read_model"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -13,7 +14,7 @@ import (
 
 func TestAdminHandlerReturnsInternalErrorWhenConsumerDirectoryFails(t *testing.T) {
 	service := new(serviceMock)
-	service.On("ListConsumers", mock.Anything).Return(nil, errors.New("database unavailable")).Once()
+	service.On("ListConsumers", mock.Anything, "").Return(nil, errors.New("database unavailable")).Once()
 	handler := NewAdminHandler(service)
 	context, recorder := adminHandlerTestContext(http.MethodGet, "/admin/consumers")
 
@@ -26,7 +27,7 @@ func TestAdminHandlerReturnsInternalErrorWhenConsumerDirectoryFails(t *testing.T
 
 func TestAdminHandlerReturnsInternalErrorWhenProviderDirectoryFails(t *testing.T) {
 	service := new(serviceMock)
-	service.On("ListProviders", mock.Anything).Return(nil, errors.New("database unavailable")).Once()
+	service.On("ListProviders", mock.Anything, "").Return(nil, errors.New("database unavailable")).Once()
 	handler := NewAdminHandler(service)
 	context, recorder := adminHandlerTestContext(http.MethodGet, "/admin/providers")
 
@@ -43,4 +44,30 @@ func adminHandlerTestContext(method, path string) (*gin.Context, *httptest.Respo
 	context, _ := gin.CreateTestContext(recorder)
 	context.Request = httptest.NewRequest(method, path, nil)
 	return context, recorder
+}
+
+func TestAdminHandlerPassesConsumerSearchQuery(t *testing.T) {
+	service := new(serviceMock)
+	service.On("ListConsumers", mock.Anything, "PÉREZ").Return([]readmodel.Consumer{}, nil).Once()
+	handler := NewAdminHandler(service)
+	context, recorder := adminHandlerTestContext(http.MethodGet, "/admin/consumers?q=P%C3%89REZ")
+
+	handler.ListConsumers(context)
+
+	assert.Equal(t, http.StatusOK, recorder.Code)
+	assert.JSONEq(t, `[]`, recorder.Body.String())
+	service.AssertExpectations(t)
+}
+
+func TestAdminHandlerPassesProviderSearchQuery(t *testing.T) {
+	service := new(serviceMock)
+	service.On("ListProviders", mock.Anything, "GÓMEZ").Return([]readmodel.Provider{}, nil).Once()
+	handler := NewAdminHandler(service)
+	context, recorder := adminHandlerTestContext(http.MethodGet, "/admin/providers?q=G%C3%93MEZ")
+
+	handler.ListProviders(context)
+
+	assert.Equal(t, http.StatusOK, recorder.Code)
+	assert.JSONEq(t, `[]`, recorder.Body.String())
+	service.AssertExpectations(t)
 }

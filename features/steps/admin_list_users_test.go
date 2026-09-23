@@ -85,6 +85,8 @@ func registerAdminListUsersSteps(sc *godog.ScenarioContext, suite *testSuite) {
 	sc.Step(`^el prestador "([^"]*)" no informa una fecha de verificación$`, suite.providerDirectoryDoesNotReportVerificationDate)
 	sc.Step(`^el prestador "([^"]*)" no expone credenciales, identificadores del proveedor de identidad, documentos ni códigos de riesgo$`, suite.providerDirectoryDoesNotExposeSensitiveData)
 	sc.Step(`^el sistema devuelve un directorio de prestadores vacío$`, suite.systemReturnsEmptyProviderDirectory)
+	sc.Step(`^busco (consumidores|prestadores) con el texto "([^"]*)"$`, suite.searchAdminDirectory)
+	sc.Step(`^el directorio contiene solamente a "([^"]*)"$`, suite.adminDirectoryContainsOnly)
 }
 
 func (suite *testSuite) thereAreRegisteredConsumers(table *godog.Table) error {
@@ -419,6 +421,39 @@ func applyVerificationResult(
 
 func (suite *testSuite) requestProviderDirectory() error {
 	return suite.requestAdminDirectory("/admin/providers")
+}
+
+func (suite *testSuite) searchAdminDirectory(userType, searchText string) error {
+	var path string
+	switch userType {
+	case "consumidores":
+		path = "/admin/consumers"
+	case "prestadores":
+		path = "/admin/providers"
+	default:
+		return fmt.Errorf("unsupported administrative directory type %q", userType)
+	}
+
+	query := url.Values{}
+	query.Set("q", searchText)
+	return suite.requestAdminDirectory(path + "?" + query.Encode())
+}
+
+func (suite *testSuite) adminDirectoryContainsOnly(email string) error {
+	if err := suite.lastResponseShouldHaveStatusCode(http.StatusOK); err != nil {
+		return err
+	}
+
+	var directory []struct {
+		Email string `json:"email"`
+	}
+	if err := json.Unmarshal(suite.lastBody, &directory); err != nil {
+		return fmt.Errorf("response is not a valid administrative directory: %w", err)
+	}
+	if len(directory) != 1 || directory[0].Email != email {
+		return fmt.Errorf("expected only %q in administrative directory, got %s", email, suite.lastBody)
+	}
+	return nil
 }
 
 func (suite *testSuite) providerDirectoryContainsExactly(table *godog.Table) error {

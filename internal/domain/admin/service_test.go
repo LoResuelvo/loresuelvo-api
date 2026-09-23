@@ -20,7 +20,7 @@ func TestServiceListsConsumersWithProfilePhotoURLsResolvedInBulk(t *testing.T) {
 		{ID: 3, Email: "carla@example.com", ProfilePhotoFileID: "photo-3", CreatedOn: createdOn.Add(2 * time.Minute)},
 	}
 	reader := new(consumerDirectoryReaderMock)
-	reader.On("FindConsumers", mock.Anything).Return(consumers, nil).Once()
+	reader.On("FindConsumers", mock.Anything, "").Return(consumers, nil).Once()
 	resolver := new(profilePhotoURLResolverMock)
 	resolver.On("ResolvePublicURLs", mock.Anything, []string{"photo-1", "photo-3"}).Return(map[string]string{
 		"photo-1": "https://cdn.example/photo-1.jpg",
@@ -28,7 +28,7 @@ func TestServiceListsConsumersWithProfilePhotoURLsResolvedInBulk(t *testing.T) {
 	}, nil).Once()
 	service := admin.NewService(reader, nil, resolver)
 
-	result, err := service.ListConsumers(t.Context())
+	result, err := service.ListConsumers(t.Context(), "")
 
 	require.NoError(t, err)
 	require.Len(t, result, 3)
@@ -41,11 +41,11 @@ func TestServiceListsConsumersWithProfilePhotoURLsResolvedInBulk(t *testing.T) {
 
 func TestServiceReturnsNonNilEmptyConsumerDirectoryWithoutResolvingPhotos(t *testing.T) {
 	reader := new(consumerDirectoryReaderMock)
-	reader.On("FindConsumers", mock.Anything).Return([]readmodel.Consumer{}, nil).Once()
+	reader.On("FindConsumers", mock.Anything, "").Return([]readmodel.Consumer{}, nil).Once()
 	resolver := new(profilePhotoURLResolverMock)
 	service := admin.NewService(reader, nil, resolver)
 
-	result, err := service.ListConsumers(t.Context())
+	result, err := service.ListConsumers(t.Context(), "")
 
 	require.NoError(t, err)
 	assert.NotNil(t, result)
@@ -57,11 +57,11 @@ func TestServiceReturnsNonNilEmptyConsumerDirectoryWithoutResolvingPhotos(t *tes
 func TestServiceDoesNotResolvePhotosWhenConsumersHaveNone(t *testing.T) {
 	consumers := []readmodel.Consumer{{ID: 1, Email: "ana@example.com"}}
 	reader := new(consumerDirectoryReaderMock)
-	reader.On("FindConsumers", mock.Anything).Return(consumers, nil).Once()
+	reader.On("FindConsumers", mock.Anything, "").Return(consumers, nil).Once()
 	resolver := new(profilePhotoURLResolverMock)
 	service := admin.NewService(reader, nil, resolver)
 
-	result, err := service.ListConsumers(t.Context())
+	result, err := service.ListConsumers(t.Context(), "")
 
 	require.NoError(t, err)
 	assert.Equal(t, consumers, result)
@@ -72,10 +72,10 @@ func TestServiceDoesNotResolvePhotosWhenConsumersHaveNone(t *testing.T) {
 func TestServiceWrapsConsumerReaderError(t *testing.T) {
 	expectedErr := errors.New("database unavailable")
 	reader := new(consumerDirectoryReaderMock)
-	reader.On("FindConsumers", mock.Anything).Return(nil, expectedErr).Once()
+	reader.On("FindConsumers", mock.Anything, "").Return(nil, expectedErr).Once()
 	service := admin.NewService(reader, nil, new(profilePhotoURLResolverMock))
 
-	result, err := service.ListConsumers(t.Context())
+	result, err := service.ListConsumers(t.Context(), "")
 
 	assert.Nil(t, result)
 	assert.ErrorIs(t, err, expectedErr)
@@ -87,12 +87,12 @@ func TestServiceWrapsProfilePhotoResolutionError(t *testing.T) {
 	expectedErr := errors.New("storage unavailable")
 	consumers := []readmodel.Consumer{{ID: 1, Email: "ana@example.com", ProfilePhotoFileID: "photo-1"}}
 	reader := new(consumerDirectoryReaderMock)
-	reader.On("FindConsumers", mock.Anything).Return(consumers, nil).Once()
+	reader.On("FindConsumers", mock.Anything, "").Return(consumers, nil).Once()
 	resolver := new(profilePhotoURLResolverMock)
 	resolver.On("ResolvePublicURLs", mock.Anything, []string{"photo-1"}).Return(nil, expectedErr).Once()
 	service := admin.NewService(reader, nil, resolver)
 
-	result, err := service.ListConsumers(t.Context())
+	result, err := service.ListConsumers(t.Context(), "")
 
 	assert.Nil(t, result)
 	assert.ErrorIs(t, err, expectedErr)
@@ -108,7 +108,7 @@ func TestServiceListsProvidersWithProfilePhotoURLsResolvedInBulk(t *testing.T) {
 		{ID: 3, Email: "pedro@example.com", ProfilePhotoFileID: "photo-3"},
 	}
 	reader := new(providerDirectoryReaderMock)
-	reader.On("FindProviders", mock.Anything).Return(providers, nil).Once()
+	reader.On("FindProviders", mock.Anything, "").Return(providers, nil).Once()
 	resolver := new(profilePhotoURLResolverMock)
 	resolver.On("ResolvePublicURLs", mock.Anything, []string{"photo-1", "photo-3"}).Return(map[string]string{
 		"photo-1": "https://cdn.example/photo-1.jpg",
@@ -116,7 +116,7 @@ func TestServiceListsProvidersWithProfilePhotoURLsResolvedInBulk(t *testing.T) {
 	}, nil).Once()
 	service := admin.NewService(nil, reader, resolver)
 
-	result, err := service.ListProviders(t.Context())
+	result, err := service.ListProviders(t.Context(), "")
 
 	require.NoError(t, err)
 	require.Len(t, result, 3)
@@ -129,11 +129,11 @@ func TestServiceListsProvidersWithProfilePhotoURLsResolvedInBulk(t *testing.T) {
 
 func TestServiceReturnsNonNilEmptyProviderDirectoryWithoutResolvingPhotos(t *testing.T) {
 	reader := new(providerDirectoryReaderMock)
-	reader.On("FindProviders", mock.Anything).Return([]readmodel.Provider{}, nil).Once()
+	reader.On("FindProviders", mock.Anything, "").Return([]readmodel.Provider{}, nil).Once()
 	resolver := new(profilePhotoURLResolverMock)
 	service := admin.NewService(nil, reader, resolver)
 
-	result, err := service.ListProviders(t.Context())
+	result, err := service.ListProviders(t.Context(), "")
 
 	require.NoError(t, err)
 	assert.NotNil(t, result)
@@ -145,11 +145,11 @@ func TestServiceReturnsNonNilEmptyProviderDirectoryWithoutResolvingPhotos(t *tes
 func TestServiceDoesNotResolvePhotosWhenProvidersHaveNone(t *testing.T) {
 	providers := []readmodel.Provider{{ID: 1, Email: "juan@example.com"}}
 	reader := new(providerDirectoryReaderMock)
-	reader.On("FindProviders", mock.Anything).Return(providers, nil).Once()
+	reader.On("FindProviders", mock.Anything, "").Return(providers, nil).Once()
 	resolver := new(profilePhotoURLResolverMock)
 	service := admin.NewService(nil, reader, resolver)
 
-	result, err := service.ListProviders(t.Context())
+	result, err := service.ListProviders(t.Context(), "")
 
 	require.NoError(t, err)
 	assert.Equal(t, providers, result)
@@ -160,10 +160,10 @@ func TestServiceDoesNotResolvePhotosWhenProvidersHaveNone(t *testing.T) {
 func TestServiceWrapsProviderReaderError(t *testing.T) {
 	expectedErr := errors.New("database unavailable")
 	reader := new(providerDirectoryReaderMock)
-	reader.On("FindProviders", mock.Anything).Return(nil, expectedErr).Once()
+	reader.On("FindProviders", mock.Anything, "").Return(nil, expectedErr).Once()
 	service := admin.NewService(nil, reader, new(profilePhotoURLResolverMock))
 
-	result, err := service.ListProviders(t.Context())
+	result, err := service.ListProviders(t.Context(), "")
 
 	assert.Nil(t, result)
 	assert.ErrorIs(t, err, expectedErr)
@@ -175,16 +175,42 @@ func TestServiceWrapsProviderProfilePhotoResolutionError(t *testing.T) {
 	expectedErr := errors.New("storage unavailable")
 	providers := []readmodel.Provider{{ID: 1, Email: "juan@example.com", ProfilePhotoFileID: "photo-1"}}
 	reader := new(providerDirectoryReaderMock)
-	reader.On("FindProviders", mock.Anything).Return(providers, nil).Once()
+	reader.On("FindProviders", mock.Anything, "").Return(providers, nil).Once()
 	resolver := new(profilePhotoURLResolverMock)
 	resolver.On("ResolvePublicURLs", mock.Anything, []string{"photo-1"}).Return(nil, expectedErr).Once()
 	service := admin.NewService(nil, reader, resolver)
 
-	result, err := service.ListProviders(t.Context())
+	result, err := service.ListProviders(t.Context(), "")
 
 	assert.Nil(t, result)
 	assert.ErrorIs(t, err, expectedErr)
 	assert.ErrorContains(t, err, "resolving provider profile photo URLs")
 	reader.AssertExpectations(t)
 	resolver.AssertExpectations(t)
+}
+
+func TestServiceForwardsConsumerSearchQuery(t *testing.T) {
+	reader := new(consumerDirectoryReaderMock)
+	reader.On("FindConsumers", mock.Anything, "PÉREZ").Return([]readmodel.Consumer{}, nil).Once()
+	service := admin.NewService(reader, nil, nil)
+
+	result, err := service.ListConsumers(t.Context(), "PÉREZ")
+
+	require.NoError(t, err)
+	assert.NotNil(t, result)
+	assert.Empty(t, result)
+	reader.AssertExpectations(t)
+}
+
+func TestServiceForwardsProviderSearchQuery(t *testing.T) {
+	reader := new(providerDirectoryReaderMock)
+	reader.On("FindProviders", mock.Anything, "GÓMEZ").Return([]readmodel.Provider{}, nil).Once()
+	service := admin.NewService(nil, reader, nil)
+
+	result, err := service.ListProviders(t.Context(), "GÓMEZ")
+
+	require.NoError(t, err)
+	assert.NotNil(t, result)
+	assert.Empty(t, result)
+	reader.AssertExpectations(t)
 }

@@ -9,8 +9,8 @@ import (
 
 type consumerDirectoryReaderMock struct{ mock.Mock }
 
-func (reader *consumerDirectoryReaderMock) FindConsumers(ctx context.Context) ([]readmodel.Consumer, error) {
-	args := reader.Called(ctx)
+func (reader *consumerDirectoryReaderMock) FindConsumers(ctx context.Context, query string) ([]readmodel.Consumer, error) {
+	args := reader.Called(ctx, query)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
@@ -19,8 +19,8 @@ func (reader *consumerDirectoryReaderMock) FindConsumers(ctx context.Context) ([
 
 type providerDirectoryReaderMock struct{ mock.Mock }
 
-func (reader *providerDirectoryReaderMock) FindProviders(ctx context.Context) ([]readmodel.Provider, error) {
-	args := reader.Called(ctx)
+func (reader *providerDirectoryReaderMock) FindProviders(ctx context.Context, query string) ([]readmodel.Provider, error) {
+	args := reader.Called(ctx, query)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}

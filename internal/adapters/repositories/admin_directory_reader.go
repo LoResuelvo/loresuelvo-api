@@ -20,7 +20,7 @@ func NewAdminDirectoryReader(database *sql.DB) *AdminDirectoryReader {
 	return &AdminDirectoryReader{db: database}
 }
 
-func (reader *AdminDirectoryReader) FindConsumers(ctx context.Context) ([]readmodel.Consumer, error) {
+func (reader *AdminDirectoryReader) FindConsumers(ctx context.Context, query string) ([]readmodel.Consumer, error) {
 	rows, err := reader.db.QueryContext(
 		ctx,
 		`SELECT users.id, users.name, users.surname, users.email,
@@ -28,8 +28,12 @@ func (reader *AdminDirectoryReader) FindConsumers(ctx context.Context) ([]readmo
 		FROM consumers
 		INNER JOIN users ON users.id = consumers.user_id
 		WHERE users.role = $1
+			AND (STRPOS(LOWER(users.name), LOWER($2)) > 0
+				OR STRPOS(LOWER(users.surname), LOWER($2)) > 0
+				OR STRPOS(LOWER(users.email), LOWER($2)) > 0)
 		ORDER BY users.created_on ASC, users.id ASC`,
 		consumer.Role,
+		query,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("querying administrative consumer directory: %w", err)
@@ -78,10 +82,13 @@ LEFT JOIN provider_coverage_zones ON provider_coverage_zones.provider_id = provi
 LEFT JOIN coverage_zones zones ON zones.id = provider_coverage_zones.coverage_zone_id
 LEFT JOIN latest_verifications ON latest_verifications.provider_id = providers.user_id
 WHERE users.role = $1
+	AND (STRPOS(LOWER(users.name), LOWER($2)) > 0
+		OR STRPOS(LOWER(users.surname), LOWER($2)) > 0
+		OR STRPOS(LOWER(users.email), LOWER($2)) > 0)
 ORDER BY users.created_on ASC, users.id ASC, zones.id ASC`
 
-func (reader *AdminDirectoryReader) FindProviders(ctx context.Context) ([]readmodel.Provider, error) {
-	rows, err := reader.db.QueryContext(ctx, adminProviderDirectorySQL, provider.Role)
+func (reader *AdminDirectoryReader) FindProviders(ctx context.Context, query string) ([]readmodel.Provider, error) {
+	rows, err := reader.db.QueryContext(ctx, adminProviderDirectorySQL, provider.Role, query)
 	if err != nil {
 		return nil, fmt.Errorf("querying administrative provider directory: %w", err)
 	}
