@@ -189,3 +189,56 @@ Feature: Listar usuarios registrados
                 | tipo de usuario | permiso disponible |
                 | consumidores    | read:providers      |
                 | prestadores     | read:consumers      |
+
+    @wip
+    Rule: Los filtros de prestadores se combinan sin recortar sus datos y son exclusivos de su directorio
+
+        Scenario: 61.16-LU Combinar rubro, zona y estado de verificación para filtrar prestadores
+            Given que existen los rubros "Plomería" y "Electricidad"
+            And que están habilitadas las zonas de cobertura "Comuna 6" y "Comuna 14"
+            And existe un prestador registrado con correo "juan@example.com", nombre "Juan", apellido "Gómez" y rubro "Plomería"
+            And existe un prestador registrado con correo "laura@example.com", nombre "Laura", apellido "Díaz" y rubro "Plomería"
+            And existe un prestador registrado con correo "pedro@example.com", nombre "Pedro", apellido "Ruiz" y rubro "Plomería"
+            And existe un prestador registrado con correo "marta@example.com", nombre "Marta", apellido "Sosa" y rubro "Electricidad"
+            And que "juan@example.com" cubre la zona "Comuna 6"
+            And que "juan@example.com" cubre la zona "Comuna 14"
+            And que "pedro@example.com" cubre la zona "Comuna 6"
+            And que "marta@example.com" cubre la zona "Comuna 6"
+            And que "laura@example.com" cubre la zona "Comuna 14"
+            And que la identidad de "juan@example.com" está aprobada
+            And que la identidad de "laura@example.com" está aprobada
+            And que la identidad de "marta@example.com" está aprobada
+            And que la verificación de "pedro@example.com" está en estado "declined"
+            And que estoy autenticado como administrador "supervisor@example.com" con el permiso "read:providers"
+            When filtro el directorio de prestadores por el rubro "Plomería", la zona de cobertura "Comuna 6" y el estado de verificación "approved"
+            Then el directorio contiene solamente a "juan@example.com"
+            And el prestador "juan@example.com" incluye exactamente las siguientes zonas de cobertura:
+                | zona      |
+                | Comuna 6  |
+                | Comuna 14 |
+
+        Scenario Outline: 61.17-LU Rechazar el filtro <parámetro> de prestadores en el directorio de consumidores
+            Given que existe el rubro "Plomería"
+            And que están habilitadas las zonas de cobertura "Comuna 6" y "Comuna 14"
+            And que estoy autenticado como administrador "supervisor@example.com" con el permiso "read:consumers"
+            When consulto el directorio de consumidores con el parámetro "<parámetro>" usando <valor válido>
+            Then el sistema responde con estado 400
+            And el sistema informa que el filtro es inválido
+
+            Examples:
+                | parámetro                    | valor válido                                     |
+                | category_id                  | el identificador positivo del rubro "Plomería"   |
+                | coverage_zone_id             | el identificador positivo de la zona "Comuna 6" |
+                | identity_verification_status | el estado "approved"                            |
+
+    @wip
+    Rule: Los directorios administrativos requieren un token Bearer
+
+        Scenario Outline: 61.18-LU Rechazar la consulta de <tipo de usuario> sin token Bearer
+            When consulto el directorio de <tipo de usuario> sin enviar un token Bearer
+            Then el sistema responde con estado 401
+
+            Examples:
+                | tipo de usuario |
+                | consumidores    |
+                | prestadores     |
