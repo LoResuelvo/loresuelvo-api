@@ -28,6 +28,8 @@ type categoryCreationResponse struct {
 
 func registerCreateCategorySteps(sc *godog.ScenarioContext, suite *testSuite) {
 	sc.Step(`^que existe el rubro "([^"]*)"$`, suite.thereIsCategoryNamed)
+	sc.Step(`^que falla el almacenamiento del evento de auditoría de esta creación$`, suite.auditEventSaveWillFail)
+	sc.Step(`^que falla el almacenamiento del rubro durante esta creación$`, suite.categorySaveWillFail)
 	sc.Step(`^creo el rubro "([^"]*)"$`, suite.requestCategoryCreationWithName)
 	sc.Step(`^intento crear un rubro sin nombre$`, suite.tryCreateCategoryWithoutName)
 	sc.Step(`^intento crear el rubro "([^"]*)"$`, suite.requestCategoryCreationWithName)
@@ -41,6 +43,9 @@ func registerCreateCategorySteps(sc *godog.ScenarioContext, suite *testSuite) {
 	sc.Step(`^la ubicación del recurso creado corresponde al identificador del rubro$`, suite.createdCategoryLocationMatchesID)
 	sc.Step(`^queda registrado un único evento de creación exitosa para este rubro por "([^"]*)"$`, suite.categoryCreationAuditEventIsRecorded)
 	sc.Step(`^ese evento contiene la fecha y hora "([^"]*)" en UTC y la correlación de esta solicitud$`, suite.categoryCreationAuditEventHasExpectedTimeAndCorrelation)
+	sc.Step(`^el sistema responde con un error interno controlado$`, suite.categoryCreationRespondsWithControlledInternalError)
+	sc.Step(`^no existe el rubro "([^"]*)"$`, suite.categoryDoesNotExist)
+	sc.Step(`^no queda registrado un evento exitoso de creación de esta solicitud$`, suite.categoryCreationHasNoSuccessfulAuditEvent)
 	sc.Step(`^el sistema rechaza la creación porque el nombre del rubro es obligatorio$`, suite.systemRejectsRequiredCategoryName)
 	sc.Step(`^el sistema rechaza la creación porque el nombre del rubro es demasiado largo$`, suite.systemRejectsTooLongCategoryName)
 	sc.Step(`^el sistema rechaza la creación porque el nombre del rubro debe ser texto$`, suite.systemRejectsNonTextCategoryName)
@@ -93,7 +98,7 @@ func (suite *testSuite) tryCreateCategoryWithNumericName() error {
 }
 
 func (suite *testSuite) requestCategoryCreation(payload any) error {
-	suite.categoryAuditCapture.reset()
+	suite.categoryAuditCapture.resetAttempt()
 	suite.lastCategoryAuditEventIDs = nil
 	response, err := suite.postCategoryCreation(payload)
 	if err != nil {
@@ -111,6 +116,70 @@ func (suite *testSuite) requestCategoryCreation(payload any) error {
 	suite.lastLocation = response.Header.Get("Location")
 	suite.lastRequestID = response.Header.Get("X-Request-ID")
 	suite.lastCategoryAuditEventIDs = suite.categoryAuditCapture.snapshot()
+	return nil
+}
+
+func (suite *testSuite) auditEventSaveWillFail() error {
+	suite.categoryAuditCapture.fail(categoryAuditFailureSaveAuditEvent)
+	return nil
+}
+
+func (suite *testSuite) categorySaveWillFail() error {
+	suite.categoryAuditCapture.fail(categoryAuditFailureSaveCategory)
+	return nil
+}
+
+func (suite *testSuite) categoryCreationRespondsWithControlledInternalError() error {
+	if err := suite.categoryCreationResponseShouldHaveStatusCode(http.StatusInternalServerError); err != nil {
+		return err
+	}
+	var response map[string]string
+	if err := json.Unmarshal(suite.lastBody, &response); err != nil {
+		return fmt.Errorf("category error response is not valid JSON: %w", err)
+	}
+	if len(response) != 1 || response["error"] != http.StatusText(http.StatusInternalServerError) {
+		return fmt.Errorf("expected a generic internal error response without details")
+	}
+	return nil
+}
+
+func (suite *testSuite) categoryDoesNotExist(name string) error {
+	categoryToFind, err := category.New(name)
+	if err != nil {
+		return fmt.Errorf("building category lookup: %w", err)
+	}
+	categories, err := suite.categoryRepository.ListAll()
+	if err != nil {
+		return fmt.Errorf("listing categories to verify absence: %w", err)
+	}
+	for _, existing := range categories {
+		if existing.NormalizedName == categoryToFind.NormalizedName {
+			return fmt.Errorf("expected category %q not to exist", name)
+		}
+	}
+	return nil
+}
+
+func (suite *testSuite) categoryCreationHasNoSuccessfulAuditEvent() error {
+	if committedIDs := suite.categoryAuditCapture.snapshot(); len(committedIDs) != 0 {
+		return fmt.Errorf("expected no committed category audit event for this request, got %d", len(committedIDs))
+	}
+	if suite.categoryAuditCapture.failureMode() == categoryAuditFailureSaveCategory && suite.categoryAuditCapture.saveCategoryAttemptCount() != 1 {
+		return fmt.Errorf("expected exactly one category persistence attempt in the injected-failure scenario, got %d", suite.categoryAuditCapture.saveCategoryAttemptCount())
+	}
+	attemptedIDs := suite.categoryAuditCapture.attemptedSnapshot()
+	if suite.categoryAuditCapture.failureMode() == categoryAuditFailureSaveAuditEvent && len(attemptedIDs) != 1 {
+		return fmt.Errorf("expected exactly one attempted category audit event, got %d", len(attemptedIDs))
+	}
+	for _, eventID := range attemptedIDs {
+		_, err := suite.auditEvents.FindByID(suite.scenarioContext, eventID)
+		if !errors.Is(err, audit.ErrNotFound) {
+			if err != nil {
+				return fmt.Errorf("checking category audit event persistence: %w", err)
+			}
+			return fmt.Errorf("expected attempted category audit event not to be persisted")
+		}
+	}
 	return nil
 }
 

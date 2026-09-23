@@ -446,6 +446,7 @@ func ScenarioInitializer(sc *godog.ScenarioContext, t *testing.T, database *sql.
 		return ctx, nil
 	})
 	sc.Before(func(ctx context.Context, sc *godog.Scenario) (context.Context, error) {
+		testSuite.categoryAuditCapture.reset()
 		if err := testSuite.cleanup(); err != nil {
 			return ctx, fmt.Errorf("could not clean test status: %w", err)
 		}

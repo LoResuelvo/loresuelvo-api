@@ -68,6 +68,96 @@ func TestCategoryUnitOfWorkCommitsCategoryAndAuditEventTogether(t *testing.T) {
 	assert.Equal(t, occurredOn, persistedEvent.OccurredOn())
 }
 
+func TestCategoryUnitOfWorkRollsBackCategoryWhenAuditInsertConflicts(t *testing.T) {
+	unit, categories, auditEvents, database := newCategoryUnitOfWorkTest(t)
+	ctx := context.Background()
+	eventID := uuid.New()
+	seedCorrelationID := "seed-" + uuid.NewString()
+	seedEvent, err := audit.NewEvent(audit.EventParams{
+		ID: eventID, OperatorID: 71, Action: audit.ActionCreate,
+		ResourceType: "category", ResourceID: "seed",
+		OccurredOn: time.Date(2026, 8, 15, 14, 0, 0, 0, time.UTC),
+		Result:     audit.ResultSucceeded, CorrelationID: seedCorrelationID,
+	})
+	require.NoError(t, err)
+	require.NoError(t, auditEvents.Save(ctx, seedEvent))
+
+	toSave, err := category.New("Audit conflict " + uuid.NewString())
+	require.NoError(t, err)
+	requestCorrelationID := "request-" + uuid.NewString()
+	err = unit.Execute(ctx, func(store category.TransactionalStore) error {
+		saved, saveErr := store.SaveCategory(ctx, *toSave)
+		if saveErr != nil {
+			return saveErr
+		}
+		conflictingEvent, eventErr := audit.NewEvent(audit.EventParams{
+			ID: eventID, OperatorID: 71, Action: audit.ActionCreate,
+			ResourceType: "category", ResourceID: strconv.Itoa(saved.ID),
+			OccurredOn: time.Date(2026, 8, 15, 14, 0, 0, 0, time.UTC),
+			Result:     audit.ResultSucceeded, CorrelationID: requestCorrelationID,
+		})
+		if eventErr != nil {
+			return eventErr
+		}
+		return store.SaveAuditEvent(ctx, conflictingEvent)
+	})
+
+	require.ErrorIs(t, err, audit.ErrPersistence)
+	assert.Nil(t, categories.FindByNormalizedName(toSave.NormalizedName))
+	persistedSeed, err := auditEvents.FindByID(ctx, eventID)
+	require.NoError(t, err)
+	assert.Equal(t, seedCorrelationID, persistedSeed.CorrelationID())
+	assert.Zero(t, countSuccessfulCategoryAuditEvents(t, database, requestCorrelationID))
+}
+
+func TestCategoryUnitOfWorkRollsBackAuditWhenCategoryInsertConflicts(t *testing.T) {
+	unit, categories, auditEvents, database := newCategoryUnitOfWorkTest(t)
+	ctx := context.Background()
+	toSave, err := category.New("Category conflict " + uuid.NewString())
+	require.NoError(t, err)
+	existing, err := categories.Save(*toSave)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		_, cleanupErr := database.ExecContext(context.Background(), `DELETE FROM categories WHERE id = $1`, existing.ID)
+		require.NoError(t, cleanupErr)
+	})
+
+	eventID := uuid.New()
+	requestCorrelationID := "request-" + uuid.NewString()
+	event, err := audit.NewEvent(audit.EventParams{
+		ID: eventID, OperatorID: 71, Action: audit.ActionCreate,
+		ResourceType: "category", ResourceID: strconv.Itoa(existing.ID),
+		OccurredOn: time.Date(2026, 8, 15, 14, 0, 0, 0, time.UTC),
+		Result:     audit.ResultSucceeded, CorrelationID: requestCorrelationID,
+	})
+	require.NoError(t, err)
+	duplicate, err := category.New("  " + toSave.Name + "  ")
+	require.NoError(t, err)
+	err = unit.Execute(ctx, func(store category.TransactionalStore) error {
+		if saveErr := store.SaveAuditEvent(ctx, event); saveErr != nil {
+			return saveErr
+		}
+		_, saveErr := store.SaveCategory(ctx, *duplicate)
+		return saveErr
+	})
+
+	require.ErrorIs(t, err, category.ErrAlreadyExists)
+	_, err = auditEvents.FindByID(ctx, eventID)
+	assert.ErrorIs(t, err, audit.ErrNotFound, "a failed category insert must roll back the earlier audit insert")
+	assert.Zero(t, countSuccessfulCategoryAuditEvents(t, database, requestCorrelationID))
+}
+
+func countSuccessfulCategoryAuditEvents(t *testing.T, database *sql.DB, correlationID string) int {
+	t.Helper()
+	var count int
+	err := database.QueryRowContext(context.Background(), `
+		SELECT COUNT(*) FROM audit_events
+		WHERE correlation_id = $1 AND resource_type = 'category'
+			AND action = 'create' AND result = 'succeeded'`, correlationID).Scan(&count)
+	require.NoError(t, err)
+	return count
+}
+
 func TestCategoryUnitOfWorkRejectsNilOperation(t *testing.T) {
 	unit := repositories.NewCategoryUnitOfWork(nil, nil, nil)
 	err := unit.Execute(context.Background(), nil)
