@@ -130,7 +130,6 @@ Feature: Listar usuarios registrados
                 | consumidores    | read:consumers |
                 | prestadores     | read:providers |
 
-    @wip
     Rule: El administrador puede filtrar prestadores por sus atributos operativos
 
         Background:
@@ -143,6 +142,7 @@ Feature: Listar usuarios registrados
             And que la identidad de "juan@example.com" está aprobada
             And que la verificación de "laura@example.com" está en estado "declined"
             And existe un prestador registrado con correo "pedro@example.com", nombre "Pedro", apellido "Ruiz" y rubro "Plomería"
+            And que "pedro@example.com" cubre la zona "Comuna 14"
             And que "pedro@example.com" no tiene sesiones de verificación de identidad
             And que estoy autenticado como administrador "supervisor@example.com" con el permiso "read:providers"
 
@@ -189,7 +189,6 @@ Feature: Listar usuarios registrados
                 | consumidores    | read:providers      |
                 | prestadores     | read:consumers      |
 
-    @wip
     Rule: Los filtros de prestadores se combinan sin recortar sus datos y son exclusivos de su directorio
 
         Scenario: 61.16-LU Combinar rubro, zona y estado de verificación para filtrar prestadores
@@ -216,6 +215,7 @@ Feature: Listar usuarios registrados
                 | Comuna 6  |
                 | Comuna 14 |
 
+        @wip
         Scenario Outline: 61.17-LU Rechazar el filtro <parámetro> de prestadores en el directorio de consumidores
             Given que existe el rubro "Plomería"
             And que están habilitadas las zonas de cobertura "Comuna 6" y "Comuna 14"
