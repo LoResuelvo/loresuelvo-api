@@ -223,7 +223,7 @@
                 ],
                 "operationId": "createCategory",
                 "summary": "Create a service category",
-                "description": "Creates a category using the provided name. The domain trims surrounding whitespace, enforces a maximum of 100 Unicode characters, and stores a lowercase normalized_name for duplicate checks. Requires the create:categories permission.",
+                "description": "Creates a category using the provided name. The domain trims surrounding whitespace, enforces a maximum of 100 Unicode characters, and stores a lowercase normalized_name for duplicate checks. The category and its successful audit event are committed atomically. If persisting either one fails, the API returns a controlled 500 response and neither the new category nor a successful audit event is committed. Requires the create:categories permission.",
                 "security": [
                     {
                         "BearerAuth": []
@@ -249,7 +249,7 @@
                 },
                 "responses": {
                     "201": {
-                        "description": "Category created successfully.",
+                        "description": "Category and its successful audit event were committed atomically.",
                         "headers": {
                             "Location": {
                                 "description": "Relative URI of the created category.",
@@ -373,7 +373,7 @@
                         }
                     },
                     "500": {
-                        "description": "An unexpected persistence error occurred while creating the category.",
+                        "description": "Category or audit-event persistence failed. The API returns a controlled error, and neither the new category nor a successful audit event is committed.",
                         "content": {
                             "application/json": {
                                 "schema": {
