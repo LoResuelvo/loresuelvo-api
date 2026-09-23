@@ -93,6 +93,13 @@ func registerAdminListUsersSteps(sc *godog.ScenarioContext, suite *testSuite) {
 	sc.Step(`^filtro el directorio de prestadores por la zona de cobertura "([^"]*)"$`, suite.filterAdminProviderDirectoryByCoverageZone)
 	sc.Step(`^filtro el directorio de prestadores por el estado de verificación "([^"]*)"$`, suite.filterAdminProviderDirectoryByVerificationStatus)
 	sc.Step(`^filtro el directorio de prestadores por el rubro "([^"]*)", la zona de cobertura "([^"]*)" y el estado de verificación "([^"]*)"$`, suite.filterAdminProviderDirectoryByCategoryZoneAndStatus)
+	sc.Step(`^consulto el directorio de prestadores con el parámetro "([^"]*)" igual a "([^"]*)"$`, suite.requestProviderDirectoryWithParameter)
+	sc.Step(`^intento consultar el directorio de (consumidores|prestadores)$`, suite.attemptAdminDirectory)
+	sc.Step(`^consulto el directorio de consumidores con el parámetro "([^"]*)" usando el identificador positivo del rubro "([^"]*)"$`, suite.requestConsumerDirectoryWithCategoryID)
+	sc.Step(`^consulto el directorio de consumidores con el parámetro "([^"]*)" usando el identificador positivo de la zona "([^"]*)"$`, suite.requestConsumerDirectoryWithCoverageZoneID)
+	sc.Step(`^consulto el directorio de consumidores con el parámetro "([^"]*)" usando el estado "([^"]*)"$`, suite.requestConsumerDirectoryWithVerificationStatus)
+	sc.Step(`^el sistema informa que el filtro es inválido$`, suite.systemReportsInvalidFilter)
+	sc.Step(`^consulto el directorio de (consumidores|prestadores) sin enviar un token Bearer$`, suite.requestAdminDirectoryWithoutBearer)
 }
 
 func (suite *testSuite) thereAreRegisteredConsumers(table *godog.Table) error {
@@ -151,14 +158,20 @@ func (suite *testSuite) requestConsumerDirectory() error {
 }
 
 func (suite *testSuite) requestAdminDirectory(path string) error {
+	return suite.requestAdminDirectoryWithBearer(path, true)
+}
+
+func (suite *testSuite) requestAdminDirectoryWithBearer(path string, bearer bool) error {
 	request, err := http.NewRequest(http.MethodGet, suite.server.URL+path, nil)
 	if err != nil {
 		return fmt.Errorf("creating administrative directory request: %w", err)
 	}
-	request.Header.Set(
-		"Authorization",
-		"Bearer "+suite.tokenBuilder.BuildToken(suite.currentAuth0ID, suite.currentPermissions),
-	)
+	if bearer {
+		request.Header.Set(
+			"Authorization",
+			"Bearer "+suite.tokenBuilder.BuildToken(suite.currentAuth0ID, suite.currentPermissions),
+		)
+	}
 
 	response, err := http.DefaultClient.Do(request)
 	if err != nil {
@@ -429,15 +442,98 @@ func (suite *testSuite) requestProviderDirectory() error {
 	return suite.requestAdminDirectory("/admin/providers")
 }
 
-func (suite *testSuite) searchAdminDirectory(userType, searchText string) error {
-	var path string
+func (suite *testSuite) requestProviderDirectoryWithParameter(parameter, value string) error {
+	return suite.requestAdminDirectoryWithParameter("/admin/providers", parameter, value)
+}
+
+func (suite *testSuite) requestConsumerDirectoryWithCategoryID(parameter, categoryName string) error {
+	if parameter != "category_id" {
+		return fmt.Errorf("expected category_id parameter, got %q", parameter)
+	}
+	categoryID, err := suite.categoryIDFor(categoryName)
+	if err != nil {
+		return err
+	}
+	if categoryID <= 0 {
+		return fmt.Errorf("expected a positive category ID for %q, got %d", categoryName, categoryID)
+	}
+	return suite.requestAdminDirectoryWithParameter("/admin/consumers", parameter, fmt.Sprintf("%d", categoryID))
+}
+
+func (suite *testSuite) requestConsumerDirectoryWithCoverageZoneID(parameter, zoneName string) error {
+	if parameter != "coverage_zone_id" {
+		return fmt.Errorf("expected coverage_zone_id parameter, got %q", parameter)
+	}
+	zoneID, err := suite.ensureProviderCoverageZoneByName(zoneName)
+	if err != nil {
+		return err
+	}
+	if zoneID <= 0 {
+		return fmt.Errorf("expected a positive coverage zone ID for %q, got %d", zoneName, zoneID)
+	}
+	return suite.requestAdminDirectoryWithParameter("/admin/consumers", parameter, fmt.Sprintf("%d", zoneID))
+}
+
+func (suite *testSuite) requestConsumerDirectoryWithVerificationStatus(parameter, status string) error {
+	if parameter != "identity_verification_status" {
+		return fmt.Errorf("expected identity_verification_status parameter, got %q", parameter)
+	}
+	if status != string(identityverification.StatusApproved) {
+		return fmt.Errorf("expected valid approved verification status, got %q", status)
+	}
+	return suite.requestAdminDirectoryWithParameter("/admin/consumers", parameter, status)
+}
+
+func (suite *testSuite) requestAdminDirectoryWithParameter(path, parameter, value string) error {
+	query := url.Values{}
+	query.Set(parameter, value)
+	return suite.requestAdminDirectory(path + "?" + query.Encode())
+}
+
+func (suite *testSuite) attemptAdminDirectory(userType string) error {
+	path, err := adminDirectoryPathForUserType(userType)
+	if err != nil {
+		return err
+	}
+	return suite.requestAdminDirectory(path)
+}
+
+func (suite *testSuite) requestAdminDirectoryWithoutBearer(userType string) error {
+	path, err := adminDirectoryPathForUserType(userType)
+	if err != nil {
+		return err
+	}
+	return suite.requestAdminDirectoryWithBearer(path, false)
+}
+
+func adminDirectoryPathForUserType(userType string) (string, error) {
 	switch userType {
 	case "consumidores":
-		path = "/admin/consumers"
+		return "/admin/consumers", nil
 	case "prestadores":
-		path = "/admin/providers"
+		return "/admin/providers", nil
 	default:
-		return fmt.Errorf("unsupported administrative directory type %q", userType)
+		return "", fmt.Errorf("unsupported administrative directory type %q", userType)
+	}
+}
+
+func (suite *testSuite) systemReportsInvalidFilter() error {
+	var response struct {
+		Error string `json:"error"`
+	}
+	if err := json.Unmarshal(suite.lastBody, &response); err != nil {
+		return fmt.Errorf("invalid filter response is not valid JSON: %w", err)
+	}
+	if response.Error != "invalid filter" {
+		return fmt.Errorf("expected invalid filter error, got %s", suite.lastBody)
+	}
+	return nil
+}
+
+func (suite *testSuite) searchAdminDirectory(userType, searchText string) error {
+	path, err := adminDirectoryPathForUserType(userType)
+	if err != nil {
+		return err
 	}
 
 	query := url.Values{}

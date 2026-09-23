@@ -16,6 +16,19 @@ const (
 	StatusKYCExpired   VerificationStatus = "kyc_expired"
 )
 
+// IsValid reports whether the status is one of the application's known
+// verification states, including the absence of a verification session.
+func (status VerificationStatus) IsValid() bool {
+	switch status {
+	case StatusUnverified, StatusNotStarted, StatusInProgress, StatusAwaitingUser,
+		StatusInReview, StatusApproved, StatusDeclined, StatusResubmitted,
+		StatusAbandoned, StatusExpired, StatusKYCExpired:
+		return true
+	default:
+		return false
+	}
+}
+
 func (status VerificationStatus) CanApplyResult() bool {
 	switch status {
 	case StatusInProgress, StatusAwaitingUser, StatusInReview, StatusApproved,
