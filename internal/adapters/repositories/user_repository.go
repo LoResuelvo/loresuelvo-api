@@ -144,6 +144,30 @@ func saveProviderCoverageZones(ctx context.Context, tx *sql.Tx, providerToSave *
 	return nil
 }
 
+// ReplaceProviderCoverageZones persists the provider aggregate's coverage-zone association set.
+func (repository *UserRepository) ReplaceProviderCoverageZones(ctx context.Context, providerID int, coverageZoneIDs []int) error {
+	tx, err := repository.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("beginning provider coverage zone transaction: %w", err)
+	}
+
+	if _, err := tx.ExecContext(ctx, `DELETE FROM provider_coverage_zones WHERE provider_id = $1`, providerID); err != nil {
+		return rollbackUserTx(tx, fmt.Errorf("deleting provider coverage zones: %w", err))
+	}
+	for _, zoneID := range coverageZoneIDs {
+		if _, err := tx.ExecContext(ctx,
+			`INSERT INTO provider_coverage_zones (provider_id, coverage_zone_id) VALUES ($1, $2)`,
+			providerID, zoneID,
+		); err != nil {
+			return rollbackUserTx(tx, fmt.Errorf("saving provider coverage zone %d: %w", zoneID, err))
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("committing provider coverage zones: %w", err)
+	}
+	return nil
+}
+
 type userQueryRower interface {
 	QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row
 }

@@ -11,5 +11,5 @@ type ConsumerDirectoryReader interface {
 }
 
 type ProviderDirectoryReader interface {
-	FindProviders(ctx context.Context, query string) ([]readmodel.Provider, error)
+	FindProviders(ctx context.Context, filter ProviderDirectoryFilter) ([]readmodel.Provider, error)
 }

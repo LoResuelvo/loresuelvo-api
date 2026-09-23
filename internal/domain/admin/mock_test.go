@@ -3,6 +3,7 @@ package admin_test
 import (
 	"context"
 
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/admin"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/admin/read_model"
 	"github.com/stretchr/testify/mock"
 )
@@ -19,8 +20,8 @@ func (reader *consumerDirectoryReaderMock) FindConsumers(ctx context.Context, qu
 
 type providerDirectoryReaderMock struct{ mock.Mock }
 
-func (reader *providerDirectoryReaderMock) FindProviders(ctx context.Context, query string) ([]readmodel.Provider, error) {
-	args := reader.Called(ctx, query)
+func (reader *providerDirectoryReaderMock) FindProviders(ctx context.Context, filter admin.ProviderDirectoryFilter) ([]readmodel.Provider, error) {
+	args := reader.Called(ctx, filter)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}

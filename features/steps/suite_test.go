@@ -140,10 +140,11 @@ type testSuite struct {
 	lastIdentityVerificationEventID         uuid.UUID
 	identityVerificationWebhookStatuses     []int
 
-	categoryIDsByName              map[string]int
-	lastProviderFilterCategoryName string
-	participantRolesByFullName     map[string]string
-	providerEmailsByFullName       map[string]string
+	categoryIDsByName                   map[string]int
+	lastProviderFilterCategoryName      string
+	participantRolesByFullName          map[string]string
+	providerEmailsByFullName            map[string]string
+	adminProviderCoverageZoneIDsByEmail map[string][]int
 }
 
 func (s *testSuite) registerAllSteps(sc *godog.ScenarioContext) {
@@ -257,6 +258,7 @@ func (s *testSuite) cleanup() error {
 	s.categoryIDsByName = map[string]int{}
 	s.participantRolesByFullName = map[string]string{}
 	s.providerEmailsByFullName = map[string]string{}
+	s.adminProviderCoverageZoneIDsByEmail = map[string][]int{}
 	s.realtimeConnections = map[string]*realtimeTestConnection{}
 	s.lastRealtimeEvent = nil
 	s.lastWorkRequestProviderID = 0
@@ -408,20 +410,21 @@ func newTestSuite(tb testing.TB, database *sql.DB) *testSuite {
 		identityVerifier:               doubles.IdentityVerifier,
 		scenarioContext:                context.Background(),
 
-		categoryIDsByName:                  map[string]int{},
-		participantRolesByFullName:         map[string]string{},
-		providerEmailsByFullName:           map[string]string{},
-		realtimeConnections:                map[string]*realtimeTestConnection{},
-		messageImagesByName:                map[string]messageImageFixture{},
-		messageAudiosByName:                map[string]messageAudioFixture{},
-		messageVideosByName:                map[string]messageVideoFixture{},
-		completionImagesByName:             map[string]completionImageFixture{},
-		aiJobRequestsByProvider:            map[string]jobRequestCreationResponse{},
-		aiWorkConversationIDsBeforeContact: map[int]int{},
-		expectedChatbotImageDescriptions:   map[string]string{},
-		serviceProposalConversationIDs:     map[string]int{},
-		serviceProposalFixtures:            map[int]serviceProposalFixture{},
-		workOrdersByServiceProposalID:      map[int][]workOrderResponse{},
+		categoryIDsByName:                   map[string]int{},
+		participantRolesByFullName:          map[string]string{},
+		providerEmailsByFullName:            map[string]string{},
+		adminProviderCoverageZoneIDsByEmail: map[string][]int{},
+		realtimeConnections:                 map[string]*realtimeTestConnection{},
+		messageImagesByName:                 map[string]messageImageFixture{},
+		messageAudiosByName:                 map[string]messageAudioFixture{},
+		messageVideosByName:                 map[string]messageVideoFixture{},
+		completionImagesByName:              map[string]completionImageFixture{},
+		aiJobRequestsByProvider:             map[string]jobRequestCreationResponse{},
+		aiWorkConversationIDsBeforeContact:  map[int]int{},
+		expectedChatbotImageDescriptions:    map[string]string{},
+		serviceProposalConversationIDs:      map[string]int{},
+		serviceProposalFixtures:             map[int]serviceProposalFixture{},
+		workOrdersByServiceProposalID:       map[int][]workOrderResponse{},
 	}
 }
 

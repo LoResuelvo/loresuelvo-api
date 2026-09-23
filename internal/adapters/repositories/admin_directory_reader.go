@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/admin"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/admin/read_model"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/consumer"
 	coveragezone "github.com/LoResuelvo/loresuelvo-api/internal/domain/coverage_zone"
@@ -85,10 +86,29 @@ WHERE users.role = $1
 	AND (STRPOS(LOWER(users.name), LOWER($2)) > 0
 		OR STRPOS(LOWER(users.surname), LOWER($2)) > 0
 		OR STRPOS(LOWER(users.email), LOWER($2)) > 0)
+	AND ($3::integer IS NULL OR providers.category_id = $3)
+	AND ($4::integer IS NULL OR EXISTS (
+		SELECT 1 FROM provider_coverage_zones selected_zone
+		WHERE selected_zone.provider_id = providers.user_id
+			AND selected_zone.coverage_zone_id = $4
+	))
+	AND ($5::text IS NULL OR COALESCE(latest_verifications.status, 'unverified') = $5)
 ORDER BY users.created_on ASC, users.id ASC, zones.id ASC`
 
-func (reader *AdminDirectoryReader) FindProviders(ctx context.Context, query string) ([]readmodel.Provider, error) {
-	rows, err := reader.db.QueryContext(ctx, adminProviderDirectorySQL, provider.Role, query)
+func (reader *AdminDirectoryReader) FindProviders(ctx context.Context, filter admin.ProviderDirectoryFilter) ([]readmodel.Provider, error) {
+	var categoryID, coverageZoneID, verificationStatus any
+	if filter.CategoryID != nil {
+		categoryID = *filter.CategoryID
+	}
+	if filter.CoverageZoneID != nil {
+		coverageZoneID = *filter.CoverageZoneID
+	}
+	if filter.IdentityVerificationStatus != nil {
+		verificationStatus = string(*filter.IdentityVerificationStatus)
+	}
+	rows, err := reader.db.QueryContext(ctx, adminProviderDirectorySQL,
+		provider.Role, filter.Query, categoryID, coverageZoneID, verificationStatus,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("querying administrative provider directory: %w", err)
 	}

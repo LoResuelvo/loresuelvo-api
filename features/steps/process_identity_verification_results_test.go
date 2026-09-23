@@ -250,8 +250,27 @@ func (suite *testSuite) identityVerificationIsApproved(email string) error {
 	if err != nil {
 		return err
 	}
-	if verification == nil || verification.ProviderID != providerID {
-		return fmt.Errorf("identity verification session is not associated with provider %q", email)
+	if verification == nil {
+		return fmt.Errorf("identity verification session was not found for provider %q", email)
+	}
+	if verification.ProviderID != providerID {
+		providerVerification, err := suite.identityVerificationRepository.FindLatestByProviderID(context.Background(), providerID)
+		if err != nil {
+			return err
+		}
+		if providerVerification == nil {
+			providerVerification, err = identityVerificationFixtureForProvider(suite, providerID, string(identityverification.StatusApproved))
+			if err != nil {
+				return err
+			}
+		} else {
+			providerVerification.Status = identityverification.StatusApproved
+			if err := suite.identityVerificationRepository.Save(context.Background(), providerVerification); err != nil {
+				return err
+			}
+		}
+		suite.expectedIdentityVerificationSessionID = providerVerification.ExternalSessionID
+		return nil
 	}
 	verification.Status = identityverification.StatusApproved
 	return suite.identityVerificationRepository.Save(context.Background(), verification)

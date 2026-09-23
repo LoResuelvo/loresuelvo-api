@@ -55,8 +55,8 @@ func (service *Service) ListConsumers(ctx context.Context, query string) ([]read
 	return consumers, nil
 }
 
-func (service *Service) ListProviders(ctx context.Context, query string) ([]readmodel.Provider, error) {
-	providers, err := service.providerReader.FindProviders(ctx, query)
+func (service *Service) ListProviders(ctx context.Context, filter ProviderDirectoryFilter) ([]readmodel.Provider, error) {
+	providers, err := service.providerReader.FindProviders(ctx, filter)
 	if err != nil {
 		return nil, fmt.Errorf("finding providers for administrative directory: %w", err)
 	}

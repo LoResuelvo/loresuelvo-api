@@ -193,6 +193,40 @@ func TestProviderRepositorySavesCoverageZonesAtomically(t *testing.T) {
 	require.Equal(t, []coveragezone.CoverageZone{*firstZone, *secondZone}, zones)
 }
 
+func TestProviderRepositoryReplacesCoverageZones(t *testing.T) {
+	testContext := newProviderRepositoryTest(t)
+	coverageZoneRepository := repositories.NewCoverageZoneRepository(testContext.database)
+	firstZone := savedCoverageZoneForProvider(t, testContext.database, "Comuna 6")
+	secondZone := savedCoverageZoneForProvider(t, testContext.database, "Comuna 14")
+	providerToSave := validProviderWithCoverageZones(t, testContext.categoryRepository, testContext.database,
+		"auth0|josue", "josugod@gmail.com", "Josue", "el pro", "Plomería", []coveragezone.CoverageZone{*firstZone})
+	savedUser, err := testContext.providerRepository.Save(context.Background(), providerUser(providerToSave))
+	require.NoError(t, err)
+
+	err = testContext.providerRepository.ReplaceProviderCoverageZones(context.Background(), savedUser.ID(), []int{secondZone.ID})
+	require.NoError(t, err)
+	zones, err := coverageZoneRepository.FindByProviderID(context.Background(), savedUser.ID())
+	require.NoError(t, err)
+	require.Equal(t, []coveragezone.CoverageZone{*secondZone}, zones)
+}
+
+func TestProviderRepositoryRollsBackCoverageZoneReplacementOnInvalidZone(t *testing.T) {
+	testContext := newProviderRepositoryTest(t)
+	coverageZoneRepository := repositories.NewCoverageZoneRepository(testContext.database)
+	firstZone := savedCoverageZoneForProvider(t, testContext.database, "Comuna 6")
+	secondZone := savedCoverageZoneForProvider(t, testContext.database, "Comuna 14")
+	providerToSave := validProviderWithCoverageZones(t, testContext.categoryRepository, testContext.database,
+		"auth0|josue", "josugod@gmail.com", "Josue", "el pro", "Plomería", []coveragezone.CoverageZone{*firstZone})
+	savedUser, err := testContext.providerRepository.Save(context.Background(), providerUser(providerToSave))
+	require.NoError(t, err)
+
+	err = testContext.providerRepository.ReplaceProviderCoverageZones(context.Background(), savedUser.ID(), []int{secondZone.ID, 999999999})
+	require.Error(t, err)
+	zones, err := coverageZoneRepository.FindByProviderID(context.Background(), savedUser.ID())
+	require.NoError(t, err)
+	require.Equal(t, []coveragezone.CoverageZone{*firstZone}, zones)
+}
+
 func TestProviderRepositoryHydratesCoverageZones(t *testing.T) {
 	testContext := newProviderRepositoryTest(t)
 	firstZone := savedCoverageZoneForProvider(t, testContext.database, "Comuna 6")

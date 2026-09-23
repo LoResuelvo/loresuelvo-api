@@ -87,6 +87,12 @@ func registerAdminListUsersSteps(sc *godog.ScenarioContext, suite *testSuite) {
 	sc.Step(`^el sistema devuelve un directorio de prestadores vacío$`, suite.systemReturnsEmptyProviderDirectory)
 	sc.Step(`^busco (consumidores|prestadores) con el texto "([^"]*)"$`, suite.searchAdminDirectory)
 	sc.Step(`^el directorio contiene solamente a "([^"]*)"$`, suite.adminDirectoryContainsOnly)
+	sc.Step(`^que existen los rubros "([^"]*)" y "([^"]*)"$`, suite.thereAreCategories)
+	sc.Step(`^que "([^"]*)" cubre la zona "([^"]*)"$`, suite.providerCoversZoneInAdminDirectoryFixture)
+	sc.Step(`^filtro el directorio de prestadores por el rubro "([^"]*)"$`, suite.filterAdminProviderDirectoryByCategory)
+	sc.Step(`^filtro el directorio de prestadores por la zona de cobertura "([^"]*)"$`, suite.filterAdminProviderDirectoryByCoverageZone)
+	sc.Step(`^filtro el directorio de prestadores por el estado de verificación "([^"]*)"$`, suite.filterAdminProviderDirectoryByVerificationStatus)
+	sc.Step(`^filtro el directorio de prestadores por el rubro "([^"]*)", la zona de cobertura "([^"]*)" y el estado de verificación "([^"]*)"$`, suite.filterAdminProviderDirectoryByCategoryZoneAndStatus)
 }
 
 func (suite *testSuite) thereAreRegisteredConsumers(table *godog.Table) error {
@@ -437,6 +443,84 @@ func (suite *testSuite) searchAdminDirectory(userType, searchText string) error 
 	query := url.Values{}
 	query.Set("q", searchText)
 	return suite.requestAdminDirectory(path + "?" + query.Encode())
+}
+
+func (suite *testSuite) thereAreCategories(firstName, secondName string) error {
+	for _, name := range []string{firstName, secondName} {
+		if err := suite.thereIsCategoryNamed(name); err != nil {
+			return fmt.Errorf("creating category %q: %w", name, err)
+		}
+	}
+	return nil
+}
+
+func (suite *testSuite) providerCoversZoneInAdminDirectoryFixture(email, zoneName string) error {
+	providerID, err := suite.providerIDByEmail(email)
+	if err != nil {
+		return err
+	}
+	zoneID, err := suite.ensureProviderCoverageZoneByName(zoneName)
+	if err != nil {
+		return err
+	}
+	zoneIDs := suite.adminProviderCoverageZoneIDsByEmail[email]
+	for _, existingID := range zoneIDs {
+		if existingID == zoneID {
+			return nil
+		}
+	}
+	zoneIDs = append(zoneIDs, zoneID)
+	if err := suite.userRepository.ReplaceProviderCoverageZones(suite.scenarioContext, providerID, zoneIDs); err != nil {
+		return fmt.Errorf("assigning coverage zones to provider %q: %w", email, err)
+	}
+	suite.adminProviderCoverageZoneIDsByEmail[email] = zoneIDs
+	return nil
+}
+
+func (suite *testSuite) filterAdminProviderDirectoryByCategory(categoryName string) error {
+	categoryID, err := suite.categoryIDFor(categoryName)
+	if err != nil {
+		return err
+	}
+	return suite.requestAdminProviderDirectoryWithFilters(url.Values{
+		"category_id": {fmt.Sprintf("%d", categoryID)},
+	})
+}
+
+func (suite *testSuite) filterAdminProviderDirectoryByCoverageZone(zoneName string) error {
+	zoneID, err := suite.ensureProviderCoverageZoneByName(zoneName)
+	if err != nil {
+		return err
+	}
+	return suite.requestAdminProviderDirectoryWithFilters(url.Values{
+		"coverage_zone_id": {fmt.Sprintf("%d", zoneID)},
+	})
+}
+
+func (suite *testSuite) filterAdminProviderDirectoryByVerificationStatus(status string) error {
+	return suite.requestAdminProviderDirectoryWithFilters(url.Values{
+		"identity_verification_status": {status},
+	})
+}
+
+func (suite *testSuite) filterAdminProviderDirectoryByCategoryZoneAndStatus(categoryName, zoneName, status string) error {
+	categoryID, err := suite.categoryIDFor(categoryName)
+	if err != nil {
+		return err
+	}
+	zoneID, err := suite.ensureProviderCoverageZoneByName(zoneName)
+	if err != nil {
+		return err
+	}
+	return suite.requestAdminProviderDirectoryWithFilters(url.Values{
+		"category_id":                  {fmt.Sprintf("%d", categoryID)},
+		"coverage_zone_id":             {fmt.Sprintf("%d", zoneID)},
+		"identity_verification_status": {status},
+	})
+}
+
+func (suite *testSuite) requestAdminProviderDirectoryWithFilters(filters url.Values) error {
+	return suite.requestAdminDirectory("/admin/providers?" + filters.Encode())
 }
 
 func (suite *testSuite) adminDirectoryContainsOnly(email string) error {

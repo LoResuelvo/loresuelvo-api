@@ -9,6 +9,7 @@ import (
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/admin"
 	coveragezone "github.com/LoResuelvo/loresuelvo-api/internal/domain/coverage_zone"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/identityverification"
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/provider"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -170,7 +171,7 @@ func TestAdminDirectoryReaderFindsProvidersWithOperationalDataAndLatestVerificat
 	require.NoError(t, verificationRepository.Save(t.Context(), declinedWithStaleVerifiedOn))
 
 	reader := repositories.NewAdminDirectoryReader(database)
-	providers, err := reader.FindProviders(t.Context(), "")
+	providers, err := reader.FindProviders(t.Context(), admin.ProviderDirectoryFilter{})
 
 	require.NoError(t, err)
 	require.Len(t, providers, 3)
@@ -199,7 +200,7 @@ func TestAdminDirectoryReaderReturnsNonNilEmptyProviders(t *testing.T) {
 	require.NoError(t, userRepository.DeleteAll())
 	reader := repositories.NewAdminDirectoryReader(database)
 
-	providers, err := reader.FindProviders(t.Context(), "")
+	providers, err := reader.FindProviders(t.Context(), admin.ProviderDirectoryFilter{})
 
 	require.NoError(t, err)
 	assert.NotNil(t, providers)
@@ -212,7 +213,7 @@ func TestAdminDirectoryReaderFindProvidersHonorsContextCancellation(t *testing.T
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 
-	providers, err := reader.FindProviders(ctx, "")
+	providers, err := reader.FindProviders(ctx, admin.ProviderDirectoryFilter{})
 
 	assert.Nil(t, providers)
 	assert.ErrorIs(t, err, context.Canceled)
@@ -272,7 +273,7 @@ func TestAdminDirectoryReaderSearchesProvidersWithoutTrimmingCoverageZones(t *te
 
 	for _, query := range []string{"JUAN", "GÓMEZ", "JUAN.GOMEZ@EXAMPLE.COM", "juan.gomez"} {
 		t.Run(query, func(t *testing.T) {
-			found, err := reader.FindProviders(t.Context(), query)
+			found, err := reader.FindProviders(t.Context(), admin.ProviderDirectoryFilter{Query: query})
 
 			require.NoError(t, err)
 			require.Len(t, found, 1)
@@ -284,11 +285,87 @@ func TestAdminDirectoryReaderSearchesProvidersWithoutTrimmingCoverageZones(t *te
 	}
 	for _, query := range []string{"inexistente", "%", "_"} {
 		t.Run(query, func(t *testing.T) {
-			found, err := reader.FindProviders(t.Context(), query)
+			found, err := reader.FindProviders(t.Context(), admin.ProviderDirectoryFilter{Query: query})
 
 			require.NoError(t, err)
 			assert.NotNil(t, found)
 			assert.Empty(t, found)
+		})
+	}
+}
+
+func TestAdminDirectoryReaderFiltersProvidersWithoutTrimmingCoverageZones(t *testing.T) {
+	userRepository, database := newUserRepositoryTest(t)
+	require.NoError(t, userRepository.DeleteAll())
+	categoryRepository := repositories.NewCategoryRepository(database)
+	firstZone := savedCoverageZoneForProvider(t, database, "Comuna 6")
+	secondZone := savedCoverageZoneForProvider(t, database, "Comuna 14")
+	juan := validProviderWithCoverageZones(t, categoryRepository, database,
+		"auth0|admin-filter-juan", "admin.filter.juan@example.com", "Juan", "Gómez", "Plomería",
+		[]coveragezone.CoverageZone{*firstZone, *secondZone})
+	laura := validProviderWithCoverageZones(t, categoryRepository, database,
+		"auth0|admin-filter-laura", "admin.filter.laura@example.com", "Laura", "Díaz", "Electricidad",
+		[]coveragezone.CoverageZone{*secondZone})
+	pedro := validProviderWithCoverageZones(t, categoryRepository, database,
+		"auth0|admin-filter-pedro", "admin.filter.pedro@example.com", "Pedro", "Ruiz", "Plomería",
+		[]coveragezone.CoverageZone{*firstZone})
+	for _, user := range []*provider.Provider{juan, laura, pedro} {
+		_, err := userRepository.Save(t.Context(), user)
+		require.NoError(t, err)
+	}
+
+	verificationRepository := repositories.NewIdentityVerificationRepository(database)
+	earlier := time.Now().UTC().Add(-time.Hour)
+	previous, err := identityverification.Rehydrate(
+		uuid.New(), juan.ID(), "didit", uuid.New(), 1, identityverification.StatusInReview, earlier, earlier,
+	)
+	require.NoError(t, err)
+	require.NoError(t, verificationRepository.Save(t.Context(), previous))
+	for _, record := range []struct {
+		providerID int
+		status     identityverification.VerificationStatus
+	}{
+		{juan.ID(), identityverification.StatusApproved},
+		{laura.ID(), identityverification.StatusDeclined},
+	} {
+		now := time.Now().UTC()
+		verification, err := identityverification.Rehydrate(
+			uuid.New(), record.providerID, "didit", uuid.New(), 1, record.status, now, now,
+		)
+		require.NoError(t, err)
+		require.NoError(t, verificationRepository.Save(t.Context(), verification))
+	}
+
+	reader := repositories.NewAdminDirectoryReader(database)
+	categoryID := juan.Category.ID
+	verificationApproved := identityverification.StatusApproved
+	verificationDeclined := identityverification.StatusDeclined
+	verificationUnverified := identityverification.StatusUnverified
+	tests := []struct {
+		name      string
+		filter    admin.ProviderDirectoryFilter
+		wantID    int
+		wantCount int
+		wantZones int
+	}{
+		{"category", admin.ProviderDirectoryFilter{CategoryID: &laura.Category.ID}, laura.ID(), 1, 1},
+		{"coverage zone", admin.ProviderDirectoryFilter{CoverageZoneID: &firstZone.ID}, juan.ID(), 2, 2},
+		{"approved", admin.ProviderDirectoryFilter{IdentityVerificationStatus: &verificationApproved}, juan.ID(), 1, 2},
+		{"declined", admin.ProviderDirectoryFilter{IdentityVerificationStatus: &verificationDeclined}, laura.ID(), 1, 1},
+		{"unverified", admin.ProviderDirectoryFilter{IdentityVerificationStatus: &verificationUnverified}, pedro.ID(), 1, 1},
+		{"combined", admin.ProviderDirectoryFilter{
+			CategoryID: &categoryID, CoverageZoneID: &firstZone.ID,
+			IdentityVerificationStatus: &verificationApproved,
+		}, juan.ID(), 1, 2},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			found, err := reader.FindProviders(t.Context(), test.filter)
+
+			require.NoError(t, err)
+			require.Len(t, found, test.wantCount)
+			assert.Equal(t, test.wantID, found[0].ID)
+			assert.Len(t, found[0].CoverageZones, test.wantZones)
 		})
 	}
 }

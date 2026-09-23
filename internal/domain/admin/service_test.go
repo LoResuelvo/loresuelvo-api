@@ -7,6 +7,7 @@ import (
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/admin"
 	readmodel "github.com/LoResuelvo/loresuelvo-api/internal/domain/admin/read_model"
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/identityverification"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -108,7 +109,7 @@ func TestServiceListsProvidersWithProfilePhotoURLsResolvedInBulk(t *testing.T) {
 		{ID: 3, Email: "pedro@example.com", ProfilePhotoFileID: "photo-3"},
 	}
 	reader := new(providerDirectoryReaderMock)
-	reader.On("FindProviders", mock.Anything, "").Return(providers, nil).Once()
+	reader.On("FindProviders", mock.Anything, admin.ProviderDirectoryFilter{}).Return(providers, nil).Once()
 	resolver := new(profilePhotoURLResolverMock)
 	resolver.On("ResolvePublicURLs", mock.Anything, []string{"photo-1", "photo-3"}).Return(map[string]string{
 		"photo-1": "https://cdn.example/photo-1.jpg",
@@ -116,7 +117,7 @@ func TestServiceListsProvidersWithProfilePhotoURLsResolvedInBulk(t *testing.T) {
 	}, nil).Once()
 	service := admin.NewService(nil, reader, resolver)
 
-	result, err := service.ListProviders(t.Context(), "")
+	result, err := service.ListProviders(t.Context(), admin.ProviderDirectoryFilter{})
 
 	require.NoError(t, err)
 	require.Len(t, result, 3)
@@ -129,11 +130,11 @@ func TestServiceListsProvidersWithProfilePhotoURLsResolvedInBulk(t *testing.T) {
 
 func TestServiceReturnsNonNilEmptyProviderDirectoryWithoutResolvingPhotos(t *testing.T) {
 	reader := new(providerDirectoryReaderMock)
-	reader.On("FindProviders", mock.Anything, "").Return([]readmodel.Provider{}, nil).Once()
+	reader.On("FindProviders", mock.Anything, admin.ProviderDirectoryFilter{}).Return([]readmodel.Provider{}, nil).Once()
 	resolver := new(profilePhotoURLResolverMock)
 	service := admin.NewService(nil, reader, resolver)
 
-	result, err := service.ListProviders(t.Context(), "")
+	result, err := service.ListProviders(t.Context(), admin.ProviderDirectoryFilter{})
 
 	require.NoError(t, err)
 	assert.NotNil(t, result)
@@ -145,11 +146,11 @@ func TestServiceReturnsNonNilEmptyProviderDirectoryWithoutResolvingPhotos(t *tes
 func TestServiceDoesNotResolvePhotosWhenProvidersHaveNone(t *testing.T) {
 	providers := []readmodel.Provider{{ID: 1, Email: "juan@example.com"}}
 	reader := new(providerDirectoryReaderMock)
-	reader.On("FindProviders", mock.Anything, "").Return(providers, nil).Once()
+	reader.On("FindProviders", mock.Anything, admin.ProviderDirectoryFilter{}).Return(providers, nil).Once()
 	resolver := new(profilePhotoURLResolverMock)
 	service := admin.NewService(nil, reader, resolver)
 
-	result, err := service.ListProviders(t.Context(), "")
+	result, err := service.ListProviders(t.Context(), admin.ProviderDirectoryFilter{})
 
 	require.NoError(t, err)
 	assert.Equal(t, providers, result)
@@ -160,10 +161,10 @@ func TestServiceDoesNotResolvePhotosWhenProvidersHaveNone(t *testing.T) {
 func TestServiceWrapsProviderReaderError(t *testing.T) {
 	expectedErr := errors.New("database unavailable")
 	reader := new(providerDirectoryReaderMock)
-	reader.On("FindProviders", mock.Anything, "").Return(nil, expectedErr).Once()
+	reader.On("FindProviders", mock.Anything, admin.ProviderDirectoryFilter{}).Return(nil, expectedErr).Once()
 	service := admin.NewService(nil, reader, new(profilePhotoURLResolverMock))
 
-	result, err := service.ListProviders(t.Context(), "")
+	result, err := service.ListProviders(t.Context(), admin.ProviderDirectoryFilter{})
 
 	assert.Nil(t, result)
 	assert.ErrorIs(t, err, expectedErr)
@@ -175,12 +176,12 @@ func TestServiceWrapsProviderProfilePhotoResolutionError(t *testing.T) {
 	expectedErr := errors.New("storage unavailable")
 	providers := []readmodel.Provider{{ID: 1, Email: "juan@example.com", ProfilePhotoFileID: "photo-1"}}
 	reader := new(providerDirectoryReaderMock)
-	reader.On("FindProviders", mock.Anything, "").Return(providers, nil).Once()
+	reader.On("FindProviders", mock.Anything, admin.ProviderDirectoryFilter{}).Return(providers, nil).Once()
 	resolver := new(profilePhotoURLResolverMock)
 	resolver.On("ResolvePublicURLs", mock.Anything, []string{"photo-1"}).Return(nil, expectedErr).Once()
 	service := admin.NewService(nil, reader, resolver)
 
-	result, err := service.ListProviders(t.Context(), "")
+	result, err := service.ListProviders(t.Context(), admin.ProviderDirectoryFilter{})
 
 	assert.Nil(t, result)
 	assert.ErrorIs(t, err, expectedErr)
@@ -204,13 +205,31 @@ func TestServiceForwardsConsumerSearchQuery(t *testing.T) {
 
 func TestServiceForwardsProviderSearchQuery(t *testing.T) {
 	reader := new(providerDirectoryReaderMock)
-	reader.On("FindProviders", mock.Anything, "GÓMEZ").Return([]readmodel.Provider{}, nil).Once()
+	reader.On("FindProviders", mock.Anything, admin.ProviderDirectoryFilter{Query: "GÓMEZ"}).Return([]readmodel.Provider{}, nil).Once()
 	service := admin.NewService(nil, reader, nil)
 
-	result, err := service.ListProviders(t.Context(), "GÓMEZ")
+	result, err := service.ListProviders(t.Context(), admin.ProviderDirectoryFilter{Query: "GÓMEZ"})
 
 	require.NoError(t, err)
 	assert.NotNil(t, result)
 	assert.Empty(t, result)
+	reader.AssertExpectations(t)
+}
+
+func TestServiceForwardsCombinedProviderFilter(t *testing.T) {
+	categoryID, coverageZoneID := 2, 6
+	status := identityverification.StatusApproved
+	filter := admin.ProviderDirectoryFilter{
+		Query: "JUAN", CategoryID: &categoryID, CoverageZoneID: &coverageZoneID,
+		IdentityVerificationStatus: &status,
+	}
+	reader := new(providerDirectoryReaderMock)
+	reader.On("FindProviders", mock.Anything, filter).Return([]readmodel.Provider{}, nil).Once()
+	service := admin.NewService(nil, reader, nil)
+
+	result, err := service.ListProviders(t.Context(), filter)
+
+	require.NoError(t, err)
+	assert.NotNil(t, result)
 	reader.AssertExpectations(t)
 }
