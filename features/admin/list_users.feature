@@ -164,7 +164,6 @@ Feature: Listar usuarios registrados
                 | declined   | laura@example.com |
                 | unverified | pedro@example.com |
 
-    @wip
     Rule: Los filtros inválidos deben rechazarse
 
         Scenario Outline: 61.14-LU Rechazar un filtro inválido de prestadores
@@ -215,7 +214,6 @@ Feature: Listar usuarios registrados
                 | Comuna 6  |
                 | Comuna 14 |
 
-        @wip
         Scenario Outline: 61.17-LU Rechazar el filtro <parámetro> de prestadores en el directorio de consumidores
             Given que existe el rubro "Plomería"
             And que están habilitadas las zonas de cobertura "Comuna 6" y "Comuna 14"
@@ -230,7 +228,6 @@ Feature: Listar usuarios registrados
                 | coverage_zone_id             | el identificador positivo de la zona "Comuna 6" |
                 | identity_verification_status | el estado "approved"                            |
 
-    @wip
     Rule: Los directorios administrativos requieren un token Bearer
 
         Scenario Outline: 61.18-LU Rechazar la consulta de <tipo de usuario> sin token Bearer
