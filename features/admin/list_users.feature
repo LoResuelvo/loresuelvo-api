@@ -97,7 +97,6 @@ Feature: Listar usuarios registrados
             When consulto el directorio de prestadores
             Then el sistema devuelve un directorio de prestadores vacío
 
-    @wip
     Rule: El administrador puede buscar usuarios por nombre, apellido o correo sin distinguir mayúsculas
 
         Background:
