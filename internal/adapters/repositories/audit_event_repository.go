@@ -71,17 +71,39 @@ func (repository *AuditEventRepository) FindByID(ctx context.Context, id uuid.UU
 	return event, nil
 }
 
-// FindLatest returns only a bounded, deterministic, newest-first selection.
-func (repository *AuditEventRepository) FindLatest(ctx context.Context, filter audit.LogFilter, limit int) ([]*audit.Event, error) {
+// CaptureWatermark reads a committed counter value. The insert trigger updates
+// the counter in the same transaction as the event and holds its row lock until
+// commit, so an in-flight insert can never later commit below this boundary.
+func (repository *AuditEventRepository) CaptureWatermark(ctx context.Context) (int64, error) {
+	var watermark int64
+	if err := repository.db.QueryRowContext(ctx, `SELECT last_value FROM audit_ingest_counter WHERE id = 1`).Scan(&watermark); err != nil {
+		return 0, fmt.Errorf("capturing audit ingest watermark: %w: %w", audit.ErrPersistence, err)
+	}
+	return watermark, nil
+}
+
+func (repository *AuditEventRepository) FindPage(ctx context.Context, filter audit.LogFilter, watermark int64, before *audit.LogPosition, limit int) ([]*audit.Event, error) {
 	if err := filter.Validate(); err != nil {
 		return nil, err
 	}
-	if limit < 1 || limit > 100 {
-		return nil, fmt.Errorf("finding latest audit events: %w", audit.ErrInvalidQuery)
+	if watermark < 0 || limit < 1 || limit > 101 || before != nil && (before.ID == uuid.Nil || before.OccurredOn.IsZero()) {
+		return nil, fmt.Errorf("finding audit event page: %w", audit.ErrInvalidQuery)
 	}
+	conditions, args := auditFilterConditions(filter)
+	args = append(args, watermark)
+	conditions = append(conditions, fmt.Sprintf("ingest_seq <= $%d", len(args)))
+	if before != nil {
+		args = append(args, before.OccurredOn.UTC(), before.ID)
+		conditions = append(conditions, fmt.Sprintf("(occurred_on, id) < ($%d, $%d)", len(args)-1, len(args)))
+	}
+	args = append(args, limit)
+	query := `SELECT id, operator_id, action, resource_type, resource_id, occurred_on,
+		result, correlation_id, reason, changed_field, state_from, state_to FROM audit_events WHERE ` +
+		strings.Join(conditions, ` AND `) + fmt.Sprintf(` ORDER BY occurred_on DESC, id DESC LIMIT $%d`, len(args))
+	return repository.queryEvents(ctx, query, args, limit)
+}
 
-	const columns = `SELECT id, operator_id, action, resource_type, resource_id, occurred_on,
-		result, correlation_id, reason, changed_field, state_from, state_to FROM audit_events`
+func auditFilterConditions(filter audit.LogFilter) ([]string, []any) {
 	conditions := make([]string, 0, 7)
 	args := make([]any, 0, 8)
 	appendCondition := func(column, comparison string, value any) {
@@ -109,15 +131,13 @@ func (repository *AuditEventRepository) FindLatest(ctx context.Context, filter a
 	if filter.OccurredTo != nil {
 		appendCondition("occurred_on", "<", filter.OccurredTo.UTC())
 	}
-	query := columns
-	if len(conditions) > 0 {
-		query += ` WHERE ` + strings.Join(conditions, ` AND `)
-	}
-	args = append(args, limit)
-	query += fmt.Sprintf(` ORDER BY occurred_on DESC, id DESC LIMIT $%d`, len(args))
+	return conditions, args
+}
+
+func (repository *AuditEventRepository) queryEvents(ctx context.Context, query string, args []any, limit int) ([]*audit.Event, error) {
 	rows, err := repository.db.QueryContext(ctx, query, args...)
 	if err != nil {
-		return nil, fmt.Errorf("finding latest audit events: %w: %w", audit.ErrPersistence, err)
+		return nil, fmt.Errorf("finding audit event page: %w: %w", audit.ErrPersistence, err)
 	}
 	defer rows.Close()
 
@@ -125,12 +145,12 @@ func (repository *AuditEventRepository) FindLatest(ctx context.Context, filter a
 	for rows.Next() {
 		event, err := scanAuditEvent(rows)
 		if err != nil {
-			return nil, fmt.Errorf("rehydrating latest audit event: %w: %w", audit.ErrPersistence, err)
+			return nil, fmt.Errorf("rehydrating audit event page: %w: %w", audit.ErrPersistence, err)
 		}
 		events = append(events, event)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("iterating latest audit events: %w: %w", audit.ErrPersistence, err)
+		return nil, fmt.Errorf("iterating audit event page: %w: %w", audit.ErrPersistence, err)
 	}
 	return events, nil
 }

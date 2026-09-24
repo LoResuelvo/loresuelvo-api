@@ -27,6 +27,13 @@ func newAuditRepositoryTest(t *testing.T) (*sql.DB, *AuditEventRepository) {
 	return database, NewAuditEventRepository(database)
 }
 
+func findAuditPageAtCurrentCut(t *testing.T, repository *AuditEventRepository, ctx context.Context, filter audit.LogFilter, limit int) ([]*audit.Event, error) {
+	t.Helper()
+	watermark, err := repository.CaptureWatermark(ctx)
+	require.NoError(t, err)
+	return repository.FindPage(ctx, filter, watermark, nil, limit)
+}
+
 func newAuditRepositoryEvent(t *testing.T, id uuid.UUID) *audit.Event {
 	t.Helper()
 	event, err := audit.NewEvent(audit.EventParams{
@@ -191,7 +198,7 @@ func TestAuditEventRepositoryExposesNoMutationMethod(t *testing.T) {
 	for i := range typ.NumMethod() {
 		methods = append(methods, typ.Method(i).Name)
 	}
-	require.ElementsMatch(t, []string{"Save", "FindByID", "FindLatest"}, methods)
+	require.ElementsMatch(t, []string{"Save", "FindByID", "CaptureWatermark", "FindPage"}, methods)
 	var _ audit.Writer = (*AuditEventRepository)(nil)
 	var _ audit.Reader = (*AuditEventRepository)(nil)
 	var _ audit.LogReader = (*AuditEventRepository)(nil)
@@ -203,7 +210,7 @@ func TestAuditEventRepositoryRejectsNilEvent(t *testing.T) {
 	require.True(t, errors.Is(err, audit.ErrInvalidEvent))
 }
 
-func TestAuditEventRepositoryFindLatestFiltersOrdersBoundsAndRehydrates(t *testing.T) {
+func TestAuditEventRepositoryFindPageFiltersOrdersBoundsAndRehydrates(t *testing.T) {
 	_, repository := newAuditRepositoryTest(t)
 	operatorID := 1_000_000_000 + rand.IntN(100_000_000)
 	base := time.Now().UTC().AddDate(100, 0, 0)
@@ -230,7 +237,7 @@ func TestAuditEventRepositoryFindLatestFiltersOrdersBoundsAndRehydrates(t *testi
 		require.NoError(t, repository.Save(context.Background(), event))
 	}
 
-	events, err := repository.FindLatest(context.Background(), audit.LogFilter{OperatorID: &operatorID}, 2)
+	events, err := findAuditPageAtCurrentCut(t, repository, context.Background(), audit.LogFilter{OperatorID: &operatorID}, 2)
 	require.NoError(t, err)
 	require.Len(t, events, 2)
 	require.Equal(t, []uuid.UUID{ids[0], ids[1]}, []uuid.UUID{events[0].ID(), events[1].ID()})
@@ -239,27 +246,27 @@ func TestAuditEventRepositoryFindLatestFiltersOrdersBoundsAndRehydrates(t *testi
 	require.Equal(t, "17", events[0].ResourceID())
 	require.Equal(t, "query-test", events[0].CorrelationID())
 
-	all, err := repository.FindLatest(context.Background(), audit.LogFilter{OperatorID: &operatorID}, 20)
+	all, err := findAuditPageAtCurrentCut(t, repository, context.Background(), audit.LogFilter{OperatorID: &operatorID}, 20)
 	require.NoError(t, err)
 	require.Len(t, all, 3)
 	require.Equal(t, []uuid.UUID{ids[0], ids[1], ids[2]}, []uuid.UUID{all[0].ID(), all[1].ID(), all[2].ID()})
 
-	allOperators, err := repository.FindLatest(context.Background(), audit.LogFilter{}, 1)
+	allOperators, err := findAuditPageAtCurrentCut(t, repository, context.Background(), audit.LogFilter{}, 1)
 	require.NoError(t, err)
 	require.Len(t, allOperators, 1)
 	require.Equal(t, otherOperatorEventID, allOperators[0].ID())
 }
 
-func TestAuditEventRepositoryFindLatestReturnsNonNilEmptyCollection(t *testing.T) {
+func TestAuditEventRepositoryFindPageReturnsNonNilEmptyCollection(t *testing.T) {
 	_, repository := newAuditRepositoryTest(t)
 	operatorID := 1_000_000_000 + rand.IntN(100_000_000)
-	events, err := repository.FindLatest(context.Background(), audit.LogFilter{OperatorID: &operatorID}, 20)
+	events, err := findAuditPageAtCurrentCut(t, repository, context.Background(), audit.LogFilter{OperatorID: &operatorID}, 20)
 	require.NoError(t, err)
 	require.NotNil(t, events)
 	require.Empty(t, events)
 }
 
-func TestAuditEventRepositoryFindLatestRejectsInvalidArgumentsAndReadFailures(t *testing.T) {
+func TestAuditEventRepositoryFindPageRejectsInvalidArgumentsAndReadFailures(t *testing.T) {
 	database, repository := newAuditRepositoryTest(t)
 	invalidOperatorID := 0
 	tooLargeOperatorID := int(int64(1 << 31))
@@ -267,24 +274,24 @@ func TestAuditEventRepositoryFindLatestRejectsInvalidArgumentsAndReadFailures(t 
 		operatorID *int
 		limit      int
 	}{
-		{nil, 0}, {nil, 101}, {&invalidOperatorID, 20}, {&tooLargeOperatorID, 20},
+		{nil, 0}, {nil, 102}, {&invalidOperatorID, 20}, {&tooLargeOperatorID, 20},
 	} {
-		_, err := repository.FindLatest(context.Background(), audit.LogFilter{OperatorID: tc.operatorID}, tc.limit)
+		_, err := repository.FindPage(context.Background(), audit.LogFilter{OperatorID: tc.operatorID}, 0, nil, tc.limit)
 		require.ErrorIs(t, err, audit.ErrInvalidQuery)
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	_, err := repository.FindLatest(ctx, audit.LogFilter{}, 20)
+	_, err := repository.FindPage(ctx, audit.LogFilter{}, 0, nil, 20)
 	require.ErrorIs(t, err, audit.ErrPersistence)
 	require.ErrorIs(t, err, context.Canceled)
 
 	require.NoError(t, database.Close())
-	_, err = repository.FindLatest(context.Background(), audit.LogFilter{}, 20)
+	_, err = repository.FindPage(context.Background(), audit.LogFilter{}, 0, nil, 20)
 	require.ErrorIs(t, err, audit.ErrPersistence)
 }
 
-func TestAuditEventRepositoryFindLatestCombinesEveryFilterWithAND(t *testing.T) {
+func TestAuditEventRepositoryFindPageCombinesEveryFilterWithAND(t *testing.T) {
 	_, repository := newAuditRepositoryTest(t)
 	ctx := context.Background()
 	operatorID := 1_000_000_000 + rand.IntN(100_000_000)
@@ -347,7 +354,7 @@ func TestAuditEventRepositoryFindLatestCombinesEveryFilterWithAND(t *testing.T) 
 		{"offset-equivalent window", audit.LogFilter{OperatorID: &operatorID, Action: &action, ResourceType: &resourceType, ResourceID: &resourceID, Result: &result, OccurredFrom: &baseWithOffset, OccurredTo: &endWithOffset}, []string{"A"}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			events, err := repository.FindLatest(ctx, tc.filter, 20)
+			events, err := findAuditPageAtCurrentCut(t, repository, ctx, tc.filter, 20)
 			require.NoError(t, err)
 			actual := make([]uuid.UUID, 0, len(events))
 			for _, event := range events {
@@ -363,7 +370,106 @@ func TestAuditEventRepositoryFindLatestCombinesEveryFilterWithAND(t *testing.T) 
 
 	prepared := audit.ResultPrepared
 	created := audit.ActionCreate
-	events, err := repository.FindLatest(ctx, audit.LogFilter{OperatorID: &operatorID, Action: &created, Result: &prepared}, 20)
+	events, err := findAuditPageAtCurrentCut(t, repository, ctx, audit.LogFilter{OperatorID: &operatorID, Action: &created, Result: &prepared}, 20)
 	require.NoError(t, err)
 	require.Empty(t, events)
+}
+
+func TestAuditEventRepositoryFindPageKeepsCommittedCutAndTieOrder(t *testing.T) {
+	_, repository := newAuditRepositoryTest(t)
+	ctx := context.Background()
+	operatorID := 1_000_000_000 + rand.IntN(100_000_000)
+	base := time.Now().UTC().AddDate(100, 0, 0).Truncate(time.Second)
+	ids := []uuid.UUID{uuid.New(), uuid.New(), uuid.New(), uuid.New()}
+	// The second and third events tie on time; ID is the deterministic tiebreaker.
+	if ids[1].String() < ids[2].String() {
+		ids[1], ids[2] = ids[2], ids[1]
+	}
+	for index, id := range ids {
+		at := base.Add(-time.Duration(index) * time.Hour)
+		if index == 2 {
+			at = base.Add(-time.Hour)
+		}
+		event, err := audit.NewEvent(audit.EventParams{
+			ID: id, OperatorID: operatorID, Action: audit.ActionCreate,
+			ResourceType: "category", ResourceID: "17", OccurredOn: at,
+			Result: audit.ResultSucceeded, CorrelationID: "page-test",
+		})
+		require.NoError(t, err)
+		require.NoError(t, repository.Save(ctx, event))
+	}
+	watermark, err := repository.CaptureWatermark(ctx)
+	require.NoError(t, err)
+	filter := audit.LogFilter{OperatorID: &operatorID}
+	first, err := repository.FindPage(ctx, filter, watermark, nil, 2)
+	require.NoError(t, err)
+	require.Equal(t, []uuid.UUID{ids[0], ids[1]}, []uuid.UUID{first[0].ID(), first[1].ID()})
+
+	// A later insert with an older occurrence time must not enter page two.
+	late, err := audit.NewEvent(audit.EventParams{
+		ID: uuid.New(), OperatorID: operatorID, Action: audit.ActionCreate,
+		ResourceType: "category", ResourceID: "17", OccurredOn: base.Add(-2 * time.Hour),
+		Result: audit.ResultSucceeded, CorrelationID: "late-page-test",
+	})
+	require.NoError(t, err)
+	require.NoError(t, repository.Save(ctx, late))
+	before := &audit.LogPosition{OccurredOn: first[1].OccurredOn(), ID: first[1].ID()}
+	second, err := repository.FindPage(ctx, filter, watermark, before, 3)
+	require.NoError(t, err)
+	require.Equal(t, []uuid.UUID{ids[2], ids[3]}, []uuid.UUID{second[0].ID(), second[1].ID()})
+}
+
+func TestAuditEventRepositoryFailedInsertDoesNotAdvanceWatermark(t *testing.T) {
+	_, repository := newAuditRepositoryTest(t)
+	ctx := context.Background()
+	event := newAuditRepositoryEvent(t, uuid.New())
+	require.NoError(t, repository.Save(ctx, event))
+	before, err := repository.CaptureWatermark(ctx)
+	require.NoError(t, err)
+	require.ErrorIs(t, repository.Save(ctx, event), audit.ErrPersistence)
+	after, err := repository.CaptureWatermark(ctx)
+	require.NoError(t, err)
+	require.Equal(t, before, after)
+}
+
+func TestAuditEventRepositoryUncommittedInsertCannotEnterCapturedCut(t *testing.T) {
+	database, repository := newAuditRepositoryTest(t)
+	ctx := context.Background()
+	operatorID := 1_000_000_000 + rand.IntN(100_000_000)
+	base := time.Now().UTC().AddDate(100, 0, 0)
+	event, err := audit.NewEvent(audit.EventParams{
+		ID: uuid.New(), OperatorID: operatorID, Action: audit.ActionCreate,
+		ResourceType: "category", ResourceID: "17", OccurredOn: base,
+		Result: audit.ResultSucceeded, CorrelationID: "pending-page-test",
+	})
+	require.NoError(t, err)
+	tx, err := database.BeginTx(ctx, nil)
+	require.NoError(t, err)
+	require.NoError(t, repository.saveWithExecutor(ctx, tx, event))
+	watermark, err := repository.CaptureWatermark(ctx)
+	require.NoError(t, err)
+	require.NoError(t, tx.Commit())
+	events, err := repository.FindPage(ctx, audit.LogFilter{OperatorID: &operatorID}, watermark, nil, 20)
+	require.NoError(t, err)
+	require.Empty(t, events)
+}
+
+func TestAuditEventRepositoryFindPageRejectsInvalidArguments(t *testing.T) {
+	_, repository := newAuditRepositoryTest(t)
+	invalidOperator := 0
+	for _, tc := range []struct {
+		filter    audit.LogFilter
+		watermark int64
+		before    *audit.LogPosition
+		limit     int
+	}{
+		{filter: audit.LogFilter{OperatorID: &invalidOperator}, limit: 1},
+		{watermark: -1, limit: 1},
+		{before: &audit.LogPosition{ID: uuid.New()}, limit: 1},
+		{limit: 0},
+		{limit: 102},
+	} {
+		_, err := repository.FindPage(context.Background(), tc.filter, tc.watermark, tc.before, tc.limit)
+		require.ErrorIs(t, err, audit.ErrInvalidQuery)
+	}
 }

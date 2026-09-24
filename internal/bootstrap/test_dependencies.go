@@ -72,6 +72,7 @@ func NewTestDependencies(
 		addressResolverOverride:     consumerAddressResolver,
 		recommendationConfig:        conversation.DefaultProviderRecommendationConfig(),
 		identityWebhook:             newTestIdentityVerificationWebhook(),
+		auditCursorSigningKey:       []byte("test-audit-cursor-signing-key-2026-keep-private"),
 		categoryUnitOfWorkDecorator: categoryDecorator,
 	})
 	if err != nil {

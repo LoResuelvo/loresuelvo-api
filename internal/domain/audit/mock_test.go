@@ -10,8 +10,12 @@ import (
 
 type logReaderMock struct{ mock.Mock }
 
-func (m *logReaderMock) FindLatest(ctx context.Context, filter audit.LogFilter, limit int) ([]*audit.Event, error) {
-	args := m.Called(ctx, filter, limit)
+func (m *logReaderMock) CaptureWatermark(ctx context.Context) (int64, error) {
+	args := m.Called(ctx)
+	return args.Get(0).(int64), args.Error(1)
+}
+func (m *logReaderMock) FindPage(ctx context.Context, filter audit.LogFilter, watermark int64, before *audit.LogPosition, limit int) ([]*audit.Event, error) {
+	args := m.Called(ctx, filter, watermark, before, limit)
 	if events := args.Get(0); events != nil {
 		return events.([]*audit.Event), args.Error(1)
 	}

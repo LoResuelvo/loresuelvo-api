@@ -1,6 +1,7 @@
 package steps_test
 
 import (
+	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -16,13 +17,18 @@ import (
 )
 
 type auditQueryState struct {
-	fixtures    map[string]*audit.Event
-	correlation string
-	rangeStart  string
-	rangeEnd    string
-	headers     http.Header
-	noBearer    bool
-	badBearer   bool
+	fixtures       map[string]*audit.Event
+	correlation    string
+	rangeStart     string
+	rangeEnd       string
+	headers        http.Header
+	noBearer       bool
+	badBearer      bool
+	firstPage      auditPageResponse
+	secondPage     auditPageResponse
+	pendingPostCut *audit.EventParams
+	postCutID      uuid.UUID
+	validCursor    string
 }
 
 type auditPageResponse struct {
@@ -67,6 +73,20 @@ func registerAdminQueryAuditLogsSteps(sc *godog.ScenarioContext, suite *testSuit
 	sc.Step(`^la página contiene solamente el evento "([^"]*)"$`, suite.auditPageContainsOnlyEvent)
 	sc.Step(`^el inicio del rango es inclusivo y el fin es exclusivo$`, suite.auditRangeHasExpectedBounds)
 	sc.Step(`^consulto el registro desde "([^"]*)" hasta "([^"]*)"$`, suite.queryAuditWithinRange)
+	sc.Step(`^que se agregará un evento sintético del operador "([^"]*)" con acción "([^"]*)", recurso "([^"]*)" e ID "([^"]*)", resultado "([^"]*)" y correlación única después de la primera página$`, suite.schedulePostCutAuditEvent)
+	sc.Step(`^recorro el registro para el operador "([^"]*)" y la acción "([^"]*)" con páginas de (\d+) eventos$`, suite.walkAuditPages)
+	sc.Step(`^la primera página contiene los eventos "([^"]*)" y "([^"]*)" en ese orden y entrega un cursor siguiente$`, suite.firstAuditPageContainsEvents)
+	sc.Step(`^la segunda página contiene los eventos "([^"]*)" y "([^"]*)" en ese orden y no tiene cursor siguiente$`, suite.secondAuditPageContainsEvents)
+	sc.Step(`^ningún evento se repite ni aparecen el evento "([^"]*)" o el evento posterior al corte$`, suite.auditPagesExcludeUnwantedEvents)
+	sc.Step(`^que existen (\d+) eventos sintéticos preexistentes del operador "([^"]*)" con acción "([^"]*)", recurso "([^"]*)" e ID "([^"]*)", resultado "([^"]*)", fechas anteriores a la consulta e identificadores y correlaciones únicos$`, suite.thereAreSyntheticAuditEvents)
+	sc.Step(`^consulto el registro para el operador "([^"]*)" sin indicar límite$`, suite.queryAuditWithDefaultLimit)
+	sc.Step(`^consulto el registro para el operador "([^"]*)" con límite (\d+)$`, suite.queryAuditWithExplicitLimit)
+	sc.Step(`^la página contiene (\d+) eventos y entrega un cursor siguiente$`, suite.auditPageHasCountAndCursor)
+	sc.Step(`^consulto el registro de auditoría con el parámetro "([^"]*)" igual a "([^"]*)"$`, suite.queryAuditWithInvalidParameter)
+	sc.Step(`^que existen (\d+) eventos de auditoría preexistentes del operador "([^"]*)" con acción "([^"]*)"$`, suite.thereAreExistingAuditEventsForCursor)
+	sc.Step(`^que obtuve un cursor válido al filtrar el registro por el operador "([^"]*)" y la acción "([^"]*)" con límite (\d+)$`, suite.obtainValidAuditCursor)
+	sc.Step(`^consulto el registro con el cursor alterado, el mismo operador y la acción "([^"]*)"$`, suite.queryAuditWithTamperedCursor)
+	sc.Step(`^consulto el registro con ese cursor, el mismo operador y la acción "([^"]*)"$`, suite.queryAuditWithUnchangedCursor)
 }
 
 func (suite *testSuite) auditOperatorID(email string) (int, error) {
@@ -79,9 +99,15 @@ func (suite *testSuite) auditOperatorID(email string) (int, error) {
 
 func (suite *testSuite) thereAreExistingAuditEvents(table *godog.Table) error {
 	headers := []string{"evento", "operador", "acción", "tipo de recurso", "ID de recurso", "fecha UTC", "resultado", "correlación"}
-	withReason := len(table.Rows) > 0 && len(table.Rows[0].Cells) == len(headers)+1
+	orderedIDs := len(table.Rows) > 0 && len(table.Rows[0].Cells) == len(headers)+1 && table.Rows[0].Cells[8].Value == "orden de ID"
+	if orderedIDs {
+		headers[3] = "recurso"
+	}
+	withReason := !orderedIDs && len(table.Rows) > 0 && len(table.Rows[0].Cells) == len(headers)+1
 	if withReason {
 		headers = append(headers, "motivo")
+	} else if orderedIDs {
+		headers = append(headers, "orden de ID")
 	}
 	if err := requireTableHeaders(table, headers...); err != nil {
 		return err
@@ -90,6 +116,8 @@ func (suite *testSuite) thereAreExistingAuditEvents(table *godog.Table) error {
 		return fmt.Errorf("audit fixture table has no events")
 	}
 	suite.auditQuery.fixtures = make(map[string]*audit.Event, len(table.Rows)-1)
+	orderedPrefix := uuid.New()
+	usedRanks := make(map[uint32]bool)
 	for _, row := range table.Rows[1:] {
 		if len(row.Cells) != len(headers) {
 			return fmt.Errorf("audit fixture row requires %d columns, got %d", len(headers), len(row.Cells))
@@ -113,8 +141,18 @@ func (suite *testSuite) thereAreExistingAuditEvents(table *godog.Table) error {
 				return err
 			}
 		}
+		id := uuid.New()
+		if orderedIDs {
+			rank, parseErr := strconv.ParseUint(cell(8), 10, 32)
+			if parseErr != nil || rank == 0 || usedRanks[uint32(rank)] {
+				return fmt.Errorf("invalid or duplicate audit fixture ID rank %q", cell(8))
+			}
+			usedRanks[uint32(rank)] = true
+			id = orderedPrefix
+			binary.BigEndian.PutUint32(id[12:], uint32(rank))
+		}
 		event, err := suite.auditEvents.Save(suite.scenarioContext, audit.EventParams{
-			ID: uuid.New(), OperatorID: operatorID, Action: audit.Action(cell(2)), ResourceType: cell(3),
+			ID: id, OperatorID: operatorID, Action: audit.Action(cell(2)), ResourceType: cell(3),
 			ResourceID: cell(4), OccurredOn: occurredOn, Result: audit.Result(cell(6)),
 			CorrelationID: cell(7), Reason: reason,
 		})
@@ -425,7 +463,12 @@ func (suite *testSuite) preparedAccessEventsFor(email string) ([]*audit.Event, e
 	if err != nil {
 		return nil, err
 	}
-	latest, err := suite.dependencies.Persistence.AuditEventRepository.FindLatest(suite.scenarioContext, audit.LogFilter{OperatorID: &operatorID}, 20)
+	reader := suite.dependencies.Persistence.AuditEventRepository
+	watermark, err := reader.CaptureWatermark(suite.scenarioContext)
+	if err != nil {
+		return nil, fmt.Errorf("capturing audit ingest watermark: %w", err)
+	}
+	latest, err := reader.FindPage(suite.scenarioContext, audit.LogFilter{OperatorID: &operatorID}, watermark, nil, 20)
 	if err != nil {
 		return nil, fmt.Errorf("listing latest audit events for operator: %w", err)
 	}
@@ -484,4 +527,234 @@ func (suite *testSuite) currentAuditAccessIsNotReturned() error {
 
 func (suite *testSuite) preparedAuditAccessEventsForCurrentOperator() ([]*audit.Event, error) {
 	return suite.preparedAccessEventsFor("supervisor@example.com")
+}
+
+func (suite *testSuite) schedulePostCutAuditEvent(email, action, resourceType, resourceID, result string) error {
+	operatorID, err := suite.auditOperatorID(email)
+	if err != nil {
+		return err
+	}
+	params := audit.EventParams{
+		ID: uuid.New(), OperatorID: operatorID, Action: audit.Action(action),
+		ResourceType: resourceType, ResourceID: resourceID,
+		OccurredOn: time.Date(2026, 9, 20, 10, 30, 0, 0, time.UTC),
+		Result:     audit.Result(result), CorrelationID: "post-cut-" + uuid.NewString(),
+	}
+	suite.auditQuery.pendingPostCut = &params
+	return nil
+}
+
+func (suite *testSuite) walkAuditPages(email, action string, limit int) error {
+	if suite.auditQuery.pendingPostCut == nil {
+		return fmt.Errorf("post-cut audit fixture was not scheduled")
+	}
+	operatorID, err := suite.auditOperatorID(email)
+	if err != nil {
+		return err
+	}
+	query := url.Values{"operator_id": {strconv.Itoa(operatorID)}, "action": {action}, "limit": {strconv.Itoa(limit)}}
+	if err := suite.sendAuditQuery(query, ""); err != nil {
+		return err
+	}
+	if suite.lastStatus != http.StatusOK {
+		return fmt.Errorf("first audit page returned status %d", suite.lastStatus)
+	}
+	first, _, err := suite.decodedAuditPage()
+	if err != nil {
+		return err
+	}
+	if first.NextCursor == nil || *first.NextCursor == "" {
+		return fmt.Errorf("first audit page has no next cursor")
+	}
+	suite.auditQuery.firstPage = first
+	inserted, err := suite.auditEvents.Save(suite.scenarioContext, *suite.auditQuery.pendingPostCut)
+	if err != nil {
+		return fmt.Errorf("saving post-cut audit fixture: %w", err)
+	}
+	suite.auditQuery.postCutID = inserted.ID()
+	query.Set("cursor", *first.NextCursor)
+	if err := suite.sendAuditQuery(query, ""); err != nil {
+		return err
+	}
+	if suite.lastStatus != http.StatusOK {
+		return fmt.Errorf("second audit page returned status %d", suite.lastStatus)
+	}
+	second, _, err := suite.decodedAuditPage()
+	if err != nil {
+		return err
+	}
+	suite.auditQuery.secondPage = second
+	return nil
+}
+
+func (suite *testSuite) auditPageMatchesFixtures(page auditPageResponse, names ...string) error {
+	if len(page.Events) != len(names) {
+		return fmt.Errorf("expected %d audit events, got %d", len(names), len(page.Events))
+	}
+	for i, name := range names {
+		expected := suite.auditQuery.fixtures[name]
+		if expected == nil {
+			return fmt.Errorf("unknown audit fixture %q", name)
+		}
+		if page.Events[i].ID != expected.ID() {
+			return fmt.Errorf("audit event at position %d is not fixture %q", i, name)
+		}
+	}
+	return nil
+}
+
+func (suite *testSuite) firstAuditPageContainsEvents(first, second string) error {
+	if err := suite.auditPageMatchesFixtures(suite.auditQuery.firstPage, first, second); err != nil {
+		return err
+	}
+	if suite.auditQuery.firstPage.NextCursor == nil || *suite.auditQuery.firstPage.NextCursor == "" {
+		return fmt.Errorf("first audit page has no next cursor")
+	}
+	return nil
+}
+
+func (suite *testSuite) secondAuditPageContainsEvents(first, second string) error {
+	if err := suite.auditPageMatchesFixtures(suite.auditQuery.secondPage, first, second); err != nil {
+		return err
+	}
+	if suite.auditQuery.secondPage.NextCursor != nil {
+		return fmt.Errorf("second audit page unexpectedly has a next cursor")
+	}
+	return nil
+}
+
+func (suite *testSuite) auditPagesExcludeUnwantedEvents(name string) error {
+	unwanted := suite.auditQuery.fixtures[name]
+	if unwanted == nil || suite.auditQuery.postCutID == uuid.Nil {
+		return fmt.Errorf("missing excluded audit fixtures")
+	}
+	seen := make(map[uuid.UUID]bool)
+	for _, page := range []auditPageResponse{suite.auditQuery.firstPage, suite.auditQuery.secondPage} {
+		for _, event := range page.Events {
+			if seen[event.ID] || event.ID == unwanted.ID() || event.ID == suite.auditQuery.postCutID {
+				return fmt.Errorf("audit pages contain a duplicate or excluded event")
+			}
+			seen[event.ID] = true
+		}
+	}
+	return nil
+}
+
+func (suite *testSuite) thereAreSyntheticAuditEvents(count int, email, action, resourceType, resourceID, result string) error {
+	if count < 1 || count > 101 {
+		return fmt.Errorf("synthetic audit fixture count is out of bounds")
+	}
+	operatorID, err := suite.auditOperatorID(email)
+	if err != nil {
+		return err
+	}
+	base := time.Date(2026, 9, 20, 12, 0, 0, 0, time.UTC)
+	for i := range count {
+		_, err := suite.auditEvents.Save(suite.scenarioContext, audit.EventParams{
+			ID: uuid.New(), OperatorID: operatorID, Action: audit.Action(action),
+			ResourceType: resourceType, ResourceID: resourceID,
+			OccurredOn: base.Add(-time.Duration(i) * time.Second),
+			Result:     audit.Result(result), CorrelationID: "synthetic-" + uuid.NewString(),
+		})
+		if err != nil {
+			return fmt.Errorf("saving synthetic audit fixture %d: %w", i, err)
+		}
+	}
+	return nil
+}
+
+func (suite *testSuite) queryAuditWithDefaultLimit(email string) error {
+	return suite.queryAuditWithLimit(email, 0)
+}
+
+func (suite *testSuite) queryAuditWithExplicitLimit(email string, limit int) error {
+	return suite.queryAuditWithLimit(email, limit)
+}
+
+func (suite *testSuite) queryAuditWithLimit(email string, limit int) error {
+	operatorID, err := suite.auditOperatorID(email)
+	if err != nil {
+		return err
+	}
+	query := url.Values{"operator_id": {strconv.Itoa(operatorID)}}
+	if limit > 0 {
+		query.Set("limit", strconv.Itoa(limit))
+	}
+	return suite.sendAuditQuery(query, "")
+}
+
+func (suite *testSuite) auditPageHasCountAndCursor(count int) error {
+	page, _, err := suite.decodedAuditPage()
+	if err != nil {
+		return err
+	}
+	if len(page.Events) != count || page.NextCursor == nil || *page.NextCursor == "" {
+		return fmt.Errorf("expected %d audit events and a next cursor, got %d events, cursor present: %t", count, len(page.Events), page.NextCursor != nil)
+	}
+	return nil
+}
+
+func (suite *testSuite) queryAuditWithInvalidParameter(name, value string) error {
+	return suite.sendAuditQuery(url.Values{name: {value}}, "")
+}
+
+func (suite *testSuite) thereAreExistingAuditEventsForCursor(count int, email, action string) error {
+	return suite.thereAreSyntheticAuditEvents(count, email, action, "category", "17", string(audit.ResultSucceeded))
+}
+
+func (suite *testSuite) obtainValidAuditCursor(email, action string, limit int) error {
+	operatorID, err := suite.auditOperatorID(email)
+	if err != nil {
+		return err
+	}
+	if err := suite.sendAuditQuery(url.Values{
+		"operator_id": {strconv.Itoa(operatorID)}, "action": {action}, "limit": {strconv.Itoa(limit)},
+	}, ""); err != nil {
+		return err
+	}
+	if suite.lastStatus != http.StatusOK {
+		return fmt.Errorf("obtaining audit cursor returned status %d", suite.lastStatus)
+	}
+	page, _, err := suite.decodedAuditPage()
+	if err != nil {
+		return err
+	}
+	if page.NextCursor == nil || *page.NextCursor == "" {
+		return fmt.Errorf("audit query did not return a valid cursor")
+	}
+	suite.auditQuery.validCursor = *page.NextCursor
+	return nil
+}
+
+func (suite *testSuite) queryAuditWithTamperedCursor(action string) error {
+	return suite.queryAuditWithCursor(action, true)
+}
+
+func (suite *testSuite) queryAuditWithUnchangedCursor(action string) error {
+	return suite.queryAuditWithCursor(action, false)
+}
+
+func (suite *testSuite) queryAuditWithCursor(action string, tamper bool) error {
+	operatorID, err := suite.auditOperatorID("supervisor@example.com")
+	if err != nil {
+		return err
+	}
+	cursor := suite.auditQuery.validCursor
+	if cursor == "" {
+		return fmt.Errorf("no valid audit cursor was obtained")
+	}
+	if tamper {
+		index := len(cursor) / 2
+		if index+1 < len(cursor) {
+			index++
+		}
+		replacement := byte('A')
+		if cursor[index] == replacement {
+			replacement = 'B'
+		}
+		cursor = cursor[:index] + string(replacement) + cursor[index+1:]
+	}
+	return suite.sendAuditQuery(url.Values{
+		"operator_id": {strconv.Itoa(operatorID)}, "action": {action}, "limit": {"1"}, "cursor": {cursor},
+	}, "")
 }

@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"log/slog"
+	"os"
 	"time"
 
 	chatbotadapter "github.com/LoResuelvo/loresuelvo-api/internal/adapters/chatbot"
@@ -94,6 +95,7 @@ type dependencyAdapters struct {
 	recommendationConfig         conversation.ProviderRecommendationConfig
 	identityWebhook              identity_verification_handler.IdentityVerificationWebhook
 	categoryUnitOfWorkDecorator  func(category.UnitOfWork) category.UnitOfWork
+	auditCursorSigningKey        []byte
 }
 
 func (dependencies *Dependencies) RouterConfig(
@@ -170,6 +172,7 @@ func NewDependencies(database *sql.DB) (*Dependencies, error) {
 		identityVerifier:             identityVerifier,
 		recommendationConfig:         recommendationConfig,
 		identityWebhook:              identityWebhook,
+		auditCursorSigningKey:        []byte(os.Getenv("AUDIT_CURSOR_HMAC_KEY")),
 	})
 }
 
@@ -225,6 +228,10 @@ func newDependencies(database *sql.DB, adapters dependencyAdapters) (*Dependenci
 		persistence.UserRepository,
 		systemClock,
 	)
+	auditLogHandler, err := audit_log_handler.NewHandler(auditLogQueryService, adapters.auditCursorSigningKey)
+	if err != nil {
+		return nil, fmt.Errorf("configuring audit log cursor: %w", err)
+	}
 	coverageZoneService := coveragezone.NewService(persistence.CoverageZoneRepository)
 	providerService := provider.NewService(
 		persistence.ProviderSearchReader,
@@ -356,7 +363,7 @@ func newDependencies(database *sql.DB, adapters dependencyAdapters) (*Dependenci
 		Clock: systemClock,
 		routerConfig: httpadapter.RouterConfig{
 			AdminHandler:                admin_handler.NewAdminHandler(adminService),
-			AuditLogHandler:             audit_log_handler.NewHandler(auditLogQueryService),
+			AuditLogHandler:             auditLogHandler,
 			CategoryHandler:             category_handler.NewCategoryHandler(categoryService),
 			CalendarConnectionHandler:   calendar_connection_handler.NewCalendarConnectionHandler(calendarConnectionService, adapters.calendarHandlerConfig),
 			CoverageZoneHandler:         coverage_zone_handler.NewCoverageZoneHandler(coverageZoneService),

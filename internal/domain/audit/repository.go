@@ -19,7 +19,8 @@ type Reader interface {
 // LogReader retrieves a bounded, newest-first view of immutable audit events.
 // Nil filter fields leave their dimension unrestricted.
 type LogReader interface {
-	FindLatest(ctx context.Context, filter LogFilter, limit int) ([]*Event, error)
+	CaptureWatermark(ctx context.Context) (int64, error)
+	FindPage(ctx context.Context, filter LogFilter, watermark int64, before *LogPosition, limit int) ([]*Event, error)
 }
 
 // OperatorIDFinder resolves the local operator from an authenticated subject.

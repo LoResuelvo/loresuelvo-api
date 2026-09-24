@@ -24,18 +24,37 @@ func NewLogQueryService(reader LogReader, writer Writer, operatorIDs OperatorIDF
 
 // Query reads before appending access evidence, so this request never observes
 // its own audit event. Nothing is returned unless the evidence is persisted.
-func (service *LogQueryService) Query(ctx context.Context, authSubject, correlationID string, filter LogFilter) ([]*Event, error) {
-	if err := filter.Validate(); err != nil {
-		return nil, err
+func (service *LogQueryService) Query(ctx context.Context, authSubject, correlationID string, query LogQuery) (LogPage, error) {
+	if err := query.Validate(); err != nil {
+		return LogPage{}, err
 	}
 	actorID, err := service.operatorIDs.FindOperatorIDByAuthID(ctx, authSubject)
 	if err != nil {
-		return nil, fmt.Errorf("finding audit log reader: %w", err)
+		return LogPage{}, fmt.Errorf("finding audit log reader: %w", err)
 	}
 
-	events, err := service.reader.FindLatest(ctx, filter, defaultLogQueryLimit)
+	var watermark int64
+	if query.Watermark == nil {
+		watermark, err = service.reader.CaptureWatermark(ctx)
+		if err != nil {
+			return LogPage{}, fmt.Errorf("capturing audit log watermark: %w", err)
+		}
+	} else {
+		watermark = *query.Watermark
+	}
+	limit := query.effectiveLimit()
+	events, err := service.reader.FindPage(ctx, query.Filter, watermark, query.Before, limit+1)
 	if err != nil {
-		return nil, fmt.Errorf("reading audit log: %w", err)
+		return LogPage{}, fmt.Errorf("reading audit log: %w", err)
+	}
+	page := LogPage{Events: events, Watermark: watermark}
+	if page.Events == nil {
+		page.Events = []*Event{}
+	}
+	if len(page.Events) > limit {
+		page.Events = page.Events[:limit]
+		last := page.Events[limit-1]
+		page.Next = &LogPosition{OccurredOn: last.OccurredOn(), ID: last.ID()}
 	}
 
 	access, err := NewEvent(EventParams{
@@ -44,14 +63,10 @@ func (service *LogQueryService) Query(ctx context.Context, authSubject, correlat
 		Result: ResultPrepared, CorrelationID: correlationID,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("creating audit log access event: %w", err)
+		return LogPage{}, fmt.Errorf("creating audit log access event: %w", err)
 	}
 	if err := service.writer.Save(ctx, access); err != nil {
-		return nil, fmt.Errorf("saving audit log access event: %w", err)
+		return LogPage{}, fmt.Errorf("saving audit log access event: %w", err)
 	}
-
-	if events == nil {
-		return []*Event{}, nil
-	}
-	return events, nil
+	return page, nil
 }
