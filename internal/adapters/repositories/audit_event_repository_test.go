@@ -230,7 +230,7 @@ func TestAuditEventRepositoryFindLatestFiltersOrdersBoundsAndRehydrates(t *testi
 		require.NoError(t, repository.Save(context.Background(), event))
 	}
 
-	events, err := repository.FindLatest(context.Background(), &operatorID, 2)
+	events, err := repository.FindLatest(context.Background(), audit.LogFilter{OperatorID: &operatorID}, 2)
 	require.NoError(t, err)
 	require.Len(t, events, 2)
 	require.Equal(t, []uuid.UUID{ids[0], ids[1]}, []uuid.UUID{events[0].ID(), events[1].ID()})
@@ -239,12 +239,12 @@ func TestAuditEventRepositoryFindLatestFiltersOrdersBoundsAndRehydrates(t *testi
 	require.Equal(t, "17", events[0].ResourceID())
 	require.Equal(t, "query-test", events[0].CorrelationID())
 
-	all, err := repository.FindLatest(context.Background(), &operatorID, 20)
+	all, err := repository.FindLatest(context.Background(), audit.LogFilter{OperatorID: &operatorID}, 20)
 	require.NoError(t, err)
 	require.Len(t, all, 3)
 	require.Equal(t, []uuid.UUID{ids[0], ids[1], ids[2]}, []uuid.UUID{all[0].ID(), all[1].ID(), all[2].ID()})
 
-	allOperators, err := repository.FindLatest(context.Background(), nil, 1)
+	allOperators, err := repository.FindLatest(context.Background(), audit.LogFilter{}, 1)
 	require.NoError(t, err)
 	require.Len(t, allOperators, 1)
 	require.Equal(t, otherOperatorEventID, allOperators[0].ID())
@@ -253,7 +253,7 @@ func TestAuditEventRepositoryFindLatestFiltersOrdersBoundsAndRehydrates(t *testi
 func TestAuditEventRepositoryFindLatestReturnsNonNilEmptyCollection(t *testing.T) {
 	_, repository := newAuditRepositoryTest(t)
 	operatorID := 1_000_000_000 + rand.IntN(100_000_000)
-	events, err := repository.FindLatest(context.Background(), &operatorID, 20)
+	events, err := repository.FindLatest(context.Background(), audit.LogFilter{OperatorID: &operatorID}, 20)
 	require.NoError(t, err)
 	require.NotNil(t, events)
 	require.Empty(t, events)
@@ -262,23 +262,108 @@ func TestAuditEventRepositoryFindLatestReturnsNonNilEmptyCollection(t *testing.T
 func TestAuditEventRepositoryFindLatestRejectsInvalidArgumentsAndReadFailures(t *testing.T) {
 	database, repository := newAuditRepositoryTest(t)
 	invalidOperatorID := 0
+	tooLargeOperatorID := int(int64(1 << 31))
 	for _, tc := range []struct {
 		operatorID *int
 		limit      int
 	}{
-		{nil, 0}, {nil, 101}, {&invalidOperatorID, 20},
+		{nil, 0}, {nil, 101}, {&invalidOperatorID, 20}, {&tooLargeOperatorID, 20},
 	} {
-		_, err := repository.FindLatest(context.Background(), tc.operatorID, tc.limit)
+		_, err := repository.FindLatest(context.Background(), audit.LogFilter{OperatorID: tc.operatorID}, tc.limit)
 		require.ErrorIs(t, err, audit.ErrInvalidQuery)
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	_, err := repository.FindLatest(ctx, nil, 20)
+	_, err := repository.FindLatest(ctx, audit.LogFilter{}, 20)
 	require.ErrorIs(t, err, audit.ErrPersistence)
 	require.ErrorIs(t, err, context.Canceled)
 
 	require.NoError(t, database.Close())
-	_, err = repository.FindLatest(context.Background(), nil, 20)
+	_, err = repository.FindLatest(context.Background(), audit.LogFilter{}, 20)
 	require.ErrorIs(t, err, audit.ErrPersistence)
+}
+
+func TestAuditEventRepositoryFindLatestCombinesEveryFilterWithAND(t *testing.T) {
+	_, repository := newAuditRepositoryTest(t)
+	ctx := context.Background()
+	operatorID := 1_000_000_000 + rand.IntN(100_000_000)
+	base := time.Now().UTC().AddDate(100, 0, 0).Truncate(time.Second)
+	end := base.Add(time.Hour)
+	art := time.FixedZone("ART", -3*3600)
+	baseWithOffset := base.In(art)
+	endWithOffset := end.In(art)
+	action := audit.ActionExecute
+	resourceType := "payment"
+	resourceID := "42"
+	result := audit.ResultSucceeded
+
+	type fixture struct {
+		name         string
+		operatorID   int
+		action       audit.Action
+		resourceType string
+		resourceID   string
+		result       audit.Result
+		occurredOn   time.Time
+	}
+	fixtures := []fixture{
+		{"A", operatorID, action, resourceType, resourceID, result, base},
+		{"B", operatorID + 1, action, resourceType, resourceID, result, base},
+		{"C", operatorID, audit.ActionCreate, resourceType, resourceID, result, base},
+		{"D", operatorID, action, "category", resourceID, result, base},
+		{"E", operatorID, action, resourceType, "43", result, base},
+		{"F", operatorID, action, resourceType, resourceID, audit.ResultFailed, base},
+		{"G", operatorID, action, resourceType, resourceID, result, end},
+		{"H", operatorID, action, resourceType, resourceID, result, base.Add(-time.Second)},
+	}
+	ids := make(map[string]uuid.UUID, len(fixtures))
+	for _, fixture := range fixtures {
+		id := uuid.New()
+		ids[fixture.name] = id
+		event, err := audit.NewEvent(audit.EventParams{
+			ID: id, OperatorID: fixture.operatorID, Action: fixture.action,
+			ResourceType: fixture.resourceType, ResourceID: fixture.resourceID,
+			OccurredOn: fixture.occurredOn, Result: fixture.result,
+			CorrelationID: "filter-test-" + fixture.name,
+		})
+		require.NoError(t, err)
+		require.NoError(t, repository.Save(ctx, event))
+	}
+
+	for _, tc := range []struct {
+		name   string
+		filter audit.LogFilter
+		want   []string
+	}{
+		{"operator", audit.LogFilter{OperatorID: &operatorID}, []string{"A", "C", "D", "E", "F", "G", "H"}},
+		{"action", audit.LogFilter{OperatorID: &operatorID, Action: &action}, []string{"A", "D", "E", "F", "G", "H"}},
+		{"resource type", audit.LogFilter{OperatorID: &operatorID, ResourceType: &resourceType}, []string{"A", "C", "E", "F", "G", "H"}},
+		{"resource ID", audit.LogFilter{OperatorID: &operatorID, ResourceID: &resourceID}, []string{"A", "C", "D", "F", "G", "H"}},
+		{"result", audit.LogFilter{OperatorID: &operatorID, Result: &result}, []string{"A", "C", "D", "E", "G", "H"}},
+		{"inclusive start", audit.LogFilter{OperatorID: &operatorID, OccurredFrom: &base}, []string{"A", "C", "D", "E", "F", "G"}},
+		{"exclusive end", audit.LogFilter{OperatorID: &operatorID, OccurredTo: &end}, []string{"A", "C", "D", "E", "F", "H"}},
+		{"all dimensions", audit.LogFilter{OperatorID: &operatorID, Action: &action, ResourceType: &resourceType, ResourceID: &resourceID, Result: &result, OccurredFrom: &base, OccurredTo: &end}, []string{"A"}},
+		{"offset-equivalent window", audit.LogFilter{OperatorID: &operatorID, Action: &action, ResourceType: &resourceType, ResourceID: &resourceID, Result: &result, OccurredFrom: &baseWithOffset, OccurredTo: &endWithOffset}, []string{"A"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			events, err := repository.FindLatest(ctx, tc.filter, 20)
+			require.NoError(t, err)
+			actual := make([]uuid.UUID, 0, len(events))
+			for _, event := range events {
+				actual = append(actual, event.ID())
+			}
+			want := make([]uuid.UUID, 0, len(tc.want))
+			for _, name := range tc.want {
+				want = append(want, ids[name])
+			}
+			require.ElementsMatch(t, want, actual)
+		})
+	}
+
+	prepared := audit.ResultPrepared
+	created := audit.ActionCreate
+	events, err := repository.FindLatest(ctx, audit.LogFilter{OperatorID: &operatorID, Action: &created, Result: &prepared}, 20)
+	require.NoError(t, err)
+	require.Empty(t, events)
 }

@@ -24,13 +24,16 @@ func NewLogQueryService(reader LogReader, writer Writer, operatorIDs OperatorIDF
 
 // Query reads before appending access evidence, so this request never observes
 // its own audit event. Nothing is returned unless the evidence is persisted.
-func (service *LogQueryService) Query(ctx context.Context, authSubject, correlationID string, operatorID *int) ([]*Event, error) {
+func (service *LogQueryService) Query(ctx context.Context, authSubject, correlationID string, filter LogFilter) ([]*Event, error) {
+	if err := filter.Validate(); err != nil {
+		return nil, err
+	}
 	actorID, err := service.operatorIDs.FindOperatorIDByAuthID(ctx, authSubject)
 	if err != nil {
 		return nil, fmt.Errorf("finding audit log reader: %w", err)
 	}
 
-	events, err := service.reader.FindLatest(ctx, operatorID, defaultLogQueryLimit)
+	events, err := service.reader.FindLatest(ctx, filter, defaultLogQueryLimit)
 	if err != nil {
 		return nil, fmt.Errorf("reading audit log: %w", err)
 	}

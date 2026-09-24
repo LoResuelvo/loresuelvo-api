@@ -10,8 +10,8 @@ import (
 
 type logReaderMock struct{ mock.Mock }
 
-func (m *logReaderMock) FindLatest(ctx context.Context, operatorID *int, limit int) ([]*audit.Event, error) {
-	args := m.Called(ctx, operatorID, limit)
+func (m *logReaderMock) FindLatest(ctx context.Context, filter audit.LogFilter, limit int) ([]*audit.Event, error) {
+	args := m.Called(ctx, filter, limit)
 	if events := args.Get(0); events != nil {
 		return events.([]*audit.Event), args.Error(1)
 	}

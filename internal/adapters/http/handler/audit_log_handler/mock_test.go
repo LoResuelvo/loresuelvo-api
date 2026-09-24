@@ -9,8 +9,8 @@ import (
 
 type serviceMock struct{ mock.Mock }
 
-func (service *serviceMock) Query(ctx context.Context, authSubject, correlationID string, operatorID *int) ([]*audit.Event, error) {
-	args := service.Called(ctx, authSubject, correlationID, operatorID)
+func (service *serviceMock) Query(ctx context.Context, authSubject, correlationID string, filter audit.LogFilter) ([]*audit.Event, error) {
+	args := service.Called(ctx, authSubject, correlationID, filter)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}

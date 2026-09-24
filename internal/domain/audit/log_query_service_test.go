@@ -27,7 +27,7 @@ func TestLogQueryServiceReadsBeforeAuditingAndReturnsImmutableEvents(t *testing.
 	writer := &auditWriterMock{}
 	finder := &auditOperatorIDFinderMock{}
 	finder.On("FindOperatorIDByAuthID", ctx, "auth0|supervisor").Return(23, nil).Once()
-	reader.On("FindLatest", ctx, &operatorID, 20).Run(func(mock.Arguments) {
+	reader.On("FindLatest", ctx, audit.LogFilter{OperatorID: &operatorID}, 20).Run(func(mock.Arguments) {
 		sequence = append(sequence, "read")
 	}).Return([]*audit.Event{listed}, nil).Once()
 	writer.On("Save", ctx, mock.MatchedBy(func(event *audit.Event) bool {
@@ -41,7 +41,7 @@ func TestLogQueryServiceReadsBeforeAuditingAndReturnsImmutableEvents(t *testing.
 	}).Return(nil).Once()
 
 	service := audit.NewLogQueryService(reader, writer, finder, auditFixedClock{now})
-	events, err := service.Query(ctx, "auth0|supervisor", "request-audit", &operatorID)
+	events, err := service.Query(ctx, "auth0|supervisor", "request-audit", audit.LogFilter{OperatorID: &operatorID})
 	require.NoError(t, err)
 	require.Equal(t, []*audit.Event{listed}, events)
 	require.Equal(t, []string{"read", "save"}, sequence)
@@ -56,11 +56,11 @@ func TestLogQueryServiceReturnsNonNilEmptyCollection(t *testing.T) {
 	writer := &auditWriterMock{}
 	finder := &auditOperatorIDFinderMock{}
 	finder.On("FindOperatorIDByAuthID", ctx, "actor").Return(23, nil).Once()
-	reader.On("FindLatest", ctx, (*int)(nil), 20).Return(nil, nil).Once()
+	reader.On("FindLatest", ctx, audit.LogFilter{}, 20).Return(nil, nil).Once()
 	writer.On("Save", ctx, mock.Anything).Return(nil).Once()
 
 	service := audit.NewLogQueryService(reader, writer, finder, auditFixedClock{time.Now()})
-	events, err := service.Query(ctx, "actor", "request-audit", nil)
+	events, err := service.Query(ctx, "actor", "request-audit", audit.LogFilter{})
 	require.NoError(t, err)
 	require.NotNil(t, events)
 	require.Empty(t, events)
@@ -76,7 +76,7 @@ func TestLogQueryServiceRejectsOperatorResolutionFailureBeforeReading(t *testing
 	finder.On("FindOperatorIDByAuthID", ctx, "actor").Return(0, want).Once()
 
 	service := audit.NewLogQueryService(reader, writer, finder, auditFixedClock{time.Now()})
-	events, err := service.Query(ctx, "actor", "request-audit", nil)
+	events, err := service.Query(ctx, "actor", "request-audit", audit.LogFilter{})
 	require.Nil(t, events)
 	require.ErrorIs(t, err, want)
 	reader.AssertNotCalled(t, "FindLatest", mock.Anything, mock.Anything, mock.Anything)
@@ -90,10 +90,10 @@ func TestLogQueryServiceDoesNotAuditFailedRead(t *testing.T) {
 	finder := &auditOperatorIDFinderMock{}
 	want := errors.New("read failed")
 	finder.On("FindOperatorIDByAuthID", ctx, "actor").Return(23, nil).Once()
-	reader.On("FindLatest", ctx, (*int)(nil), 20).Return(nil, want).Once()
+	reader.On("FindLatest", ctx, audit.LogFilter{}, 20).Return(nil, want).Once()
 
 	service := audit.NewLogQueryService(reader, writer, finder, auditFixedClock{time.Now()})
-	events, err := service.Query(ctx, "actor", "request-audit", nil)
+	events, err := service.Query(ctx, "actor", "request-audit", audit.LogFilter{})
 	require.Nil(t, events)
 	require.ErrorIs(t, err, want)
 	writer.AssertNotCalled(t, "Save", mock.Anything, mock.Anything)
@@ -114,11 +114,11 @@ func TestLogQueryServiceDoesNotReturnEventsWhenAuditPersistenceFails(t *testing.
 	})
 	require.NoError(t, err)
 	finder.On("FindOperatorIDByAuthID", ctx, "actor").Return(23, nil).Once()
-	reader.On("FindLatest", ctx, (*int)(nil), 20).Return([]*audit.Event{listed}, nil).Once()
+	reader.On("FindLatest", ctx, audit.LogFilter{}, 20).Return([]*audit.Event{listed}, nil).Once()
 	writer.On("Save", ctx, mock.Anything).Return(want).Once()
 
 	service := audit.NewLogQueryService(reader, writer, finder, auditFixedClock{time.Now()})
-	events, err := service.Query(ctx, "actor", "request-audit", nil)
+	events, err := service.Query(ctx, "actor", "request-audit", audit.LogFilter{})
 	require.Nil(t, events)
 	require.ErrorIs(t, err, want)
 	require.NotContains(t, err.Error(), reason.Text())
@@ -130,11 +130,53 @@ func TestLogQueryServiceDoesNotReturnEventsWhenAccessEvidenceIsInvalid(t *testin
 	writer := &auditWriterMock{}
 	finder := &auditOperatorIDFinderMock{}
 	finder.On("FindOperatorIDByAuthID", ctx, "actor").Return(23, nil).Once()
-	reader.On("FindLatest", ctx, (*int)(nil), 20).Return([]*audit.Event{}, nil).Once()
+	reader.On("FindLatest", ctx, audit.LogFilter{}, 20).Return([]*audit.Event{}, nil).Once()
 
 	service := audit.NewLogQueryService(reader, writer, finder, auditFixedClock{time.Now()})
-	events, err := service.Query(ctx, "actor", "invalid correlation with spaces", nil)
+	events, err := service.Query(ctx, "actor", "invalid correlation with spaces", audit.LogFilter{})
 	require.Nil(t, events)
 	require.ErrorIs(t, err, audit.ErrInvalidEvent)
+	writer.AssertNotCalled(t, "Save", mock.Anything, mock.Anything)
+}
+
+func TestLogQueryServicePassesValidatedFiltersToReader(t *testing.T) {
+	ctx := context.Background()
+	operatorID := 7
+	action := audit.ActionExecute
+	resourceType := "payment"
+	resourceID := "42"
+	result := audit.ResultSucceeded
+	from := time.Date(2026, 9, 20, 10, 0, 0, 0, time.UTC)
+	to := from.Add(time.Hour)
+	filter := audit.LogFilter{
+		OperatorID: &operatorID, Action: &action, ResourceType: &resourceType,
+		ResourceID: &resourceID, Result: &result, OccurredFrom: &from, OccurredTo: &to,
+	}
+	reader := &logReaderMock{}
+	writer := &auditWriterMock{}
+	finder := &auditOperatorIDFinderMock{}
+	finder.On("FindOperatorIDByAuthID", ctx, "actor").Return(23, nil).Once()
+	reader.On("FindLatest", ctx, filter, 20).Return([]*audit.Event{}, nil).Once()
+	writer.On("Save", ctx, mock.Anything).Return(nil).Once()
+
+	service := audit.NewLogQueryService(reader, writer, finder, auditFixedClock{time.Now()})
+	_, err := service.Query(ctx, "actor", "request-audit", filter)
+	require.NoError(t, err)
+	reader.AssertExpectations(t)
+	writer.AssertExpectations(t)
+}
+
+func TestLogQueryServiceRejectsInvalidFilterBeforeResolvingOperatorOrReading(t *testing.T) {
+	invalidOperator := 0
+	reader := &logReaderMock{}
+	writer := &auditWriterMock{}
+	finder := &auditOperatorIDFinderMock{}
+	service := audit.NewLogQueryService(reader, writer, finder, auditFixedClock{time.Now()})
+
+	events, err := service.Query(context.Background(), "actor", "request-audit", audit.LogFilter{OperatorID: &invalidOperator})
+	require.Nil(t, events)
+	require.ErrorIs(t, err, audit.ErrInvalidQuery)
+	finder.AssertNotCalled(t, "FindOperatorIDByAuthID", mock.Anything, mock.Anything)
+	reader.AssertNotCalled(t, "FindLatest", mock.Anything, mock.Anything, mock.Anything)
 	writer.AssertNotCalled(t, "Save", mock.Anything, mock.Anything)
 }

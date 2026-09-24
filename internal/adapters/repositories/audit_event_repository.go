@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/audit"
@@ -71,20 +72,50 @@ func (repository *AuditEventRepository) FindByID(ctx context.Context, id uuid.UU
 }
 
 // FindLatest returns only a bounded, deterministic, newest-first selection.
-func (repository *AuditEventRepository) FindLatest(ctx context.Context, operatorID *int, limit int) ([]*audit.Event, error) {
-	if limit < 1 || limit > 100 || (operatorID != nil && *operatorID <= 0) {
+func (repository *AuditEventRepository) FindLatest(ctx context.Context, filter audit.LogFilter, limit int) ([]*audit.Event, error) {
+	if err := filter.Validate(); err != nil {
+		return nil, err
+	}
+	if limit < 1 || limit > 100 {
 		return nil, fmt.Errorf("finding latest audit events: %w", audit.ErrInvalidQuery)
 	}
 
 	const columns = `SELECT id, operator_id, action, resource_type, resource_id, occurred_on,
 		result, correlation_id, reason, changed_field, state_from, state_to FROM audit_events`
-	var rows *sql.Rows
-	var err error
-	if operatorID == nil {
-		rows, err = repository.db.QueryContext(ctx, columns+` ORDER BY occurred_on DESC, id DESC LIMIT $1`, limit)
-	} else {
-		rows, err = repository.db.QueryContext(ctx, columns+` WHERE operator_id = $1 ORDER BY occurred_on DESC, id DESC LIMIT $2`, *operatorID, limit)
+	conditions := make([]string, 0, 7)
+	args := make([]any, 0, 8)
+	appendCondition := func(column, comparison string, value any) {
+		args = append(args, value)
+		conditions = append(conditions, fmt.Sprintf("%s %s $%d", column, comparison, len(args)))
 	}
+	if filter.OperatorID != nil {
+		appendCondition("operator_id", "=", *filter.OperatorID)
+	}
+	if filter.Action != nil {
+		appendCondition("action", "=", *filter.Action)
+	}
+	if filter.ResourceType != nil {
+		appendCondition("resource_type", "=", *filter.ResourceType)
+	}
+	if filter.ResourceID != nil {
+		appendCondition("resource_id", "=", *filter.ResourceID)
+	}
+	if filter.Result != nil {
+		appendCondition("result", "=", *filter.Result)
+	}
+	if filter.OccurredFrom != nil {
+		appendCondition("occurred_on", ">=", filter.OccurredFrom.UTC())
+	}
+	if filter.OccurredTo != nil {
+		appendCondition("occurred_on", "<", filter.OccurredTo.UTC())
+	}
+	query := columns
+	if len(conditions) > 0 {
+		query += ` WHERE ` + strings.Join(conditions, ` AND `)
+	}
+	args = append(args, limit)
+	query += fmt.Sprintf(` ORDER BY occurred_on DESC, id DESC LIMIT $%d`, len(args))
+	rows, err := repository.db.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("finding latest audit events: %w: %w", audit.ErrPersistence, err)
 	}

@@ -18,6 +18,8 @@ import (
 type auditQueryState struct {
 	fixtures    map[string]*audit.Event
 	correlation string
+	rangeStart  string
+	rangeEnd    string
 	headers     http.Header
 	noBearer    bool
 	badBearer   bool
@@ -61,6 +63,10 @@ func registerAdminQueryAuditLogsSteps(sc *godog.ScenarioContext, suite *testSuit
 	sc.Step(`^queda registrado exactamente un evento de acceso preparado a la colección de auditoría por "([^"]*)"$`, suite.onePreparedAuditAccessIsRecorded)
 	sc.Step(`^ese evento contiene la correlación "([^"]*)" y no requiere motivo manual$`, suite.preparedAuditAccessHasCorrelationAndNoReason)
 	sc.Step(`^el evento de esta consulta no aparece en la colección devuelta$`, suite.currentAuditAccessIsNotReturned)
+	sc.Step(`^filtro el registro por el operador "([^"]*)", la acción "([^"]*)", el recurso "([^"]*)" con ID "([^"]*)", el resultado "([^"]*)" y el rango desde "([^"]*)" hasta "([^"]*)"$`, suite.filterAuditEvents)
+	sc.Step(`^la página contiene solamente el evento "([^"]*)"$`, suite.auditPageContainsOnlyEvent)
+	sc.Step(`^el inicio del rango es inclusivo y el fin es exclusivo$`, suite.auditRangeHasExpectedBounds)
+	sc.Step(`^consulto el registro desde "([^"]*)" hasta "([^"]*)"$`, suite.queryAuditWithinRange)
 }
 
 func (suite *testSuite) auditOperatorID(email string) (int, error) {
@@ -72,7 +78,12 @@ func (suite *testSuite) auditOperatorID(email string) (int, error) {
 }
 
 func (suite *testSuite) thereAreExistingAuditEvents(table *godog.Table) error {
-	if err := requireTableHeaders(table, "evento", "operador", "acción", "tipo de recurso", "ID de recurso", "fecha UTC", "resultado", "correlación", "motivo"); err != nil {
+	headers := []string{"evento", "operador", "acción", "tipo de recurso", "ID de recurso", "fecha UTC", "resultado", "correlación"}
+	withReason := len(table.Rows) > 0 && len(table.Rows[0].Cells) == len(headers)+1
+	if withReason {
+		headers = append(headers, "motivo")
+	}
+	if err := requireTableHeaders(table, headers...); err != nil {
 		return err
 	}
 	if len(table.Rows) < 2 {
@@ -80,8 +91,8 @@ func (suite *testSuite) thereAreExistingAuditEvents(table *godog.Table) error {
 	}
 	suite.auditQuery.fixtures = make(map[string]*audit.Event, len(table.Rows)-1)
 	for _, row := range table.Rows[1:] {
-		if len(row.Cells) != 9 {
-			return fmt.Errorf("audit fixture row requires nine columns, got %d", len(row.Cells))
+		if len(row.Cells) != len(headers) {
+			return fmt.Errorf("audit fixture row requires %d columns, got %d", len(headers), len(row.Cells))
 		}
 		cell := func(index int) string { return row.Cells[index].Value }
 		if _, exists := suite.auditQuery.fixtures[cell(0)]; exists {
@@ -96,7 +107,7 @@ func (suite *testSuite) thereAreExistingAuditEvents(table *godog.Table) error {
 			return fmt.Errorf("invalid audit fixture date %q: %w", cell(5), err)
 		}
 		var reason *audit.Reason
-		if cell(8) != "" {
+		if withReason && cell(8) != "" {
 			reason, err = audit.NewReason(cell(8))
 			if err != nil {
 				return err
@@ -143,6 +154,28 @@ func (suite *testSuite) queryAuditForOperatorWithCorrelation(email, correlation 
 	}
 	query := url.Values{"operator_id": {strconv.Itoa(operatorID)}}
 	return suite.sendAuditQuery(query, correlation)
+}
+
+func (suite *testSuite) filterAuditEvents(email, action, resourceType, resourceID, result, from, to string) error {
+	operatorID, err := suite.auditOperatorID(email)
+	if err != nil {
+		return err
+	}
+	suite.auditQuery.rangeStart = from
+	suite.auditQuery.rangeEnd = to
+	return suite.sendAuditQuery(url.Values{
+		"operator_id":   {strconv.Itoa(operatorID)},
+		"action":        {action},
+		"resource_type": {resourceType},
+		"resource_id":   {resourceID},
+		"result":        {result},
+		"occurred_from": {from},
+		"occurred_to":   {to},
+	}, "")
+}
+
+func (suite *testSuite) queryAuditWithinRange(from, to string) error {
+	return suite.sendAuditQuery(url.Values{"occurred_from": {from}, "occurred_to": {to}}, "")
 }
 
 func (suite *testSuite) attemptAuditQuery() error {
@@ -231,6 +264,38 @@ func (suite *testSuite) auditPageContainsTwoEventsInOrder(first, second string) 
 		}
 	}
 	return nil
+}
+
+func (suite *testSuite) auditPageContainsOnlyEvent(name string) error {
+	page, _, err := suite.decodedAuditPage()
+	if err != nil {
+		return err
+	}
+	expected := suite.auditQuery.fixtures[name]
+	if expected == nil {
+		return fmt.Errorf("unknown audit fixture %q", name)
+	}
+	if len(page.Events) != 1 || page.Events[0].ID != expected.ID() || page.NextCursor != nil {
+		return fmt.Errorf("expected only fixture %q with no next cursor; got %d events, cursor present: %t", name, len(page.Events), page.NextCursor != nil)
+	}
+	return nil
+}
+
+func (suite *testSuite) auditRangeHasExpectedBounds() error {
+	from, err := time.Parse(time.RFC3339Nano, suite.auditQuery.rangeStart)
+	if err != nil {
+		return fmt.Errorf("invalid lower range bound: %w", err)
+	}
+	to, err := time.Parse(time.RFC3339Nano, suite.auditQuery.rangeEnd)
+	if err != nil {
+		return fmt.Errorf("invalid upper range bound: %w", err)
+	}
+	start := suite.auditQuery.fixtures["A"]
+	end := suite.auditQuery.fixtures["G"]
+	if start == nil || end == nil || !start.OccurredOn().Equal(from) || !end.OccurredOn().Equal(to) {
+		return fmt.Errorf("audit fixture dates do not exercise both range boundaries")
+	}
+	return suite.auditPageContainsOnlyEvent("A")
 }
 
 func (suite *testSuite) auditEventsExposeAllowedFields() error {
@@ -360,7 +425,7 @@ func (suite *testSuite) preparedAccessEventsFor(email string) ([]*audit.Event, e
 	if err != nil {
 		return nil, err
 	}
-	latest, err := suite.dependencies.Persistence.AuditEventRepository.FindLatest(suite.scenarioContext, &operatorID, 20)
+	latest, err := suite.dependencies.Persistence.AuditEventRepository.FindLatest(suite.scenarioContext, audit.LogFilter{OperatorID: &operatorID}, 20)
 	if err != nil {
 		return nil, fmt.Errorf("listing latest audit events for operator: %w", err)
 	}
