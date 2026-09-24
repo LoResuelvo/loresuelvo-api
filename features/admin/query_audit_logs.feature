@@ -11,7 +11,6 @@ Feature: Consultar el registro de auditoría administrativa
         Background:
             Given que estoy autenticado como administrador "supervisor@example.com" con el permiso "read:admin_audit"
 
-        @wip
         Scenario: 63.1-AL Consultar eventos existentes sin exponer datos privados
             Given que existen los siguientes eventos de auditoría preexistentes:
                 | evento | operador              | acción  | tipo de recurso | ID de recurso | fecha UTC            | resultado | correlación | motivo             |
@@ -26,7 +25,6 @@ Feature: Consultar el registro de auditoría administrativa
             And la respuesta incluye la cabecera "Cache-Control" con valor "private, no-store"
             And los eventos "A" y "B" permanecen sin modificaciones
 
-        @wip
         Scenario: 63.2-AL Devolver una colección vacía sin confundirla con un fallo
             Given que existe un administrador provisionado con correo "auditor@example.com", nombre "Ana" y apellido "Pérez"
             And que existe un evento de auditoría preexistente del operador "auditor@example.com"
@@ -90,7 +88,6 @@ Feature: Consultar el registro de auditoría administrativa
 
     Rule: La autenticación, el permiso y los parámetros restringen la consulta
 
-        @wip
         Scenario Outline: 63.6-AL Rechazar la consulta sin autenticación válida
             Given que existe un evento de auditoría preexistente
             And que <estado de autenticación>
@@ -103,7 +100,6 @@ Feature: Consultar el registro de auditoría administrativa
                 | no envío un token Bearer                 |
                 | envío un token Bearer inválido          |
 
-        @wip
         Scenario: 63.7-AL Rechazar a un administrador sin el permiso de auditoría
             Given que existe un evento de auditoría preexistente
             And que estoy autenticado como administrador "supervisor@example.com" solamente con el permiso "read:providers"
@@ -156,7 +152,6 @@ Feature: Consultar el registro de auditoría administrativa
         Background:
             Given que estoy autenticado como administrador "supervisor@example.com" con el permiso "read:admin_audit"
 
-        @wip
         Scenario: 63.11-AL Registrar una sola evidencia de acceso sin recursión ni motivo manual
             Given que existe un administrador provisionado con correo "auditor@example.com", nombre "Ana" y apellido "Pérez"
             And que existe un evento de auditoría preexistente del operador "auditor@example.com"
