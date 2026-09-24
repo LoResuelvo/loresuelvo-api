@@ -74,6 +74,7 @@ type testSuite struct {
 	expectedCoverageZoneRegistrationError   string
 	lastLocation                            string
 	lastRequestID                           string
+	auditQuery                              auditQueryState
 	categoryAuditCapture                    *categoryAuditEventCapture
 	lastCategoryAuditEventIDs               []uuid.UUID
 	currentAuth0ID                          string
@@ -202,6 +203,7 @@ func (s *testSuite) registerAllSteps(sc *godog.ScenarioContext) {
 	registerProcessIdentityVerificationResultSteps(sc, s)
 	registerShowProviderIdentityVerificationSteps(sc, s)
 	registerAdminListUsersSteps(sc, s)
+	registerAdminQueryAuditLogsSteps(sc, s)
 }
 
 func (s *testSuite) cleanup() error {
@@ -331,6 +333,7 @@ func (s *testSuite) cleanup() error {
 	s.lastIdentityVerificationEventID = uuid.Nil
 	s.identityVerificationWebhookStatuses = nil
 	s.currentPermissions = nil
+	s.auditQuery = auditQueryState{}
 	s.currentAuth0ID = ""
 	s.invalidSession = false
 	return nil
@@ -390,7 +393,7 @@ func newTestSuite(tb testing.TB, database *sql.DB) *testSuite {
 		dependencies:                   dependencies,
 		database:                       database,
 		categoryRepository:             dependencies.Persistence.CategoryRepository,
-		auditEvents:                    testsupport.AuditEvents{Reader: dependencies.Persistence.AuditEventRepository},
+		auditEvents:                    testsupport.AuditEvents{Writer: dependencies.Persistence.AuditEventRepository, Reader: dependencies.Persistence.AuditEventRepository},
 		coverageZoneRepository:         dependencies.Persistence.CoverageZoneRepository,
 		conversationRepository:         dependencies.Persistence.ConversationRepository,
 		messageRepository:              dependencies.Persistence.MessageRepository,

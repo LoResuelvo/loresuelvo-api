@@ -1,8 +1,10 @@
 package middleware
 
 import (
+	"bytes"
 	"io"
 	"log/slog"
+	"net/http"
 	"net/http/httptest"
 	"testing"
 
@@ -52,4 +54,25 @@ func TestRequestLoggerExposesValidatedRequestID(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestRequestLoggerDoesNotCaptureAuditLogResponse(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	var logs bytes.Buffer
+	router := gin.New()
+	router.Use(RequestLogger(slog.New(slog.NewTextHandler(&logs, nil))))
+	router.GET("/admin/audit-logs", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{"reason": "private reconciliation reason"})
+	})
+
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/admin/audit-logs?category_id=private-reconciliation-reason", nil))
+
+	require.Equal(t, http.StatusOK, response.Code)
+	require.Contains(t, response.Body.String(), "private reconciliation reason")
+	require.Contains(t, logs.String(), "http.request.completed")
+	require.NotContains(t, logs.String(), "private reconciliation reason")
+	require.NotContains(t, logs.String(), "http.response")
+	require.NotContains(t, logs.String(), "private-reconciliation-reason")
+	require.NotContains(t, logs.String(), "http.query_params")
 }

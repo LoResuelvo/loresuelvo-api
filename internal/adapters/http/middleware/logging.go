@@ -28,7 +28,9 @@ func RequestLogger(logger *slog.Logger) gin.HandlerFunc {
 		c.Request = c.Request.WithContext(observability.ContextWithLogger(c.Request.Context(), requestLogger))
 		c.Header(requestIDHeader, requestID)
 
-		includeBodies := requestLogger.Enabled(c.Request.Context(), slog.LevelInfo)
+		// Audit responses may contain private operator reasons. Never capture their
+		// bodies in technical request logs, even when info logging is enabled.
+		includeBodies := c.Request.URL.Path != "/admin/audit-logs" && requestLogger.Enabled(c.Request.Context(), slog.LevelInfo)
 		var requestBody *limitedBodyCapture
 		var responseBody *limitedBodyCapture
 		if includeBodies {
@@ -59,8 +61,10 @@ func RequestLogger(logger *slog.Logger) gin.HandlerFunc {
 		if pathParams := pathParameters(c.Params); len(pathParams) > 0 {
 			attributes = append(attributes, "http.path_params", pathParams)
 		}
-		if queryParams := queryParameters(c.Request); len(queryParams) > 0 {
-			attributes = append(attributes, "http.query_params", queryParams)
+		if c.Request.URL.Path != "/admin/audit-logs" {
+			if queryParams := queryParameters(c.Request); len(queryParams) > 0 {
+				attributes = append(attributes, "http.query_params", queryParams)
+			}
 		}
 		if includeBodies {
 			attributes = append(attributes, capturedBodyAttributes(

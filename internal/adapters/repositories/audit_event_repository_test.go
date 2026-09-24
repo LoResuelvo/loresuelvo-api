@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"math/rand/v2"
 	"reflect"
 	"sync"
 	"testing"
@@ -190,13 +191,94 @@ func TestAuditEventRepositoryExposesNoMutationMethod(t *testing.T) {
 	for i := range typ.NumMethod() {
 		methods = append(methods, typ.Method(i).Name)
 	}
-	require.ElementsMatch(t, []string{"Save", "FindByID"}, methods)
+	require.ElementsMatch(t, []string{"Save", "FindByID", "FindLatest"}, methods)
 	var _ audit.Writer = (*AuditEventRepository)(nil)
 	var _ audit.Reader = (*AuditEventRepository)(nil)
+	var _ audit.LogReader = (*AuditEventRepository)(nil)
 }
 
 func TestAuditEventRepositoryRejectsNilEvent(t *testing.T) {
 	_, repository := newAuditRepositoryTest(t)
 	err := repository.Save(context.Background(), nil)
 	require.True(t, errors.Is(err, audit.ErrInvalidEvent))
+}
+
+func TestAuditEventRepositoryFindLatestFiltersOrdersBoundsAndRehydrates(t *testing.T) {
+	_, repository := newAuditRepositoryTest(t)
+	operatorID := 1_000_000_000 + rand.IntN(100_000_000)
+	base := time.Now().UTC().AddDate(100, 0, 0)
+	makeEvent := func(id uuid.UUID, operator int, at time.Time) *audit.Event {
+		event, err := audit.NewEvent(audit.EventParams{
+			ID: id, OperatorID: operator, Action: audit.ActionCreate,
+			ResourceType: "category", ResourceID: "17", OccurredOn: at,
+			Result: audit.ResultSucceeded, CorrelationID: "query-test",
+		})
+		require.NoError(t, err)
+		return event
+	}
+	ids := []uuid.UUID{uuid.New(), uuid.New(), uuid.New()}
+	otherOperatorEventID := uuid.New()
+	if ids[1].String() < ids[2].String() {
+		ids[1], ids[2] = ids[2], ids[1]
+	}
+	for _, event := range []*audit.Event{
+		makeEvent(ids[0], operatorID, base.Add(time.Minute)),
+		makeEvent(ids[1], operatorID, base),
+		makeEvent(ids[2], operatorID, base),
+		makeEvent(otherOperatorEventID, operatorID+1, base.Add(time.Hour)),
+	} {
+		require.NoError(t, repository.Save(context.Background(), event))
+	}
+
+	events, err := repository.FindLatest(context.Background(), &operatorID, 2)
+	require.NoError(t, err)
+	require.Len(t, events, 2)
+	require.Equal(t, []uuid.UUID{ids[0], ids[1]}, []uuid.UUID{events[0].ID(), events[1].ID()})
+	require.Equal(t, operatorID, events[0].OperatorID())
+	require.Equal(t, "category", events[0].ResourceType())
+	require.Equal(t, "17", events[0].ResourceID())
+	require.Equal(t, "query-test", events[0].CorrelationID())
+
+	all, err := repository.FindLatest(context.Background(), &operatorID, 20)
+	require.NoError(t, err)
+	require.Len(t, all, 3)
+	require.Equal(t, []uuid.UUID{ids[0], ids[1], ids[2]}, []uuid.UUID{all[0].ID(), all[1].ID(), all[2].ID()})
+
+	allOperators, err := repository.FindLatest(context.Background(), nil, 1)
+	require.NoError(t, err)
+	require.Len(t, allOperators, 1)
+	require.Equal(t, otherOperatorEventID, allOperators[0].ID())
+}
+
+func TestAuditEventRepositoryFindLatestReturnsNonNilEmptyCollection(t *testing.T) {
+	_, repository := newAuditRepositoryTest(t)
+	operatorID := 1_000_000_000 + rand.IntN(100_000_000)
+	events, err := repository.FindLatest(context.Background(), &operatorID, 20)
+	require.NoError(t, err)
+	require.NotNil(t, events)
+	require.Empty(t, events)
+}
+
+func TestAuditEventRepositoryFindLatestRejectsInvalidArgumentsAndReadFailures(t *testing.T) {
+	database, repository := newAuditRepositoryTest(t)
+	invalidOperatorID := 0
+	for _, tc := range []struct {
+		operatorID *int
+		limit      int
+	}{
+		{nil, 0}, {nil, 101}, {&invalidOperatorID, 20},
+	} {
+		_, err := repository.FindLatest(context.Background(), tc.operatorID, tc.limit)
+		require.ErrorIs(t, err, audit.ErrInvalidQuery)
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	_, err := repository.FindLatest(ctx, nil, 20)
+	require.ErrorIs(t, err, audit.ErrPersistence)
+	require.ErrorIs(t, err, context.Canceled)
+
+	require.NoError(t, database.Close())
+	_, err = repository.FindLatest(context.Background(), nil, 20)
+	require.ErrorIs(t, err, audit.ErrPersistence)
 }

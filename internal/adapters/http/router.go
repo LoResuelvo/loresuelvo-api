@@ -5,6 +5,7 @@ import (
 	"log/slog"
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/admin_handler"
+	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/audit_log_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/calendar_connection_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/category_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/consumer_handler"
@@ -29,6 +30,7 @@ import (
 
 const readConsumersPermission = "read:consumers"
 const readProvidersPermission = "read:providers"
+const readAdminAuditPermission = "read:admin_audit"
 const createCategoriesPermission = "create:categories"
 
 type Environment string
@@ -43,6 +45,7 @@ const (
 type RouterConfig struct {
 	Environment                 Environment
 	AdminHandler                *admin_handler.AdminHandler
+	AuditLogHandler             *audit_log_handler.Handler
 	CategoryHandler             *category_handler.CategoryHandler
 	CalendarConnectionHandler   *calendar_connection_handler.CalendarConnectionHandler
 	CoverageZoneHandler         *coverage_zone_handler.CoverageZoneHandler
@@ -67,6 +70,7 @@ type RouterConfig struct {
 type Router struct {
 	environment                 Environment
 	adminHandler                *admin_handler.AdminHandler
+	auditLogHandler             *audit_log_handler.Handler
 	categoryHandler             *category_handler.CategoryHandler
 	calendarConnectionHandler   *calendar_connection_handler.CalendarConnectionHandler
 	coverageZoneHandler         *coverage_zone_handler.CoverageZoneHandler
@@ -97,6 +101,7 @@ func NewRouter(config RouterConfig) *Router {
 	router := &Router{
 		environment:                 config.Environment,
 		adminHandler:                config.AdminHandler,
+		auditLogHandler:             config.AuditLogHandler,
 		categoryHandler:             config.CategoryHandler,
 		calendarConnectionHandler:   config.CalendarConnectionHandler,
 		coverageZoneHandler:         config.CoverageZoneHandler,
@@ -160,6 +165,16 @@ func (router *Router) SetUp() (*gin.Engine, error) {
 }
 
 func (router *Router) registerAdminRoutes(engine *gin.Engine, authMiddleware gin.HandlerFunc) {
+	engine.GET(
+		"/admin/audit-logs",
+		func(c *gin.Context) {
+			c.Header("Cache-Control", "private, no-store")
+			c.Next()
+		},
+		authMiddleware,
+		middleware.RequirePermissionLayer(readAdminAuditPermission),
+		router.auditLogHandler.List,
+	)
 	engine.GET(
 		"/admin/consumers",
 		authMiddleware,
