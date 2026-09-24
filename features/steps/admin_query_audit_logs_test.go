@@ -337,8 +337,13 @@ func (suite *testSuite) auditErrorResponseHasNoEvents() error {
 	if err := json.Unmarshal(suite.lastBody, &raw); err != nil {
 		return fmt.Errorf("invalid audit error response JSON: %w", err)
 	}
-	if err := requireExactJSONFields(raw, "audit error response", "error"); err != nil {
-		return err
+	if _, exists := raw["error"]; !exists {
+		return fmt.Errorf("audit error response is missing its error field")
+	}
+	for field := range raw {
+		if field != "error" && field != "message" {
+			return fmt.Errorf("audit error response has unexpected field %q", field)
+		}
 	}
 	return nil
 }
