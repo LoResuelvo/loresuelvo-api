@@ -39,7 +39,6 @@ Feature: Consultar el registro de auditoría administrativa
             Given que existe un administrador provisionado con correo "auditor@example.com", nombre "Ana" y apellido "Pérez"
             And que estoy autenticado como administrador "supervisor@example.com" con el permiso "read:admin_audit"
 
-        @wip
         Scenario: 63.3-AL Filtrar por operador, acción, recurso, resultado y rango temporal mediante AND
             Given que existen los siguientes eventos de auditoría preexistentes:
                 | evento | operador              | acción  | tipo de recurso | ID de recurso | fecha UTC            | resultado | correlación |
@@ -126,7 +125,6 @@ Feature: Consultar el registro de auditoría administrativa
                 | limit         | 0                    |
                 | limit         | 101                  |
 
-        @wip
         Scenario: 63.9-AL Rechazar un rango temporal invertido
             Given que estoy autenticado como administrador "supervisor@example.com" con el permiso "read:admin_audit"
             When consulto el registro desde "2026-09-21T00:00:00Z" hasta "2026-09-20T00:00:00Z"
