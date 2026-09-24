@@ -1,10 +1,11 @@
 # Administrative audit component (US-62)
 
 This is an internal, append-only **application contract** for administrative
-audit events. It does not add an HTTP endpoint, authorize requests, or
-automatically instrument `/admin`. Producing use cases choose when to create
-an event and own the corresponding acceptance tests. The separate audit-log
-query API belongs to US-63 (#214).
+audit events (US-62). It does not itself define an HTTP endpoint, authorize
+requests, or automatically instrument `/admin`. Producing use cases choose
+when to create an event and own the corresponding acceptance tests. The
+separate audit-log query API is defined by US-63 (#214), documented in
+OpenAPI, and explicitly listed in the policy below.
 
 ## Event contract
 
@@ -59,8 +60,10 @@ returned row.
 - Propagate audit errors. Do not pretend an event was stored when `Save`
   failed, and do not compensate by logging the private event or its reason.
 - For BDD/other integration tests, `internal/testsupport.AuditEvents` offers
-  `Save` and `FindByID` through `audit.Writer`/`audit.Reader`. Scenario steps
-  should use those ports, not raw SQL or `GET /admin/audit-logs`.
+  `Save` and `FindByID` through `audit.Writer`/`audit.Reader`. Scenarios
+  testing event production should use those ports, not raw SQL or
+  `GET /admin/audit-logs`; the query endpoint is covered by its own US-63
+  acceptance scenarios.
 
 ## First-iteration policy
 
@@ -76,6 +79,13 @@ returned row.
 | Contract chat read | Yes | Yes | #217 |
 | Payment reconciliation | Yes, with local changes where present | Yes | #219 |
 | Audit-log query | Yes, without recursive logging | No | #214 |
+
+The query endpoint is `GET /admin/audit-logs` and requires the Auth0
+`read:admin_audit` permission. It exposes only allowlisted event fields,
+records one prepared access event before returning a page, fails closed if
+that evidence cannot be persisted, and sends `Cache-Control: private,
+no-store`. Its supported filters, signed stable-cutoff cursor, and HTTP
+responses are specified in the OpenAPI contract.
 
 This policy does not make excluded reads public; their authentication,
 authorization, privacy controls, and sanitized technical/security logs remain

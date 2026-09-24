@@ -62,6 +62,8 @@ paths:
     $ref: ./paths/admin-consumers.yaml
   /admin/providers:
     $ref: ./paths/admin-providers.yaml
+  /admin/audit-logs:
+    $ref: ./paths/admin-audit-logs.yaml
   /providers:
     $ref: ./paths/providers.yaml
   /providers/{providerID}:
@@ -240,6 +242,10 @@ components:
       $ref: ./components/schemas/admin-provider-directory-item.yaml
     AdminProviderCoverageZone:
       $ref: ./components/schemas/admin-provider-coverage-zone.yaml
+    AdminAuditLogEvent:
+      $ref: ./components/schemas/admin-audit-log-event.yaml
+    AdminAuditLogPage:
+      $ref: ./components/schemas/admin-audit-log-page.yaml
     RegisterProviderRequest:
       $ref: ./components/schemas/register-provider-request.yaml
     ProviderSummary:

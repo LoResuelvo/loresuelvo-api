@@ -1,0 +1,56 @@
+type: object
+required:
+- id
+- operator_id
+- action
+- resource_type
+- occurred_on
+- result
+- correlation_id
+properties:
+  id:
+    type: string
+    format: uuid
+    description: Internal immutable audit-event identifier.
+  operator_id:
+    type: integer
+    minimum: 1
+    description: Internal user ID of the authenticated operator.
+  action:
+    type: string
+    enum:
+    - create
+    - access
+    - execute
+  resource_type:
+    type: string
+    minLength: 1
+    maxLength: 64
+    pattern: '^[a-z][a-z0-9_]*$'
+  resource_id:
+    type: string
+    minLength: 1
+    maxLength: 128
+    pattern: '^[A-Za-z0-9][A-Za-z0-9._:-]*$'
+  occurred_on:
+    type: string
+    format: date-time
+    description: Event occurrence instant serialized in UTC.
+  result:
+    type: string
+    enum:
+    - succeeded
+    - prepared
+    - failed
+  correlation_id:
+    type: string
+    minLength: 1
+    maxLength: 128
+    pattern: '^[A-Za-z0-9][A-Za-z0-9._:-]*$'
+    description: Safe request/operation correlation identifier.
+  reason:
+    type: string
+    minLength: 1
+    maxLength: 500
+    description: Optional bounded operator-provided justification.
+additionalProperties: false

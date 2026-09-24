@@ -935,6 +935,259 @@
                 }
             }
         },
+        "/admin/audit-logs": {
+            "get": {
+                "tags": [
+                    "Administration"
+                ],
+                "operationId": "listAdminAuditLogs",
+                "summary": "Query administrative audit events",
+                "description": "Returns allowlisted audit-event metadata without exposing authentication credentials, external authentication identifiers, HTTP bodies, chat content, biometric data, or signed URLs. Requires the `read:admin_audit` permission in the Bearer JWT. Every accepted query is itself recorded as one prepared access event; the event is persisted before the response is released and is not included in that response. The response uses `Cache-Control: private, no-store`.\nFilters are combined with AND. `occurred_from` is inclusive and `occurred_to` is exclusive; both accept RFC 3339 timestamps and are compared as UTC instants. The default page limit is 20 and the maximum is 100. A returned cursor is opaque and signed; it is bound to the filters, limit, and ingestion cutoff captured for the first page. Later events are excluded from subsequent pages, even if their occurrence timestamps would otherwise place them in the result. When continuing, omit filters and `limit` to inherit the original values, or repeat matching values; changing a bound value is rejected.",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "name": "operator_id",
+                        "in": "query",
+                        "required": false,
+                        "description": "Match the internal ID of the operator who generated the event.",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 2147483647
+                        },
+                        "example": 42
+                    },
+                    {
+                        "name": "action",
+                        "in": "query",
+                        "required": false,
+                        "description": "Match the audit action.",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "create",
+                                "access",
+                                "execute"
+                            ]
+                        },
+                        "example": "execute"
+                    },
+                    {
+                        "name": "resource_type",
+                        "in": "query",
+                        "required": false,
+                        "description": "Match the bounded snake_case resource type.",
+                        "schema": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 64,
+                            "pattern": "^[a-z][a-z0-9_]*$"
+                        },
+                        "example": "payment"
+                    },
+                    {
+                        "name": "resource_id",
+                        "in": "query",
+                        "required": false,
+                        "description": "Match a safe resource identifier.",
+                        "schema": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 128,
+                            "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+                        },
+                        "example": "42"
+                    },
+                    {
+                        "name": "result",
+                        "in": "query",
+                        "required": false,
+                        "description": "Match the recorded result.",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "succeeded",
+                                "prepared",
+                                "failed"
+                            ]
+                        },
+                        "example": "succeeded"
+                    },
+                    {
+                        "name": "occurred_from",
+                        "in": "query",
+                        "required": false,
+                        "description": "Inclusive lower bound of the occurrence-time range (RFC 3339).",
+                        "schema": {
+                            "type": "string",
+                            "format": "date-time"
+                        },
+                        "example": "2026-09-20T10:00:00Z"
+                    },
+                    {
+                        "name": "occurred_to",
+                        "in": "query",
+                        "required": false,
+                        "description": "Exclusive upper bound of the occurrence-time range (RFC 3339).",
+                        "schema": {
+                            "type": "string",
+                            "format": "date-time"
+                        },
+                        "example": "2026-09-21T00:00:00Z"
+                    },
+                    {
+                        "name": "limit",
+                        "in": "query",
+                        "required": false,
+                        "description": "Number of events per page. A cursor is bound to the original limit.",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 100,
+                            "default": 20
+                        },
+                        "example": 20
+                    },
+                    {
+                        "name": "cursor",
+                        "in": "query",
+                        "required": false,
+                        "description": "Opaque signed cursor returned as `next_cursor` by the preceding page.",
+                        "schema": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 4096
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Audit events returned in descending occurrence-time and ID order. The events array is empty when there are no matches.",
+                        "headers": {
+                            "Cache-Control": {
+                                "description": "Prevents shared or private caches from storing sensitive audit results.",
+                                "schema": {
+                                    "type": "string",
+                                    "const": "private, no-store"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AdminAuditLogPage"
+                                },
+                                "example": {
+                                    "events": [
+                                        {
+                                            "id": "01990a7c-4e2e-7abc-9def-0123456789ab",
+                                            "operator_id": 42,
+                                            "action": "execute",
+                                            "resource_type": "payment",
+                                            "resource_id": "17",
+                                            "occurred_on": "2026-09-20T10:00:00Z",
+                                            "result": "succeeded",
+                                            "correlation_id": "request-abc123",
+                                            "reason": "Revisión aprobada"
+                                        }
+                                    ],
+                                    "next_cursor": null
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "A filter, page limit, or cursor is malformed, invalid, or incompatible with its bound filters or limit.",
+                        "headers": {
+                            "Cache-Control": {
+                                "description": "Prevents shared or private caches from storing sensitive audit-query responses.",
+                                "schema": {
+                                    "type": "string",
+                                    "const": "private, no-store"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                },
+                                "example": {
+                                    "error": "invalid filter"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "The Bearer token is missing or invalid.",
+                        "headers": {
+                            "Cache-Control": {
+                                "description": "Prevents shared or private caches from storing sensitive audit-query responses.",
+                                "schema": {
+                                    "type": "string",
+                                    "const": "private, no-store"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AuthErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "The Bearer token does not contain the `read:admin_audit` permission.",
+                        "headers": {
+                            "Cache-Control": {
+                                "description": "Prevents shared or private caches from storing sensitive audit-query responses.",
+                                "schema": {
+                                    "type": "string",
+                                    "const": "private, no-store"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                },
+                                "example": {
+                                    "error": "insufficient permissions"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "The audit query or persistence of its access evidence failed; no audit events are returned.",
+                        "headers": {
+                            "Cache-Control": {
+                                "description": "Prevents shared or private caches from storing sensitive audit-query responses.",
+                                "schema": {
+                                    "type": "string",
+                                    "const": "private, no-store"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                },
+                                "example": {
+                                    "error": "internal server error"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/providers": {
             "get": {
                 "tags": [
@@ -5335,6 +5588,100 @@
                         "example": true
                     }
                 }
+            },
+            "AdminAuditLogEvent": {
+                "type": "object",
+                "required": [
+                    "id",
+                    "operator_id",
+                    "action",
+                    "resource_type",
+                    "occurred_on",
+                    "result",
+                    "correlation_id"
+                ],
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "Internal immutable audit-event identifier."
+                    },
+                    "operator_id": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "description": "Internal user ID of the authenticated operator."
+                    },
+                    "action": {
+                        "type": "string",
+                        "enum": [
+                            "create",
+                            "access",
+                            "execute"
+                        ]
+                    },
+                    "resource_type": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 64,
+                        "pattern": "^[a-z][a-z0-9_]*$"
+                    },
+                    "resource_id": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 128,
+                        "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+                    },
+                    "occurred_on": {
+                        "type": "string",
+                        "format": "date-time",
+                        "description": "Event occurrence instant serialized in UTC."
+                    },
+                    "result": {
+                        "type": "string",
+                        "enum": [
+                            "succeeded",
+                            "prepared",
+                            "failed"
+                        ]
+                    },
+                    "correlation_id": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 128,
+                        "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$",
+                        "description": "Safe request/operation correlation identifier."
+                    },
+                    "reason": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 500,
+                        "description": "Optional bounded operator-provided justification."
+                    }
+                },
+                "additionalProperties": false
+            },
+            "AdminAuditLogPage": {
+                "type": "object",
+                "required": [
+                    "events",
+                    "next_cursor"
+                ],
+                "properties": {
+                    "events": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/AdminAuditLogEvent"
+                        }
+                    },
+                    "next_cursor": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "description": "Opaque signed continuation cursor, or null when there is no next page. The cursor is bound to the original filters, limit, and stable ingestion cutoff; use it as returned."
+                    }
+                },
+                "additionalProperties": false
             },
             "RegisterProviderRequest": {
                 "type": "object",

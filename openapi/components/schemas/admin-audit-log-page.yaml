@@ -1,0 +1,18 @@
+type: object
+required:
+- events
+- next_cursor
+properties:
+  events:
+    type: array
+    items:
+      $ref: '#/components/schemas/AdminAuditLogEvent'
+  next_cursor:
+    type:
+    - string
+    - 'null'
+    description: >-
+      Opaque signed continuation cursor, or null when there is no next page.
+      The cursor is bound to the original filters, limit, and stable ingestion
+      cutoff; use it as returned.
+additionalProperties: false
