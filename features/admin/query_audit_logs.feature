@@ -59,7 +59,6 @@ Feature: Consultar el registro de auditoría administrativa
         Background:
             Given que estoy autenticado como administrador "supervisor@example.com" con el permiso "read:admin_audit"
 
-        @wip
         Scenario: 63.4-AL Recorrer páginas sin duplicados ni eventos posteriores al corte
             Given que existen los siguientes eventos de auditoría preexistentes:
                 | evento | operador               | acción  | recurso  | ID de recurso | fecha UTC            | resultado | correlación | orden de ID |
@@ -74,7 +73,6 @@ Feature: Consultar el registro de auditoría administrativa
             And la segunda página contiene los eventos "C" y "D" en ese orden y no tiene cursor siguiente
             And ningún evento se repite ni aparecen el evento "X" o el evento posterior al corte
 
-        @wip
         Scenario Outline: 63.5-AL Aplicar el límite predeterminado y el máximo documentados
             Given que existen 101 eventos sintéticos preexistentes del operador "supervisor@example.com" con acción "create", recurso "category" e ID "17", resultado "succeeded", fechas anteriores a la consulta e identificadores y correlaciones únicos
             When consulto el registro para el operador "supervisor@example.com" <configuración del límite>
@@ -106,7 +104,6 @@ Feature: Consultar el registro de auditoría administrativa
             Then el sistema responde con estado 403
             And la respuesta no contiene eventos de auditoría
 
-        @wip
         Scenario Outline: 63.8-AL Rechazar filtros y límites inválidos
             Given que estoy autenticado como administrador "supervisor@example.com" con el permiso "read:admin_audit"
             When consulto el registro de auditoría con el parámetro "<parámetro>" igual a "<valor>"
@@ -131,7 +128,6 @@ Feature: Consultar el registro de auditoría administrativa
             Then el sistema responde con estado 400
             And la respuesta no contiene eventos de auditoría
 
-        @wip
         Scenario Outline: 63.10-AL Rechazar un cursor ilegible o incompatible con los filtros
             Given que estoy autenticado como administrador "supervisor@example.com" con el permiso "read:admin_audit"
             And que existen 3 eventos de auditoría preexistentes del operador "supervisor@example.com" con acción "create"
