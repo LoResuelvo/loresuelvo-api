@@ -169,8 +169,6 @@ func (router *Router) SetUp() (*gin.Engine, error) {
 	return engine, nil
 }
 
-// privateNoStore keeps administrative responses out of shared and local caches,
-// including error responses produced by later middleware.
 func privateNoStore(c *gin.Context) {
 	c.Header("Cache-Control", "private, no-store")
 	c.Next()

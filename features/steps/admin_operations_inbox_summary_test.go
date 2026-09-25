@@ -12,7 +12,6 @@ import (
 	"github.com/cucumber/godog"
 )
 
-// inboxRequestLabelFor resolves the job request that anchors an operation label.
 func (suite *testSuite) inboxRequestLabelFor(label string) (string, error) {
 	if _, exists := suite.operationInbox.requests[label]; exists {
 		return label, nil
@@ -23,8 +22,6 @@ func (suite *testSuite) inboxRequestLabelFor(label string) (string, error) {
 	return "", fmt.Errorf("unknown operation label %q", label)
 }
 
-// inboxOperation finds an operation by its starting label, or by the label of
-// its work order.
 func (suite *testSuite) inboxOperation(label string) (inboxOperationResponse, error) {
 	page, err := suite.decodedInboxPage()
 	if err != nil {
@@ -198,7 +195,6 @@ func (suite *testSuite) inboxOperationInformsDates(label string, table *godog.Ta
 		if err != nil {
 			return err
 		}
-		// Decoding into time.Time already requires RFC 3339 with an explicit offset.
 		actual, exists := dates[row["fecha"]]
 		if !exists {
 			return fmt.Errorf("unknown or absent date %q", row["fecha"])
@@ -292,8 +288,7 @@ func (suite *testSuite) inboxResponseIsMinimized() error {
 	return nil
 }
 
-// noAuditEventIsRecorded compares the committed audit ingest watermark with
-// the one captured right before the inbox query; any event would advance it.
+// Any audit write advances the committed ingest watermark.
 func (suite *testSuite) noAuditEventIsRecorded() error {
 	if suite.operationInbox.auditWatermark == nil {
 		return fmt.Errorf("the inbox was not queried in this scenario")
@@ -308,8 +303,6 @@ func (suite *testSuite) noAuditEventIsRecorded() error {
 	return nil
 }
 
-// thereIsInboxOperationInSituation builds one operation relative to the
-// scenario's current time.
 func (suite *testSuite) thereIsInboxOperationInSituation(consumerEmail, providerEmail, situation string) error {
 	suite.operationInbox.ensureMaps()
 	return suite.withInboxFixtureClock(func() error {

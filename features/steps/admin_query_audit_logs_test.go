@@ -63,7 +63,6 @@ func registerAdminQueryAuditLogsSteps(sc *godog.ScenarioContext, suite *testSuit
 	sc.Step(`^el evento de esta consulta no aparece en la colección devuelta$`, suite.currentAuditAccessIsNotReturned)
 	sc.Step(`^filtro el registro por el operador "([^"]*)", la acción "([^"]*)", el recurso "([^"]*)" con ID "([^"]*)", el resultado "([^"]*)" y el rango desde "([^"]*)" hasta "([^"]*)"$`, suite.filterAuditEvents)
 	sc.Step(`^la página contiene solamente el evento "([^"]*)"$`, suite.auditPageContainsOnlyEvent)
-	sc.Step(`^el inicio del rango es inclusivo y el fin es exclusivo$`, suite.auditRangeHasExpectedBounds)
 	sc.Step(`^consulto el registro desde "([^"]*)" hasta "([^"]*)"$`, suite.queryAuditWithinRange)
 	sc.Step(`^que se agregará un evento sintético del operador "([^"]*)" con acción "([^"]*)", recurso "([^"]*)" e ID "([^"]*)", resultado "([^"]*)" y correlación única después de la primera página$`, suite.schedulePostCutAuditEvent)
 	sc.Step(`^recorro el registro para el operador "([^"]*)" y la acción "([^"]*)" con páginas de (\d+) eventos$`, suite.walkAuditPages)

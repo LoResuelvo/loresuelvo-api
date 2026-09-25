@@ -179,7 +179,6 @@ func TestOperationInboxReaderFlagsPendingProposalsThatReachedTheirBookingDeadlin
 		email := fmt.Sprintf("inbox.deadline%d@example.com", index)
 		consumerID := savedConsumerIDWithData(t, fixture.testContext, "auth0|"+email, email, "Consumer", "Deadline")
 		request := fixture.jobRequest(t, consumerID, juan, now.Add(-96*time.Hour), jobrequest.StatusAccepted)
-		// The fixture schedules proposals 72 hours after creation; the deadline is 24 hours before that.
 		proposalsByDeadline[deadlineOffset] = fixture.proposal(t, request, now.Add(deadlineOffset-48*time.Hour), serviceproposal.StatusPending)
 	}
 
@@ -286,4 +285,56 @@ func TestOperationInboxReaderDerivesAlertsAndLastBusinessAdvanceAtTheirExactBoun
 		filteredRequests = append(filteredRequests, found.JobRequest.ID)
 	}
 	assert.ElementsMatch(t, []int{awaitingBalance.ID, idleProposal.ID}, filteredRequests)
+}
+
+func TestOperationInboxReaderAppliesEveryFilterWithAndSemantics(t *testing.T) {
+	fixture := newOperationInboxFixture(t)
+	ana := savedConsumerIDWithData(t, fixture.testContext, "auth0|inbox-ana", "inbox.ana@example.com", "Ana", "Perez")
+	carla := savedConsumerIDWithData(t, fixture.testContext, "auth0|inbox-carla", "inbox.carla@example.com", "Carla", "Gomez")
+	juan := savedProviderIDWithData(t, fixture.testContext, "auth0|inbox-juan", "inbox.juan@example.com", "Juan", "Gomez", "Plomeria")
+	pedro := savedProviderIDWithData(t, fixture.testContext, "auth0|inbox-pedro", "inbox.pedro@example.com", "Pedro", "Dib", "Electricidad")
+	criteria := operationInboxCriteria(20)
+	dayStart := time.Date(2026, 9, 20, 3, 0, 0, 0, time.UTC)
+
+	anaJuan := fixture.jobRequest(t, ana, juan, dayStart, jobrequest.StatusAccepted)
+	fixture.workOrder(t, fixture.scheduledProposal(t, anaJuan, dayStart.Add(time.Hour), dayStart.Add(48*time.Hour), 60, serviceproposal.StatusAccepted), dayStart.Add(2*time.Hour), workorder.StatusScheduled)
+	anaPedro := fixture.jobRequest(t, ana, pedro, dayStart.Add(24*time.Hour), jobrequest.StatusPending)
+	carlaJuan := fixture.jobRequest(t, carla, juan, dayStart.Add(-time.Second), jobrequest.StatusPending)
+	reader := repositories.NewOperationInboxReader(fixture.testContext.database)
+	requestIDs := func(filter operation.InboxFilter, scheduled ...time.Time) []int {
+		t.Helper()
+		query := criteria
+		query.Filter = filter
+		if len(scheduled) == 2 {
+			query.ScheduledWindow = &operation.TimeWindow{From: scheduled[0], To: scheduled[1]}
+		}
+		operations, err := reader.FindPage(context.Background(), query)
+		require.NoError(t, err)
+		ids := []int{}
+		for _, found := range operations {
+			ids = append(ids, found.JobRequest.ID)
+		}
+		return ids
+	}
+	unfiltered, err := reader.FindPage(context.Background(), criteria)
+	require.NoError(t, err)
+	var plumbingID int
+	for _, found := range unfiltered {
+		if found.Provider.ID == juan {
+			plumbingID = found.Category.ID
+		}
+	}
+	require.NotZero(t, plumbingID)
+	stage := readmodel.StageRequestPending
+	windowEnd := dayStart.Add(24 * time.Hour)
+
+	assert.ElementsMatch(t, []int{anaJuan.ID, anaPedro.ID}, requestIDs(operation.InboxFilter{ConsumerID: &ana}))
+	assert.ElementsMatch(t, []int{anaJuan.ID, carlaJuan.ID}, requestIDs(operation.InboxFilter{ProviderID: &juan}))
+	assert.ElementsMatch(t, []int{anaJuan.ID, carlaJuan.ID}, requestIDs(operation.InboxFilter{CategoryID: &plumbingID}))
+	assert.ElementsMatch(t, []int{anaJuan.ID}, requestIDs(operation.InboxFilter{StartedFrom: &dayStart, StartedTo: &windowEnd}))
+	assert.ElementsMatch(t, []int{anaPedro.ID, carlaJuan.ID}, requestIDs(operation.InboxFilter{Stage: &stage}))
+	assert.ElementsMatch(t, []int{anaPedro.ID}, requestIDs(operation.InboxFilter{ConsumerID: &ana, Stage: &stage}))
+	scheduledDay := dayStart.Add(48 * time.Hour)
+	assert.ElementsMatch(t, []int{anaJuan.ID}, requestIDs(operation.InboxFilter{}, scheduledDay, scheduledDay.Add(24*time.Hour)))
+	assert.Empty(t, requestIDs(operation.InboxFilter{}, scheduledDay.Add(time.Second), scheduledDay.Add(24*time.Hour)))
 }

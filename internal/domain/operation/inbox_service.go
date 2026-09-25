@@ -10,16 +10,10 @@ import (
 )
 
 const (
-	// RequestResponseWindow is how long a provider may leave a job request
-	// unanswered before it raises request_pending_over_24h.
 	RequestResponseWindow = 24 * time.Hour
-	// StallThreshold is how old the last business advance of an operation
-	// awaiting a party may be before it raises stalled.
-	StallThreshold = 72 * time.Hour
+	StallThreshold        = 72 * time.Hour
 )
 
-// InboxService serves the administrative operations inbox. Ordinary inbox
-// reads are not audited.
 type InboxService struct {
 	reader InboxReader
 	clock  clock.Clock
@@ -35,14 +29,19 @@ func (service *InboxService) Query(ctx context.Context, query InboxQuery) (Inbox
 	}
 	limit := query.effectiveLimit()
 	now := service.clock.Now().UTC()
-	operations, err := service.reader.FindPage(ctx, InboxCriteria{
+	criteria := InboxCriteria{
 		Now:                  now,
 		PendingRequestCutoff: now.Add(-RequestResponseWindow),
 		StalledCutoff:        now.Add(-StallThreshold),
 		Filter:               query.Filter,
 		After:                query.After,
 		Limit:                limit + 1,
-	})
+	}
+	if day := query.Filter.ScheduledDay; day != nil {
+		from, to := day.Bounds()
+		criteria.ScheduledWindow = &TimeWindow{From: from.UTC(), To: to.UTC()}
+	}
+	operations, err := service.reader.FindPage(ctx, criteria)
 	if err != nil {
 		return InboxPage{}, fmt.Errorf("reading operations inbox: %w", err)
 	}

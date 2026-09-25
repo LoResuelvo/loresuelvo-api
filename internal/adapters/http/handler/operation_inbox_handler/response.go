@@ -15,8 +15,6 @@ type pageResponse struct {
 	NextCursor *string             `json:"next_cursor"`
 }
 
-// operationResponse is an allowlisted summary: it never carries messages,
-// attachments, credentials, biometrics or payment payloads.
 type operationResponse struct {
 	ID                    string                   `json:"id"`
 	Stage                 readmodel.Stage          `json:"stage"`
@@ -67,8 +65,6 @@ type categoryResponse struct {
 	Name string `json:"name"`
 }
 
-// operationID renders the stable identifier of the resource that started the
-// operation, for example "jr-12" or "sp-34".
 func operationID(id readmodel.ID) string {
 	return string(id.Kind) + "-" + strconv.Itoa(id.ResourceID)
 }

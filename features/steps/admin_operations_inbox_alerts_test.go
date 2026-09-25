@@ -15,7 +15,7 @@ import (
 	"github.com/cucumber/godog"
 )
 
-// quotedLabelList matches `"A"`, `"A" y "B"` and `"A", "B" y "C"`.
+// quotedLabelList matches "A", "A" y "B" and "A", "B" y "C".
 const quotedLabelList = `"[^"]*"(?:, "[^"]*")*(?: y "[^"]*")?`
 
 var quotedLabelPattern = regexp.MustCompile(`"([^"]*)"`)
@@ -32,10 +32,11 @@ func registerAdminOperationsInboxAlertSteps(sc *godog.ScenarioContext, suite *te
 	sc.Step(`^la operación "([^"]*)" informa como último avance de negocio "([^"]*)"$`, suite.inboxOperationHasLastBusinessAdvance)
 	sc.Step(`^la operación "([^"]*)" informa explícitamente como nulo su último avance de negocio$`, suite.inboxOperationHasNullLastBusinessAdvance)
 	sc.Step(`^la operación "([^"]*)" informa la limitación "([^"]*)"$`, suite.inboxOperationHasLimitation)
+	sc.Step(`^filtro la bandeja por el día programado "([^"]*)"$`, suite.filterInboxByScheduledDate)
+	sc.Step(`^filtro la bandeja por el consumidor "([^"]*)", el rubro "([^"]*)", el inicio desde "([^"]*)" hasta "([^"]*)" y la etapa "([^"]*)"$`, suite.filterInboxByConsumerCategoryWindowAndStage)
+	sc.Step(`^filtro la bandeja por el prestador "([^"]*)"$`, suite.filterInboxByProvider)
 }
 
-// thereAreInboxScheduledWorkOrders builds each order's request and proposal
-// ahead of its schedule and reports completion at its expected end.
 func (suite *testSuite) thereAreInboxScheduledWorkOrders(table *godog.Table) error {
 	rows, err := inboxTableRows(table)
 	if err != nil {
@@ -256,4 +257,87 @@ func (suite *testSuite) inboxOperationHasLimitation(label, limitation string) er
 		}
 	}
 	return fmt.Errorf("operation %q has limitations %v, missing %q", label, limitations, limitation)
+}
+
+func (suite *testSuite) filterInboxByScheduledDate(date string) error {
+	return suite.queryOperationsInboxWith(url.Values{"scheduled_date": {date}})
+}
+
+func (suite *testSuite) filterInboxByConsumerCategoryWindowAndStage(consumerEmail, categoryName, from, to, stage string) error {
+	consumerID, err := suite.userRepository.FindIDByEmail(consumerEmail)
+	if err != nil {
+		return err
+	}
+	categoryID, err := suite.categoryIDFor(categoryName)
+	if err != nil {
+		return err
+	}
+	fromInstant, err := parseInboxInstant(from)
+	if err != nil {
+		return err
+	}
+	toInstant, err := parseInboxInstant(to)
+	if err != nil {
+		return err
+	}
+	suite.operationInbox.startWindow = &[2]time.Time{fromInstant, toInstant}
+	return suite.queryOperationsInboxWith(url.Values{
+		"consumer_id": {strconv.Itoa(consumerID)}, "category_id": {strconv.Itoa(categoryID)},
+		"started_from": {from}, "started_to": {to}, "stage": {stage},
+	})
+}
+
+func (suite *testSuite) filterInboxByProvider(providerEmail string) error {
+	providerID, err := suite.providerIDByEmail(providerEmail)
+	if err != nil {
+		return err
+	}
+	return suite.queryOperationsInboxWith(url.Values{"provider_id": {strconv.Itoa(providerID)}})
+}
+
+func (suite *testSuite) inboxStartWindowHasExpectedBounds() error {
+	from, to := suite.operationInbox.startWindow[0], suite.operationInbox.startWindow[1]
+	page, err := suite.decodedInboxPage()
+	if err != nil {
+		return err
+	}
+	returned := map[string]bool{}
+	startsAtWindowStart := false
+	for _, found := range page.Operations {
+		returned[found.ID] = true
+		startsAtWindowStart = startsAtWindowStart || found.StartedOn.Equal(from)
+	}
+	if !startsAtWindowStart {
+		return fmt.Errorf("no returned operation started exactly at %s", from)
+	}
+	createdAtWindowEnd := map[string]string{}
+	for label, request := range suite.operationInbox.requests {
+		if request.createdOn.Equal(to) {
+			createdAtWindowEnd[fmt.Sprintf("jr-%d", request.id)] = label
+		}
+	}
+	for label, proposal := range suite.operationInbox.proposals {
+		if proposal.createdOn.Equal(to) && !suite.inboxFirstProposalOfRequest(label) {
+			createdAtWindowEnd[fmt.Sprintf("sp-%d", proposal.id)] = label
+		}
+	}
+	if len(createdAtWindowEnd) == 0 {
+		return fmt.Errorf("no operation started exactly at %s", to)
+	}
+	for operationID, label := range createdAtWindowEnd {
+		if returned[operationID] {
+			return fmt.Errorf("operation %q started at the exclusive window end but was returned", label)
+		}
+	}
+	return nil
+}
+
+func (suite *testSuite) inboxFirstProposalOfRequest(label string) bool {
+	proposal := suite.operationInbox.proposals[label]
+	for _, other := range suite.operationInbox.proposals {
+		if other.requestLabel == proposal.requestLabel && other.id < proposal.id {
+			return false
+		}
+	}
+	return true
 }

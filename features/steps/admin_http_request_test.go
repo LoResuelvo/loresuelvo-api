@@ -10,8 +10,6 @@ import (
 	"github.com/cucumber/godog"
 )
 
-// adminRequestState holds the authentication shape and response headers of
-// the latest administrative GET request.
 type adminRequestState struct {
 	omitBearer    bool
 	invalidBearer bool
@@ -23,6 +21,14 @@ func registerAdminHTTPRequestSteps(sc *godog.ScenarioContext, suite *testSuite) 
 	sc.Step(`^que envío un token Bearer inválido$`, suite.sendInvalidAdminBearer)
 	sc.Step(`^la respuesta incluye la cabecera "([^"]*)" con valor "([^"]*)"$`, suite.adminResponseHeaderEquals)
 	sc.Step(`^la página contiene una colección vacía, no nula, y no tiene cursor siguiente$`, suite.adminPageIsEmpty)
+	sc.Step(`^el inicio del rango es inclusivo y el fin es exclusivo$`, suite.queriedRangeHasExpectedBounds)
+}
+
+func (suite *testSuite) queriedRangeHasExpectedBounds() error {
+	if suite.operationInbox.startWindow != nil {
+		return suite.inboxStartWindowHasExpectedBounds()
+	}
+	return suite.auditRangeHasExpectedBounds()
 }
 
 func (suite *testSuite) doNotSendAdminBearer() error {
@@ -75,8 +81,6 @@ func (suite *testSuite) adminResponseHeaderEquals(name, value string) error {
 	return nil
 }
 
-// adminPageIsEmpty accepts any administrative page shaped as exactly one
-// collection plus next_cursor.
 func (suite *testSuite) adminPageIsEmpty() error {
 	var raw map[string]json.RawMessage
 	if err := json.Unmarshal(suite.lastBody, &raw); err != nil {

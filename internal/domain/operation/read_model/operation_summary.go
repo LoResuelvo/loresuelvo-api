@@ -8,7 +8,6 @@ import (
 	workorder "github.com/LoResuelvo/loresuelvo-api/internal/domain/work_order"
 )
 
-// Kind names the resource that started an operation.
 type Kind string
 
 const (
@@ -16,15 +15,13 @@ const (
 	KindServiceProposal Kind = "sp"
 )
 
-// ID identifies an operation by the resource that started it. A job request
-// operation continues through the first proposal of its conversation and that
-// proposal's work order; every later proposal starts its own operation.
+// ID names the resource that started the operation. A job request's operation
+// continues through its conversation's first proposal; later proposals start their own.
 type ID struct {
 	Kind       Kind
 	ResourceID int
 }
 
-// Stage is the persisted status of the most advanced resource of an operation.
 type Stage string
 
 const (
@@ -37,37 +34,22 @@ const (
 	StageWorkOrderPaid            Stage = "work_order_paid"
 )
 
-// Alert is derived from persisted state and its timestamps; it is never stored
-// and never changes that state.
 type Alert string
 
 const (
-	// AlertRequestPendingOver24h marks a job request still awaiting the
-	// provider's answer more than 24 hours after it was created.
 	AlertRequestPendingOver24h Alert = "request_pending_over_24h"
-	// AlertBookingDeadlinePassed marks a pending proposal whose booking deposit
-	// can no longer be paid.
 	AlertBookingDeadlinePassed Alert = "booking_deadline_passed"
-	// AlertDelayed marks a scheduled work order whose expected end has passed
-	// without a completion report. It does not prove the provider missed it.
-	AlertDelayed Alert = "delayed"
-	// AlertStalled marks an operation awaiting a party whose last business
-	// advance is more than 72 hours old. Messages are not business advances.
-	AlertStalled Alert = "stalled"
+	AlertDelayed               Alert = "delayed"
+	AlertStalled               Alert = "stalled"
 )
 
-// Limitation explains why a derived value could not be established.
 type Limitation string
 
 const (
-	// LimitationRequestAcceptanceTimeUnavailable: job requests do not record
-	// when they were accepted, so an accepted request without proposals has no
-	// known last business advance.
 	LimitationRequestAcceptanceTimeUnavailable Limitation = "request_acceptance_time_unavailable"
 )
 
-// Owner is who must act next. OwnerNone means the operation needs no further
-// action; an owner that cannot be deduced is a nil *Owner.
+// A nil *Owner means the owner cannot be deduced; OwnerNone means nobody must act.
 type Owner string
 
 const (
@@ -110,21 +92,18 @@ type Category struct {
 	Name string
 }
 
-// OperationSummary is the bounded administrative view of one operation.
-// Nil references mean the operation has not reached that resource.
 type OperationSummary struct {
-	ID              ID
-	StartedOn       time.Time
-	Stage           Stage
-	JobRequest      *JobRequest
-	ServiceProposal *ServiceProposal
-	WorkOrder       *WorkOrder
-	Consumer        Party
-	Provider        Party
-	Category        *Category
-	Alerts          []Alert
-	NextActionOwner *Owner
-	// LastBusinessAdvanceOn is nil when no business timestamp establishes it.
+	ID                    ID
+	StartedOn             time.Time
+	Stage                 Stage
+	JobRequest            *JobRequest
+	ServiceProposal       *ServiceProposal
+	WorkOrder             *WorkOrder
+	Consumer              Party
+	Provider              Party
+	Category              *Category
+	Alerts                []Alert
+	NextActionOwner       *Owner
 	LastBusinessAdvanceOn *time.Time
 	Limitations           []Limitation
 }

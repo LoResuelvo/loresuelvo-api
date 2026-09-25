@@ -2,8 +2,6 @@ package operation
 
 import readmodel "github.com/LoResuelvo/loresuelvo-api/internal/domain/operation/read_model"
 
-// nextActionOwner deduces who must act next from the stage. It returns nil
-// when the persisted state does not identify anyone, instead of guessing.
 func nextActionOwner(summary readmodel.OperationSummary) *readmodel.Owner {
 	var owner readmodel.Owner
 	switch summary.Stage {

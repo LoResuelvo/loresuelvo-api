@@ -14,15 +14,7 @@ import (
 	workorder "github.com/LoResuelvo/loresuelvo-api/internal/domain/work_order"
 )
 
-// operationInboxSQL groups hiring resources into operations: a job request
-// continues through the first proposal of its conversation, and every other
-// proposal starts its own operation. Work orders and completion reports are
-// 1:1 with their parents, so no join multiplies an operation.
-//
-// Stage, last business advance and alerts are derived once, in "derived", and
-// both returned and filtered from there. $1 is the evaluation instant, $2 the
-// cutoff of unanswered requests and $3 the cutoff of stalled operations.
-// Messages never count as business advances.
+// Filters use the values computed once in "derived".
 const operationInboxSQL = `WITH first_proposals AS (
 	SELECT DISTINCT ON (conversation_id) conversation_id, id
 	FROM service_proposals
@@ -100,6 +92,14 @@ INNER JOIN users provider_user ON provider_user.id = d.provider_id
 INNER JOIN providers ON providers.user_id = provider_user.id
 LEFT JOIN categories ON categories.id = providers.category_id
 WHERE ($4::text IS NULL OR $4::text = ANY(d.alerts))
+	AND ($9::integer IS NULL OR d.consumer_id = $9::integer)
+	AND ($10::integer IS NULL OR d.provider_id = $10::integer)
+	AND ($11::integer IS NULL OR providers.category_id = $11::integer)
+	AND ($12::timestamp IS NULL OR d.started_on >= $12::timestamp)
+	AND ($13::timestamp IS NULL OR d.started_on < $13::timestamp)
+	AND ($14::text IS NULL OR d.stage = $14::text)
+	AND ($15::timestamp IS NULL
+		OR (d.work_order_id IS NOT NULL AND d.scheduled_on >= $15::timestamp AND d.scheduled_on < $16::timestamp))
 	AND ($5::timestamp IS NULL
 		OR (d.started_on, d.kind, d.resource_id) < ($5::timestamp, $6::text, $7::integer))
 ORDER BY d.started_on DESC, d.kind DESC, d.resource_id DESC
@@ -120,13 +120,24 @@ func (reader *OperationInboxReader) FindPage(ctx context.Context, criteria opera
 		afterKind = string(criteria.After.ID.Kind)
 		afterResourceID = criteria.After.ID.ResourceID
 	}
-	var alert any
-	if criteria.Filter.Alert != nil {
-		alert = string(*criteria.Filter.Alert)
+	filter := criteria.Filter
+	var alert, stage any
+	if filter.Alert != nil {
+		alert = string(*filter.Alert)
+	}
+	if filter.Stage != nil {
+		stage = string(*filter.Stage)
+	}
+	var scheduledFrom, scheduledTo any
+	if window := criteria.ScheduledWindow; window != nil {
+		scheduledFrom, scheduledTo = window.From.UTC(), window.To.UTC()
 	}
 	rows, err := reader.db.QueryContext(ctx, operationInboxSQL,
 		criteria.Now.UTC(), criteria.PendingRequestCutoff.UTC(), criteria.StalledCutoff.UTC(), alert,
 		afterStartedOn, afterKind, afterResourceID, criteria.Limit,
+		optionalInteger(filter.ConsumerID), optionalInteger(filter.ProviderID), optionalInteger(filter.CategoryID),
+		optionalInstant(filter.StartedFrom), optionalInstant(filter.StartedTo), stage,
+		scheduledFrom, scheduledTo,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("querying operations inbox: %w", err)
@@ -208,4 +219,18 @@ func optionalUTC(value sql.NullTime) *time.Time {
 	}
 	instant := value.Time.UTC()
 	return &instant
+}
+
+func optionalInteger(value *int) any {
+	if value == nil {
+		return nil
+	}
+	return *value
+}
+
+func optionalInstant(value *time.Time) any {
+	if value == nil {
+		return nil
+	}
+	return value.UTC()
 }

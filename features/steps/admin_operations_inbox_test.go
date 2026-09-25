@@ -23,7 +23,6 @@ import (
 
 const operationsInboxPath = "/admin/operations"
 
-// operationInboxState maps scenario labels (S1, P1, O1) to persisted IDs.
 type operationInboxState struct {
 	requests         map[string]inboxJobRequestFixture
 	proposals        map[string]inboxProposalFixture
@@ -31,9 +30,11 @@ type operationInboxState struct {
 	recordedIDs      map[string]string
 	acceptedProposal map[string]bool
 	auditWatermark   *int64
+	startWindow      *[2]time.Time
 }
 
 type inboxJobRequestFixture struct {
+	createdOn      time.Time
 	id             int
 	conversationID int
 	consumerEmail  string
@@ -41,6 +42,7 @@ type inboxJobRequestFixture struct {
 }
 
 type inboxProposalFixture struct {
+	createdOn    time.Time
 	id           int
 	requestLabel string
 }
@@ -88,8 +90,6 @@ type inboxCategoryResponse struct {
 	Name string `json:"name"`
 }
 
-// inboxAllowedFields is the exact allowlist of the operation summary; any
-// other key would expose data the inbox must not carry.
 var inboxAllowedFields = map[string][]string{
 	"operation": {"id", "stage", "started_on", "job_request", "service_proposal", "work_order", "consumer", "provider", "category",
 		"alerts", "next_action_owner", "last_business_advance_on", "limitations"},
@@ -144,8 +144,6 @@ func (state *operationInboxState) ensureMaps() {
 	}
 }
 
-// withInboxFixtureClock runs fixture creation under row-specific clocks and
-// then restores the scenario's current time and authenticated administrator.
 func (suite *testSuite) withInboxFixtureClock(create func() error) error {
 	now := suite.clock.Now()
 	auth0ID, permissions := suite.currentAuth0ID, suite.currentPermissions
@@ -235,7 +233,7 @@ func (suite *testSuite) createInboxJobRequest(label, consumerEmail, providerEmai
 		return err
 	}
 	suite.operationInbox.requests[label] = inboxJobRequestFixture{
-		id: created.ID, conversationID: created.ConversationID,
+		createdOn: createdOn, id: created.ID, conversationID: created.ConversationID,
 		consumerEmail: consumerEmail, providerEmail: providerEmail,
 	}
 	switch status {
@@ -334,7 +332,7 @@ func (suite *testSuite) createInboxServiceProposal(label, requestLabel string, c
 	}
 	switch status {
 	case string(serviceproposal.StatusPending), string(serviceproposal.StatusAccepted):
-		// Accepted proposals are accepted together with their work order.
+		// Accepted proposals are accepted when their work order is created.
 	case string(serviceproposal.StatusRejected):
 		proposal.Status = serviceproposal.StatusRejected
 	default:
@@ -344,7 +342,7 @@ func (suite *testSuite) createInboxServiceProposal(label, requestLabel string, c
 	if err != nil {
 		return err
 	}
-	suite.operationInbox.proposals[label] = inboxProposalFixture{id: saved.ID, requestLabel: requestLabel}
+	suite.operationInbox.proposals[label] = inboxProposalFixture{createdOn: createdOn, id: saved.ID, requestLabel: requestLabel}
 	suite.operationInbox.acceptedProposal[label] = status == string(serviceproposal.StatusAccepted)
 	return nil
 }
@@ -511,8 +509,6 @@ func (suite *testSuite) inboxProposalHadRejectedThenApprovedDeposit(proposalLabe
 	return nil
 }
 
-// thereAreNoInboxJobRequests documents the precondition guaranteed by the
-// per-scenario cleanup.
 func (suite *testSuite) thereAreNoInboxJobRequests() error {
 	if len(suite.operationInbox.requests) != 0 {
 		return fmt.Errorf("scenario already prepared job requests")
@@ -544,8 +540,6 @@ func (suite *testSuite) decodedInboxPage() (inboxPageResponse, error) {
 	return page, nil
 }
 
-// inboxOperationID resolves a scenario label to the stable operation ID of the
-// resource that started it.
 func (suite *testSuite) inboxOperationID(label string) (string, error) {
 	if request, exists := suite.operationInbox.requests[label]; exists {
 		return fmt.Sprintf("jr-%d", request.id), nil
