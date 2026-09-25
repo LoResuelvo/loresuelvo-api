@@ -88,7 +88,6 @@ Feature: Consultar la bandeja administrativa de contrataciones
             Given que la fecha y hora actual del sistema es "2026-09-25T12:00:00-03:00"
             And que estoy autenticado como administrador "operador@example.com" con el permiso "read:admin_operations"
 
-        @wip
         Scenario: 64.5-AO Informar partes, rubro, fechas y estados sin exponer datos privados
             Given que existen las siguientes solicitudes de trabajo:
                 | solicitud | consumidor      | prestador        | creada                    | estado   |
@@ -119,7 +118,6 @@ Feature: Consultar la bandeja administrativa de contrataciones
 
     Rule: El responsable de la siguiente acción se deduce de la etapa y nunca se inventa
 
-        @wip
         Scenario Outline: 64.6-AO Informar el responsable de la siguiente acción para <situación>
             Given que la fecha y hora actual del sistema es "2026-09-25T12:00:00-03:00"
             And que existe una operación entre "ana@example.com" y "juan@example.com" con <situación>
