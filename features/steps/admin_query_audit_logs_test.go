@@ -4,7 +4,6 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"net/url"
 	"reflect"
@@ -21,9 +20,6 @@ type auditQueryState struct {
 	correlation    string
 	rangeStart     string
 	rangeEnd       string
-	headers        http.Header
-	noBearer       bool
-	badBearer      bool
 	firstPage      auditPageResponse
 	secondPage     auditPageResponse
 	pendingPostCut *audit.EventParams
@@ -55,15 +51,11 @@ func registerAdminQueryAuditLogsSteps(sc *godog.ScenarioContext, suite *testSuit
 	sc.Step(`^consulto el registro de auditoría administrativa para el operador "([^"]*)"$`, suite.queryAuditForOperator)
 	sc.Step(`^consulto el registro de auditoría administrativa para el operador "([^"]*)" con la correlación "([^"]*)"$`, suite.queryAuditForOperatorWithCorrelation)
 	sc.Step(`^intento consultar el registro de auditoría administrativa$`, suite.attemptAuditQuery)
-	sc.Step(`^que no envío un token Bearer$`, suite.doNotSendBearerForAuditQuery)
-	sc.Step(`^que envío un token Bearer inválido$`, suite.sendInvalidBearerForAuditQuery)
 	sc.Step(`^la página contiene los eventos "([^"]*)" y "([^"]*)" en ese orden$`, suite.auditPageContainsTwoEventsInOrder)
 	sc.Step(`^cada evento expone exactamente su identificador, referencia interna del operador, acción, tipo e ID de recurso, fecha UTC, resultado, correlación y motivo sólo cuando existe$`, suite.auditEventsExposeAllowedFields)
 	sc.Step(`^el evento "([^"]*)" informa el motivo "([^"]*)" y el evento "([^"]*)" no informa motivo$`, suite.auditEventReasonsMatch)
 	sc.Step(`^la respuesta no expone credenciales, identificadores externos de autenticación, cuerpos HTTP, mensajes de chat, biometría ni URLs firmadas$`, suite.auditResponseHasNoPrivateData)
-	sc.Step(`^la respuesta incluye la cabecera "([^"]*)" con valor "([^"]*)"$`, suite.auditResponseHeaderEquals)
 	sc.Step(`^los eventos "([^"]*)" y "([^"]*)" permanecen sin modificaciones$`, suite.auditEventsRemainUnchanged)
-	sc.Step(`^la página contiene una colección vacía, no nula, y no tiene cursor siguiente$`, suite.auditPageIsEmpty)
 	sc.Step(`^la respuesta no contiene eventos de auditoría$`, suite.auditErrorResponseHasNoEvents)
 	sc.Step(`^el sistema responde con estado 200 y una colección vacía no nula$`, suite.auditQueryRespondsWithEmptyCollection)
 	sc.Step(`^queda registrado exactamente un evento de acceso preparado a la colección de auditoría por "([^"]*)"$`, suite.onePreparedAuditAccessIsRecorded)
@@ -220,47 +212,10 @@ func (suite *testSuite) attemptAuditQuery() error {
 	return suite.sendAuditQuery(nil, "")
 }
 
-func (suite *testSuite) doNotSendBearerForAuditQuery() error {
-	suite.auditQuery.noBearer = true
-	return nil
-}
-
-func (suite *testSuite) sendInvalidBearerForAuditQuery() error {
-	suite.auditQuery.badBearer = true
-	return nil
-}
-
 func (suite *testSuite) sendAuditQuery(query url.Values, correlation string) error {
-	path := "/admin/audit-logs"
-	if len(query) > 0 {
-		path += "?" + query.Encode()
+	if err := suite.sendAdminGet("/admin/audit-logs", query, correlation); err != nil {
+		return err
 	}
-	request, err := http.NewRequest(http.MethodGet, suite.server.URL+path, nil)
-	if err != nil {
-		return fmt.Errorf("building audit query request: %w", err)
-	}
-	if !suite.auditQuery.noBearer {
-		if suite.auditQuery.badBearer {
-			request.Header.Set("Authorization", "Bearer invalid-token")
-		} else {
-			request.Header.Set("Authorization", "Bearer "+suite.tokenBuilder.BuildToken(suite.currentAuth0ID, suite.currentPermissions))
-		}
-	}
-	if correlation != "" {
-		request.Header.Set("X-Request-ID", correlation)
-	}
-	response, err := http.DefaultClient.Do(request)
-	if err != nil {
-		return fmt.Errorf("requesting administrative audit events: %w", err)
-	}
-	defer response.Body.Close()
-	body, err := io.ReadAll(response.Body)
-	if err != nil {
-		return fmt.Errorf("reading administrative audit response: %w", err)
-	}
-	suite.lastStatus = response.StatusCode
-	suite.lastBody = body
-	suite.auditQuery.headers = response.Header.Clone()
 	suite.auditQuery.correlation = correlation
 	return nil
 }
@@ -400,13 +355,6 @@ func (suite *testSuite) auditResponseHasNoPrivateData() error {
 	return suite.auditEventsExposeAllowedFields()
 }
 
-func (suite *testSuite) auditResponseHeaderEquals(name, value string) error {
-	if got := suite.auditQuery.headers.Get(name); got != value {
-		return fmt.Errorf("expected %s header %q, got %q", name, value, got)
-	}
-	return nil
-}
-
 func (suite *testSuite) auditEventsRemainUnchanged(first, second string) error {
 	for _, name := range []string{first, second} {
 		expected := suite.auditQuery.fixtures[name]
@@ -425,14 +373,10 @@ func (suite *testSuite) auditEventsRemainUnchanged(first, second string) error {
 }
 
 func (suite *testSuite) auditPageIsEmpty() error {
-	page, _, err := suite.decodedAuditPage()
-	if err != nil {
+	if _, _, err := suite.decodedAuditPage(); err != nil {
 		return err
 	}
-	if len(page.Events) != 0 || page.NextCursor != nil {
-		return fmt.Errorf("expected empty audit page and no cursor; got %d events, cursor present: %t", len(page.Events), page.NextCursor != nil)
-	}
-	return nil
+	return suite.adminPageIsEmpty()
 }
 
 func (suite *testSuite) auditErrorResponseHasNoEvents() error {

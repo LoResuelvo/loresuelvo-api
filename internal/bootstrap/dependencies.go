@@ -23,6 +23,7 @@ import (
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/health_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/identity_verification_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/job_request_handler"
+	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/operation_inbox_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/payment_account_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/payment_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/provider_handler"
@@ -50,6 +51,7 @@ import (
 	filedomain "github.com/LoResuelvo/loresuelvo-api/internal/domain/file"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/identityverification"
 	jobrequest "github.com/LoResuelvo/loresuelvo-api/internal/domain/job_request"
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/operation"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/payment"
 	paymentaccount "github.com/LoResuelvo/loresuelvo-api/internal/domain/payment_account"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/provider"
@@ -260,6 +262,7 @@ func newDependencies(database *sql.DB, adapters dependencyAdapters) (*Dependenci
 		persistence.UserRepository,
 		persistence.ConversationRepository,
 		fileService,
+		systemClock,
 	)
 	userService := user.NewService(persistence.UserRepository, fileService)
 	adminService := admin.NewService(
@@ -364,6 +367,7 @@ func newDependencies(database *sql.DB, adapters dependencyAdapters) (*Dependenci
 		routerConfig: httpadapter.RouterConfig{
 			AdminHandler:                admin_handler.NewAdminHandler(adminService),
 			AuditLogHandler:             auditLogHandler,
+			OperationInboxHandler:       operation_inbox_handler.NewHandler(operation.NewInboxService(persistence.OperationInboxReader)),
 			CategoryHandler:             category_handler.NewCategoryHandler(categoryService),
 			CalendarConnectionHandler:   calendar_connection_handler.NewCalendarConnectionHandler(calendarConnectionService, adapters.calendarHandlerConfig),
 			CoverageZoneHandler:         coverage_zone_handler.NewCoverageZoneHandler(coverageZoneService),

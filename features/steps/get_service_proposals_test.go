@@ -250,6 +250,7 @@ func (suite *testSuite) saveServiceProposalFixture(
 		Description:              description,
 		EstimatedDurationMinutes: durationMinutes,
 		Status:                   status,
+		CreatedOn:                suite.clock.Now(),
 	})
 	if err != nil {
 		return fmt.Errorf("saving service proposal fixture: %w", err)

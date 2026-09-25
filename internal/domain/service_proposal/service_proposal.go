@@ -41,7 +41,8 @@ type ServiceProposal struct {
 }
 
 func NewServiceProposal(provider *provider.Provider, consumer *consumer.Consumer, conversation conversation.Conversation, scheduledOn time.Time, description string, bookingTerms BookingTerms, clock clock.Clock, estimatedDuration ...int) (*ServiceProposal, error) {
-	if err := validateParameters(scheduledOn, clock); err != nil {
+	now := clock.Now()
+	if err := validateParameters(scheduledOn, now); err != nil {
 		return nil, err
 	}
 
@@ -65,6 +66,7 @@ func NewServiceProposal(provider *provider.Provider, consumer *consumer.Consumer
 		Description:              description,
 		EstimatedDurationMinutes: durationMinutes,
 		Status:                   StatusPending,
+		CreatedOn:                now,
 		BookingTerms:             bookingTerms,
 	}, nil
 }
@@ -177,8 +179,7 @@ func (sp *ServiceProposal) CounterpartFor(authID string) (user.User, error) {
 	return nil, ErrOnlyParticipantCanView
 }
 
-func validateParameters(scheduledOn time.Time, clock clock.Clock) error {
-	now := clock.Now()
+func validateParameters(scheduledOn, now time.Time) error {
 	if !scheduledOn.After(now) {
 		return ErrInvalidScheduledOn
 	}

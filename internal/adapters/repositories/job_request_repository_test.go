@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"testing"
+	"time"
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/repositories"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/conversation"
@@ -132,6 +133,7 @@ func validJobRequest(t *testing.T, consumerID, providerID int) jobrequest.JobReq
 
 	requestToSave, err := jobrequest.New(consumerID, providerID, "Reparacion de fuga", "Necesito ayuda esta semana", nil)
 	require.NoError(t, err)
+	requestToSave.CreatedOn = time.Date(2026, 9, 25, 15, 0, 0, 0, time.UTC)
 
 	return *requestToSave
 }
@@ -173,6 +175,7 @@ func TestJobRequestRepositoryCanSaveRequestWithConversation(t *testing.T) {
 	assert.Equal(t, requestToSave.Description, savedJobRequest.Description)
 	assert.Equal(t, jobrequest.StatusPending, savedJobRequest.Status)
 	assert.Equal(t, requestToSave.Images, savedJobRequest.Images)
+	assert.True(t, requestToSave.CreatedOn.Equal(savedJobRequest.CreatedOn))
 
 	foundConversation, err := testContext.conversationRepository.FindByID(context.Background(), savedJobRequest.ConversationID)
 	require.NoError(t, err)
@@ -184,6 +187,7 @@ func TestJobRequestRepositoryCanSaveRequestWithConversation(t *testing.T) {
 	foundJobRequest, err := testContext.jobRequestRepository.FindByConversationID(savedJobRequest.ConversationID)
 	require.NoError(t, err)
 	assert.Equal(t, requestToSave.Images, foundJobRequest.Images)
+	assert.True(t, requestToSave.CreatedOn.Equal(foundJobRequest.CreatedOn))
 }
 
 func TestJobRequestRepositoryRejectsDuplicateRequestBetweenSameConsumerAndProvider(t *testing.T) {

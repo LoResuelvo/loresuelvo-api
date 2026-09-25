@@ -36,6 +36,9 @@ func (r *ServiceProposalRepository) Save(serviceProposal *serviceproposal.Servic
 	if serviceProposal.Conversation == nil {
 		return nil, fmt.Errorf("saving service proposal: conversation is required")
 	}
+	if serviceProposal.CreatedOn.IsZero() {
+		return nil, fmt.Errorf("saving service proposal: creation time is required")
+	}
 
 	saved := *serviceProposal
 	err := r.db.QueryRowContext(
@@ -57,7 +60,7 @@ func (r *ServiceProposalRepository) Save(serviceProposal *serviceproposal.Servic
 			created_on,
 			updated_on
 		)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NOW(), NOW())
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $14)
 		RETURNING id`,
 		serviceProposal.Consumer.ID(),
 		serviceProposal.Provider.ID(),
@@ -72,6 +75,7 @@ func (r *ServiceProposalRepository) Save(serviceProposal *serviceproposal.Servic
 		serviceProposal.EstimatedDurationMinutes,
 		serviceProposal.Description,
 		serviceProposal.Status,
+		serviceProposal.CreatedOn.UTC(),
 	).Scan(&saved.ID)
 	if err != nil {
 		return nil, fmt.Errorf("saving service proposal: %w", err)

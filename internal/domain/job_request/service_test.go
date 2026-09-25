@@ -150,6 +150,7 @@ func TestCreateFromChatbotAssessmentCopiesCurrentAssessment(t *testing.T) {
 			ConsumerID:       10, CurrentAssessment: assessment,
 		}},
 		fileServiceForJobRequestTest(),
+		jobRequestTestClock{},
 	)
 
 	created, err := service.CreateFromChatbotAssessment(context.Background(), "auth0|consumer", 7, 20)
@@ -178,6 +179,7 @@ func TestCreateFromChatbotAssessmentRejectsSelfServiceOutcome(t *testing.T) {
 			},
 		}},
 		fileServiceForJobRequestTest(),
+		jobRequestTestClock{},
 	)
 
 	created, err := service.CreateFromChatbotAssessment(context.Background(), "auth0|consumer", 7, 20)
@@ -195,6 +197,7 @@ func TestCreateFromChatbotAssessmentRejectsDifferentOwner(t *testing.T) {
 			ConsumerID:       10,
 		}},
 		fileServiceForJobRequestTest(),
+		jobRequestTestClock{},
 	)
 
 	created, err := service.CreateFromChatbotAssessment(context.Background(), "auth0|other", 7, 20)
@@ -289,6 +292,7 @@ func TestCreateJobRequestSavesRequestWithPendingConversation(t *testing.T) {
 		newUserRepositoryMock(&consumerRepo{consumerID: 10}, &providerRepo{exists: true}),
 		&conversationRepo{},
 		fileServiceForJobRequestTest(),
+		jobRequestTestClock{},
 	)
 
 	createdRequest, err := service.Create(context.Background(), "auth0|consumer", 20, "  Reparación de fuga  ", "  Necesito ayuda esta semana  ", []string{})
@@ -304,6 +308,7 @@ func TestCreateJobRequestSavesRequestWithPendingConversation(t *testing.T) {
 	assert.Equal(t, "Reparación de fuga", firstSavedRequest.Title)
 	assert.Equal(t, "Necesito ayuda esta semana", firstSavedRequest.Description)
 	assert.Equal(t, jobrequest.StatusPending, firstSavedRequest.Status)
+	assert.Equal(t, jobRequestTestClock{}.Now(), firstSavedRequest.CreatedOn)
 	savedConversation := repo.savedConversation.(*conversation.WorkConversation)
 	assert.Equal(t, conversation.StatusPending, savedConversation.Status())
 	assert.Equal(t, 10, savedConversation.ConsumerID)
@@ -322,6 +327,7 @@ func TestCreateJobRequestValidatesImagesWithFileService(t *testing.T) {
 		newUserRepositoryMock(&consumerRepo{consumerID: 10}, &providerRepo{exists: true}),
 		&conversationRepo{},
 		imageValidator,
+		jobRequestTestClock{},
 	)
 
 	createdRequest, err := service.Create(context.Background(), "auth0|consumer", 20, "Reparación de fuga", "Necesito ayuda", []string{"file-1"})
@@ -342,6 +348,7 @@ func TestCreateJobRequestAllowsEmptyDescription(t *testing.T) {
 		newUserRepositoryMock(&consumerRepo{consumerID: 10}, &providerRepo{exists: true}),
 		&conversationRepo{},
 		fileServiceForJobRequestTest(),
+		jobRequestTestClock{},
 	)
 
 	createdRequest, err := service.Create(context.Background(), "auth0|consumer", 20, "Reparación de fuga", "   ", []string{})
@@ -358,6 +365,7 @@ func TestCreateJobRequestRejectsMissingTitle(t *testing.T) {
 		newUserRepositoryMock(&consumerRepo{consumerID: 10}, &providerRepo{exists: true}),
 		&conversationRepo{},
 		fileServiceForJobRequestTest(),
+		jobRequestTestClock{},
 	)
 
 	createdRequest, err := service.Create(context.Background(), "auth0|consumer", 20, "   ", "Necesito ayuda", []string{})
@@ -374,6 +382,7 @@ func TestCreateJobRequestRejectsNonConsumer(t *testing.T) {
 		newUserRepositoryMock(&consumerRepo{err: errors.New("consumer not found")}, &providerRepo{exists: true}),
 		&conversationRepo{},
 		fileServiceForJobRequestTest(),
+		jobRequestTestClock{},
 	)
 
 	createdRequest, err := service.Create(context.Background(), "auth0|provider", 20, "Reparación de fuga", "", []string{})
@@ -390,6 +399,7 @@ func TestCreateJobRequestRejectsNonExistingProvider(t *testing.T) {
 		newUserRepositoryMock(&consumerRepo{consumerID: 10}, &providerRepo{exists: false}),
 		&conversationRepo{},
 		fileServiceForJobRequestTest(),
+		jobRequestTestClock{},
 	)
 
 	createdRequest, err := service.Create(context.Background(), "auth0|consumer", 20, "Reparación de fuga", "", []string{})
@@ -406,6 +416,7 @@ func TestCreateJobRequestRejectsExistingOpenRequestBetweenConsumerAndProvider(t 
 		newUserRepositoryMock(&consumerRepo{consumerID: 10}, &providerRepo{exists: true}),
 		&conversationRepo{},
 		fileServiceForJobRequestTest(),
+		jobRequestTestClock{},
 	)
 
 	createdRequest, err := service.Create(context.Background(), "auth0|consumer", 20, "Reparación de fuga", "", []string{})
@@ -424,6 +435,7 @@ func TestCreateJobRequestPropagatesOpenRequestLookupError(t *testing.T) {
 		newUserRepositoryMock(&consumerRepo{consumerID: 10}, &providerRepo{exists: true}),
 		&conversationRepo{},
 		fileServiceForJobRequestTest(),
+		jobRequestTestClock{},
 	)
 
 	createdRequest, err := service.Create(context.Background(), "auth0|consumer", 20, "Reparación de fuga", "", []string{})
@@ -441,6 +453,7 @@ func TestShouldGetNoJobRequests(t *testing.T) {
 		newUserRepositoryMock(&consumerRepo{consumerID: 10}, &providerRepo{exists: true}),
 		&conversationRepo{},
 		fileServiceForJobRequestTest(),
+		jobRequestTestClock{},
 	)
 
 	jobRequests, err := service.GetJobRequests(context.Background(), "auth0|consumer")
@@ -456,6 +469,7 @@ func TestSHouldGetListOfJobRequests(t *testing.T) {
 		newUserRepositoryMock(&consumerRepo{consumerID: 10}, &providerRepo{exists: true}),
 		&conversationRepo{},
 		fileServiceForJobRequestTest(),
+		jobRequestTestClock{},
 	)
 
 	repo.foundJobRequests = []readmodel.JobRequestSummary{
@@ -494,6 +508,7 @@ func TestAcceptJobRequestActivatesLinkedConversationForAssignedProvider(t *testi
 		newUserRepositoryMock(&consumerRepo{}, &providerRepo{providerID: 20}),
 		conversationRepo,
 		fileServiceForJobRequestTest(),
+		jobRequestTestClock{},
 	)
 
 	acceptedJobRequest, err := service.Accept(context.Background(), "auth0|provider", 1)
@@ -527,6 +542,7 @@ func TestAcceptJobRequestRejectsProviderThatIsNotAssigned(t *testing.T) {
 		newUserRepositoryMock(&consumerRepo{}, &providerRepo{providerID: 99}),
 		conversationRepo,
 		fileServiceForJobRequestTest(),
+		jobRequestTestClock{},
 	)
 
 	acceptedJobRequest, err := service.Accept(context.Background(), "auth0|other-provider", 1)
@@ -547,6 +563,7 @@ func TestAcceptJobRequestReturnsNotFoundWhenRequestDoesNotExist(t *testing.T) {
 		newUserRepositoryMock(&consumerRepo{}, &providerRepo{providerID: 20}),
 		conversationRepo,
 		fileServiceForJobRequestTest(),
+		jobRequestTestClock{},
 	)
 
 	acceptedJobRequest, err := service.Accept(context.Background(), "auth0|provider", 999)
@@ -576,6 +593,7 @@ func TestAcceptJobRequestRejectsAlreadyAcceptedRequest(t *testing.T) {
 		newUserRepositoryMock(&consumerRepo{}, &providerRepo{providerID: 20}),
 		conversationRepo,
 		fileServiceForJobRequestTest(),
+		jobRequestTestClock{},
 	)
 
 	acceptedJobRequest, err := service.Accept(context.Background(), "auth0|provider", 1)
@@ -586,4 +604,10 @@ func TestAcceptJobRequestRejectsAlreadyAcceptedRequest(t *testing.T) {
 	assert.False(t, conversationRepo.findByIDCalled)
 	assert.False(t, conversationRepo.saveStatusCalled)
 	assert.False(t, repo.saveStatusCalled)
+}
+
+type jobRequestTestClock struct{}
+
+func (jobRequestTestClock) Now() time.Time {
+	return time.Date(2026, 9, 25, 15, 0, 0, 0, time.UTC)
 }

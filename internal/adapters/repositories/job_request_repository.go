@@ -28,6 +28,9 @@ func (repository *JobRequestRepository) SaveWithConversation(jobRequest jobreque
 	if !ok {
 		return nil, fmt.Errorf("saving job request: expected work conversation, got %s", pendingConversation.ConversationType())
 	}
+	if jobRequest.CreatedOn.IsZero() {
+		return nil, fmt.Errorf("saving job request: creation time is required")
+	}
 
 	ctx := context.Background()
 	tx, err := repository.db.BeginTx(ctx, nil)
@@ -39,10 +42,11 @@ func (repository *JobRequestRepository) SaveWithConversation(jobRequest jobreque
 	err = tx.QueryRowContext(
 		ctx,
 		`INSERT INTO conversations (type, status, created_on, updated_on)
-		VALUES ($1, $2, NOW(), NOW())
+		VALUES ($1, $2, $3, $3)
 		RETURNING id`,
 		workConversation.ConversationType(),
 		workConversation.Status(),
+		jobRequest.CreatedOn.UTC(),
 	).Scan(&conversationID)
 	if err != nil {
 		return nil, rollbackJobRequestTx(tx, mapJobRequestInsertError(err))
@@ -64,8 +68,8 @@ func (repository *JobRequestRepository) SaveWithConversation(jobRequest jobreque
 	err = tx.QueryRowContext(
 		ctx,
 		`INSERT INTO job_requests (consumer_id, provider_id, conversation_id, title, description, status, source_assessment_id, created_on, updated_on)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW())
-		RETURNING id, consumer_id, provider_id, conversation_id, title, description, status, source_assessment_id`,
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $8)
+		RETURNING id, consumer_id, provider_id, conversation_id, title, description, status, source_assessment_id, created_on`,
 		jobRequest.ConsumerID,
 		jobRequest.ProviderID,
 		conversationID,
@@ -73,6 +77,7 @@ func (repository *JobRequestRepository) SaveWithConversation(jobRequest jobreque
 		jobRequest.Description,
 		jobRequest.Status,
 		jobRequest.SourceAssessmentID,
+		jobRequest.CreatedOn.UTC(),
 	).Scan(
 		&savedJobRequest.ID,
 		&savedJobRequest.ConsumerID,
@@ -82,6 +87,7 @@ func (repository *JobRequestRepository) SaveWithConversation(jobRequest jobreque
 		&savedJobRequest.Description,
 		&savedJobRequest.Status,
 		&savedJobRequest.SourceAssessmentID,
+		&savedJobRequest.CreatedOn,
 	)
 	if err != nil {
 		return nil, rollbackJobRequestTx(tx, mapJobRequestInsertError(err))
@@ -132,7 +138,7 @@ func (repository *JobRequestRepository) ExistsBetweenWithAnyStatus(consumerID, p
 func (repository *JobRequestRepository) FindByConversationID(conversationID int) (*jobrequest.JobRequest, error) {
 	var foundJobRequest jobrequest.JobRequest
 	err := repository.db.QueryRow(
-		`SELECT id, consumer_id, provider_id, conversation_id, title, description, status, source_assessment_id
+		`SELECT id, consumer_id, provider_id, conversation_id, title, description, status, source_assessment_id, created_on
 		FROM job_requests
 		WHERE conversation_id = $1`,
 		conversationID,
@@ -145,6 +151,7 @@ func (repository *JobRequestRepository) FindByConversationID(conversationID int)
 		&foundJobRequest.Description,
 		&foundJobRequest.Status,
 		&foundJobRequest.SourceAssessmentID,
+		&foundJobRequest.CreatedOn,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("finding job request by conversation id: %w", err)
@@ -161,7 +168,7 @@ func (repository *JobRequestRepository) FindByConversationID(conversationID int)
 func (repository *JobRequestRepository) FindByID(id int) (*jobrequest.JobRequest, error) {
 	var foundJobRequest jobrequest.JobRequest
 	err := repository.db.QueryRow(
-		`SELECT id, consumer_id, provider_id, conversation_id, title, description, status, source_assessment_id
+		`SELECT id, consumer_id, provider_id, conversation_id, title, description, status, source_assessment_id, created_on
 		FROM job_requests
 		WHERE id = $1`,
 		id,
@@ -174,6 +181,7 @@ func (repository *JobRequestRepository) FindByID(id int) (*jobrequest.JobRequest
 		&foundJobRequest.Description,
 		&foundJobRequest.Status,
 		&foundJobRequest.SourceAssessmentID,
+		&foundJobRequest.CreatedOn,
 	)
 
 	if err != nil {

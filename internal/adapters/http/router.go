@@ -15,6 +15,7 @@ import (
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/health_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/identity_verification_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/job_request_handler"
+	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/operation_inbox_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/payment_account_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/payment_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/provider_handler"
@@ -31,6 +32,7 @@ import (
 const readConsumersPermission = "read:consumers"
 const readProvidersPermission = "read:providers"
 const readAdminAuditPermission = "read:admin_audit"
+const readAdminOperationsPermission = "read:admin_operations"
 const createCategoriesPermission = "create:categories"
 
 type Environment string
@@ -46,6 +48,7 @@ type RouterConfig struct {
 	Environment                 Environment
 	AdminHandler                *admin_handler.AdminHandler
 	AuditLogHandler             *audit_log_handler.Handler
+	OperationInboxHandler       *operation_inbox_handler.Handler
 	CategoryHandler             *category_handler.CategoryHandler
 	CalendarConnectionHandler   *calendar_connection_handler.CalendarConnectionHandler
 	CoverageZoneHandler         *coverage_zone_handler.CoverageZoneHandler
@@ -71,6 +74,7 @@ type Router struct {
 	environment                 Environment
 	adminHandler                *admin_handler.AdminHandler
 	auditLogHandler             *audit_log_handler.Handler
+	operationInboxHandler       *operation_inbox_handler.Handler
 	categoryHandler             *category_handler.CategoryHandler
 	calendarConnectionHandler   *calendar_connection_handler.CalendarConnectionHandler
 	coverageZoneHandler         *coverage_zone_handler.CoverageZoneHandler
@@ -102,6 +106,7 @@ func NewRouter(config RouterConfig) *Router {
 		environment:                 config.Environment,
 		adminHandler:                config.AdminHandler,
 		auditLogHandler:             config.AuditLogHandler,
+		operationInboxHandler:       config.OperationInboxHandler,
 		categoryHandler:             config.CategoryHandler,
 		calendarConnectionHandler:   config.CalendarConnectionHandler,
 		coverageZoneHandler:         config.CoverageZoneHandler,
@@ -164,16 +169,27 @@ func (router *Router) SetUp() (*gin.Engine, error) {
 	return engine, nil
 }
 
+// privateNoStore keeps administrative responses out of shared and local caches,
+// including error responses produced by later middleware.
+func privateNoStore(c *gin.Context) {
+	c.Header("Cache-Control", "private, no-store")
+	c.Next()
+}
+
 func (router *Router) registerAdminRoutes(engine *gin.Engine, authMiddleware gin.HandlerFunc) {
 	engine.GET(
 		"/admin/audit-logs",
-		func(c *gin.Context) {
-			c.Header("Cache-Control", "private, no-store")
-			c.Next()
-		},
+		privateNoStore,
 		authMiddleware,
 		middleware.RequirePermissionLayer(readAdminAuditPermission),
 		router.auditLogHandler.List,
+	)
+	engine.GET(
+		"/admin/operations",
+		privateNoStore,
+		authMiddleware,
+		middleware.RequirePermissionLayer(readAdminOperationsPermission),
+		router.operationInboxHandler.List,
 	)
 	engine.GET(
 		"/admin/consumers",

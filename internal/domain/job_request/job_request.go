@@ -2,6 +2,7 @@ package jobrequest
 
 import (
 	"strings"
+	"time"
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/conversation"
 	filedomain "github.com/LoResuelvo/loresuelvo-api/internal/domain/file"
@@ -30,6 +31,7 @@ type JobRequest struct {
 	Status             Status
 	SourceAssessmentID *int
 	Images             []filedomain.Image
+	CreatedOn          time.Time
 }
 
 func NewFromAssessment(consumerID, providerID int, assessment conversation.ProblemAssessment) (*JobRequest, error) {

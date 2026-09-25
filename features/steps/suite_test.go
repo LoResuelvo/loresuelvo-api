@@ -75,6 +75,8 @@ type testSuite struct {
 	lastLocation                            string
 	lastRequestID                           string
 	auditQuery                              auditQueryState
+	adminRequest                            adminRequestState
+	operationInbox                          operationInboxState
 	categoryAuditCapture                    *categoryAuditEventCapture
 	lastCategoryAuditEventIDs               []uuid.UUID
 	currentAuth0ID                          string
@@ -203,7 +205,9 @@ func (s *testSuite) registerAllSteps(sc *godog.ScenarioContext) {
 	registerProcessIdentityVerificationResultSteps(sc, s)
 	registerShowProviderIdentityVerificationSteps(sc, s)
 	registerAdminListUsersSteps(sc, s)
+	registerAdminHTTPRequestSteps(sc, s)
 	registerAdminQueryAuditLogsSteps(sc, s)
+	registerAdminOperationsInboxSteps(sc, s)
 }
 
 func (s *testSuite) cleanup() error {
@@ -334,6 +338,8 @@ func (s *testSuite) cleanup() error {
 	s.identityVerificationWebhookStatuses = nil
 	s.currentPermissions = nil
 	s.auditQuery = auditQueryState{}
+	s.adminRequest = adminRequestState{}
+	s.operationInbox = operationInboxState{}
 	s.currentAuth0ID = ""
 	s.invalidSession = false
 	return nil

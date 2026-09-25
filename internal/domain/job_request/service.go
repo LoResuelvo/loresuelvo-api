@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/clock"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/conversation"
 	filedomain "github.com/LoResuelvo/loresuelvo-api/internal/domain/file"
 	readmodel "github.com/LoResuelvo/loresuelvo-api/internal/domain/job_request/read_model"
@@ -16,6 +17,7 @@ type Service struct {
 	userRepository         UserRepository
 	conversationRepository ConversationRepository
 	fileService            FileService
+	clock                  clock.Clock
 }
 
 func NewService(
@@ -23,12 +25,14 @@ func NewService(
 	userRepository UserRepository,
 	conversationRepository ConversationRepository,
 	fileService FileService,
+	clock clock.Clock,
 ) *Service {
 	return &Service{
 		repository:             repository,
 		userRepository:         userRepository,
 		conversationRepository: conversationRepository,
 		fileService:            fileService,
+		clock:                  clock,
 	}
 }
 
@@ -59,6 +63,7 @@ func (s *Service) Create(ctx context.Context, consumerAuthID string, providerID 
 	if err != nil {
 		return nil, err
 	}
+	jobRequest.CreatedOn = s.clock.Now()
 
 	return s.repository.SaveWithConversation(*jobRequest, pendingConversation)
 }
@@ -114,6 +119,7 @@ func (s *Service) CreateFromChatbotAssessment(ctx context.Context, consumerAuthI
 	if err != nil {
 		return nil, err
 	}
+	jobRequest.CreatedOn = s.clock.Now()
 	pendingConversation, err := conversation.NewPendingConversation(consumerID, providerID)
 	if err != nil {
 		return nil, err
