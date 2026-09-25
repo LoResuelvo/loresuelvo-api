@@ -21,7 +21,6 @@ Feature: Consultar la bandeja administrativa de contrataciones
             Given que la fecha y hora actual del sistema es "2026-09-25T12:00:00-03:00"
             And que estoy autenticado como administrador "operador@example.com" con el permiso "read:admin_operations"
 
-        @wip
         Scenario: 64.1-AO Incluir cada etapa sin correlacionar conversaciones por consumidor o fecha
             Given que existen las siguientes solicitudes de trabajo:
                 | solicitud | consumidor        | prestador         | creada                    | estado   |
@@ -46,7 +45,6 @@ Feature: Consultar la bandeja administrativa de contrataciones
                 | S4        | S4        | P4        | O4    | work_order_scheduled |
             And cada referencia ausente se informa explícitamente como nula
 
-        @wip
         Scenario: 64.2-AO Conservar el identificador de la operación al avanzar de etapa
             Given que existen las siguientes solicitudes de trabajo:
                 | solicitud | consumidor      | prestador        | creada                    | estado  |
@@ -59,7 +57,6 @@ Feature: Consultar la bandeja administrativa de contrataciones
                 | S1        | S1        | P1        | O1    | work_order_scheduled |
             And la operación "S1" conserva el identificador registrado
 
-        @wip
         Scenario: 64.3-AO Distinguir varias propuestas de una conversación sin duplicar intentos de pago
             Given que existen las siguientes solicitudes de trabajo:
                 | solicitud | consumidor      | prestador        | creada                    | estado   |
@@ -79,7 +76,6 @@ Feature: Consultar la bandeja administrativa de contrataciones
                 | P2        | S1        | P2        |       | proposal_pending |
             And las operaciones "S1" y "P2" tienen identificadores distintos
 
-        @wip
         Scenario: 64.4-AO Devolver una bandeja vacía sin confundirla con un fallo
             Given que no existen solicitudes de trabajo
             When consulto la bandeja administrativa de contrataciones
@@ -310,7 +306,6 @@ Feature: Consultar la bandeja administrativa de contrataciones
 
     Rule: La autenticación, el permiso y los parámetros restringen la consulta
 
-        @wip
         Scenario Outline: 64.17-AO Rechazar la consulta sin autenticación válida
             Given que existe una solicitud de trabajo pendiente para el prestador "juan@example.com"
             And que <estado de autenticación>
@@ -323,7 +318,6 @@ Feature: Consultar la bandeja administrativa de contrataciones
                 | no envío un token Bearer       |
                 | envío un token Bearer inválido |
 
-        @wip
         Scenario: 64.18-AO Rechazar a un administrador sin el permiso de operaciones
             Given que existe una solicitud de trabajo pendiente para el prestador "juan@example.com"
             And que estoy autenticado como administrador "operador@example.com" solamente con el permiso "read:admin_audit"
