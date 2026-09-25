@@ -218,7 +218,6 @@ Feature: Consultar la bandeja administrativa de contrataciones
 
     Rule: El día programado se interpreta en la zona horaria America/Argentina/Buenos_Aires
 
-        @wip
         Scenario: 64.12-AO Filtrar los trabajos programados para un día de Buenos Aires
             Given que la fecha y hora actual del sistema es "2026-09-25T23:30:00-03:00"
             And que existen las siguientes órdenes de trabajo con su fecha programada:
@@ -254,13 +253,11 @@ Feature: Consultar la bandeja administrativa de contrataciones
                 | O7    | P7        | 2026-09-20T13:00:00-03:00 | scheduled |                        |              |
             And que estoy autenticado como administrador "operador@example.com" con el permiso "read:admin_operations"
 
-        @wip
         Scenario: 64.13-AO Combinar consumidor, rubro, rango de inicio y etapa
             When filtro la bandeja por el consumidor "ana@example.com", el rubro "Plomería", el inicio desde "2026-09-20T00:00:00-03:00" hasta "2026-09-21T00:00:00-03:00" y la etapa "proposal_pending"
             Then la bandeja contiene solamente las operaciones "S1" y "S3"
             And el inicio del rango es inclusivo y el fin es exclusivo
 
-        @wip
         Scenario: 64.14-AO Filtrar por prestador
             When filtro la bandeja por el prestador "juan@example.com"
             Then la bandeja contiene solamente las operaciones "S1", "S2", "P6" y "P7"
