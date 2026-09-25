@@ -64,6 +64,8 @@ paths:
     $ref: ./paths/admin-providers.yaml
   /admin/audit-logs:
     $ref: ./paths/admin-audit-logs.yaml
+  /admin/operations:
+    $ref: ./paths/admin-operations.yaml
   /providers:
     $ref: ./paths/providers.yaml
   /providers/{providerID}:
@@ -246,6 +248,16 @@ components:
       $ref: ./components/schemas/admin-audit-log-event.yaml
     AdminAuditLogPage:
       $ref: ./components/schemas/admin-audit-log-page.yaml
+    AdminOperation:
+      $ref: ./components/schemas/admin-operation.yaml
+    AdminOperationPage:
+      $ref: ./components/schemas/admin-operation-page.yaml
+    AdminOperationParty:
+      $ref: ./components/schemas/admin-operation-party.yaml
+    AdminOperationStage:
+      $ref: ./components/schemas/admin-operation-stage.yaml
+    AdminOperationAlert:
+      $ref: ./components/schemas/admin-operation-alert.yaml
     RegisterProviderRequest:
       $ref: ./components/schemas/register-provider-request.yaml
     ProviderSummary:

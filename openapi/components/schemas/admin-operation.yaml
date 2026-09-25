@@ -1,0 +1,162 @@
+type: object
+required:
+- id
+- stage
+- started_on
+- job_request
+- service_proposal
+- work_order
+- consumer
+- provider
+- category
+- alerts
+- next_action_owner
+- last_business_advance_on
+- limitations
+properties:
+  id:
+    type: string
+    pattern: '^(jr|sp)-[1-9][0-9]*$'
+    description: Stable operation ID named after the resource that started it.
+  stage:
+    $ref: '#/components/schemas/AdminOperationStage'
+  started_on:
+    type: string
+    format: date-time
+    description: Creation of the job request or proposal that started the operation.
+  job_request:
+    type:
+    - object
+    - 'null'
+    required:
+    - id
+    - status
+    - created_on
+    properties:
+      id:
+        type: integer
+        minimum: 1
+      status:
+        type: string
+        enum:
+        - pending
+        - accepted
+      created_on:
+        type: string
+        format: date-time
+    additionalProperties: false
+  service_proposal:
+    type:
+    - object
+    - 'null'
+    required:
+    - id
+    - status
+    - created_on
+    - scheduled_on
+    - estimated_duration_minutes
+    - booking_payment_deadline
+    properties:
+      id:
+        type: integer
+        minimum: 1
+      status:
+        type: string
+        enum:
+        - pending
+        - accepted
+        - rejected
+      created_on:
+        type: string
+        format: date-time
+      scheduled_on:
+        type: string
+        format: date-time
+      estimated_duration_minutes:
+        type: integer
+        minimum: 15
+        maximum: 1440
+      booking_payment_deadline:
+        type: string
+        format: date-time
+    additionalProperties: false
+  work_order:
+    type:
+    - object
+    - 'null'
+    required:
+    - id
+    - status
+    - accepted_on
+    - completion_reported_on
+    - balance_paid_on
+    properties:
+      id:
+        type: integer
+        minimum: 1
+      status:
+        type: string
+        enum:
+        - scheduled
+        - awaiting_payment
+        - paid
+      accepted_on:
+        type: string
+        format: date-time
+      completion_reported_on:
+        type:
+        - string
+        - 'null'
+        format: date-time
+      balance_paid_on:
+        type:
+        - string
+        - 'null'
+        format: date-time
+    additionalProperties: false
+  consumer:
+    $ref: '#/components/schemas/AdminOperationParty'
+  provider:
+    $ref: '#/components/schemas/AdminOperationParty'
+  category:
+    type:
+    - object
+    - 'null'
+    description: The provider's category, or null when it is not available.
+    required:
+    - id
+    - name
+    properties:
+      id:
+        type: integer
+        minimum: 1
+      name:
+        type: string
+    additionalProperties: false
+  alerts:
+    type: array
+    items:
+      $ref: '#/components/schemas/AdminOperationAlert'
+  next_action_owner:
+    type:
+    - string
+    - 'null'
+    enum:
+    - consumer
+    - provider
+    - none
+    - null
+    description: Who must act next; `none` when nobody must act, null when it cannot be deduced.
+  last_business_advance_on:
+    type:
+    - string
+    - 'null'
+    format: date-time
+    description: Latest business milestone; null when no recorded timestamp establishes it.
+  limitations:
+    type: array
+    items:
+      type: string
+      enum:
+      - request_acceptance_time_unavailable
+additionalProperties: false

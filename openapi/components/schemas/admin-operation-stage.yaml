@@ -1,0 +1,9 @@
+type: string
+enum:
+- request_pending
+- request_accepted
+- proposal_pending
+- proposal_rejected
+- work_order_scheduled
+- work_order_awaiting_payment
+- work_order_paid

@@ -1,0 +1,15 @@
+type: object
+required:
+- id
+- name
+- surname
+properties:
+  id:
+    type: integer
+    minimum: 1
+    description: Internal user ID.
+  name:
+    type: string
+  surname:
+    type: string
+additionalProperties: false

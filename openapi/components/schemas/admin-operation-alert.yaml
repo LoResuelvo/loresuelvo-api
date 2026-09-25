@@ -1,0 +1,6 @@
+type: string
+enum:
+- request_pending_over_24h
+- booking_deadline_passed
+- delayed
+- stalled

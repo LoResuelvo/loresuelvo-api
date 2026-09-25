@@ -1,0 +1,274 @@
+get:
+  tags:
+  - Administration
+  operationId: listAdminOperations
+  summary: Query the administrative hiring operations inbox
+  description: >-
+    Lists hiring operations across all users with a bounded summary. Requires
+    the `read:admin_operations` permission in the Bearer JWT. Ordinary inbox
+    queries are not recorded as audit events. The response never includes
+    messages, chat excerpts, attachments, credentials, biometric data or
+    payment payloads, and uses `Cache-Control: private, no-store`.
+
+
+    **Operations.** A job request starts an operation that continues through
+    the first service proposal of its conversation and that proposal's work
+    order. Every later proposal in the same conversation starts its own
+    operation, which references the same job request. Operations are never
+    correlated by shared consumer, provider, email or time proximity, and
+    payment attempts never add rows. The operation `id` is `jr-<job request
+    ID>` or `sp-<service proposal ID>` and stays the same as the operation
+    advances from request to proposal to work order.
+
+
+    **Stage** is the persisted status of the most advanced resource:
+    `request_*`, `proposal_*` or `work_order_*`.
+
+
+    **Alerts** are derived at query time and never change persisted statuses:
+
+    - `request_pending_over_24h`: pending request created more than 24 hours
+    ago (exactly 24 hours does not count).
+
+    - `booking_deadline_passed`: pending proposal whose booking payment
+    deadline has been reached.
+
+    - `delayed`: scheduled work order whose scheduled time plus estimated
+    duration has passed without a completion report. It does not prove that
+    the provider missed the job.
+
+    - `stalled`: pending request, pending proposal or work order awaiting
+    payment whose last business advance is more than 72 hours old.
+
+
+    **Last business advance** is the request creation (pending request), the
+    proposal creation (proposal stages), the order acceptance (scheduled
+    order), the completion report (awaiting payment) or the balance payment
+    (paid). Messages never count. Job requests do not record their acceptance
+    time, so an accepted request without proposals reports `null` with the
+    `request_acceptance_time_unavailable` limitation and is never `stalled`.
+
+
+    **Filters** combine with AND. `started_from` is inclusive and
+    `started_to` is exclusive over the operation start (request or
+    proposal creation); both require RFC 3339 timestamps with an explicit
+    offset (encode `+` as `%2B`). `scheduled_date` is a calendar day in
+    `America/Argentina/Buenos_Aires` and matches work orders scheduled on it.
+    Operations are ordered by start descending, then by `id` kind and
+    numeric part descending. The default page limit is 20 and the maximum is
+    100. `next_cursor` is opaque and bound to the filters and limit of the
+    first page; when continuing, omit them or repeat the same values.
+  security:
+  - BearerAuth: []
+  parameters:
+  - name: consumer_id
+    in: query
+    required: false
+    description: Match the consumer's user ID.
+    schema:
+      type: integer
+      minimum: 1
+      maximum: 2147483647
+    example: 7
+  - name: provider_id
+    in: query
+    required: false
+    description: Match the provider's user ID.
+    schema:
+      type: integer
+      minimum: 1
+      maximum: 2147483647
+    example: 8
+  - name: category_id
+    in: query
+    required: false
+    description: Match the provider's category.
+    schema:
+      type: integer
+      minimum: 1
+      maximum: 2147483647
+    example: 3
+  - name: started_from
+    in: query
+    required: false
+    description: Inclusive lower bound of the operation start (RFC 3339 with offset).
+    schema:
+      type: string
+      format: date-time
+    example: '2026-09-20T00:00:00-03:00'
+  - name: started_to
+    in: query
+    required: false
+    description: Exclusive upper bound of the operation start (RFC 3339 with offset).
+    schema:
+      type: string
+      format: date-time
+    example: '2026-09-21T00:00:00-03:00'
+  - name: stage
+    in: query
+    required: false
+    description: Match the operation stage.
+    schema:
+      $ref: '#/components/schemas/AdminOperationStage'
+  - name: alert
+    in: query
+    required: false
+    description: Keep operations that currently raise this alert.
+    schema:
+      $ref: '#/components/schemas/AdminOperationAlert'
+  - name: scheduled_date
+    in: query
+    required: false
+    description: Keep work orders scheduled on this America/Argentina/Buenos_Aires day.
+    schema:
+      type: string
+      format: date
+    example: '2026-09-25'
+  - name: limit
+    in: query
+    required: false
+    description: Number of operations per page. A cursor is bound to the original limit.
+    schema:
+      type: integer
+      minimum: 1
+      maximum: 100
+      default: 20
+    example: 20
+  - name: cursor
+    in: query
+    required: false
+    description: Opaque cursor returned as `next_cursor` by the preceding page.
+    schema:
+      type: string
+      minLength: 1
+      maxLength: 2048
+  responses:
+    '200':
+      description: Operations matching every filter. The operations array is empty when there are no matches.
+      headers:
+        Cache-Control:
+          description: Prevents shared or private caches from storing administrative results.
+          schema:
+            type: string
+            const: private, no-store
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/AdminOperationPage'
+          example:
+            operations:
+            - id: jr-12
+              stage: work_order_awaiting_payment
+              started_on: '2026-09-15T13:00:00Z'
+              job_request:
+                id: 12
+                status: accepted
+                created_on: '2026-09-15T13:00:00Z'
+              service_proposal:
+                id: 34
+                status: accepted
+                created_on: '2026-09-16T13:00:00Z'
+                scheduled_on: '2026-09-23T13:00:00Z'
+                estimated_duration_minutes: 120
+                booking_payment_deadline: '2026-09-22T13:00:00Z'
+              work_order:
+                id: 56
+                status: awaiting_payment
+                accepted_on: '2026-09-17T12:00:00Z'
+                completion_reported_on: '2026-09-23T16:00:00Z'
+                balance_paid_on: null
+              consumer:
+                id: 7
+                name: Ana
+                surname: Pérez
+              provider:
+                id: 8
+                name: Juan
+                surname: Gómez
+              category:
+                id: 3
+                name: Plomería
+              alerts: []
+              next_action_owner: consumer
+              last_business_advance_on: '2026-09-23T16:00:00Z'
+              limitations: []
+            - id: jr-13
+              stage: request_accepted
+              started_on: '2026-09-10T13:00:00Z'
+              job_request:
+                id: 13
+                status: accepted
+                created_on: '2026-09-10T13:00:00Z'
+              service_proposal: null
+              work_order: null
+              consumer:
+                id: 9
+                name: Carla
+                surname: Gómez
+              provider:
+                id: 8
+                name: Juan
+                surname: Gómez
+              category:
+                id: 3
+                name: Plomería
+              alerts: []
+              next_action_owner: provider
+              last_business_advance_on: null
+              limitations:
+              - request_acceptance_time_unavailable
+            next_cursor: null
+    '400':
+      description: A filter, page limit or cursor is malformed, invalid or incompatible with the cursor's filters or limit.
+      headers:
+        Cache-Control:
+          description: Prevents shared or private caches from storing administrative responses.
+          schema:
+            type: string
+            const: private, no-store
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: invalid filter
+    '401':
+      description: The Bearer token is missing or invalid.
+      headers:
+        Cache-Control:
+          description: Prevents shared or private caches from storing administrative responses.
+          schema:
+            type: string
+            const: private, no-store
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/AuthErrorResponse'
+    '403':
+      description: The Bearer token does not contain the `read:admin_operations` permission.
+      headers:
+        Cache-Control:
+          description: Prevents shared or private caches from storing administrative responses.
+          schema:
+            type: string
+            const: private, no-store
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: insufficient permissions
+    '500':
+      description: The inbox query failed.
+      headers:
+        Cache-Control:
+          description: Prevents shared or private caches from storing administrative responses.
+          schema:
+            type: string
+            const: private, no-store
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: internal server error

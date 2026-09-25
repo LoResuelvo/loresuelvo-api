@@ -1,0 +1,15 @@
+type: object
+required:
+- operations
+- next_cursor
+properties:
+  operations:
+    type: array
+    items:
+      $ref: '#/components/schemas/AdminOperation'
+  next_cursor:
+    type:
+    - string
+    - 'null'
+    description: Opaque continuation cursor bound to the original filters and limit, or null on the last page.
+additionalProperties: false
