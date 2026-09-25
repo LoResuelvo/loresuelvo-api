@@ -2,6 +2,7 @@ package operation_inbox_handler
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -45,7 +46,7 @@ func TestListRendersBoundedSummariesWithExplicitNulls(t *testing.T) {
 				ID: 56, Status: workorder.StatusAwaitingPayment, AcceptedOn: startedOn.Add(time.Hour), CompletionReportedOn: &reportedOn,
 			},
 			Consumer: ana, Provider: juan, Category: &readmodel.Category{ID: 3, Name: "Plomería"},
-			Alerts: []readmodel.Alert{}, NextActionOwner: &consumerOwner,
+			Alerts: []readmodel.Alert{}, NextActionOwner: &consumerOwner, LastBusinessAdvanceOn: &reportedOn,
 		},
 		{
 			ID: readmodel.ID{Kind: readmodel.KindJobRequest, ResourceID: 13}, StartedOn: startedOn.Add(-time.Hour),
@@ -72,13 +73,15 @@ func TestListRendersBoundedSummariesWithExplicitNulls(t *testing.T) {
 		 "work_order":{"id":56,"status":"awaiting_payment","accepted_on":"2026-09-25T16:00:00Z",
 		  "completion_reported_on":"2026-09-28T16:00:00Z","balance_paid_on":null},
 		 "consumer":{"id":7,"name":"Ana","surname":"Pérez"},"provider":{"id":8,"name":"Juan","surname":"Gómez"},
-		 "category":{"id":3,"name":"Plomería"},"alerts":[],"next_action_owner":"consumer"},
+		 "category":{"id":3,"name":"Plomería"},"alerts":[],"next_action_owner":"consumer",
+		 "last_business_advance_on":"2026-09-28T16:00:00Z","limitations":[]},
 		{"id":"jr-13","stage":"proposal_pending","started_on":"2026-09-25T14:00:00Z",
 		 "job_request":{"id":13,"status":"accepted","created_on":"2026-09-25T14:00:00Z"},
 		 "service_proposal":{"id":35,"status":"pending","created_on":"2026-09-25T14:00:00Z","scheduled_on":"2026-09-26T03:00:00Z",
 		  "estimated_duration_minutes":60,"booking_payment_deadline":"2026-09-25T03:00:00Z"},"work_order":null,
 		 "consumer":{"id":7,"name":"Ana","surname":"Pérez"},"provider":{"id":8,"name":"Juan","surname":"Gómez"},
-		 "category":null,"alerts":["booking_deadline_passed"],"next_action_owner":null}
+		 "category":null,"alerts":["booking_deadline_passed"],"next_action_owner":null,
+		 "last_business_advance_on":null,"limitations":[]}
 	],"next_cursor":null}`, response.Body.String())
 	service.AssertExpectations(t)
 }
@@ -94,14 +97,32 @@ func TestListReturnsEmptyCollection(t *testing.T) {
 	require.JSONEq(t, `{"operations":[],"next_cursor":null}`, response.Body.String())
 }
 
-func TestListRejectsUnsupportedParametersWithoutCallingService(t *testing.T) {
+func TestListFiltersByAlert(t *testing.T) {
+	stalled := readmodel.AlertStalled
 	service := new(serviceMock)
+	service.On("Query", mock.Anything, operation.InboxQuery{Filter: operation.InboxFilter{Alert: &stalled}}).
+		Return(operation.InboxPage{Operations: []readmodel.OperationSummary{}}, nil).Once()
 
 	response := httptest.NewRecorder()
-	testRouter(service).ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/admin/operations?unknown=1", nil))
+	testRouter(service).ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/admin/operations?alert=stalled", nil))
 
-	require.Equal(t, http.StatusBadRequest, response.Code)
-	service.AssertNotCalled(t, "Query", mock.Anything, mock.Anything)
+	require.Equal(t, http.StatusOK, response.Code)
+	service.AssertExpectations(t)
+}
+
+func TestListRejectsInvalidParametersWithoutCallingService(t *testing.T) {
+	for _, query := range []string{"unknown=1", "alert=", "alert=stalled&alert=delayed"} {
+		t.Run(query, func(t *testing.T) {
+			service := new(serviceMock)
+
+			response := httptest.NewRecorder()
+			testRouter(service).ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/admin/operations?"+query, nil))
+
+			require.Equal(t, http.StatusBadRequest, response.Code)
+			require.JSONEq(t, `{"error":"invalid filter"}`, response.Body.String())
+			service.AssertNotCalled(t, "Query", mock.Anything, mock.Anything)
+		})
+	}
 }
 
 func TestListHidesServiceFailures(t *testing.T) {
@@ -113,4 +134,17 @@ func TestListHidesServiceFailures(t *testing.T) {
 
 	require.Equal(t, http.StatusInternalServerError, response.Code)
 	require.JSONEq(t, `{"error":"internal server error"}`, response.Body.String())
+}
+
+func TestListRejectsFiltersTheDomainConsidersInvalid(t *testing.T) {
+	expired := readmodel.Alert("expired")
+	service := new(serviceMock)
+	service.On("Query", mock.Anything, operation.InboxQuery{Filter: operation.InboxFilter{Alert: &expired}}).
+		Return(operation.InboxPage{}, fmt.Errorf("%w: alert is invalid", operation.ErrInvalidInboxQuery)).Once()
+
+	response := httptest.NewRecorder()
+	testRouter(service).ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/admin/operations?alert=expired", nil))
+
+	require.Equal(t, http.StatusBadRequest, response.Code)
+	require.JSONEq(t, `{"error":"invalid filter"}`, response.Body.String())
 }

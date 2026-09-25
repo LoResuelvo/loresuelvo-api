@@ -23,10 +23,20 @@ func (suite *testSuite) inboxRequestLabelFor(label string) (string, error) {
 	return "", fmt.Errorf("unknown operation label %q", label)
 }
 
+// inboxOperation finds an operation by its starting label, or by the label of
+// its work order.
 func (suite *testSuite) inboxOperation(label string) (inboxOperationResponse, error) {
 	page, err := suite.decodedInboxPage()
 	if err != nil {
 		return inboxOperationResponse{}, err
+	}
+	if orderID, isOrder := suite.operationInbox.orders[label]; isOrder {
+		for _, found := range page.Operations {
+			if found.WorkOrder != nil && found.WorkOrder.ID == orderID {
+				return found, nil
+			}
+		}
+		return inboxOperationResponse{}, fmt.Errorf("the operation of work order %q is not in the inbox", label)
 	}
 	operationID, err := suite.inboxOperationID(label)
 	if err != nil {
@@ -41,10 +51,11 @@ func (suite *testSuite) inboxOperation(label string) (inboxOperationResponse, er
 }
 
 func (suite *testSuite) rawInboxOperation(label string) (map[string]json.RawMessage, error) {
-	operationID, err := suite.inboxOperationID(label)
+	found, err := suite.inboxOperation(label)
 	if err != nil {
 		return nil, err
 	}
+	operationID := found.ID
 	var page struct {
 		Operations []map[string]json.RawMessage `json:"operations"`
 	}

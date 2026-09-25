@@ -22,6 +22,15 @@ func inboxOperation(kind readmodel.Kind, resourceID int, startedOn time.Time, st
 	}
 }
 
+func inboxCriteria(limit int) operation.InboxCriteria {
+	return operation.InboxCriteria{
+		Now:                  inboxNow,
+		PendingRequestCutoff: inboxNow.Add(-24 * time.Hour),
+		StalledCutoff:        inboxNow.Add(-72 * time.Hour),
+		Limit:                limit,
+	}
+}
+
 func inboxService(reader operation.InboxReader) *operation.InboxService {
 	return operation.NewInboxService(reader, inboxFixedClock{now: inboxNow})
 }
@@ -32,7 +41,7 @@ func TestInboxServiceReadsOneLookaheadOperationAndExposesNextPosition(t *testing
 	second := inboxOperation(readmodel.KindServiceProposal, 9, inboxNow.Add(-time.Hour), readmodel.StageRequestPending)
 	third := inboxOperation(readmodel.KindJobRequest, 1, inboxNow.Add(-2*time.Hour), readmodel.StageRequestPending)
 	reader := &inboxReaderMock{}
-	reader.On("FindPage", ctx, operation.InboxCriteria{Now: inboxNow, Limit: 3}).
+	reader.On("FindPage", ctx, inboxCriteria(3)).
 		Return([]readmodel.OperationSummary{first, second, third}, nil).Once()
 
 	page, err := inboxService(reader).Query(ctx, operation.InboxQuery{Limit: 2})
@@ -47,7 +56,7 @@ func TestInboxServiceReadsOneLookaheadOperationAndExposesNextPosition(t *testing
 func TestInboxServiceUsesDefaultLimitAndReturnsNonNilEmptyPage(t *testing.T) {
 	ctx := context.Background()
 	reader := &inboxReaderMock{}
-	reader.On("FindPage", ctx, operation.InboxCriteria{Now: inboxNow, Limit: operation.DefaultInboxLimit + 1}).Return(nil, nil).Once()
+	reader.On("FindPage", ctx, inboxCriteria(operation.DefaultInboxLimit+1)).Return(nil, nil).Once()
 
 	page, err := inboxService(reader).Query(ctx, operation.InboxQuery{})
 
@@ -77,7 +86,7 @@ func TestInboxServiceDeducesNextActionOwnerFromStage(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := context.Background()
 			reader := &inboxReaderMock{}
-			reader.On("FindPage", ctx, operation.InboxCriteria{Now: inboxNow, Limit: operation.DefaultInboxLimit + 1}).
+			reader.On("FindPage", ctx, inboxCriteria(operation.DefaultInboxLimit+1)).
 				Return([]readmodel.OperationSummary{inboxOperation(readmodel.KindJobRequest, 1, inboxNow, tc.stage, tc.alerts...)}, nil).Once()
 
 			page, err := inboxService(reader).Query(ctx, operation.InboxQuery{})
@@ -101,9 +110,42 @@ func TestInboxServiceWrapsReaderFailures(t *testing.T) {
 	ctx := context.Background()
 	failure := errors.New("database unavailable")
 	reader := &inboxReaderMock{}
-	reader.On("FindPage", ctx, operation.InboxCriteria{Now: inboxNow, Limit: operation.DefaultInboxLimit + 1}).Return(nil, failure).Once()
+	reader.On("FindPage", ctx, inboxCriteria(operation.DefaultInboxLimit+1)).Return(nil, failure).Once()
 
 	_, err := inboxService(reader).Query(ctx, operation.InboxQuery{})
 
 	require.ErrorIs(t, err, failure)
+}
+
+func TestInboxServicePassesTheAlertFilterAndRejectsUnknownAlerts(t *testing.T) {
+	ctx := context.Background()
+	stalled := readmodel.AlertStalled
+	criteria := inboxCriteria(operation.DefaultInboxLimit + 1)
+	criteria.Filter = operation.InboxFilter{Alert: &stalled}
+	reader := &inboxReaderMock{}
+	reader.On("FindPage", ctx, criteria).Return(nil, nil).Once()
+
+	_, err := inboxService(reader).Query(ctx, operation.InboxQuery{Filter: operation.InboxFilter{Alert: &stalled}})
+	require.NoError(t, err)
+	reader.AssertExpectations(t)
+
+	unknown := readmodel.Alert("expired")
+	_, err = inboxService(reader).Query(ctx, operation.InboxQuery{Filter: operation.InboxFilter{Alert: &unknown}})
+	require.ErrorIs(t, err, operation.ErrInvalidInboxQuery)
+}
+
+func TestInboxServiceReportsWhyAnAcceptedRequestHasNoKnownLastAdvance(t *testing.T) {
+	ctx := context.Background()
+	advancedOn := inboxNow.Add(-time.Hour)
+	accepted := inboxOperation(readmodel.KindJobRequest, 1, inboxNow, readmodel.StageRequestAccepted)
+	pending := inboxOperation(readmodel.KindJobRequest, 2, inboxNow, readmodel.StageRequestPending)
+	pending.LastBusinessAdvanceOn = &advancedOn
+	reader := &inboxReaderMock{}
+	reader.On("FindPage", ctx, inboxCriteria(operation.DefaultInboxLimit+1)).Return([]readmodel.OperationSummary{accepted, pending}, nil).Once()
+
+	page, err := inboxService(reader).Query(ctx, operation.InboxQuery{})
+
+	require.NoError(t, err)
+	require.Equal(t, []readmodel.Limitation{readmodel.LimitationRequestAcceptanceTimeUnavailable}, page.Operations[0].Limitations)
+	require.Equal(t, []readmodel.Limitation{}, page.Operations[1].Limitations)
 }

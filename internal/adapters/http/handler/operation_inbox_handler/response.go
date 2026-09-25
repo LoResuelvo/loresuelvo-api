@@ -18,17 +18,19 @@ type pageResponse struct {
 // operationResponse is an allowlisted summary: it never carries messages,
 // attachments, credentials, biometrics or payment payloads.
 type operationResponse struct {
-	ID              string                   `json:"id"`
-	Stage           readmodel.Stage          `json:"stage"`
-	StartedOn       time.Time                `json:"started_on"`
-	JobRequest      *jobRequestResponse      `json:"job_request"`
-	ServiceProposal *serviceProposalResponse `json:"service_proposal"`
-	WorkOrder       *workOrderResponse       `json:"work_order"`
-	Consumer        partyResponse            `json:"consumer"`
-	Provider        partyResponse            `json:"provider"`
-	Category        *categoryResponse        `json:"category"`
-	Alerts          []readmodel.Alert        `json:"alerts"`
-	NextActionOwner *readmodel.Owner         `json:"next_action_owner"`
+	ID                    string                   `json:"id"`
+	Stage                 readmodel.Stage          `json:"stage"`
+	StartedOn             time.Time                `json:"started_on"`
+	JobRequest            *jobRequestResponse      `json:"job_request"`
+	ServiceProposal       *serviceProposalResponse `json:"service_proposal"`
+	WorkOrder             *workOrderResponse       `json:"work_order"`
+	Consumer              partyResponse            `json:"consumer"`
+	Provider              partyResponse            `json:"provider"`
+	Category              *categoryResponse        `json:"category"`
+	Alerts                []readmodel.Alert        `json:"alerts"`
+	NextActionOwner       *readmodel.Owner         `json:"next_action_owner"`
+	LastBusinessAdvanceOn *time.Time               `json:"last_business_advance_on"`
+	Limitations           []readmodel.Limitation   `json:"limitations"`
 }
 
 type jobRequestResponse struct {
@@ -83,13 +85,15 @@ func operationResponsesFromDomain(operations []readmodel.OperationSummary) []ope
 	responses := make([]operationResponse, 0, len(operations))
 	for _, found := range operations {
 		response := operationResponse{
-			ID:              operationID(found.ID),
-			Stage:           found.Stage,
-			StartedOn:       found.StartedOn.UTC(),
-			Consumer:        partyResponse{ID: found.Consumer.ID, Name: found.Consumer.Name, Surname: found.Consumer.Surname},
-			Provider:        partyResponse{ID: found.Provider.ID, Name: found.Provider.Name, Surname: found.Provider.Surname},
-			Alerts:          append([]readmodel.Alert{}, found.Alerts...),
-			NextActionOwner: found.NextActionOwner,
+			ID:                    operationID(found.ID),
+			Stage:                 found.Stage,
+			StartedOn:             found.StartedOn.UTC(),
+			Consumer:              partyResponse{ID: found.Consumer.ID, Name: found.Consumer.Name, Surname: found.Consumer.Surname},
+			Provider:              partyResponse{ID: found.Provider.ID, Name: found.Provider.Name, Surname: found.Provider.Surname},
+			Alerts:                append([]readmodel.Alert{}, found.Alerts...),
+			NextActionOwner:       found.NextActionOwner,
+			LastBusinessAdvanceOn: optionalUTC(found.LastBusinessAdvanceOn),
+			Limitations:           append([]readmodel.Limitation{}, found.Limitations...),
 		}
 		if request := found.JobRequest; request != nil {
 			response.JobRequest = &jobRequestResponse{ID: request.ID, Status: request.Status, CreatedOn: request.CreatedOn.UTC()}

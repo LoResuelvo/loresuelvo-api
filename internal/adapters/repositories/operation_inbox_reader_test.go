@@ -40,16 +40,20 @@ func (fixture operationInboxFixture) jobRequest(t *testing.T, consumerID, provid
 
 func (fixture operationInboxFixture) proposal(t *testing.T, request jobrequest.JobRequest, createdOn time.Time, status serviceproposal.Status) int {
 	t.Helper()
-	scheduledOn := createdOn.Add(72 * time.Hour)
+	return fixture.scheduledProposal(t, request, createdOn, createdOn.Add(72*time.Hour), 60, status)
+}
+
+func (fixture operationInboxFixture) scheduledProposal(t *testing.T, request jobrequest.JobRequest, createdOn, scheduledOn time.Time, durationMinutes int, status serviceproposal.Status) int {
+	t.Helper()
 	var id int
 	err := fixture.testContext.database.QueryRow(
 		`INSERT INTO service_proposals (consumer_id, provider_id, conversation_id, amount_cents, scheduled_on, description, status,
 			created_on, updated_on, currency, deposit_cents, platform_fee_total_cents, platform_fee_due_now_cents,
 			booking_payment_deadline, estimated_duration_minutes)
-		VALUES ($1, $2, $3, 100000, $4, 'Reparación', $5, $6, $6, 'ARS', 20000, 5000, 1000, $7, 60)
+		VALUES ($1, $2, $3, 100000, $4, 'Reparación', $5, $6, $6, 'ARS', 20000, 5000, 1000, $7, $8)
 		RETURNING id`,
 		request.ConsumerID, request.ProviderID, request.ConversationID, scheduledOn.UTC(), status, createdOn.UTC(),
-		scheduledOn.Add(-24*time.Hour).UTC(),
+		scheduledOn.Add(-24*time.Hour).UTC(), durationMinutes,
 	).Scan(&id)
 	require.NoError(t, err)
 	return id
@@ -67,7 +71,13 @@ func (fixture operationInboxFixture) workOrder(t *testing.T, proposalID int, acc
 }
 
 func operationInboxCriteria(limit int) operation.InboxCriteria {
-	return operation.InboxCriteria{Now: time.Date(2026, 9, 25, 15, 0, 0, 0, time.UTC), Limit: limit}
+	now := time.Date(2026, 9, 25, 15, 0, 0, 0, time.UTC)
+	return operation.InboxCriteria{
+		Now:                  now,
+		PendingRequestCutoff: now.Add(-operation.RequestResponseWindow),
+		StalledCutoff:        now.Add(-operation.StallThreshold),
+		Limit:                limit,
+	}
 }
 
 type operationInboxRow struct {
@@ -95,6 +105,15 @@ func operationInboxRows(operations []readmodel.OperationSummary) []operationInbo
 		rows = append(rows, row)
 	}
 	return rows
+}
+
+func (fixture operationInboxFixture) completionReport(t *testing.T, workOrderID int, reportedOn time.Time) {
+	t.Helper()
+	_, err := fixture.testContext.database.Exec(
+		`INSERT INTO work_order_completion_reports (work_order_id, description, reported_on) VALUES ($1, 'Trabajo terminado', $2)`,
+		workOrderID, reportedOn.UTC(),
+	)
+	require.NoError(t, err)
 }
 
 func TestOperationInboxReaderGroupsResourcesIntoOperationsNewestFirst(t *testing.T) {
@@ -147,7 +166,8 @@ func TestOperationInboxReaderSummarizesPartiesCategoryAndDates(t *testing.T) {
 		ScheduledOn: base.Add(96 * time.Hour), EstimatedDurationMinutes: 60, BookingPaymentDeadline: base.Add(72 * time.Hour),
 	}, found.ServiceProposal)
 	assert.Equal(t, &readmodel.WorkOrder{ID: orderID, Status: workorder.StatusScheduled, AcceptedOn: base.Add(48 * time.Hour)}, found.WorkOrder)
-	assert.Equal(t, []readmodel.Alert{}, found.Alerts)
+	assert.Equal(t, base.Add(48*time.Hour), *found.LastBusinessAdvanceOn)
+	assert.Equal(t, []readmodel.Alert{readmodel.AlertDelayed}, found.Alerts)
 }
 
 func TestOperationInboxReaderFlagsPendingProposalsThatReachedTheirBookingDeadline(t *testing.T) {
@@ -210,4 +230,60 @@ func TestOperationInboxReaderReturnsNonNilEmptyPage(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotNil(t, operations)
 	assert.Empty(t, operations)
+}
+
+func TestOperationInboxReaderDerivesAlertsAndLastBusinessAdvanceAtTheirExactBoundaries(t *testing.T) {
+	fixture := newOperationInboxFixture(t)
+	juan := savedProviderIDWithData(t, fixture.testContext, "auth0|inbox-juan", "inbox.juan@example.com", "Juan", "Gomez", "Plomeria")
+	criteria := operationInboxCriteria(20)
+	now := criteria.Now
+	consumers := 0
+	request := func(createdOn time.Time, status jobrequest.Status) jobrequest.JobRequest {
+		consumers++
+		email := fmt.Sprintf("inbox.alert%d@example.com", consumers)
+		consumerID := savedConsumerIDWithData(t, fixture.testContext, "auth0|"+email, email, "Consumer", "Alert")
+		return fixture.jobRequest(t, consumerID, juan, createdOn, status)
+	}
+	unansweredForExactly24h := request(now.Add(-24*time.Hour), jobrequest.StatusPending)
+	unansweredForMore := request(now.Add(-24*time.Hour-time.Second), jobrequest.StatusPending)
+	acceptedWithoutProposals := request(now.Add(-240*time.Hour), jobrequest.StatusAccepted)
+	endingNow := request(now.Add(-240*time.Hour), jobrequest.StatusAccepted)
+	endingNowOrder := fixture.workOrder(t, fixture.scheduledProposal(t, endingNow, now.Add(-200*time.Hour), now.Add(-2*time.Hour), 120, serviceproposal.StatusAccepted), now.Add(-100*time.Hour), workorder.StatusScheduled)
+	endedMinuteAgo := request(now.Add(-240*time.Hour), jobrequest.StatusAccepted)
+	fixture.workOrder(t, fixture.scheduledProposal(t, endedMinuteAgo, now.Add(-200*time.Hour), now.Add(-2*time.Hour), 119, serviceproposal.StatusAccepted), now.Add(-100*time.Hour), workorder.StatusScheduled)
+	awaitingBalance := request(now.Add(-240*time.Hour), jobrequest.StatusAccepted)
+	awaitingOrder := fixture.workOrder(t, fixture.scheduledProposal(t, awaitingBalance, now.Add(-200*time.Hour), now.Add(-100*time.Hour), 60, serviceproposal.StatusAccepted), now.Add(-150*time.Hour), workorder.StatusAwaitingPayment)
+	fixture.completionReport(t, awaitingOrder, now.Add(-73*time.Hour))
+	idleProposal := request(now.Add(-240*time.Hour), jobrequest.StatusAccepted)
+	fixture.proposal(t, idleProposal, now.Add(-72*time.Hour-time.Minute), serviceproposal.StatusPending)
+
+	reader := repositories.NewOperationInboxReader(fixture.testContext.database)
+	operations, err := reader.FindPage(context.Background(), criteria)
+
+	require.NoError(t, err)
+	byRequest := map[int]readmodel.OperationSummary{}
+	for _, found := range operations {
+		byRequest[found.JobRequest.ID] = found
+	}
+	assert.Equal(t, []readmodel.Alert{}, byRequest[unansweredForExactly24h.ID].Alerts)
+	assert.Equal(t, now.Add(-24*time.Hour), *byRequest[unansweredForExactly24h.ID].LastBusinessAdvanceOn)
+	assert.Equal(t, []readmodel.Alert{readmodel.AlertRequestPendingOver24h}, byRequest[unansweredForMore.ID].Alerts)
+	assert.Equal(t, []readmodel.Alert{}, byRequest[acceptedWithoutProposals.ID].Alerts)
+	assert.Nil(t, byRequest[acceptedWithoutProposals.ID].LastBusinessAdvanceOn)
+	assert.Equal(t, []readmodel.Alert{}, byRequest[endingNow.ID].Alerts)
+	assert.Equal(t, endingNowOrder, byRequest[endingNow.ID].WorkOrder.ID)
+	assert.Equal(t, []readmodel.Alert{readmodel.AlertDelayed}, byRequest[endedMinuteAgo.ID].Alerts)
+	assert.Equal(t, []readmodel.Alert{readmodel.AlertStalled}, byRequest[awaitingBalance.ID].Alerts)
+	assert.Equal(t, now.Add(-73*time.Hour), *byRequest[awaitingBalance.ID].LastBusinessAdvanceOn)
+	assert.Equal(t, []readmodel.Alert{readmodel.AlertBookingDeadlinePassed, readmodel.AlertStalled}, byRequest[idleProposal.ID].Alerts)
+
+	stalled := readmodel.AlertStalled
+	criteria.Filter = operation.InboxFilter{Alert: &stalled}
+	filtered, err := reader.FindPage(context.Background(), criteria)
+	require.NoError(t, err)
+	filteredRequests := []int{}
+	for _, found := range filtered {
+		filteredRequests = append(filteredRequests, found.JobRequest.ID)
+	}
+	assert.ElementsMatch(t, []int{awaitingBalance.ID, idleProposal.ID}, filteredRequests)
 }

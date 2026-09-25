@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"strings"
 	"time"
 
 	jobrequest "github.com/LoResuelvo/loresuelvo-api/internal/domain/job_request"
@@ -16,8 +17,12 @@ import (
 // operationInboxSQL groups hiring resources into operations: a job request
 // continues through the first proposal of its conversation, and every other
 // proposal starts its own operation. Work orders and completion reports are
-// 1:1 with their parents, so no join multiplies an operation. $1 is the
-// evaluation instant of derived alerts.
+// 1:1 with their parents, so no join multiplies an operation.
+//
+// Stage, last business advance and alerts are derived once, in "derived", and
+// both returned and filtered from there. $1 is the evaluation instant, $2 the
+// cutoff of unanswered requests and $3 the cutoff of stalled operations.
+// Messages never count as business advances.
 const operationInboxSQL = `WITH first_proposals AS (
 	SELECT DISTINCT ON (conversation_id) conversation_id, id
 	FROM service_proposals
@@ -34,33 +39,71 @@ operations AS (
 	LEFT JOIN job_requests jr ON jr.conversation_id = sp.conversation_id
 	LEFT JOIN first_proposals fp ON fp.conversation_id = sp.conversation_id
 	WHERE jr.id IS NULL OR fp.id <> sp.id
+),
+resources AS (
+	SELECT o.kind, o.resource_id, o.started_on,
+		CASE
+			WHEN wo.id IS NOT NULL THEN 'work_order_' || wo.status
+			WHEN sp.id IS NOT NULL THEN 'proposal_' || sp.status
+			ELSE 'request_' || jr.status
+		END AS stage,
+		jr.id AS job_request_id, jr.status AS job_request_status, jr.created_on AS job_request_created_on,
+		sp.id AS proposal_id, sp.status AS proposal_status, sp.created_on AS proposal_created_on,
+		sp.scheduled_on, sp.estimated_duration_minutes, sp.booking_payment_deadline,
+		wo.id AS work_order_id, wo.status AS work_order_status, wo.accepted_on, report.reported_on, wo.paid_on,
+		COALESCE(sp.consumer_id, jr.consumer_id) AS consumer_id,
+		COALESCE(sp.provider_id, jr.provider_id) AS provider_id
+	FROM operations o
+	LEFT JOIN job_requests jr ON jr.id = o.job_request_id
+	LEFT JOIN service_proposals sp ON sp.id = o.service_proposal_id
+	LEFT JOIN work_orders wo ON wo.service_proposal_id = sp.id
+	LEFT JOIN work_order_completion_reports report ON report.work_order_id = wo.id
+),
+advanced AS (
+	SELECT r.*,
+		CASE r.stage
+			WHEN 'request_pending' THEN r.job_request_created_on
+			WHEN 'request_accepted' THEN NULL
+			WHEN 'work_order_scheduled' THEN r.accepted_on
+			WHEN 'work_order_awaiting_payment' THEN r.reported_on
+			WHEN 'work_order_paid' THEN r.paid_on
+			ELSE r.proposal_created_on
+		END AS last_business_advance_on
+	FROM resources r
+),
+derived AS (
+	SELECT a.*, array_remove(ARRAY[
+		CASE WHEN a.stage = 'request_pending' AND a.job_request_created_on < $2::timestamp
+			THEN 'request_pending_over_24h' END,
+		CASE WHEN a.stage = 'proposal_pending' AND a.booking_payment_deadline <= $1::timestamp
+			THEN 'booking_deadline_passed' END,
+		CASE WHEN a.stage = 'work_order_scheduled'
+				AND a.scheduled_on + make_interval(mins => a.estimated_duration_minutes) < $1::timestamp
+			THEN 'delayed' END,
+		CASE WHEN a.stage IN ('request_pending', 'proposal_pending', 'work_order_awaiting_payment')
+				AND a.last_business_advance_on < $3::timestamp
+			THEN 'stalled' END
+	], NULL) AS alerts
+	FROM advanced a
 )
-SELECT o.kind, o.resource_id, o.started_on,
-	CASE
-		WHEN wo.id IS NOT NULL THEN 'work_order_' || wo.status
-		WHEN sp.id IS NOT NULL THEN 'proposal_' || sp.status
-		ELSE 'request_' || jr.status
-	END,
-	jr.id, jr.status, jr.created_on,
-	sp.id, sp.status, sp.created_on, sp.scheduled_on, sp.estimated_duration_minutes, sp.booking_payment_deadline,
-	wo.id, wo.status, wo.accepted_on, report.reported_on, wo.paid_on,
+SELECT d.kind, d.resource_id, d.started_on, d.stage,
+	d.job_request_id, d.job_request_status, d.job_request_created_on,
+	d.proposal_id, d.proposal_status, d.proposal_created_on, d.scheduled_on, d.estimated_duration_minutes, d.booking_payment_deadline,
+	d.work_order_id, d.work_order_status, d.accepted_on, d.reported_on, d.paid_on,
 	consumer_user.id, consumer_user.name, consumer_user.surname,
 	provider_user.id, provider_user.name, provider_user.surname,
 	categories.id, categories.name,
-	(wo.id IS NULL AND sp.status = 'pending' AND sp.booking_payment_deadline <= $1::timestamp)
-FROM operations o
-LEFT JOIN job_requests jr ON jr.id = o.job_request_id
-LEFT JOIN service_proposals sp ON sp.id = o.service_proposal_id
-LEFT JOIN work_orders wo ON wo.service_proposal_id = sp.id
-LEFT JOIN work_order_completion_reports report ON report.work_order_id = wo.id
-INNER JOIN users consumer_user ON consumer_user.id = COALESCE(sp.consumer_id, jr.consumer_id)
-INNER JOIN users provider_user ON provider_user.id = COALESCE(sp.provider_id, jr.provider_id)
+	array_to_string(d.alerts, ','), d.last_business_advance_on
+FROM derived d
+INNER JOIN users consumer_user ON consumer_user.id = d.consumer_id
+INNER JOIN users provider_user ON provider_user.id = d.provider_id
 INNER JOIN providers ON providers.user_id = provider_user.id
 LEFT JOIN categories ON categories.id = providers.category_id
-WHERE ($2::timestamp IS NULL
-	OR (o.started_on, o.kind, o.resource_id) < ($2::timestamp, $3::text, $4::integer))
-ORDER BY o.started_on DESC, o.kind DESC, o.resource_id DESC
-LIMIT $5`
+WHERE ($4::text IS NULL OR $4::text = ANY(d.alerts))
+	AND ($5::timestamp IS NULL
+		OR (d.started_on, d.kind, d.resource_id) < ($5::timestamp, $6::text, $7::integer))
+ORDER BY d.started_on DESC, d.kind DESC, d.resource_id DESC
+LIMIT $8`
 
 type OperationInboxReader struct {
 	db *sql.DB
@@ -77,8 +120,13 @@ func (reader *OperationInboxReader) FindPage(ctx context.Context, criteria opera
 		afterKind = string(criteria.After.ID.Kind)
 		afterResourceID = criteria.After.ID.ResourceID
 	}
+	var alert any
+	if criteria.Filter.Alert != nil {
+		alert = string(*criteria.Filter.Alert)
+	}
 	rows, err := reader.db.QueryContext(ctx, operationInboxSQL,
-		criteria.Now.UTC(), afterStartedOn, afterKind, afterResourceID, criteria.Limit,
+		criteria.Now.UTC(), criteria.PendingRequestCutoff.UTC(), criteria.StalledCutoff.UTC(), alert,
+		afterStartedOn, afterKind, afterResourceID, criteria.Limit,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("querying operations inbox: %w", err)
@@ -105,8 +153,8 @@ func scanOperationSummary(rows *sql.Rows) (readmodel.OperationSummary, error) {
 	var jobRequestID, proposalID, proposalDuration, workOrderID, categoryID sql.NullInt64
 	var jobRequestStatus, proposalStatus, workOrderStatus, categoryName sql.NullString
 	var jobRequestCreatedOn, proposalCreatedOn, proposalScheduledOn, bookingDeadline sql.NullTime
-	var acceptedOn, reportedOn, paidOn sql.NullTime
-	var bookingDeadlinePassed sql.NullBool
+	var acceptedOn, reportedOn, paidOn, lastBusinessAdvanceOn sql.NullTime
+	var alerts string
 	if err := rows.Scan(
 		&kind, &found.ID.ResourceID, &found.StartedOn, &stage,
 		&jobRequestID, &jobRequestStatus, &jobRequestCreatedOn,
@@ -115,7 +163,7 @@ func scanOperationSummary(rows *sql.Rows) (readmodel.OperationSummary, error) {
 		&found.Consumer.ID, &found.Consumer.Name, &found.Consumer.Surname,
 		&found.Provider.ID, &found.Provider.Name, &found.Provider.Surname,
 		&categoryID, &categoryName,
-		&bookingDeadlinePassed,
+		&alerts, &lastBusinessAdvanceOn,
 	); err != nil {
 		return readmodel.OperationSummary{}, fmt.Errorf("scanning operations inbox: %w", err)
 	}
@@ -145,9 +193,12 @@ func scanOperationSummary(rows *sql.Rows) (readmodel.OperationSummary, error) {
 		found.Category = &readmodel.Category{ID: int(categoryID.Int64), Name: categoryName.String}
 	}
 	found.Alerts = []readmodel.Alert{}
-	if bookingDeadlinePassed.Bool {
-		found.Alerts = append(found.Alerts, readmodel.AlertBookingDeadlinePassed)
+	if alerts != "" {
+		for _, alert := range strings.Split(alerts, ",") {
+			found.Alerts = append(found.Alerts, readmodel.Alert(alert))
+		}
 	}
+	found.LastBusinessAdvanceOn = optionalUTC(lastBusinessAdvanceOn)
 	return found, nil
 }
 

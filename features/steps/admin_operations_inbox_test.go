@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"sort"
 	"strconv"
 	"strings"
@@ -50,17 +51,19 @@ type inboxPageResponse struct {
 }
 
 type inboxOperationResponse struct {
-	ID              string                 `json:"id"`
-	Stage           string                 `json:"stage"`
-	StartedOn       time.Time              `json:"started_on"`
-	JobRequest      *inboxResourceResponse `json:"job_request"`
-	ServiceProposal *inboxResourceResponse `json:"service_proposal"`
-	WorkOrder       *inboxResourceResponse `json:"work_order"`
-	Consumer        inboxPartyResponse     `json:"consumer"`
-	Provider        inboxPartyResponse     `json:"provider"`
-	Category        *inboxCategoryResponse `json:"category"`
-	Alerts          []string               `json:"alerts"`
-	NextActionOwner *string                `json:"next_action_owner"`
+	ID                    string                 `json:"id"`
+	Stage                 string                 `json:"stage"`
+	StartedOn             time.Time              `json:"started_on"`
+	JobRequest            *inboxResourceResponse `json:"job_request"`
+	ServiceProposal       *inboxResourceResponse `json:"service_proposal"`
+	WorkOrder             *inboxResourceResponse `json:"work_order"`
+	Consumer              inboxPartyResponse     `json:"consumer"`
+	Provider              inboxPartyResponse     `json:"provider"`
+	Category              *inboxCategoryResponse `json:"category"`
+	Alerts                []string               `json:"alerts"`
+	NextActionOwner       *string                `json:"next_action_owner"`
+	LastBusinessAdvanceOn *time.Time             `json:"last_business_advance_on"`
+	Limitations           []string               `json:"limitations"`
 }
 
 type inboxResourceResponse struct {
@@ -88,7 +91,8 @@ type inboxCategoryResponse struct {
 // inboxAllowedFields is the exact allowlist of the operation summary; any
 // other key would expose data the inbox must not carry.
 var inboxAllowedFields = map[string][]string{
-	"operation":        {"id", "stage", "started_on", "job_request", "service_proposal", "work_order", "consumer", "provider", "category", "alerts", "next_action_owner"},
+	"operation": {"id", "stage", "started_on", "job_request", "service_proposal", "work_order", "consumer", "provider", "category",
+		"alerts", "next_action_owner", "last_business_advance_on", "limitations"},
 	"job_request":      {"id", "status", "created_on"},
 	"service_proposal": {"id", "status", "created_on", "scheduled_on", "estimated_duration_minutes", "booking_payment_deadline"},
 	"work_order":       {"id", "status", "accepted_on", "completion_reported_on", "balance_paid_on"},
@@ -517,12 +521,16 @@ func (suite *testSuite) thereAreNoInboxJobRequests() error {
 }
 
 func (suite *testSuite) queryOperationsInbox() error {
+	return suite.queryOperationsInboxWith(nil)
+}
+
+func (suite *testSuite) queryOperationsInboxWith(query url.Values) error {
 	watermark, err := suite.dependencies.Persistence.AuditEventRepository.CaptureWatermark(suite.scenarioContext)
 	if err != nil {
 		return fmt.Errorf("capturing audit ingest watermark: %w", err)
 	}
 	suite.operationInbox.auditWatermark = &watermark
-	return suite.sendAdminGet(operationsInboxPath, nil, "")
+	return suite.sendAdminGet(operationsInboxPath, query, "")
 }
 
 func (suite *testSuite) decodedInboxPage() (inboxPageResponse, error) {

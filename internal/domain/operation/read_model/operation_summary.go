@@ -42,9 +42,28 @@ const (
 type Alert string
 
 const (
+	// AlertRequestPendingOver24h marks a job request still awaiting the
+	// provider's answer more than 24 hours after it was created.
+	AlertRequestPendingOver24h Alert = "request_pending_over_24h"
 	// AlertBookingDeadlinePassed marks a pending proposal whose booking deposit
 	// can no longer be paid.
 	AlertBookingDeadlinePassed Alert = "booking_deadline_passed"
+	// AlertDelayed marks a scheduled work order whose expected end has passed
+	// without a completion report. It does not prove the provider missed it.
+	AlertDelayed Alert = "delayed"
+	// AlertStalled marks an operation awaiting a party whose last business
+	// advance is more than 72 hours old. Messages are not business advances.
+	AlertStalled Alert = "stalled"
+)
+
+// Limitation explains why a derived value could not be established.
+type Limitation string
+
+const (
+	// LimitationRequestAcceptanceTimeUnavailable: job requests do not record
+	// when they were accepted, so an accepted request without proposals has no
+	// known last business advance.
+	LimitationRequestAcceptanceTimeUnavailable Limitation = "request_acceptance_time_unavailable"
 )
 
 // Owner is who must act next. OwnerNone means the operation needs no further
@@ -105,6 +124,9 @@ type OperationSummary struct {
 	Category        *Category
 	Alerts          []Alert
 	NextActionOwner *Owner
+	// LastBusinessAdvanceOn is nil when no business timestamp establishes it.
+	LastBusinessAdvanceOn *time.Time
+	Limitations           []Limitation
 }
 
 func (summary OperationSummary) HasAlert(alert Alert) bool {
