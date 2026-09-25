@@ -126,7 +126,7 @@ services:
       - ./openapi.json:/spec/openapi.json:ro
 
   minio:
-    image: quay.io/minio/minio:latest
+    image: pgsty/minio:RELEASE.2026-08-04T00-00-00Z
     command: server /data --address ":${MINIO_API_PORT:-9000}" --console-address ":${MINIO_CONSOLE_PORT:-9001}"
     environment:
       MINIO_ROOT_USER: "loresuelvo-local"
@@ -150,7 +150,7 @@ services:
           - minio.localhost
 
   minio-init:
-    image: quay.io/minio/mc:latest
+    image: pgsty/mc:RELEASE.2026-09-16T00-00-00Z
     depends_on:
       minio:
         condition: service_healthy
@@ -187,7 +187,7 @@ services:
       - up
 
   seed-assets:
-    image: quay.io/minio/mc:latest
+    image: pgsty/mc:RELEASE.2026-09-16T00-00-00Z
     depends_on:
       minio-init:
         condition: service_completed_successfully
@@ -215,7 +215,7 @@ services:
           - seed-assets.localhost
 
   minio-clean-tests:
-    image: quay.io/minio/mc:latest
+    image: pgsty/mc:RELEASE.2026-09-16T00-00-00Z
     depends_on:
       minio:
         condition: service_healthy
