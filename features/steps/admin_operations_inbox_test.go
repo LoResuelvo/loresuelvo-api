@@ -29,6 +29,7 @@ type operationInboxState struct {
 	orders           map[string]int
 	recordedIDs      map[string]string
 	acceptedProposal map[string]bool
+	auditWatermark   *int64
 }
 
 type inboxJobRequestFixture struct {
@@ -55,12 +56,51 @@ type inboxOperationResponse struct {
 	JobRequest      *inboxResourceResponse `json:"job_request"`
 	ServiceProposal *inboxResourceResponse `json:"service_proposal"`
 	WorkOrder       *inboxResourceResponse `json:"work_order"`
+	Consumer        inboxPartyResponse     `json:"consumer"`
+	Provider        inboxPartyResponse     `json:"provider"`
+	Category        *inboxCategoryResponse `json:"category"`
+	Alerts          []string               `json:"alerts"`
+	NextActionOwner *string                `json:"next_action_owner"`
 }
 
 type inboxResourceResponse struct {
-	ID     int    `json:"id"`
-	Status string `json:"status"`
+	ID                       int        `json:"id"`
+	Status                   string     `json:"status"`
+	CreatedOn                *time.Time `json:"created_on"`
+	ScheduledOn              *time.Time `json:"scheduled_on"`
+	AcceptedOn               *time.Time `json:"accepted_on"`
+	CompletionReportedOn     *time.Time `json:"completion_reported_on"`
+	BalancePaidOn            *time.Time `json:"balance_paid_on"`
+	EstimatedDurationMinutes int        `json:"estimated_duration_minutes"`
 }
+
+type inboxPartyResponse struct {
+	ID      int    `json:"id"`
+	Name    string `json:"name"`
+	Surname string `json:"surname"`
+}
+
+type inboxCategoryResponse struct {
+	ID   int    `json:"id"`
+	Name string `json:"name"`
+}
+
+// inboxAllowedFields is the exact allowlist of the operation summary; any
+// other key would expose data the inbox must not carry.
+var inboxAllowedFields = map[string][]string{
+	"operation":        {"id", "stage", "started_on", "job_request", "service_proposal", "work_order", "consumer", "provider", "category", "alerts", "next_action_owner"},
+	"job_request":      {"id", "status", "created_on"},
+	"service_proposal": {"id", "status", "created_on", "scheduled_on", "estimated_duration_minutes", "booking_payment_deadline"},
+	"work_order":       {"id", "status", "accepted_on", "completion_reported_on", "balance_paid_on"},
+	"consumer":         {"id", "name", "surname"},
+	"provider":         {"id", "name", "surname"},
+	"category":         {"id", "name"},
+}
+
+const (
+	inboxPrivateMessage              = "Mensaje privado de la conversación"
+	inboxCompletionDescriptionPrefix = "Evidencia privada de finalización"
+)
 
 func registerAdminOperationsInboxSteps(sc *godog.ScenarioContext, suite *testSuite) {
 	sc.Step(`^que existen las siguientes solicitudes de trabajo:$`, suite.thereAreInboxJobRequests)
@@ -77,6 +117,17 @@ func registerAdminOperationsInboxSteps(sc *godog.ScenarioContext, suite *testSui
 	sc.Step(`^la operación "([^"]*)" conserva el identificador registrado$`, suite.inboxOperationKeepsRecordedID)
 	sc.Step(`^las operaciones "([^"]*)" y "([^"]*)" tienen identificadores distintos$`, suite.inboxOperationsHaveDistinctIDs)
 	sc.Step(`^la respuesta no contiene operaciones$`, suite.inboxErrorResponseHasNoOperations)
+	sc.Step(`^que "([^"]*)" tiene una imagen adjunta$`, suite.inboxConversationHasImageAttachment)
+	sc.Step(`^que la conversación de "([^"]*)" tiene mensajes entre "([^"]*)" y "([^"]*)"$`, suite.inboxConversationHasMessagesBetween)
+	sc.Step(`^la operación "([^"]*)" informa al consumidor "([^"]*)" y al prestador "([^"]*)" con sus identificadores$`, suite.inboxOperationInformsParties)
+	sc.Step(`^la operación "([^"]*)" informa el rubro "([^"]*)"$`, suite.inboxOperationInformsCategory)
+	sc.Step(`^la operación "([^"]*)" informa los estados de dominio "([^"]*)" de la solicitud, "([^"]*)" de la propuesta y "([^"]*)" de la orden$`, suite.inboxOperationInformsDomainStatuses)
+	sc.Step(`^la operación "([^"]*)" informa las siguientes fechas con zona horaria explícita:$`, suite.inboxOperationInformsDates)
+	sc.Step(`^la operación "([^"]*)" informa explícitamente como nula la fecha de pago del saldo$`, suite.inboxOperationHasNullBalancePayment)
+	sc.Step(`^la respuesta no expone mensajes, extractos del chat, adjuntos, credenciales, biometría ni payloads de pagos$`, suite.inboxResponseIsMinimized)
+	sc.Step(`^no se registra ningún evento de auditoría$`, suite.noAuditEventIsRecorded)
+	sc.Step(`^que existe una operación entre "([^"]*)" y "([^"]*)" con (.+)$`, suite.thereIsInboxOperationInSituation)
+	sc.Step(`^la operación entre "([^"]*)" y "([^"]*)" informa que el responsable de la siguiente acción es (.+)$`, suite.inboxOperationBetweenHasNextActionOwner)
 }
 
 func (state *operationInboxState) ensureMaps() {
@@ -397,7 +448,7 @@ func (suite *testSuite) reportInboxWorkOrderCompletion(label string, order *work
 	if err := suite.uploadAndConfirmCompletionImage(imageName); err != nil {
 		return fmt.Errorf("preparing completion image of %q: %w", label, err)
 	}
-	report, err := workorder.NewCompletionReport("Trabajo "+label+" finalizado", []string{suite.completionImagesByName[imageName].FileID}, reportedOn)
+	report, err := workorder.NewCompletionReport(inboxCompletionDescriptionPrefix+" "+label, []string{suite.completionImagesByName[imageName].FileID}, reportedOn)
 	if err != nil {
 		return err
 	}
@@ -466,6 +517,11 @@ func (suite *testSuite) thereAreNoInboxJobRequests() error {
 }
 
 func (suite *testSuite) queryOperationsInbox() error {
+	watermark, err := suite.dependencies.Persistence.AuditEventRepository.CaptureWatermark(suite.scenarioContext)
+	if err != nil {
+		return fmt.Errorf("capturing audit ingest watermark: %w", err)
+	}
+	suite.operationInbox.auditWatermark = &watermark
 	return suite.sendAdminGet(operationsInboxPath, nil, "")
 }
 

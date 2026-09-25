@@ -118,13 +118,13 @@ func (client *CheckoutClient) CreateCheckout(
 		PaymentMethods: &preference.PaymentMethodsRequest{
 			ExcludedPaymentTypes: []preference.ExcludedPaymentTypeRequest{{ID: "ticket"}},
 		},
-		ExternalReference:  checkoutRequest.ExternalReference,
-		NotificationURL:    client.config.NotificationURL,
-		MarketplaceFee:     sdkAmountFromCents(checkoutRequest.PlatformFeeCents),
-		AutoReturn:       "approved",
-		BinaryMode:       false,
-		Expires:          true,
-		ExpirationDateTo: &checkoutRequest.ExpiresOn,
+		ExternalReference: checkoutRequest.ExternalReference,
+		NotificationURL:   client.config.NotificationURL,
+		MarketplaceFee:    sdkAmountFromCents(checkoutRequest.PlatformFeeCents),
+		AutoReturn:        "approved",
+		BinaryMode:        false,
+		Expires:           true,
+		ExpirationDateTo:  &checkoutRequest.ExpiresOn,
 	}
 	preferenceClient, err := client.preferenceClientFactory(accessToken)
 	if err != nil {

@@ -10,9 +10,9 @@ import (
 const defaultPresignExpiration = 10 * time.Minute
 
 type Config struct {
-	Environment       string
-	Provider          string
-	Endpoint          string
+	Environment string
+	Provider    string
+	Endpoint    string
 	// PresignEndpoint is the host the presigned S3 URLs are signed
 	// against. When empty, the presign client uses [Endpoint]
 	// (which works when the API container and the storage live on

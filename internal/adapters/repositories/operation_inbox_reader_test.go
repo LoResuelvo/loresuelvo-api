@@ -2,6 +2,7 @@ package repositories_test
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -65,6 +66,37 @@ func (fixture operationInboxFixture) workOrder(t *testing.T, proposalID int, acc
 	return id
 }
 
+func operationInboxCriteria(limit int) operation.InboxCriteria {
+	return operation.InboxCriteria{Now: time.Date(2026, 9, 25, 15, 0, 0, 0, time.UTC), Limit: limit}
+}
+
+type operationInboxRow struct {
+	ID           readmodel.ID
+	Stage        readmodel.Stage
+	JobRequestID *int
+	ProposalID   *int
+	WorkOrderID  *int
+	StartedOn    time.Time
+}
+
+func operationInboxRows(operations []readmodel.OperationSummary) []operationInboxRow {
+	rows := make([]operationInboxRow, 0, len(operations))
+	for _, found := range operations {
+		row := operationInboxRow{ID: found.ID, Stage: found.Stage, StartedOn: found.StartedOn}
+		if found.JobRequest != nil {
+			row.JobRequestID = &found.JobRequest.ID
+		}
+		if found.ServiceProposal != nil {
+			row.ProposalID = &found.ServiceProposal.ID
+		}
+		if found.WorkOrder != nil {
+			row.WorkOrderID = &found.WorkOrder.ID
+		}
+		rows = append(rows, row)
+	}
+	return rows
+}
+
 func TestOperationInboxReaderGroupsResourcesIntoOperationsNewestFirst(t *testing.T) {
 	fixture := newOperationInboxFixture(t)
 	ana := savedConsumerIDWithData(t, fixture.testContext, "auth0|inbox-ana", "inbox.ana@example.com", "Ana", "Perez")
@@ -78,29 +110,74 @@ func TestOperationInboxReaderGroupsResourcesIntoOperationsNewestFirst(t *testing
 	laterProposal := fixture.proposal(t, hired, base.Add(3*time.Hour), serviceproposal.StatusPending)
 	pending := fixture.jobRequest(t, ana, pedro, base.Add(-time.Hour), jobrequest.StatusPending)
 
-	operations, err := repositories.NewOperationInboxReader(fixture.testContext.database).FindPage(context.Background(), nil, 10)
+	operations, err := repositories.NewOperationInboxReader(fixture.testContext.database).FindPage(context.Background(), operationInboxCriteria(10))
 
 	require.NoError(t, err)
-	require.Equal(t, []readmodel.OperationSummary{
-		{
-			ID: readmodel.ID{Kind: readmodel.KindServiceProposal, ResourceID: laterProposal}, StartedOn: base.Add(3 * time.Hour),
-			Stage:           readmodel.StageProposalPending,
-			JobRequest:      &readmodel.JobRequest{ID: hired.ID, Status: jobrequest.StatusAccepted},
-			ServiceProposal: &readmodel.ServiceProposal{ID: laterProposal, Status: serviceproposal.StatusPending},
-		},
-		{
-			ID: readmodel.ID{Kind: readmodel.KindJobRequest, ResourceID: hired.ID}, StartedOn: base,
-			Stage:           readmodel.StageWorkOrderPaid,
-			JobRequest:      &readmodel.JobRequest{ID: hired.ID, Status: jobrequest.StatusAccepted},
-			ServiceProposal: &readmodel.ServiceProposal{ID: firstProposal, Status: serviceproposal.StatusAccepted},
-			WorkOrder:       &readmodel.WorkOrder{ID: firstOrder, Status: workorder.StatusPaid},
-		},
-		{
-			ID: readmodel.ID{Kind: readmodel.KindJobRequest, ResourceID: pending.ID}, StartedOn: base.Add(-time.Hour),
-			Stage:      readmodel.StageRequestPending,
-			JobRequest: &readmodel.JobRequest{ID: pending.ID, Status: jobrequest.StatusPending},
-		},
-	}, operations)
+	require.Equal(t, []operationInboxRow{
+		{ID: readmodel.ID{Kind: readmodel.KindServiceProposal, ResourceID: laterProposal}, Stage: readmodel.StageProposalPending,
+			JobRequestID: &hired.ID, ProposalID: &laterProposal, StartedOn: base.Add(3 * time.Hour)},
+		{ID: readmodel.ID{Kind: readmodel.KindJobRequest, ResourceID: hired.ID}, Stage: readmodel.StageWorkOrderPaid,
+			JobRequestID: &hired.ID, ProposalID: &firstProposal, WorkOrderID: &firstOrder, StartedOn: base},
+		{ID: readmodel.ID{Kind: readmodel.KindJobRequest, ResourceID: pending.ID}, Stage: readmodel.StageRequestPending,
+			JobRequestID: &pending.ID, StartedOn: base.Add(-time.Hour)},
+	}, operationInboxRows(operations))
+}
+
+func TestOperationInboxReaderSummarizesPartiesCategoryAndDates(t *testing.T) {
+	fixture := newOperationInboxFixture(t)
+	ana := savedConsumerIDWithData(t, fixture.testContext, "auth0|inbox-ana", "inbox.ana@example.com", "Ana", "Perez")
+	juan := savedProviderIDWithData(t, fixture.testContext, "auth0|inbox-juan", "inbox.juan@example.com", "Juan", "Gomez", "Plomeria")
+	base := time.Date(2026, 9, 15, 13, 0, 0, 0, time.UTC)
+	request := fixture.jobRequest(t, ana, juan, base, jobrequest.StatusAccepted)
+	proposalID := fixture.proposal(t, request, base.Add(24*time.Hour), serviceproposal.StatusAccepted)
+	orderID := fixture.workOrder(t, proposalID, base.Add(48*time.Hour), workorder.StatusScheduled)
+
+	operations, err := repositories.NewOperationInboxReader(fixture.testContext.database).FindPage(context.Background(), operationInboxCriteria(10))
+
+	require.NoError(t, err)
+	require.Len(t, operations, 1)
+	found := operations[0]
+	assert.Equal(t, readmodel.Party{ID: ana, Name: "Ana", Surname: "Perez"}, found.Consumer)
+	assert.Equal(t, readmodel.Party{ID: juan, Name: "Juan", Surname: "Gomez"}, found.Provider)
+	require.NotNil(t, found.Category)
+	assert.Equal(t, "Plomeria", found.Category.Name)
+	assert.Equal(t, &readmodel.JobRequest{ID: request.ID, Status: jobrequest.StatusAccepted, CreatedOn: base}, found.JobRequest)
+	assert.Equal(t, &readmodel.ServiceProposal{
+		ID: proposalID, Status: serviceproposal.StatusAccepted, CreatedOn: base.Add(24 * time.Hour),
+		ScheduledOn: base.Add(96 * time.Hour), EstimatedDurationMinutes: 60, BookingPaymentDeadline: base.Add(72 * time.Hour),
+	}, found.ServiceProposal)
+	assert.Equal(t, &readmodel.WorkOrder{ID: orderID, Status: workorder.StatusScheduled, AcceptedOn: base.Add(48 * time.Hour)}, found.WorkOrder)
+	assert.Equal(t, []readmodel.Alert{}, found.Alerts)
+}
+
+func TestOperationInboxReaderFlagsPendingProposalsThatReachedTheirBookingDeadline(t *testing.T) {
+	fixture := newOperationInboxFixture(t)
+	juan := savedProviderIDWithData(t, fixture.testContext, "auth0|inbox-juan", "inbox.juan@example.com", "Juan", "Gomez", "Plomeria")
+	now := operationInboxCriteria(10).Now
+	proposalsByDeadline := map[time.Duration]int{}
+	for index, deadlineOffset := range []time.Duration{0, time.Minute} {
+		email := fmt.Sprintf("inbox.deadline%d@example.com", index)
+		consumerID := savedConsumerIDWithData(t, fixture.testContext, "auth0|"+email, email, "Consumer", "Deadline")
+		request := fixture.jobRequest(t, consumerID, juan, now.Add(-96*time.Hour), jobrequest.StatusAccepted)
+		// The fixture schedules proposals 72 hours after creation; the deadline is 24 hours before that.
+		proposalsByDeadline[deadlineOffset] = fixture.proposal(t, request, now.Add(deadlineOffset-48*time.Hour), serviceproposal.StatusPending)
+	}
+
+	bookedConsumerID := savedConsumerIDWithData(t, fixture.testContext, "auth0|inbox.booked@example.com", "inbox.booked@example.com", "Consumer", "Booked")
+	bookedRequest := fixture.jobRequest(t, bookedConsumerID, juan, now.Add(-96*time.Hour), jobrequest.StatusAccepted)
+	bookedProposal := fixture.proposal(t, bookedRequest, now.Add(-48*time.Hour), serviceproposal.StatusAccepted)
+	fixture.workOrder(t, bookedProposal, now.Add(-47*time.Hour), workorder.StatusScheduled)
+
+	operations, err := repositories.NewOperationInboxReader(fixture.testContext.database).FindPage(context.Background(), operationInboxCriteria(10))
+
+	require.NoError(t, err)
+	alertsByProposal := map[int][]readmodel.Alert{}
+	for _, found := range operations {
+		alertsByProposal[found.ServiceProposal.ID] = found.Alerts
+	}
+	assert.Equal(t, []readmodel.Alert{readmodel.AlertBookingDeadlinePassed}, alertsByProposal[proposalsByDeadline[0]])
+	assert.Equal(t, []readmodel.Alert{}, alertsByProposal[proposalsByDeadline[time.Minute]])
+	assert.Equal(t, []readmodel.Alert{}, alertsByProposal[bookedProposal])
 }
 
 func TestOperationInboxReaderContinuesAfterPositionWithDeterministicTieBreak(t *testing.T) {
@@ -114,11 +191,11 @@ func TestOperationInboxReaderContinuesAfterPositionWithDeterministicTieBreak(t *
 	}
 	reader := repositories.NewOperationInboxReader(fixture.testContext.database)
 
-	firstPage, err := reader.FindPage(context.Background(), nil, 2)
+	firstPage, err := reader.FindPage(context.Background(), operationInboxCriteria(2))
 	require.NoError(t, err)
 	require.Len(t, firstPage, 2)
 	last := firstPage[1]
-	secondPage, err := reader.FindPage(context.Background(), &operation.InboxPosition{StartedOn: last.StartedOn, ID: last.ID}, 2)
+	secondPage, err := reader.FindPage(context.Background(), operation.InboxCriteria{Now: operationInboxCriteria(2).Now, After: &operation.InboxPosition{StartedOn: last.StartedOn, ID: last.ID}, Limit: 2})
 
 	require.NoError(t, err)
 	require.Len(t, secondPage, 1)
@@ -128,7 +205,7 @@ func TestOperationInboxReaderContinuesAfterPositionWithDeterministicTieBreak(t *
 func TestOperationInboxReaderReturnsNonNilEmptyPage(t *testing.T) {
 	fixture := newOperationInboxFixture(t)
 
-	operations, err := repositories.NewOperationInboxReader(fixture.testContext.database).FindPage(context.Background(), nil, 10)
+	operations, err := repositories.NewOperationInboxReader(fixture.testContext.database).FindPage(context.Background(), operationInboxCriteria(10))
 
 	require.NoError(t, err)
 	assert.NotNil(t, operations)

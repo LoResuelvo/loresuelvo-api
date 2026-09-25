@@ -37,19 +37,58 @@ const (
 	StageWorkOrderPaid            Stage = "work_order_paid"
 )
 
+// Alert is derived from persisted state and its timestamps; it is never stored
+// and never changes that state.
+type Alert string
+
+const (
+	// AlertBookingDeadlinePassed marks a pending proposal whose booking deposit
+	// can no longer be paid.
+	AlertBookingDeadlinePassed Alert = "booking_deadline_passed"
+)
+
+// Owner is who must act next. OwnerNone means the operation needs no further
+// action; an owner that cannot be deduced is a nil *Owner.
+type Owner string
+
+const (
+	OwnerConsumer Owner = "consumer"
+	OwnerProvider Owner = "provider"
+	OwnerNone     Owner = "none"
+)
+
 type JobRequest struct {
-	ID     int
-	Status jobrequest.Status
+	ID        int
+	Status    jobrequest.Status
+	CreatedOn time.Time
 }
 
 type ServiceProposal struct {
-	ID     int
-	Status serviceproposal.Status
+	ID                       int
+	Status                   serviceproposal.Status
+	CreatedOn                time.Time
+	ScheduledOn              time.Time
+	EstimatedDurationMinutes int
+	BookingPaymentDeadline   time.Time
 }
 
 type WorkOrder struct {
-	ID     int
-	Status workorder.Status
+	ID                   int
+	Status               workorder.Status
+	AcceptedOn           time.Time
+	CompletionReportedOn *time.Time
+	BalancePaidOn        *time.Time
+}
+
+type Party struct {
+	ID      int
+	Name    string
+	Surname string
+}
+
+type Category struct {
+	ID   int
+	Name string
 }
 
 // OperationSummary is the bounded administrative view of one operation.
@@ -61,4 +100,18 @@ type OperationSummary struct {
 	JobRequest      *JobRequest
 	ServiceProposal *ServiceProposal
 	WorkOrder       *WorkOrder
+	Consumer        Party
+	Provider        Party
+	Category        *Category
+	Alerts          []Alert
+	NextActionOwner *Owner
+}
+
+func (summary OperationSummary) HasAlert(alert Alert) bool {
+	for _, found := range summary.Alerts {
+		if found == alert {
+			return true
+		}
+	}
+	return false
 }

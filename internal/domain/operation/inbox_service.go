@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/clock"
 	readmodel "github.com/LoResuelvo/loresuelvo-api/internal/domain/operation/read_model"
 )
 
@@ -11,10 +12,11 @@ import (
 // reads are not audited.
 type InboxService struct {
 	reader InboxReader
+	clock  clock.Clock
 }
 
-func NewInboxService(reader InboxReader) *InboxService {
-	return &InboxService{reader: reader}
+func NewInboxService(reader InboxReader, clock clock.Clock) *InboxService {
+	return &InboxService{reader: reader, clock: clock}
 }
 
 func (service *InboxService) Query(ctx context.Context, query InboxQuery) (InboxPage, error) {
@@ -22,7 +24,9 @@ func (service *InboxService) Query(ctx context.Context, query InboxQuery) (Inbox
 		return InboxPage{}, err
 	}
 	limit := query.effectiveLimit()
-	operations, err := service.reader.FindPage(ctx, query.After, limit+1)
+	operations, err := service.reader.FindPage(ctx, InboxCriteria{
+		Now: service.clock.Now().UTC(), After: query.After, Limit: limit + 1,
+	})
 	if err != nil {
 		return InboxPage{}, fmt.Errorf("reading operations inbox: %w", err)
 	}
@@ -34,6 +38,9 @@ func (service *InboxService) Query(ctx context.Context, query InboxQuery) (Inbox
 		page.Operations = page.Operations[:limit]
 		last := page.Operations[limit-1]
 		page.Next = &InboxPosition{StartedOn: last.StartedOn, ID: last.ID}
+	}
+	for index := range page.Operations {
+		page.Operations[index].NextActionOwner = nextActionOwner(page.Operations[index])
 	}
 	return page, nil
 }

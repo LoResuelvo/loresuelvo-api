@@ -367,7 +367,7 @@ func newDependencies(database *sql.DB, adapters dependencyAdapters) (*Dependenci
 		routerConfig: httpadapter.RouterConfig{
 			AdminHandler:                admin_handler.NewAdminHandler(adminService),
 			AuditLogHandler:             auditLogHandler,
-			OperationInboxHandler:       operation_inbox_handler.NewHandler(operation.NewInboxService(persistence.OperationInboxReader)),
+			OperationInboxHandler:       operation_inbox_handler.NewHandler(operation.NewInboxService(persistence.OperationInboxReader, systemClock)),
 			CategoryHandler:             category_handler.NewCategoryHandler(categoryService),
 			CalendarConnectionHandler:   calendar_connection_handler.NewCalendarConnectionHandler(calendarConnectionService, adapters.calendarHandlerConfig),
 			CoverageZoneHandler:         coverage_zone_handler.NewCoverageZoneHandler(coverageZoneService),
