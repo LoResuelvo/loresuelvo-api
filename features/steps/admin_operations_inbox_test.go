@@ -31,6 +31,7 @@ type operationInboxState struct {
 	acceptedProposal map[string]bool
 	auditWatermark   *int64
 	startWindow      *[2]time.Time
+	pages            []inboxPageResponse
 }
 
 type inboxJobRequestFixture struct {
@@ -416,7 +417,7 @@ func (suite *testSuite) createInboxWorkOrder(label, proposalLabel string, accept
 	if err != nil {
 		return fmt.Errorf("work order %q needs its completion time: %w", label, err)
 	}
-	if err := suite.reportInboxWorkOrderCompletion(label, persisted, reportedOn); err != nil {
+	if err := suite.reportInboxWorkOrderCompletion(label, persisted, reportedOn, 1); err != nil {
 		return err
 	}
 	if status == string(workorder.StatusAwaitingPayment) {
@@ -437,7 +438,7 @@ func (suite *testSuite) createInboxWorkOrder(label, proposalLabel string, accept
 	return err
 }
 
-func (suite *testSuite) reportInboxWorkOrderCompletion(label string, order *workorder.WorkOrder, reportedOn time.Time) error {
+func (suite *testSuite) reportInboxWorkOrderCompletion(label string, order *workorder.WorkOrder, reportedOn time.Time, imageCount int) error {
 	providerAuthID, err := suite.authIDForUserID(order.ProviderID())
 	if err != nil {
 		return err
@@ -446,11 +447,15 @@ func (suite *testSuite) reportInboxWorkOrderCompletion(label string, order *work
 		return err
 	}
 	suite.currentAuth0ID = providerAuthID
-	imageName := "bandeja-" + strings.ToLower(label) + ".jpg"
-	if err := suite.uploadAndConfirmCompletionImage(imageName); err != nil {
-		return fmt.Errorf("preparing completion image of %q: %w", label, err)
+	fileIDs := make([]string, 0, imageCount)
+	for index := 1; index <= imageCount; index++ {
+		imageName := fmt.Sprintf("bandeja-%s-%d.jpg", strings.ToLower(label), index)
+		if err := suite.uploadAndConfirmCompletionImage(imageName); err != nil {
+			return fmt.Errorf("preparing completion image of %q: %w", label, err)
+		}
+		fileIDs = append(fileIDs, suite.completionImagesByName[imageName].FileID)
 	}
-	report, err := workorder.NewCompletionReport(inboxCompletionDescriptionPrefix+" "+label, []string{suite.completionImagesByName[imageName].FileID}, reportedOn)
+	report, err := workorder.NewCompletionReport(inboxCompletionDescriptionPrefix+" "+label, fileIDs, reportedOn)
 	if err != nil {
 		return err
 	}

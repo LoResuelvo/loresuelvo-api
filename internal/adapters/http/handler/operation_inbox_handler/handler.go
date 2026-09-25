@@ -42,11 +42,21 @@ func (handler *Handler) List(c *gin.Context) {
 		httphandler.RespondError(c, http.StatusInternalServerError, "internal server error")
 		return
 	}
-	c.JSON(http.StatusOK, pageResponse{Operations: operationResponsesFromDomain(page.Operations)})
+	response := pageResponse{Operations: operationResponsesFromDomain(page.Operations)}
+	if page.Next != nil {
+		cursor, err := encodeCursor(*page.Next, query.Filter, query.EffectiveLimit())
+		if err != nil {
+			httphandler.RespondError(c, http.StatusInternalServerError, "internal server error")
+			return
+		}
+		response.NextCursor = &cursor
+	}
+	c.JSON(http.StatusOK, response)
 }
 
 func parseInboxQuery(values url.Values) (operation.InboxQuery, bool) {
 	var query operation.InboxQuery
+	var cursor string
 	filter := &query.Filter
 	for key, raw := range values {
 		if len(raw) != 1 || raw[0] == "" {
@@ -54,6 +64,14 @@ func parseInboxQuery(values url.Values) (operation.InboxQuery, bool) {
 		}
 		value, valid := raw[0], true
 		switch key {
+		case "limit":
+			limit, err := strconv.Atoi(value)
+			if err != nil || limit < 1 || limit > operation.MaxInboxLimit {
+				return operation.InboxQuery{}, false
+			}
+			query.Limit = limit
+		case "cursor":
+			cursor = value
 		case "consumer_id":
 			filter.ConsumerID, valid = parseID(value)
 		case "provider_id":
@@ -90,7 +108,15 @@ func parseInboxQuery(values url.Values) (operation.InboxQuery, bool) {
 			return operation.InboxQuery{}, false
 		}
 	}
-	return query, true
+	if cursor == "" {
+		return query, true
+	}
+	payload, err := decodeCursor(cursor)
+	if err != nil || !payload.Filter.accepts(query.Filter) || (query.Limit != 0 && query.Limit != payload.Limit) {
+		return operation.InboxQuery{}, false
+	}
+	position := payload.position()
+	return operation.InboxQuery{Filter: operation.InboxFilter(payload.Filter), Limit: payload.Limit, After: &position}, true
 }
 
 func parseID(value string) (*int, bool) {

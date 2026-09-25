@@ -27,7 +27,7 @@ func (service *InboxService) Query(ctx context.Context, query InboxQuery) (Inbox
 	if err := query.Validate(); err != nil {
 		return InboxPage{}, err
 	}
-	limit := query.effectiveLimit()
+	limit := query.EffectiveLimit()
 	now := service.clock.Now().UTC()
 	criteria := InboxCriteria{
 		Now:                  now,

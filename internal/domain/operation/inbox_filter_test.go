@@ -54,3 +54,17 @@ func TestInboxServiceTurnsTheScheduledDayIntoUTCInstants(t *testing.T) {
 	require.NoError(t, err)
 	reader.AssertExpectations(t)
 }
+
+func TestInboxQueryRejectsInvalidPositions(t *testing.T) {
+	startedOn := time.Date(2026, 9, 25, 15, 0, 0, 0, time.UTC)
+	for name, position := range map[string]operation.InboxPosition{
+		"unknown kind":      {StartedOn: startedOn, ID: readmodel.ID{Kind: "wo", ResourceID: 1}},
+		"zero resource":     {StartedOn: startedOn, ID: readmodel.ID{Kind: readmodel.KindJobRequest}},
+		"oversized ID":      {StartedOn: startedOn, ID: readmodel.ID{Kind: readmodel.KindServiceProposal, ResourceID: math.MaxInt32 + 1}},
+		"missing timestamp": {ID: readmodel.ID{Kind: readmodel.KindJobRequest, ResourceID: 1}},
+	} {
+		t.Run(name, func(t *testing.T) {
+			require.ErrorIs(t, operation.InboxQuery{After: &position}.Validate(), operation.ErrInvalidInboxQuery)
+		})
+	}
+}
