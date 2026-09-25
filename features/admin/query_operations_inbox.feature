@@ -141,7 +141,6 @@ Feature: Consultar la bandeja administrativa de contrataciones
             Given que la fecha y hora actual del sistema es "2026-09-25T12:00:00-03:00"
             And que estoy autenticado como administrador "operador@example.com" con el permiso "read:admin_operations"
 
-        @wip
         Scenario: 64.7-AO Filtrar solicitudes pendientes de respuesta por más de 24 horas
             Given que existen las siguientes solicitudes de trabajo:
                 | solicitud | consumidor        | prestador         | creada                    | estado   |
@@ -153,7 +152,6 @@ Feature: Consultar la bandeja administrativa de contrataciones
             And la operación "S2" informa la alerta "request_pending_over_24h"
             And la operación "S2" informa el estado de dominio "pending" de la solicitud
 
-        @wip
         Scenario: 64.8-AO Filtrar propuestas pendientes que alcanzaron el límite de pago de la seña
             Given que existen las siguientes solicitudes de trabajo:
                 | solicitud | consumidor        | prestador         | creada                    | estado   |
@@ -172,7 +170,6 @@ Feature: Consultar la bandeja administrativa de contrataciones
             Then la bandeja contiene solamente la operación "S1"
             And la operación "S1" informa el estado de dominio "pending" de la propuesta
 
-        @wip
         Scenario: 64.9-AO Filtrar trabajos demorados sin afirmar la inasistencia del prestador
             Given que existen las siguientes órdenes de trabajo con su fecha programada:
                 | orden | consumidor        | prestador         | fecha programada          | duración | estado           |
@@ -184,7 +181,6 @@ Feature: Consultar la bandeja administrativa de contrataciones
             And la operación de la orden "O2" informa la alerta "delayed"
             And la operación de la orden "O2" informa el estado de dominio "scheduled" de la orden
 
-        @wip
         Scenario: 64.10-AO Filtrar operaciones estancadas por su último avance de negocio y no por sus mensajes
             Given que existen las siguientes solicitudes de trabajo:
                 | solicitud | consumidor          | prestador         | creada                    | estado   |
@@ -211,7 +207,6 @@ Feature: Consultar la bandeja administrativa de contrataciones
             Then la bandeja contiene solamente las operaciones "S1", "S3" y "S6"
             And la operación "S1" informa como último avance de negocio "2026-09-22T11:59:00-03:00"
 
-        @wip
         Scenario: 64.11-AO Informar la limitación cuando no existe evidencia del último avance de negocio
             Given que existen las siguientes solicitudes de trabajo:
                 | solicitud | consumidor      | prestador        | creada                    | estado   |
