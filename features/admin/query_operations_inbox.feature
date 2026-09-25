@@ -268,11 +268,10 @@ Feature: Consultar la bandeja administrativa de contrataciones
             Given que la fecha y hora actual del sistema es "2026-09-25T12:00:00-03:00"
             And que estoy autenticado como administrador "operador@example.com" con el permiso "read:admin_operations"
 
-        @wip
         Scenario: 64.15-AO Recorrer páginas en orden estable sin multiplicar operaciones por sus relaciones
             Given que existen las siguientes solicitudes de trabajo:
                 | solicitud | consumidor          | prestador         | creada                    | estado   |
-                | S1        | ana@example.com     | juan@example.com  | 2026-09-24T12:00:00-03:00 | accepted |
+                | S1        | ana@example.com     | juan@example.com  | 2026-09-20T12:00:00-03:00 | accepted |
                 | S2        | carla@example.com   | juan@example.com  | 2026-09-24T11:00:00-03:00 | pending  |
                 | S3        | beatriz@example.com | juan@example.com  | 2026-09-24T11:00:00-03:00 | pending  |
                 | S4        | ana@example.com     | pedro@example.com | 2026-09-24T11:00:00-03:00 | pending  |
@@ -283,7 +282,6 @@ Feature: Consultar la bandeja administrativa de contrataciones
             And las páginas contienen las operaciones "S1", "S2", "S3", "S4" y "S5" una sola vez cada una
             And las operaciones se ordenan por inicio descendente y las operaciones "S2", "S3" y "S4" se desempatan por identificador descendente
 
-        @wip
         Scenario Outline: 64.16-AO Aplicar el límite predeterminado y el máximo documentados
             Given que existen 101 solicitudes de trabajo pendientes sintéticas entre pares distintos de consumidor y prestador
             When consulto la bandeja administrativa de contrataciones <configuración del límite>
@@ -315,7 +313,6 @@ Feature: Consultar la bandeja administrativa de contrataciones
             Then el sistema responde con estado 403
             And la respuesta no contiene operaciones
 
-        @wip
         Scenario Outline: 64.19-AO Rechazar filtros, rangos, límites y cursores inválidos
             Given que estoy autenticado como administrador "operador@example.com" con el permiso "read:admin_operations"
             When consulto la bandeja administrativa de contrataciones con los parámetros "<parámetros>"
