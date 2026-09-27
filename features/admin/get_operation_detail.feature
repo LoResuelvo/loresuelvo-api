@@ -229,7 +229,6 @@ Feature: Consultar el detalle administrativo de una operación
             And la solicitud "S1" y sus relaciones conservan exactamente los estados y los instantes previos a la consulta
             And la consulta no crea ni modifica propuestas, órdenes, pagos, conversaciones ni mensajes
 
-        @wip
         Scenario: 64.1.13-OD No entregar el detalle cuando falla el registro de auditoría
             Given que falla el almacenamiento del evento de auditoría de esta consulta
             When consulto el detalle administrativo de la solicitud "S1"
