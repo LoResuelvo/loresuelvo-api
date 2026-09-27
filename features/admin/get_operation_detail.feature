@@ -43,7 +43,6 @@ Feature: Consultar el detalle administrativo de una operación
             And el detalle no expone mensajes ni contenido de la conversación
             And la respuesta incluye la cabecera "Cache-Control" con valor "private, no-store"
 
-        @wip
         Scenario: 64.1.2-OD Separar propuestas relacionadas y limitar cronología y pagos a la operación elegida
             Given que existe la siguiente solicitud de trabajo:
                 | solicitud | consumidor      | prestador        | creada               | estado   | título            | descripción              |
@@ -74,14 +73,13 @@ Feature: Consultar el detalle administrativo de una operación
             And la orden "O1" informa estado "awaiting_payment", instante de aceptación "2026-09-12T13:00:00Z", finalización informada "2026-09-20T15:00:00Z" e instante de saldo pagado nulo
             And la respuesta no contiene mensajes ni extractos de chat
 
-        @wip
         Scenario: 64.1.3-OD Consultar una propuesta posterior por su identidad y limitar sus hitos
             Given que existe la siguiente solicitud de trabajo:
                 | solicitud | consumidor      | prestador        | creada               | estado   | título            | descripción             |
                 | S1        | ana@example.com | juan@example.com | 2026-09-10T13:00:00Z | accepted | Reparar calefón | El calefón no enciende. |
             And que existen las siguientes propuestas de servicio:
                 | propuesta | solicitud | creada               | fecha programada     | duración | descripción                    | estado   | precio total | moneda | seña | comisión total | comisión inicial | saldo servicio | saldo comisión |
-                | P1        | S1        | 2026-09-11T13:00:00Z | 2026-09-20T13:00:00Z | 90       | Revisar calefón.              | accepted | 8500000      | ARS    | 1700000 | 500000         | 100000           | 6800000        | 400000         |
+                | P1        | S1        | 2026-09-11T13:00:00Z | 2026-09-20T13:00:00Z | 90       | Revisar calefón.              | pending  | 8500000      | ARS    | 1700000 | 500000         | 100000           | 6800000        | 400000         |
                 | P2        | S1        | 2026-09-19T13:00:00Z | 2026-09-29T13:00:00Z | 120      | Reemplazar válvula y probar.  | accepted | 12000000     | ARS    | 2400000 | 500000         | 100000           | 9600000        | 400000         |
             And que "P1" tiene el siguiente intento de pago de seña:
                 | referencia interna | propósito      | estado   | creada               |
