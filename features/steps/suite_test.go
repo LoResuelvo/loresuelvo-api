@@ -210,6 +210,7 @@ func (s *testSuite) registerAllSteps(sc *godog.ScenarioContext) {
 	registerAdminOperationsInboxSteps(sc, s)
 	registerAdminOperationsInboxAlertSteps(sc, s)
 	registerAdminOperationsInboxPaginationSteps(sc, s)
+	registerAdminOperationDetailSteps(sc, s)
 }
 
 func (s *testSuite) cleanup() error {

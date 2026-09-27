@@ -28,9 +28,10 @@ func RequestLogger(logger *slog.Logger) gin.HandlerFunc {
 		c.Request = c.Request.WithContext(observability.ContextWithLogger(c.Request.Context(), requestLogger))
 		c.Header(requestIDHeader, requestID)
 
-		// Audit responses may contain private operator reasons. Never capture their
-		// bodies in technical request logs, even when info logging is enabled.
-		includeBodies := c.Request.URL.Path != "/admin/audit-logs" && requestLogger.Enabled(c.Request.Context(), slog.LevelInfo)
+		// Admin audit and operation details may contain private operator data.
+		// Keep request metadata, but never capture their bodies or query values.
+		privateAdminRead := isPrivateAdminReadPath(c.Request.URL.Path)
+		includeBodies := !privateAdminRead && requestLogger.Enabled(c.Request.Context(), slog.LevelInfo)
 		var requestBody *limitedBodyCapture
 		var responseBody *limitedBodyCapture
 		if includeBodies {
@@ -61,7 +62,7 @@ func RequestLogger(logger *slog.Logger) gin.HandlerFunc {
 		if pathParams := pathParameters(c.Params); len(pathParams) > 0 {
 			attributes = append(attributes, "http.path_params", pathParams)
 		}
-		if c.Request.URL.Path != "/admin/audit-logs" {
+		if !privateAdminRead {
 			if queryParams := queryParameters(c.Request); len(queryParams) > 0 {
 				attributes = append(attributes, "http.query_params", queryParams)
 			}
@@ -80,6 +81,14 @@ func RequestLogger(logger *slog.Logger) gin.HandlerFunc {
 		}
 		requestLogger.Log(c.Request.Context(), httpLogLevel(status), "http.request.completed", attributes...)
 	}
+}
+
+func isPrivateAdminReadPath(path string) bool {
+	if path == "/admin/audit-logs" {
+		return true
+	}
+	operationPath, isDetail := strings.CutPrefix(path, "/admin/operations/")
+	return isDetail && operationPath != ""
 }
 
 // GetRequestID returns the validated request ID assigned by RequestLogger.

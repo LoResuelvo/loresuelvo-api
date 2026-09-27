@@ -76,3 +76,59 @@ func TestRequestLoggerDoesNotCaptureAuditLogResponse(t *testing.T) {
 	require.NotContains(t, logs.String(), "private-reconciliation-reason")
 	require.NotContains(t, logs.String(), "http.query_params")
 }
+
+func TestRequestLoggerDoesNotCaptureOperationDetailResponse(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	for _, test := range []struct {
+		name   string
+		route  string
+		path   string
+		status int
+	}{
+		{name: "existing operation", route: "/admin/operations/:operation_id", path: "/admin/operations/jr-123", status: http.StatusOK},
+		{name: "invalid operation ID", route: "/admin/operations/:operation_id", path: "/admin/operations/invalid", status: http.StatusBadRequest},
+		{name: "missing operation", route: "/admin/operations/:operation_id", path: "/admin/operations/sp-999", status: http.StatusNotFound},
+		{name: "nested private media", route: "/admin/operations/:operation_id/media/:file_id", path: "/admin/operations/jr-123/media/file-456", status: http.StatusOK},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			var logs bytes.Buffer
+			router := gin.New()
+			router.Use(RequestLogger(slog.New(slog.NewTextHandler(&logs, nil))))
+			router.GET(test.route, func(c *gin.Context) {
+				c.JSON(test.status, gin.H{"reason": "private operator reason"})
+			})
+
+			response := httptest.NewRecorder()
+			router.ServeHTTP(response, httptest.NewRequest(http.MethodGet, test.path+"?data.id=private-provider-reference", nil))
+
+			require.Equal(t, test.status, response.Code)
+			require.Contains(t, response.Body.String(), "private operator reason")
+			require.Contains(t, logs.String(), "http.request.completed")
+			require.Contains(t, logs.String(), "http.route="+test.route)
+			require.Contains(t, logs.String(), "http.path_params")
+			require.NotContains(t, logs.String(), "private operator reason")
+			require.NotContains(t, logs.String(), "private-provider-reference")
+			require.NotContains(t, logs.String(), "http.response")
+			require.NotContains(t, logs.String(), "http.query_params")
+		})
+	}
+}
+
+func TestRequestLoggerStillCapturesOperationInboxResponse(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	var logs bytes.Buffer
+	router := gin.New()
+	router.Use(RequestLogger(slog.New(slog.NewTextHandler(&logs, nil))))
+	router.GET("/admin/operations", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{"summary": "inbox summary"})
+	})
+
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/admin/operations?category_id=42", nil))
+
+	require.Equal(t, http.StatusOK, response.Code)
+	require.Contains(t, logs.String(), "inbox summary")
+	require.Contains(t, logs.String(), "http.response")
+	require.Contains(t, logs.String(), "http.query_params")
+}

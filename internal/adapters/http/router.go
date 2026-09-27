@@ -15,6 +15,7 @@ import (
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/health_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/identity_verification_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/job_request_handler"
+	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/operation_detail_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/operation_inbox_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/payment_account_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/payment_handler"
@@ -49,6 +50,7 @@ type RouterConfig struct {
 	AdminHandler                *admin_handler.AdminHandler
 	AuditLogHandler             *audit_log_handler.Handler
 	OperationInboxHandler       *operation_inbox_handler.Handler
+	OperationDetailHandler      *operation_detail_handler.Handler
 	CategoryHandler             *category_handler.CategoryHandler
 	CalendarConnectionHandler   *calendar_connection_handler.CalendarConnectionHandler
 	CoverageZoneHandler         *coverage_zone_handler.CoverageZoneHandler
@@ -75,6 +77,7 @@ type Router struct {
 	adminHandler                *admin_handler.AdminHandler
 	auditLogHandler             *audit_log_handler.Handler
 	operationInboxHandler       *operation_inbox_handler.Handler
+	operationDetailHandler      *operation_detail_handler.Handler
 	categoryHandler             *category_handler.CategoryHandler
 	calendarConnectionHandler   *calendar_connection_handler.CalendarConnectionHandler
 	coverageZoneHandler         *coverage_zone_handler.CoverageZoneHandler
@@ -107,6 +110,7 @@ func NewRouter(config RouterConfig) *Router {
 		adminHandler:                config.AdminHandler,
 		auditLogHandler:             config.AuditLogHandler,
 		operationInboxHandler:       config.OperationInboxHandler,
+		operationDetailHandler:      config.OperationDetailHandler,
 		categoryHandler:             config.CategoryHandler,
 		calendarConnectionHandler:   config.CalendarConnectionHandler,
 		coverageZoneHandler:         config.CoverageZoneHandler,
@@ -188,6 +192,13 @@ func (router *Router) registerAdminRoutes(engine *gin.Engine, authMiddleware gin
 		authMiddleware,
 		middleware.RequirePermissionLayer(readAdminOperationsPermission),
 		router.operationInboxHandler.List,
+	)
+	engine.GET(
+		"/admin/operations/:operation_id",
+		privateNoStore,
+		authMiddleware,
+		middleware.RequirePermissionLayer(readAdminOperationsPermission),
+		router.operationDetailHandler.Get,
 	)
 	engine.GET(
 		"/admin/consumers",
