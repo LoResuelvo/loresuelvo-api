@@ -41,6 +41,99 @@ get:
         application/json:
           schema:
             $ref: '#/components/schemas/AdminOperationDetail'
+          examples:
+            complete:
+              summary: Contract with persisted assessment, payment, completion evidence and review
+              value:
+                id: jr-12
+                started_on: '2026-09-10T12:00:00Z'
+                job_request:
+                  id: 12
+                  status: accepted
+                  title: Reparar calefón
+                  description: El calefón no enciende.
+                  created_on: '2026-09-10T12:00:00Z'
+                  images:
+                  - file_id: 61f99ae1-a8b8-4591-8a9b-012393e7b54d
+                    original_name: calefon.jpg
+                    mime_type: image/jpeg
+                    purpose: job_request_image
+                    created_on: '2026-09-10T12:00:00Z'
+                service_proposal:
+                  id: 41
+                  status: accepted
+                  description: Revisar calefón y cambiar piloto.
+                  amount_cents: 8500000
+                  currency: ARS
+                  created_on: '2026-09-11T13:00:00Z'
+                  scheduled_on: '2026-09-20T13:00:00Z'
+                  estimated_duration_minutes: 90
+                  deposit_cents: 1700000
+                  platform_fee_total_cents: 500000
+                  platform_fee_due_now_cents: 100000
+                  service_balance_cents: 6800000
+                  platform_fee_balance_cents: 400000
+                related_proposals: []
+                work_order:
+                  id: 51
+                  status: paid
+                  accepted_on: '2026-09-12T13:00:00Z'
+                  completion_reported_on: '2026-09-20T15:00:00Z'
+                  balance_paid_on: '2026-09-21T10:00:00Z'
+                  completion_report:
+                    description: Se cambió el piloto y se verificó el encendido.
+                    reported_on: '2026-09-20T15:00:00Z'
+                    images:
+                    - file_id: 4b79f9db-1295-4ff1-af41-77398af038d5
+                      original_name: reparacion.jpg
+                      mime_type: image/jpeg
+                      purpose: work_order_completion_image
+                      created_on: '2026-09-20T15:00:00Z'
+                  review:
+                    rating: 5
+                    description: Quedó impecable.
+                payment_milestones:
+                - id: 11111111-1111-4111-8111-111111111111
+                  purpose: booking_deposit
+                  status: paid
+                  created_on: '2026-09-12T13:01:00Z'
+                timeline:
+                - {type: job_request_created, source_type: job_request, source_id: '12', occurred_on: '2026-09-10T12:00:00Z'}
+                - {type: service_proposal_created, source_type: service_proposal, source_id: '41', occurred_on: '2026-09-11T13:00:00Z'}
+                - {type: work_order_accepted, source_type: work_order, source_id: '51', occurred_on: '2026-09-12T13:00:00Z'}
+                - {type: payment_intent_created, source_type: payment_intent, source_id: 11111111-1111-4111-8111-111111111111, occurred_on: '2026-09-12T13:01:00Z'}
+                - {type: completion_reported, source_type: work_order, source_id: '51', occurred_on: '2026-09-20T15:00:00Z'}
+                - {type: balance_paid, source_type: work_order, source_id: '51', occurred_on: '2026-09-21T10:00:00Z'}
+                consumer: {id: 7, name: Ana, surname: Pérez}
+                provider: {id: 9, name: Juan, surname: Gómez}
+                category: {id: 3, name: Plomería}
+                address: {street: Av. Rivadavia, street_number: '1420', floor: '3', unit: B, source: current_consumer_address}
+                source_assessment:
+                  id: 15
+                  version: 2
+                  outcome: professional_required
+                  category: {id: 3, name: Plomería}
+                  title: Pérdida bajo la pileta
+                  description: Hay una pérdida debajo de la pileta.
+                  based_on_message_id: 31
+                  created_on: '2026-09-10T11:59:00Z'
+            incomplete:
+              summary: Valid request without historical assessment or later hiring stages
+              value:
+                id: jr-13
+                started_on: '2026-09-20T12:00:00Z'
+                job_request: {id: 13, status: pending, title: Revisar instalación, description: Hay una falla eléctrica., created_on: '2026-09-20T12:00:00Z', images: []}
+                service_proposal: null
+                related_proposals: []
+                work_order: null
+                payment_milestones: []
+                timeline:
+                - {type: job_request_created, source_type: job_request, source_id: '13', occurred_on: '2026-09-20T12:00:00Z'}
+                consumer: {id: 7, name: Ana, surname: Pérez}
+                provider: {id: 9, name: Juan, surname: Gómez}
+                category: {id: 3, name: Plomería}
+                address: null
+                source_assessment: null
     '400':
       description: The operation ID is malformed or invalid.
       headers:
