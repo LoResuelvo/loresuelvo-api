@@ -82,23 +82,24 @@ type RuntimeDependencies struct {
 }
 
 type dependencyAdapters struct {
-	chatbot                      conversation.Chatbot
-	paymentAccountOAuthConnector paymentaccount.OAuthConnector
-	paymentGateway               payment.Gateway
-	webhookVerifier              payment_handler.WebhookVerifier
-	credentialProtector          paymentaccount.CredentialProtector
-	secretGenerator              paymentaccount.SecretGenerator
-	paymentAccountHandlerConfig  payment_account_handler.Config
-	calendarOAuthConnector       calendarconnection.OAuthConnector
-	calendarCredentialProtector  calendarconnection.CredentialProtector
-	calendarEventPublisher       workordercalendar.EventPublisher
-	calendarHandlerConfig        calendar_connection_handler.Config
-	identityVerifier             identityverification.IdentityVerifier
-	addressResolverOverride      consumer.AddressResolver
-	recommendationConfig         conversation.ProviderRecommendationConfig
-	identityWebhook              identity_verification_handler.IdentityVerificationWebhook
-	categoryUnitOfWorkDecorator  func(category.UnitOfWork) category.UnitOfWork
-	auditCursorSigningKey        []byte
+	chatbot                             conversation.Chatbot
+	paymentAccountOAuthConnector        paymentaccount.OAuthConnector
+	paymentGateway                      payment.Gateway
+	webhookVerifier                     payment_handler.WebhookVerifier
+	credentialProtector                 paymentaccount.CredentialProtector
+	secretGenerator                     paymentaccount.SecretGenerator
+	paymentAccountHandlerConfig         payment_account_handler.Config
+	calendarOAuthConnector              calendarconnection.OAuthConnector
+	calendarCredentialProtector         calendarconnection.CredentialProtector
+	calendarEventPublisher              workordercalendar.EventPublisher
+	calendarHandlerConfig               calendar_connection_handler.Config
+	identityVerifier                    identityverification.IdentityVerifier
+	addressResolverOverride             consumer.AddressResolver
+	recommendationConfig                conversation.ProviderRecommendationConfig
+	identityWebhook                     identity_verification_handler.IdentityVerificationWebhook
+	categoryUnitOfWorkDecorator         func(category.UnitOfWork) category.UnitOfWork
+	operationDetailAuditWriterDecorator func(audit.Writer) audit.Writer
+	auditCursorSigningKey               []byte
 }
 
 func (dependencies *Dependencies) RouterConfig(
@@ -355,6 +356,10 @@ func newDependencies(database *sql.DB, adapters dependencyAdapters) (*Dependenci
 		calendarSyncService,
 		scheduler.WithLock(schedulerLock, scheduler.CalendarSyncLockKey),
 	)
+	operationDetailAuditWriter := audit.Writer(persistence.AuditEventRepository)
+	if adapters.operationDetailAuditWriterDecorator != nil {
+		operationDetailAuditWriter = adapters.operationDetailAuditWriterDecorator(operationDetailAuditWriter)
+	}
 	return &Dependencies{
 		Persistence: persistence,
 		Runtime: RuntimeDependencies{
@@ -369,7 +374,7 @@ func newDependencies(database *sql.DB, adapters dependencyAdapters) (*Dependenci
 			AdminHandler:                admin_handler.NewAdminHandler(adminService),
 			AuditLogHandler:             auditLogHandler,
 			OperationInboxHandler:       operation_inbox_handler.NewHandler(operation.NewInboxService(persistence.OperationInboxReader, systemClock)),
-			OperationDetailHandler:      operation_detail_handler.NewHandler(operation.NewDetailService(persistence.OperationDetailReader, persistence.UserRepository, persistence.AuditEventRepository, systemClock)),
+			OperationDetailHandler:      operation_detail_handler.NewHandler(operation.NewDetailService(persistence.OperationDetailReader, persistence.UserRepository, operationDetailAuditWriter, systemClock)),
 			CategoryHandler:             category_handler.NewCategoryHandler(categoryService),
 			CalendarConnectionHandler:   calendar_connection_handler.NewCalendarConnectionHandler(calendarConnectionService, adapters.calendarHandlerConfig),
 			CoverageZoneHandler:         coverage_zone_handler.NewCoverageZoneHandler(coverageZoneService),

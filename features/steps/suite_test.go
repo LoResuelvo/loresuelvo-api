@@ -26,6 +26,7 @@ import (
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/repositories"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/scheduler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/bootstrap"
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/audit"
 	filedomain "github.com/LoResuelvo/loresuelvo-api/internal/domain/file"
 	"github.com/LoResuelvo/loresuelvo-api/internal/infrastructure/db"
 	"github.com/LoResuelvo/loresuelvo-api/internal/testsupport"
@@ -78,6 +79,8 @@ type testSuite struct {
 	adminRequest                            adminRequestState
 	operationInbox                          operationInboxState
 	categoryAuditCapture                    *categoryAuditEventCapture
+	operationDetailAuditCapture             *operationDetailAuditCapture
+	operationDetailAuditSnapshot            *operationDetailAuditSnapshot
 	lastCategoryAuditEventIDs               []uuid.UUID
 	currentAuth0ID                          string
 	currentPermissions                      []string
@@ -211,6 +214,7 @@ func (s *testSuite) registerAllSteps(sc *godog.ScenarioContext) {
 	registerAdminOperationsInboxAlertSteps(sc, s)
 	registerAdminOperationsInboxPaginationSteps(sc, s)
 	registerAdminOperationDetailSteps(sc, s)
+	registerAdminOperationDetailAuditSteps(sc, s)
 }
 
 func (s *testSuite) cleanup() error {
@@ -370,6 +374,7 @@ func newTestSuite(tb testing.TB, database *sql.DB) *testSuite {
 	webhookVerifier, err := paymentmercadopago.NewWebhookVerifier("test-mercado-pago-webhook-secret")
 	require.NoError(tb, err, "could not initialize test webhook verifier")
 	auditCapture := &categoryAuditEventCapture{}
+	operationDetailAuditCapture := &operationDetailAuditCapture{}
 	dependencies, doubles, err := bootstrap.NewTestDependencies(
 		database,
 		chatbot,
@@ -382,6 +387,7 @@ func newTestSuite(tb testing.TB, database *sql.DB) *testSuite {
 			ConnectionSuccessURL:   "http://frontend.loresuelvo.test/provider/register/mercado-pago?result=success",
 			ConnectionCancelledURL: "http://frontend.loresuelvo.test/provider/register/mercado-pago?result=cancelled",
 		},
+		func(writer audit.Writer) audit.Writer { return operationDetailAuditCapture.decorate(writer) },
 		auditCapture.decorate,
 	)
 	require.NoError(tb, err, "could not initialize dependencies")
@@ -429,6 +435,7 @@ func newTestSuite(tb testing.TB, database *sql.DB) *testSuite {
 		identityVerificationRepository: dependencies.Persistence.IdentityVerificationRepository,
 		identityVerifier:               doubles.IdentityVerifier,
 		categoryAuditCapture:           auditCapture,
+		operationDetailAuditCapture:    operationDetailAuditCapture,
 		scenarioContext:                context.Background(),
 
 		categoryIDsByName:                   map[string]int{},
@@ -459,6 +466,7 @@ func ScenarioInitializer(sc *godog.ScenarioContext, t *testing.T, database *sql.
 	})
 	sc.Before(func(ctx context.Context, sc *godog.Scenario) (context.Context, error) {
 		testSuite.categoryAuditCapture.reset()
+		testSuite.operationDetailAuditCapture.reset()
 		if err := testSuite.cleanup(); err != nil {
 			return ctx, fmt.Errorf("could not clean test status: %w", err)
 		}

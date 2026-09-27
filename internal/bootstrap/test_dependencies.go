@@ -12,6 +12,7 @@ import (
 	didit "github.com/LoResuelvo/loresuelvo-api/internal/adapters/identityverification/didit"
 	identityverificationfake "github.com/LoResuelvo/loresuelvo-api/internal/adapters/identityverification/fake"
 	locationadapter "github.com/LoResuelvo/loresuelvo-api/internal/adapters/location"
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/audit"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/category"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/conversation"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/payment"
@@ -41,6 +42,7 @@ func NewTestDependencies(
 	credentialProtector paymentaccount.CredentialProtector,
 	secretGenerator paymentaccount.SecretGenerator,
 	paymentAccountHandlerConfig payment_account_handler.Config,
+	operationDetailAuditWriterDecorator func(audit.Writer) audit.Writer,
 	categoryUnitOfWorkDecorator ...func(category.UnitOfWork) category.UnitOfWork,
 ) (*Dependencies, TestDoubles, error) {
 	if len(categoryUnitOfWorkDecorator) > 1 {
@@ -68,12 +70,13 @@ func NewTestDependencies(
 			ConnectionSuccessURL:   "/me",
 			ConnectionCancelledURL: "/me",
 		},
-		identityVerifier:            identityVerifier,
-		addressResolverOverride:     consumerAddressResolver,
-		recommendationConfig:        conversation.DefaultProviderRecommendationConfig(),
-		identityWebhook:             newTestIdentityVerificationWebhook(),
-		auditCursorSigningKey:       []byte("test-audit-cursor-signing-key-2026-keep-private"),
-		categoryUnitOfWorkDecorator: categoryDecorator,
+		identityVerifier:                    identityVerifier,
+		addressResolverOverride:             consumerAddressResolver,
+		recommendationConfig:                conversation.DefaultProviderRecommendationConfig(),
+		identityWebhook:                     newTestIdentityVerificationWebhook(),
+		auditCursorSigningKey:               []byte("test-audit-cursor-signing-key-2026-keep-private"),
+		categoryUnitOfWorkDecorator:         categoryDecorator,
+		operationDetailAuditWriterDecorator: operationDetailAuditWriterDecorator,
 	})
 	if err != nil {
 		return nil, TestDoubles{}, err
