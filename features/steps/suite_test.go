@@ -78,6 +78,7 @@ type testSuite struct {
 	auditQuery                              auditQueryState
 	adminRequest                            adminRequestState
 	operationInbox                          operationInboxState
+	detailProposal                          detailProposalState
 	categoryAuditCapture                    *categoryAuditEventCapture
 	operationDetailAuditCapture             *operationDetailAuditCapture
 	operationDetailAuditSnapshot            *operationDetailAuditSnapshot
@@ -215,6 +216,7 @@ func (s *testSuite) registerAllSteps(sc *godog.ScenarioContext) {
 	registerAdminOperationsInboxPaginationSteps(sc, s)
 	registerAdminOperationDetailSteps(sc, s)
 	registerAdminOperationDetailAuditSteps(sc, s)
+	registerAdminOperationDetailProposalSteps(sc, s)
 }
 
 func (s *testSuite) cleanup() error {
@@ -347,6 +349,7 @@ func (s *testSuite) cleanup() error {
 	s.auditQuery = auditQueryState{}
 	s.adminRequest = adminRequestState{}
 	s.operationInbox = operationInboxState{}
+	s.detailProposal = detailProposalState{}
 	s.currentAuth0ID = ""
 	s.invalidSession = false
 	return nil

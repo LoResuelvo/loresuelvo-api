@@ -8,15 +8,19 @@ import (
 )
 
 type detailResponse struct {
-	ID               string              `json:"id"`
-	StartedOn        time.Time           `json:"started_on"`
-	JobRequest       *jobRequestResponse `json:"job_request"`
-	ServiceProposal  *proposalResponse   `json:"service_proposal"`
-	Consumer         partyResponse       `json:"consumer"`
-	Provider         partyResponse       `json:"provider"`
-	Category         *categoryResponse   `json:"category"`
-	Address          *addressResponse    `json:"address"`
-	SourceAssessment *assessmentResponse `json:"source_assessment"`
+	ID                string                     `json:"id"`
+	StartedOn         time.Time                  `json:"started_on"`
+	JobRequest        *jobRequestResponse        `json:"job_request"`
+	ServiceProposal   *proposalResponse          `json:"service_proposal"`
+	RelatedProposals  []relatedProposalResponse  `json:"related_proposals"`
+	WorkOrder         *workOrderResponse         `json:"work_order"`
+	PaymentMilestones []paymentMilestoneResponse `json:"payment_milestones"`
+	Timeline          []timelineResponse         `json:"timeline"`
+	Consumer          partyResponse              `json:"consumer"`
+	Provider          partyResponse              `json:"provider"`
+	Category          *categoryResponse          `json:"category"`
+	Address           *addressResponse           `json:"address"`
+	SourceAssessment  *assessmentResponse        `json:"source_assessment"`
 }
 type jobRequestResponse struct {
 	ID          int       `json:"id"`
@@ -26,9 +30,42 @@ type jobRequestResponse struct {
 	CreatedOn   time.Time `json:"created_on"`
 }
 type proposalResponse struct {
-	ID        int       `json:"id"`
+	ID                       int       `json:"id"`
+	Status                   string    `json:"status"`
+	Description              string    `json:"description"`
+	AmountCents              int64     `json:"amount_cents"`
+	Currency                 string    `json:"currency"`
+	CreatedOn                time.Time `json:"created_on"`
+	ScheduledOn              time.Time `json:"scheduled_on"`
+	EstimatedDurationMinutes int       `json:"estimated_duration_minutes"`
+	DepositCents             int64     `json:"deposit_cents"`
+	PlatformFeeTotalCents    int64     `json:"platform_fee_total_cents"`
+	PlatformFeeDueNowCents   int64     `json:"platform_fee_due_now_cents"`
+	ServiceBalanceCents      int64     `json:"service_balance_cents"`
+	PlatformFeeBalanceCents  int64     `json:"platform_fee_balance_cents"`
+}
+type relatedProposalResponse struct {
+	OperationID string `json:"operation_id"`
+	proposalResponse
+}
+type workOrderResponse struct {
+	ID                   int        `json:"id"`
+	Status               string     `json:"status"`
+	AcceptedOn           time.Time  `json:"accepted_on"`
+	CompletionReportedOn *time.Time `json:"completion_reported_on"`
+	BalancePaidOn        *time.Time `json:"balance_paid_on"`
+}
+type paymentMilestoneResponse struct {
+	ID        string    `json:"id"`
+	Purpose   string    `json:"purpose"`
 	Status    string    `json:"status"`
 	CreatedOn time.Time `json:"created_on"`
+}
+type timelineResponse struct {
+	Type       string    `json:"type"`
+	SourceType string    `json:"source_type"`
+	SourceID   string    `json:"source_id"`
+	OccurredOn time.Time `json:"occurred_on"`
 }
 type partyResponse struct {
 	ID      int    `json:"id"`
@@ -61,6 +98,9 @@ func responseFromDomain(found *readmodel.OperationDetail) detailResponse {
 	response := detailResponse{
 		ID: string(found.ID.Kind) + "-" + strconv.Itoa(found.ID.ResourceID), StartedOn: found.StartedOn.UTC(),
 		Consumer: partyResponse(found.Consumer), Provider: partyResponse(found.Provider),
+		RelatedProposals:  make([]relatedProposalResponse, 0, len(found.RelatedProposals)),
+		PaymentMilestones: make([]paymentMilestoneResponse, 0, len(found.PaymentMilestones)),
+		Timeline:          make([]timelineResponse, 0, len(found.Timeline)),
 	}
 	if found.Category != nil {
 		response.Category = &categoryResponse{ID: found.Category.ID, Name: found.Category.Name}
@@ -69,7 +109,24 @@ func responseFromDomain(found *readmodel.OperationDetail) detailResponse {
 		response.JobRequest = &jobRequestResponse{ID: request.ID, Status: request.Status, Title: request.Title, Description: request.Description, CreatedOn: request.CreatedOn.UTC()}
 	}
 	if proposal := found.ServiceProposal; proposal != nil {
-		response.ServiceProposal = &proposalResponse{ID: proposal.ID, Status: proposal.Status, CreatedOn: proposal.CreatedOn.UTC()}
+		mapped := proposalFromDomain(*proposal)
+		response.ServiceProposal = &mapped
+	}
+	for _, related := range found.RelatedProposals {
+		response.RelatedProposals = append(response.RelatedProposals, relatedProposalResponse{
+			OperationID:      string(related.OperationID.Kind) + "-" + strconv.Itoa(related.OperationID.ResourceID),
+			proposalResponse: proposalFromDomain(related.Proposal),
+		})
+	}
+	if order := found.WorkOrder; order != nil {
+		response.WorkOrder = &workOrderResponse{ID: order.ID, Status: order.Status, AcceptedOn: order.AcceptedOn.UTC(),
+			CompletionReportedOn: order.CompletionReportedOn, BalancePaidOn: order.BalancePaidOn}
+	}
+	for _, milestone := range found.PaymentMilestones {
+		response.PaymentMilestones = append(response.PaymentMilestones, paymentMilestoneResponse(milestone))
+	}
+	for _, event := range found.Timeline {
+		response.Timeline = append(response.Timeline, timelineResponse(event))
 	}
 	if address := found.Address; address != nil {
 		response.Address = &addressResponse{Street: address.Street, StreetNumber: address.StreetNumber, Floor: address.Floor, Unit: address.Unit, Source: "current_consumer_address"}
@@ -82,4 +139,14 @@ func responseFromDomain(found *readmodel.OperationDetail) detailResponse {
 		response.SourceAssessment = assessment
 	}
 	return response
+}
+
+func proposalFromDomain(proposal readmodel.DetailProposal) proposalResponse {
+	return proposalResponse{ID: proposal.ID, Status: proposal.Status, Description: proposal.Description,
+		AmountCents: proposal.AmountCents, Currency: proposal.Currency, CreatedOn: proposal.CreatedOn.UTC(),
+		ScheduledOn: proposal.ScheduledOn.UTC(), EstimatedDurationMinutes: proposal.EstimatedDurationMinutes,
+		DepositCents: proposal.DepositCents, PlatformFeeTotalCents: proposal.PlatformFeeTotalCents,
+		PlatformFeeDueNowCents:  proposal.PlatformFeeDueNowCents,
+		ServiceBalanceCents:     proposal.ServiceBalanceCents(),
+		PlatformFeeBalanceCents: proposal.PlatformFeeBalanceCents()}
 }

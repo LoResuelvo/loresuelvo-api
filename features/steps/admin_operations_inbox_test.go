@@ -109,7 +109,7 @@ const (
 
 func registerAdminOperationsInboxSteps(sc *godog.ScenarioContext, suite *testSuite) {
 	sc.Step(`^que existen las siguientes solicitudes de trabajo:$`, suite.thereAreInboxJobRequests)
-	sc.Step(`^que existen las siguientes propuestas de servicio:$`, suite.thereAreInboxServiceProposals)
+	sc.Step(`^que existen las siguientes propuestas de servicio:$`, suite.thereAreDetailServiceProposals)
 	sc.Step(`^que existen las siguientes órdenes de trabajo:$`, suite.thereAreInboxWorkOrders)
 	sc.Step(`^que la seña de "([^"]*)" tuvo un intento de pago rechazado antes del intento aprobado$`, suite.inboxProposalHadRejectedThenApprovedDeposit)
 	sc.Step(`^que no existen solicitudes de trabajo$`, suite.thereAreNoInboxJobRequests)
