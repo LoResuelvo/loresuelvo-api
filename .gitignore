@@ -17,3 +17,9 @@ credenciales
 /LoResuelvo_US60*.zip
 
 docker-compose.override.yml
+
+/tmp/
+/.codegraph/
+# Local Pi runtime state
+.atl/
+odd/
