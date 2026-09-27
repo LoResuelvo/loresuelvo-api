@@ -177,7 +177,6 @@ Feature: Consultar el detalle administrativo de una operación
                 | solicitud | consumidor      | prestador        | creada               | estado  | título               | descripción             |
                 | S1        | ana@example.com | juan@example.com | 2026-09-20T12:00:00Z | pending | Revisar instalación | Hay una falla eléctrica. |
 
-        @wip
         Scenario Outline: 64.1.8-OD Rechazar una consulta sin autenticación válida
             Given que <estado de autenticación>
             When intento consultar el detalle administrativo de la operación de la solicitud "S1"
@@ -189,7 +188,6 @@ Feature: Consultar el detalle administrativo de una operación
                 | no envío un token Bearer |
                 | envío un token Bearer inválido |
 
-        @wip
         Scenario: 64.1.9-OD Rechazar a un administrador sin permiso de consulta de operaciones
             Given que estoy autenticado como administrador "operador@example.com" solamente con el permiso "read:admin_audit"
             When intento consultar el detalle administrativo de la operación de la solicitud "S1"
@@ -198,14 +196,12 @@ Feature: Consultar el detalle administrativo de una operación
 
     Rule: La identidad y validación limitan otras consultas
 
-        @wip
         Scenario: 64.1.10-OD Informar no encontrado para una operación inexistente
             Given que no existe ninguna solicitud con ID persistido 987654321 ni propuesta con ID persistido 987654321
             When consulto el detalle administrativo de la operación "jr-987654321"
             Then el sistema responde con estado 404
             And la respuesta no contiene datos del detalle
 
-        @wip
         Scenario Outline: 64.1.11-OD Rechazar identificadores de operación inválidos
             When consulto el detalle administrativo de la operación "<identificador>"
             Then el sistema responde con estado 400
