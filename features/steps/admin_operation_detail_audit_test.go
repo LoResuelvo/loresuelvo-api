@@ -65,6 +65,9 @@ func (suite *testSuite) thereIsAuditedDetailJobRequest(table *godog.Table) error
 		return fmt.Errorf("expected one job request, got %d", len(rows))
 	}
 	row := rows[0]
+	if _, hasSourceAssessment := row["evaluación origen"]; hasSourceAssessment {
+		return suite.thereIsDetailRequestWithAssessment(table)
+	}
 	createdOn, err := parseInboxInstant(row["creada"])
 	if err != nil {
 		return err

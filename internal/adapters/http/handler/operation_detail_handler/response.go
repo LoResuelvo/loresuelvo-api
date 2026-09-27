@@ -23,11 +23,19 @@ type detailResponse struct {
 	SourceAssessment  *assessmentResponse        `json:"source_assessment"`
 }
 type jobRequestResponse struct {
-	ID          int       `json:"id"`
-	Status      string    `json:"status"`
-	Title       string    `json:"title"`
-	Description string    `json:"description"`
-	CreatedOn   time.Time `json:"created_on"`
+	ID          int                    `json:"id"`
+	Status      string                 `json:"status"`
+	Title       string                 `json:"title"`
+	Description string                 `json:"description"`
+	CreatedOn   time.Time              `json:"created_on"`
+	Images      []privateImageResponse `json:"images"`
+}
+type privateImageResponse struct {
+	FileID       string    `json:"file_id"`
+	OriginalName string    `json:"original_name"`
+	MimeType     string    `json:"mime_type"`
+	Purpose      string    `json:"purpose"`
+	CreatedOn    time.Time `json:"created_on"`
 }
 type proposalResponse struct {
 	ID                       int       `json:"id"`
@@ -49,11 +57,22 @@ type relatedProposalResponse struct {
 	proposalResponse
 }
 type workOrderResponse struct {
-	ID                   int        `json:"id"`
-	Status               string     `json:"status"`
-	AcceptedOn           time.Time  `json:"accepted_on"`
-	CompletionReportedOn *time.Time `json:"completion_reported_on"`
-	BalancePaidOn        *time.Time `json:"balance_paid_on"`
+	ID                   int                       `json:"id"`
+	Status               string                    `json:"status"`
+	AcceptedOn           time.Time                 `json:"accepted_on"`
+	CompletionReportedOn *time.Time                `json:"completion_reported_on"`
+	BalancePaidOn        *time.Time                `json:"balance_paid_on"`
+	CompletionReport     *completionReportResponse `json:"completion_report"`
+	Review               *workOrderReviewResponse  `json:"review"`
+}
+type completionReportResponse struct {
+	Description string                 `json:"description"`
+	ReportedOn  time.Time              `json:"reported_on"`
+	Images      []privateImageResponse `json:"images"`
+}
+type workOrderReviewResponse struct {
+	Rating      int    `json:"rating"`
+	Description string `json:"description"`
 }
 type paymentMilestoneResponse struct {
 	ID        string    `json:"id"`
@@ -106,7 +125,7 @@ func responseFromDomain(found *readmodel.OperationDetail) detailResponse {
 		response.Category = &categoryResponse{ID: found.Category.ID, Name: found.Category.Name}
 	}
 	if request := found.JobRequest; request != nil {
-		response.JobRequest = &jobRequestResponse{ID: request.ID, Status: request.Status, Title: request.Title, Description: request.Description, CreatedOn: request.CreatedOn.UTC()}
+		response.JobRequest = &jobRequestResponse{ID: request.ID, Status: request.Status, Title: request.Title, Description: request.Description, CreatedOn: request.CreatedOn.UTC(), Images: privateImagesFromDomain(request.Images)}
 	}
 	if proposal := found.ServiceProposal; proposal != nil {
 		mapped := proposalFromDomain(*proposal)
@@ -121,6 +140,12 @@ func responseFromDomain(found *readmodel.OperationDetail) detailResponse {
 	if order := found.WorkOrder; order != nil {
 		response.WorkOrder = &workOrderResponse{ID: order.ID, Status: order.Status, AcceptedOn: order.AcceptedOn.UTC(),
 			CompletionReportedOn: order.CompletionReportedOn, BalancePaidOn: order.BalancePaidOn}
+		if report := order.CompletionReport; report != nil {
+			response.WorkOrder.CompletionReport = &completionReportResponse{Description: report.Description, ReportedOn: report.ReportedOn.UTC(), Images: privateImagesFromDomain(report.Images)}
+		}
+		if review := order.Review; review != nil {
+			response.WorkOrder.Review = &workOrderReviewResponse{Rating: review.Rating, Description: review.Description}
+		}
 	}
 	for _, milestone := range found.PaymentMilestones {
 		response.PaymentMilestones = append(response.PaymentMilestones, paymentMilestoneResponse(milestone))
@@ -139,6 +164,15 @@ func responseFromDomain(found *readmodel.OperationDetail) detailResponse {
 		response.SourceAssessment = assessment
 	}
 	return response
+}
+
+func privateImagesFromDomain(images []readmodel.PrivateImage) []privateImageResponse {
+	mapped := make([]privateImageResponse, 0, len(images))
+	for _, image := range images {
+		mapped = append(mapped, privateImageResponse{FileID: image.ID, OriginalName: image.OriginalName,
+			MimeType: image.MimeType, Purpose: image.Purpose, CreatedOn: image.CreatedOn.UTC()})
+	}
+	return mapped
 }
 
 func proposalFromDomain(proposal readmodel.DetailProposal) proposalResponse {

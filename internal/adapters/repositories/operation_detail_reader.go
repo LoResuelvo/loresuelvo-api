@@ -32,7 +32,8 @@ SELECT o.started_on, COALESCE(sp.conversation_id, jr.conversation_id),
  jr.id, jr.status, jr.title, jr.description, jr.created_on,
  sp.id, sp.status, sp.description, sp.amount_cents, sp.currency, sp.created_on,
  sp.scheduled_on, sp.estimated_duration_minutes, sp.deposit_cents, sp.platform_fee_total_cents, sp.platform_fee_due_now_cents,
- wo.id, wo.status, wo.accepted_on, report.reported_on, wo.paid_on,
+	 wo.id, wo.status, wo.accepted_on, report.reported_on, wo.paid_on,
+	 report.id, report.description, review.rating, review.description,
  consumer_user.id, consumer_user.name, consumer_user.surname,
  provider_user.id, provider_user.name, provider_user.surname, provider_category.id, provider_category.name,
  address.street, address.street_number, address.floor, address.unit,
@@ -43,6 +44,7 @@ LEFT JOIN job_requests jr ON jr.id = o.job_request_id
 LEFT JOIN service_proposals sp ON sp.id = o.proposal_id
 LEFT JOIN work_orders wo ON wo.service_proposal_id = sp.id
 LEFT JOIN work_order_completion_reports report ON report.work_order_id = wo.id
+LEFT JOIN work_order_reviews review ON review.work_order_id = wo.id
 JOIN users consumer_user ON consumer_user.id = o.consumer_id
 JOIN users provider_user ON provider_user.id = o.provider_id
 JOIN providers provider ON provider.user_id = provider_user.id
@@ -74,16 +76,17 @@ func (reader *OperationDetailReader) FindByID(ctx context.Context, id readmodel.
 	var found readmodel.OperationDetail
 	found.ID = id
 	var conversationID int
-	var jrID, spID, orderID, amount, duration, deposit, feeTotal, feeNow, assessmentID, categoryID, providerCategoryID, assessmentVersion, baseMessageID sql.NullInt64
+	var jrID, spID, orderID, reportID, rating, amount, duration, deposit, feeTotal, feeNow, assessmentID, categoryID, providerCategoryID, assessmentVersion, baseMessageID sql.NullInt64
 	var jrStatus, jrTitle, jrDescription, spStatus, spDescription, currency, orderStatus sql.NullString
 	var street, streetNumber, floor, unit sql.NullString
-	var outcome, categoryName, providerCategoryName, assessmentTitle, assessmentDescription sql.NullString
+	var outcome, categoryName, providerCategoryName, assessmentTitle, assessmentDescription, reportDescription, reviewDescription sql.NullString
 	var jrCreatedOn, spCreatedOn, scheduledOn, acceptedOn, reportedOn, paidOn, assessmentCreatedOn sql.NullTime
 	err = tx.QueryRowContext(ctx, operationDetailSQL, string(id.Kind), id.ResourceID).Scan(
 		&found.StartedOn, &conversationID,
 		&jrID, &jrStatus, &jrTitle, &jrDescription, &jrCreatedOn,
 		&spID, &spStatus, &spDescription, &amount, &currency, &spCreatedOn, &scheduledOn, &duration,
 		&deposit, &feeTotal, &feeNow, &orderID, &orderStatus, &acceptedOn, &reportedOn, &paidOn,
+		&reportID, &reportDescription, &rating, &reviewDescription,
 		&found.Consumer.ID, &found.Consumer.Name, &found.Consumer.Surname,
 		&found.Provider.ID, &found.Provider.Name, &found.Provider.Surname, &providerCategoryID, &providerCategoryName,
 		&street, &streetNumber, &floor, &unit,
@@ -98,7 +101,7 @@ func (reader *OperationDetailReader) FindByID(ctx context.Context, id readmodel.
 	}
 	found.StartedOn = found.StartedOn.UTC()
 	if jrID.Valid {
-		found.JobRequest = &readmodel.DetailJobRequest{ID: int(jrID.Int64), Status: jrStatus.String, Title: jrTitle.String, Description: jrDescription.String, CreatedOn: jrCreatedOn.Time.UTC()}
+		found.JobRequest = &readmodel.DetailJobRequest{ID: int(jrID.Int64), Status: jrStatus.String, Title: jrTitle.String, Description: jrDescription.String, CreatedOn: jrCreatedOn.Time.UTC(), Images: make([]readmodel.PrivateImage, 0)}
 	}
 	if spID.Valid {
 		found.ServiceProposal = &readmodel.DetailProposal{ID: int(spID.Int64), Status: spStatus.String, Description: spDescription.String,
@@ -108,6 +111,12 @@ func (reader *OperationDetailReader) FindByID(ctx context.Context, id readmodel.
 	if orderID.Valid {
 		found.WorkOrder = &readmodel.DetailWorkOrder{ID: int(orderID.Int64), Status: orderStatus.String, AcceptedOn: acceptedOn.Time.UTC(),
 			CompletionReportedOn: nullTimePointer(reportedOn), BalancePaidOn: nullTimePointer(paidOn)}
+		if reportID.Valid {
+			found.WorkOrder.CompletionReport = &readmodel.CompletionReport{Description: reportDescription.String, ReportedOn: reportedOn.Time.UTC(), Images: make([]readmodel.PrivateImage, 0)}
+		}
+		if rating.Valid {
+			found.WorkOrder.Review = &readmodel.WorkOrderReview{Rating: int(rating.Int64), Description: reviewDescription.String}
+		}
 	}
 	if providerCategoryID.Valid {
 		found.Category = &readmodel.Category{ID: int(providerCategoryID.Int64), Name: providerCategoryName.String}
@@ -124,6 +133,18 @@ func (reader *OperationDetailReader) FindByID(ctx context.Context, id readmodel.
 	if err := reader.loadRelatedProposals(ctx, tx, conversationID, &found); err != nil {
 		return nil, err
 	}
+	if found.JobRequest != nil {
+		found.JobRequest.Images, err = reader.loadRequestImages(ctx, tx, found.JobRequest.ID)
+		if err != nil {
+			return nil, err
+		}
+	}
+	if reportID.Valid {
+		found.WorkOrder.CompletionReport.Images, err = reader.loadCompletionImages(ctx, tx, int(reportID.Int64))
+		if err != nil {
+			return nil, err
+		}
+	}
 	if err := reader.loadPaymentMilestones(ctx, tx, &found); err != nil {
 		return nil, err
 	}
@@ -133,6 +154,46 @@ func (reader *OperationDetailReader) FindByID(ctx context.Context, id readmodel.
 	}
 	committed = true
 	return &found, nil
+}
+
+func (reader *OperationDetailReader) loadRequestImages(ctx context.Context, tx *sql.Tx, requestID int) ([]readmodel.PrivateImage, error) {
+	rows, err := tx.QueryContext(ctx, `SELECT f.id::text, f.original_name, f.mime_type, f.purpose, f.created_on
+		FROM job_request_images image JOIN files f ON f.id = image.file_id
+		WHERE image.job_request_id = $1 AND f.status = 'confirmed' AND f.visibility = 'private' AND f.purpose = 'job_request_image'
+		ORDER BY image.position, image.file_id`, requestID)
+	if err != nil {
+		return nil, fmt.Errorf("querying job request images: %w", err)
+	}
+	defer rows.Close()
+	return scanPrivateImages(rows)
+}
+
+func (reader *OperationDetailReader) loadCompletionImages(ctx context.Context, tx *sql.Tx, reportID int) ([]readmodel.PrivateImage, error) {
+	rows, err := tx.QueryContext(ctx, `SELECT f.id::text, f.original_name, f.mime_type, f.purpose, f.created_on
+		FROM work_order_completion_images image JOIN files f ON f.id = image.file_id
+		WHERE image.completion_report_id = $1 AND f.status = 'confirmed' AND f.visibility = 'private' AND f.purpose = 'work_order_completion_image'
+		ORDER BY image.position, image.file_id`, reportID)
+	if err != nil {
+		return nil, fmt.Errorf("querying completion images: %w", err)
+	}
+	defer rows.Close()
+	return scanPrivateImages(rows)
+}
+
+func scanPrivateImages(rows *sql.Rows) ([]readmodel.PrivateImage, error) {
+	images := make([]readmodel.PrivateImage, 0)
+	for rows.Next() {
+		var image readmodel.PrivateImage
+		if err := rows.Scan(&image.ID, &image.OriginalName, &image.MimeType, &image.Purpose, &image.CreatedOn); err != nil {
+			return nil, fmt.Errorf("scanning private image: %w", err)
+		}
+		image.CreatedOn = image.CreatedOn.UTC()
+		images = append(images, image)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterating private images: %w", err)
+	}
+	return images, nil
 }
 
 // Separate bounded queries avoid multiplying proposal rows by payment attempts.

@@ -29,3 +29,24 @@ func TestResponseKeepsRelatedProposalTermsAndEmptyCollections(t *testing.T) {
 	require.Equal(t, []any{}, body["payment_milestones"])
 	require.Equal(t, []any{}, body["timeline"])
 }
+
+func TestResponseExposesPrivateImageMetadataAndReportWithoutReviewTimestamp(t *testing.T) {
+	now := time.Date(2026, 9, 27, 12, 0, 0, 0, time.UTC)
+	image := readmodel.PrivateImage{ID: "file-1", OriginalName: "evidence.jpg", MimeType: "image/jpeg", Purpose: "job_request_image", CreatedOn: now}
+	found := &readmodel.OperationDetail{ID: readmodel.ID{Kind: readmodel.KindJobRequest, ResourceID: 1}, StartedOn: now,
+		JobRequest: &readmodel.DetailJobRequest{ID: 1, Images: []readmodel.PrivateImage{image}},
+		WorkOrder:  &readmodel.DetailWorkOrder{ID: 2, CompletionReport: &readmodel.CompletionReport{Description: "Done", ReportedOn: now, Images: []readmodel.PrivateImage{image}}, Review: &readmodel.WorkOrderReview{Rating: 5, Description: "Great"}}}
+	data, err := json.Marshal(responseFromDomain(found))
+	require.NoError(t, err)
+	var body map[string]any
+	require.NoError(t, json.Unmarshal(data, &body))
+	request := body["job_request"].(map[string]any)
+	images := request["images"].([]any)
+	require.Len(t, images, 1)
+	require.Equal(t, map[string]any{"file_id": "file-1", "original_name": "evidence.jpg", "mime_type": "image/jpeg", "purpose": "job_request_image", "created_on": now.Format(time.RFC3339)}, images[0])
+	order := body["work_order"].(map[string]any)
+	require.Len(t, order["completion_report"].(map[string]any)["images"].([]any), 1)
+	require.Equal(t, map[string]any{"rating": float64(5), "description": "Great"}, order["review"])
+	require.NotContains(t, string(data), "storage")
+	require.NotContains(t, string(data), "url")
+}

@@ -25,6 +25,16 @@ type DetailJobRequest struct {
 	Title       string
 	Description string
 	CreatedOn   time.Time
+	Images      []PrivateImage
+}
+
+// PrivateImage describes persisted media without exposing its storage location.
+type PrivateImage struct {
+	ID           string
+	OriginalName string
+	MimeType     string
+	Purpose      string
+	CreatedOn    time.Time
 }
 
 type DetailProposal struct {
@@ -62,6 +72,19 @@ type DetailWorkOrder struct {
 	AcceptedOn           time.Time
 	CompletionReportedOn *time.Time
 	BalancePaidOn        *time.Time
+	CompletionReport     *CompletionReport
+	Review               *WorkOrderReview
+}
+
+type CompletionReport struct {
+	Description string
+	ReportedOn  time.Time
+	Images      []PrivateImage
+}
+
+type WorkOrderReview struct {
+	Rating      int
+	Description string
 }
 
 type PaymentMilestone struct {

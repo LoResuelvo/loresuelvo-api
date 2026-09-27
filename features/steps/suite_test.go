@@ -79,6 +79,10 @@ type testSuite struct {
 	adminRequest                            adminRequestState
 	operationInbox                          operationInboxState
 	detailProposal                          detailProposalState
+	detailRequestEvidence                   detailRequestEvidenceState
+	detailMedia                             detailMediaState
+	detailReport                            detailReportState
+	detailAuditSuccess                      detailAuditSuccessState
 	categoryAuditCapture                    *categoryAuditEventCapture
 	operationDetailAuditCapture             *operationDetailAuditCapture
 	operationDetailAuditSnapshot            *operationDetailAuditSnapshot
@@ -217,6 +221,11 @@ func (s *testSuite) registerAllSteps(sc *godog.ScenarioContext) {
 	registerAdminOperationDetailSteps(sc, s)
 	registerAdminOperationDetailAuditSteps(sc, s)
 	registerAdminOperationDetailProposalSteps(sc, s)
+	registerAdminOperationDetailRequestEvidenceSteps(sc, s)
+	registerAdminOperationDetailMediaSteps(sc, s)
+	registerAdminOperationDetailReportSteps(sc, s)
+	registerAdminOperationDetailAbsentSteps(sc, s)
+	registerAdminOperationDetailAuditSuccessSteps(sc, s)
 }
 
 func (s *testSuite) cleanup() error {
@@ -350,6 +359,10 @@ func (s *testSuite) cleanup() error {
 	s.adminRequest = adminRequestState{}
 	s.operationInbox = operationInboxState{}
 	s.detailProposal = detailProposalState{}
+	s.detailRequestEvidence = detailRequestEvidenceState{}
+	s.detailMedia = detailMediaState{}
+	s.detailReport = detailReportState{}
+	s.detailAuditSuccess = detailAuditSuccessState{}
 	s.currentAuth0ID = ""
 	s.invalidSession = false
 	return nil
