@@ -1,0 +1,106 @@
+get:
+  tags: [Administration]
+  operationId: getAdminOperationDetail
+  summary: Get the audited detail of one hiring operation
+  description: >-
+    Returns persisted request, selected proposal and order, related proposals,
+    completion/review evidence, internal payment-intent references and exact
+    timeline events for a stable inbox operation ID. Requires the
+    `read:admin_operations` permission. The first proposal belongs to its
+    request's `jr-<id>` operation; later proposals use `sp-<id>`. Payment
+    milestones and timeline are restricted to the selected operation, never
+    its siblings. The request's source assessment is resolved by its persisted
+    reference, not the conversation's latest assessment; the address is the
+    consumer's current address, not a historical snapshot. Missing relations
+    are null or empty rather than synthesized. No messages, chat excerpts,
+    storage URLs, checkout URLs, credentials or provider payment payloads are
+    returned. A prepared audit access event is saved before the detail is
+    delivered; audit persistence failure returns 500 without partial detail.
+    Responses use `Cache-Control: private, no-store`.
+  security:
+  - BearerAuth: []
+  parameters:
+  - name: id
+    in: path
+    required: true
+    description: Stable operation ID from the administrative inbox.
+    schema:
+      type: string
+      pattern: '^(jr|sp)-[1-9][0-9]*$'
+    example: jr-12
+  responses:
+    '200':
+      description: Persisted operation detail after its access event is prepared.
+      headers:
+        Cache-Control:
+          description: Prevents storage of private administrative detail.
+          schema:
+            type: string
+            const: private, no-store
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/AdminOperationDetail'
+    '400':
+      description: The operation ID is malformed or invalid.
+      headers:
+        Cache-Control:
+          schema:
+            type: string
+            const: private, no-store
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: invalid operation ID
+    '401':
+      description: The Bearer token is missing or invalid.
+      headers:
+        Cache-Control:
+          schema:
+            type: string
+            const: private, no-store
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/AuthErrorResponse'
+    '403':
+      description: The Bearer token lacks `read:admin_operations`.
+      headers:
+        Cache-Control:
+          schema:
+            type: string
+            const: private, no-store
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: insufficient permissions
+    '404':
+      description: No operation has this stable ID.
+      headers:
+        Cache-Control:
+          schema:
+            type: string
+            const: private, no-store
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: operation not found
+    '500':
+      description: The detail could not be read or its access audit event could not be saved.
+      headers:
+        Cache-Control:
+          schema:
+            type: string
+            const: private, no-store
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: internal server error

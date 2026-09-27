@@ -1,0 +1,134 @@
+get:
+  tags: [Administration]
+  operationId: getAdminOperationImage
+  summary: Retrieve a private image associated with an operation
+  description: >-
+    Returns the bytes of a confirmed private job-request or completion-report
+    image associated with the selected stable operation. Request images are
+    shared request context; completion images belong only to the selected
+    proposal's work order. Requires a Bearer JWT with
+    `read:admin_operations`; a file ID alone never grants access. No public
+    or signed storage URL is disclosed. Responses use
+    `Cache-Control: private, no-store` and
+    `X-Content-Type-Options: nosniff`.
+  security:
+  - BearerAuth: []
+  parameters:
+  - name: id
+    in: path
+    required: true
+    description: Stable operation ID from the administrative inbox.
+    schema:
+      type: string
+      pattern: '^(jr|sp)-[1-9][0-9]*$'
+    example: jr-12
+  - name: file_id
+    in: path
+    required: true
+    description: Canonical UUID from an image metadata entry in the detail response.
+    schema:
+      type: string
+      format: uuid
+    example: 61f99ae1-a8b8-4591-8a9b-012393e7b54d
+  responses:
+    '200':
+      description: Private image bytes.
+      headers:
+        Cache-Control:
+          schema:
+            type: string
+            const: private, no-store
+        X-Content-Type-Options:
+          schema:
+            type: string
+            const: nosniff
+      content:
+        image/jpeg:
+          schema:
+            type: string
+            format: binary
+        image/png:
+          schema:
+            type: string
+            format: binary
+        image/webp:
+          schema:
+            type: string
+            format: binary
+    '400':
+      description: The operation or image ID is malformed or invalid.
+      headers:
+        Cache-Control:
+          schema:
+            type: string
+            const: private, no-store
+        X-Content-Type-Options:
+          schema:
+            type: string
+            const: nosniff
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: invalid operation or image ID
+    '401':
+      description: The Bearer token is missing or invalid.
+      headers:
+        Cache-Control:
+          schema:
+            type: string
+            const: private, no-store
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/AuthErrorResponse'
+    '403':
+      description: The Bearer token lacks `read:admin_operations`.
+      headers:
+        Cache-Control:
+          schema:
+            type: string
+            const: private, no-store
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: insufficient permissions
+    '404':
+      description: >-
+        The image is not associated with this operation, or is not a confirmed
+        private image eligible for retrieval.
+      headers:
+        Cache-Control:
+          schema:
+            type: string
+            const: private, no-store
+        X-Content-Type-Options:
+          schema:
+            type: string
+            const: nosniff
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: operation image not found
+    '500':
+      description: The image metadata or private object could not be retrieved.
+      headers:
+        Cache-Control:
+          schema:
+            type: string
+            const: private, no-store
+        X-Content-Type-Options:
+          schema:
+            type: string
+            const: nosniff
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: internal server error

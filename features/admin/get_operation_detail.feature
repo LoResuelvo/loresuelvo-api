@@ -14,7 +14,6 @@ Feature: Consultar el detalle administrativo de una operación
 
     Rule: El detalle corresponde a una identidad estable y sólo agrega evidencia de la operación consultada
 
-        @wip
         Scenario: 64.1.1-OD Mostrar solicitud, evaluación persistida, procedencia de contacto y sus imágenes
             Given que el consumidor "ana@example.com" tiene la dirección actual "Av. Rivadavia", número "1420", piso "3", unidad "B"
             And que existe la conversación "C1" del consumidor "ana@example.com" con los siguientes mensajes persistidos:
@@ -100,7 +99,6 @@ Feature: Consultar el detalle administrativo de una operación
 
     Rule: La orden expone evidencia persistida de finalización y review sin revelar los medios privados
 
-        @wip
         Scenario: 64.1.4-OD Mostrar reporte y review persistidos de la orden
             Given que existe la siguiente solicitud de trabajo:
                 | solicitud | consumidor      | prestador        | creada               | estado   | título            | descripción             |
@@ -127,7 +125,6 @@ Feature: Consultar el detalle administrativo de una operación
                 | solicitud | consumidor      | prestador        | creada               | estado  | título               | descripción             |
                 | S1        | ana@example.com | juan@example.com | 2026-09-20T12:00:00Z | pending | Revisar instalación | Hay una falla eléctrica. |
 
-        @wip
         Scenario: 64.1.5-OD Informar datos ausentes cuando no hay relaciones persistidas
             Given que no existen dirección, propuestas, órdenes, reportes, reviews ni referencias de pago persistidas para "S1"
             When consulto el detalle administrativo de la operación de la solicitud "S1"
@@ -148,21 +145,18 @@ Feature: Consultar el detalle administrativo de una operación
                 | archivo   | nombre original | mime_type  | propósito          | creada               |
                 | request-1 | caño.jpg        | image/jpeg | job_request_image | 2026-09-20T12:01:00Z |
 
-        @wip
         Scenario: 64.1.6-OD Autorizar la recuperación de una imagen privada de la solicitud
             When solicito la imagen privada "request-1" como administrador de operaciones
             Then el sistema responde con estado 200 y el contenido corresponde al archivo "request-1"
             And la respuesta de imagen incluye "Cache-Control" con valor "private, no-store"
             And la respuesta no expone acceso público anónimo a la imagen
 
-        @wip
         Scenario: 64.1.7-OD Rechazar la recuperación de una imagen privada sin autenticación administrativa
             Given que no envío un token Bearer
             When solicito la imagen privada "request-1" como administrador de operaciones
             Then el sistema responde con estado 401
             And no se entrega ningún byte de la imagen
 
-        @wip
         Scenario: 64.1.7a-OD Rechazar la recuperación de una imagen privada sin permiso de operaciones
             Given que estoy autenticado como administrador "operador@example.com" solamente con el permiso "read:admin_audit"
             When solicito la imagen privada "request-1" como administrador de operaciones
@@ -218,7 +212,6 @@ Feature: Consultar el detalle administrativo de una operación
                 | solicitud | consumidor      | prestador        | creada               | estado   | título          | descripción      |
                 | S1        | ana@example.com | juan@example.com | 2026-09-20T12:00:00Z | accepted | Revisar cañería | Hay una pérdida. |
 
-        @wip
         Scenario: 64.1.12-OD Preparar el resultado de auditoría antes de entregar el detalle sin cambiar la contratación
             Given que no existe un evento de auditoría para la correlación "request-operation-detail-1"
             When consulto el detalle administrativo de la solicitud "S1" con la correlación "request-operation-detail-1"

@@ -1502,6 +1502,355 @@
                 }
             }
         },
+        "/admin/operations/{id}": {
+            "get": {
+                "tags": [
+                    "Administration"
+                ],
+                "operationId": "getAdminOperationDetail",
+                "summary": "Get the audited detail of one hiring operation",
+                "description": "Returns persisted request, selected proposal and order, related proposals, completion/review evidence, internal payment-intent references and exact timeline events for a stable inbox operation ID. Requires the `read:admin_operations` permission. The first proposal belongs to its request's `jr-<id>` operation; later proposals use `sp-<id>`. Payment milestones and timeline are restricted to the selected operation, never its siblings. The request's source assessment is resolved by its persisted reference, not the conversation's latest assessment; the address is the consumer's current address, not a historical snapshot. Missing relations are null or empty rather than synthesized. No messages, chat excerpts, storage URLs, checkout URLs, credentials or provider payment payloads are returned. A prepared audit access event is saved before the detail is delivered; audit persistence failure returns 500 without partial detail. Responses use `Cache-Control: private, no-store`.",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "description": "Stable operation ID from the administrative inbox.",
+                        "schema": {
+                            "type": "string",
+                            "pattern": "^(jr|sp)-[1-9][0-9]*$"
+                        },
+                        "example": "jr-12"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Persisted operation detail after its access event is prepared.",
+                        "headers": {
+                            "Cache-Control": {
+                                "description": "Prevents storage of private administrative detail.",
+                                "schema": {
+                                    "type": "string",
+                                    "const": "private, no-store"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AdminOperationDetail"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "The operation ID is malformed or invalid.",
+                        "headers": {
+                            "Cache-Control": {
+                                "schema": {
+                                    "type": "string",
+                                    "const": "private, no-store"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                },
+                                "example": {
+                                    "error": "invalid operation ID"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "The Bearer token is missing or invalid.",
+                        "headers": {
+                            "Cache-Control": {
+                                "schema": {
+                                    "type": "string",
+                                    "const": "private, no-store"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AuthErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "The Bearer token lacks `read:admin_operations`.",
+                        "headers": {
+                            "Cache-Control": {
+                                "schema": {
+                                    "type": "string",
+                                    "const": "private, no-store"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                },
+                                "example": {
+                                    "error": "insufficient permissions"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "No operation has this stable ID.",
+                        "headers": {
+                            "Cache-Control": {
+                                "schema": {
+                                    "type": "string",
+                                    "const": "private, no-store"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                },
+                                "example": {
+                                    "error": "operation not found"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "The detail could not be read or its access audit event could not be saved.",
+                        "headers": {
+                            "Cache-Control": {
+                                "schema": {
+                                    "type": "string",
+                                    "const": "private, no-store"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                },
+                                "example": {
+                                    "error": "internal server error"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/operations/{id}/images/{file_id}": {
+            "get": {
+                "tags": [
+                    "Administration"
+                ],
+                "operationId": "getAdminOperationImage",
+                "summary": "Retrieve a private image associated with an operation",
+                "description": "Returns the bytes of a confirmed private job-request or completion-report image associated with the selected stable operation. Request images are shared request context; completion images belong only to the selected proposal's work order. Requires a Bearer JWT with `read:admin_operations`; a file ID alone never grants access. No public or signed storage URL is disclosed. Responses use `Cache-Control: private, no-store` and `X-Content-Type-Options: nosniff`.",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "description": "Stable operation ID from the administrative inbox.",
+                        "schema": {
+                            "type": "string",
+                            "pattern": "^(jr|sp)-[1-9][0-9]*$"
+                        },
+                        "example": "jr-12"
+                    },
+                    {
+                        "name": "file_id",
+                        "in": "path",
+                        "required": true,
+                        "description": "Canonical UUID from an image metadata entry in the detail response.",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "example": "61f99ae1-a8b8-4591-8a9b-012393e7b54d"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Private image bytes.",
+                        "headers": {
+                            "Cache-Control": {
+                                "schema": {
+                                    "type": "string",
+                                    "const": "private, no-store"
+                                }
+                            },
+                            "X-Content-Type-Options": {
+                                "schema": {
+                                    "type": "string",
+                                    "const": "nosniff"
+                                }
+                            }
+                        },
+                        "content": {
+                            "image/jpeg": {
+                                "schema": {
+                                    "type": "string",
+                                    "format": "binary"
+                                }
+                            },
+                            "image/png": {
+                                "schema": {
+                                    "type": "string",
+                                    "format": "binary"
+                                }
+                            },
+                            "image/webp": {
+                                "schema": {
+                                    "type": "string",
+                                    "format": "binary"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "The operation or image ID is malformed or invalid.",
+                        "headers": {
+                            "Cache-Control": {
+                                "schema": {
+                                    "type": "string",
+                                    "const": "private, no-store"
+                                }
+                            },
+                            "X-Content-Type-Options": {
+                                "schema": {
+                                    "type": "string",
+                                    "const": "nosniff"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                },
+                                "example": {
+                                    "error": "invalid operation or image ID"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "The Bearer token is missing or invalid.",
+                        "headers": {
+                            "Cache-Control": {
+                                "schema": {
+                                    "type": "string",
+                                    "const": "private, no-store"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AuthErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "The Bearer token lacks `read:admin_operations`.",
+                        "headers": {
+                            "Cache-Control": {
+                                "schema": {
+                                    "type": "string",
+                                    "const": "private, no-store"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                },
+                                "example": {
+                                    "error": "insufficient permissions"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "The image is not associated with this operation, or is not a confirmed private image eligible for retrieval.",
+                        "headers": {
+                            "Cache-Control": {
+                                "schema": {
+                                    "type": "string",
+                                    "const": "private, no-store"
+                                }
+                            },
+                            "X-Content-Type-Options": {
+                                "schema": {
+                                    "type": "string",
+                                    "const": "nosniff"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                },
+                                "example": {
+                                    "error": "operation image not found"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "The image metadata or private object could not be retrieved.",
+                        "headers": {
+                            "Cache-Control": {
+                                "schema": {
+                                    "type": "string",
+                                    "const": "private, no-store"
+                                }
+                            },
+                            "X-Content-Type-Options": {
+                                "schema": {
+                                    "type": "string",
+                                    "const": "nosniff"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                },
+                                "example": {
+                                    "error": "internal server error"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/providers": {
             "get": {
                 "tags": [
@@ -6237,6 +6586,670 @@
                     }
                 },
                 "additionalProperties": false
+            },
+            "AdminOperationDetail": {
+                "type": "object",
+                "description": "Persisted evidence for one stable administrative operation. Null means that the corresponding relation or recorded value is absent; empty arrays mean that no matching records exist. No chat content, storage URL, checkout URL, credential, or payment-provider payload is exposed.",
+                "required": [
+                    "id",
+                    "started_on",
+                    "job_request",
+                    "service_proposal",
+                    "related_proposals",
+                    "work_order",
+                    "payment_milestones",
+                    "timeline",
+                    "consumer",
+                    "provider",
+                    "category",
+                    "address",
+                    "source_assessment"
+                ],
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "pattern": "^(jr|sp)-[1-9][0-9]*$",
+                        "description": "Stable identity shared with the administrative operations inbox."
+                    },
+                    "started_on": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "job_request": {
+                        "oneOf": [
+                            {
+                                "$ref": "#/components/schemas/AdminOperationDetail/$defs/JobRequest"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "description": "Null for a proposal that has no linked job request."
+                    },
+                    "service_proposal": {
+                        "oneOf": [
+                            {
+                                "$ref": "#/components/schemas/AdminOperationDetail/$defs/Proposal"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "description": "Only the proposal belonging to this operation, if any."
+                    },
+                    "related_proposals": {
+                        "type": "array",
+                        "description": "Proposals in the same conversation, each with its own stable operation ID. These are context, not primary payment or timeline evidence.",
+                        "items": {
+                            "$ref": "#/components/schemas/AdminOperationDetail/$defs/RelatedProposal"
+                        }
+                    },
+                    "work_order": {
+                        "oneOf": [
+                            {
+                                "$ref": "#/components/schemas/AdminOperationDetail/$defs/WorkOrder"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "description": "The selected proposal's work order, if one exists."
+                    },
+                    "payment_milestones": {
+                        "type": "array",
+                        "description": "Internal payment-intent references for the selected proposal only; statuses are payment-intent statuses, not transaction statuses.",
+                        "items": {
+                            "$ref": "#/components/schemas/AdminOperationDetail/$defs/PaymentMilestone"
+                        }
+                    },
+                    "timeline": {
+                        "type": "array",
+                        "description": "Events backed by recorded timestamps for this operation, sorted by occurred_on, then type, then source_id. No inferred request acceptance timestamp or chat event is emitted.",
+                        "items": {
+                            "$ref": "#/components/schemas/AdminOperationDetail/$defs/TimelineEvent"
+                        }
+                    },
+                    "consumer": {
+                        "$ref": "#/components/schemas/AdminOperationParty"
+                    },
+                    "provider": {
+                        "$ref": "#/components/schemas/AdminOperationParty"
+                    },
+                    "category": {
+                        "oneOf": [
+                            {
+                                "$ref": "#/components/schemas/AdminOperationDetail/$defs/Category"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "description": "Provider category, or null if unavailable."
+                    },
+                    "address": {
+                        "oneOf": [
+                            {
+                                "$ref": "#/components/schemas/AdminOperationDetail/$defs/Address"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "description": "Current consumer address, not a historical request snapshot."
+                    },
+                    "source_assessment": {
+                        "oneOf": [
+                            {
+                                "$ref": "#/components/schemas/AdminOperationDetail/$defs/SourceAssessment"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "description": "Assessment referenced by the request's persisted source_assessment_id; null when no such reference exists. Never inferred from the latest conversation assessment."
+                    }
+                },
+                "additionalProperties": false,
+                "$defs": {
+                    "Category": {
+                        "type": "object",
+                        "required": [
+                            "id",
+                            "name"
+                        ],
+                        "properties": {
+                            "id": {
+                                "type": "integer",
+                                "minimum": 1
+                            },
+                            "name": {
+                                "type": "string"
+                            }
+                        },
+                        "additionalProperties": false
+                    },
+                    "PrivateImage": {
+                        "type": "object",
+                        "description": "Confirmed private image metadata; bytes require the protected image endpoint.",
+                        "required": [
+                            "file_id",
+                            "original_name",
+                            "mime_type",
+                            "purpose",
+                            "created_on"
+                        ],
+                        "properties": {
+                            "file_id": {
+                                "type": "string",
+                                "format": "uuid"
+                            },
+                            "original_name": {
+                                "type": "string"
+                            },
+                            "mime_type": {
+                                "type": "string",
+                                "enum": [
+                                    "image/jpeg",
+                                    "image/png",
+                                    "image/webp"
+                                ]
+                            },
+                            "purpose": {
+                                "type": "string",
+                                "enum": [
+                                    "job_request_image",
+                                    "work_order_completion_image"
+                                ]
+                            },
+                            "created_on": {
+                                "type": "string",
+                                "format": "date-time"
+                            }
+                        },
+                        "additionalProperties": false
+                    },
+                    "JobRequest": {
+                        "type": "object",
+                        "required": [
+                            "id",
+                            "status",
+                            "title",
+                            "description",
+                            "created_on",
+                            "images"
+                        ],
+                        "properties": {
+                            "id": {
+                                "type": "integer",
+                                "minimum": 1
+                            },
+                            "status": {
+                                "type": "string",
+                                "enum": [
+                                    "pending",
+                                    "accepted"
+                                ]
+                            },
+                            "title": {
+                                "type": "string"
+                            },
+                            "description": {
+                                "type": "string"
+                            },
+                            "created_on": {
+                                "type": "string",
+                                "format": "date-time"
+                            },
+                            "images": {
+                                "type": "array",
+                                "items": {
+                                    "$ref": "#/components/schemas/AdminOperationDetail/$defs/PrivateImage"
+                                }
+                            }
+                        },
+                        "additionalProperties": false
+                    },
+                    "Proposal": {
+                        "type": "object",
+                        "required": [
+                            "id",
+                            "status",
+                            "description",
+                            "amount_cents",
+                            "currency",
+                            "created_on",
+                            "scheduled_on",
+                            "estimated_duration_minutes",
+                            "deposit_cents",
+                            "platform_fee_total_cents",
+                            "platform_fee_due_now_cents",
+                            "service_balance_cents",
+                            "platform_fee_balance_cents"
+                        ],
+                        "properties": {
+                            "id": {
+                                "type": "integer",
+                                "minimum": 1
+                            },
+                            "status": {
+                                "type": "string",
+                                "enum": [
+                                    "pending",
+                                    "accepted",
+                                    "rejected"
+                                ]
+                            },
+                            "description": {
+                                "type": "string"
+                            },
+                            "amount_cents": {
+                                "type": "integer",
+                                "format": "int64"
+                            },
+                            "currency": {
+                                "type": "string",
+                                "enum": [
+                                    "ARS"
+                                ]
+                            },
+                            "created_on": {
+                                "type": "string",
+                                "format": "date-time"
+                            },
+                            "scheduled_on": {
+                                "type": "string",
+                                "format": "date-time"
+                            },
+                            "estimated_duration_minutes": {
+                                "type": "integer"
+                            },
+                            "deposit_cents": {
+                                "type": "integer",
+                                "format": "int64"
+                            },
+                            "platform_fee_total_cents": {
+                                "type": "integer",
+                                "format": "int64"
+                            },
+                            "platform_fee_due_now_cents": {
+                                "type": "integer",
+                                "format": "int64"
+                            },
+                            "service_balance_cents": {
+                                "type": "integer",
+                                "format": "int64"
+                            },
+                            "platform_fee_balance_cents": {
+                                "type": "integer",
+                                "format": "int64"
+                            }
+                        },
+                        "additionalProperties": false
+                    },
+                    "RelatedProposal": {
+                        "type": "object",
+                        "required": [
+                            "operation_id",
+                            "id",
+                            "status",
+                            "description",
+                            "amount_cents",
+                            "currency",
+                            "created_on",
+                            "scheduled_on",
+                            "estimated_duration_minutes",
+                            "deposit_cents",
+                            "platform_fee_total_cents",
+                            "platform_fee_due_now_cents",
+                            "service_balance_cents",
+                            "platform_fee_balance_cents"
+                        ],
+                        "properties": {
+                            "operation_id": {
+                                "type": "string",
+                                "pattern": "^(jr|sp)-[1-9][0-9]*$"
+                            },
+                            "id": {
+                                "type": "integer",
+                                "minimum": 1
+                            },
+                            "status": {
+                                "type": "string",
+                                "enum": [
+                                    "pending",
+                                    "accepted",
+                                    "rejected"
+                                ]
+                            },
+                            "description": {
+                                "type": "string"
+                            },
+                            "amount_cents": {
+                                "type": "integer",
+                                "format": "int64"
+                            },
+                            "currency": {
+                                "type": "string",
+                                "enum": [
+                                    "ARS"
+                                ]
+                            },
+                            "created_on": {
+                                "type": "string",
+                                "format": "date-time"
+                            },
+                            "scheduled_on": {
+                                "type": "string",
+                                "format": "date-time"
+                            },
+                            "estimated_duration_minutes": {
+                                "type": "integer"
+                            },
+                            "deposit_cents": {
+                                "type": "integer",
+                                "format": "int64"
+                            },
+                            "platform_fee_total_cents": {
+                                "type": "integer",
+                                "format": "int64"
+                            },
+                            "platform_fee_due_now_cents": {
+                                "type": "integer",
+                                "format": "int64"
+                            },
+                            "service_balance_cents": {
+                                "type": "integer",
+                                "format": "int64"
+                            },
+                            "platform_fee_balance_cents": {
+                                "type": "integer",
+                                "format": "int64"
+                            }
+                        },
+                        "additionalProperties": false
+                    },
+                    "WorkOrder": {
+                        "type": "object",
+                        "required": [
+                            "id",
+                            "status",
+                            "accepted_on",
+                            "completion_reported_on",
+                            "balance_paid_on",
+                            "completion_report",
+                            "review"
+                        ],
+                        "properties": {
+                            "id": {
+                                "type": "integer",
+                                "minimum": 1
+                            },
+                            "status": {
+                                "type": "string",
+                                "enum": [
+                                    "scheduled",
+                                    "awaiting_payment",
+                                    "paid"
+                                ]
+                            },
+                            "accepted_on": {
+                                "type": "string",
+                                "format": "date-time"
+                            },
+                            "completion_reported_on": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ],
+                                "format": "date-time"
+                            },
+                            "balance_paid_on": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ],
+                                "format": "date-time"
+                            },
+                            "completion_report": {
+                                "oneOf": [
+                                    {
+                                        "$ref": "#/components/schemas/AdminOperationDetail/$defs/CompletionReport"
+                                    },
+                                    {
+                                        "type": "null"
+                                    }
+                                ]
+                            },
+                            "review": {
+                                "oneOf": [
+                                    {
+                                        "$ref": "#/components/schemas/AdminOperationDetail/$defs/Review"
+                                    },
+                                    {
+                                        "type": "null"
+                                    }
+                                ]
+                            }
+                        },
+                        "additionalProperties": false
+                    },
+                    "CompletionReport": {
+                        "type": "object",
+                        "required": [
+                            "description",
+                            "reported_on",
+                            "images"
+                        ],
+                        "properties": {
+                            "description": {
+                                "type": "string"
+                            },
+                            "reported_on": {
+                                "type": "string",
+                                "format": "date-time"
+                            },
+                            "images": {
+                                "type": "array",
+                                "items": {
+                                    "$ref": "#/components/schemas/AdminOperationDetail/$defs/PrivateImage"
+                                }
+                            }
+                        },
+                        "additionalProperties": false
+                    },
+                    "Review": {
+                        "type": "object",
+                        "description": "No review timestamp is recorded by this resource.",
+                        "required": [
+                            "rating",
+                            "description"
+                        ],
+                        "properties": {
+                            "rating": {
+                                "type": "integer",
+                                "minimum": 1,
+                                "maximum": 5
+                            },
+                            "description": {
+                                "type": "string"
+                            }
+                        },
+                        "additionalProperties": false
+                    },
+                    "PaymentMilestone": {
+                        "type": "object",
+                        "required": [
+                            "id",
+                            "purpose",
+                            "status",
+                            "created_on"
+                        ],
+                        "properties": {
+                            "id": {
+                                "type": "string",
+                                "format": "uuid"
+                            },
+                            "purpose": {
+                                "type": "string",
+                                "enum": [
+                                    "booking_deposit",
+                                    "service_balance"
+                                ]
+                            },
+                            "status": {
+                                "type": "string",
+                                "enum": [
+                                    "requires_checkout",
+                                    "checkout_ready",
+                                    "processing",
+                                    "paid",
+                                    "expired",
+                                    "cancelled",
+                                    "refunded",
+                                    "disputed",
+                                    "payment_mismatch",
+                                    "rejected"
+                                ]
+                            },
+                            "created_on": {
+                                "type": "string",
+                                "format": "date-time"
+                            }
+                        },
+                        "additionalProperties": false
+                    },
+                    "TimelineEvent": {
+                        "type": "object",
+                        "required": [
+                            "type",
+                            "source_type",
+                            "source_id",
+                            "occurred_on"
+                        ],
+                        "properties": {
+                            "type": {
+                                "type": "string",
+                                "enum": [
+                                    "job_request_created",
+                                    "service_proposal_created",
+                                    "work_order_accepted",
+                                    "completion_reported",
+                                    "balance_paid",
+                                    "payment_intent_created"
+                                ]
+                            },
+                            "source_type": {
+                                "type": "string",
+                                "enum": [
+                                    "job_request",
+                                    "service_proposal",
+                                    "work_order",
+                                    "payment_intent"
+                                ]
+                            },
+                            "source_id": {
+                                "type": "string",
+                                "description": "Decimal resource ID or payment-intent UUID."
+                            },
+                            "occurred_on": {
+                                "type": "string",
+                                "format": "date-time"
+                            }
+                        },
+                        "additionalProperties": false
+                    },
+                    "Address": {
+                        "type": "object",
+                        "required": [
+                            "street",
+                            "street_number",
+                            "floor",
+                            "unit",
+                            "source"
+                        ],
+                        "properties": {
+                            "street": {
+                                "type": "string"
+                            },
+                            "street_number": {
+                                "type": "string"
+                            },
+                            "floor": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "unit": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ]
+                            },
+                            "source": {
+                                "type": "string",
+                                "const": "current_consumer_address"
+                            }
+                        },
+                        "additionalProperties": false
+                    },
+                    "SourceAssessment": {
+                        "type": "object",
+                        "required": [
+                            "id",
+                            "version",
+                            "outcome",
+                            "category",
+                            "title",
+                            "description",
+                            "based_on_message_id",
+                            "created_on"
+                        ],
+                        "properties": {
+                            "id": {
+                                "type": "integer",
+                                "minimum": 1
+                            },
+                            "version": {
+                                "type": "integer",
+                                "minimum": 1
+                            },
+                            "outcome": {
+                                "type": "string",
+                                "enum": [
+                                    "collecting_information",
+                                    "self_service",
+                                    "professional_required"
+                                ]
+                            },
+                            "category": {
+                                "oneOf": [
+                                    {
+                                        "$ref": "#/components/schemas/AdminOperationDetail/$defs/Category"
+                                    },
+                                    {
+                                        "type": "null"
+                                    }
+                                ]
+                            },
+                            "title": {
+                                "type": "string"
+                            },
+                            "description": {
+                                "type": "string"
+                            },
+                            "based_on_message_id": {
+                                "type": "integer",
+                                "minimum": 1
+                            },
+                            "created_on": {
+                                "type": "string",
+                                "format": "date-time"
+                            }
+                        },
+                        "additionalProperties": false
+                    }
+                }
             },
             "AdminOperationParty": {
                 "type": "object",

@@ -66,6 +66,10 @@ paths:
     $ref: ./paths/admin-audit-logs.yaml
   /admin/operations:
     $ref: ./paths/admin-operations.yaml
+  /admin/operations/{id}:
+    $ref: ./paths/admin-operation-detail.yaml
+  /admin/operations/{id}/images/{file_id}:
+    $ref: ./paths/admin-operation-image.yaml
   /providers:
     $ref: ./paths/providers.yaml
   /providers/{providerID}:
@@ -252,6 +256,8 @@ components:
       $ref: ./components/schemas/admin-operation.yaml
     AdminOperationPage:
       $ref: ./components/schemas/admin-operation-page.yaml
+    AdminOperationDetail:
+      $ref: ./components/schemas/admin-operation-detail.yaml
     AdminOperationParty:
       $ref: ./components/schemas/admin-operation-party.yaml
     AdminOperationStage:
