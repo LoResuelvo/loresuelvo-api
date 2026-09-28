@@ -68,6 +68,8 @@ paths:
     $ref: ./paths/admin-operations.yaml
   /admin/operations/{id}:
     $ref: ./paths/admin-operation-detail.yaml
+  /admin/operations/{id}/conversation:
+    $ref: ./paths/admin-operation-chat.yaml
   /admin/operations/{id}/images/{file_id}:
     $ref: ./paths/admin-operation-image.yaml
   /providers:
@@ -258,6 +260,8 @@ components:
       $ref: ./components/schemas/admin-operation-page.yaml
     AdminOperationDetail:
       $ref: ./components/schemas/admin-operation-detail.yaml
+    AdminOperationChat:
+      $ref: ./components/schemas/admin-operation-chat.yaml
     AdminOperationParty:
       $ref: ./components/schemas/admin-operation-party.yaml
     AdminOperationStage:

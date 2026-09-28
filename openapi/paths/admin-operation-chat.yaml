@@ -1,0 +1,170 @@
+get:
+  tags: [Administration]
+  operationId: getAdminOperationChat
+  summary: Get an audited page of an operation's private conversation
+  description: >-
+    Requires `read:admin_chat_audit`, independently of `read:admin_operations`.
+    Resolves the persisted work conversation and participants from a stable
+    operation ID, never from a caller-selected conversation ID. The first
+    proposal associated with a request remains in its jr operation; later
+    proposals use sp identities and may share the same complete conversation.
+    Messages are not attributed exclusively to the selected proposal.
+    Every page requires authorization and the X-Audit-Reason header. The UI
+    may ask for the reason once on entry and resend it automatically on each
+    page. One access/prepared event is saved before delivery or generation of
+    private attachment access URLs. Prepared does not prove client receipt.
+    Audit failure returns 500 without messages or signed attachment access.
+    Only attachments owned by delivered messages and their persisted sender
+    are considered; confirmed/private/purpose media policy is enforced.
+    No participant membership, conversation state or realtime subscription is
+    changed. This is chronological keyset pagination, not a frozen snapshot.
+    Unknown or duplicated query parameters are rejected. A GET body cannot
+    supply the reason. All route responses use Cache-Control: private, no-store.
+  security:
+  - BearerAuth: []
+  parameters:
+  - name: id
+    in: path
+    required: true
+    description: Stable jr/sp operation ID; suffix must be 1 through 2147483647, without leading zeroes.
+    schema:
+      type: string
+      pattern: '^(jr|sp)-[1-9][0-9]*$'
+    example: sp-42
+  - name: X-Audit-Reason
+    in: header
+    required: true
+    description: >-
+      Human-authored reason required for each page. Unicode surrounding
+      whitespace is trimmed; the result must be nonempty valid UTF-8, contain
+      no Unicode control characters, and occupy 1–500 UTF-8 bytes. Do not
+      include messages, credentials or signed URLs. OpenAPI maxLength counts
+      characters, not trimmed UTF-8 bytes, so that runtime limit is documented
+      here rather than represented as an inaccurate raw-header maxLength.
+    schema:
+      type: string
+      minLength: 1
+    example: Investigate support incident 123
+  - name: X-Request-ID
+    in: header
+    required: false
+    description: >-
+      Optional correlation identifier. Invalid or missing values are replaced
+      by a generated ID; the effective value is returned in the response header.
+    schema:
+      type: string
+  - name: limit
+    in: query
+    required: false
+    description: >-
+      Decimal page size. Initial default is 20. With a cursor, omit this
+      parameter to inherit the signed limit, or repeat the same limit; a
+      different limit is rejected. Values must occur only once.
+    schema:
+      type: integer
+      minimum: 1
+      maximum: 100
+      default: 20
+  - name: cursor
+    in: query
+    required: false
+    description: >-
+      Nonempty opaque signed token from next_cursor, at most 4096 characters.
+      Binds version, stable operation, persisted conversation, limit and the
+      last delivered created_on/message-ID ordering key. Integrity and the
+      persisted association are checked again; it is not an authorization
+      credential. Do not decode, edit or reuse it for another operation.
+    schema:
+      type: string
+      minLength: 1
+      maxLength: 4096
+  responses:
+    '200':
+      description: Audited page with optional private media; empty messages is [], and exhausted next_cursor is null.
+      headers:
+        Cache-Control:
+          schema: {type: string, const: 'private, no-store'}
+        X-Request-ID:
+          description: Effective request correlation ID recorded in the access event.
+          schema: {type: string}
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/AdminOperationChat'
+          examples:
+            shared:
+              summary: Later proposal sharing historical messages with the first proposal
+              value:
+                operation_id: sp-42
+                conversation_id: 9
+                job_request_id: 12
+                service_proposal_id: 42
+                related_service_proposal_ids: [41, 42]
+                shared_conversation: true
+                messages:
+                - {id: 31, sender_role: consumer, content: First proposal question., created_on: '2026-09-20T13:05:00Z'}
+                - {id: 32, sender_role: provider, content: Second proposal answer., created_on: '2026-09-21T13:05:00Z'}
+                next_cursor: null
+            empty:
+              summary: Associated conversation without messages
+              value:
+                operation_id: jr-13
+                conversation_id: 10
+                job_request_id: 13
+                service_proposal_id: null
+                related_service_proposal_ids: []
+                shared_conversation: false
+                messages: []
+                next_cursor: null
+    '400':
+      description: Invalid operation ID, missing/invalid reason, or invalid/duplicated/unknown query parameter or cursor binding.
+      headers:
+        Cache-Control:
+          schema: {type: string, const: 'private, no-store'}
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            id: {value: {error: invalid operation ID}}
+            reason: {value: {error: invalid audit reason}}
+            query: {value: {error: invalid chat query}}
+    '401':
+      description: Missing or invalid Bearer token.
+      headers:
+        Cache-Control:
+          schema: {type: string, const: 'private, no-store'}
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/AuthErrorResponse'
+    '403':
+      description: Bearer token lacks read:admin_chat_audit, even if it has another administrative permission.
+      headers:
+        Cache-Control:
+          schema: {type: string, const: 'private, no-store'}
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example: {error: insufficient permissions}
+    '404':
+      description: No stable operation with a matching persisted work conversation/participants exists.
+      headers:
+        Cache-Control:
+          schema: {type: string, const: 'private, no-store'}
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example: {error: operation not found}
+    '500':
+      description: Operation/messages/media could not be read or resolved, or the access audit could not be saved. No partial chat response is delivered.
+      headers:
+        Cache-Control:
+          schema: {type: string, const: 'private, no-store'}
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example: {error: internal server error}

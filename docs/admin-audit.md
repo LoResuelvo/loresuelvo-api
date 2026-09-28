@@ -26,10 +26,11 @@ retain the original.
 | `Result` | Required: `succeeded`, `prepared`, or `failed` via the corresponding result constants. Create/execute allow succeeded or failed; access allows prepared or failed. |
 | `CorrelationID` | Required safe ASCII identifier, 1–128 bytes, linking the event to the operation/request without copying its payload. |
 | `Reason` | Optional `NewReason(text)`: trimmed, nonempty valid UTF-8, no Unicode control characters, at most 500 bytes. The **producer** decides which operations require a manual reason; do not include it in technical logs. |
+| `ConversationID` | Optional positive integer referencing the conversation involved in a producing use case. Defensively copied by the event. Persisted as nullable evidence without a foreign key, so deletion of the conversation does not invalidate recorded evidence. |
 | `StateChange` | Optional `NewStateChange(field, from, to)`: each component is snake_case, 1–64 bytes; `from` and `to` must differ. Only use it for a bounded, non-sensitive state transition. |
 
-Safe identifiers match `[A-Za-z0-9][A-Za-z0-9._:-]*`. The only structured metadata admitted by this contract is the typed `Reason`
-and `StateChange`. There is no generic metadata map or arbitrary HTTP-body
+Safe identifiers match `[A-Za-z0-9][A-Za-z0-9._:-]*`. The admitted metadata is explicitly typed: `Reason`, `StateChange`, and the
+optional positive `ConversationID` association. There is no generic metadata map or arbitrary HTTP-body
 field. Never put credentials, tokens, chat messages, documents, biometric
 material, signed URLs, or response payloads in an event. A producing use case
 must select and sanitize its own identifiers and state labels before building
@@ -42,6 +43,10 @@ received, displayed, or read the data. For sensitive reads, the producing
 use case must save the event **before** releasing the response and fail closed
 if persistence fails. It must not claim receipt or create one event per
 returned row.
+
+`ConversationID` is currently internal audit evidence: the allowlisted
+`AdminAuditLogEvent` HTTP mapper does not expose it. Do not silently expand
+that public response when adding a typed internal association.
 
 ## Integration boundary
 
@@ -92,6 +97,17 @@ authorization, privacy controls, and sanitized technical/security logs remain
 in force. No global audit middleware should be introduced. Do not expand the
 policy to new exports, private data, or future administrative mutations
 without a separately defined increment.
+
+The operation chat endpoint is `GET /admin/operations/{id}/conversation`
+(US-64.2, #217), independently guarded by `read:admin_chat_audit`. Its manual
+reason is required on each page; the frontend may ask once on entry and
+resend it automatically while paginating. Each page saves one access/prepared
+event before delivery or private media URL preparation. The event records the
+primary operation and typed conversation association, never chat text or
+attachments. Cursor navigation does not represent a frozen snapshot. See the
+[administrative operation chat contract](admin-operation-chat.md) for the
+permission boundaries, bounded pagination, fail-closed behavior and media
+ownership rules.
 
 ## Explicitly accepted risk
 
