@@ -3,6 +3,7 @@ package repositories
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	readmodel "github.com/LoResuelvo/loresuelvo-api/internal/domain/operation/read_model"
@@ -15,7 +16,9 @@ func NewOperationConversationReader(db *sql.DB) *OperationConversationReader {
 }
 
 const operationConversationAssociationSQL = operationSelectedSQL + `
-SELECT selected.conversation_id, selected.consumer_id, selected.provider_id, selected.job_request_id, selected.proposal_id
+SELECT selected.conversation_id, selected.consumer_id, selected.provider_id, selected.job_request_id, selected.proposal_id,
+ COALESCE((SELECT json_agg(sp.id ORDER BY sp.id) FROM service_proposals sp
+ WHERE sp.conversation_id = selected.conversation_id), '[]'::json)
 FROM selected
 JOIN conversations c ON c.id = selected.conversation_id AND c.type = 'work'
 JOIN work_conversations wc ON wc.conversation_id = c.id
@@ -24,12 +27,16 @@ JOIN work_conversations wc ON wc.conversation_id = c.id
 func (reader *OperationConversationReader) FindConversationAssociation(ctx context.Context, id readmodel.ID) (*readmodel.ConversationAssociation, error) {
 	var found readmodel.ConversationAssociation
 	var requestID, proposalID sql.NullInt64
-	err := reader.db.QueryRowContext(ctx, operationConversationAssociationSQL, string(id.Kind), id.ResourceID).Scan(&found.ConversationID, &found.ConsumerID, &found.ProviderID, &requestID, &proposalID)
+	var relatedProposalIDs []byte
+	err := reader.db.QueryRowContext(ctx, operationConversationAssociationSQL, string(id.Kind), id.ResourceID).Scan(&found.ConversationID, &found.ConsumerID, &found.ProviderID, &requestID, &proposalID, &relatedProposalIDs)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
 	if err != nil {
 		return nil, fmt.Errorf("querying operation conversation association: %w", err)
+	}
+	if err := json.Unmarshal(relatedProposalIDs, &found.RelatedServiceProposalIDs); err != nil {
+		return nil, fmt.Errorf("decoding operation conversation proposal associations: %w", err)
 	}
 	if requestID.Valid {
 		value := int(requestID.Int64)

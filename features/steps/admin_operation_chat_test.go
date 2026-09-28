@@ -3,10 +3,14 @@ package steps_test
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/payment"
+	serviceproposal "github.com/LoResuelvo/loresuelvo-api/internal/domain/service_proposal"
 	"io"
 	"net/http"
 	"reflect"
+	"slices"
 	"strconv"
+	"time"
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/audit"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/conversation"
@@ -23,6 +27,11 @@ type operationChatState struct {
 func registerAdminOperationChatSteps(sc *godog.ScenarioContext, suite *testSuite) {
 	sc.Step(`^que existe la siguiente solicitud de trabajo con una única conversación de trabajo "([^"]*)" creada junto con ella y activada al ser aceptada por "([^"]*)":$`, suite.thereIsOperationChat)
 	sc.Step(`^que "([^"]*)" tiene los siguientes mensajes persistidos:$`, suite.operationChatHasMessages)
+	sc.Step(`^que "([^"]*)" contiene los siguientes mensajes persistidos:$`, suite.operationChatHasMessages)
+	sc.Step(`^que existen las siguientes propuestas vinculadas a "([^"]*)":$`, suite.operationChatHasProposals)
+	sc.Step(`^consulto el chat administrativo de la operación "sp-" seguida del ID persistido de "([^"]*)" con motivo "([^"]*)"$`, suite.queryProposalOperationChat)
+	sc.Step(`^la respuesta identifica la operación "sp-" seguida del ID persistido de "([^"]*)" y su vínculo con la conversación "([^"]*)" compartida con "([^"]*)"$`, suite.operationChatIdentifiesSharedProposal)
+	sc.Step(`^la página incluye "([^"]*)" y "([^"]*)" con sus instantes persistidos, sin atribuir ambos exclusivamente a "([^"]*)"$`, suite.operationChatMessagesAreConversationScoped)
 	sc.Step(`^consulto el chat administrativo de la operación de la solicitud "([^"]*)" con la cabecera "X-Audit-Reason" igual a "([^"]*)" y la correlación "([^"]*)"$`, suite.queryOperationChat)
 	sc.Step(`^la respuesta identifica la operación "jr-" seguida del ID persistido de "([^"]*)", la conversación "([^"]*)" y su vínculo con la solicitud$`, suite.operationChatIdentifiesRequest)
 	sc.Step(`^la página contiene "([^"]*)" y "([^"]*)" en ese orden, con ID, rol remitente, contenido e instante de creación persistidos$`, suite.operationChatContainsMessages)
@@ -83,7 +92,11 @@ func (suite *testSuite) queryOperationChat(label, reason, correlation string) er
 	if err := testsupport.ResetOperationDetailAuditCorrelation(suite.scenarioContext, suite.database, correlation); err != nil {
 		return err
 	}
-	request, err := http.NewRequest(http.MethodGet, suite.server.URL+operationsInboxPath+"/jr-"+strconv.Itoa(fixture.id)+"/conversation", nil)
+	return suite.sendOperationChatGet("jr-"+strconv.Itoa(fixture.id), reason, correlation)
+}
+
+func (suite *testSuite) sendOperationChatGet(operationID, reason, correlation string) error {
+	request, err := http.NewRequest(http.MethodGet, suite.server.URL+operationsInboxPath+"/"+operationID+"/conversation", nil)
 	if err != nil {
 		return err
 	}
@@ -212,6 +225,137 @@ func (suite *testSuite) operationChatAuditMinimized() error {
 	}
 	if event.StateChange() != nil {
 		return fmt.Errorf("chat access audit contains changes")
+	}
+	return nil
+}
+
+func (suite *testSuite) operationChatHasProposals(requestLabel string, table *godog.Table) error {
+	rows, err := inboxTableRows(table)
+	if err != nil {
+		return err
+	}
+	return suite.withInboxFixtureClock(func() error {
+		for _, row := range rows {
+			created, err := parseInboxInstant(row["creada"])
+			if err != nil {
+				return err
+			}
+			status := serviceproposal.Status(row["estado"])
+			if status != serviceproposal.StatusPending && status != serviceproposal.StatusAccepted {
+				return fmt.Errorf("unsupported proposal fixture status %q", status)
+			}
+			label := row["propuesta"]
+			if err := suite.createInboxServiceProposal(label, requestLabel, created, created.Add(72*time.Hour), 60, string(status)); err != nil {
+				return err
+			}
+			fixture := suite.operationInbox.proposals[label]
+			repository := suite.dependencies.Persistence.ServiceProposalRepository
+			proposal, err := repository.FindByID(suite.scenarioContext, fixture.id)
+			if err != nil {
+				return err
+			}
+			if status == serviceproposal.StatusAccepted {
+				if err := proposal.Accept(proposal.Consumer.ID(), created); err != nil {
+					return err
+				}
+				if err := suite.dependencies.Persistence.PaymentUnitOfWork.Execute(suite.scenarioContext, func(store payment.TransactionalStore) error {
+					return store.SaveServiceProposal(suite.scenarioContext, proposal)
+				}); err != nil {
+					return err
+				}
+			}
+			persisted, err := repository.FindByID(suite.scenarioContext, fixture.id)
+			if err != nil {
+				return err
+			}
+			if persisted.Status != status || !persisted.CreatedOn.Equal(created) {
+				return fmt.Errorf("proposal %q does not match persisted historical fixture", label)
+			}
+			// FindByID does not hydrate Conversation; the participant collection does.
+			participantProposals, err := repository.FindByUserID(suite.scenarioContext, persisted.Consumer.ID())
+			if err != nil {
+				return err
+			}
+			request := suite.operationInbox.requests[requestLabel]
+			associationVerified := false
+			for _, participantProposal := range participantProposals {
+				if participantProposal.ID != persisted.ID {
+					continue
+				}
+				if participantProposal.Conversation == nil || participantProposal.Conversation.ID() != request.conversationID {
+					return fmt.Errorf("proposal %q has incorrect persisted conversation association", label)
+				}
+				associationVerified = true
+			}
+			if !associationVerified {
+				return fmt.Errorf("proposal %q is absent from persisted participant proposals", label)
+			}
+		}
+		return nil
+	})
+}
+
+func (suite *testSuite) queryProposalOperationChat(label, reason string) error {
+	proposal, ok := suite.operationInbox.proposals[label]
+	if !ok {
+		return fmt.Errorf("unknown proposal %q", label)
+	}
+	return suite.sendOperationChatGet("sp-"+strconv.Itoa(proposal.id), reason, "")
+}
+
+func (suite *testSuite) operationChatIdentifiesSharedProposal(selectedLabel, conversationLabel, relatedLabel string) error {
+	selected, ok := suite.operationInbox.proposals[selectedLabel]
+	if !ok {
+		return fmt.Errorf("unknown selected proposal %q", selectedLabel)
+	}
+	related, ok := suite.operationInbox.proposals[relatedLabel]
+	if !ok {
+		return fmt.Errorf("unknown related proposal %q", relatedLabel)
+	}
+	conversationID, ok := suite.operationChat.conversations[conversationLabel]
+	if !ok {
+		return fmt.Errorf("unknown conversation %q", conversationLabel)
+	}
+	var response struct {
+		OperationID               string `json:"operation_id"`
+		ConversationID            int    `json:"conversation_id"`
+		JobRequestID              *int   `json:"job_request_id"`
+		ServiceProposalID         *int   `json:"service_proposal_id"`
+		RelatedServiceProposalIDs []int  `json:"related_service_proposal_ids"`
+		SharedConversation        bool   `json:"shared_conversation"`
+	}
+	if err := json.Unmarshal(suite.lastBody, &response); err != nil {
+		return err
+	}
+	request := suite.operationInbox.requests[selected.requestLabel]
+	expected := []int{selected.id, related.id}
+	slices.Sort(expected)
+	if response.OperationID != "sp-"+strconv.Itoa(selected.id) || response.ServiceProposalID == nil || *response.ServiceProposalID != selected.id || response.ConversationID != conversationID || response.JobRequestID == nil || *response.JobRequestID != request.id || !response.SharedConversation || !slices.Equal(response.RelatedServiceProposalIDs, expected) {
+		return fmt.Errorf("incorrect shared proposal association: %s", suite.lastBody)
+	}
+	return nil
+}
+
+func (suite *testSuite) operationChatMessagesAreConversationScoped(first, second, selectedLabel string) error {
+	if _, ok := suite.operationInbox.proposals[selectedLabel]; !ok {
+		return fmt.Errorf("unknown proposal %q", selectedLabel)
+	}
+	if err := suite.operationChatContainsMessages(first, second); err != nil {
+		return err
+	}
+	var response struct {
+		Messages []map[string]json.RawMessage `json:"messages"`
+	}
+	if err := json.Unmarshal(suite.lastBody, &response); err != nil {
+		return err
+	}
+	allowed := map[string]bool{"id": true, "sender_role": true, "content": true, "created_on": true}
+	for _, message := range response.Messages {
+		for field := range message {
+			if !allowed[field] {
+				return fmt.Errorf("conversation message contains unexpected attribution or private field %q", field)
+			}
+		}
 	}
 	return nil
 }

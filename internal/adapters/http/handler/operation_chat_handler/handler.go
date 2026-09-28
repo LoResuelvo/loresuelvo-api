@@ -52,11 +52,13 @@ func (handler *Handler) Get(c *gin.Context) {
 }
 
 type chatResponse struct {
-	OperationID       string            `json:"operation_id"`
-	ConversationID    int               `json:"conversation_id"`
-	JobRequestID      *int              `json:"job_request_id"`
-	ServiceProposalID *int              `json:"service_proposal_id"`
-	Messages          []messageResponse `json:"messages"`
+	OperationID               string            `json:"operation_id"`
+	ConversationID            int               `json:"conversation_id"`
+	JobRequestID              *int              `json:"job_request_id"`
+	ServiceProposalID         *int              `json:"service_proposal_id"`
+	RelatedServiceProposalIDs []int             `json:"related_service_proposal_ids"`
+	SharedConversation        bool              `json:"shared_conversation"`
+	Messages                  []messageResponse `json:"messages"`
 }
 type messageResponse struct {
 	ID         int       `json:"id"`
@@ -66,7 +68,8 @@ type messageResponse struct {
 }
 
 func responseFromDomain(found *readmodel.OperationChat) chatResponse {
-	response := chatResponse{OperationID: string(found.OperationID.Kind) + "-" + strconv.Itoa(found.OperationID.ResourceID), ConversationID: found.ConversationID, JobRequestID: found.JobRequestID, ServiceProposalID: found.ServiceProposalID, Messages: make([]messageResponse, 0, len(found.Messages))}
+	relatedProposalIDs := append(make([]int, 0, len(found.RelatedServiceProposalIDs)), found.RelatedServiceProposalIDs...)
+	response := chatResponse{RelatedServiceProposalIDs: relatedProposalIDs, SharedConversation: found.IsShared(), OperationID: string(found.OperationID.Kind) + "-" + strconv.Itoa(found.OperationID.ResourceID), ConversationID: found.ConversationID, JobRequestID: found.JobRequestID, ServiceProposalID: found.ServiceProposalID, Messages: make([]messageResponse, 0, len(found.Messages))}
 	for _, message := range found.Messages {
 		response.Messages = append(response.Messages, messageResponse{ID: message.ID, SenderRole: message.SenderRole, Content: message.Content, CreatedOn: message.CreatedOn.UTC()})
 	}

@@ -38,7 +38,7 @@ func TestGetMapsMessagesWithoutPrivateAttachmentMetadata(t *testing.T) {
 	response := httptest.NewRecorder()
 	chatRouter(service).ServeHTTP(response, request)
 	require.Equal(t, http.StatusOK, response.Code)
-	require.JSONEq(t, `{"operation_id":"jr-12","conversation_id":9,"job_request_id":12,"service_proposal_id":null,"messages":[{"id":4,"sender_role":"consumer","content":"Help","created_on":"2026-09-20T12:00:00Z"}]}`, response.Body.String())
+	require.JSONEq(t, `{"operation_id":"jr-12","conversation_id":9,"job_request_id":12,"service_proposal_id":null,"related_service_proposal_ids":[],"shared_conversation":false,"messages":[{"id":4,"sender_role":"consumer","content":"Help","created_on":"2026-09-20T12:00:00Z"}]}`, response.Body.String())
 	service.AssertExpectations(t)
 }
 func TestGetMapsDomainErrorsWithoutLeakingChat(t *testing.T) {
@@ -68,5 +68,30 @@ func TestGetDoesNotTakeReasonFromGETBody(t *testing.T) {
 	response := httptest.NewRecorder()
 	chatRouter(service).ServeHTTP(response, request)
 	require.Equal(t, 400, response.Code)
+	service.AssertExpectations(t)
+}
+
+func TestGetIdentifiesSharedConversationWithoutAssigningMessagesToProposal(t *testing.T) {
+	service := &chatServiceMock{}
+	requestID, firstProposalID, selectedProposalID := 12, 21, 22
+	found := &readmodel.OperationChat{
+		OperationID: readmodel.ID{Kind: readmodel.KindServiceProposal, ResourceID: selectedProposalID},
+		ConversationAssociation: readmodel.ConversationAssociation{
+			ConversationID: 9, JobRequestID: &requestID, ServiceProposalID: &selectedProposalID,
+			RelatedServiceProposalIDs: []int{firstProposalID, selectedProposalID},
+		},
+		Messages: []conversation.Message{
+			{ID: 4, ConversationID: 9, SenderRole: "consumer", Content: "First proposal", CreatedOn: time.Date(2026, 9, 20, 13, 5, 0, 0, time.UTC)},
+			{ID: 5, ConversationID: 9, SenderRole: "consumer", Content: "Second proposal", CreatedOn: time.Date(2026, 9, 21, 13, 5, 0, 0, time.UTC)},
+		},
+	}
+	service.On("Query", mock.Anything, "sp-22", "auth0|support", "chat-shared-request", "Investigate").Return(found, nil).Once()
+	request := httptest.NewRequest(http.MethodGet, "/admin/operations/sp-22/conversation", nil)
+	request.Header.Set("X-Audit-Reason", "Investigate")
+	request.Header.Set("X-Request-ID", "chat-shared-request")
+	response := httptest.NewRecorder()
+	chatRouter(service).ServeHTTP(response, request)
+	require.Equal(t, 200, response.Code)
+	require.JSONEq(t, `{"operation_id":"sp-22","conversation_id":9,"job_request_id":12,"service_proposal_id":22,"related_service_proposal_ids":[21,22],"shared_conversation":true,"messages":[{"id":4,"sender_role":"consumer","content":"First proposal","created_on":"2026-09-20T13:05:00Z"},{"id":5,"sender_role":"consumer","content":"Second proposal","created_on":"2026-09-21T13:05:00Z"}]}`, response.Body.String())
 	service.AssertExpectations(t)
 }
