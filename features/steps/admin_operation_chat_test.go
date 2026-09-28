@@ -7,9 +7,11 @@ import (
 	serviceproposal "github.com/LoResuelvo/loresuelvo-api/internal/domain/service_proposal"
 	"io"
 	"net/http"
+	"net/url"
 	"reflect"
 	"slices"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/audit"
@@ -28,6 +30,9 @@ func registerAdminOperationChatSteps(sc *godog.ScenarioContext, suite *testSuite
 	sc.Step(`^que existe la siguiente solicitud de trabajo con una única conversación de trabajo "([^"]*)" creada junto con ella y activada al ser aceptada por "([^"]*)":$`, suite.thereIsOperationChat)
 	sc.Step(`^que "([^"]*)" tiene los siguientes mensajes persistidos:$`, suite.operationChatHasMessages)
 	sc.Step(`^que "([^"]*)" no tiene mensajes$`, suite.operationChatHasNoMessages)
+	sc.Step(`^que existe otra conversación de trabajo "([^"]*)" con mensajes privados que no está vinculada a "([^"]*)"$`, suite.thereIsUnrelatedOperationChat)
+	sc.Step(`^intento consultar el chat administrativo de la operación de la solicitud "([^"]*)" con motivo "([^"]*)" y el parámetro de consulta "conversation_id" igual al ID persistido de "([^"]*)"$`, suite.queryOperationChatSelectingConversation)
+	sc.Step(`^la respuesta no contiene mensajes ni URLs de adjuntos de "([^"]*)"$`, suite.operationChatErrorDoesNotLeakUnrelatedConversation)
 	sc.Step(`^consulto el chat administrativo de la operación de la solicitud "([^"]*)" con motivo "([^"]*)"$`, suite.queryInitialOperationChat)
 	sc.Step(`^que "([^"]*)" contiene los siguientes mensajes persistidos:$`, suite.operationChatHasMessages)
 	sc.Step(`^que existen las siguientes propuestas vinculadas a "([^"]*)":$`, suite.operationChatHasProposals)
@@ -98,7 +103,14 @@ func (suite *testSuite) queryOperationChat(label, reason, correlation string) er
 }
 
 func (suite *testSuite) sendOperationChatGet(operationID, reason, correlation string) error {
-	request, err := http.NewRequest(http.MethodGet, suite.server.URL+operationsInboxPath+"/"+operationID+"/conversation", nil)
+	return suite.sendOperationChatGetWithQuery(operationID, reason, correlation, nil)
+}
+func (suite *testSuite) sendOperationChatGetWithQuery(operationID, reason, correlation string, query url.Values) error {
+	path := suite.server.URL + operationsInboxPath + "/" + operationID + "/conversation"
+	if len(query) > 0 {
+		path += "?" + query.Encode()
+	}
+	request, err := http.NewRequest(http.MethodGet, path, nil)
 	if err != nil {
 		return err
 	}
@@ -395,4 +407,80 @@ func (suite *testSuite) operationChatPageIsEmpty() error {
 		return fmt.Errorf("expected empty non-null messages and explicit null next cursor, got %s", suite.lastBody)
 	}
 	return nil
+}
+
+func (suite *testSuite) thereIsUnrelatedOperationChat(label, requestLabel string) error {
+	request, ok := suite.operationInbox.requests[requestLabel]
+	if !ok {
+		return fmt.Errorf("unknown request %q", requestLabel)
+	}
+	const consumerEmail = "unrelated-chat@example.com"
+	if err := suite.thereIsRegisteredConsumerWithEmailNameAndSurname(consumerEmail, "Unrelated", "Consumer"); err != nil {
+		return err
+	}
+	consumer, err := suite.userRepository.FindByAuthID(auth0IDForConsumerEmail(consumerEmail))
+	if err != nil {
+		return err
+	}
+	providerID, err := suite.providerIDByEmail(request.providerEmail)
+	if err != nil {
+		return err
+	}
+	unrelated, err := conversation.NewPendingConversation(consumer.ID(), providerID)
+	if err != nil {
+		return err
+	}
+	if err := unrelated.Activate(); err != nil {
+		return err
+	}
+	persisted, err := suite.conversationRepository.SaveConversation(suite.scenarioContext, unrelated)
+	if err != nil {
+		return err
+	}
+	if persisted.ID() == request.conversationID {
+		return fmt.Errorf("unrelated conversation unexpectedly matches request conversation")
+	}
+	content := "Private content belonging only to unrelated conversation " + label
+	message, err := (testsupport.OperationChatFixture{DB: suite.database}).AddMessage(suite.scenarioContext, persisted.ID(), conversation.SenderConsumer, content, suite.clock.Now())
+	if err != nil {
+		return err
+	}
+	reloaded, err := suite.conversationRepository.FindByID(suite.scenarioContext, persisted.ID())
+	if err != nil {
+		return err
+	}
+	if reloaded.ConversationType() != conversation.TypeWork || len(reloaded.Messages()) != 1 || reloaded.Messages()[0].ID != message.ID || reloaded.Messages()[0].Content != content {
+		return fmt.Errorf("unrelated conversation private message was not persisted")
+	}
+	linkedRequest, err := suite.jobRequestRepository.FindByID(request.id)
+	if err != nil {
+		return err
+	}
+	if linkedRequest.ConversationID != request.conversationID || linkedRequest.ConversationID == persisted.ID() {
+		return fmt.Errorf("unrelated conversation is linked to target request")
+	}
+	suite.operationChat.conversations[label] = persisted.ID()
+	suite.operationChat.messages[label+"-private"] = message
+	return nil
+}
+func (suite *testSuite) queryOperationChatSelectingConversation(requestLabel, reason, conversationLabel string) error {
+	request, ok := suite.operationInbox.requests[requestLabel]
+	if !ok {
+		return fmt.Errorf("unknown request %q", requestLabel)
+	}
+	conversationID, ok := suite.operationChat.conversations[conversationLabel]
+	if !ok {
+		return fmt.Errorf("unknown conversation %q", conversationLabel)
+	}
+	return suite.sendOperationChatGetWithQuery("jr-"+strconv.Itoa(request.id), reason, "", url.Values{"conversation_id": {strconv.Itoa(conversationID)}})
+}
+func (suite *testSuite) operationChatErrorDoesNotLeakUnrelatedConversation(label string) error {
+	fixture, ok := suite.operationChat.messages[label+"-private"]
+	if !ok || fixture.ID <= 0 || fixture.Content == "" {
+		return fmt.Errorf("unrelated private message fixture is absent")
+	}
+	if strings.Contains(string(suite.lastBody), fixture.Content) || strings.Contains(string(suite.lastBody), "https://") || strings.Contains(string(suite.lastBody), "http://") {
+		return fmt.Errorf("error response exposes private content or attachment URL")
+	}
+	return suite.adminDetailErrorHasNoData()
 }

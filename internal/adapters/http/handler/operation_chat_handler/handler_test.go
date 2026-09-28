@@ -110,3 +110,14 @@ func TestGetReturnsEmptyMessagesAndNoNextCursor(t *testing.T) {
 	require.Contains(t, response.Body.String(), `"next_cursor":null`)
 	service.AssertExpectations(t)
 }
+
+func TestGetRejectsRequestChosenConversationBeforeQueryingChat(t *testing.T) {
+	service := &chatServiceMock{}
+	request := httptest.NewRequest(http.MethodGet, "/admin/operations/jr-12/conversation?conversation_id=99", nil)
+	request.Header.Set("X-Audit-Reason", "Investigate request")
+	response := httptest.NewRecorder()
+	chatRouter(service).ServeHTTP(response, request)
+	require.Equal(t, http.StatusBadRequest, response.Code)
+	require.JSONEq(t, `{"error":"unsupported query parameter"}`, response.Body.String())
+	service.AssertNotCalled(t, "Query", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+}
