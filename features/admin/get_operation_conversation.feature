@@ -113,7 +113,6 @@ Feature: Consultar el chat de una contratación con justificación auditada
 
     Rule: El permiso de soporte es independiente del permiso de operaciones y de los endpoints de participantes
 
-        @wip
         Scenario Outline: 64.2.8-CO Rechazar la consulta sin autenticación válida
             Given que <estado de autenticación>
             When intento consultar el chat administrativo de "S1" con motivo "Investigar incidente"
@@ -125,7 +124,6 @@ Feature: Consultar el chat de una contratación con justificación auditada
                 | no envío un token Bearer      |
                 | envío un token Bearer inválido |
 
-        @wip
         Scenario Outline: 64.2.9-CO Denegar la consulta inicial y la continuación sin permiso de chat
             Given que <contexto de consulta>
             And que estoy autenticado como administrador "soporte@example.com" solamente con el permiso "read:admin_operations"
