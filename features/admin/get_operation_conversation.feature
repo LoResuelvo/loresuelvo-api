@@ -43,7 +43,6 @@ Feature: Consultar el chat de una contratación con justificación auditada
             And la respuesta identifica la operación "sp-" seguida del ID persistido de "P2" y su vínculo con la conversación "C1" compartida con "P1"
             And la página incluye "M1" y "M2" con sus instantes persistidos, sin atribuir ambos exclusivamente a "P2"
 
-        @wip
         Scenario: 64.2.3-CO Consultar una conversación existente sin mensajes
             Given que "C1" no tiene mensajes
             When consulto el chat administrativo de la operación de la solicitud "S1" con motivo "Verificar conversación vacía"
