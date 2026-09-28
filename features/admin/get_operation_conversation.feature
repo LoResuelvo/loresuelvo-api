@@ -49,7 +49,6 @@ Feature: Consultar el chat de una contratación con justificación auditada
             Then el sistema responde con estado 200
             And la página contiene una colección vacía, no nula, y no tiene cursor siguiente
 
-        @wip
         Scenario: 64.2.4-CO No permitir elegir otra conversación ni obtener recursos no relacionados
             Given que existe otra conversación de trabajo "C2" con mensajes privados que no está vinculada a "S1"
             When intento consultar el chat administrativo de la operación de la solicitud "S1" con motivo "Investigar la solicitud" y el parámetro de consulta "conversation_id" igual al ID persistido de "C2"
