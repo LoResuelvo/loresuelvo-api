@@ -14,6 +14,8 @@ import (
 )
 
 func registerAdminOperationChatAuthSteps(sc *godog.ScenarioContext, suite *testSuite) {
+	sc.Step(`^intento consultar "([^"]*)" por el endpoint de detalle de conversación de participantes$`, suite.queryParticipantConversationAsChatOperator)
+	sc.Step(`^no se entregan mensajes ni URLs de adjuntos$`, suite.operationChatErrorHasNoPrivateData)
 	sc.Step(`^intento consultar el chat administrativo de "([^"]*)" con motivo "([^"]*)"$`, suite.queryInitialOperationChat)
 	sc.Step(`^que no se realizó ninguna consulta previa de "([^"]*)"$`, suite.operationChatHasNoPreviousAccess)
 	sc.Step(`^que "([^"]*)" tiene tres mensajes persistidos y una consulta autorizada previa de "([^"]*)" con límite (\d+) y motivo "([^"]*)" devolvió un cursor siguiente válido$`, suite.operationChatHasAuthorizedContinuation)
@@ -99,4 +101,19 @@ func (suite *testSuite) queryOperationChatWithReceivedCursor(label, reason strin
 		return err
 	}
 	return suite.sendOperationChatGetWithQuery(operationID, reason, "", url.Values{"cursor": {previous.cursor}})
+}
+
+func (suite *testSuite) queryParticipantConversationAsChatOperator(label string) error {
+	conversationID, ok := suite.operationChat.conversations[label]
+	if !ok {
+		return fmt.Errorf("unknown conversation %q", label)
+	}
+	persisted, err := suite.conversationRepository.FindByID(suite.scenarioContext, conversationID)
+	if err != nil {
+		return err
+	}
+	if persisted.ConversationType() != conversation.TypeWork || persisted.Status() != conversation.StatusActive {
+		return fmt.Errorf("participant endpoint fixture must be an existing active work conversation")
+	}
+	return suite.sendAdminGet("/conversations/"+strconv.Itoa(persisted.ID()), nil, "")
 }
