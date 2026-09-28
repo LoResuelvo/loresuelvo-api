@@ -57,7 +57,6 @@ Feature: Consultar el chat de una contratación con justificación auditada
 
     Rule: Cada página exige autorización y auditoría independientes y una justificación válida
 
-        @wip
         Scenario: 64.2.5-CO Limitar la primera página sin descargar el historial completo
             Given que "C1" contiene los siguientes mensajes persistidos en el orden indicado, con IDs crecientes:
                 | mensaje | remitente | contenido        | creado               |
@@ -68,7 +67,6 @@ Feature: Consultar el chat de una contratación con justificación auditada
             Then el sistema responde con estado 200
             And la página contiene "M1" y "M2" en ese orden y entrega un cursor siguiente, sin incluir "M3"
 
-        @wip
         Scenario: 64.2.5a-CO Auditar nuevamente la página siguiente sin repetir mensajes
             Given que "C1" contiene los siguientes mensajes persistidos en el orden indicado, con IDs crecientes:
                 | mensaje | remitente | contenido        | creado               |
