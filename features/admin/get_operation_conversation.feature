@@ -142,7 +142,6 @@ Feature: Consultar el chat de una contratación con justificación auditada
             Then el sistema responde con estado 403
             And no se entregan mensajes ni URLs de adjuntos
 
-        @wip
         Scenario: 64.2.11-CO Informar no encontrado para una operación inexistente
             Given que no existe ninguna solicitud con ID persistido 987654321 ni propuesta con ID persistido 987654321
             When consulto el chat administrativo de la operación "jr-987654321" con motivo "Investigar incidente"
