@@ -42,7 +42,6 @@ Feature: Consultar un diagnóstico administrativo acotado de prestador
             And antes de entregar el diagnóstico queda preparado exactamente un evento de acceso al recurso "provider" con el ID persistido de "juan@example.com", el operador "soporte@example.com" y la correlación "provider-diagnostic-1"
             And el resultado del evento de acceso es "prepared", no "succeeded", y no contiene datos del diagnóstico ni una justificación manual
 
-        @wip
         Scenario: 61.1.2-PD Diferenciar evidencia ausente de una falla de lectura
             Given que "juan@example.com" no tiene sesiones de verificación de identidad
             And que no existe una cuenta de Mercado Pago ni una conexión de Google Calendar para "juan@example.com"
@@ -74,7 +73,6 @@ Feature: Consultar un diagnóstico administrativo acotado de prestador
             And el control "payment_token_expiry" informa "warning" con reason_code "payment_token_expiry_elapsed" y evidencia "2026-09-27T23:00:00Z"
             And la expiración informada es exclusivamente el dato persistido en la cuenta
 
-        @wip
         Scenario: 61.1.5-PD No afirmar que la falta de pago conectado impide recibir solicitudes
             Given que no existe una cuenta de Mercado Pago para "juan@example.com"
             And que existen las siguientes solicitudes de trabajo:
@@ -104,7 +102,6 @@ Feature: Consultar un diagnóstico administrativo acotado de prestador
             And Calendar informa el estado "action_required", resultado "warning", reason_code "calendar_authorization_required" y evidencia "2026-09-27T10:00:00Z"
             And la conexión no se informa como "disconnected" ni como sincronización confirmada de órdenes
 
-        @wip
         Scenario: 61.1.8-PD Distinguir conexión Calendar de sincronización individual de órdenes
             Given que la fecha y hora actual del sistema es "2026-09-26T00:00:00Z"
             And que la cuenta de Mercado Pago "mp-juan" está vinculada al prestador "juan@example.com"
@@ -125,7 +122,6 @@ Feature: Consultar un diagnóstico administrativo acotado de prestador
         Background:
             Given que estoy autenticado como administrador "soporte@example.com" con el permiso "read:providers"
 
-        @wip
         Scenario: 61.1.9-PD Mostrar las seis referencias recientes con identidad y fecha de cada tipo
             Given que la fecha y hora actual del sistema es "2026-10-02T00:00:00Z"
             And que la cuenta de Mercado Pago "mp-juan" está vinculada al prestador "juan@example.com"
@@ -157,7 +153,6 @@ Feature: Consultar un diagnóstico administrativo acotado de prestador
             And la orden "O2" awaiting_payment no aparece como trabajo pagado ni contribuye al promedio de reviews
             And las referencias no incluyen detalle de operaciones ni chat, y la respuesta no contiene transacciones financieras completas o datos personales del consumidor
 
-        @wip
         Scenario: 61.1.10-PD Informar actividad y reviews vacías como colecciones válidas
             Given que "juan@example.com" no tiene actividad ni reviews asociadas
             When consulto el diagnóstico administrativo del prestador "juan@example.com"
