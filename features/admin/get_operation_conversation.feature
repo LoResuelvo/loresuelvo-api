@@ -150,7 +150,6 @@ Feature: Consultar el chat de una contratación con justificación auditada
 
     Rule: Los adjuntos privados sólo se resuelven después de comprobar pertenencia y registrar el acceso
 
-        @wip
         Scenario: 64.2.12-CO Fallar cerrado si no se puede guardar la evidencia de acceso
             Given que "C1" tiene mensajes persistidos y un adjunto privado confirmado
             And que falla el almacenamiento del evento de auditoría de esta consulta
