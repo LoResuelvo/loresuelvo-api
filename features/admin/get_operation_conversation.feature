@@ -79,7 +79,6 @@ Feature: Consultar el chat de una contratación con justificación auditada
             And la página contiene sólo "M3" y no tiene cursor siguiente
             And quedan persistidos dos eventos de acceso distintos, ambos con el motivo "Revisar página inicial" reutilizado y con las correlaciones "request-chat-page-1" y "request-chat-page-2" respectivamente
 
-        @wip
         Scenario Outline: 64.2.6-CO Rechazar un motivo ausente, blanco o excesivo
             When intento consultar el chat administrativo de "S1" con <motivo>
             Then el sistema responde con estado 400
