@@ -66,14 +66,19 @@ func (writer providerDiagnosticAuditWriterDecorator) Save(ctx context.Context, e
 }
 
 type providerDiagnosticResponse struct {
-	Provider adminProviderDirectoryResponse    `json:"provider"`
-	Checks   []providerDiagnosticCheckResponse `json:"checks"`
-	Payment  struct {
+	Activity   []diagnosticActivityResponse      `json:"activity"`
+	Reviews    []diagnosticReviewResponse        `json:"reviews"`
+	Reputation diagnosticReputationResponse      `json:"reputation"`
+	Navigation diagnosticNavigationResponse      `json:"navigation"`
+	Provider   adminProviderDirectoryResponse    `json:"provider"`
+	Checks     []providerDiagnosticCheckResponse `json:"checks"`
+	Payment    struct {
 		State          string     `json:"state"`
 		TokenExpiresOn *time.Time `json:"token_expires_on"`
 	} `json:"payment"`
 	Calendar struct {
-		State string `json:"state"`
+		State     string                        `json:"calendar_connection_status"`
+		OrderSync []diagnosticOrderSyncResponse `json:"order_sync"`
 	} `json:"calendar"`
 }
 
@@ -85,11 +90,13 @@ type providerDiagnosticCheckResponse struct {
 }
 
 type providerDiagnosticState struct {
-	correlation string
-	providerID  int
-	operatorID  int
-	readMark    int
-	auditMark   int
+	correlation           string
+	providerID            int
+	operatorID            int
+	readMark              int
+	auditMark             int
+	calendarPublishCounts map[calendarPublicationCountKey]int
+	consumerCalendarSync  *time.Time
 }
 
 func registerAdminProviderDiagnosticSteps(sc *godog.ScenarioContext, suite *testSuite) {
@@ -137,10 +144,18 @@ func (suite *testSuite) queryAdminProviderDiagnostic(identifier, correlation str
 	if correlation == "" {
 		correlation = "provider-diagnostic-test-" + strconv.Itoa(providerID) + "-" + strconv.FormatInt(time.Now().UnixNano(), 10)
 	}
-	state := providerDiagnosticState{correlation: correlation, providerID: providerID}
+	state := providerDiagnosticState{
+		correlation:          correlation,
+		providerID:           providerID,
+		consumerCalendarSync: suite.providerDiagnostic.consumerCalendarSync,
+	}
 	state.readMark = suite.providerDiagnosticCapture.readAttempts
 	state.auditMark = suite.providerDiagnosticCapture.auditAttempts
 	state.operatorID, err = suite.providerDiagnosticOperatorID()
+	if err != nil {
+		return err
+	}
+	state.calendarPublishCounts, err = suite.snapshotProviderDiagnosticCalendarPublisherCounts()
 	if err != nil {
 		return err
 	}
@@ -161,7 +176,11 @@ func (suite *testSuite) attemptAdminProviderDiagnostic(identifier string) error 
 	if err != nil {
 		return err
 	}
-	suite.providerDiagnostic = providerDiagnosticState{correlation: correlation, providerID: providerID, operatorID: operatorID}
+	calendarCounts, err := suite.snapshotProviderDiagnosticCalendarPublisherCounts()
+	if err != nil {
+		return err
+	}
+	suite.providerDiagnostic = providerDiagnosticState{correlation: correlation, providerID: providerID, operatorID: operatorID, calendarPublishCounts: calendarCounts}
 	return suite.sendAdminGet(providerDiagnosticPath+"/"+url.PathEscape(strconv.Itoa(providerID))+"/diagnostic", nil, correlation)
 }
 

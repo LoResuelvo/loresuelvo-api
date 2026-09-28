@@ -6,6 +6,7 @@ import (
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/middleware"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/admin"
 	readmodel "github.com/LoResuelvo/loresuelvo-api/internal/domain/admin/read_model"
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/provider"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -36,7 +37,7 @@ func TestDiagnosticHandlerMapsSafeFieldsAndNullEvidence(t *testing.T) {
 	require.Equal(t, 200, rec.Code)
 	var body map[string]json.RawMessage
 	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
-	require.Len(t, body, 4)
+	require.Len(t, body, 8)
 	require.NotContains(t, rec.Body.String(), "internal-photo")
 	require.NotContains(t, rec.Body.String(), "IdentityResultOn")
 	require.Contains(t, rec.Body.String(), `"evidence_on":null`)
@@ -58,4 +59,19 @@ func TestDiagnosticHandlerDoesNotLeakDomainErrors(t *testing.T) {
 		require.Equal(t, tc.code, rec.Code)
 		require.JSONEq(t, `{"error":"`+tc.body+`"}`, rec.Body.String())
 	}
+}
+
+func TestDiagnosticMapperKeepsTypedReferencesAndPermissionSeparated(t *testing.T) {
+	now := time.Date(2026, 9, 28, 12, 0, 0, 0, time.UTC)
+	d := &readmodel.ProviderDiagnostic{Provider: readmodel.Provider{ID: 12}, Activity: []readmodel.ProviderActivity{{Type: "work_order", ID: 9, Status: "paid", OccurredOn: now}}, Reviews: []readmodel.ProviderReview{{WorkOrderID: 9, Rating: 5, Description: "Persisted"}}, OrderSync: []readmodel.ProviderOrderSync{{WorkOrderID: 9}}, RatingStats: provider.RatingStats{Count: 8, Total: 39}}
+	response := diagnosticResponseFromModel(d)
+	require.Equal(t, "/admin/operations?provider_id=12", response.Navigation.OperationsURL)
+	require.Equal(t, "read:admin_operations", response.Navigation.RequiredPermission)
+	require.Equal(t, 8, response.Reputation.Count)
+	require.Equal(t, 4.9, response.Reputation.Average)
+	require.Len(t, response.Activity, 1)
+	require.Equal(t, 9, response.Activity[0].ID)
+	require.Equal(t, "work_order", response.Activity[0].Type)
+	require.Len(t, response.Calendar.OrderSync, 1)
+	require.Nil(t, response.Calendar.OrderSync[0].SyncedOn)
 }

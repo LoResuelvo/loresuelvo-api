@@ -1,12 +1,18 @@
 package readmodel
 
 import (
-	"github.com/LoResuelvo/loresuelvo-api/internal/domain/identityverification"
 	"time"
+
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/identityverification"
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/provider"
 )
 
 // ProviderDiagnostic contains only persisted evidence safe for administrative access.
 type ProviderDiagnostic struct {
+	Activity         []ProviderActivity
+	Reviews          []ProviderReview
+	OrderSync        []ProviderOrderSync
+	RatingStats      provider.RatingStats
 	DiagnosticChecks []DiagnosticCheck
 	Provider         Provider
 	IdentityResultOn *time.Time

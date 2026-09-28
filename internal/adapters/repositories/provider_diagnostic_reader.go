@@ -72,6 +72,9 @@ func (r *ProviderDiagnosticReader) FindByProviderID(ctx context.Context, id int)
 		return nil, fmt.Errorf("reading diagnostic Calendar evidence: %w", err)
 	}
 	d.Calendar = readmodel.CalendarEvidence{Status: calendarStatus, ConnectedOn: diagnosticTime(calendarConnected), UpdatedOn: diagnosticTime(updated)}
+	if err = readDiagnosticActivity(ctx, tx, id, d); err != nil {
+		return nil, err
+	}
 	if err = tx.Commit(); err != nil {
 		return nil, fmt.Errorf("committing provider diagnostic read: %w", err)
 	}
@@ -79,7 +82,7 @@ func (r *ProviderDiagnosticReader) FindByProviderID(ctx context.Context, id int)
 	return d, nil
 }
 func diagnosticTime(t sql.NullTime) *time.Time {
-	if !t.Valid {
+	if !t.Valid || t.Time.IsZero() {
 		return nil
 	}
 	utc := t.Time.UTC()

@@ -130,9 +130,9 @@ Feature: Consultar un diagnóstico administrativo acotado de prestador
             Given que la fecha y hora actual del sistema es "2026-10-02T00:00:00Z"
             And que la cuenta de Mercado Pago "mp-juan" está vinculada al prestador "juan@example.com"
             And que existen las siguientes solicitudes de trabajo:
-                | solicitud | consumidor          | prestador        | creada               | estado   | título             | descripción                 |
-                | S1         | ana@example.com     | juan@example.com | 2026-09-20T12:00:00Z | pending  | Revisar canilla    | Pierde agua la canilla.     |
-                | S2         | beatriz@example.com | juan@example.com | 2026-09-21T11:00:00Z | accepted | Reparar calefón   | El calefón no enciende.     |
+                | solicitud | consumidor          | prestador        | creada               | estado   |
+                | S1         | ana@example.com     | juan@example.com | 2026-09-20T12:00:00Z | pending  |
+                | S2         | beatriz@example.com | juan@example.com | 2026-09-21T11:00:00Z | accepted |
             And que existen las siguientes propuestas de servicio:
                 | propuesta | solicitud | creada               | fecha programada     | duración | descripción                    | estado   | precio total | moneda | seña    | comisión total | comisión inicial | saldo servicio | saldo comisión |
                 | P1        | S2        | 2026-09-21T12:00:00Z | 2026-09-30T13:00:00Z | 60       | Revisar válvula.               | accepted | 8500000      | ARS    | 1700000 | 500000         | 100000           | 6800000        | 400000         |
@@ -142,7 +142,7 @@ Feature: Consultar un diagnóstico administrativo acotado de prestador
                 | orden | propuesta | aceptada             | estado           | finalización informada | saldo pagado          |
                 | O1    | P1        | 2026-09-21T15:00:00Z | paid             | 2026-09-30T15:00:00Z   | 2026-10-01T13:00:00Z |
                 | O2    | P2        | 2026-09-21T16:00:00Z | awaiting_payment | 2026-10-01T15:00:00Z   |                       |
-            And que la review persistida de "O1" tiene calificación 5 y descripción "Trabajo prolijo."
+            And que la orden "O1" tiene una review persistida con calificación 5 y descripción "Trabajo prolijo."
             When consulto el diagnóstico administrativo del prestador "juan@example.com"
             Then la actividad contiene como máximo 6 referencias en total y, para estos datos, en orden más reciente a más antigua:
                 | tipo          | referencia | estado           | instante de ordenamiento |

@@ -233,6 +233,7 @@ func (s *testSuite) registerAllSteps(sc *godog.ScenarioContext) {
 	registerAdminOperationDetailAuditSuccessSteps(sc, s)
 	registerAdminOperationChatSteps(sc, s)
 	registerAdminProviderDiagnosticSteps(sc, s)
+	registerAdminProviderDiagnosticActivitySteps(sc, s)
 }
 
 func (s *testSuite) cleanup() error {
