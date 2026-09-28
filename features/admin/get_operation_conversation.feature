@@ -15,7 +15,6 @@ Feature: Consultar el chat de una contratación con justificación auditada
 
     Rule: Sólo se entrega el chat de la conversación vinculada a la identidad estable de la operación
 
-        @wip
         Scenario: 64.2.1-CO Consultar mensajes con una justificación auditada
             Given que "C1" tiene los siguientes mensajes persistidos:
                 | mensaje | remitente  | contenido                        | creado               |
