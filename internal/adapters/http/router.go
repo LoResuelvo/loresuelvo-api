@@ -52,6 +52,7 @@ type RouterConfig struct {
 	Environment                 Environment
 	AdminHandler                *admin_handler.AdminHandler
 	ProviderDiagnosticHandler   *admin_handler.ProviderDiagnosticHandler
+	ConsumerHistoryHandler      *admin_handler.ConsumerHistoryHandler
 	AuditLogHandler             *audit_log_handler.Handler
 	OperationInboxHandler       *operation_inbox_handler.Handler
 	OperationDetailHandler      *operation_detail_handler.Handler
@@ -82,6 +83,7 @@ type Router struct {
 	environment                 Environment
 	adminHandler                *admin_handler.AdminHandler
 	providerDiagnosticHandler   *admin_handler.ProviderDiagnosticHandler
+	consumerHistoryHandler      *admin_handler.ConsumerHistoryHandler
 	auditLogHandler             *audit_log_handler.Handler
 	operationInboxHandler       *operation_inbox_handler.Handler
 	operationDetailHandler      *operation_detail_handler.Handler
@@ -118,6 +120,7 @@ func NewRouter(config RouterConfig) *Router {
 		environment:                 config.Environment,
 		adminHandler:                config.AdminHandler,
 		providerDiagnosticHandler:   config.ProviderDiagnosticHandler,
+		consumerHistoryHandler:      config.ConsumerHistoryHandler,
 		auditLogHandler:             config.AuditLogHandler,
 		operationInboxHandler:       config.OperationInboxHandler,
 		operationDetailHandler:      config.OperationDetailHandler,
@@ -191,6 +194,7 @@ func privateNoStore(c *gin.Context) {
 }
 
 func (router *Router) registerAdminRoutes(engine *gin.Engine, authMiddleware gin.HandlerFunc) {
+	engine.GET("/admin/consumers/:consumer_id/history", privateNoStore, authMiddleware, middleware.RequirePermissionLayer(readConsumersPermission), router.consumerHistoryHandler.Get)
 	engine.GET("/admin/providers/:provider_id/diagnostic", privateNoStore, authMiddleware, middleware.RequirePermissionLayer(readProvidersPermission), router.providerDiagnosticHandler.Get)
 	engine.GET("/admin/operations/:operation_id/conversation", privateNoStore, authMiddleware, middleware.RequirePermissionLayer(readAdminChatAuditPermission), router.operationChatHandler.Get)
 	engine.GET(

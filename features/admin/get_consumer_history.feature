@@ -7,10 +7,10 @@ Feature: Consultar la ficha y el historial administrativo de un consumidor
     Background:
         Given que existe el rubro "Plomería"
         And que están habilitadas las zonas de cobertura "Comuna 6" y "Comuna 14"
-        And que existen los siguientes consumidores registrados:
-            | correo              | nombre  | apellido |
-            | ana@example.com     | Ana     | Pérez    |
-            | beatriz@example.com | Beatriz | Suárez   |
+        And que existen los siguientes consumidores registrados con dirección:
+            | correo              | nombre  | apellido | calle         | número | piso | unidad |
+            | ana@example.com     | Ana     | Pérez    | Av. Rivadavia | 5100   | 4    | B      |
+            | beatriz@example.com | Beatriz | Suárez   | Av. Rivadavia | 5100   |      |        |
         And existe un prestador registrado con correo "juan@example.com", nombre "Juan", apellido "Gómez" y rubro "Plomería"
         And existe un prestador registrado con correo "luis@example.com", nombre "Luis", apellido "Ruiz" y rubro "Plomería"
         And existe un prestador registrado con correo "pedro@example.com", nombre "Pedro", apellido "Dib" y rubro "Plomería"
@@ -20,9 +20,7 @@ Feature: Consultar la ficha y el historial administrativo de un consumidor
     Rule: La ficha muestra datos disponibles sin inventar evidencia
 
         Scenario: 61.2.1-CH Entregar la ficha y auditar su acceso antes de responder
-            Given que el consumidor "ana@example.com" tiene la dirección actual "Av. Rivadavia", número "5100", piso "4", unidad "B"
-            And que el domicilio del consumidor "ana@example.com" pertenece a la zona de cobertura "Comuna 6"
-            And que "ana@example.com" no tiene foto de perfil persistida ni actividad de contratación
+            Given que "ana@example.com" no tiene foto de perfil persistida ni actividad de contratación
             When consulto la ficha y el historial administrativo de "ana@example.com" con correlación "consumer-history-1"
             Then el sistema responde con estado 200
             And la ficha identifica al consumidor por su ID persistido, rol, nombre, apellido, correo y fecha de registro
@@ -92,10 +90,9 @@ Feature: Consultar la ficha y el historial administrativo de un consumidor
             And no aparece ningún recurso de "beatriz@example.com"
 
         Scenario: 61.2.3-CH No atribuir el domicilio actual a contrataciones anteriores
-            Given que el consumidor "ana@example.com" tiene la dirección actual "Av. Corrientes", número "6200", piso "2", unidad "A"
             When consulto la ficha y el historial administrativo de "ana@example.com"
             Then el sistema responde con estado 200
-            And la dirección informa "Av. Corrientes", "6200", "2" y "A", con procedencia "current_consumer_profile"
+            And la dirección informa "Av. Rivadavia", "5100", "4" y "B", con procedencia "current_consumer_profile"
             And las entradas no contienen un campo de domicilio histórico ni copian la dirección del perfil
 
         Scenario Outline: 61.2.4-CH Filtrar estados compatibles con el tipo de recurso

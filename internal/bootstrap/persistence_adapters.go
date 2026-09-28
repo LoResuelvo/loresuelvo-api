@@ -9,6 +9,7 @@ import (
 type PersistenceAdapters struct {
 	AdminDirectoryReader                   *repositories.AdminDirectoryReader
 	ProviderDiagnosticReader               *repositories.ProviderDiagnosticReader
+	ConsumerHistoryReader                  *repositories.ConsumerHistoryReader
 	OperationInboxReader                   *repositories.OperationInboxReader
 	OperationDetailReader                  *repositories.OperationDetailReader
 	OperationMediaReader                   *repositories.OperationMediaReader
@@ -87,6 +88,7 @@ func NewPersistenceAdapters(database *sql.DB) *PersistenceAdapters {
 	return &PersistenceAdapters{
 		AdminDirectoryReader:                   repositories.NewAdminDirectoryReader(database),
 		ProviderDiagnosticReader:               repositories.NewProviderDiagnosticReader(database),
+		ConsumerHistoryReader:                  repositories.NewConsumerHistoryReader(database),
 		OperationInboxReader:                   repositories.NewOperationInboxReader(database),
 		OperationDetailReader:                  repositories.NewOperationDetailReader(database),
 		OperationMediaReader:                   repositories.NewOperationMediaReader(database),

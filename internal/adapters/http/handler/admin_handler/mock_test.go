@@ -35,3 +35,13 @@ func (m *diagnosticServiceMock) Query(ctx context.Context, id, subject, correlat
 	}
 	return args.Get(0).(*readmodel.ProviderDiagnostic), args.Error(1)
 }
+
+type consumerHistoryServiceMock struct{ mock.Mock }
+
+func (m *consumerHistoryServiceMock) Query(ctx context.Context, id int, q admin.ConsumerHistoryQuery, subject, correlation string) (*readmodel.ConsumerHistory, error) {
+	a := m.Called(ctx, id, q, subject, correlation)
+	if a.Get(0) == nil {
+		return nil, a.Error(1)
+	}
+	return a.Get(0).(*readmodel.ConsumerHistory), a.Error(1)
+}

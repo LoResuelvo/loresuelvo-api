@@ -35,7 +35,13 @@ func newTestIdentityVerificationWebhook() identity_verification_handler.Identity
 	return webhook
 }
 
+type ConsumerHistoryTestOptions struct {
+	ReaderDecorator      func(admin.ConsumerHistoryReader) admin.ConsumerHistoryReader
+	AuditWriterDecorator func(audit.Writer) audit.Writer
+}
+
 type ProviderDiagnosticTestOptions struct {
+	ConsumerHistory      ConsumerHistoryTestOptions
 	ReaderDecorator      func(admin.ProviderDiagnosticReader) admin.ProviderDiagnosticReader
 	AuditWriterDecorator func(audit.Writer) audit.Writer
 }

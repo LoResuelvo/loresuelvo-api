@@ -69,3 +69,13 @@ func (m *diagnosticAuditMock) Save(ctx context.Context, event *audit.Event) erro
 type diagnosticClock struct{ now time.Time }
 
 func (c diagnosticClock) Now() time.Time { return c.now }
+
+type consumerHistoryReaderMock struct{ mock.Mock }
+
+func (m *consumerHistoryReaderMock) FindByConsumerID(ctx context.Context, id int, q admin.ConsumerHistoryQuery) (*readmodel.ConsumerHistory, error) {
+	a := m.Called(ctx, id, q)
+	if a.Get(0) == nil {
+		return nil, a.Error(1)
+	}
+	return a.Get(0).(*readmodel.ConsumerHistory), a.Error(1)
+}

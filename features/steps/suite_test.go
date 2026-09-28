@@ -90,6 +90,8 @@ type testSuite struct {
 	operationDetailAuditCapture             *operationDetailAuditCapture
 	operationChatMediaCapture               *operationChatMediaCapture
 	providerDiagnosticCapture               *providerDiagnosticTestCapture
+	consumerHistoryCapture                  *consumerHistoryTestCapture
+	consumerHistory                         consumerHistoryState
 	operationDetailAuditSnapshot            *operationDetailAuditSnapshot
 	lastCategoryAuditEventIDs               []uuid.UUID
 	currentAuth0ID                          string
@@ -234,6 +236,7 @@ func (s *testSuite) registerAllSteps(sc *godog.ScenarioContext) {
 	registerAdminOperationChatSteps(sc, s)
 	registerAdminProviderDiagnosticSteps(sc, s)
 	registerAdminProviderDiagnosticActivitySteps(sc, s)
+	registerAdminConsumerHistorySteps(sc, s)
 }
 
 func (s *testSuite) cleanup() error {
@@ -406,8 +409,14 @@ func newTestSuite(tb testing.TB, database *sql.DB) *testSuite {
 	operationDetailAuditCapture := &operationDetailAuditCapture{}
 	operationChatMediaCapture := &operationChatMediaCapture{}
 	providerDiagnosticCapture := &providerDiagnosticTestCapture{}
+	consumerHistoryCapture := &consumerHistoryTestCapture{}
 	dependencies, doubles, err := bootstrap.NewTestDependenciesWithProviderDiagnosticOptions(
 		bootstrap.ProviderDiagnosticTestOptions{
+			ConsumerHistory: bootstrap.ConsumerHistoryTestOptions{
+				AuditWriterDecorator: func(writer audit.Writer) audit.Writer {
+					return consumerHistoryAuditWriterDecorator{inner: writer, capture: consumerHistoryCapture}
+				},
+			},
 			ReaderDecorator: func(reader admin.ProviderDiagnosticReader) admin.ProviderDiagnosticReader {
 				return providerDiagnosticReaderDecorator{inner: reader, capture: providerDiagnosticCapture}
 			},
@@ -478,6 +487,7 @@ func newTestSuite(tb testing.TB, database *sql.DB) *testSuite {
 		operationDetailAuditCapture:    operationDetailAuditCapture,
 		operationChatMediaCapture:      operationChatMediaCapture,
 		providerDiagnosticCapture:      providerDiagnosticCapture,
+		consumerHistoryCapture:         consumerHistoryCapture,
 		scenarioContext:                context.Background(),
 
 		categoryIDsByName:                   map[string]int{},
@@ -510,6 +520,8 @@ func ScenarioInitializer(sc *godog.ScenarioContext, t *testing.T, database *sql.
 		testSuite.categoryAuditCapture.reset()
 		testSuite.operationDetailAuditCapture.reset()
 		testSuite.operationChatMediaCapture.reset()
+		testSuite.consumerHistoryCapture.reset()
+		testSuite.consumerHistory = consumerHistoryState{}
 		if err := testSuite.cleanup(); err != nil {
 			return ctx, fmt.Errorf("could not clean test status: %w", err)
 		}

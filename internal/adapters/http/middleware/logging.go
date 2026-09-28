@@ -87,6 +87,13 @@ func isPrivateAdminReadPath(path string) bool {
 	if path == "/admin/audit-logs" {
 		return true
 	}
+	for _, resource := range []struct{ prefix, suffix string }{{"/admin/consumers/", "/history"}, {"/admin/providers/", "/diagnostic"}} {
+		if rest, ok := strings.CutPrefix(path, resource.prefix); ok {
+			if id, found := strings.CutSuffix(rest, resource.suffix); found && id != "" && !strings.Contains(id, "/") {
+				return true
+			}
+		}
+	}
 	operationPath, isDetail := strings.CutPrefix(path, "/admin/operations/")
 	return isDetail && operationPath != ""
 }

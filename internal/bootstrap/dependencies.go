@@ -383,6 +383,19 @@ func newDependencies(database *sql.DB, adapters dependencyAdapters) (*Dependenci
 		diagnosticWriter = adapters.providerDiagnosticTestOptions.AuditWriterDecorator(diagnosticWriter)
 	}
 	diagnosticHandler := admin_handler.NewProviderDiagnosticHandler(admin.NewDiagnosticService(diagnosticReader, fileService, persistence.UserRepository, diagnosticWriter, systemClock))
+	historyReader := admin.ConsumerHistoryReader(persistence.ConsumerHistoryReader)
+	historyWriter := audit.Writer(persistence.AuditEventRepository)
+	if adapters.providerDiagnosticTestOptions.ConsumerHistory.ReaderDecorator != nil {
+		historyReader = adapters.providerDiagnosticTestOptions.ConsumerHistory.ReaderDecorator(historyReader)
+	}
+	if adapters.providerDiagnosticTestOptions.ConsumerHistory.AuditWriterDecorator != nil {
+		historyWriter = adapters.providerDiagnosticTestOptions.ConsumerHistory.AuditWriterDecorator(historyWriter)
+	}
+	historyHandler, err := admin_handler.NewConsumerHistoryHandler(admin.NewConsumerHistoryService(historyReader, fileService, persistence.UserRepository, historyWriter, systemClock), adapters.auditCursorSigningKey)
+	if err != nil {
+		return nil, fmt.Errorf("configuring consumer history cursor: %w", err)
+	}
+
 	return &Dependencies{
 		Persistence: persistence,
 		Runtime: RuntimeDependencies{
@@ -396,6 +409,7 @@ func newDependencies(database *sql.DB, adapters dependencyAdapters) (*Dependenci
 		routerConfig: httpadapter.RouterConfig{
 			AdminHandler:                admin_handler.NewAdminHandler(adminService),
 			ProviderDiagnosticHandler:   diagnosticHandler,
+			ConsumerHistoryHandler:      historyHandler,
 			AuditLogHandler:             auditLogHandler,
 			OperationInboxHandler:       operation_inbox_handler.NewHandler(operation.NewInboxService(persistence.OperationInboxReader, systemClock)),
 			OperationDetailHandler:      operation_detail_handler.NewHandler(operation.NewDetailService(persistence.OperationDetailReader, persistence.UserRepository, operationDetailAuditWriter, systemClock)),
