@@ -19,6 +19,7 @@ func registerAdminOperationChatValidationSteps(sc *godog.ScenarioContext, suite 
 	sc.Step(`^intento consultar el chat administrativo de la operación de la solicitud "([^"]*)" con motivo "([^"]*)" y límite mayor que el máximo documentado$`, suite.queryOperationChatWithExcessiveLimit)
 	sc.Step(`^intento consultar el chat administrativo de la operación de la solicitud "([^"]*)" con motivo "([^"]*)" y cursor "no-es-un-cursor"$`, suite.queryOperationChatWithUnreadableCursor)
 	sc.Step(`^intento consultar el chat administrativo de la operación "([^"]*)" con motivo "([^"]*)"$`, suite.queryOperationChatWithRawID)
+	sc.Step(`^consulto el chat administrativo de la operación "([^"]*)" con motivo "([^"]*)"$`, suite.queryOperationChatWithRawID)
 }
 
 func (suite *testSuite) queryOperationChatWithoutReasonHeader(label string) error {
