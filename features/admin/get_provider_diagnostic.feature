@@ -19,7 +19,6 @@ Feature: Consultar un diagnóstico administrativo acotado de prestador
         Background:
             Given que estoy autenticado como administrador "soporte@example.com" con el permiso "read:providers"
 
-        @wip
         Scenario: 61.1.1-PD Entregar controles concretos basados en evidencia persistida
             Given que la fecha y hora actual del sistema es "2026-09-28T00:00:00Z"
             And que la identidad de "juan@example.com" fue aprobada el "2026-09-18T15:30:00Z"
@@ -55,7 +54,6 @@ Feature: Consultar un diagnóstico administrativo acotado de prestador
             And Calendar informa estado "disconnected", resultado "warning", reason_code "calendar_not_connected" y evidencia nula
             And reputación informa cero reviews y promedio 0
 
-        @wip
         Scenario: 61.1.3-PD Fallar cerrado cuando no se puede leer una fuente requerida
             Given que falla la lectura de una fuente requerida del diagnóstico del prestador "juan@example.com"
             When consulto el diagnóstico administrativo del prestador "juan@example.com"
@@ -67,7 +65,6 @@ Feature: Consultar un diagnóstico administrativo acotado de prestador
         Background:
             Given que estoy autenticado como administrador "soporte@example.com" con el permiso "read:providers"
 
-        @wip
         Scenario: 61.1.4-PD Informar una expiración persistida ya vencida
             Given que la fecha y hora actual del sistema es "2026-09-28T00:00:00Z"
             And que existe una cuenta de Mercado Pago "mp-juan" vinculada al prestador "juan@example.com" con expiración persistida "2026-09-27T23:00:00Z"
@@ -90,7 +87,6 @@ Feature: Consultar un diagnóstico administrativo acotado de prestador
             And la actividad incluye la solicitud "S1" con estado "pending"
             And la respuesta no incluye un campo ni un control que afirme que el prestador no puede recibir solicitudes
 
-        @wip
         Scenario: 61.1.6-PD Informar la disponibilidad actual de las zonas de cobertura
             Given que la zona de cobertura "Comuna 14" se deshabilita después del registro de "juan@example.com"
             When consulto el diagnóstico administrativo del prestador "juan@example.com"
@@ -101,7 +97,6 @@ Feature: Consultar un diagnóstico administrativo acotado de prestador
         Background:
             Given que estoy autenticado como administrador "soporte@example.com" con el permiso "read:providers"
 
-        @wip
         Scenario: 61.1.7-PD No confundir una conexión de Calendar que requiere autorización con desconexión
             Given que la conexión de Google Calendar de "juan@example.com" está en estado "action_required" desde "2026-09-27T10:00:00Z"
             When consulto el diagnóstico administrativo del prestador "juan@example.com"
@@ -171,7 +166,6 @@ Feature: Consultar un diagnóstico administrativo acotado de prestador
             And reputación informa cantidad 0 y promedio 0
 
     Rule: Autenticación, permiso y auditoría limitan la consulta sin modificar otras autorizaciones
-        @wip
         Scenario Outline: 61.1.11-PD Rechazar el acceso sin token válido
             Given que <autenticación>
             When intento consultar el diagnóstico administrativo del prestador "juan@example.com"
@@ -184,7 +178,6 @@ Feature: Consultar un diagnóstico administrativo acotado de prestador
                 | no envío un token Bearer       |
                 | envío un token Bearer inválido |
 
-        @wip
         Scenario Outline: 61.1.12-PD Denegar la consulta sin el permiso "read:providers"
             Given que <sesión>
             When intento consultar el diagnóstico administrativo del prestador "juan@example.com"
@@ -198,7 +191,6 @@ Feature: Consultar un diagnóstico administrativo acotado de prestador
                 | estoy autenticado como administrador "soporte@example.com" solamente con "read:admin_audit"      |
                 | estoy autenticado como prestador "juan@example.com"                                            |
 
-        @wip
         Scenario: 61.1.13-PD Informar no encontrado cuando el prestador no existe
             Given que no existe ningún prestador con ID persistido 987654321
             And que estoy autenticado como administrador "soporte@example.com" con el permiso "read:providers"
@@ -207,7 +199,6 @@ Feature: Consultar un diagnóstico administrativo acotado de prestador
             And no se entrega un diagnóstico
             And no se registra ningún evento de auditoría para esta solicitud
 
-        @wip
         Scenario: 61.1.14-PD No entregar el diagnóstico cuando falla el registro de auditoría
             Given que estoy autenticado como administrador "soporte@example.com" con el permiso "read:providers"
             And que falla el almacenamiento del evento de auditoría de este diagnóstico
