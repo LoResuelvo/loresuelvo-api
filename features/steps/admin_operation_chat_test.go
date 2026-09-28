@@ -29,6 +29,7 @@ type operationChatState struct {
 
 func registerAdminOperationChatSteps(sc *godog.ScenarioContext, suite *testSuite) {
 	registerAdminOperationChatPaginationSteps(sc, suite)
+	registerAdminOperationChatValidationSteps(sc, suite)
 	sc.Step(`^que existe la siguiente solicitud de trabajo con una única conversación de trabajo "([^"]*)" creada junto con ella y activada al ser aceptada por "([^"]*)":$`, suite.thereIsOperationChat)
 	sc.Step(`^que "([^"]*)" tiene los siguientes mensajes persistidos:$`, suite.operationChatHasMessages)
 	sc.Step(`^que "([^"]*)" no tiene mensajes$`, suite.operationChatHasNoMessages)
@@ -108,6 +109,9 @@ func (suite *testSuite) sendOperationChatGet(operationID, reason, correlation st
 	return suite.sendOperationChatGetWithQuery(operationID, reason, correlation, nil)
 }
 func (suite *testSuite) sendOperationChatGetWithQuery(operationID, reason, correlation string, query url.Values) error {
+	return suite.sendOperationChatGetWithAuditReason(operationID, correlation, query, &reason)
+}
+func (suite *testSuite) sendOperationChatGetWithAuditReason(operationID, correlation string, query url.Values, reason *string) error {
 	path := suite.server.URL + operationsInboxPath + "/" + operationID + "/conversation"
 	if len(query) > 0 {
 		path += "?" + query.Encode()
@@ -117,7 +121,9 @@ func (suite *testSuite) sendOperationChatGetWithQuery(operationID, reason, corre
 		return err
 	}
 	request.Header.Set("Authorization", "Bearer "+suite.tokenBuilder.BuildToken(suite.currentAuth0ID, suite.currentPermissions))
-	request.Header.Set("X-Audit-Reason", reason)
+	if reason != nil {
+		request.Header.Set("X-Audit-Reason", *reason)
+	}
 	request.Header.Set("X-Request-ID", correlation)
 	response, err := http.DefaultClient.Do(request)
 	if err != nil {

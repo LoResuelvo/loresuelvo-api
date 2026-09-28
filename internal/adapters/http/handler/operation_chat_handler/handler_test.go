@@ -172,3 +172,13 @@ func TestGetRejectsInvalidPagingBeforeService(t *testing.T) {
 	}
 	require.Empty(t, service.Calls)
 }
+
+func TestGetDoesNotTakeReasonFromQuery(t *testing.T) {
+	service := &chatServiceMock{}
+	request := httptest.NewRequest(http.MethodGet, "/admin/operations/jr-12/conversation?reason=Investigate", nil)
+	response := httptest.NewRecorder()
+	chatRouter(service).ServeHTTP(response, request)
+	require.Equal(t, http.StatusBadRequest, response.Code)
+	require.NotContains(t, response.Body.String(), "messages")
+	service.AssertNotCalled(t, "Query", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+}
