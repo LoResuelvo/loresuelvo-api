@@ -109,6 +109,17 @@ func NewHub() *Hub {
 	}
 }
 
+// HasConnectionsForAuthID reports whether an identity has a local connection.
+// It does not register or return connections.
+func (h *Hub) HasConnectionsForAuthID(authID string) bool {
+	if h == nil || authID == "" {
+		return false
+	}
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	return len(h.connections[authID]) > 0
+}
+
 func (h *Hub) addConnection(conn *Connection) {
 	h.mu.Lock()
 	defer h.mu.Unlock()

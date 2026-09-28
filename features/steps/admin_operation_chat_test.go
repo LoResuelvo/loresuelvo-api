@@ -26,6 +26,7 @@ type operationChatState struct {
 	event         *audit.Event
 	pagination    operationChatPaginationState
 	failure       operationChatFailureState
+	readState     operationChatReadState
 }
 
 func registerAdminOperationChatSteps(sc *godog.ScenarioContext, suite *testSuite) {
@@ -33,6 +34,7 @@ func registerAdminOperationChatSteps(sc *godog.ScenarioContext, suite *testSuite
 	registerAdminOperationChatValidationSteps(sc, suite)
 	registerAdminOperationChatAuthSteps(sc, suite)
 	registerAdminOperationChatFailureSteps(sc, suite)
+	registerAdminOperationChatStateSteps(sc, suite)
 	sc.Step(`^que existe la siguiente solicitud de trabajo con una única conversación de trabajo "([^"]*)" creada junto con ella y activada al ser aceptada por "([^"]*)":$`, suite.thereIsOperationChat)
 	sc.Step(`^que "([^"]*)" tiene los siguientes mensajes persistidos:$`, suite.operationChatHasMessages)
 	sc.Step(`^que "([^"]*)" no tiene mensajes$`, suite.operationChatHasNoMessages)

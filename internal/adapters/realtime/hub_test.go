@@ -70,3 +70,30 @@ func TestHubRemovingOneConnectionKeepsOtherConnections(t *testing.T) {
 	_, open := <-first.send
 	require.False(t, open)
 }
+
+func TestHubHasConnectionsForAuthIDTracksRegistrationLifecycle(t *testing.T) {
+	hub := NewHub()
+	require.False(t, hub.HasConnectionsForAuthID("auth0|consumer"))
+	first := &Connection{hub: hub, send: make(chan []byte, 1), authID: "auth0|consumer", role: consumer.Role, profileID: 10}
+	second := &Connection{hub: hub, send: make(chan []byte, 1), authID: first.authID, role: first.role, profileID: first.profileID}
+	hub.addConnection(first)
+	hub.addConnection(second)
+	require.True(t, hub.HasConnectionsForAuthID(first.authID))
+	require.False(t, hub.HasConnectionsForAuthID("auth0|other"))
+	hub.removeConnection(first)
+	require.True(t, hub.HasConnectionsForAuthID(second.authID))
+	hub.removeConnection(second)
+	require.False(t, hub.HasConnectionsForAuthID(second.authID))
+}
+
+func TestHubHasConnectionsForAuthIDIsAbsentAfterClose(t *testing.T) {
+	hub := NewHub()
+	connection := &Connection{hub: hub, send: make(chan []byte, 1), authID: "auth0|consumer", role: consumer.Role, profileID: 10}
+	hub.addConnection(connection)
+	require.True(t, hub.HasConnectionsForAuthID(connection.authID))
+	hub.Close()
+	require.False(t, hub.HasConnectionsForAuthID(connection.authID))
+	var absent *Hub
+	require.False(t, absent.HasConnectionsForAuthID(connection.authID))
+	require.False(t, hub.HasConnectionsForAuthID(""))
+}
