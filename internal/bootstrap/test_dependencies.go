@@ -12,6 +12,7 @@ import (
 	didit "github.com/LoResuelvo/loresuelvo-api/internal/adapters/identityverification/didit"
 	identityverificationfake "github.com/LoResuelvo/loresuelvo-api/internal/adapters/identityverification/fake"
 	locationadapter "github.com/LoResuelvo/loresuelvo-api/internal/adapters/location"
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/admin"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/audit"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/category"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/conversation"
@@ -34,7 +35,29 @@ func newTestIdentityVerificationWebhook() identity_verification_handler.Identity
 	return webhook
 }
 
+type ProviderDiagnosticTestOptions struct {
+	ReaderDecorator      func(admin.ProviderDiagnosticReader) admin.ProviderDiagnosticReader
+	AuditWriterDecorator func(audit.Writer) audit.Writer
+}
+
 func NewTestDependencies(
+	database *sql.DB,
+	chatbot conversation.Chatbot,
+	paymentAccountOAuthConnector paymentaccount.OAuthConnector,
+	paymentGateway payment.Gateway,
+	webhookVerifier payment_handler.WebhookVerifier,
+	credentialProtector paymentaccount.CredentialProtector,
+	secretGenerator paymentaccount.SecretGenerator,
+	paymentAccountHandlerConfig payment_account_handler.Config,
+	operationDetailAuditWriterDecorator func(audit.Writer) audit.Writer,
+	operationChatMediaResolverDecorator func(operation.ChatMediaResolver) operation.ChatMediaResolver,
+	categoryUnitOfWorkDecorator ...func(category.UnitOfWork) category.UnitOfWork,
+) (*Dependencies, TestDoubles, error) {
+	return NewTestDependenciesWithProviderDiagnosticOptions(ProviderDiagnosticTestOptions{}, database, chatbot, paymentAccountOAuthConnector, paymentGateway, webhookVerifier, credentialProtector, secretGenerator, paymentAccountHandlerConfig, operationDetailAuditWriterDecorator, operationChatMediaResolverDecorator, categoryUnitOfWorkDecorator...)
+}
+
+func NewTestDependenciesWithProviderDiagnosticOptions(
+	options ProviderDiagnosticTestOptions,
 	database *sql.DB,
 	chatbot conversation.Chatbot,
 	paymentAccountOAuthConnector paymentaccount.OAuthConnector,
@@ -58,16 +81,17 @@ func NewTestDependencies(
 		categoryDecorator = categoryUnitOfWorkDecorator[0]
 	}
 	dependencies, err := newDependencies(database, dependencyAdapters{
-		chatbot:                      chatbot,
-		paymentAccountOAuthConnector: paymentAccountOAuthConnector,
-		paymentGateway:               paymentGateway,
-		webhookVerifier:              webhookVerifier,
-		credentialProtector:          credentialProtector,
-		secretGenerator:              secretGenerator,
-		paymentAccountHandlerConfig:  paymentAccountHandlerConfig,
-		calendarOAuthConnector:       googlecalendar.NewFakeOAuthClient(),
-		calendarCredentialProtector:  credentialProtector,
-		calendarEventPublisher:       calendarEventPublisher,
+		chatbot:                       chatbot,
+		providerDiagnosticTestOptions: options,
+		paymentAccountOAuthConnector:  paymentAccountOAuthConnector,
+		paymentGateway:                paymentGateway,
+		webhookVerifier:               webhookVerifier,
+		credentialProtector:           credentialProtector,
+		secretGenerator:               secretGenerator,
+		paymentAccountHandlerConfig:   paymentAccountHandlerConfig,
+		calendarOAuthConnector:        googlecalendar.NewFakeOAuthClient(),
+		calendarCredentialProtector:   credentialProtector,
+		calendarEventPublisher:        calendarEventPublisher,
 		calendarHandlerConfig: calendar_connection_handler.Config{
 			ConnectionSuccessURL:   "/me",
 			ConnectionCancelledURL: "/me",

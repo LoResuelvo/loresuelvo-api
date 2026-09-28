@@ -26,6 +26,7 @@ import (
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/repositories"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/scheduler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/bootstrap"
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/admin"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/audit"
 	filedomain "github.com/LoResuelvo/loresuelvo-api/internal/domain/file"
 	"github.com/LoResuelvo/loresuelvo-api/internal/infrastructure/db"
@@ -84,9 +85,11 @@ type testSuite struct {
 	detailReport                            detailReportState
 	detailAuditSuccess                      detailAuditSuccessState
 	operationChat                           operationChatState
+	providerDiagnostic                      providerDiagnosticState
 	categoryAuditCapture                    *categoryAuditEventCapture
 	operationDetailAuditCapture             *operationDetailAuditCapture
 	operationChatMediaCapture               *operationChatMediaCapture
+	providerDiagnosticCapture               *providerDiagnosticTestCapture
 	operationDetailAuditSnapshot            *operationDetailAuditSnapshot
 	lastCategoryAuditEventIDs               []uuid.UUID
 	currentAuth0ID                          string
@@ -229,6 +232,7 @@ func (s *testSuite) registerAllSteps(sc *godog.ScenarioContext) {
 	registerAdminOperationDetailAbsentSteps(sc, s)
 	registerAdminOperationDetailAuditSuccessSteps(sc, s)
 	registerAdminOperationChatSteps(sc, s)
+	registerAdminProviderDiagnosticSteps(sc, s)
 }
 
 func (s *testSuite) cleanup() error {
@@ -367,6 +371,10 @@ func (s *testSuite) cleanup() error {
 	s.detailReport = detailReportState{}
 	s.detailAuditSuccess = detailAuditSuccessState{}
 	s.operationChat = operationChatState{}
+	s.providerDiagnostic = providerDiagnosticState{}
+	if s.providerDiagnosticCapture != nil {
+		s.providerDiagnosticCapture.reset()
+	}
 	s.currentAuth0ID = ""
 	s.invalidSession = false
 	return nil
@@ -396,7 +404,16 @@ func newTestSuite(tb testing.TB, database *sql.DB) *testSuite {
 	auditCapture := &categoryAuditEventCapture{}
 	operationDetailAuditCapture := &operationDetailAuditCapture{}
 	operationChatMediaCapture := &operationChatMediaCapture{}
-	dependencies, doubles, err := bootstrap.NewTestDependencies(
+	providerDiagnosticCapture := &providerDiagnosticTestCapture{}
+	dependencies, doubles, err := bootstrap.NewTestDependenciesWithProviderDiagnosticOptions(
+		bootstrap.ProviderDiagnosticTestOptions{
+			ReaderDecorator: func(reader admin.ProviderDiagnosticReader) admin.ProviderDiagnosticReader {
+				return providerDiagnosticReaderDecorator{inner: reader, capture: providerDiagnosticCapture}
+			},
+			AuditWriterDecorator: func(writer audit.Writer) audit.Writer {
+				return providerDiagnosticAuditWriterDecorator{inner: writer, capture: providerDiagnosticCapture}
+			},
+		},
 		database,
 		chatbot,
 		mercadopago.NewFakeOAuthClient(),
@@ -459,6 +476,7 @@ func newTestSuite(tb testing.TB, database *sql.DB) *testSuite {
 		categoryAuditCapture:           auditCapture,
 		operationDetailAuditCapture:    operationDetailAuditCapture,
 		operationChatMediaCapture:      operationChatMediaCapture,
+		providerDiagnosticCapture:      providerDiagnosticCapture,
 		scenarioContext:                context.Background(),
 
 		categoryIDsByName:                   map[string]int{},

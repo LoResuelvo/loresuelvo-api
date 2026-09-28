@@ -103,6 +103,7 @@ type dependencyAdapters struct {
 	categoryUnitOfWorkDecorator         func(category.UnitOfWork) category.UnitOfWork
 	operationDetailAuditWriterDecorator func(audit.Writer) audit.Writer
 	operationChatMediaResolverDecorator func(operation.ChatMediaResolver) operation.ChatMediaResolver
+	providerDiagnosticTestOptions       ProviderDiagnosticTestOptions
 	auditCursorSigningKey               []byte
 }
 
@@ -373,6 +374,15 @@ func newDependencies(database *sql.DB, adapters dependencyAdapters) (*Dependenci
 	if err != nil {
 		return nil, fmt.Errorf("configuring operation chat cursor: %w", err)
 	}
+	diagnosticReader := admin.ProviderDiagnosticReader(persistence.ProviderDiagnosticReader)
+	diagnosticWriter := audit.Writer(persistence.AuditEventRepository)
+	if adapters.providerDiagnosticTestOptions.ReaderDecorator != nil {
+		diagnosticReader = adapters.providerDiagnosticTestOptions.ReaderDecorator(diagnosticReader)
+	}
+	if adapters.providerDiagnosticTestOptions.AuditWriterDecorator != nil {
+		diagnosticWriter = adapters.providerDiagnosticTestOptions.AuditWriterDecorator(diagnosticWriter)
+	}
+	diagnosticHandler := admin_handler.NewProviderDiagnosticHandler(admin.NewDiagnosticService(diagnosticReader, fileService, persistence.UserRepository, diagnosticWriter, systemClock))
 	return &Dependencies{
 		Persistence: persistence,
 		Runtime: RuntimeDependencies{
@@ -385,6 +395,7 @@ func newDependencies(database *sql.DB, adapters dependencyAdapters) (*Dependenci
 		Clock: systemClock,
 		routerConfig: httpadapter.RouterConfig{
 			AdminHandler:                admin_handler.NewAdminHandler(adminService),
+			ProviderDiagnosticHandler:   diagnosticHandler,
 			AuditLogHandler:             auditLogHandler,
 			OperationInboxHandler:       operation_inbox_handler.NewHandler(operation.NewInboxService(persistence.OperationInboxReader, systemClock)),
 			OperationDetailHandler:      operation_detail_handler.NewHandler(operation.NewDetailService(persistence.OperationDetailReader, persistence.UserRepository, operationDetailAuditWriter, systemClock)),

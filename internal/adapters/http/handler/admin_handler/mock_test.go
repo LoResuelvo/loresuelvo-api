@@ -25,3 +25,13 @@ func (service *serviceMock) ListProviders(ctx context.Context, filter admin.Prov
 	}
 	return args.Get(0).([]readmodel.Provider), args.Error(1)
 }
+
+type diagnosticServiceMock struct{ mock.Mock }
+
+func (m *diagnosticServiceMock) Query(ctx context.Context, id, subject, correlation string) (*readmodel.ProviderDiagnostic, error) {
+	args := m.Called(ctx, id, subject, correlation)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*readmodel.ProviderDiagnostic), args.Error(1)
+}

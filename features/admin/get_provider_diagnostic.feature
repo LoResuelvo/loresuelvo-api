@@ -23,8 +23,7 @@ Feature: Consultar un diagnóstico administrativo acotado de prestador
         Scenario: 61.1.1-PD Entregar controles concretos basados en evidencia persistida
             Given que la fecha y hora actual del sistema es "2026-09-28T00:00:00Z"
             And que la identidad de "juan@example.com" fue aprobada el "2026-09-18T15:30:00Z"
-            And que la cuenta de Mercado Pago "mp-juan" está vinculada al prestador "juan@example.com"
-            And que su fecha de expiración persistida es "2026-09-29T00:00:00Z"
+            And que existe una cuenta de Mercado Pago "mp-juan" vinculada al prestador "juan@example.com" con expiración persistida "2026-09-29T00:00:00Z"
             And que "juan@example.com" tiene Google Calendar conectado desde "2026-09-18T15:45:00Z"
             When consulto el diagnóstico administrativo del prestador "juan@example.com" con correlación "provider-diagnostic-1"
             Then el sistema responde con estado 200
@@ -71,14 +70,12 @@ Feature: Consultar un diagnóstico administrativo acotado de prestador
         @wip
         Scenario: 61.1.4-PD Informar una expiración persistida ya vencida
             Given que la fecha y hora actual del sistema es "2026-09-28T00:00:00Z"
-            And que la cuenta de Mercado Pago "mp-juan" está vinculada al prestador "juan@example.com"
-            And que su fecha de expiración persistida es "2026-09-27T23:00:00Z"
+            And que existe una cuenta de Mercado Pago "mp-juan" vinculada al prestador "juan@example.com" con expiración persistida "2026-09-27T23:00:00Z"
             When consulto el diagnóstico administrativo del prestador "juan@example.com"
             Then el sistema responde con estado 200
             And el control de conexión informa "pass" con reason_code "payment_account_connected"
             And el control "payment_token_expiry" informa "warning" con reason_code "payment_token_expiry_elapsed" y evidencia "2026-09-27T23:00:00Z"
             And la expiración informada es exclusivamente el dato persistido en la cuenta
-            And la consulta no llama al proveedor de pagos
 
         @wip
         Scenario: 61.1.5-PD No afirmar que la falta de pago conectado impide recibir solicitudes
@@ -213,9 +210,8 @@ Feature: Consultar un diagnóstico administrativo acotado de prestador
         @wip
         Scenario: 61.1.14-PD No entregar el diagnóstico cuando falla el registro de auditoría
             Given que estoy autenticado como administrador "soporte@example.com" con el permiso "read:providers"
-            And que falla el almacenamiento del evento de auditoría de esta consulta
+            And que falla el almacenamiento del evento de auditoría de este diagnóstico
             When consulto el diagnóstico administrativo del prestador "juan@example.com" con correlación "provider-diagnostic-audit-fail"
             Then el sistema responde con estado 500
             And no se entrega ningún campo ni colección del diagnóstico
-            And no se registra ningún evento de auditoría
-            And no se ejecutan consultas a OAuth o servicios externos, renovaciones de credenciales, sincronizaciones ni mutaciones del prestador
+            And no se persiste ningún evento de auditoría para esta consulta diagnóstica

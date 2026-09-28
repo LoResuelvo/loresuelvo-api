@@ -2,6 +2,8 @@ package admin_test
 
 import (
 	"context"
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/audit"
+	"time"
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/admin"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/admin/read_model"
@@ -40,3 +42,30 @@ func (resolver *profilePhotoURLResolverMock) ResolvePublicURLs(
 	}
 	return args.Get(0).(map[string]string), args.Error(1)
 }
+
+type diagnosticReaderMock struct{ mock.Mock }
+
+func (m *diagnosticReaderMock) FindByProviderID(ctx context.Context, id int) (*readmodel.ProviderDiagnostic, error) {
+	args := m.Called(ctx, id)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*readmodel.ProviderDiagnostic), args.Error(1)
+}
+
+type diagnosticOperatorMock struct{ mock.Mock }
+
+func (m *diagnosticOperatorMock) FindOperatorIDByAuthID(ctx context.Context, subject string) (int, error) {
+	args := m.Called(ctx, subject)
+	return args.Int(0), args.Error(1)
+}
+
+type diagnosticAuditMock struct{ mock.Mock }
+
+func (m *diagnosticAuditMock) Save(ctx context.Context, event *audit.Event) error {
+	return m.Called(ctx, event).Error(0)
+}
+
+type diagnosticClock struct{ now time.Time }
+
+func (c diagnosticClock) Now() time.Time { return c.now }
