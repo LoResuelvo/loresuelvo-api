@@ -90,7 +90,6 @@ Feature: Consultar el chat de una contratación con justificación auditada
                 | la cabecera X-Audit-Reason en blanco |
                 | una cabecera X-Audit-Reason que supera la longitud máxima documentada |
 
-        @wip
         Scenario Outline: 64.2.7-CO Rechazar límites y cursores inválidos para una operación existente
             When intento consultar el chat administrativo de la operación de la solicitud "S1" con motivo "Investigar incidente" y <parámetro inválido>
             Then el sistema responde con estado 400
@@ -102,7 +101,6 @@ Feature: Consultar el chat de una contratación con justificación auditada
                 | límite mayor que el máximo documentado    |
                 | cursor "no-es-un-cursor"                    |
 
-        @wip
         Scenario Outline: 64.2.7a-CO Rechazar identificadores de operación inválidos
             When intento consultar el chat administrativo de la operación "<identificador>" con motivo "Investigar incidente"
             Then el sistema responde con estado 400
