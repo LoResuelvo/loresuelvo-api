@@ -136,7 +136,6 @@ Feature: Consultar el chat de una contratación con justificación auditada
                 | no se realizó ninguna consulta previa de "S1"                                                                                                                                | sin cursor               |
                 | "C1" tiene tres mensajes persistidos y una consulta autorizada previa de "S1" con límite 2 y motivo "Revisar página inicial" devolvió un cursor siguiente válido              | con el cursor recibido   |
 
-        @wip
         Scenario: 64.2.10-CO No ampliar el endpoint de conversación de los participantes
             Given que estoy autenticado como administrador "soporte@example.com" solamente con el permiso "read:admin_chat_audit"
             When intento consultar "C1" por el endpoint de detalle de conversación de participantes
