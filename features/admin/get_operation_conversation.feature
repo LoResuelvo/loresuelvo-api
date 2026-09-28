@@ -160,7 +160,6 @@ Feature: Consultar el chat de una contratación con justificación auditada
 
     Rule: La consulta de soporte no altera la conversación ni filtra datos privados por otras vías
 
-        @wip
         Scenario: 64.2.13-CO Conservar los mensajes y el estado de los participantes
             Given que "C1" tiene mensajes y un estado persistidos
             When consulto el chat administrativo de la operación de la solicitud "S1" con motivo "Investigar incidente"
