@@ -91,3 +91,30 @@ func attachImagesToMessageDetails(messages []readmodel.MessageDetail, imagesByMe
 		}
 	}
 }
+
+func (repository *MessageImageRepository) FindByMessagePage(ctx context.Context, scope conversation.MessageAttachmentScope) (map[int][]conversation.MessageImageReference, error) {
+	if err := validateMessageAttachmentScope(scope); err != nil {
+		return nil, err
+	}
+	result := make(map[int][]conversation.MessageImageReference)
+	if len(scope.MessageIDs) == 0 {
+		return result, nil
+	}
+	rows, err := repository.db.QueryContext(ctx, `SELECT attachment.message_id, attachment.file_id::text, attachment.description FROM message_images attachment`+messageAttachmentOwnershipSQL+` ORDER BY attachment.message_id,attachment.position`, scope.ConversationID, scope.ConsumerID, scope.ProviderID, scope.MessageIDs)
+	if err != nil {
+		return nil, fmt.Errorf("querying page message images: %w", err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var id int
+		var ref conversation.MessageImageReference
+		if err := rows.Scan(&id, &ref.FileID, &ref.Description); err != nil {
+			return nil, fmt.Errorf("scanning page message image: %w", err)
+		}
+		result[id] = append(result[id], ref)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterating page message images: %w", err)
+	}
+	return result, nil
+}

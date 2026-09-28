@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/gin-gonic/gin"
@@ -131,4 +132,81 @@ func TestRequestLoggerStillCapturesOperationInboxResponse(t *testing.T) {
 	require.Contains(t, logs.String(), "inbox summary")
 	require.Contains(t, logs.String(), "http.response")
 	require.Contains(t, logs.String(), "http.query_params")
+}
+
+func TestRequestLoggerDoesNotCapturePrivateOperationChatOrAuditReason(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	var logs bytes.Buffer
+	router := gin.New()
+	router.Use(RequestLogger(slog.New(slog.NewTextHandler(&logs, nil))))
+	router.GET("/admin/operations/:operation_id/conversation", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{"messages": []gin.H{{"content": "private-chat-content", "images": []gin.H{{"url": "https://storage.invalid/private-key?secret-signature"}}}}})
+	})
+	request := httptest.NewRequest(http.MethodGet, "/admin/operations/jr-123/conversation?cursor=private-cursor", strings.NewReader(`{"payload":"private-get-body"}`))
+	request.Header.Set("X-Audit-Reason", "private-audit-reason")
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, request)
+	require.Equal(t, 200, response.Code)
+	require.Contains(t, logs.String(), "http.request.completed")
+	for _, private := range []string{"private-chat-content", "private-key", "secret-signature", "private-audit-reason", "private-get-body", "private-cursor", "http.request_body", "http.response_body", "http.query_params"} {
+		require.NotContains(t, logs.String(), private)
+	}
+}
+
+func TestRequestLoggerDoesNotCaptureParticipantWorkChatPayloads(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	for _, test := range []struct{ method, path, route string }{{"GET", "/conversations", "/conversations"}, {"GET", "/conversations/12", "/conversations/:conversationID"}, {"POST", "/conversations/12/messages", "/conversations/:conversationID/messages"}} {
+		t.Run(test.method+test.path, func(t *testing.T) {
+			var logs bytes.Buffer
+			router := gin.New()
+			router.Use(RequestLogger(slog.New(slog.NewTextHandler(&logs, nil))))
+			router.Handle(test.method, test.route, func(c *gin.Context) {
+				c.JSON(200, gin.H{"content": "private-response-chat", "url": "https://storage.invalid/private-signed-url?secret"})
+			})
+			request := httptest.NewRequest(test.method, test.path+"?cursor=private-cursor", strings.NewReader(`{"content":"private-request-chat"}`))
+			request.Header.Set("Content-Type", "application/json")
+			request.Header.Set("Authorization", "Bearer private-token")
+			request.Header.Set("X-Request-ID", "private-work-chat-test")
+			response := httptest.NewRecorder()
+			router.ServeHTTP(response, request)
+			require.Equal(t, 200, response.Code)
+			require.Contains(t, logs.String(), "http.request.completed")
+			require.Contains(t, logs.String(), "http.route="+test.route)
+			require.Contains(t, logs.String(), "http.method="+test.method)
+			require.Contains(t, logs.String(), "http.status_code=200")
+			require.Contains(t, logs.String(), "request_id=private-work-chat-test")
+			require.Equal(t, "private-work-chat-test", response.Header().Get("X-Request-ID"))
+			for _, private := range []string{"private-response-chat", "private-request-chat", "private-signed-url", "private-cursor", "private-token", "http.request_body", "http.response_body", "http.query_params"} {
+				require.NotContains(t, logs.String(), private)
+			}
+		})
+	}
+}
+
+func TestRequestLoggerStillCapturesOrdinaryCategoryPostPayloads(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	var logs bytes.Buffer
+	router := gin.New()
+	router.Use(RequestLogger(slog.New(slog.NewTextHandler(&logs, nil))))
+	router.POST("/categories", func(c *gin.Context) {
+		var body map[string]string
+		if err := c.ShouldBindJSON(&body); err != nil {
+			c.AbortWithStatus(http.StatusBadRequest)
+			return
+		}
+		c.JSON(http.StatusCreated, gin.H{"name": "public-category-response"})
+	})
+	request := httptest.NewRequest(http.MethodPost, "/categories", strings.NewReader(`{"name":"public-category-request"}`))
+	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set("X-Request-ID", "public-category-test")
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, request)
+	require.Equal(t, http.StatusCreated, response.Code)
+	require.Contains(t, logs.String(), "public-category-request")
+	require.Contains(t, logs.String(), "public-category-response")
+	require.Contains(t, logs.String(), "http.request_body")
+	require.Contains(t, logs.String(), "http.response_body")
+	require.Contains(t, logs.String(), "http.method=POST")
+	require.Contains(t, logs.String(), "http.status_code=201")
+	require.Contains(t, logs.String(), "request_id=public-category-test")
 }

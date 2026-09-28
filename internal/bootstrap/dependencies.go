@@ -102,6 +102,7 @@ type dependencyAdapters struct {
 	identityWebhook                     identity_verification_handler.IdentityVerificationWebhook
 	categoryUnitOfWorkDecorator         func(category.UnitOfWork) category.UnitOfWork
 	operationDetailAuditWriterDecorator func(audit.Writer) audit.Writer
+	operationChatMediaResolverDecorator func(operation.ChatMediaResolver) operation.ChatMediaResolver
 	auditCursorSigningKey               []byte
 }
 
@@ -363,7 +364,12 @@ func newDependencies(database *sql.DB, adapters dependencyAdapters) (*Dependenci
 	if adapters.operationDetailAuditWriterDecorator != nil {
 		operationDetailAuditWriter = adapters.operationDetailAuditWriterDecorator(operationDetailAuditWriter)
 	}
-	operationChatHandler, err := operation_chat_handler.NewHandler(operation.NewChatService(repositories.NewOperationConversationReader(database), repositories.NewConversationMessagePageReader(database), persistence.UserRepository, operationDetailAuditWriter, systemClock), adapters.auditCursorSigningKey)
+	operationChatMediaResolver := operation.ChatMediaResolver(fileService)
+	if adapters.operationChatMediaResolverDecorator != nil {
+		operationChatMediaResolver = adapters.operationChatMediaResolverDecorator(operationChatMediaResolver)
+	}
+	operationChatAttachments := repositories.NewConversationMessageAttachmentReader(repositories.NewMessageImageRepository(database), repositories.NewMessageAudioRepository(database), repositories.NewMessageVideoRepository(database))
+	operationChatHandler, err := operation_chat_handler.NewHandler(operation.NewChatService(repositories.NewOperationConversationReader(database), repositories.NewConversationMessagePageReader(database), persistence.UserRepository, operationDetailAuditWriter, systemClock, operationChatAttachments, operationChatMediaResolver), adapters.auditCursorSigningKey)
 	if err != nil {
 		return nil, fmt.Errorf("configuring operation chat cursor: %w", err)
 	}

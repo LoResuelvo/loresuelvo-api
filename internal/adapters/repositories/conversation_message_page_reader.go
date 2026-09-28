@@ -7,7 +7,7 @@ import (
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/conversation"
 )
 
-const MaxConversationMessagePageSize = 101
+const MaxConversationMessagePageSize = conversation.MaxMessagePageSize + 1
 
 type ConversationMessagePageReader struct{ db *sql.DB }
 

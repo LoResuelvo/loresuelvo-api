@@ -6,6 +6,7 @@ import (
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/audit"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/conversation"
+	filedomain "github.com/LoResuelvo/loresuelvo-api/internal/domain/file"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/operation"
 	readmodel "github.com/LoResuelvo/loresuelvo-api/internal/domain/operation/read_model"
 	"github.com/stretchr/testify/mock"
@@ -88,4 +89,45 @@ type chatAuditWriterMock struct{ mock.Mock }
 
 func (m *chatAuditWriterMock) Save(ctx context.Context, event *audit.Event) error {
 	return m.Called(ctx, event).Error(0)
+}
+
+type chatAttachmentReaderMock struct{ mock.Mock }
+
+func (m *chatAttachmentReaderMock) FindByMessagePage(ctx context.Context, scope conversation.MessageAttachmentScope) (map[int]conversation.MessageAttachmentReferences, error) {
+	args := m.Called(ctx, scope)
+	if value := args.Get(0); value != nil {
+		return value.(map[int]conversation.MessageAttachmentReferences), args.Error(1)
+	}
+	return nil, args.Error(1)
+}
+
+type chatMediaResolverMock struct{ mock.Mock }
+
+func (m *chatMediaResolverMock) ResolveMessageImages(ctx context.Context, ids []string) (map[string]filedomain.MessageImage, error) {
+	args := m.Called(ctx, ids)
+	if value := args.Get(0); value != nil {
+		return value.(map[string]filedomain.MessageImage), args.Error(1)
+	}
+	return nil, args.Error(1)
+}
+func (m *chatMediaResolverMock) ResolveMessageAudios(ctx context.Context, ids []string) (map[string]filedomain.MessageAudio, error) {
+	args := m.Called(ctx, ids)
+	if value := args.Get(0); value != nil {
+		return value.(map[string]filedomain.MessageAudio), args.Error(1)
+	}
+	return nil, args.Error(1)
+}
+func (m *chatMediaResolverMock) ResolveMessageVideos(ctx context.Context, ids []string) (map[string]filedomain.MessageVideo, error) {
+	args := m.Called(ctx, ids)
+	if value := args.Get(0); value != nil {
+		return value.(map[string]filedomain.MessageVideo), args.Error(1)
+	}
+	return nil, args.Error(1)
+}
+
+// Text-only service scenarios share an attachment reader returning no references.
+func newTextChatService(association operation.ConversationAssociationReader, messages conversation.MessagePageReader, operators audit.OperatorIDFinder, writer audit.Writer, clock inboxFixedClock) *operation.ChatService {
+	attachments := &chatAttachmentReaderMock{}
+	attachments.On("FindByMessagePage", mock.Anything, mock.Anything).Return(map[int]conversation.MessageAttachmentReferences{}, nil).Maybe()
+	return operation.NewChatService(association, messages, operators, writer, clock, attachments, &chatMediaResolverMock{})
 }

@@ -8,7 +8,7 @@ import (
 
 var ErrInvalidChatQuery = errors.New("invalid conversation message query")
 
-const MaxChatPageSize = 100
+const MaxChatPageSize = conversation.MaxMessagePageSize
 
 // ChatQuery binds a continuation position to its persisted conversation.
 // HTTP cursor integrity and operation identity are validated by the adapter.

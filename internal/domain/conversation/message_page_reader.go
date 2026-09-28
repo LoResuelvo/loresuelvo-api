@@ -5,6 +5,9 @@ import (
 	"time"
 )
 
+// MaxMessagePageSize bounds delivered messages; readers may fetch one lookahead row.
+const MaxMessagePageSize = 100
+
 // MessagePosition is the final delivered chronological ordering key.
 type MessagePosition struct {
 	CreatedOn time.Time

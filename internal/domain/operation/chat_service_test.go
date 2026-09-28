@@ -36,7 +36,7 @@ func TestChatServiceReturnsOnlyAfterAuditSucceeds(t *testing.T) {
 			writer.On("Save", ctx, mock.MatchedBy(func(event *audit.Event) bool {
 				return event.OperatorID() == 23 && event.Action() == audit.ActionAccess && event.ResourceType() == "job_request" && event.ResourceID() == "7" && event.ConversationID() != nil && *event.ConversationID() == 21 && event.Reason().Text() == "Support case" && event.Result() == audit.ResultPrepared && event.CorrelationID() == "request-1" && event.OccurredOn().Equal(now) && event.StateChange() == nil
 			})).Return(saveErr).Once()
-			service := operation.NewChatService(association, messages, operators, writer, inboxFixedClock{now: now})
+			service := newTextChatService(association, messages, operators, writer, inboxFixedClock{now: now})
 			result, err := service.Query(ctx, "jr-7", "subject", "request-1", " Support case ", operation.ChatQuery{})
 			if auditFails {
 				require.ErrorIs(t, err, failure)
@@ -64,7 +64,7 @@ func TestChatServiceRejectsInvalidInputBeforeReading(t *testing.T) {
 		messages := &messagePageReaderMock{}
 		operators := &chatOperatorIDFinderMock{}
 		writer := &chatAuditWriterMock{}
-		service := operation.NewChatService(association, messages, operators, writer, inboxFixedClock{now: time.Now()})
+		service := newTextChatService(association, messages, operators, writer, inboxFixedClock{now: time.Now()})
 		result, err := service.Query(context.Background(), tc.id, "subject", "request-1", tc.reason, operation.ChatQuery{})
 		require.Nil(t, result)
 		require.ErrorIs(t, err, tc.expected)
@@ -100,7 +100,7 @@ func TestChatServiceStopsBeforeAuditOnMissingAssociationOrReadFailure(t *testing
 				operators.On("FindOperatorIDByAuthID", ctx, "subject").Return(23, nil).Once()
 				messages.On("FindPage", ctx, 21, (*conversation.MessagePosition)(nil), 21).Return(nil, failure).Once()
 			}
-			service := operation.NewChatService(association, messages, operators, writer, inboxFixedClock{now: time.Now()})
+			service := newTextChatService(association, messages, operators, writer, inboxFixedClock{now: time.Now()})
 			result, err := service.Query(ctx, "jr-7", "subject", "request-1", "Support case", operation.ChatQuery{})
 			require.Nil(t, result)
 			require.ErrorIs(t, err, expected)
@@ -131,7 +131,7 @@ func TestChatServiceAuditsEachKeysetPageAndSuppressesLookahead(t *testing.T) {
 			return event.CorrelationID() == correlation && event.Reason().Text() == "Support case" && *event.ConversationID() == 21
 		})).Return(nil).Once()
 	}
-	service := operation.NewChatService(association, messages, operators, writer, inboxFixedClock{now: now})
+	service := newTextChatService(association, messages, operators, writer, inboxFixedClock{now: now})
 	first, err := service.Query(ctx, "jr-7", "subject", "request-page-1", "Support case", operation.ChatQuery{Limit: 2})
 	require.NoError(t, err)
 	require.Equal(t, page[:2], first.Messages)
@@ -152,7 +152,7 @@ func TestChatServiceRechecksPersistedConversationOnContinuation(t *testing.T) {
 	operators := &chatOperatorIDFinderMock{}
 	writer := &chatAuditWriterMock{}
 	association.On("FindConversationAssociation", mock.Anything, readmodel.ID{Kind: readmodel.KindJobRequest, ResourceID: 7}).Return(&readmodel.ConversationAssociation{ConversationID: 22}, nil).Once()
-	service := operation.NewChatService(association, messages, operators, writer, inboxFixedClock{now: time.Now()})
+	service := newTextChatService(association, messages, operators, writer, inboxFixedClock{now: time.Now()})
 	result, err := service.Query(context.Background(), "jr-7", "subject", "request-1", "Support case", operation.ChatQuery{Limit: 2, ConversationID: 21, After: &conversation.MessagePosition{ID: 1, CreatedOn: time.Now()}})
 	require.Nil(t, result)
 	require.ErrorIs(t, err, operation.ErrInvalidChatQuery)

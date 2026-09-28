@@ -28,10 +28,10 @@ func RequestLogger(logger *slog.Logger) gin.HandlerFunc {
 		c.Request = c.Request.WithContext(observability.ContextWithLogger(c.Request.Context(), requestLogger))
 		c.Header(requestIDHeader, requestID)
 
-		// Admin audit and operation details may contain private operator data.
+		// Admin reads and participant work chats contain private operator or message data.
 		// Keep request metadata, but never capture their bodies or query values.
-		privateAdminRead := isPrivateAdminReadPath(c.Request.URL.Path)
-		includeBodies := !privateAdminRead && requestLogger.Enabled(c.Request.Context(), slog.LevelInfo)
+		privateRead := isPrivateAdminReadPath(c.Request.URL.Path) || isPrivateWorkChatPath(c.Request.URL.Path)
+		includeBodies := !privateRead && requestLogger.Enabled(c.Request.Context(), slog.LevelInfo)
 		var requestBody *limitedBodyCapture
 		var responseBody *limitedBodyCapture
 		if includeBodies {
@@ -62,7 +62,7 @@ func RequestLogger(logger *slog.Logger) gin.HandlerFunc {
 		if pathParams := pathParameters(c.Params); len(pathParams) > 0 {
 			attributes = append(attributes, "http.path_params", pathParams)
 		}
-		if !privateAdminRead {
+		if !privateRead {
 			if queryParams := queryParameters(c.Request); len(queryParams) > 0 {
 				attributes = append(attributes, "http.query_params", queryParams)
 			}
@@ -89,6 +89,10 @@ func isPrivateAdminReadPath(path string) bool {
 	}
 	operationPath, isDetail := strings.CutPrefix(path, "/admin/operations/")
 	return isDetail && operationPath != ""
+}
+
+func isPrivateWorkChatPath(path string) bool {
+	return path == "/conversations" || strings.HasPrefix(path, "/conversations/")
 }
 
 // GetRequestID returns the validated request ID assigned by RequestLogger.

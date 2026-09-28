@@ -86,6 +86,7 @@ type testSuite struct {
 	operationChat                           operationChatState
 	categoryAuditCapture                    *categoryAuditEventCapture
 	operationDetailAuditCapture             *operationDetailAuditCapture
+	operationChatMediaCapture               *operationChatMediaCapture
 	operationDetailAuditSnapshot            *operationDetailAuditSnapshot
 	lastCategoryAuditEventIDs               []uuid.UUID
 	currentAuth0ID                          string
@@ -394,6 +395,7 @@ func newTestSuite(tb testing.TB, database *sql.DB) *testSuite {
 	require.NoError(tb, err, "could not initialize test webhook verifier")
 	auditCapture := &categoryAuditEventCapture{}
 	operationDetailAuditCapture := &operationDetailAuditCapture{}
+	operationChatMediaCapture := &operationChatMediaCapture{}
 	dependencies, doubles, err := bootstrap.NewTestDependencies(
 		database,
 		chatbot,
@@ -407,6 +409,7 @@ func newTestSuite(tb testing.TB, database *sql.DB) *testSuite {
 			ConnectionCancelledURL: "http://frontend.loresuelvo.test/provider/register/mercado-pago?result=cancelled",
 		},
 		func(writer audit.Writer) audit.Writer { return operationDetailAuditCapture.decorate(writer) },
+		operationChatMediaCapture.decorate,
 		auditCapture.decorate,
 	)
 	require.NoError(tb, err, "could not initialize dependencies")
@@ -455,6 +458,7 @@ func newTestSuite(tb testing.TB, database *sql.DB) *testSuite {
 		identityVerifier:               doubles.IdentityVerifier,
 		categoryAuditCapture:           auditCapture,
 		operationDetailAuditCapture:    operationDetailAuditCapture,
+		operationChatMediaCapture:      operationChatMediaCapture,
 		scenarioContext:                context.Background(),
 
 		categoryIDsByName:                   map[string]int{},
@@ -486,6 +490,7 @@ func ScenarioInitializer(sc *godog.ScenarioContext, t *testing.T, database *sql.
 	sc.Before(func(ctx context.Context, sc *godog.Scenario) (context.Context, error) {
 		testSuite.categoryAuditCapture.reset()
 		testSuite.operationDetailAuditCapture.reset()
+		testSuite.operationChatMediaCapture.reset()
 		if err := testSuite.cleanup(); err != nil {
 			return ctx, fmt.Errorf("could not clean test status: %w", err)
 		}

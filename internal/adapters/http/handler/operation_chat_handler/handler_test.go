@@ -182,3 +182,25 @@ func TestGetDoesNotTakeReasonFromQuery(t *testing.T) {
 	require.NotContains(t, response.Body.String(), "messages")
 	service.AssertNotCalled(t, "Query", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
 }
+
+func TestChatResponseMapsSafeResolvedMediaOnly(t *testing.T) {
+	message := conversation.Message{ID: 1, Content: "Private", Images: []filedomain.MessageImage{{Image: filedomain.Image{FileID: "image", OriginalName: "photo.jpg", URL: "https://storage.invalid/signed-image"}, Description: "Evidence"}}, Audio: &filedomain.MessageAudio{FileID: "audio", OriginalName: "audio.ogg", URL: "https://storage.invalid/signed-audio", MimeType: "audio/ogg", Codec: "opus", DurationSeconds: 4}, Video: &filedomain.MessageVideo{FileID: "video", OriginalName: "video.mp4", URL: "https://storage.invalid/signed-video", MimeType: "video/mp4", VideoCodec: "h264", DurationSeconds: 5, Width: 640, Height: 480}}
+	response := responseFromDomain(&readmodel.OperationChat{OperationID: readmodel.ID{Kind: readmodel.KindJobRequest, ResourceID: 1}, Messages: []conversation.Message{message}})
+	encoded, err := json.Marshal(response)
+	require.NoError(t, err)
+	var decoded map[string]any
+	require.NoError(t, json.Unmarshal(encoded, &decoded))
+	mediaMessage := decoded["messages"].([]any)[0].(map[string]any)
+	require.JSONEq(t, `{"id":"image","url":"https://storage.invalid/signed-image","original_name":"photo.jpg","description":"Evidence"}`, string(mustJSON(t, mediaMessage["images"].([]any)[0])))
+	require.Contains(t, mediaMessage, "audio")
+	require.Contains(t, mediaMessage, "video")
+	for _, private := range []string{"bucket", "key", "uploaded_by_auth_id", "visibility", "credentials"} {
+		require.NotContains(t, string(encoded), `"`+private+`"`)
+	}
+}
+func mustJSON(t *testing.T, value any) []byte {
+	t.Helper()
+	encoded, err := json.Marshal(value)
+	require.NoError(t, err)
+	return encoded
+}

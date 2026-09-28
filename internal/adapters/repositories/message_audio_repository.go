@@ -112,3 +112,30 @@ func messageAudioFromPersistence(audio persistedMessageAudio) *filedomain.Messag
 		DurationSeconds: audio.DurationSeconds,
 	}
 }
+
+func (repository *MessageAudioRepository) FindByMessagePage(ctx context.Context, scope conversation.MessageAttachmentScope) (map[int]string, error) {
+	if err := validateMessageAttachmentScope(scope); err != nil {
+		return nil, err
+	}
+	result := make(map[int]string)
+	if len(scope.MessageIDs) == 0 {
+		return result, nil
+	}
+	rows, err := repository.db.QueryContext(ctx, `SELECT attachment.message_id, attachment.file_id::text FROM message_audios attachment`+messageAttachmentOwnershipSQL, scope.ConversationID, scope.ConsumerID, scope.ProviderID, scope.MessageIDs)
+	if err != nil {
+		return nil, fmt.Errorf("querying page message audios: %w", err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var id int
+		var fileID string
+		if err := rows.Scan(&id, &fileID); err != nil {
+			return nil, fmt.Errorf("scanning page message audio: %w", err)
+		}
+		result[id] = fileID
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterating page message audios: %w", err)
+	}
+	return result, nil
+}

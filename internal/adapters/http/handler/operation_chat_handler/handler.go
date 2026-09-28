@@ -84,17 +84,22 @@ type chatResponse struct {
 	NextCursor                *string           `json:"next_cursor"`
 }
 type messageResponse struct {
-	ID         int       `json:"id"`
-	SenderRole string    `json:"sender_role"`
-	Content    string    `json:"content"`
-	CreatedOn  time.Time `json:"created_on"`
+	Images     []imageResponse `json:"images,omitempty"`
+	Audio      *audioResponse  `json:"audio,omitempty"`
+	Video      *videoResponse  `json:"video,omitempty"`
+	ID         int             `json:"id"`
+	SenderRole string          `json:"sender_role"`
+	Content    string          `json:"content"`
+	CreatedOn  time.Time       `json:"created_on"`
 }
 
 func responseFromDomain(found *readmodel.OperationChat) chatResponse {
 	relatedProposalIDs := append(make([]int, 0, len(found.RelatedServiceProposalIDs)), found.RelatedServiceProposalIDs...)
 	response := chatResponse{RelatedServiceProposalIDs: relatedProposalIDs, SharedConversation: found.IsShared(), OperationID: string(found.OperationID.Kind) + "-" + strconv.Itoa(found.OperationID.ResourceID), ConversationID: found.ConversationID, JobRequestID: found.JobRequestID, ServiceProposalID: found.ServiceProposalID, Messages: make([]messageResponse, 0, len(found.Messages))}
 	for _, message := range found.Messages {
-		response.Messages = append(response.Messages, messageResponse{ID: message.ID, SenderRole: message.SenderRole, Content: message.Content, CreatedOn: message.CreatedOn.UTC()})
+		mapped := messageResponse{ID: message.ID, SenderRole: message.SenderRole, Content: message.Content, CreatedOn: message.CreatedOn.UTC()}
+		mediaFromDomain(message, &mapped)
+		response.Messages = append(response.Messages, mapped)
 	}
 	return response
 }

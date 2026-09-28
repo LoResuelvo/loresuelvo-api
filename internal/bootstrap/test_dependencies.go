@@ -15,6 +15,7 @@ import (
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/audit"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/category"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/conversation"
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/operation"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/payment"
 	paymentaccount "github.com/LoResuelvo/loresuelvo-api/internal/domain/payment_account"
 )
@@ -43,6 +44,7 @@ func NewTestDependencies(
 	secretGenerator paymentaccount.SecretGenerator,
 	paymentAccountHandlerConfig payment_account_handler.Config,
 	operationDetailAuditWriterDecorator func(audit.Writer) audit.Writer,
+	operationChatMediaResolverDecorator func(operation.ChatMediaResolver) operation.ChatMediaResolver,
 	categoryUnitOfWorkDecorator ...func(category.UnitOfWork) category.UnitOfWork,
 ) (*Dependencies, TestDoubles, error) {
 	if len(categoryUnitOfWorkDecorator) > 1 {
@@ -77,6 +79,7 @@ func NewTestDependencies(
 		auditCursorSigningKey:               []byte("test-audit-cursor-signing-key-2026-keep-private"),
 		categoryUnitOfWorkDecorator:         categoryDecorator,
 		operationDetailAuditWriterDecorator: operationDetailAuditWriterDecorator,
+		operationChatMediaResolverDecorator: operationChatMediaResolverDecorator,
 	})
 	if err != nil {
 		return nil, TestDoubles{}, err

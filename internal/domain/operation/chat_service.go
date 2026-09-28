@@ -27,10 +27,12 @@ type ChatService struct {
 	operatorIDs audit.OperatorIDFinder
 	auditWriter audit.Writer
 	clock       clock.Clock
+	attachments conversation.MessageAttachmentReader
+	media       ChatMediaResolver
 }
 
-func NewChatService(association ConversationAssociationReader, messages conversation.MessagePageReader, operatorIDs audit.OperatorIDFinder, auditWriter audit.Writer, clock clock.Clock) *ChatService {
-	return &ChatService{association: association, messages: messages, operatorIDs: operatorIDs, auditWriter: auditWriter, clock: clock}
+func NewChatService(association ConversationAssociationReader, messages conversation.MessagePageReader, operatorIDs audit.OperatorIDFinder, auditWriter audit.Writer, clock clock.Clock, attachments conversation.MessageAttachmentReader, media ChatMediaResolver) *ChatService {
+	return &ChatService{association: association, messages: messages, operatorIDs: operatorIDs, auditWriter: auditWriter, clock: clock, attachments: attachments, media: media}
 }
 
 func (service *ChatService) Query(ctx context.Context, rawID, authSubject, correlationID, reasonText string, query ChatQuery) (*readmodel.OperationChat, error) {
@@ -84,6 +86,9 @@ func (service *ChatService) Query(ctx context.Context, rawID, authSubject, corre
 	}
 	if err := service.auditWriter.Save(ctx, event); err != nil {
 		return nil, fmt.Errorf("saving operation conversation access event: %w", err)
+	}
+	if err := service.prepareMedia(ctx, association, messages); err != nil {
+		return nil, err
 	}
 	return &readmodel.OperationChat{OperationID: id, ConversationAssociation: *association, Messages: messages, Next: next}, nil
 }
