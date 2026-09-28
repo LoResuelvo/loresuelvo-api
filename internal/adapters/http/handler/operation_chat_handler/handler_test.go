@@ -38,7 +38,7 @@ func TestGetMapsMessagesWithoutPrivateAttachmentMetadata(t *testing.T) {
 	response := httptest.NewRecorder()
 	chatRouter(service).ServeHTTP(response, request)
 	require.Equal(t, http.StatusOK, response.Code)
-	require.JSONEq(t, `{"operation_id":"jr-12","conversation_id":9,"job_request_id":12,"service_proposal_id":null,"related_service_proposal_ids":[],"shared_conversation":false,"messages":[{"id":4,"sender_role":"consumer","content":"Help","created_on":"2026-09-20T12:00:00Z"}]}`, response.Body.String())
+	require.JSONEq(t, `{"operation_id":"jr-12","conversation_id":9,"job_request_id":12,"service_proposal_id":null,"related_service_proposal_ids":[],"shared_conversation":false,"next_cursor":null,"messages":[{"id":4,"sender_role":"consumer","content":"Help","created_on":"2026-09-20T12:00:00Z"}]}`, response.Body.String())
 	service.AssertExpectations(t)
 }
 func TestGetMapsDomainErrorsWithoutLeakingChat(t *testing.T) {
@@ -92,6 +92,21 @@ func TestGetIdentifiesSharedConversationWithoutAssigningMessagesToProposal(t *te
 	response := httptest.NewRecorder()
 	chatRouter(service).ServeHTTP(response, request)
 	require.Equal(t, 200, response.Code)
-	require.JSONEq(t, `{"operation_id":"sp-22","conversation_id":9,"job_request_id":12,"service_proposal_id":22,"related_service_proposal_ids":[21,22],"shared_conversation":true,"messages":[{"id":4,"sender_role":"consumer","content":"First proposal","created_on":"2026-09-20T13:05:00Z"},{"id":5,"sender_role":"consumer","content":"Second proposal","created_on":"2026-09-21T13:05:00Z"}]}`, response.Body.String())
+	require.JSONEq(t, `{"operation_id":"sp-22","conversation_id":9,"job_request_id":12,"service_proposal_id":22,"related_service_proposal_ids":[21,22],"shared_conversation":true,"next_cursor":null,"messages":[{"id":4,"sender_role":"consumer","content":"First proposal","created_on":"2026-09-20T13:05:00Z"},{"id":5,"sender_role":"consumer","content":"Second proposal","created_on":"2026-09-21T13:05:00Z"}]}`, response.Body.String())
+	service.AssertExpectations(t)
+}
+
+func TestGetReturnsEmptyMessagesAndNoNextCursor(t *testing.T) {
+	service := &chatServiceMock{}
+	requestID := 12
+	found := &readmodel.OperationChat{OperationID: readmodel.ID{Kind: readmodel.KindJobRequest, ResourceID: requestID}, ConversationAssociation: readmodel.ConversationAssociation{ConversationID: 9, JobRequestID: &requestID}}
+	service.On("Query", mock.Anything, "jr-12", "auth0|support", mock.Anything, "Check empty chat").Return(found, nil).Once()
+	request := httptest.NewRequest(http.MethodGet, "/admin/operations/jr-12/conversation", nil)
+	request.Header.Set("X-Audit-Reason", "Check empty chat")
+	response := httptest.NewRecorder()
+	chatRouter(service).ServeHTTP(response, request)
+	require.Equal(t, http.StatusOK, response.Code)
+	require.Contains(t, response.Body.String(), `"messages":[]`)
+	require.Contains(t, response.Body.String(), `"next_cursor":null`)
 	service.AssertExpectations(t)
 }

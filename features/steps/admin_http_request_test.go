@@ -82,6 +82,9 @@ func (suite *testSuite) adminResponseHeaderEquals(name, value string) error {
 }
 
 func (suite *testSuite) adminPageIsEmpty() error {
+	if len(suite.operationChat.conversations) > 0 {
+		return suite.operationChatPageIsEmpty()
+	}
 	var raw map[string]json.RawMessage
 	if err := json.Unmarshal(suite.lastBody, &raw); err != nil {
 		return fmt.Errorf("invalid administrative page JSON: %w", err)

@@ -27,6 +27,8 @@ type operationChatState struct {
 func registerAdminOperationChatSteps(sc *godog.ScenarioContext, suite *testSuite) {
 	sc.Step(`^que existe la siguiente solicitud de trabajo con una única conversación de trabajo "([^"]*)" creada junto con ella y activada al ser aceptada por "([^"]*)":$`, suite.thereIsOperationChat)
 	sc.Step(`^que "([^"]*)" tiene los siguientes mensajes persistidos:$`, suite.operationChatHasMessages)
+	sc.Step(`^que "([^"]*)" no tiene mensajes$`, suite.operationChatHasNoMessages)
+	sc.Step(`^consulto el chat administrativo de la operación de la solicitud "([^"]*)" con motivo "([^"]*)"$`, suite.queryInitialOperationChat)
 	sc.Step(`^que "([^"]*)" contiene los siguientes mensajes persistidos:$`, suite.operationChatHasMessages)
 	sc.Step(`^que existen las siguientes propuestas vinculadas a "([^"]*)":$`, suite.operationChatHasProposals)
 	sc.Step(`^consulto el chat administrativo de la operación "sp-" seguida del ID persistido de "([^"]*)" con motivo "([^"]*)"$`, suite.queryProposalOperationChat)
@@ -356,6 +358,41 @@ func (suite *testSuite) operationChatMessagesAreConversationScoped(first, second
 				return fmt.Errorf("conversation message contains unexpected attribution or private field %q", field)
 			}
 		}
+	}
+	return nil
+}
+
+func (suite *testSuite) operationChatHasNoMessages(label string) error {
+	conversationID, ok := suite.operationChat.conversations[label]
+	if !ok {
+		return fmt.Errorf("unknown conversation %q", label)
+	}
+	if err := (testsupport.OperationChatFixture{DB: suite.database}).DeleteMessages(suite.scenarioContext, conversationID); err != nil {
+		return err
+	}
+	found, err := suite.conversationRepository.FindByID(suite.scenarioContext, conversationID)
+	if err != nil {
+		return err
+	}
+	if found.Status() != conversation.StatusActive || len(found.Messages()) != 0 {
+		return fmt.Errorf("conversation fixture is not active and empty")
+	}
+	return nil
+}
+func (suite *testSuite) queryInitialOperationChat(label, reason string) error {
+	fixture, ok := suite.operationInbox.requests[label]
+	if !ok {
+		return fmt.Errorf("unknown request %q", label)
+	}
+	return suite.sendOperationChatGet("jr-"+strconv.Itoa(fixture.id), reason, "")
+}
+func (suite *testSuite) operationChatPageIsEmpty() error {
+	var response map[string]json.RawMessage
+	if err := json.Unmarshal(suite.lastBody, &response); err != nil {
+		return err
+	}
+	if string(response["messages"]) != "[]" || string(response["next_cursor"]) != "null" {
+		return fmt.Errorf("expected empty non-null messages and explicit null next cursor, got %s", suite.lastBody)
 	}
 	return nil
 }

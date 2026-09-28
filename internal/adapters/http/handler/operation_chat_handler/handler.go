@@ -59,6 +59,7 @@ type chatResponse struct {
 	RelatedServiceProposalIDs []int             `json:"related_service_proposal_ids"`
 	SharedConversation        bool              `json:"shared_conversation"`
 	Messages                  []messageResponse `json:"messages"`
+	NextCursor                *string           `json:"next_cursor"`
 }
 type messageResponse struct {
 	ID         int       `json:"id"`

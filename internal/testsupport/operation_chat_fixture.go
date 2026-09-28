@@ -22,3 +22,11 @@ func (fixture OperationChatFixture) AddMessage(ctx context.Context, conversation
 	}
 	return message, nil
 }
+
+// DeleteMessages removes only the named conversation's historical message fixtures.
+func (fixture OperationChatFixture) DeleteMessages(ctx context.Context, conversationID int) error {
+	if _, err := fixture.DB.ExecContext(ctx, `DELETE FROM messages WHERE conversation_id=$1`, conversationID); err != nil {
+		return fmt.Errorf("deleting conversation message fixtures: %w", err)
+	}
+	return nil
+}
