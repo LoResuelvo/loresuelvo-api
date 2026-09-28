@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/signedcursor"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/audit"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
@@ -51,7 +52,7 @@ func TestCursorCodecRoundTripAndTamperRejection(t *testing.T) {
 	_, err = codec.decode(base64.RawURLEncoding.EncodeToString(modified) + "." + parts[1])
 	require.ErrorIs(t, err, errInvalidCursor)
 
-	for _, invalid := range []string{"", "not-a-cursor", token + ".extra", strings.Repeat("a", maxCursorLength+1)} {
+	for _, invalid := range []string{"", "not-a-cursor", token + ".extra", strings.Repeat("a", signedcursor.MaxLength+1)} {
 		_, err = codec.decode(invalid)
 		require.ErrorIs(t, err, errInvalidCursor)
 	}
@@ -79,4 +80,23 @@ func TestCursorCodecRejectsSignedInvalidPayloads(t *testing.T) {
 			require.ErrorIs(t, err, errInvalidCursor)
 		})
 	}
+}
+
+// The fixed token was generated with the original audit codec's raw JSON HMAC
+// (no purpose prefix). It protects compatibility independently of round-trips.
+func TestCursorCodecPreservesLegacyTokenBytes(t *testing.T) {
+	codec, err := newCursorCodec([]byte("test-audit-cursor-signing-key-2026-keep-private"))
+	require.NoError(t, err)
+	const legacyToken = "eyJ2IjoxLCJ3YXRlcm1hcmsiOjcxLCJiZWZvcmUiOnsiT2NjdXJyZWRPbiI6IjIwMjYtMDktMjBUMDE6MDA6MDBaIiwiSUQiOiIwMDAwMDAwMC0wMDAwLTQwMDAtODAwMC0wMDAwMDAwMDAwMDEifSwiZmlsdGVyIjp7Ik9wZXJhdG9ySUQiOm51bGwsIkFjdGlvbiI6bnVsbCwiUmVzb3VyY2VUeXBlIjpudWxsLCJSZXNvdXJjZUlEIjpudWxsLCJSZXN1bHQiOm51bGwsIk9jY3VycmVkRnJvbSI6bnVsbCwiT2NjdXJyZWRUbyI6bnVsbH0sImxpbWl0IjoyMH0.Jqm-sSyWn0tn5WseAm630sUG4F-nBWoFlgl9bBLo7wA"
+	expected := cursorPayload{
+		Version: 1, Watermark: 71,
+		Before: audit.LogPosition{OccurredOn: time.Date(2026, 9, 20, 1, 0, 0, 0, time.UTC), ID: uuid.MustParse("00000000-0000-4000-8000-000000000001")},
+		Limit:  20,
+	}
+	decoded, err := codec.decode(legacyToken)
+	require.NoError(t, err)
+	require.Equal(t, expected, decoded)
+	encoded, err := codec.encode(expected)
+	require.NoError(t, err)
+	require.Equal(t, legacyToken, encoded)
 }

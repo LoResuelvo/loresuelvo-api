@@ -15,7 +15,9 @@ import (
 
 func TestOperationChatRouteRequiresItsOwnPermissionAndAlwaysPreventsCaching(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	router := NewRouter(RouterConfig{Auth0Validator: auth0.NewFakeValidator(), OperationChatHandler: operation_chat_handler.NewHandler(nil)})
+	handler, err := operation_chat_handler.NewHandler(nil, []byte("test-audit-cursor-signing-key-2026-keep-private"))
+	require.NoError(t, err)
+	router := NewRouter(RouterConfig{Auth0Validator: auth0.NewFakeValidator(), OperationChatHandler: handler})
 	authentication, err := router.middlewareSetup()
 	require.NoError(t, err)
 	engine := gin.New()

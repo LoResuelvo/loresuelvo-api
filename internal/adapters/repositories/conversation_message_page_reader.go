@@ -7,7 +7,7 @@ import (
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/conversation"
 )
 
-const MaxConversationMessagePageSize = 100
+const MaxConversationMessagePageSize = 101
 
 type ConversationMessagePageReader struct{ db *sql.DB }
 
@@ -19,11 +19,18 @@ func NewConversationMessagePageReader(db *sql.DB) *ConversationMessagePageReader
 const conversationMessagePageSQL = `SELECT id, conversation_id, sender_role, content, created_on FROM messages
  WHERE conversation_id = $1 ORDER BY created_on ASC, id ASC LIMIT $2`
 
-func (reader *ConversationMessagePageReader) FindPage(ctx context.Context, conversationID, limit int) ([]conversation.Message, error) {
-	if conversationID <= 0 || limit < 1 || limit > MaxConversationMessagePageSize {
+func (reader *ConversationMessagePageReader) FindPage(ctx context.Context, conversationID int, after *conversation.MessagePosition, limit int) ([]conversation.Message, error) {
+	if conversationID <= 0 || limit < 1 || limit > MaxConversationMessagePageSize || after != nil && (after.ID <= 0 || after.CreatedOn.IsZero()) {
 		return nil, fmt.Errorf("reading conversation message page: %w", conversation.ErrInvalidMessagePage)
 	}
-	rows, err := reader.db.QueryContext(ctx, conversationMessagePageSQL, conversationID, limit)
+	query := conversationMessagePageSQL
+	args := []any{conversationID, limit}
+	if after != nil {
+		query = `SELECT id, conversation_id, sender_role, content, created_on FROM messages
+ WHERE conversation_id = $1 AND (created_on,id) > ($3,$4) ORDER BY created_on ASC,id ASC LIMIT $2`
+		args = append(args, after.CreatedOn.UTC(), after.ID)
+	}
+	rows, err := reader.db.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("querying conversation message page: %w", err)
 	}

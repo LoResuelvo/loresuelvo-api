@@ -3,8 +3,6 @@ package steps_test
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/LoResuelvo/loresuelvo-api/internal/domain/payment"
-	serviceproposal "github.com/LoResuelvo/loresuelvo-api/internal/domain/service_proposal"
 	"io"
 	"net/http"
 	"net/url"
@@ -16,6 +14,8 @@ import (
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/audit"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/conversation"
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/payment"
+	serviceproposal "github.com/LoResuelvo/loresuelvo-api/internal/domain/service_proposal"
 	"github.com/LoResuelvo/loresuelvo-api/internal/testsupport"
 	"github.com/cucumber/godog"
 )
@@ -24,9 +24,11 @@ type operationChatState struct {
 	conversations map[string]int
 	messages      map[string]conversation.Message
 	event         *audit.Event
+	pagination    operationChatPaginationState
 }
 
 func registerAdminOperationChatSteps(sc *godog.ScenarioContext, suite *testSuite) {
+	registerAdminOperationChatPaginationSteps(sc, suite)
 	sc.Step(`^que existe la siguiente solicitud de trabajo con una única conversación de trabajo "([^"]*)" creada junto con ella y activada al ser aceptada por "([^"]*)":$`, suite.thereIsOperationChat)
 	sc.Step(`^que "([^"]*)" tiene los siguientes mensajes persistidos:$`, suite.operationChatHasMessages)
 	sc.Step(`^que "([^"]*)" no tiene mensajes$`, suite.operationChatHasNoMessages)
@@ -148,6 +150,9 @@ func (suite *testSuite) operationChatIdentifiesRequest(requestLabel, conversatio
 	return nil
 }
 func (suite *testSuite) operationChatContainsMessages(first, second string) error {
+	return suite.operationChatPageContains(first, second)
+}
+func (suite *testSuite) operationChatPageContains(labels ...string) error {
 	var response struct {
 		Messages []struct {
 			ID         int    `json:"id"`
@@ -159,10 +164,10 @@ func (suite *testSuite) operationChatContainsMessages(first, second string) erro
 	if err := json.Unmarshal(suite.lastBody, &response); err != nil {
 		return err
 	}
-	if len(response.Messages) != 2 {
-		return fmt.Errorf("expected two messages, got %d", len(response.Messages))
+	if len(response.Messages) != len(labels) {
+		return fmt.Errorf("expected %d messages, got %d", len(labels), len(response.Messages))
 	}
-	for index, label := range []string{first, second} {
+	for index, label := range labels {
 		expected, ok := suite.operationChat.messages[label]
 		if !ok {
 			return fmt.Errorf("unknown message %q", label)

@@ -9,17 +9,27 @@ import (
 
 	httphandler "github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/middleware"
+	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/signedcursor"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/operation"
 	readmodel "github.com/LoResuelvo/loresuelvo-api/internal/domain/operation/read_model"
 	"github.com/gin-gonic/gin"
 )
 
 type service interface {
-	Query(ctx context.Context, id, authSubject, correlationID, reason string) (*readmodel.OperationChat, error)
+	Query(ctx context.Context, id, authSubject, correlationID, reason string, query operation.ChatQuery) (*readmodel.OperationChat, error)
 }
-type Handler struct{ service service }
+type Handler struct {
+	service service
+	cursors *signedcursor.Codec
+}
 
-func NewHandler(service service) *Handler { return &Handler{service: service} }
+func NewHandler(service service, key []byte) (*Handler, error) {
+	codec, err := signedcursor.New(key, chatCursorPurpose)
+	if err != nil {
+		return nil, err
+	}
+	return &Handler{service: service, cursors: codec}, nil
+}
 
 func (handler *Handler) Get(c *gin.Context) {
 	authSubject, ok := httphandler.GetAuthenticatedUserID(c)
@@ -31,15 +41,18 @@ func (handler *Handler) Get(c *gin.Context) {
 		httphandler.RespondError(c, http.StatusInternalServerError, "internal server error")
 		return
 	}
-	// This slice exposes only the bounded initial page, not arbitrary selection.
-	if len(c.Request.URL.Query()) != 0 {
-		httphandler.RespondError(c, http.StatusBadRequest, "unsupported query parameter")
+
+	query, err := parseQuery(c.Request.URL.RawQuery, c.Param("operation_id"), handler.cursors)
+	if err != nil {
+		httphandler.RespondError(c, http.StatusBadRequest, "invalid chat query")
 		return
 	}
-	found, err := handler.service.Query(c.Request.Context(), c.Param("operation_id"), authSubject, correlationID, c.GetHeader("X-Audit-Reason"))
+	found, err := handler.service.Query(c.Request.Context(), c.Param("operation_id"), authSubject, correlationID, c.GetHeader("X-Audit-Reason"), query)
 	switch {
 	case errors.Is(err, operation.ErrInvalidOperationID):
 		httphandler.RespondError(c, http.StatusBadRequest, "invalid operation ID")
+	case errors.Is(err, operation.ErrInvalidChatQuery):
+		httphandler.RespondError(c, http.StatusBadRequest, "invalid chat query")
 	case errors.Is(err, operation.ErrInvalidChatReason):
 		httphandler.RespondError(c, http.StatusBadRequest, "invalid audit reason")
 	case errors.Is(err, operation.ErrOperationNotFound):
@@ -47,7 +60,16 @@ func (handler *Handler) Get(c *gin.Context) {
 	case err != nil:
 		httphandler.RespondError(c, http.StatusInternalServerError, "internal server error")
 	default:
-		c.JSON(http.StatusOK, responseFromDomain(found))
+		response := responseFromDomain(found)
+		if found.Next != nil {
+			token, err := handler.cursors.Encode(cursorPayload{Version: chatCursorVersion, OperationID: response.OperationID, ConversationID: found.ConversationID, Limit: query.EffectiveLimit(), After: cursorPosition{CreatedOn: found.Next.CreatedOn, ID: found.Next.ID}})
+			if err != nil {
+				httphandler.RespondError(c, http.StatusInternalServerError, "internal server error")
+				return
+			}
+			response.NextCursor = &token
+		}
+		c.JSON(http.StatusOK, response)
 	}
 }
 

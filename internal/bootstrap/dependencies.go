@@ -363,6 +363,10 @@ func newDependencies(database *sql.DB, adapters dependencyAdapters) (*Dependenci
 	if adapters.operationDetailAuditWriterDecorator != nil {
 		operationDetailAuditWriter = adapters.operationDetailAuditWriterDecorator(operationDetailAuditWriter)
 	}
+	operationChatHandler, err := operation_chat_handler.NewHandler(operation.NewChatService(repositories.NewOperationConversationReader(database), repositories.NewConversationMessagePageReader(database), persistence.UserRepository, operationDetailAuditWriter, systemClock), adapters.auditCursorSigningKey)
+	if err != nil {
+		return nil, fmt.Errorf("configuring operation chat cursor: %w", err)
+	}
 	return &Dependencies{
 		Persistence: persistence,
 		Runtime: RuntimeDependencies{
@@ -378,7 +382,7 @@ func newDependencies(database *sql.DB, adapters dependencyAdapters) (*Dependenci
 			AuditLogHandler:             auditLogHandler,
 			OperationInboxHandler:       operation_inbox_handler.NewHandler(operation.NewInboxService(persistence.OperationInboxReader, systemClock)),
 			OperationDetailHandler:      operation_detail_handler.NewHandler(operation.NewDetailService(persistence.OperationDetailReader, persistence.UserRepository, operationDetailAuditWriter, systemClock)),
-			OperationChatHandler:        operation_chat_handler.NewHandler(operation.NewChatService(repositories.NewOperationConversationReader(database), repositories.NewConversationMessagePageReader(database), persistence.UserRepository, operationDetailAuditWriter, systemClock)),
+			OperationChatHandler:        operationChatHandler,
 			OperationMediaHandler:       operation_media_handler.NewHandler(operation.NewMediaService(persistence.OperationMediaReader, repositories.NewOperationMediaFileFinder(persistence.FileRepository), storageComponents.Storage)),
 			CategoryHandler:             category_handler.NewCategoryHandler(categoryService),
 			CalendarConnectionHandler:   calendar_connection_handler.NewCalendarConnectionHandler(calendarConnectionService, adapters.calendarHandlerConfig),

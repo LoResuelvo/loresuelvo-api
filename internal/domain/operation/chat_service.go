@@ -33,9 +33,12 @@ func NewChatService(association ConversationAssociationReader, messages conversa
 	return &ChatService{association: association, messages: messages, operatorIDs: operatorIDs, auditWriter: auditWriter, clock: clock}
 }
 
-func (service *ChatService) Query(ctx context.Context, rawID, authSubject, correlationID, reasonText string) (*readmodel.OperationChat, error) {
+func (service *ChatService) Query(ctx context.Context, rawID, authSubject, correlationID, reasonText string, query ChatQuery) (*readmodel.OperationChat, error) {
 	id, err := ParseOperationID(rawID)
 	if err != nil {
+		return nil, err
+	}
+	if err := query.Validate(); err != nil {
 		return nil, err
 	}
 	reason, err := audit.NewReason(reasonText)
@@ -49,13 +52,22 @@ func (service *ChatService) Query(ctx context.Context, rawID, authSubject, corre
 	if association == nil {
 		return nil, ErrOperationNotFound
 	}
+	if query.After != nil && query.ConversationID != association.ConversationID {
+		return nil, ErrInvalidChatQuery
+	}
 	operatorID, err := service.operatorIDs.FindOperatorIDByAuthID(ctx, authSubject)
 	if err != nil {
 		return nil, fmt.Errorf("finding operation conversation reader: %w", err)
 	}
-	messages, err := service.messages.FindPage(ctx, association.ConversationID, DefaultChatPageSize)
+	messages, err := service.messages.FindPage(ctx, association.ConversationID, query.After, query.EffectiveLimit()+1)
 	if err != nil {
 		return nil, fmt.Errorf("reading operation conversation messages: %w", err)
+	}
+	var next *conversation.MessagePosition
+	if len(messages) > query.EffectiveLimit() {
+		messages = messages[:query.EffectiveLimit()]
+		last := messages[len(messages)-1]
+		next = &conversation.MessagePosition{ID: last.ID, CreatedOn: last.CreatedOn}
 	}
 	resourceType := "job_request"
 	if id.Kind == readmodel.KindServiceProposal {
@@ -73,5 +85,5 @@ func (service *ChatService) Query(ctx context.Context, rawID, authSubject, corre
 	if err := service.auditWriter.Save(ctx, event); err != nil {
 		return nil, fmt.Errorf("saving operation conversation access event: %w", err)
 	}
-	return &readmodel.OperationChat{OperationID: id, ConversationAssociation: *association, Messages: messages}, nil
+	return &readmodel.OperationChat{OperationID: id, ConversationAssociation: *association, Messages: messages, Next: next}, nil
 }

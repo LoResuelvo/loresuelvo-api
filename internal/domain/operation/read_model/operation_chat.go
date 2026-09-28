@@ -17,6 +17,7 @@ type OperationChat struct {
 	OperationID ID
 	ConversationAssociation
 	Messages []conversation.Message
+	Next     *conversation.MessagePosition
 }
 
 // IsShared reports whether multiple persisted proposals use this conversation.

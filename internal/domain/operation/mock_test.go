@@ -69,8 +69,8 @@ func (m *conversationAssociationReaderMock) FindConversationAssociation(ctx cont
 
 type messagePageReaderMock struct{ mock.Mock }
 
-func (m *messagePageReaderMock) FindPage(ctx context.Context, id, limit int) ([]conversation.Message, error) {
-	args := m.Called(ctx, id, limit)
+func (m *messagePageReaderMock) FindPage(ctx context.Context, id int, after *conversation.MessagePosition, limit int) ([]conversation.Message, error) {
+	args := m.Called(ctx, id, after, limit)
 	if found := args.Get(0); found != nil {
 		return found.([]conversation.Message), args.Error(1)
 	}

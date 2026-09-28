@@ -70,7 +70,7 @@ func TestConversationMessagePageReaderReadsBoundedText(t *testing.T) {
 		_, err := fixture.database.Exec(`INSERT INTO messages (conversation_id,sender_role,content,created_on) VALUES ($1,'consumer',$2,$3)`, conversationID, fmt.Sprintf("Message %02d", index), now)
 		require.NoError(t, err)
 	}
-	messages, err := reader.FindPage(ctx, conversationID, 20)
+	messages, err := reader.FindPage(ctx, conversationID, nil, 20)
 	require.NoError(t, err)
 	require.Len(t, messages, 20)
 	require.Equal(t, fixture.initialMessage.Content, messages[0].Content)
@@ -85,9 +85,36 @@ func TestConversationMessagePageReaderReadsBoundedText(t *testing.T) {
 		require.Nil(t, message.Audio)
 		require.Nil(t, message.Video)
 	}
-	for _, limit := range []int{0, 101} {
-		messages, err = reader.FindPage(ctx, conversationID, limit)
+	for _, limit := range []int{0, 102} {
+		messages, err = reader.FindPage(ctx, conversationID, nil, limit)
 		require.Nil(t, messages)
 		require.ErrorIs(t, err, conversation.ErrInvalidMessagePage)
 	}
+}
+
+func TestConversationMessagePageReaderContinuesAcrossTimestampTies(t *testing.T) {
+	fixture := newSavedConversationReaderFixture(t)
+	ctx := context.Background()
+	reader := repositories.NewConversationMessagePageReader(fixture.database)
+	conversationID := fixture.savedConversation.ID()
+	now := time.Now().UTC().Add(time.Hour).Truncate(time.Microsecond)
+	for _, content := range []string{"Tie A", "Tie B", "Tie C"} {
+		_, err := fixture.database.Exec(`INSERT INTO messages (conversation_id,sender_role,content,created_on) VALUES ($1,'consumer',$2,$3)`, conversationID, content, now)
+		require.NoError(t, err)
+	}
+	first, err := reader.FindPage(ctx, conversationID, nil, 3)
+	require.NoError(t, err)
+	require.Len(t, first, 3)
+	require.Equal(t, "Tie A", first[1].Content)
+	require.Equal(t, "Tie B", first[2].Content)
+	position := &conversation.MessagePosition{ID: first[2].ID, CreatedOn: first[2].CreatedOn}
+	second, err := reader.FindPage(ctx, conversationID, position, 3)
+	require.NoError(t, err)
+	require.Len(t, second, 1)
+	require.Equal(t, "Tie C", second[0].Content)
+	require.Greater(t, second[0].ID, position.ID)
+	exhausted, err := reader.FindPage(ctx, conversationID, &conversation.MessagePosition{ID: second[0].ID, CreatedOn: second[0].CreatedOn}, 3)
+	require.NoError(t, err)
+	require.Empty(t, exhausted)
+	require.NotNil(t, exhausted)
 }
