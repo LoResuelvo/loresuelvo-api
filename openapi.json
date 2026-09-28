@@ -935,6 +935,118 @@
                 }
             }
         },
+        "/admin/providers/{provider_id}/diagnostic": {
+            "get": {
+                "tags": [
+                    "Administration"
+                ],
+                "operationId": "getAdminProviderDiagnostic",
+                "summary": "Get a provider's administrative diagnostic",
+                "description": "Returns a bounded, read-only view of persisted provider-directory, identity, payment-account, Calendar, activity, review and reputation evidence. The response reports recorded connection and expiry data only; it does not validate payment credentials remotely, establish provider eligibility, or assert that the provider can or cannot receive requests. Calendar synchronization evidence is scoped to the provider participant and is not initiated or retried by this request. A prepared audit-access event is persisted before the diagnostic is delivered; failure to prepare the audit event or read a required source returns an error without partial diagnostic data. Responses use `Cache-Control: private, no-store`. Requires the `read:providers` permission in the Bearer JWT.",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "name": "provider_id",
+                        "in": "path",
+                        "required": true,
+                        "description": "Positive internal provider ID.",
+                        "schema": {
+                            "type": "integer",
+                            "format": "int32",
+                            "minimum": 1
+                        },
+                        "example": 12
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Persisted provider diagnostic after its access event is prepared.",
+                        "headers": {
+                            "Cache-Control": {
+                                "description": "Prevents storage of private administrative diagnostic data.",
+                                "schema": {
+                                    "type": "string",
+                                    "const": "private, no-store"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AdminProviderDiagnostic"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "The provider ID is malformed or is not a positive int32.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                },
+                                "example": {
+                                    "error": "invalid provider ID"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "The Bearer token is missing or invalid.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AuthErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "The Bearer token does not contain the `read:providers` permission.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                },
+                                "example": {
+                                    "error": "insufficient permissions"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "No provider exists with the requested ID.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                },
+                                "example": {
+                                    "error": "provider not found"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "A required diagnostic source or the audit event could not be prepared; no partial diagnostic is returned.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                },
+                                "example": {
+                                    "error": "internal server error"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/admin/audit-logs": {
             "get": {
                 "tags": [
@@ -6632,6 +6744,350 @@
                         "format": "date-time",
                         "description": "Timestamp at which the latest approved verification was recorded, or null when the current status is not approved or no verification session exists.",
                         "example": "2026-09-18T15:30:00Z"
+                    }
+                }
+            },
+            "AdminProviderDiagnostic": {
+                "type": "object",
+                "description": "Bounded persisted evidence for administrative support. Identity evidence is informative and its warning does not block requests. Persisted payment connection or token expiry does not establish remote payment-account validity; a connected payment account is required by proposal and checkout flows, but is not a gate for receiving requests. Current enabled coverage zones are evidence only, not a universal eligibility decision. This response contains no credentials, tokens, private identity documents, risk codes, or consumer personal details.",
+                "additionalProperties": false,
+                "required": [
+                    "provider",
+                    "checks",
+                    "payment",
+                    "calendar",
+                    "activity",
+                    "reviews",
+                    "reputation",
+                    "navigation"
+                ],
+                "properties": {
+                    "provider": {
+                        "$ref": "#/components/schemas/AdminProviderDirectoryItem"
+                    },
+                    "checks": {
+                        "type": "array",
+                        "description": "Four independent persisted-evidence checks; none is a general eligibility verdict.",
+                        "minItems": 4,
+                        "maxItems": 4,
+                        "items": {
+                            "$ref": "#/components/schemas/AdminProviderDiagnostic/$defs/Check"
+                        }
+                    },
+                    "payment": {
+                        "$ref": "#/components/schemas/AdminProviderDiagnostic/$defs/Payment"
+                    },
+                    "calendar": {
+                        "$ref": "#/components/schemas/AdminProviderDiagnostic/$defs/Calendar"
+                    },
+                    "activity": {
+                        "type": "array",
+                        "description": "At most six recent persisted job-request, proposal, or work-order references, ordered by creation or acceptance time descending, then type and ID descending for stable ties. Status values are constrained to those valid for each referenced entity type.",
+                        "maxItems": 6,
+                        "items": {
+                            "$ref": "#/components/schemas/AdminProviderDiagnostic/$defs/Activity"
+                        }
+                    },
+                    "reviews": {
+                        "type": "array",
+                        "description": "At most six persisted reviews from associated work orders, ordered by work-order acceptance time and work-order ID descending; no review timestamp is available in this source.",
+                        "maxItems": 6,
+                        "items": {
+                            "$ref": "#/components/schemas/AdminProviderDiagnostic/$defs/Review"
+                        }
+                    },
+                    "reputation": {
+                        "$ref": "#/components/schemas/AdminProviderDiagnostic/$defs/Reputation"
+                    },
+                    "navigation": {
+                        "$ref": "#/components/schemas/AdminProviderDiagnostic/$defs/Navigation"
+                    }
+                },
+                "$defs": {
+                    "Payment": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                            "state",
+                            "token_expires_on"
+                        ],
+                        "properties": {
+                            "state": {
+                                "type": "string",
+                                "enum": [
+                                    "connected",
+                                    "disconnected"
+                                ],
+                                "description": "Whether a payment-account connection is persisted; not remote credential validity."
+                            },
+                            "token_expires_on": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ],
+                                "format": "date-time",
+                                "description": "Persisted token expiry, or null when unavailable; it does not validate the token remotely."
+                            }
+                        }
+                    },
+                    "Calendar": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                            "calendar_connection_status",
+                            "order_sync"
+                        ],
+                        "properties": {
+                            "calendar_connection_status": {
+                                "type": "string",
+                                "enum": [
+                                    "connected",
+                                    "disconnected",
+                                    "action_required"
+                                ],
+                                "description": "Persisted Calendar connection state."
+                            },
+                            "order_sync": {
+                                "type": "array",
+                                "description": "Persisted Calendar synchronization evidence for the provider participant on up to the six latest associated work orders, ordered by acceptance time and work-order ID descending. A null timestamp means no confirmation is persisted for the provider; consumer-side synchronization is not included.",
+                                "maxItems": 6,
+                                "items": {
+                                    "$ref": "#/components/schemas/AdminProviderDiagnostic/$defs/OrderSync"
+                                }
+                            }
+                        }
+                    },
+                    "Check": {
+                        "type": "object",
+                        "description": "One concrete check over persisted evidence; evidence_on is null when no relevant persisted instant exists.",
+                        "additionalProperties": false,
+                        "required": [
+                            "control",
+                            "result",
+                            "reason_code",
+                            "evidence_on"
+                        ],
+                        "properties": {
+                            "control": {
+                                "type": "string",
+                                "enum": [
+                                    "identity_verification",
+                                    "payment_account_connection",
+                                    "payment_token_expiry",
+                                    "calendar_connection"
+                                ]
+                            },
+                            "result": {
+                                "type": "string",
+                                "enum": [
+                                    "pass",
+                                    "warning",
+                                    "unknown"
+                                ]
+                            },
+                            "reason_code": {
+                                "type": "string",
+                                "enum": [
+                                    "identity_no_session",
+                                    "identity_approved",
+                                    "identity_not_started",
+                                    "identity_in_progress",
+                                    "identity_awaiting_user",
+                                    "identity_in_review",
+                                    "identity_declined",
+                                    "identity_resubmitted",
+                                    "identity_abandoned",
+                                    "identity_expired",
+                                    "identity_kyc_expired",
+                                    "payment_account_not_connected",
+                                    "payment_account_connected",
+                                    "payment_token_expiry_unavailable",
+                                    "payment_token_expiry_elapsed",
+                                    "payment_token_expiry_future",
+                                    "calendar_connected",
+                                    "calendar_authorization_required",
+                                    "calendar_not_connected"
+                                ]
+                            },
+                            "evidence_on": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ],
+                                "format": "date-time",
+                                "description": "UTC instant supporting this check, or null when the source has no applicable persisted instant."
+                            }
+                        }
+                    },
+                    "OrderSync": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                            "work_order_id",
+                            "synced_on"
+                        ],
+                        "properties": {
+                            "work_order_id": {
+                                "type": "integer",
+                                "format": "int32",
+                                "minimum": 1
+                            },
+                            "synced_on": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ],
+                                "format": "date-time",
+                                "description": "Persisted provider-participant synchronization instant, or null when no confirmation is recorded."
+                            }
+                        }
+                    },
+                    "Activity": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                            "type",
+                            "id",
+                            "status",
+                            "occurred_on"
+                        ],
+                        "properties": {
+                            "type": {
+                                "type": "string",
+                                "enum": [
+                                    "job_request",
+                                    "service_proposal",
+                                    "work_order"
+                                ]
+                            },
+                            "id": {
+                                "type": "integer",
+                                "format": "int32",
+                                "minimum": 1,
+                                "description": "Internal identifier of the referenced entity; interpret together with type."
+                            },
+                            "status": {
+                                "type": "string",
+                                "description": "Persisted status of the referenced entity."
+                            },
+                            "occurred_on": {
+                                "type": "string",
+                                "format": "date-time",
+                                "description": "Persisted creation or work-order acceptance instant used to order activity, normalized to UTC."
+                            }
+                        },
+                        "oneOf": [
+                            {
+                                "properties": {
+                                    "type": {
+                                        "const": "job_request"
+                                    },
+                                    "status": {
+                                        "enum": [
+                                            "pending",
+                                            "accepted"
+                                        ]
+                                    }
+                                }
+                            },
+                            {
+                                "properties": {
+                                    "type": {
+                                        "const": "service_proposal"
+                                    },
+                                    "status": {
+                                        "enum": [
+                                            "pending",
+                                            "accepted",
+                                            "rejected"
+                                        ]
+                                    }
+                                }
+                            },
+                            {
+                                "properties": {
+                                    "type": {
+                                        "const": "work_order"
+                                    },
+                                    "status": {
+                                        "enum": [
+                                            "scheduled",
+                                            "awaiting_payment",
+                                            "paid"
+                                        ]
+                                    }
+                                }
+                            }
+                        ]
+                    },
+                    "Review": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                            "work_order_id",
+                            "rating",
+                            "description"
+                        ],
+                        "properties": {
+                            "work_order_id": {
+                                "type": "integer",
+                                "format": "int32",
+                                "minimum": 1
+                            },
+                            "rating": {
+                                "type": "integer",
+                                "minimum": 1,
+                                "maximum": 5
+                            },
+                            "description": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "Reputation": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                            "count",
+                            "average"
+                        ],
+                        "properties": {
+                            "count": {
+                                "type": "integer",
+                                "format": "int64",
+                                "minimum": 0,
+                                "description": "Count of all persisted provider reviews, including reviews beyond the bounded reviews sample."
+                            },
+                            "average": {
+                                "type": "number",
+                                "format": "double",
+                                "minimum": 0,
+                                "maximum": 5,
+                                "description": "Average over all persisted provider reviews rounded to one decimal place; zero when there are no reviews."
+                            }
+                        }
+                    },
+                    "Navigation": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                            "operations_url",
+                            "required_permission"
+                        ],
+                        "properties": {
+                            "operations_url": {
+                                "type": "string",
+                                "format": "uri-reference",
+                                "pattern": "^/admin/operations[?]provider_id=[1-9][0-9]*$",
+                                "description": "Relative link to the provider's administrative operations, including this provider's ID.",
+                                "example": "/admin/operations?provider_id=12"
+                            },
+                            "required_permission": {
+                                "type": "string",
+                                "const": "read:admin_operations",
+                                "description": "Permission independently required by the destination operations endpoint."
+                            }
+                        }
                     }
                 }
             },

@@ -1,0 +1,80 @@
+get:
+  tags:
+  - Administration
+  operationId: getAdminProviderDiagnostic
+  summary: Get a provider's administrative diagnostic
+  description: >-
+    Returns a bounded, read-only view of persisted provider-directory,
+    identity, payment-account, Calendar, activity, review and reputation
+    evidence. The response reports recorded connection and expiry data only;
+    it does not validate payment credentials remotely, establish provider
+    eligibility, or assert that the provider can or cannot receive requests.
+    Calendar synchronization evidence is scoped to the provider participant
+    and is not initiated or retried by this request. A prepared audit-access
+    event is persisted before the diagnostic is delivered; failure to prepare
+    the audit event or read a required source returns an error without partial
+    diagnostic data. Responses use `Cache-Control: private, no-store`.
+    Requires the `read:providers` permission in the Bearer JWT.
+  security:
+  - BearerAuth: []
+  parameters:
+  - name: provider_id
+    in: path
+    required: true
+    description: Positive internal provider ID.
+    schema:
+      type: integer
+      format: int32
+      minimum: 1
+    example: 12
+  responses:
+    '200':
+      description: Persisted provider diagnostic after its access event is prepared.
+      headers:
+        Cache-Control:
+          description: Prevents storage of private administrative diagnostic data.
+          schema:
+            type: string
+            const: private, no-store
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/AdminProviderDiagnostic'
+    '400':
+      description: The provider ID is malformed or is not a positive int32.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: invalid provider ID
+    '401':
+      description: The Bearer token is missing or invalid.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/AuthErrorResponse'
+    '403':
+      description: The Bearer token does not contain the `read:providers` permission.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: insufficient permissions
+    '404':
+      description: No provider exists with the requested ID.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: provider not found
+    '500':
+      description: A required diagnostic source or the audit event could not be prepared; no partial diagnostic is returned.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: internal server error
