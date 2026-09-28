@@ -7,6 +7,7 @@ import (
 	"reflect"
 	"strconv"
 	"strings"
+	"testing"
 	"time"
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/repositories"
@@ -16,6 +17,7 @@ import (
 	serviceproposal "github.com/LoResuelvo/loresuelvo-api/internal/domain/service_proposal"
 	"github.com/cucumber/godog"
 	"github.com/google/uuid"
+	"github.com/stretchr/testify/require"
 )
 
 type detailProposalState struct {
@@ -32,6 +34,7 @@ func (suite *testSuite) detailProposals() *detailProposalState {
 }
 
 func registerAdminOperationDetailProposalSteps(sc *godog.ScenarioContext, suite *testSuite) {
+	sc.Step(`^que existe la siguiente propuesta de servicio:$`, suite.thereAreDetailServiceProposals)
 	sc.Step(`^que existe la siguiente orden de trabajo:$`, suite.thereAreInboxWorkOrders)
 	sc.Step(`^que "([^"]*)" tiene los siguientes intentos de pago de seña:$`, suite.detailProposalHasPaymentIntents)
 	sc.Step(`^que "([^"]*)" tiene el siguiente intento de pago de seña:$`, suite.detailProposalHasPaymentIntents)
@@ -44,7 +47,6 @@ func registerAdminOperationDetailProposalSteps(sc *godog.ScenarioContext, suite 
 	sc.Step(`^la cronología y los hitos de pago principales contienen solamente los de "([^"]*)" y su orden "([^"]*)"$`, suite.detailPrimaryTimelineAndPayments)
 	sc.Step(`^los hitos incluyen las referencias internas de ambos intentos de seña y del intento de saldo con propósito, estado e instante, sin confundir sus estados con los de transacciones ni exponer montos, URLs de checkout, tokens o payloads del proveedor$`, suite.detailThreePaymentMilestones)
 	sc.Step(`^la orden "([^"]*)" informa estado "([^"]*)", instante de aceptación "([^"]*)", finalización informada "([^"]*)" e instante de saldo pagado nulo$`, suite.detailOrderFields)
-	sc.Step(`^la respuesta no contiene mensajes ni extractos de chat$`, suite.detailResponseHasNoChat)
 	sc.Step(`^el detalle primario informa la propuesta "([^"]*)" con identidad "sp-" seguida del ID persistido de "([^"]*)"$`, suite.detailPrimaryProposalIdentity)
 	sc.Step(`^la propuesta hermana "([^"]*)" se informa por separado con identidad "jr-" seguida del ID persistido de "([^"]*)"$`, suite.detailSiblingIdentity)
 	sc.Step(`^la cronología principal incluye únicamente los eventos de "([^"]*)" y su orden "([^"]*)", no los eventos de "([^"]*)"$`, suite.detailPrimaryProposalTimeline)
@@ -104,30 +106,7 @@ func (suite *testSuite) createDetailProposal(row map[string]string) error {
 	if err != nil {
 		return err
 	}
-	deposit, err := detailInt(row, "seña")
-	if err != nil {
-		return err
-	}
-	fee, err := detailInt(row, "comisión total")
-	if err != nil {
-		return err
-	}
-	feeNow, err := detailInt(row, "comisión inicial")
-	if err != nil {
-		return err
-	}
-	remaining, err := detailInt(row, "saldo servicio")
-	if err != nil {
-		return err
-	}
-	feeRemaining, err := detailInt(row, "saldo comisión")
-	if err != nil {
-		return err
-	}
-	if amount-deposit != remaining || fee-feeNow != feeRemaining {
-		return fmt.Errorf("inconsistent persisted terms for %q", label)
-	}
-	terms, err := serviceproposal.NewBookingTerms(row["moneda"], amount, deposit, fee, feeNow, scheduled.Add(-24*time.Hour))
+	terms, err := detailProposalBookingTerms(row, amount, scheduled)
 	if err != nil {
 		return err
 	}
@@ -729,4 +708,69 @@ func (suite *testSuite) detailOnlyPrimaryPayment(primaryAlias, siblingAlias stri
 		return fmt.Errorf("wrong primary payment milestones: %#v", items)
 	}
 	return nil
+}
+
+func detailProposalBookingTerms(row map[string]string, amount int64, scheduled time.Time) (serviceproposal.BookingTerms, error) {
+	hasExplicitTerms := false
+	for _, key := range []string{"seña", "comisión total", "comisión inicial", "saldo servicio", "saldo comisión"} {
+		if _, ok := row[key]; ok {
+			hasExplicitTerms = true
+		}
+	}
+	if !hasExplicitTerms {
+		terms, err := serviceproposal.NewBookingPolicy().Calculate(amount, scheduled)
+		if err != nil {
+			return serviceproposal.BookingTerms{}, err
+		}
+		if row["moneda"] != terms.Currency() {
+			return serviceproposal.BookingTerms{}, fmt.Errorf("unsupported proposal fixture currency %q", row["moneda"])
+		}
+		return terms, nil
+	}
+	deposit, err := detailInt(row, "seña")
+	if err != nil {
+		return serviceproposal.BookingTerms{}, err
+	}
+	fee, err := detailInt(row, "comisión total")
+	if err != nil {
+		return serviceproposal.BookingTerms{}, err
+	}
+	feeNow, err := detailInt(row, "comisión inicial")
+	if err != nil {
+		return serviceproposal.BookingTerms{}, err
+	}
+	remaining, err := detailInt(row, "saldo servicio")
+	if err != nil {
+		return serviceproposal.BookingTerms{}, err
+	}
+	feeRemaining, err := detailInt(row, "saldo comisión")
+	if err != nil {
+		return serviceproposal.BookingTerms{}, err
+	}
+	if amount-deposit != remaining || fee-feeNow != feeRemaining {
+		return serviceproposal.BookingTerms{}, fmt.Errorf("inconsistent persisted terms for %q", row["propuesta"])
+	}
+	return serviceproposal.NewBookingTerms(row["moneda"], amount, deposit, fee, feeNow, scheduled.Add(-24*time.Hour))
+}
+
+func TestDetailProposalBookingTermsUsesPolicyWhenTermColumnsAreAbsent(t *testing.T) {
+	scheduled := time.Date(2026, 9, 10, 13, 0, 0, 0, time.UTC)
+	expected, err := serviceproposal.NewBookingPolicy().Calculate(25000000, scheduled)
+	require.NoError(t, err)
+	found, err := detailProposalBookingTerms(map[string]string{"moneda": "ARS"}, 25000000, scheduled)
+	require.NoError(t, err)
+	require.Equal(t, expected, found)
+}
+func TestDetailProposalBookingTermsPreservesExplicitTerms(t *testing.T) {
+	scheduled := time.Date(2026, 9, 10, 13, 0, 0, 0, time.UTC)
+	row := map[string]string{"moneda": "ARS", "seña": "20000", "comisión total": "7000", "comisión inicial": "1000", "saldo servicio": "80000", "saldo comisión": "6000"}
+	found, err := detailProposalBookingTerms(row, 100000, scheduled)
+	require.NoError(t, err)
+	expected, err := serviceproposal.NewBookingTerms("ARS", 100000, 20000, 7000, 1000, scheduled.Add(-24*time.Hour))
+	require.NoError(t, err)
+	require.Equal(t, expected, found)
+}
+func TestDetailProposalBookingTermsRejectsPartialExplicitTerms(t *testing.T) {
+	_, err := detailProposalBookingTerms(map[string]string{"moneda": "ARS", "seña": "20000"}, 100000, time.Now().Add(72*time.Hour))
+	require.Error(t, err)
 }

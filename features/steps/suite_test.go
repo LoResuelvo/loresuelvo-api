@@ -540,6 +540,7 @@ func TestFeatures(t *testing.T) {
 		},
 		Options: &godog.Options{
 			Format:   "pretty",
+			Strict:   true,
 			Paths:    paths,
 			Tags:     tags,
 			TestingT: t,

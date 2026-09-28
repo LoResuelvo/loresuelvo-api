@@ -4,17 +4,18 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"testing"
 	"time"
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/testsupport"
 	"github.com/cucumber/godog"
+	"github.com/stretchr/testify/require"
 )
 
 // Registered by registerAllSteps in suite_test.go. This file owns only the
-// legacy absent-evidence scenario; other detail scenarios use their own steps.
+// absent-evidence setup and the shared detail chat-minimization assertion.
 func registerAdminOperationDetailAbsentSteps(sc *godog.ScenarioContext, suite *testSuite) {
 	sc.Step(`^que no existen dirección, propuestas, órdenes, reportes, reviews ni referencias de pago persistidas para "([^"]*)"$`, suite.prepareDetailWithoutRelatedEvidence)
-	sc.Step(`^consulto el detalle administrativo de la operación de la solicitud "([^"]*)"$`, suite.queryAdminJobRequestDetail)
 	sc.Step(`^el detalle informa el ID estable "jr-" seguido del ID persistido de "([^"]*)" y conserva los datos persistidos de solicitud y partes$`, suite.absentDetailPreservesRequestAndParties)
 	sc.Step(`^la evaluación de origen se informa no disponible porque no existe una referencia persistida desde la solicitud, sin inferir procedencia manual o histórica$`, suite.absentDetailHasNoSourceAssessment)
 	sc.Step(`^la dirección, propuestas, órdenes, reportes, reviews y hitos de pago se informan como ausentes$`, suite.absentDetailHasNoRelatedEvidence)
@@ -183,6 +184,9 @@ func (suite *testSuite) absentDetailHasNoInventedEvents() error {
 }
 
 func (suite *testSuite) absentDetailHasNoChat() error {
+	if err := suite.detailResponseHasNoChat(); err != nil {
+		return err
+	}
 	var detail any
 	if err := json.Unmarshal(suite.lastBody, &detail); err != nil {
 		return fmt.Errorf("decoding operation detail: %w", err)
@@ -215,4 +219,11 @@ func (suite *testSuite) absentDetailHasNoChat() error {
 		return fmt.Errorf("operation detail exposes private chat content")
 	}
 	return nil
+}
+
+func TestSharedDetailChatGuardRejectsBothKindsOfLeak(t *testing.T) {
+	for _, body := range []string{`{"source":{"chat":{}}}`, `{"source":{"message_content":"private"}}`, `{"description":"Mensaje privado de la conversación"}`} {
+		suite := &testSuite{lastBody: []byte(body)}
+		require.Error(t, suite.absentDetailHasNoChat(), body)
+	}
 }
