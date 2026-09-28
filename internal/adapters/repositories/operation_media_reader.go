@@ -34,17 +34,7 @@ func NewOperationMediaReader(db *sql.DB) *OperationMediaReader {
 // The first proposal belongs to jr-N; later proposals are addressed by sp-N.
 // Request images are shared with those later operations, but completion evidence
 // is restricted to the work order belonging to the selected proposal.
-const operationImageAssociationSQL = `WITH selected AS (
- SELECT jr.id AS job_request_id,
-   (SELECT sp.id FROM service_proposals sp WHERE sp.conversation_id = jr.conversation_id ORDER BY sp.id LIMIT 1) AS proposal_id
- FROM job_requests jr WHERE $1::text = 'jr' AND jr.id = $2
- UNION ALL
- SELECT jr.id AS job_request_id, sp.id AS proposal_id
- FROM service_proposals sp
- LEFT JOIN job_requests jr ON jr.conversation_id = sp.conversation_id
- WHERE $1::text = 'sp' AND sp.id = $2
-   AND (jr.id IS NULL OR sp.id <> (SELECT first.id FROM service_proposals first WHERE first.conversation_id = sp.conversation_id ORDER BY first.id LIMIT 1))
-)
+const operationImageAssociationSQL = operationSelectedSQL + `
 SELECT CASE
  WHEN EXISTS (SELECT 1 FROM job_request_images image WHERE image.job_request_id = selected.job_request_id AND image.file_id = $3::uuid)
    THEN 'job_request_image'

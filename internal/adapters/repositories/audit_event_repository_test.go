@@ -473,3 +473,36 @@ func TestAuditEventRepositoryFindPageRejectsInvalidArguments(t *testing.T) {
 		require.ErrorIs(t, err, audit.ErrInvalidQuery)
 	}
 }
+
+func TestAuditEventRepositoryPreservesConversationEvidence(t *testing.T) {
+	_, repository := newAuditRepositoryTest(t)
+	ctx := context.Background()
+	conversationID := 2147483647
+	reason, err := audit.NewReason("Support case")
+	require.NoError(t, err)
+	event, err := audit.NewEvent(audit.EventParams{
+		ID: uuid.New(), OperatorID: 7, Action: audit.ActionAccess,
+		ResourceType: "job_request", ResourceID: "12", ConversationID: &conversationID,
+		OccurredOn: time.Now().Truncate(time.Microsecond), Result: audit.ResultPrepared,
+		CorrelationID: "request-chat", Reason: reason,
+	})
+	require.NoError(t, err)
+	require.NoError(t, repository.Save(ctx, event))
+	found, err := repository.FindByID(ctx, event.ID())
+	require.NoError(t, err)
+	require.Equal(t, &conversationID, found.ConversationID())
+	require.Equal(t, "12", found.ResourceID())
+	require.Equal(t, "Support case", found.Reason().Text())
+	resourceType := "job_request"
+	resourceID := "12"
+	page, err := findAuditPageAtCurrentCut(t, repository, ctx, audit.LogFilter{ResourceType: &resourceType, ResourceID: &resourceID}, 100)
+	require.NoError(t, err)
+	var located bool
+	for _, readEvent := range page {
+		if readEvent.ID() == event.ID() {
+			located = true
+			require.Equal(t, &conversationID, readEvent.ConversationID())
+		}
+	}
+	require.True(t, located)
+}

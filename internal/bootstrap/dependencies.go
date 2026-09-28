@@ -23,6 +23,7 @@ import (
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/health_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/identity_verification_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/job_request_handler"
+	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/operation_chat_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/operation_detail_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/operation_inbox_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/operation_media_handler"
@@ -377,6 +378,7 @@ func newDependencies(database *sql.DB, adapters dependencyAdapters) (*Dependenci
 			AuditLogHandler:             auditLogHandler,
 			OperationInboxHandler:       operation_inbox_handler.NewHandler(operation.NewInboxService(persistence.OperationInboxReader, systemClock)),
 			OperationDetailHandler:      operation_detail_handler.NewHandler(operation.NewDetailService(persistence.OperationDetailReader, persistence.UserRepository, operationDetailAuditWriter, systemClock)),
+			OperationChatHandler:        operation_chat_handler.NewHandler(operation.NewChatService(repositories.NewOperationConversationReader(database), repositories.NewConversationMessagePageReader(database), persistence.UserRepository, operationDetailAuditWriter, systemClock)),
 			OperationMediaHandler:       operation_media_handler.NewHandler(operation.NewMediaService(persistence.OperationMediaReader, repositories.NewOperationMediaFileFinder(persistence.FileRepository), storageComponents.Storage)),
 			CategoryHandler:             category_handler.NewCategoryHandler(categoryService),
 			CalendarConnectionHandler:   calendar_connection_handler.NewCalendarConnectionHandler(calendarConnectionService, adapters.calendarHandlerConfig),

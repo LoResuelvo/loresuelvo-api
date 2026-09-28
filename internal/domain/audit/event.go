@@ -94,30 +94,32 @@ func (s *StateChange) To() string {
 // OperatorID must be resolved from authenticated identity by the caller.
 // ResourceID is optional for collection-level operations.
 type EventParams struct {
-	ID            uuid.UUID
-	OperatorID    int
-	Action        Action
-	ResourceType  string
-	ResourceID    string
-	OccurredOn    time.Time
-	Result        Result
-	CorrelationID string
-	Reason        *Reason
-	StateChange   *StateChange
+	ID             uuid.UUID
+	OperatorID     int
+	Action         Action
+	ResourceType   string
+	ResourceID     string
+	OccurredOn     time.Time
+	Result         Result
+	CorrelationID  string
+	Reason         *Reason
+	StateChange    *StateChange
+	ConversationID *int
 }
 
 // Event is immutable to consumers. Corrections require a new event.
 type Event struct {
-	id            uuid.UUID
-	operatorID    int
-	action        Action
-	resourceType  string
-	resourceID    string
-	occurredOn    time.Time
-	result        Result
-	correlationID string
-	reason        *Reason
-	stateChange   *StateChange
+	id             uuid.UUID
+	operatorID     int
+	action         Action
+	resourceType   string
+	resourceID     string
+	occurredOn     time.Time
+	result         Result
+	correlationID  string
+	reason         *Reason
+	stateChange    *StateChange
+	conversationID *int
 }
 
 func NewEvent(params EventParams) (*Event, error) {
@@ -135,6 +137,9 @@ func NewEvent(params EventParams) (*Event, error) {
 	}
 	if params.ResourceID != "" && !validSafeIdentifier(params.ResourceID, 128) {
 		return nil, fmt.Errorf("%w: resource ID is invalid", ErrInvalidEvent)
+	}
+	if params.ConversationID != nil && *params.ConversationID <= 0 {
+		return nil, fmt.Errorf("%w: conversation ID must be positive", ErrInvalidEvent)
 	}
 	if params.OccurredOn.IsZero() {
 		return nil, fmt.Errorf("%w: occurrence time is required", ErrInvalidEvent)
@@ -162,6 +167,10 @@ func NewEvent(params EventParams) (*Event, error) {
 		occurredOn:    params.OccurredOn.UTC(),
 		result:        params.Result,
 		correlationID: params.CorrelationID,
+	}
+	if params.ConversationID != nil {
+		id := *params.ConversationID
+		event.conversationID = &id
 	}
 	if params.Reason != nil {
 		reason := *params.Reason
@@ -223,4 +232,12 @@ func hasControl(value string) bool {
 		}
 	}
 	return false
+}
+
+func (e *Event) ConversationID() *int {
+	if e.conversationID == nil {
+		return nil
+	}
+	id := *e.conversationID
+	return &id
 }

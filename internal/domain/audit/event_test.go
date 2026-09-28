@@ -173,3 +173,24 @@ func TestAuditContractExposesOnlyAppendAndRead(t *testing.T) {
 	}
 	require.False(t, errors.Is(audit.ErrPersistence, audit.ErrInvalidEvent))
 }
+
+func TestEventConversationIDIsOptionalPositiveAndDefensivelyCopied(t *testing.T) {
+	params := validParams()
+	absent, err := audit.NewEvent(params)
+	require.NoError(t, err)
+	require.Nil(t, absent.ConversationID())
+	id := 12
+	params.ConversationID = &id
+	event, err := audit.NewEvent(params)
+	require.NoError(t, err)
+	id = 99
+	require.Equal(t, 12, *event.ConversationID())
+	returned := event.ConversationID()
+	*returned = 100
+	require.Equal(t, 12, *event.ConversationID())
+	for _, invalid := range []int{0, -1} {
+		params.ConversationID = &invalid
+		_, err := audit.NewEvent(params)
+		require.ErrorIs(t, err, audit.ErrInvalidEvent)
+	}
+}

@@ -46,11 +46,11 @@ func (repository *AuditEventRepository) saveWithExecutor(ctx context.Context, ex
 	_, err := executor.ExecContext(ctx, `
 		INSERT INTO audit_events (
 			id, operator_id, action, resource_type, resource_id, occurred_on,
-			result, correlation_id, reason, changed_field, state_from, state_to
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+			result, correlation_id, reason, changed_field, state_from, state_to, conversation_id
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
 		event.ID(), event.OperatorID(), event.Action(), event.ResourceType(),
 		event.ResourceID(), event.OccurredOn(), event.Result(), event.CorrelationID(),
-		reason, changedField, stateFrom, stateTo)
+		reason, changedField, stateFrom, stateTo, event.ConversationID())
 	if err != nil {
 		return fmt.Errorf("saving audit event: %w: %w", audit.ErrPersistence, err)
 	}
@@ -60,7 +60,7 @@ func (repository *AuditEventRepository) saveWithExecutor(ctx context.Context, ex
 func (repository *AuditEventRepository) FindByID(ctx context.Context, id uuid.UUID) (*audit.Event, error) {
 	event, err := scanAuditEvent(repository.db.QueryRowContext(ctx, `
 		SELECT id, operator_id, action, resource_type, resource_id, occurred_on,
-			result, correlation_id, reason, changed_field, state_from, state_to
+			result, correlation_id, reason, changed_field, state_from, state_to, conversation_id
 		FROM audit_events WHERE id = $1`, id))
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, audit.ErrNotFound
@@ -98,7 +98,7 @@ func (repository *AuditEventRepository) FindPage(ctx context.Context, filter aud
 	}
 	args = append(args, limit)
 	query := `SELECT id, operator_id, action, resource_type, resource_id, occurred_on,
-		result, correlation_id, reason, changed_field, state_from, state_to FROM audit_events WHERE ` +
+		result, correlation_id, reason, changed_field, state_from, state_to, conversation_id FROM audit_events WHERE ` +
 		strings.Join(conditions, ` AND `) + fmt.Sprintf(` ORDER BY occurred_on DESC, id DESC LIMIT $%d`, len(args))
 	return repository.queryEvents(ctx, query, args, limit)
 }
@@ -168,9 +168,10 @@ func scanAuditEvent(row auditEventScanner) (*audit.Event, error) {
 	var result audit.Result
 	var correlationID string
 	var reasonText, changedField, stateFrom, stateTo sql.NullString
+	var conversationID sql.NullInt64
 
 	err := row.Scan(&id, &operatorID, &action, &resourceType, &resourceID, &occurredOn,
-		&result, &correlationID, &reasonText, &changedField, &stateFrom, &stateTo)
+		&result, &correlationID, &reasonText, &changedField, &stateFrom, &stateTo, &conversationID)
 	if err != nil {
 		return nil, err
 	}
@@ -190,10 +191,15 @@ func scanAuditEvent(row auditEventScanner) (*audit.Event, error) {
 		}
 	}
 
+	var associatedConversationID *int
+	if conversationID.Valid {
+		id := int(conversationID.Int64)
+		associatedConversationID = &id
+	}
 	event, err := audit.NewEvent(audit.EventParams{
 		ID: id, OperatorID: operatorID, Action: action, ResourceType: resourceType,
 		ResourceID: resourceID, OccurredOn: occurredOn, Result: result,
-		CorrelationID: correlationID, Reason: reason, StateChange: stateChange,
+		CorrelationID: correlationID, Reason: reason, StateChange: stateChange, ConversationID: associatedConversationID,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("rehydrating audit event: %w", err)

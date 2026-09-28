@@ -15,19 +15,7 @@ import (
 
 // operationDetailSQL resolves only stable inbox operation identities. The first
 // proposal remains in its job request operation; later proposals are independent.
-const operationDetailSQL = `WITH selected AS (
- SELECT 'jr'::text AS kind, jr.id AS resource_id, jr.created_on AS started_on,
-   jr.id AS job_request_id,
-   (SELECT sp.id FROM service_proposals sp WHERE sp.conversation_id = jr.conversation_id ORDER BY sp.id LIMIT 1) AS proposal_id,
-   jr.consumer_id, jr.provider_id
- FROM job_requests jr WHERE $1::text = 'jr' AND jr.id = $2
- UNION ALL
- SELECT 'sp'::text, sp.id, sp.created_on, jr.id, sp.id, sp.consumer_id, sp.provider_id
- FROM service_proposals sp
- LEFT JOIN job_requests jr ON jr.conversation_id = sp.conversation_id
- WHERE $1::text = 'sp' AND sp.id = $2
-   AND (jr.id IS NULL OR sp.id <> (SELECT first.id FROM service_proposals first WHERE first.conversation_id = sp.conversation_id ORDER BY first.id LIMIT 1))
-)
+const operationDetailSQL = operationSelectedSQL + `
 SELECT o.started_on, COALESCE(sp.conversation_id, jr.conversation_id),
  jr.id, jr.status, jr.title, jr.description, jr.created_on,
  sp.id, sp.status, sp.description, sp.amount_cents, sp.currency, sp.created_on,
