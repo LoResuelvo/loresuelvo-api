@@ -29,7 +29,6 @@ Feature: Consultar el chat de una contratación con justificación auditada
             And el resultado auditado indica la preparación de la entrega, no la recepción o lectura por el cliente
             And el evento de auditoría no contiene mensajes ni adjuntos del chat
 
-        @wip
         Scenario: 64.2.2-CO Identificar que varias propuestas comparten una conversación
             Given que existen las siguientes propuestas vinculadas a "S1":
                 | propuesta | creada               | estado   |
