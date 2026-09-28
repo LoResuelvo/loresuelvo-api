@@ -1,4 +1,3 @@
-@wip
 Feature: Consultar la ficha y el historial administrativo de un consumidor
     Como operador autorizado
     quiero consultar la ficha y los recursos de contratación de un consumidor
