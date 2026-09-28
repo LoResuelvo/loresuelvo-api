@@ -60,6 +60,8 @@ paths:
     $ref: ./paths/consumers.yaml
   /admin/consumers:
     $ref: ./paths/admin-consumers.yaml
+  /admin/consumers/{consumer_id}/history:
+    $ref: ./paths/admin-consumer-history.yaml
   /admin/providers:
     $ref: ./paths/admin-providers.yaml
   /admin/providers/{provider_id}/diagnostic:
@@ -248,6 +250,8 @@ components:
       $ref: ./components/schemas/consumer-summary.yaml
     AdminConsumerDirectoryItem:
       $ref: ./components/schemas/admin-consumer-directory-item.yaml
+    AdminConsumerHistory:
+      $ref: ./components/schemas/admin-consumer-history.yaml
     AdminProviderDirectoryItem:
       $ref: ./components/schemas/admin-provider-directory-item.yaml
     AdminProviderDiagnostic:

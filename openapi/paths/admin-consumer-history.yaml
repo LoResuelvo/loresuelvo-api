@@ -1,0 +1,208 @@
+get:
+  tags:
+  - Administration
+  operationId: getAdminConsumerHistory
+  summary: Get a consumer's administrative profile and resource history
+  description: 'Requires read:consumers in the Bearer JWT. Returns the current profile, global unfiltered
+    resource counts and a bounded filtered page containing each job request, service proposal and work
+    order as its own resource. This is resource history, not reconstructed event history. Current profile
+    address and coverage zone are not attributed to historical resources. All profile, count and page
+    sources use one consistent read-only snapshot per request. Before delivery, one access/prepared audit
+    event is persisted for consumer/ID with the authenticated operator and effective correlation; it contains
+    no profile/history content and requires no manual reason. Prepared does not prove client receipt.
+    Required-source, public-photo resolution, operator-resolution or audit failures return an error without
+    partial data. Operation detail, private chat and payments retain independent permissions and endpoint
+    policies. Unknown, duplicated or empty query parameters are rejected. All route responses use Cache-Control:
+    private, no-store.'
+  security:
+  - BearerAuth: []
+  parameters:
+  - name: consumer_id
+    in: path
+    required: true
+    description: 'Internal consumer ID: decimal digits only, representing a positive int32. Signs and
+      whitespace are rejected.'
+    schema:
+      type: integer
+      format: int32
+      minimum: 1
+      maximum: 2147483647
+  - name: X-Request-ID
+    in: header
+    required: false
+    description: Optional correlation identifier. Surrounding whitespace is trimmed. Missing or invalid
+      values are replaced by a generated UUID; the effective value is returned in the response header
+      and, for a successful read, recorded in the prepared access event.
+    schema:
+      type: string
+  - name: type
+    in: query
+    required: false
+    description: Restrict items to one resource type.
+    schema:
+      type: string
+      enum:
+      - job_request
+      - service_proposal
+      - work_order
+  - name: status
+    in: query
+    required: false
+    description: 'Requires a compatible type: job_request pending/accepted; service_proposal pending/accepted/rejected;
+      work_order scheduled/awaiting_payment/paid.'
+    schema:
+      type: string
+      enum:
+      - pending
+      - accepted
+      - rejected
+      - scheduled
+      - awaiting_payment
+      - paid
+  - name: provider_id
+    in: query
+    required: false
+    description: Filter this consumer's resources by persisted provider ID. Decimal digits only, representing
+      a positive int32; signs and whitespace are rejected.
+    schema:
+      type: integer
+      format: int32
+      minimum: 1
+      maximum: 2147483647
+  - name: from
+    in: query
+    required: false
+    description: Inclusive lower bound on occurred_on, RFC3339 with timezone offset, normalized to UTC.
+      When both bounds are supplied, from must precede to.
+    schema:
+      type: string
+      format: date-time
+  - name: to
+    in: query
+    required: false
+    description: Exclusive upper bound on occurred_on, RFC3339 with timezone offset, normalized to UTC.
+    schema:
+      type: string
+      format: date-time
+  - name: limit
+    in: query
+    required: false
+    description: Initial default is 20. With cursor, omit to inherit its limit or repeat exactly the same
+      value; a different limit is rejected.
+    schema:
+      type: integer
+      minimum: 1
+      maximum: 100
+      default: 20
+  - name: cursor
+    in: query
+    required: false
+    description: Nonempty opaque signed next_cursor. Binds version, consumer, normalized type/status/provider/time
+      filters, limit and ordering position. Omitted filters inherit cursor values; explicitly supplied
+      filters must match. Do not decode, edit or reuse for another consumer or endpoint. Not a frozen
+      snapshot across requests.
+    schema:
+      type: string
+      minLength: 1
+      maxLength: 4096
+  responses:
+    '200':
+      description: Profile and history after access event is prepared. Empty items is []; exhausted next_cursor
+        is null.
+      headers:
+        Cache-Control:
+          schema:
+            type: string
+            const: private, no-store
+        X-Request-ID:
+          description: Effective request correlation ID.
+          schema:
+            type: string
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/AdminConsumerHistory'
+    '400':
+      description: Invalid consumer/provider ID, type/status combination, time window, limit, unknown/duplicated/empty
+        parameter, or cursor integrity, consumer scope or query binding.
+      headers:
+        Cache-Control:
+          schema:
+            type: string
+            const: private, no-store
+        X-Request-ID:
+          description: Effective request correlation ID.
+          schema:
+            type: string
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            consumer_id:
+              value:
+                error: invalid consumer ID
+            query:
+              value:
+                error: invalid consumer history query
+    '401':
+      description: Bearer token is missing or invalid.
+      headers:
+        Cache-Control:
+          schema:
+            type: string
+            const: private, no-store
+        X-Request-ID:
+          description: Effective request correlation ID.
+          schema:
+            type: string
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/AuthErrorResponse'
+    '403':
+      description: Bearer token lacks read:consumers.
+      headers:
+        Cache-Control:
+          schema:
+            type: string
+            const: private, no-store
+        X-Request-ID:
+          description: Effective request correlation ID.
+          schema:
+            type: string
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    '404':
+      description: No consumer exists with this ID; another user role is not a consumer.
+      headers:
+        Cache-Control:
+          schema:
+            type: string
+            const: private, no-store
+        X-Request-ID:
+          description: Effective request correlation ID.
+          schema:
+            type: string
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    '500':
+      description: Required source, public-photo resolution, operator lookup or access audit could not
+        be prepared. No partial profile/history is returned.
+      headers:
+        Cache-Control:
+          schema:
+            type: string
+            const: private, no-store
+        X-Request-ID:
+          description: Effective request correlation ID.
+          schema:
+            type: string
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'

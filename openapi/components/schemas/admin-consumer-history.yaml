@@ -1,0 +1,344 @@
+type: object
+additionalProperties: false
+required:
+- consumer
+- summary
+- page
+properties:
+  consumer:
+    $ref: '#/components/schemas/AdminConsumerHistory/$defs/Consumer'
+  summary:
+    $ref: '#/components/schemas/AdminConsumerHistory/$defs/Summary'
+  page:
+    $ref: '#/components/schemas/AdminConsumerHistory/$defs/Page'
+description: Administrative profile and resource history from persisted evidence. Current address and
+  coverage zone are current profile data, not reconstructed historical evidence. Entries expose bounded
+  resource metadata and operation references, not messages, attachments, authentication identifiers, credentials,
+  private documents, complete financial transactions or processor payloads.
+$defs:
+  ID:
+    type: integer
+    format: int32
+    minimum: 1
+    maximum: 2147483647
+  Instant:
+    type: string
+    format: date-time
+    description: Persisted instant serialized with a UTC timezone offset.
+  OptionalInstant:
+    type:
+    - string
+    - 'null'
+    format: date-time
+    description: Persisted UTC instant, or null when no instant is recorded.
+  Provider:
+    type: object
+    additionalProperties: false
+    required:
+    - id
+    - name
+    - surname
+    properties:
+      id:
+        $ref: '#/components/schemas/AdminConsumerHistory/$defs/ID'
+      name:
+        type: string
+      surname:
+        type: string
+  Operation:
+    type: object
+    additionalProperties: false
+    required:
+    - id
+    - url
+    - required_permission
+    - chat_required_permission
+    properties:
+      id:
+        type: string
+        pattern: ^(jr|sp)-[1-9][0-9]*$
+        description: Canonical operation identity. Requests use jr-ID. The first proposal by persisted
+          ID in its request conversation continues that jr operation; later or orphan proposals use their
+          own sp-ID. Orders inherit their proposal's operation.
+      url:
+        type: string
+        format: uri-reference
+        pattern: ^/admin/operations/(jr|sp)-[1-9][0-9]*$
+      required_permission:
+        type: string
+        const: read:admin_operations
+      chat_required_permission:
+        type: string
+        const: read:admin_chat_audit
+  Address:
+    type:
+    - object
+    - 'null'
+    additionalProperties: false
+    required:
+    - street
+    - street_number
+    - floor
+    - unit
+    - source
+    properties:
+      street:
+        type: string
+      street_number:
+        type: string
+      floor:
+        type:
+        - string
+        - 'null'
+      unit:
+        type:
+        - string
+        - 'null'
+      source:
+        type: string
+        const: current_consumer_profile
+    description: Current profile address, or null when unavailable. This is not evidence of the address
+      at the time of a historical contracting resource.
+  CoverageZone:
+    type:
+    - object
+    - 'null'
+    additionalProperties: false
+    required:
+    - id
+    - name
+    - enabled
+    - source
+    properties:
+      id:
+        $ref: '#/components/schemas/AdminConsumerHistory/$defs/ID'
+      name:
+        type: string
+      enabled:
+        type: boolean
+      source:
+        type: string
+        const: current_consumer_profile
+    description: Coverage zone associated with the current profile address, or null when unavailable.
+      Enabled is the current persisted availability.
+  Consumer:
+    type: object
+    additionalProperties: false
+    required:
+    - id
+    - role
+    - name
+    - surname
+    - email
+    - profile_photo_url
+    - created_on
+    - address
+    - coverage_zone
+    properties:
+      id:
+        $ref: '#/components/schemas/AdminConsumerHistory/$defs/ID'
+      role:
+        type: string
+        const: consumer
+      name:
+        type: string
+      surname:
+        type: string
+      email:
+        type: string
+        format: email
+      profile_photo_url:
+        type:
+        - string
+        - 'null'
+        format: uri
+        description: Public profile photo URL, or null when no public URL is available.
+      created_on:
+        $ref: '#/components/schemas/AdminConsumerHistory/$defs/Instant'
+      address:
+        $ref: '#/components/schemas/AdminConsumerHistory/$defs/Address'
+      coverage_zone:
+        $ref: '#/components/schemas/AdminConsumerHistory/$defs/CoverageZone'
+  Summary:
+    type: object
+    additionalProperties: false
+    required:
+    - job_requests
+    - service_proposals
+    - work_orders
+    properties:
+      job_requests:
+        type: integer
+        format: int64
+        minimum: 0
+      service_proposals:
+        type: integer
+        format: int64
+        minimum: 0
+      work_orders:
+        type: integer
+        format: int64
+        minimum: 0
+    description: Counts of all persisted contracting resources belonging to the consumer, independently
+      of filters, cursor and page size.
+  JobRequest:
+    type: object
+    additionalProperties: false
+    required:
+    - type
+    - id
+    - status
+    - provider
+    - occurred_on
+    - operation
+    - created_on
+    properties:
+      type:
+        type: string
+        const: job_request
+      id:
+        $ref: '#/components/schemas/AdminConsumerHistory/$defs/ID'
+      status:
+        type: string
+        enum:
+        - pending
+        - accepted
+      provider:
+        $ref: '#/components/schemas/AdminConsumerHistory/$defs/Provider'
+      occurred_on:
+        $ref: '#/components/schemas/AdminConsumerHistory/$defs/Instant'
+      operation:
+        $ref: '#/components/schemas/AdminConsumerHistory/$defs/Operation'
+      created_on:
+        $ref: '#/components/schemas/AdminConsumerHistory/$defs/Instant'
+    description: One persisted job request. occurred_on is created_on. A request does not select a singular
+      proposal or work order and has no persisted request-acceptance instant in this response.
+  ServiceProposal:
+    type: object
+    additionalProperties: false
+    required:
+    - type
+    - id
+    - status
+    - provider
+    - occurred_on
+    - operation
+    - job_request_id
+    - created_on
+    - scheduled_on
+    - estimated_duration_minutes
+    - booking_payment_deadline
+    properties:
+      type:
+        type: string
+        const: service_proposal
+      id:
+        $ref: '#/components/schemas/AdminConsumerHistory/$defs/ID'
+      status:
+        type: string
+        enum:
+        - pending
+        - accepted
+        - rejected
+      provider:
+        $ref: '#/components/schemas/AdminConsumerHistory/$defs/Provider'
+      occurred_on:
+        $ref: '#/components/schemas/AdminConsumerHistory/$defs/Instant'
+      operation:
+        $ref: '#/components/schemas/AdminConsumerHistory/$defs/Operation'
+      job_request_id:
+        anyOf:
+        - $ref: '#/components/schemas/AdminConsumerHistory/$defs/ID'
+        - type: 'null'
+      created_on:
+        $ref: '#/components/schemas/AdminConsumerHistory/$defs/Instant'
+      scheduled_on:
+        $ref: '#/components/schemas/AdminConsumerHistory/$defs/Instant'
+      estimated_duration_minutes:
+        type: integer
+        minimum: 15
+        maximum: 1440
+      booking_payment_deadline:
+        $ref: '#/components/schemas/AdminConsumerHistory/$defs/Instant'
+    description: One persisted proposal. occurred_on is created_on. job_request_id is null for an orphan
+      proposal. No proposal-acceptance instant is invented.
+  WorkOrder:
+    type: object
+    additionalProperties: false
+    required:
+    - type
+    - id
+    - status
+    - provider
+    - occurred_on
+    - operation
+    - job_request_id
+    - service_proposal_id
+    - accepted_on
+    - completion_reported_on
+    - balance_paid_on
+    properties:
+      type:
+        type: string
+        const: work_order
+      id:
+        $ref: '#/components/schemas/AdminConsumerHistory/$defs/ID'
+      status:
+        type: string
+        enum:
+        - scheduled
+        - awaiting_payment
+        - paid
+      provider:
+        $ref: '#/components/schemas/AdminConsumerHistory/$defs/Provider'
+      occurred_on:
+        $ref: '#/components/schemas/AdminConsumerHistory/$defs/Instant'
+      operation:
+        $ref: '#/components/schemas/AdminConsumerHistory/$defs/Operation'
+      job_request_id:
+        anyOf:
+        - $ref: '#/components/schemas/AdminConsumerHistory/$defs/ID'
+        - type: 'null'
+      service_proposal_id:
+        $ref: '#/components/schemas/AdminConsumerHistory/$defs/ID'
+      accepted_on:
+        $ref: '#/components/schemas/AdminConsumerHistory/$defs/Instant'
+      completion_reported_on:
+        $ref: '#/components/schemas/AdminConsumerHistory/$defs/OptionalInstant'
+      balance_paid_on:
+        $ref: '#/components/schemas/AdminConsumerHistory/$defs/OptionalInstant'
+    description: One persisted work order. occurred_on is accepted_on. Completion and balance-payment
+      milestones are delivered only from their recorded timestamps.
+  Item:
+    oneOf:
+    - $ref: '#/components/schemas/AdminConsumerHistory/$defs/JobRequest'
+    - $ref: '#/components/schemas/AdminConsumerHistory/$defs/ServiceProposal'
+    - $ref: '#/components/schemas/AdminConsumerHistory/$defs/WorkOrder'
+  Page:
+    type: object
+    additionalProperties: false
+    required:
+    - items
+    - limit
+    - next_cursor
+    properties:
+      items:
+        type: array
+        maxItems: 100
+        items:
+          $ref: '#/components/schemas/AdminConsumerHistory/$defs/Item'
+        description: Each own resource appears once. Globally ordered by occurred_on descending, then
+          type descending using bytewise comparison (PostgreSQL C collation), then resource ID descending. An empty page is [], never null.
+      limit:
+        type: integer
+        minimum: 1
+        maximum: 100
+        description: Effective page size; initially defaults to 20.
+      next_cursor:
+        type:
+        - string
+        - 'null'
+        minLength: 1
+        maxLength: 4096
+        description: Opaque signed continuation token, or null when exhausted. Binds consumer, normalized
+          filters, limit and last delivered ordering position. Not an authorization credential.
