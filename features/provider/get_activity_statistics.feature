@@ -11,7 +11,6 @@ Feature: Consultar los resultados de mi actividad como prestador
 
     Rule: Mis resultados reflejan únicamente mis trabajos y la fecha de cada avance
 
-        @wip
         Scenario: 70.1-AP Ver mis contrataciones, finalizaciones informadas y cobros según cuándo ocurrió cada uno
             Given que existen estos trabajos con sus acuerdos aceptados:
                 | trabajo | cliente           | prestador         | precio     | comisión  | contratación confirmada | finalización informada | cobrado          |
@@ -28,7 +27,6 @@ Feature: Consultar los resultados de mi actividad como prestador
             And no aparecen los resultados de "pedro@example.com"
             And no veo una comparación con un período anterior
 
-        @wip
         Scenario: 70.2-AP Distinguir a un cliente recurrente de otro que me contrata por primera vez
             Given que informé la finalización de un trabajo para "ana@example.com" antes de septiembre de 2026
             And que informé la finalización de un trabajo para "beatriz@example.com" antes de septiembre de 2026
@@ -38,7 +36,6 @@ Feature: Consultar los resultados de mi actividad como prestador
             Then veo 4 finalizaciones informadas y 3 clientes atendidos
             And veo 2 clientes recurrentes y 1 nuevo, sin contar dos veces a quien tuvo más de un trabajo
 
-        @wip
         Scenario: 70.3-AP Contar cada trabajo una sola vez aunque tenga fotos, reseñas e intentos de pago
             Given que durante los primeros nueve días de septiembre de 2026 me contrataron, informé la finalización y cobré dos trabajos de ARS 100,01 cada uno para "ana@example.com"
             And que el primer trabajo tiene tres fotos, una reseña y un intento de pago fallido antes del aprobado
@@ -49,7 +46,6 @@ Feature: Consultar los resultados de mi actividad como prestador
 
     Rule: Puedo seguir la actividad por días, semanas o meses, incluso donde no hubo movimiento
 
-        @wip
         Scenario: 70.4-AP Ver mis resultados hasta el 3 de septiembre sin incluir cobros del día siguiente
             Given que me contrataron para un trabajo el 1 de septiembre de 2026 a las 00:00 e informé su finalización el 4 de septiembre a las 10:00
             And que me contrataron para otro trabajo el 31 de agosto de 2026, informé su finalización el 2 de septiembre a las 23:59:59 y lo cobré a partir del 4 de septiembre
@@ -62,7 +58,6 @@ Feature: Consultar los resultados de mi actividad como prestador
                 | 3 de septiembre | 0              | 0                         | 0                |
             And no veo cobros completos en el total de esos tres días
 
-        @wip
         Scenario: 70.5-AP Ver una contratación y una finalización a cada lado del inicio de semana
             Given que me contrataron para un trabajo el domingo 6 de septiembre de 2026 a las 23:30
             And que informé su finalización el martes 8 de septiembre de 2026 a las 00:30
@@ -71,7 +66,6 @@ Feature: Consultar los resultados de mi actividad como prestador
             And veo una finalización informada en el tramo desde el lunes 7 a las 00:00 hasta el martes 8 a las 12:00
             And no veo otros tramos en el período elegido
 
-        @wip
         Scenario: 70.6-AP Ver una contratación y una finalización a cada lado del inicio de mes
             Given que me contrataron para un trabajo el 31 de agosto de 2026 a las 23:30
             And que informé su finalización el 2 de septiembre de 2026 a las 00:30
@@ -82,7 +76,6 @@ Feature: Consultar los resultados de mi actividad como prestador
 
     Rule: Puedo comparar mis resultados con el período inmediatamente anterior
 
-        @wip
         Scenario: 70.7-AP Comparar el crecimiento de mis resultados con los dos días anteriores
             Given que entre el 8 y el 9 de septiembre de 2026 me contrataron, informé la finalización y cobré un trabajo de ARS 100,00 para un cliente
             And que entre el 10 y el 11 de septiembre de 2026 me contrataron, informé la finalización y cobré dos trabajos de ARS 100,00 para dos clientes distintos
@@ -97,7 +90,6 @@ Feature: Consultar los resultados de mi actividad como prestador
                 | valor pactado             | ARS 200,00 | ARS 100,00 | ARS 100,00 | 100 %             |
                 | promedio                  | ARS 100,00 | ARS 100,00 | ARS 0,00   | 0 %               |
 
-        @wip
         Scenario: 70.8-AP Comparar mis resultados cuando antes no había tenido trabajos
             Given que no tuve contrataciones, finalizaciones informadas ni cobros el 8 y 9 de septiembre de 2026
             And que el 10 y 11 de septiembre de 2026 me contrataron, informé la finalización y cobré un trabajo de ARS 100,01
@@ -110,7 +102,6 @@ Feature: Consultar los resultados de mi actividad como prestador
 
     Rule: Los pendientes muestran lo que debo atender ahora, aunque no haya tenido actividad en el período
 
-        @wip
         Scenario: 70.9-AP Ver mis pendientes actuales aunque surgieron fuera del período consultado
             Given que tengo una solicitud pendiente de "beatriz@example.com" recibida antes del 20 de septiembre de 2026
             And que tengo otra solicitud pendiente de "diego@example.com" recibida el 23 de septiembre de 2026
@@ -123,7 +114,6 @@ Feature: Consultar los resultados de mi actividad como prestador
             And veo 2 solicitudes pendientes, 2 trabajos por realizar y 1 trabajo que espera el pago
             And no veo los pendientes de "pedro@example.com"
 
-        @wip
         Scenario: 70.10-AP Ver resultados vacíos cuando todavía no tuve actividad
             Given que no tengo solicitudes ni trabajos
             When consulto mis resultados sin elegir un período
@@ -134,7 +124,6 @@ Feature: Consultar los resultados de mi actividad como prestador
 
     Rule: Solo puedo consultar mis resultados con una identidad válida y un período admisible
 
-        @wip
         Scenario Outline: 70.11-AP Rechazar períodos incompletos o fuera de los límites permitidos
             When intento consultar mis resultados <elección>
             Then se me informa que el período no es válido y no se muestran resultados
@@ -148,7 +137,6 @@ Feature: Consultar los resultados de mi actividad como prestador
                 | por más de 365 días                      |
                 | con un final posterior al momento actual |
 
-        @wip
         Scenario Outline: 70.12-AP Impedir la consulta sin una identidad de prestador válida
             Given que <identidad>
             When intento consultar mis resultados
