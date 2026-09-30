@@ -2,11 +2,36 @@ package provider_test
 
 import (
 	"context"
+	"time"
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/provider"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/provider/read_model"
 	"github.com/stretchr/testify/mock"
 )
+
+type activityReaderMock struct{ mock.Mock }
+
+func (m *activityReaderMock) Read(ctx context.Context, providerID int, query provider.ActivityQuery) (*readmodel.ActivitySnapshot, error) {
+	args := m.Called(ctx, providerID, query)
+	if value := args.Get(0); value != nil {
+		return value.(*readmodel.ActivitySnapshot), args.Error(1)
+	}
+	return nil, args.Error(1)
+}
+
+type providerActorFinderMock struct{ mock.Mock }
+
+func (m *providerActorFinderMock) FindByAuthID(ctx context.Context, authID string) (int, string, error) {
+	args := m.Called(ctx, authID)
+	return args.Int(0), args.String(1), args.Error(2)
+}
+
+type activityClockMock struct{ mock.Mock }
+
+func (m *activityClockMock) Now() time.Time {
+	args := m.Called()
+	return args.Get(0).(time.Time)
+}
 
 type providerProfileReaderMock struct {
 	statsByProviderID map[int]provider.RatingStats

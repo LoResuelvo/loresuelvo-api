@@ -30,7 +30,7 @@ func RequestLogger(logger *slog.Logger) gin.HandlerFunc {
 
 		// Admin reads and participant work chats contain private operator or message data.
 		// Keep request metadata, but never capture their bodies or query values.
-		privateRead := isPrivateAdminReadPath(c.Request.URL.Path) || isPrivateWorkChatPath(c.Request.URL.Path)
+		privateRead := isPrivateAdminReadPath(c.Request.URL.Path) || isPrivateWorkChatPath(c.Request.URL.Path) || isPrivateProviderActivityPath(c.Request.URL.Path)
 		includeBodies := !privateRead && requestLogger.Enabled(c.Request.Context(), slog.LevelInfo)
 		var requestBody *limitedBodyCapture
 		var responseBody *limitedBodyCapture
@@ -100,6 +100,10 @@ func isPrivateAdminReadPath(path string) bool {
 
 func isPrivateWorkChatPath(path string) bool {
 	return path == "/conversations" || strings.HasPrefix(path, "/conversations/")
+}
+
+func isPrivateProviderActivityPath(path string) bool {
+	return path == "/providers/me/statistics/activity"
 }
 
 // GetRequestID returns the validated request ID assigned by RequestLogger.

@@ -79,6 +79,7 @@ type testSuite struct {
 	auditQuery                              auditQueryState
 	adminRequest                            adminRequestState
 	operationInbox                          operationInboxState
+	activityStatistics                      *activityStatisticsState
 	detailProposal                          detailProposalState
 	detailRequestEvidence                   detailRequestEvidenceState
 	detailMedia                             detailMediaState
@@ -237,6 +238,7 @@ func (s *testSuite) registerAllSteps(sc *godog.ScenarioContext) {
 	registerAdminProviderDiagnosticSteps(sc, s)
 	registerAdminProviderDiagnosticActivitySteps(sc, s)
 	registerAdminConsumerHistorySteps(sc, s)
+	registerGetActivityStatisticsSteps(sc, s)
 }
 
 func (s *testSuite) cleanup() error {
@@ -369,6 +371,7 @@ func (s *testSuite) cleanup() error {
 	s.auditQuery = auditQueryState{}
 	s.adminRequest = adminRequestState{}
 	s.operationInbox = operationInboxState{}
+	s.activityStatistics = nil
 	s.detailProposal = detailProposalState{}
 	s.detailRequestEvidence = detailRequestEvidenceState{}
 	s.detailMedia = detailMediaState{}

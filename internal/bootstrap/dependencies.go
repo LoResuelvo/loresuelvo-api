@@ -251,6 +251,7 @@ func newDependencies(database *sql.DB, adapters dependencyAdapters) (*Dependenci
 		persistence.CoverageZoneRepository,
 		persistence.IdentityVerificationRepository,
 	)
+	activityService := provider.NewActivityService(persistence.ProviderActivityReader, persistence.ProviderActivityActorFinder, systemClock)
 	consumerService := consumer.NewService(persistence.UserRepository, fileService, addressResolver, coverageZoneResolver)
 	conversationService := conversation.NewService(
 		persistence.ConversationRepository,
@@ -420,6 +421,7 @@ func newDependencies(database *sql.DB, adapters dependencyAdapters) (*Dependenci
 			CoverageZoneHandler:         coverage_zone_handler.NewCoverageZoneHandler(coverageZoneService),
 			ConsumerHandler:             consumer_handler.NewConsumerHandler(consumerService),
 			ProviderHandler:             provider_handler.NewProviderHandler(providerService),
+			ActivityHandler:             provider_handler.NewActivityHandler(activityService),
 			ConversationHandler:         conversation_handler.NewConversationHandler(conversationService),
 			JobRequestHandler:           job_request_handler.NewJobRequestHandler(jobRequestService),
 			IdentityVerificationHandler: identityVerificationHandler,
