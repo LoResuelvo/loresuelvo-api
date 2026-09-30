@@ -1,0 +1,1 @@
+DROP INDEX IF EXISTS payment_transactions_approved_verified_cursor_idx;

@@ -11,6 +11,24 @@ import (
 
 type activityReaderMock struct{ mock.Mock }
 
+type collectionReaderMock struct{ mock.Mock }
+
+func (m *collectionReaderMock) ReadSummary(ctx context.Context, providerID int, query provider.ActivityQuery) (*readmodel.CollectionSnapshot, error) {
+	args := m.Called(ctx, providerID, query)
+	if value := args.Get(0); value != nil {
+		return value.(*readmodel.CollectionSnapshot), args.Error(1)
+	}
+	return nil, args.Error(1)
+}
+
+func (m *collectionReaderMock) ReadDetail(ctx context.Context, providerID int, query provider.CollectionDetailQuery) (*readmodel.CollectionDetailSnapshot, error) {
+	args := m.Called(ctx, providerID, query)
+	if value := args.Get(0); value != nil {
+		return value.(*readmodel.CollectionDetailSnapshot), args.Error(1)
+	}
+	return nil, args.Error(1)
+}
+
 func (m *activityReaderMock) Read(ctx context.Context, providerID int, query provider.ActivityQuery) (*readmodel.ActivitySnapshot, error) {
 	args := m.Called(ctx, providerID, query)
 	if value := args.Get(0); value != nil {

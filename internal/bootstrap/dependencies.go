@@ -252,6 +252,11 @@ func newDependencies(database *sql.DB, adapters dependencyAdapters) (*Dependenci
 		persistence.IdentityVerificationRepository,
 	)
 	activityService := provider.NewActivityService(persistence.ProviderActivityReader, persistence.ProviderActivityActorFinder, systemClock)
+	collectionService := provider.NewCollectionService(persistence.ProviderCollectionReader, persistence.ProviderActivityActorFinder, systemClock)
+	collectionHandler, err := provider_handler.NewCollectionHandler(collectionService, adapters.auditCursorSigningKey)
+	if err != nil {
+		return nil, fmt.Errorf("configuring collection cursor: %w", err)
+	}
 	consumerService := consumer.NewService(persistence.UserRepository, fileService, addressResolver, coverageZoneResolver)
 	conversationService := conversation.NewService(
 		persistence.ConversationRepository,
@@ -422,6 +427,7 @@ func newDependencies(database *sql.DB, adapters dependencyAdapters) (*Dependenci
 			ConsumerHandler:             consumer_handler.NewConsumerHandler(consumerService),
 			ProviderHandler:             provider_handler.NewProviderHandler(providerService),
 			ActivityHandler:             provider_handler.NewActivityHandler(activityService),
+			CollectionHandler:           collectionHandler,
 			ConversationHandler:         conversation_handler.NewConversationHandler(conversationService),
 			JobRequestHandler:           job_request_handler.NewJobRequestHandler(jobRequestService),
 			IdentityVerificationHandler: identityVerificationHandler,

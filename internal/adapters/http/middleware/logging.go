@@ -103,7 +103,9 @@ func isPrivateWorkChatPath(path string) bool {
 }
 
 func isPrivateProviderActivityPath(path string) bool {
-	return path == "/providers/me/statistics/activity"
+	return path == "/providers/me/statistics/activity" ||
+		path == "/providers/me/statistics/collections" ||
+		path == "/providers/me/statistics/collections/transactions"
 }
 
 // GetRequestID returns the validated request ID assigned by RequestLogger.

@@ -80,6 +80,7 @@ type testSuite struct {
 	adminRequest                            adminRequestState
 	operationInbox                          operationInboxState
 	activityStatistics                      *activityStatisticsState
+	collectionStatistics                    *collectionStatisticsState
 	detailProposal                          detailProposalState
 	detailRequestEvidence                   detailRequestEvidenceState
 	detailMedia                             detailMediaState
@@ -239,6 +240,7 @@ func (s *testSuite) registerAllSteps(sc *godog.ScenarioContext) {
 	registerAdminProviderDiagnosticActivitySteps(sc, s)
 	registerAdminConsumerHistorySteps(sc, s)
 	registerGetActivityStatisticsSteps(sc, s)
+	registerGetCollectionStatisticsSteps(sc, s)
 }
 
 func (s *testSuite) cleanup() error {
@@ -372,6 +374,7 @@ func (s *testSuite) cleanup() error {
 	s.adminRequest = adminRequestState{}
 	s.operationInbox = operationInboxState{}
 	s.activityStatistics = nil
+	s.collectionStatistics = nil
 	s.detailProposal = detailProposalState{}
 	s.detailRequestEvidence = detailRequestEvidenceState{}
 	s.detailMedia = detailMediaState{}
@@ -519,7 +522,7 @@ func ScenarioInitializer(sc *godog.ScenarioContext, t *testing.T, database *sql.
 		testSuite.server.Close()
 		return ctx, nil
 	})
-	sc.Before(func(ctx context.Context, sc *godog.Scenario) (context.Context, error) {
+	sc.Before(func(ctx context.Context, _ *godog.Scenario) (context.Context, error) {
 		testSuite.categoryAuditCapture.reset()
 		testSuite.operationDetailAuditCapture.reset()
 		testSuite.operationChatMediaCapture.reset()

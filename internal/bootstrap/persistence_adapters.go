@@ -10,6 +10,7 @@ type PersistenceAdapters struct {
 	AdminDirectoryReader                   *repositories.AdminDirectoryReader
 	ProviderDiagnosticReader               *repositories.ProviderDiagnosticReader
 	ProviderActivityReader                 *repositories.ProviderActivityReader
+	ProviderCollectionReader               *repositories.ProviderCollectionReader
 	ProviderActivityActorFinder            *repositories.ProviderActivityActorFinder
 	ConsumerHistoryReader                  *repositories.ConsumerHistoryReader
 	OperationInboxReader                   *repositories.OperationInboxReader
@@ -91,6 +92,7 @@ func NewPersistenceAdapters(database *sql.DB) *PersistenceAdapters {
 		AdminDirectoryReader:                   repositories.NewAdminDirectoryReader(database),
 		ProviderDiagnosticReader:               repositories.NewProviderDiagnosticReader(database),
 		ProviderActivityReader:                 repositories.NewProviderActivityReader(database),
+		ProviderCollectionReader:               repositories.NewProviderCollectionReader(database),
 		ProviderActivityActorFinder:            repositories.NewProviderActivityActorFinder(database),
 		ConsumerHistoryReader:                  repositories.NewConsumerHistoryReader(database),
 		OperationInboxReader:                   repositories.NewOperationInboxReader(database),

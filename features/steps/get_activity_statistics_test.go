@@ -115,9 +115,9 @@ func registerGetActivityStatisticsSteps(sc *godog.ScenarioContext, suite *testSu
 	sc.Step(`^que no tengo solicitudes ni trabajos$`, suite.activityNoRequestsOrOrders)
 
 	sc.Step(`^consulto mis resultados desde el (.+) hasta antes del (.+)$`, suite.activityQueryDateRange)
-	sc.Step(`^consulto mi evolución diaria desde el (.+) hasta antes del (.+)$`, suite.activityQueryDailyDateRange)
-	sc.Step(`^consulto mi evolución semanal desde el (.+) hasta el (.+)$`, suite.activityQueryWeeklyDateRange)
-	sc.Step(`^consulto mi evolución mensual desde el (.+) hasta el (.+)$`, suite.activityQueryMonthlyDateRange)
+	sc.Step(`^consulto mi evolución diaria desde el (.+) hasta antes del (.+)$`, suite.providerStatisticsQueryDailyDateRange)
+	sc.Step(`^consulto mi evolución semanal desde el (.+) hasta el (.+)$`, suite.providerStatisticsQueryWeeklyDateRange)
+	sc.Step(`^consulto mi evolución mensual desde el (.+) hasta el (.+)$`, suite.providerStatisticsQueryMonthlyDateRange)
 	sc.Step(`^comparo mis resultados del (.+) con el período anterior$`, suite.activityQueryWithComparison)
 	sc.Step(`^consulto mis resultados sin elegir un período$`, suite.activityQueryDefaultPeriod)
 	sc.Step(`^intento consultar mis resultados (.+)$`, suite.activityTryQueryInvalidPeriod)
@@ -134,12 +134,12 @@ func registerGetActivityStatisticsSteps(sc *godog.ScenarioContext, suite *testSu
 	sc.Step(`^veo (\d+) finalizaciones informadas y (\d+) clientes atendidos$`, suite.activityCompletionAndClientCounts)
 	sc.Step(`^veo (\d+) clientes recurrentes y (\d+) nuevo, sin contar dos veces a quien tuvo más de un trabajo$`, suite.activityReturningAndNewClients)
 	sc.Step(`^veo un valor pactado de ARS ([0-9,.]+) y un promedio de ARS ([0-9,.]+)$`, suite.activityValueAndAverage)
-	sc.Step(`^veo exactamente estos días, en orden:$`, suite.activityEvolutionMatches)
+	sc.Step(`^veo exactamente estos días, en orden:$`, suite.providerStatisticsEvolutionMatches)
 	sc.Step(`^no veo cobros completos en el total de esos tres días$`, suite.activityNoPaymentsInPeriod)
 	sc.Step(`^veo una contratación en el tramo desde (.+) hasta (.+)$`, suite.activityBookingInBucket)
 	sc.Step(`^veo una finalización informada en el tramo desde (.+) hasta (.+)$`, suite.activityCompletionInBucket)
-	sc.Step(`^no veo otros tramos en el período elegido$`, suite.activityNoOtherBuckets)
-	sc.Step(`^la comparación corresponde al (.+)$`, suite.activityComparisonPeriodIs)
+	sc.Step(`^no veo otros tramos en el período elegido$`, suite.providerStatisticsNoOtherBuckets)
+	sc.Step(`^la comparación corresponde al (.+)$`, suite.providerStatisticsComparisonPeriodIs)
 	sc.Step(`^veo estas diferencias entre el período elegido y el anterior:$`, suite.activityComparisonMatches)
 	sc.Step(`^veo una contratación, una finalización informada, un cobro completo y un cliente atendido más que antes$`, suite.activityComparisonOneMore)
 	sc.Step(`^veo ARS ([0-9,.]+) más de valor pactado que antes$`, suite.activityComparisonValueIncrease)
@@ -288,6 +288,10 @@ func (suite *testSuite) createActivityOrder(label, consumerEmail, providerEmail 
 }
 
 func (suite *testSuite) createActivityOrderWithImageCount(label, consumerEmail, providerEmail string, amount, fee int64, acceptedOn, reportedOn, paidOn time.Time, imageCount int) error {
+	return suite.createActivityOrderWithTerms(label, consumerEmail, providerEmail, amount, maxActivityInt64(1, amount/2), fee, fee/2, acceptedOn, reportedOn, paidOn, imageCount)
+}
+
+func (suite *testSuite) createActivityOrderWithTerms(label, consumerEmail, providerEmail string, amount, deposit, fee, feeDueNow int64, acceptedOn, reportedOn, paidOn time.Time, imageCount int) error {
 	auth0ID, permissions := suite.currentAuth0ID, suite.currentPermissions
 	defer func() {
 		suite.currentAuth0ID, suite.currentPermissions = auth0ID, permissions
@@ -346,11 +350,11 @@ func (suite *testSuite) createActivityOrderWithImageCount(label, consumerEmail, 
 		"propuesta": proposalLabel, "solicitud": requestLabel,
 		"creada": proposalCreated.UTC().Format(time.RFC3339), "fecha programada": scheduledOn.UTC().Format(time.RFC3339),
 		"duración": "60", "moneda": "ARS", "precio total": strconv.FormatInt(amount, 10),
-		"seña":             strconv.FormatInt(maxActivityInt64(1, amount/2), 10),
+		"seña":             strconv.FormatInt(deposit, 10),
 		"comisión total":   strconv.FormatInt(fee, 10),
-		"comisión inicial": strconv.FormatInt(fee/2, 10),
-		"saldo servicio":   strconv.FormatInt(amount-maxActivityInt64(1, amount/2), 10),
-		"saldo comisión":   strconv.FormatInt(fee-fee/2, 10),
+		"comisión inicial": strconv.FormatInt(feeDueNow, 10),
+		"saldo servicio":   strconv.FormatInt(amount-deposit, 10),
+		"saldo comisión":   strconv.FormatInt(fee-feeDueNow, 10),
 		"descripción":      "Trabajo para estadísticas", "estado": "pending",
 	}
 	if proposalCreated.Before(request.createdOn) {
