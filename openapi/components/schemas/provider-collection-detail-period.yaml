@@ -1,0 +1,15 @@
+type: object
+required: [from, to, time_zone]
+properties:
+  from:
+    type: string
+    format: date-time
+    description: Inclusive beginning of the fixed filtered interval, serialized in UTC.
+  to:
+    type: string
+    format: date-time
+    description: Exclusive end of the fixed filtered interval, serialized in UTC.
+  time_zone:
+    type: string
+    const: America/Argentina/Buenos_Aires
+additionalProperties: false

@@ -1,0 +1,24 @@
+type: object
+required: [period, calculated_at, currency, results, evolution, current_pending]
+properties:
+  period:
+    $ref: ./provider-collection-period.yaml
+  calculated_at:
+    type: string
+    format: date-time
+    description: UTC evaluation instant used for the default interval and future-end validation; not the exact database snapshot time.
+  currency:
+    type: string
+    const: ARS
+  results:
+    $ref: ./provider-collection-amounts.yaml
+  evolution:
+    type: array
+    description: Chronologically ordered calendar buckets intersecting the requested interval, including empty buckets.
+    items:
+      $ref: ./provider-collection-bucket.yaml
+  current_pending:
+    $ref: ./provider-collection-pending.yaml
+  comparison:
+    $ref: ./provider-collection-comparison.yaml
+additionalProperties: false

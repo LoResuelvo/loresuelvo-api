@@ -1,0 +1,14 @@
+type: object
+required: [absolute, percentage]
+properties:
+  absolute:
+    type: integer
+    format: int64
+    description: Current amount minus previous amount, in ARS cents; may be negative.
+  percentage:
+    oneOf:
+    - type: number
+      format: double
+    - type: 'null'
+    description: Percentage change relative to the previous amount, rounded to two decimal places; null when the previous amount is zero.
+additionalProperties: false

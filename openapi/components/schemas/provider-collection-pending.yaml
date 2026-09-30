@@ -1,0 +1,8 @@
+type: object
+required: [scheduled, awaiting_payment]
+properties:
+  scheduled:
+    $ref: ./provider-collection-pending-balance.yaml
+  awaiting_payment:
+    $ref: ./provider-collection-pending-balance.yaml
+additionalProperties: false

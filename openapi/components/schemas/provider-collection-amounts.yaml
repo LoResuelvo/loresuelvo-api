@@ -1,0 +1,19 @@
+type: object
+required: [booking_deposit_cents, service_balance_cents, total_cents]
+properties:
+  booking_deposit_cents:
+    type: integer
+    format: int64
+    minimum: 0
+    description: Verified booking deposits owed to the provider, excluding platform fees.
+  service_balance_cents:
+    type: integer
+    format: int64
+    minimum: 0
+    description: Verified contractual service balances owed to the provider, excluding platform fees.
+  total_cents:
+    type: integer
+    format: int64
+    minimum: 0
+    description: Sum of booking_deposit_cents and service_balance_cents.
+additionalProperties: false

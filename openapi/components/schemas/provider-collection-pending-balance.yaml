@@ -1,0 +1,13 @@
+type: object
+required: [orders, amount_cents]
+properties:
+  orders:
+    type: integer
+    format: int64
+    minimum: 0
+  amount_cents:
+    type: integer
+    format: int64
+    minimum: 0
+    description: Sum of contractual service balances still due to the provider, excluding commissions; does not require an active checkout.
+additionalProperties: false

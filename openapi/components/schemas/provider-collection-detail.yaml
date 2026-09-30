@@ -1,0 +1,34 @@
+type: object
+required: [period, calculated_at, currency, total_count, total_amount_cents, transactions, next_cursor]
+properties:
+  period:
+    $ref: ./provider-collection-detail-period.yaml
+  calculated_at:
+    type: string
+    format: date-time
+    description: UTC evaluation instant; not the exact database snapshot time.
+  currency:
+    type: string
+    const: ARS
+  total_count:
+    type: integer
+    format: int64
+    minimum: 0
+    description: Number of transactions in the entire filtered set, not only this page.
+  total_amount_cents:
+    type: integer
+    format: int64
+    minimum: 0
+    description: Sum of seller amounts in the entire filtered set, not only this page.
+  transactions:
+    type: array
+    description: One page in descending verified_on and local id order.
+    items:
+      $ref: ./provider-collection-transaction.yaml
+  next_cursor:
+    oneOf:
+    - type: string
+      minLength: 1
+    - type: 'null'
+    description: Opaque signed continuation carrying provider, period, purpose, page size and last position; null after the last page.
+additionalProperties: false

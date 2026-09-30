@@ -1,0 +1,154 @@
+get:
+  tags: [Providers]
+  operationId: getMyProviderCollectionTransactions
+  summary: List the authenticated provider's verified collection transactions
+  description: >-
+    Lists approved, verified local transactions representing the provider's
+    contractual share, without external payment or payment-account data.
+    The authenticated provider is resolved from the Bearer token; another
+    provider cannot be selected. Rows are ordered by `verified_on` descending,
+    then local `id` descending. `total_count` and `total_amount_cents` describe
+    the entire filtered set, independent of the page size or cursor.
+    An inconsistent approved record fails the request rather than being silently
+    omitted. The count, total and page are read from one consistent read-only
+    database snapshot.
+
+    `from` and `to` are an inclusive-start, exclusive-end RFC 3339 interval;
+    both must be supplied or both omitted. Encode a positive `+` UTC offset
+    as `%2B` in the query string. If omitted, the interval is the immediately
+    preceding 30 days. It must be positive, at most 365 days long, and cannot
+    end in the future. `purpose` optionally filters to `booking_deposit` or
+    `service_balance`; `limit` defaults to 20 and may be 1 through 100.
+    No granularity or comparison option is accepted for this endpoint.
+
+    `next_cursor` is null on the final page. Otherwise, use it as the `cursor`
+    query value on the next request. It is an opaque signed token bound to the
+    provider, effective period, purpose, page size and last position. A cursor
+    may be sent alone; if `from`, `to`, `purpose`, or `limit` are also sent,
+    they must exactly match its values. It preserves the original default
+    period even if the clock advances. Altered, foreign-provider, or
+    incompatible cursors return 400. `Cache-Control: private, no-store`
+    applies to success and error responses.
+  security:
+  - BearerAuth: []
+  parameters:
+  - name: from
+    in: query
+    required: false
+    description: Inclusive instant, supplied with `to` or omitted with it. Encode a positive `+` offset as `%2B`.
+    schema:
+      type: string
+      format: date-time
+  - name: to
+    in: query
+    required: false
+    description: Exclusive instant, supplied with `from` or omitted with it. Encode a positive `+` offset as `%2B`.
+    schema:
+      type: string
+      format: date-time
+  - name: purpose
+    in: query
+    required: false
+    description: Filter the complete set before totals and pagination.
+    schema:
+      type: string
+      enum: [booking_deposit, service_balance]
+  - name: limit
+    in: query
+    required: false
+    description: Maximum rows in this page.
+    schema:
+      type: integer
+      minimum: 1
+      maximum: 100
+      default: 20
+  - name: cursor
+    in: query
+    required: false
+    description: Opaque signed continuation from next_cursor; effective filter and period remain fixed.
+    schema:
+      type: string
+      minLength: 1
+  responses:
+    '200':
+      description: One ordered transaction page and totals for the entire filtered set.
+      headers:
+        Cache-Control:
+          description: Prevents storage of private provider collections.
+          schema: {type: string, const: 'private, no-store'}
+        X-Request-ID:
+          description: Request correlation identifier.
+          schema: {type: string}
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ProviderCollectionDetail'
+    '400':
+      description: Invalid interval, filter, page size or cursor; unsupported, empty, repeated or incompatible query parameter.
+      headers:
+        Cache-Control:
+          description: Prevents storage of private provider collections.
+          schema: {type: string, const: 'private, no-store'}
+        X-Request-ID:
+          description: Request correlation identifier.
+          schema: {type: string}
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example: {error: invalid collection query}
+    '401':
+      description: The Bearer token is missing or invalid.
+      headers:
+        Cache-Control:
+          description: Prevents storage of private provider collections.
+          schema: {type: string, const: 'private, no-store'}
+        X-Request-ID:
+          description: Request correlation identifier.
+          schema: {type: string}
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/AuthErrorResponse'
+    '403':
+      description: The registered authenticated user does not have the provider role.
+      headers:
+        Cache-Control:
+          description: Prevents storage of private provider collections.
+          schema: {type: string, const: 'private, no-store'}
+        X-Request-ID:
+          description: Request correlation identifier.
+          schema: {type: string}
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example: {error: provider access required}
+    '404':
+      description: No user is registered for the authenticated identity, or the provider profile is missing.
+      headers:
+        Cache-Control:
+          description: Prevents storage of private provider collections.
+          schema: {type: string, const: 'private, no-store'}
+        X-Request-ID:
+          description: Request correlation identifier.
+          schema: {type: string}
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example: {error: provider not found}
+    '500':
+      description: The complete filtered collection set could not be calculated.
+      headers:
+        Cache-Control:
+          description: Prevents storage of private provider collections.
+          schema: {type: string, const: 'private, no-store'}
+        X-Request-ID:
+          description: Request correlation identifier.
+          schema: {type: string}
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example: {error: internal server error}

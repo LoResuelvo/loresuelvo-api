@@ -3235,6 +3235,470 @@
                 }
             }
         },
+        "/providers/me/statistics/collections": {
+            "get": {
+                "tags": [
+                    "Providers"
+                ],
+                "operationId": "getMyProviderCollectionStatistics",
+                "summary": "Get verified collection totals and pending balances for the authenticated provider",
+                "description": "Returns the provider's verified collections in ARS cents, excluding platform fees. A collection is counted at its approved transaction's verification instant, not at checkout initiation, proposal acceptance, work completion, or service payment initiation. Only the authenticated provider's transactions are considered; this self-service request cannot select another provider. Booking deposits and service balances are separate, and their sum is total. The response contains no external payment, payment-method, or payment-account details. Inconsistent approved records fail the entire request instead of returning a partial total.\n`from` and `to` must both be supplied or both omitted. Each supplied value is an RFC 3339 timestamp with an explicit UTC offset; encode a positive `+` offset as `%2B` in the query string. The interval includes `from` and excludes `to`. If omitted, it is the immediately preceding 30 days. It must be positive, at most 365 days long, and may not end in the future. `granularity` defaults to `day` and also accepts `week` and `month`. Calendar buckets use America/Argentina/Buenos_Aires time, with Monday-start weeks; empty buckets appear as zeros, and the first and last are clipped to the requested interval.\n`compare_previous=true` adds the immediately preceding interval of equal elapsed duration. Absolute changes are current minus previous in cents. Percentage changes are relative to the previous amount, rounded to two decimals with halfway values away from zero, or null when the previous amount is zero. `current_pending` is a snapshot of scheduled and awaiting-payment work orders regardless of the chosen interval. It sums only contractual provider balances, even when no balance checkout exists. Totals, evolution, comparison and pending balances come from one consistent read-only database snapshot. `Cache-Control: private, no-store` is applied to success and error responses.",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "name": "from",
+                        "in": "query",
+                        "required": false,
+                        "description": "Inclusive instant; must be supplied with `to`. Encode a positive `+` UTC offset as `%2B`.",
+                        "schema": {
+                            "type": "string",
+                            "format": "date-time"
+                        },
+                        "example": "2026-09-01T00:00:00-03:00"
+                    },
+                    {
+                        "name": "to",
+                        "in": "query",
+                        "required": false,
+                        "description": "Exclusive instant; must be supplied with `from`. Encode a positive `+` UTC offset as `%2B`.",
+                        "schema": {
+                            "type": "string",
+                            "format": "date-time"
+                        },
+                        "example": "2026-09-29T00:00:00-03:00"
+                    },
+                    {
+                        "name": "granularity",
+                        "in": "query",
+                        "required": false,
+                        "description": "Calendar size of evolution buckets in Argentina/Buenos Aires time.",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "day",
+                                "week",
+                                "month"
+                            ],
+                            "default": "day"
+                        }
+                    },
+                    {
+                        "name": "compare_previous",
+                        "in": "query",
+                        "required": false,
+                        "description": "Include the immediately preceding interval and its changes.",
+                        "schema": {
+                            "type": "boolean",
+                            "default": false
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Verified collections and current pending balances from one read snapshot.",
+                        "headers": {
+                            "Cache-Control": {
+                                "description": "Prevents storage of private provider collections.",
+                                "schema": {
+                                    "type": "string",
+                                    "const": "private, no-store"
+                                }
+                            },
+                            "X-Request-ID": {
+                                "description": "Request correlation identifier.",
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ProviderCollectionStatistics"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Incomplete, invalid, repeated, empty, or unsupported query parameter.",
+                        "headers": {
+                            "Cache-Control": {
+                                "description": "Prevents storage of private provider collections.",
+                                "schema": {
+                                    "type": "string",
+                                    "const": "private, no-store"
+                                }
+                            },
+                            "X-Request-ID": {
+                                "description": "Request correlation identifier.",
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                },
+                                "example": {
+                                    "error": "invalid collection query"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "The Bearer token is missing or invalid.",
+                        "headers": {
+                            "Cache-Control": {
+                                "description": "Prevents storage of private provider collections.",
+                                "schema": {
+                                    "type": "string",
+                                    "const": "private, no-store"
+                                }
+                            },
+                            "X-Request-ID": {
+                                "description": "Request correlation identifier.",
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AuthErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "The registered authenticated user does not have the provider role.",
+                        "headers": {
+                            "Cache-Control": {
+                                "description": "Prevents storage of private provider collections.",
+                                "schema": {
+                                    "type": "string",
+                                    "const": "private, no-store"
+                                }
+                            },
+                            "X-Request-ID": {
+                                "description": "Request correlation identifier.",
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                },
+                                "example": {
+                                    "error": "provider access required"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "No user is registered for the authenticated identity, or the provider profile is missing.",
+                        "headers": {
+                            "Cache-Control": {
+                                "description": "Prevents storage of private provider collections.",
+                                "schema": {
+                                    "type": "string",
+                                    "const": "private, no-store"
+                                }
+                            },
+                            "X-Request-ID": {
+                                "description": "Request correlation identifier.",
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                },
+                                "example": {
+                                    "error": "provider not found"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "The complete collection snapshot could not be calculated.",
+                        "headers": {
+                            "Cache-Control": {
+                                "description": "Prevents storage of private provider collections.",
+                                "schema": {
+                                    "type": "string",
+                                    "const": "private, no-store"
+                                }
+                            },
+                            "X-Request-ID": {
+                                "description": "Request correlation identifier.",
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                },
+                                "example": {
+                                    "error": "internal server error"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/providers/me/statistics/collections/transactions": {
+            "get": {
+                "tags": [
+                    "Providers"
+                ],
+                "operationId": "getMyProviderCollectionTransactions",
+                "summary": "List the authenticated provider's verified collection transactions",
+                "description": "Lists approved, verified local transactions representing the provider's contractual share, without external payment or payment-account data. The authenticated provider is resolved from the Bearer token; another provider cannot be selected. Rows are ordered by `verified_on` descending, then local `id` descending. `total_count` and `total_amount_cents` describe the entire filtered set, independent of the page size or cursor. An inconsistent approved record fails the request rather than being silently omitted. The count, total and page are read from one consistent read-only database snapshot.\n`from` and `to` are an inclusive-start, exclusive-end RFC 3339 interval; both must be supplied or both omitted. Encode a positive `+` UTC offset as `%2B` in the query string. If omitted, the interval is the immediately preceding 30 days. It must be positive, at most 365 days long, and cannot end in the future. `purpose` optionally filters to `booking_deposit` or `service_balance`; `limit` defaults to 20 and may be 1 through 100. No granularity or comparison option is accepted for this endpoint.\n`next_cursor` is null on the final page. Otherwise, use it as the `cursor` query value on the next request. It is an opaque signed token bound to the provider, effective period, purpose, page size and last position. A cursor may be sent alone; if `from`, `to`, `purpose`, or `limit` are also sent, they must exactly match its values. It preserves the original default period even if the clock advances. Altered, foreign-provider, or incompatible cursors return 400. `Cache-Control: private, no-store` applies to success and error responses.",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "name": "from",
+                        "in": "query",
+                        "required": false,
+                        "description": "Inclusive instant, supplied with `to` or omitted with it. Encode a positive `+` offset as `%2B`.",
+                        "schema": {
+                            "type": "string",
+                            "format": "date-time"
+                        }
+                    },
+                    {
+                        "name": "to",
+                        "in": "query",
+                        "required": false,
+                        "description": "Exclusive instant, supplied with `from` or omitted with it. Encode a positive `+` offset as `%2B`.",
+                        "schema": {
+                            "type": "string",
+                            "format": "date-time"
+                        }
+                    },
+                    {
+                        "name": "purpose",
+                        "in": "query",
+                        "required": false,
+                        "description": "Filter the complete set before totals and pagination.",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "booking_deposit",
+                                "service_balance"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "limit",
+                        "in": "query",
+                        "required": false,
+                        "description": "Maximum rows in this page.",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 100,
+                            "default": 20
+                        }
+                    },
+                    {
+                        "name": "cursor",
+                        "in": "query",
+                        "required": false,
+                        "description": "Opaque signed continuation from next_cursor; effective filter and period remain fixed.",
+                        "schema": {
+                            "type": "string",
+                            "minLength": 1
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "One ordered transaction page and totals for the entire filtered set.",
+                        "headers": {
+                            "Cache-Control": {
+                                "description": "Prevents storage of private provider collections.",
+                                "schema": {
+                                    "type": "string",
+                                    "const": "private, no-store"
+                                }
+                            },
+                            "X-Request-ID": {
+                                "description": "Request correlation identifier.",
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ProviderCollectionDetail"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid interval, filter, page size or cursor; unsupported, empty, repeated or incompatible query parameter.",
+                        "headers": {
+                            "Cache-Control": {
+                                "description": "Prevents storage of private provider collections.",
+                                "schema": {
+                                    "type": "string",
+                                    "const": "private, no-store"
+                                }
+                            },
+                            "X-Request-ID": {
+                                "description": "Request correlation identifier.",
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                },
+                                "example": {
+                                    "error": "invalid collection query"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "The Bearer token is missing or invalid.",
+                        "headers": {
+                            "Cache-Control": {
+                                "description": "Prevents storage of private provider collections.",
+                                "schema": {
+                                    "type": "string",
+                                    "const": "private, no-store"
+                                }
+                            },
+                            "X-Request-ID": {
+                                "description": "Request correlation identifier.",
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AuthErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "The registered authenticated user does not have the provider role.",
+                        "headers": {
+                            "Cache-Control": {
+                                "description": "Prevents storage of private provider collections.",
+                                "schema": {
+                                    "type": "string",
+                                    "const": "private, no-store"
+                                }
+                            },
+                            "X-Request-ID": {
+                                "description": "Request correlation identifier.",
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                },
+                                "example": {
+                                    "error": "provider access required"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "No user is registered for the authenticated identity, or the provider profile is missing.",
+                        "headers": {
+                            "Cache-Control": {
+                                "description": "Prevents storage of private provider collections.",
+                                "schema": {
+                                    "type": "string",
+                                    "const": "private, no-store"
+                                }
+                            },
+                            "X-Request-ID": {
+                                "description": "Request correlation identifier.",
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                },
+                                "example": {
+                                    "error": "provider not found"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "The complete filtered collection set could not be calculated.",
+                        "headers": {
+                            "Cache-Control": {
+                                "description": "Prevents storage of private provider collections.",
+                                "schema": {
+                                    "type": "string",
+                                    "const": "private, no-store"
+                                }
+                            },
+                            "X-Request-ID": {
+                                "description": "Request correlation identifier.",
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                },
+                                "example": {
+                                    "error": "internal server error"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/providers/{providerID}": {
             "get": {
                 "tags": [
@@ -11100,6 +11564,931 @@
                             }
                         ],
                         "description": "Percentage change rounded to two decimal places; null when either average is undefined or the previous average is zero."
+                    }
+                },
+                "additionalProperties": false
+            },
+            "ProviderCollectionStatistics": {
+                "type": "object",
+                "required": [
+                    "period",
+                    "calculated_at",
+                    "currency",
+                    "results",
+                    "evolution",
+                    "current_pending"
+                ],
+                "properties": {
+                    "period": {
+                        "type": "object",
+                        "required": [
+                            "from",
+                            "to",
+                            "granularity",
+                            "time_zone"
+                        ],
+                        "properties": {
+                            "from": {
+                                "type": "string",
+                                "format": "date-time",
+                                "description": "Inclusive beginning of the requested interval, serialized in UTC."
+                            },
+                            "to": {
+                                "type": "string",
+                                "format": "date-time",
+                                "description": "Exclusive end of the requested interval, serialized in UTC."
+                            },
+                            "granularity": {
+                                "type": "string",
+                                "enum": [
+                                    "day",
+                                    "week",
+                                    "month"
+                                ],
+                                "description": "Calendar grouping in Argentina/Buenos Aires time."
+                            },
+                            "time_zone": {
+                                "type": "string",
+                                "const": "America/Argentina/Buenos_Aires"
+                            }
+                        },
+                        "additionalProperties": false
+                    },
+                    "calculated_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "description": "UTC evaluation instant used for the default interval and future-end validation; not the exact database snapshot time."
+                    },
+                    "currency": {
+                        "type": "string",
+                        "const": "ARS"
+                    },
+                    "results": {
+                        "type": "object",
+                        "required": [
+                            "booking_deposit_cents",
+                            "service_balance_cents",
+                            "total_cents"
+                        ],
+                        "properties": {
+                            "booking_deposit_cents": {
+                                "type": "integer",
+                                "format": "int64",
+                                "minimum": 0,
+                                "description": "Verified booking deposits owed to the provider, excluding platform fees."
+                            },
+                            "service_balance_cents": {
+                                "type": "integer",
+                                "format": "int64",
+                                "minimum": 0,
+                                "description": "Verified contractual service balances owed to the provider, excluding platform fees."
+                            },
+                            "total_cents": {
+                                "type": "integer",
+                                "format": "int64",
+                                "minimum": 0,
+                                "description": "Sum of booking_deposit_cents and service_balance_cents."
+                            }
+                        },
+                        "additionalProperties": false
+                    },
+                    "evolution": {
+                        "type": "array",
+                        "description": "Chronologically ordered calendar buckets intersecting the requested interval, including empty buckets.",
+                        "items": {
+                            "type": "object",
+                            "required": [
+                                "from",
+                                "to",
+                                "booking_deposit_cents",
+                                "service_balance_cents",
+                                "total_cents"
+                            ],
+                            "properties": {
+                                "from": {
+                                    "type": "string",
+                                    "format": "date-time",
+                                    "description": "Inclusive bucket start, clipped to the requested interval and serialized in UTC."
+                                },
+                                "to": {
+                                    "type": "string",
+                                    "format": "date-time",
+                                    "description": "Exclusive bucket end, clipped to the requested interval and serialized in UTC."
+                                },
+                                "booking_deposit_cents": {
+                                    "type": "integer",
+                                    "format": "int64",
+                                    "minimum": 0
+                                },
+                                "service_balance_cents": {
+                                    "type": "integer",
+                                    "format": "int64",
+                                    "minimum": 0
+                                },
+                                "total_cents": {
+                                    "type": "integer",
+                                    "format": "int64",
+                                    "minimum": 0
+                                }
+                            },
+                            "additionalProperties": false
+                        }
+                    },
+                    "current_pending": {
+                        "type": "object",
+                        "required": [
+                            "scheduled",
+                            "awaiting_payment"
+                        ],
+                        "properties": {
+                            "scheduled": {
+                                "type": "object",
+                                "required": [
+                                    "orders",
+                                    "amount_cents"
+                                ],
+                                "properties": {
+                                    "orders": {
+                                        "type": "integer",
+                                        "format": "int64",
+                                        "minimum": 0
+                                    },
+                                    "amount_cents": {
+                                        "type": "integer",
+                                        "format": "int64",
+                                        "minimum": 0,
+                                        "description": "Sum of contractual service balances still due to the provider, excluding commissions; does not require an active checkout."
+                                    }
+                                },
+                                "additionalProperties": false
+                            },
+                            "awaiting_payment": {
+                                "type": "object",
+                                "required": [
+                                    "orders",
+                                    "amount_cents"
+                                ],
+                                "properties": {
+                                    "orders": {
+                                        "type": "integer",
+                                        "format": "int64",
+                                        "minimum": 0
+                                    },
+                                    "amount_cents": {
+                                        "type": "integer",
+                                        "format": "int64",
+                                        "minimum": 0,
+                                        "description": "Sum of contractual service balances still due to the provider, excluding commissions; does not require an active checkout."
+                                    }
+                                },
+                                "additionalProperties": false
+                            }
+                        },
+                        "additionalProperties": false
+                    },
+                    "comparison": {
+                        "type": "object",
+                        "description": "Returned only when compare_previous=true was requested.",
+                        "required": [
+                            "period",
+                            "results",
+                            "changes"
+                        ],
+                        "properties": {
+                            "period": {
+                                "type": "object",
+                                "required": [
+                                    "from",
+                                    "to",
+                                    "granularity",
+                                    "time_zone"
+                                ],
+                                "properties": {
+                                    "from": {
+                                        "type": "string",
+                                        "format": "date-time",
+                                        "description": "Inclusive beginning of the requested interval, serialized in UTC."
+                                    },
+                                    "to": {
+                                        "type": "string",
+                                        "format": "date-time",
+                                        "description": "Exclusive end of the requested interval, serialized in UTC."
+                                    },
+                                    "granularity": {
+                                        "type": "string",
+                                        "enum": [
+                                            "day",
+                                            "week",
+                                            "month"
+                                        ],
+                                        "description": "Calendar grouping in Argentina/Buenos Aires time."
+                                    },
+                                    "time_zone": {
+                                        "type": "string",
+                                        "const": "America/Argentina/Buenos_Aires"
+                                    }
+                                },
+                                "additionalProperties": false
+                            },
+                            "results": {
+                                "type": "object",
+                                "required": [
+                                    "booking_deposit_cents",
+                                    "service_balance_cents",
+                                    "total_cents"
+                                ],
+                                "properties": {
+                                    "booking_deposit_cents": {
+                                        "type": "integer",
+                                        "format": "int64",
+                                        "minimum": 0,
+                                        "description": "Verified booking deposits owed to the provider, excluding platform fees."
+                                    },
+                                    "service_balance_cents": {
+                                        "type": "integer",
+                                        "format": "int64",
+                                        "minimum": 0,
+                                        "description": "Verified contractual service balances owed to the provider, excluding platform fees."
+                                    },
+                                    "total_cents": {
+                                        "type": "integer",
+                                        "format": "int64",
+                                        "minimum": 0,
+                                        "description": "Sum of booking_deposit_cents and service_balance_cents."
+                                    }
+                                },
+                                "additionalProperties": false
+                            },
+                            "changes": {
+                                "type": "object",
+                                "required": [
+                                    "booking_deposit_cents",
+                                    "service_balance_cents",
+                                    "total_cents"
+                                ],
+                                "properties": {
+                                    "booking_deposit_cents": {
+                                        "type": "object",
+                                        "required": [
+                                            "absolute",
+                                            "percentage"
+                                        ],
+                                        "properties": {
+                                            "absolute": {
+                                                "type": "integer",
+                                                "format": "int64",
+                                                "description": "Current amount minus previous amount, in ARS cents; may be negative."
+                                            },
+                                            "percentage": {
+                                                "oneOf": [
+                                                    {
+                                                        "type": "number",
+                                                        "format": "double"
+                                                    },
+                                                    {
+                                                        "type": "null"
+                                                    }
+                                                ],
+                                                "description": "Percentage change relative to the previous amount, rounded to two decimal places; null when the previous amount is zero."
+                                            }
+                                        },
+                                        "additionalProperties": false
+                                    },
+                                    "service_balance_cents": {
+                                        "type": "object",
+                                        "required": [
+                                            "absolute",
+                                            "percentage"
+                                        ],
+                                        "properties": {
+                                            "absolute": {
+                                                "type": "integer",
+                                                "format": "int64",
+                                                "description": "Current amount minus previous amount, in ARS cents; may be negative."
+                                            },
+                                            "percentage": {
+                                                "oneOf": [
+                                                    {
+                                                        "type": "number",
+                                                        "format": "double"
+                                                    },
+                                                    {
+                                                        "type": "null"
+                                                    }
+                                                ],
+                                                "description": "Percentage change relative to the previous amount, rounded to two decimal places; null when the previous amount is zero."
+                                            }
+                                        },
+                                        "additionalProperties": false
+                                    },
+                                    "total_cents": {
+                                        "type": "object",
+                                        "required": [
+                                            "absolute",
+                                            "percentage"
+                                        ],
+                                        "properties": {
+                                            "absolute": {
+                                                "type": "integer",
+                                                "format": "int64",
+                                                "description": "Current amount minus previous amount, in ARS cents; may be negative."
+                                            },
+                                            "percentage": {
+                                                "oneOf": [
+                                                    {
+                                                        "type": "number",
+                                                        "format": "double"
+                                                    },
+                                                    {
+                                                        "type": "null"
+                                                    }
+                                                ],
+                                                "description": "Percentage change relative to the previous amount, rounded to two decimal places; null when the previous amount is zero."
+                                            }
+                                        },
+                                        "additionalProperties": false
+                                    }
+                                },
+                                "additionalProperties": false
+                            }
+                        },
+                        "additionalProperties": false
+                    }
+                },
+                "additionalProperties": false
+            },
+            "ProviderCollectionPeriod": {
+                "type": "object",
+                "required": [
+                    "from",
+                    "to",
+                    "granularity",
+                    "time_zone"
+                ],
+                "properties": {
+                    "from": {
+                        "type": "string",
+                        "format": "date-time",
+                        "description": "Inclusive beginning of the requested interval, serialized in UTC."
+                    },
+                    "to": {
+                        "type": "string",
+                        "format": "date-time",
+                        "description": "Exclusive end of the requested interval, serialized in UTC."
+                    },
+                    "granularity": {
+                        "type": "string",
+                        "enum": [
+                            "day",
+                            "week",
+                            "month"
+                        ],
+                        "description": "Calendar grouping in Argentina/Buenos Aires time."
+                    },
+                    "time_zone": {
+                        "type": "string",
+                        "const": "America/Argentina/Buenos_Aires"
+                    }
+                },
+                "additionalProperties": false
+            },
+            "ProviderCollectionDetailPeriod": {
+                "type": "object",
+                "required": [
+                    "from",
+                    "to",
+                    "time_zone"
+                ],
+                "properties": {
+                    "from": {
+                        "type": "string",
+                        "format": "date-time",
+                        "description": "Inclusive beginning of the fixed filtered interval, serialized in UTC."
+                    },
+                    "to": {
+                        "type": "string",
+                        "format": "date-time",
+                        "description": "Exclusive end of the fixed filtered interval, serialized in UTC."
+                    },
+                    "time_zone": {
+                        "type": "string",
+                        "const": "America/Argentina/Buenos_Aires"
+                    }
+                },
+                "additionalProperties": false
+            },
+            "ProviderCollectionAmounts": {
+                "type": "object",
+                "required": [
+                    "booking_deposit_cents",
+                    "service_balance_cents",
+                    "total_cents"
+                ],
+                "properties": {
+                    "booking_deposit_cents": {
+                        "type": "integer",
+                        "format": "int64",
+                        "minimum": 0,
+                        "description": "Verified booking deposits owed to the provider, excluding platform fees."
+                    },
+                    "service_balance_cents": {
+                        "type": "integer",
+                        "format": "int64",
+                        "minimum": 0,
+                        "description": "Verified contractual service balances owed to the provider, excluding platform fees."
+                    },
+                    "total_cents": {
+                        "type": "integer",
+                        "format": "int64",
+                        "minimum": 0,
+                        "description": "Sum of booking_deposit_cents and service_balance_cents."
+                    }
+                },
+                "additionalProperties": false
+            },
+            "ProviderCollectionBucket": {
+                "type": "object",
+                "required": [
+                    "from",
+                    "to",
+                    "booking_deposit_cents",
+                    "service_balance_cents",
+                    "total_cents"
+                ],
+                "properties": {
+                    "from": {
+                        "type": "string",
+                        "format": "date-time",
+                        "description": "Inclusive bucket start, clipped to the requested interval and serialized in UTC."
+                    },
+                    "to": {
+                        "type": "string",
+                        "format": "date-time",
+                        "description": "Exclusive bucket end, clipped to the requested interval and serialized in UTC."
+                    },
+                    "booking_deposit_cents": {
+                        "type": "integer",
+                        "format": "int64",
+                        "minimum": 0
+                    },
+                    "service_balance_cents": {
+                        "type": "integer",
+                        "format": "int64",
+                        "minimum": 0
+                    },
+                    "total_cents": {
+                        "type": "integer",
+                        "format": "int64",
+                        "minimum": 0
+                    }
+                },
+                "additionalProperties": false
+            },
+            "ProviderCollectionPending": {
+                "type": "object",
+                "required": [
+                    "scheduled",
+                    "awaiting_payment"
+                ],
+                "properties": {
+                    "scheduled": {
+                        "type": "object",
+                        "required": [
+                            "orders",
+                            "amount_cents"
+                        ],
+                        "properties": {
+                            "orders": {
+                                "type": "integer",
+                                "format": "int64",
+                                "minimum": 0
+                            },
+                            "amount_cents": {
+                                "type": "integer",
+                                "format": "int64",
+                                "minimum": 0,
+                                "description": "Sum of contractual service balances still due to the provider, excluding commissions; does not require an active checkout."
+                            }
+                        },
+                        "additionalProperties": false
+                    },
+                    "awaiting_payment": {
+                        "type": "object",
+                        "required": [
+                            "orders",
+                            "amount_cents"
+                        ],
+                        "properties": {
+                            "orders": {
+                                "type": "integer",
+                                "format": "int64",
+                                "minimum": 0
+                            },
+                            "amount_cents": {
+                                "type": "integer",
+                                "format": "int64",
+                                "minimum": 0,
+                                "description": "Sum of contractual service balances still due to the provider, excluding commissions; does not require an active checkout."
+                            }
+                        },
+                        "additionalProperties": false
+                    }
+                },
+                "additionalProperties": false
+            },
+            "ProviderCollectionPendingBalance": {
+                "type": "object",
+                "required": [
+                    "orders",
+                    "amount_cents"
+                ],
+                "properties": {
+                    "orders": {
+                        "type": "integer",
+                        "format": "int64",
+                        "minimum": 0
+                    },
+                    "amount_cents": {
+                        "type": "integer",
+                        "format": "int64",
+                        "minimum": 0,
+                        "description": "Sum of contractual service balances still due to the provider, excluding commissions; does not require an active checkout."
+                    }
+                },
+                "additionalProperties": false
+            },
+            "ProviderCollectionComparison": {
+                "type": "object",
+                "description": "Returned only when compare_previous=true was requested.",
+                "required": [
+                    "period",
+                    "results",
+                    "changes"
+                ],
+                "properties": {
+                    "period": {
+                        "type": "object",
+                        "required": [
+                            "from",
+                            "to",
+                            "granularity",
+                            "time_zone"
+                        ],
+                        "properties": {
+                            "from": {
+                                "type": "string",
+                                "format": "date-time",
+                                "description": "Inclusive beginning of the requested interval, serialized in UTC."
+                            },
+                            "to": {
+                                "type": "string",
+                                "format": "date-time",
+                                "description": "Exclusive end of the requested interval, serialized in UTC."
+                            },
+                            "granularity": {
+                                "type": "string",
+                                "enum": [
+                                    "day",
+                                    "week",
+                                    "month"
+                                ],
+                                "description": "Calendar grouping in Argentina/Buenos Aires time."
+                            },
+                            "time_zone": {
+                                "type": "string",
+                                "const": "America/Argentina/Buenos_Aires"
+                            }
+                        },
+                        "additionalProperties": false
+                    },
+                    "results": {
+                        "type": "object",
+                        "required": [
+                            "booking_deposit_cents",
+                            "service_balance_cents",
+                            "total_cents"
+                        ],
+                        "properties": {
+                            "booking_deposit_cents": {
+                                "type": "integer",
+                                "format": "int64",
+                                "minimum": 0,
+                                "description": "Verified booking deposits owed to the provider, excluding platform fees."
+                            },
+                            "service_balance_cents": {
+                                "type": "integer",
+                                "format": "int64",
+                                "minimum": 0,
+                                "description": "Verified contractual service balances owed to the provider, excluding platform fees."
+                            },
+                            "total_cents": {
+                                "type": "integer",
+                                "format": "int64",
+                                "minimum": 0,
+                                "description": "Sum of booking_deposit_cents and service_balance_cents."
+                            }
+                        },
+                        "additionalProperties": false
+                    },
+                    "changes": {
+                        "type": "object",
+                        "required": [
+                            "booking_deposit_cents",
+                            "service_balance_cents",
+                            "total_cents"
+                        ],
+                        "properties": {
+                            "booking_deposit_cents": {
+                                "type": "object",
+                                "required": [
+                                    "absolute",
+                                    "percentage"
+                                ],
+                                "properties": {
+                                    "absolute": {
+                                        "type": "integer",
+                                        "format": "int64",
+                                        "description": "Current amount minus previous amount, in ARS cents; may be negative."
+                                    },
+                                    "percentage": {
+                                        "oneOf": [
+                                            {
+                                                "type": "number",
+                                                "format": "double"
+                                            },
+                                            {
+                                                "type": "null"
+                                            }
+                                        ],
+                                        "description": "Percentage change relative to the previous amount, rounded to two decimal places; null when the previous amount is zero."
+                                    }
+                                },
+                                "additionalProperties": false
+                            },
+                            "service_balance_cents": {
+                                "type": "object",
+                                "required": [
+                                    "absolute",
+                                    "percentage"
+                                ],
+                                "properties": {
+                                    "absolute": {
+                                        "type": "integer",
+                                        "format": "int64",
+                                        "description": "Current amount minus previous amount, in ARS cents; may be negative."
+                                    },
+                                    "percentage": {
+                                        "oneOf": [
+                                            {
+                                                "type": "number",
+                                                "format": "double"
+                                            },
+                                            {
+                                                "type": "null"
+                                            }
+                                        ],
+                                        "description": "Percentage change relative to the previous amount, rounded to two decimal places; null when the previous amount is zero."
+                                    }
+                                },
+                                "additionalProperties": false
+                            },
+                            "total_cents": {
+                                "type": "object",
+                                "required": [
+                                    "absolute",
+                                    "percentage"
+                                ],
+                                "properties": {
+                                    "absolute": {
+                                        "type": "integer",
+                                        "format": "int64",
+                                        "description": "Current amount minus previous amount, in ARS cents; may be negative."
+                                    },
+                                    "percentage": {
+                                        "oneOf": [
+                                            {
+                                                "type": "number",
+                                                "format": "double"
+                                            },
+                                            {
+                                                "type": "null"
+                                            }
+                                        ],
+                                        "description": "Percentage change relative to the previous amount, rounded to two decimal places; null when the previous amount is zero."
+                                    }
+                                },
+                                "additionalProperties": false
+                            }
+                        },
+                        "additionalProperties": false
+                    }
+                },
+                "additionalProperties": false
+            },
+            "ProviderCollectionMetricChange": {
+                "type": "object",
+                "required": [
+                    "absolute",
+                    "percentage"
+                ],
+                "properties": {
+                    "absolute": {
+                        "type": "integer",
+                        "format": "int64",
+                        "description": "Current amount minus previous amount, in ARS cents; may be negative."
+                    },
+                    "percentage": {
+                        "oneOf": [
+                            {
+                                "type": "number",
+                                "format": "double"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "description": "Percentage change relative to the previous amount, rounded to two decimal places; null when the previous amount is zero."
+                    }
+                },
+                "additionalProperties": false
+            },
+            "ProviderCollectionDetail": {
+                "type": "object",
+                "required": [
+                    "period",
+                    "calculated_at",
+                    "currency",
+                    "total_count",
+                    "total_amount_cents",
+                    "transactions",
+                    "next_cursor"
+                ],
+                "properties": {
+                    "period": {
+                        "type": "object",
+                        "required": [
+                            "from",
+                            "to",
+                            "time_zone"
+                        ],
+                        "properties": {
+                            "from": {
+                                "type": "string",
+                                "format": "date-time",
+                                "description": "Inclusive beginning of the fixed filtered interval, serialized in UTC."
+                            },
+                            "to": {
+                                "type": "string",
+                                "format": "date-time",
+                                "description": "Exclusive end of the fixed filtered interval, serialized in UTC."
+                            },
+                            "time_zone": {
+                                "type": "string",
+                                "const": "America/Argentina/Buenos_Aires"
+                            }
+                        },
+                        "additionalProperties": false
+                    },
+                    "calculated_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "description": "UTC evaluation instant; not the exact database snapshot time."
+                    },
+                    "currency": {
+                        "type": "string",
+                        "const": "ARS"
+                    },
+                    "total_count": {
+                        "type": "integer",
+                        "format": "int64",
+                        "minimum": 0,
+                        "description": "Number of transactions in the entire filtered set, not only this page."
+                    },
+                    "total_amount_cents": {
+                        "type": "integer",
+                        "format": "int64",
+                        "minimum": 0,
+                        "description": "Sum of seller amounts in the entire filtered set, not only this page."
+                    },
+                    "transactions": {
+                        "type": "array",
+                        "description": "One page in descending verified_on and local id order.",
+                        "items": {
+                            "type": "object",
+                            "required": [
+                                "id",
+                                "verified_on",
+                                "purpose",
+                                "seller_amount_cents",
+                                "currency",
+                                "service_proposal_id",
+                                "work_order_id"
+                            ],
+                            "properties": {
+                                "id": {
+                                    "type": "integer",
+                                    "format": "int64",
+                                    "minimum": 1,
+                                    "description": "Local payment transaction identifier, not the external payment ID."
+                                },
+                                "verified_on": {
+                                    "type": "string",
+                                    "format": "date-time",
+                                    "description": "Approval verification instant, serialized in UTC."
+                                },
+                                "purpose": {
+                                    "type": "string",
+                                    "enum": [
+                                        "booking_deposit",
+                                        "service_balance"
+                                    ]
+                                },
+                                "seller_amount_cents": {
+                                    "type": "integer",
+                                    "format": "int64",
+                                    "minimum": 1,
+                                    "description": "Contractual amount owed to the provider, excluding platform fees."
+                                },
+                                "currency": {
+                                    "type": "string",
+                                    "const": "ARS"
+                                },
+                                "service_proposal_id": {
+                                    "type": "integer",
+                                    "minimum": 1
+                                },
+                                "work_order_id": {
+                                    "type": "integer",
+                                    "minimum": 1,
+                                    "description": "Local work-order identifier associated with the approved collection."
+                                }
+                            },
+                            "additionalProperties": false
+                        }
+                    },
+                    "next_cursor": {
+                        "oneOf": [
+                            {
+                                "type": "string",
+                                "minLength": 1
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "description": "Opaque signed continuation carrying provider, period, purpose, page size and last position; null after the last page."
+                    }
+                },
+                "additionalProperties": false
+            },
+            "ProviderCollectionTransaction": {
+                "type": "object",
+                "required": [
+                    "id",
+                    "verified_on",
+                    "purpose",
+                    "seller_amount_cents",
+                    "currency",
+                    "service_proposal_id",
+                    "work_order_id"
+                ],
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "format": "int64",
+                        "minimum": 1,
+                        "description": "Local payment transaction identifier, not the external payment ID."
+                    },
+                    "verified_on": {
+                        "type": "string",
+                        "format": "date-time",
+                        "description": "Approval verification instant, serialized in UTC."
+                    },
+                    "purpose": {
+                        "type": "string",
+                        "enum": [
+                            "booking_deposit",
+                            "service_balance"
+                        ]
+                    },
+                    "seller_amount_cents": {
+                        "type": "integer",
+                        "format": "int64",
+                        "minimum": 1,
+                        "description": "Contractual amount owed to the provider, excluding platform fees."
+                    },
+                    "currency": {
+                        "type": "string",
+                        "const": "ARS"
+                    },
+                    "service_proposal_id": {
+                        "type": "integer",
+                        "minimum": 1
+                    },
+                    "work_order_id": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "description": "Local work-order identifier associated with the approved collection."
                     }
                 },
                 "additionalProperties": false

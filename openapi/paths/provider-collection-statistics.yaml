@@ -1,0 +1,152 @@
+get:
+  tags: [Providers]
+  operationId: getMyProviderCollectionStatistics
+  summary: Get verified collection totals and pending balances for the authenticated provider
+  description: >-
+    Returns the provider's verified collections in ARS cents, excluding platform
+    fees. A collection is counted at its approved transaction's verification
+    instant, not at checkout initiation, proposal acceptance, work completion,
+    or service payment initiation. Only the authenticated provider's transactions
+    are considered; this self-service request cannot select another provider.
+    Booking deposits and service balances are separate, and their sum is total.
+    The response contains no external payment, payment-method, or payment-account
+    details. Inconsistent approved records fail the entire request instead of
+    returning a partial total.
+
+    `from` and `to` must both be supplied or both omitted. Each supplied value
+    is an RFC 3339 timestamp with an explicit UTC offset; encode a positive
+    `+` offset as `%2B` in the query string. The interval includes `from` and
+    excludes `to`. If omitted, it is the immediately preceding 30 days. It
+    must be positive, at most 365 days long, and may not end in the future.
+    `granularity` defaults to `day` and also accepts `week` and `month`.
+    Calendar buckets use America/Argentina/Buenos_Aires time, with Monday-start
+    weeks; empty buckets appear as zeros, and the first and last are clipped
+    to the requested interval.
+
+    `compare_previous=true` adds the immediately preceding interval of equal
+    elapsed duration. Absolute changes are current minus previous in cents.
+    Percentage changes are relative to the previous amount, rounded to two
+    decimals with halfway values away from zero, or null when the previous
+    amount is zero. `current_pending` is a snapshot of scheduled and
+    awaiting-payment work orders regardless of the chosen interval. It sums
+    only contractual provider balances, even when no balance checkout exists.
+    Totals, evolution, comparison and pending balances come from one consistent
+    read-only database snapshot. `Cache-Control: private, no-store` is applied
+    to success and error responses.
+  security:
+  - BearerAuth: []
+  parameters:
+  - name: from
+    in: query
+    required: false
+    description: Inclusive instant; must be supplied with `to`. Encode a positive `+` UTC offset as `%2B`.
+    schema:
+      type: string
+      format: date-time
+    example: '2026-09-01T00:00:00-03:00'
+  - name: to
+    in: query
+    required: false
+    description: Exclusive instant; must be supplied with `from`. Encode a positive `+` UTC offset as `%2B`.
+    schema:
+      type: string
+      format: date-time
+    example: '2026-09-29T00:00:00-03:00'
+  - name: granularity
+    in: query
+    required: false
+    description: Calendar size of evolution buckets in Argentina/Buenos Aires time.
+    schema:
+      type: string
+      enum: [day, week, month]
+      default: day
+  - name: compare_previous
+    in: query
+    required: false
+    description: Include the immediately preceding interval and its changes.
+    schema:
+      type: boolean
+      default: false
+  responses:
+    '200':
+      description: Verified collections and current pending balances from one read snapshot.
+      headers:
+        Cache-Control:
+          description: Prevents storage of private provider collections.
+          schema: {type: string, const: 'private, no-store'}
+        X-Request-ID:
+          description: Request correlation identifier.
+          schema: {type: string}
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ProviderCollectionStatistics'
+    '400':
+      description: Incomplete, invalid, repeated, empty, or unsupported query parameter.
+      headers:
+        Cache-Control:
+          description: Prevents storage of private provider collections.
+          schema: {type: string, const: 'private, no-store'}
+        X-Request-ID:
+          description: Request correlation identifier.
+          schema: {type: string}
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example: {error: invalid collection query}
+    '401':
+      description: The Bearer token is missing or invalid.
+      headers:
+        Cache-Control:
+          description: Prevents storage of private provider collections.
+          schema: {type: string, const: 'private, no-store'}
+        X-Request-ID:
+          description: Request correlation identifier.
+          schema: {type: string}
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/AuthErrorResponse'
+    '403':
+      description: The registered authenticated user does not have the provider role.
+      headers:
+        Cache-Control:
+          description: Prevents storage of private provider collections.
+          schema: {type: string, const: 'private, no-store'}
+        X-Request-ID:
+          description: Request correlation identifier.
+          schema: {type: string}
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example: {error: provider access required}
+    '404':
+      description: No user is registered for the authenticated identity, or the provider profile is missing.
+      headers:
+        Cache-Control:
+          description: Prevents storage of private provider collections.
+          schema: {type: string, const: 'private, no-store'}
+        X-Request-ID:
+          description: Request correlation identifier.
+          schema: {type: string}
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example: {error: provider not found}
+    '500':
+      description: The complete collection snapshot could not be calculated.
+      headers:
+        Cache-Control:
+          description: Prevents storage of private provider collections.
+          schema: {type: string, const: 'private, no-store'}
+        X-Request-ID:
+          description: Request correlation identifier.
+          schema: {type: string}
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example: {error: internal server error}

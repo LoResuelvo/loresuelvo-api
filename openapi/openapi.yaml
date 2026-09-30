@@ -80,6 +80,10 @@ paths:
     $ref: ./paths/providers.yaml
   /providers/me/statistics/activity:
     $ref: ./paths/provider-activity-statistics.yaml
+  /providers/me/statistics/collections:
+    $ref: ./paths/provider-collection-statistics.yaml
+  /providers/me/statistics/collections/transactions:
+    $ref: ./paths/provider-collection-transactions.yaml
   /providers/{providerID}:
     $ref: ./paths/provider-profile.yaml
   /providers/me/identity-verification-sessions:
@@ -310,6 +314,28 @@ components:
       $ref: ./components/schemas/provider-activity-count-change.yaml
     ProviderActivityAverageChange:
       $ref: ./components/schemas/provider-activity-average-change.yaml
+    ProviderCollectionStatistics:
+      $ref: ./components/schemas/provider-collection-statistics.yaml
+    ProviderCollectionPeriod:
+      $ref: ./components/schemas/provider-collection-period.yaml
+    ProviderCollectionDetailPeriod:
+      $ref: ./components/schemas/provider-collection-detail-period.yaml
+    ProviderCollectionAmounts:
+      $ref: ./components/schemas/provider-collection-amounts.yaml
+    ProviderCollectionBucket:
+      $ref: ./components/schemas/provider-collection-bucket.yaml
+    ProviderCollectionPending:
+      $ref: ./components/schemas/provider-collection-pending.yaml
+    ProviderCollectionPendingBalance:
+      $ref: ./components/schemas/provider-collection-pending-balance.yaml
+    ProviderCollectionComparison:
+      $ref: ./components/schemas/provider-collection-comparison.yaml
+    ProviderCollectionMetricChange:
+      $ref: ./components/schemas/provider-collection-metric-change.yaml
+    ProviderCollectionDetail:
+      $ref: ./components/schemas/provider-collection-detail.yaml
+    ProviderCollectionTransaction:
+      $ref: ./components/schemas/provider-collection-transaction.yaml
     IdentityVerificationSession:
       $ref: ./components/schemas/identity-verification-session.yaml
     PaymentAccountAuthorization:

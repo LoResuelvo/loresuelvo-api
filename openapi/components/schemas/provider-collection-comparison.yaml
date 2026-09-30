@@ -1,0 +1,20 @@
+type: object
+description: Returned only when compare_previous=true was requested.
+required: [period, results, changes]
+properties:
+  period:
+    $ref: ./provider-collection-period.yaml
+  results:
+    $ref: ./provider-collection-amounts.yaml
+  changes:
+    type: object
+    required: [booking_deposit_cents, service_balance_cents, total_cents]
+    properties:
+      booking_deposit_cents:
+        $ref: ./provider-collection-metric-change.yaml
+      service_balance_cents:
+        $ref: ./provider-collection-metric-change.yaml
+      total_cents:
+        $ref: ./provider-collection-metric-change.yaml
+    additionalProperties: false
+additionalProperties: false
