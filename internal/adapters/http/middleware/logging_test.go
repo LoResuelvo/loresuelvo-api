@@ -98,6 +98,30 @@ func TestRequestLoggerDoesNotCaptureAdministrativePaymentPayloadOrCursor(t *test
 	}
 }
 
+func TestRequestLoggerDoesNotCaptureFunnelAggregatesOrCategoryFilter(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	for _, path := range []string{"/admin/metrics/funnel", "/admin/metrics/funnel/"} {
+		t.Run(path, func(t *testing.T) {
+			var logs bytes.Buffer
+			router := gin.New()
+			router.Use(RequestLogger(slog.New(slog.NewTextHandler(&logs, nil))))
+			router.GET(path, func(c *gin.Context) {
+				c.JSON(http.StatusOK, gin.H{"conversion_percentage": 66.67, "category_source": "provider.current_category_id"})
+			})
+			request := httptest.NewRequest(http.MethodGet, path+"?category_id=private-category-id", strings.NewReader(`{"filter":"private-funnel-filter"}`))
+			response := httptest.NewRecorder()
+			router.ServeHTTP(response, request)
+
+			require.Equal(t, http.StatusOK, response.Code)
+			require.Contains(t, response.Body.String(), "provider.current_category_id")
+			require.Contains(t, logs.String(), "http.request.completed")
+			for _, private := range []string{"private-category-id", "private-funnel-filter", "provider.current_category_id", "conversion_percentage", "http.request_body", "http.response_body", "http.query_params"} {
+				require.NotContains(t, logs.String(), private)
+			}
+		})
+	}
+}
+
 func TestRequestLoggerDoesNotCaptureOperationDetailResponse(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 

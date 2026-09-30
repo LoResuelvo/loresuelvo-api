@@ -84,7 +84,7 @@ func RequestLogger(logger *slog.Logger) gin.HandlerFunc {
 }
 
 func isPrivateAdminReadPath(path string) bool {
-	if path == "/admin/audit-logs" || path == "/admin/payments" || path == "/admin/payments/" {
+	if path == "/admin/audit-logs" || path == "/admin/payments" || path == "/admin/payments/" || path == "/admin/metrics/funnel" || path == "/admin/metrics/funnel/" {
 		return true
 	}
 	for _, resource := range []struct{ prefix, suffix string }{{"/admin/consumers/", "/history"}, {"/admin/providers/", "/diagnostic"}} {

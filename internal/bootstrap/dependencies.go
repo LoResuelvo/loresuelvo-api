@@ -26,6 +26,7 @@ import (
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/job_request_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/operation_chat_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/operation_detail_handler"
+	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/operation_funnel_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/operation_inbox_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/operation_media_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/payment_account_handler"
@@ -418,6 +419,11 @@ func newDependencies(database *sql.DB, adapters dependencyAdapters) (*Dependenci
 	if err != nil {
 		return nil, fmt.Errorf("configuring administrative payment cursor: %w", err)
 	}
+	funnelReader := operation.FunnelReader(persistence.OperationFunnelReader)
+	if decorator := adapters.providerDiagnosticTestOptions.AdminFunnel.ReaderDecorator; decorator != nil {
+		funnelReader = decorator(funnelReader)
+	}
+	funnelHandler := operation_funnel_handler.NewHandler(operation.NewFunnelService(funnelReader, systemClock))
 
 	return &Dependencies{
 		Persistence: persistence,
@@ -434,6 +440,7 @@ func newDependencies(database *sql.DB, adapters dependencyAdapters) (*Dependenci
 			ProviderDiagnosticHandler:   diagnosticHandler,
 			ConsumerHistoryHandler:      historyHandler,
 			AdminPaymentHandler:         adminPayments,
+			OperationFunnelHandler:      funnelHandler,
 			AuditLogHandler:             auditLogHandler,
 			OperationInboxHandler:       operation_inbox_handler.NewHandler(operation.NewInboxService(persistence.OperationInboxReader, systemClock)),
 			OperationDetailHandler:      operation_detail_handler.NewHandler(operation.NewDetailService(persistence.OperationDetailReader, persistence.UserRepository, operationDetailAuditWriter, systemClock)),

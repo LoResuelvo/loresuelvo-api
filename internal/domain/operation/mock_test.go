@@ -131,3 +131,14 @@ func newTextChatService(association operation.ConversationAssociationReader, mes
 	attachments.On("FindByMessagePage", mock.Anything, mock.Anything).Return(map[int]conversation.MessageAttachmentReferences{}, nil).Maybe()
 	return operation.NewChatService(association, messages, operators, writer, clock, attachments, &chatMediaResolverMock{})
 }
+
+type funnelReaderMock struct{ mock.Mock }
+
+func (m *funnelReaderMock) Read(ctx context.Context, criteria operation.FunnelCriteria) (readmodel.FunnelSnapshot, error) {
+	args := m.Called(ctx, criteria)
+	return args.Get(0).(readmodel.FunnelSnapshot), args.Error(1)
+}
+
+type funnelClockMock struct{ mock.Mock }
+
+func (m *funnelClockMock) Now() time.Time { return m.Called().Get(0).(time.Time) }

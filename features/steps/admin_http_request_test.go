@@ -14,6 +14,7 @@ type adminRequestState struct {
 	omitBearer    bool
 	invalidBearer bool
 	headers       http.Header
+	sentHeaders   http.Header
 }
 
 func registerAdminHTTPRequestSteps(sc *godog.ScenarioContext, suite *testSuite) {
@@ -59,6 +60,7 @@ func (suite *testSuite) sendAdminGet(path string, query url.Values, correlation 
 	if correlation != "" {
 		request.Header.Set("X-Request-ID", correlation)
 	}
+	suite.adminRequest.sentHeaders = request.Header.Clone()
 	response, err := http.DefaultClient.Do(request)
 	if err != nil {
 		return fmt.Errorf("requesting %s: %w", path, err)

@@ -1,0 +1,2 @@
+DROP INDEX job_requests_manual_created_on_idx;
+DROP INDEX problem_assessments_professional_created_on_idx;

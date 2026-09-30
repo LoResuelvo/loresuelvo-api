@@ -2,15 +2,41 @@ package httpadapter
 
 import (
 	"context"
+	"time"
 
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/operation"
+	operationreadmodel "github.com/LoResuelvo/loresuelvo-api/internal/domain/operation/read_model"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/payment"
 	readmodel "github.com/LoResuelvo/loresuelvo-api/internal/domain/payment/read_model"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/provider"
 	providerreadmodel "github.com/LoResuelvo/loresuelvo-api/internal/domain/provider/read_model"
 	serviceproposal "github.com/LoResuelvo/loresuelvo-api/internal/domain/service_proposal"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/user"
+	"github.com/lestrrat-go/jwx/v3/jwa"
+	"github.com/lestrrat-go/jwx/v3/jwt"
 	"github.com/stretchr/testify/mock"
 )
+
+func buildTokenWithRole(subject, role string) (string, error) {
+	token := jwt.New()
+	for key, value := range map[string]any{
+		jwt.SubjectKey:    subject,
+		jwt.IssuerKey:     "test-issuer",
+		jwt.AudienceKey:   []string{"test-audience"},
+		"permissions":     []string{},
+		"role":            role,
+		jwt.ExpirationKey: time.Now().Add(time.Hour),
+	} {
+		if err := token.Set(key, value); err != nil {
+			return "", err
+		}
+	}
+	signed, err := jwt.Sign(token, jwt.WithKey(jwa.HS256(), []byte("test-secret-do-not-use-in-production")))
+	if err != nil {
+		return "", err
+	}
+	return string(signed), nil
+}
 
 type collectionServiceMock struct{ mock.Mock }
 
@@ -88,4 +114,16 @@ func (finder *serviceProposalFinderMock) FindByID(ctx context.Context, id int) (
 		return proposal, arguments.Error(1)
 	}
 	return nil, arguments.Error(1)
+}
+
+type operationFunnelQueryServiceMock struct {
+	mock.Mock
+}
+
+func (service *operationFunnelQueryServiceMock) Query(ctx context.Context, query operation.FunnelQuery) (operationreadmodel.FunnelMetrics, error) {
+	arguments := service.Called(ctx, query)
+	if metrics, ok := arguments.Get(0).(operationreadmodel.FunnelMetrics); ok {
+		return metrics, arguments.Error(1)
+	}
+	return operationreadmodel.FunnelMetrics{}, arguments.Error(1)
 }

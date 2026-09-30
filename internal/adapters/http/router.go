@@ -18,6 +18,7 @@ import (
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/job_request_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/operation_chat_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/operation_detail_handler"
+	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/operation_funnel_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/operation_inbox_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/operation_media_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/payment_account_handler"
@@ -39,6 +40,7 @@ const readAdminAuditPermission = "read:admin_audit"
 const readAdminChatAuditPermission = "read:admin_chat_audit"
 const readAdminOperationsPermission = "read:admin_operations"
 const readAdminPaymentsPermission = "read:admin_payments"
+const readAdminMetricsPermission = "read:admin_metrics"
 const createCategoriesPermission = "create:categories"
 
 type Environment string
@@ -56,6 +58,7 @@ type RouterConfig struct {
 	ProviderDiagnosticHandler   *admin_handler.ProviderDiagnosticHandler
 	ConsumerHistoryHandler      *admin_handler.ConsumerHistoryHandler
 	AdminPaymentHandler         *admin_payment_handler.Handler
+	OperationFunnelHandler      *operation_funnel_handler.Handler
 	AuditLogHandler             *audit_log_handler.Handler
 	OperationInboxHandler       *operation_inbox_handler.Handler
 	OperationDetailHandler      *operation_detail_handler.Handler
@@ -90,6 +93,7 @@ type Router struct {
 	providerDiagnosticHandler   *admin_handler.ProviderDiagnosticHandler
 	consumerHistoryHandler      *admin_handler.ConsumerHistoryHandler
 	adminPaymentHandler         *admin_payment_handler.Handler
+	operationFunnelHandler      *operation_funnel_handler.Handler
 	auditLogHandler             *audit_log_handler.Handler
 	operationInboxHandler       *operation_inbox_handler.Handler
 	operationDetailHandler      *operation_detail_handler.Handler
@@ -130,6 +134,7 @@ func NewRouter(config RouterConfig) *Router {
 		providerDiagnosticHandler:   config.ProviderDiagnosticHandler,
 		consumerHistoryHandler:      config.ConsumerHistoryHandler,
 		adminPaymentHandler:         config.AdminPaymentHandler,
+		operationFunnelHandler:      config.OperationFunnelHandler,
 		auditLogHandler:             config.AuditLogHandler,
 		operationInboxHandler:       config.OperationInboxHandler,
 		operationDetailHandler:      config.OperationDetailHandler,
@@ -206,6 +211,7 @@ func privateNoStore(c *gin.Context) {
 
 func (router *Router) registerAdminRoutes(engine *gin.Engine, authMiddleware gin.HandlerFunc) {
 	engine.GET("/admin/payments", privateNoStore, authMiddleware, middleware.RequirePermissionLayer(readAdminPaymentsPermission), router.adminPaymentHandler.List)
+	engine.GET("/admin/metrics/funnel", privateNoStore, authMiddleware, middleware.RequirePermissionLayer(readAdminMetricsPermission), router.operationFunnelHandler.Get)
 	engine.GET("/admin/consumers/:consumer_id/history", privateNoStore, authMiddleware, middleware.RequirePermissionLayer(readConsumersPermission), router.consumerHistoryHandler.Get)
 	engine.GET("/admin/providers/:provider_id/diagnostic", privateNoStore, authMiddleware, middleware.RequirePermissionLayer(readProvidersPermission), router.providerDiagnosticHandler.Get)
 	engine.GET("/admin/operations/:operation_id/conversation", privateNoStore, authMiddleware, middleware.RequirePermissionLayer(readAdminChatAuditPermission), router.operationChatHandler.Get)

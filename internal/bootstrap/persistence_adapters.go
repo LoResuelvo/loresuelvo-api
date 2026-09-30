@@ -17,6 +17,7 @@ type PersistenceAdapters struct {
 	OperationInboxReader                   *repositories.OperationInboxReader
 	OperationDetailReader                  *repositories.OperationDetailReader
 	OperationMediaReader                   *repositories.OperationMediaReader
+	OperationFunnelReader                  *repositories.OperationFunnelReader
 	ProviderSearchReader                   *repositories.ProviderSearchReader
 	UserRepository                         *repositories.UserRepository
 	CategoryRepository                     *repositories.CategoryRepository
@@ -100,6 +101,7 @@ func NewPersistenceAdapters(database *sql.DB) *PersistenceAdapters {
 		OperationInboxReader:                   repositories.NewOperationInboxReader(database),
 		OperationDetailReader:                  repositories.NewOperationDetailReader(database),
 		OperationMediaReader:                   repositories.NewOperationMediaReader(database),
+		OperationFunnelReader:                  repositories.NewOperationFunnelReader(database),
 		ProviderSearchReader:                   repositories.NewProviderSearchReader(database),
 		UserRepository:                         userRepository,
 		CategoryRepository:                     categoryRepository,

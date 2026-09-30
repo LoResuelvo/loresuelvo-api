@@ -29,6 +29,7 @@ import (
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/admin"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/audit"
 	filedomain "github.com/LoResuelvo/loresuelvo-api/internal/domain/file"
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/operation"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/payment"
 	"github.com/LoResuelvo/loresuelvo-api/internal/infrastructure/db"
 	"github.com/LoResuelvo/loresuelvo-api/internal/testsupport"
@@ -95,8 +96,10 @@ type testSuite struct {
 	providerDiagnosticCapture               *providerDiagnosticTestCapture
 	consumerHistoryCapture                  *consumerHistoryTestCapture
 	adminPaymentCapture                     *adminPaymentTestCapture
+	adminFunnelCapture                      *adminFunnelTestCapture
 	consumerHistory                         consumerHistoryState
 	adminPayments                           adminPaymentState
+	adminFunnel                             adminFunnelState
 	operationDetailAuditSnapshot            *operationDetailAuditSnapshot
 	lastCategoryAuditEventIDs               []uuid.UUID
 	currentAuth0ID                          string
@@ -243,6 +246,7 @@ func (s *testSuite) registerAllSteps(sc *godog.ScenarioContext) {
 	registerAdminProviderDiagnosticActivitySteps(sc, s)
 	registerAdminConsumerHistorySteps(sc, s)
 	registerAdminPaymentSteps(sc, s)
+	registerAdminFunnelSteps(sc, s)
 	registerGetActivityStatisticsSteps(sc, s)
 	registerGetCollectionStatisticsSteps(sc, s)
 }
@@ -302,6 +306,9 @@ func (s *testSuite) cleanup() error {
 		s.calendarAvailability.SetAvailable(true)
 	}
 	s.consumerAddressResolver.SetAvailable(true)
+	if s.identityVerifier != nil {
+		s.identityVerifier.SetAvailable(true)
+	}
 
 	s.categoryIDsByName = map[string]int{}
 	s.participantRolesByFullName = map[string]string{}
@@ -421,6 +428,7 @@ func newTestSuite(tb testing.TB, database *sql.DB) *testSuite {
 	providerDiagnosticCapture := &providerDiagnosticTestCapture{}
 	consumerHistoryCapture := &consumerHistoryTestCapture{}
 	adminPaymentCapture := &adminPaymentTestCapture{}
+	adminFunnelCapture := &adminFunnelTestCapture{}
 	dependencies, doubles, err := bootstrap.NewTestDependenciesWithProviderDiagnosticOptions(
 		bootstrap.ProviderDiagnosticTestOptions{
 			ConsumerHistory: bootstrap.ConsumerHistoryTestOptions{
@@ -434,6 +442,11 @@ func newTestSuite(tb testing.TB, database *sql.DB) *testSuite {
 				},
 				AuditWriterDecorator: func(writer audit.Writer) audit.Writer {
 					return adminPaymentAuditWriterDecorator{inner: writer, capture: adminPaymentCapture}
+				},
+			},
+			AdminFunnel: bootstrap.AdminFunnelTestOptions{
+				ReaderDecorator: func(reader operation.FunnelReader) operation.FunnelReader {
+					return adminFunnelReaderDecorator{inner: reader, capture: adminFunnelCapture}
 				},
 			},
 			ReaderDecorator: func(reader admin.ProviderDiagnosticReader) admin.ProviderDiagnosticReader {
@@ -508,6 +521,7 @@ func newTestSuite(tb testing.TB, database *sql.DB) *testSuite {
 		providerDiagnosticCapture:      providerDiagnosticCapture,
 		consumerHistoryCapture:         consumerHistoryCapture,
 		adminPaymentCapture:            adminPaymentCapture,
+		adminFunnelCapture:             adminFunnelCapture,
 		scenarioContext:                context.Background(),
 
 		categoryIDsByName:                   map[string]int{},
@@ -542,8 +556,10 @@ func ScenarioInitializer(sc *godog.ScenarioContext, t *testing.T, database *sql.
 		testSuite.operationChatMediaCapture.reset()
 		testSuite.consumerHistoryCapture.reset()
 		testSuite.adminPaymentCapture.reset()
+		testSuite.adminFunnelCapture.reset()
 		testSuite.consumerHistory = consumerHistoryState{}
 		testSuite.adminPayments = adminPaymentState{}
+		testSuite.adminFunnel = adminFunnelState{}
 		if err := testSuite.cleanup(); err != nil {
 			return ctx, fmt.Errorf("could not clean test status: %w", err)
 		}

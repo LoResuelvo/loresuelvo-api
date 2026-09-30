@@ -38,3 +38,39 @@ func (fixture OperationDetailReportFixture) ReplaceCompletionReport(ctx context.
 	}
 	return nil
 }
+
+// RemoveCompletionReport represents historical persisted data whose payment
+// timestamp has no matching completion evidence. It deliberately leaves the
+// work order's paid_on and status untouched.
+func (fixture OperationDetailReportFixture) RemoveCompletionReport(ctx context.Context, orderID int) (err error) {
+	if orderID <= 0 {
+		return fmt.Errorf("removing completion report: work order ID must be positive")
+	}
+	tx, err := fixture.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("beginning completion report removal: %w", err)
+	}
+	defer func() {
+		if err != nil {
+			_ = tx.Rollback()
+		}
+	}()
+	if _, err = tx.ExecContext(ctx, `DELETE FROM work_order_completion_images WHERE completion_report_id IN (SELECT id FROM work_order_completion_reports WHERE work_order_id=$1)`, orderID); err != nil {
+		return fmt.Errorf("removing completion report images: %w", err)
+	}
+	result, err := tx.ExecContext(ctx, `DELETE FROM work_order_completion_reports WHERE work_order_id=$1`, orderID)
+	if err != nil {
+		return fmt.Errorf("removing completion report: %w", err)
+	}
+	removed, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("checking removed completion report: %w", err)
+	}
+	if removed != 1 {
+		return fmt.Errorf("removing completion report: expected one report for order %d, removed %d", orderID, removed)
+	}
+	if err = tx.Commit(); err != nil {
+		return fmt.Errorf("committing completion report removal: %w", err)
+	}
+	return nil
+}

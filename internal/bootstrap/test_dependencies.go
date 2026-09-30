@@ -46,11 +46,16 @@ type AdminPaymentTestOptions struct {
 	AuditWriterDecorator    func(audit.Writer) audit.Writer
 }
 
+type AdminFunnelTestOptions struct {
+	ReaderDecorator func(operation.FunnelReader) operation.FunnelReader
+}
+
 type ProviderDiagnosticTestOptions struct {
 	ConsumerHistory      ConsumerHistoryTestOptions
 	ReaderDecorator      func(admin.ProviderDiagnosticReader) admin.ProviderDiagnosticReader
 	AuditWriterDecorator func(audit.Writer) audit.Writer
 	AdminPayments        AdminPaymentTestOptions
+	AdminFunnel          AdminFunnelTestOptions
 }
 
 func NewTestDependencies(
