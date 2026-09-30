@@ -2690,6 +2690,276 @@
                 }
             }
         },
+        "/admin/payments": {
+            "get": {
+                "tags": [
+                    "Administration"
+                ],
+                "operationId": "listAdminPayments",
+                "summary": "Query payment intents and financial evidence for administration",
+                "description": "Lists payment intents across participants for authorized investigation. Requires a Bearer JWT with the `read:admin_payments` permission. This is a read-only lookup: it does not reconcile, edit, or transition payment, transaction, proposal, or order records. Each valid query is recorded through the administrative audit path before result data is delivered; if audit persistence fails, the endpoint returns a controlled `500` without returning payment data. Malformed queries are rejected with `400` before the audit event is prepared. Cache middleware sets `Cache-Control: private, no-store` before authorization and applies it to responses, including errors. This cross-participant administrative view does not replace or broaden the participant-scoped `GET /payment-intents/{id}` access contract.\n\n**Identifiers and matching.** `payment_intent_id` is an exact canonical internal intent UUID. `external_reference` also accepts that exact canonical internal intent UUID: it is the UUID sent to Mercado Pago when creating checkout, and is not an external payment ID returned or persisted from Mercado Pago. `external_payment_id` matches the exact persisted processor payment ID (not a prefix). `service_proposal_id` is an exact positive internal proposal ID and returns each matching intent. Consumer and provider email filters are literal partial text searches, case insensitive; emails themselves are not included in result rows. All supplied filters are combined with AND.\n\n**Purpose, status, and dates.** Purpose is `booking_deposit` (seña) or `service_balance` (saldo). The intent-status filter and response include the current states `requires_checkout`, `checkout_ready`, `processing`, `paid`, `rejected`, and `expired`, plus historical persisted states `cancelled`, `refunded`, `disputed`, and `payment_mismatch`. Supporting these historical values for retrieval/filtering does not add transitions to the current payment flow. `created_from` is inclusive and `created_to` is exclusive over the intent's persisted creation time, not transaction verification time. Both timestamps require RFC 3339 with an explicit offset; encode `+` as `%2B` in a URL.\n\n**Financial fields.** Monetary values are persisted integer minor units (centavos) and retain their currencies; no float reconstruction, currency conversion, or current-percentage recalculation is performed. The contractual breakdown comes from persisted proposal/order terms. Nullable breakdown fields mean a coherent derivation was unavailable, not zero. `approved_amounts` is proposal/order-wide and repeated on each returned intent for that proposal/order, independent of page and filters; it is not a global total or merely the current intent's total. It counts each distinct persisted `(processor, external_payment_id)` approved transaction once, gross and grouped by currency, including anomalous amounts or currencies. It is neither net revenue nor settlement. An empty array means no approved transaction evidence is known. `pending_amount` is a nullable contractual position, not an attempt sum: it is null when no order exists, terms are invalid, or a coherent position is unavailable; a valid accepted order in scheduled/awaiting-payment state with a matching paid deposit reports its nominal contractual remainder, and a valid paid order reports zero. Anomalous gross approvals are not converted or subtracted from a differently denominated contractual balance. Anomaly flags expose discrepancies for investigation only; the read never corrects them. Processor fees and net settlement are null because that evidence is not persisted; null is not zero and does not establish that provider funds were settled.\n\n**Pagination.** Results use keyset order by intent creation descending, then internal intent UUID descending. The default limit is 20 and maximum is 100. `next_cursor` is signed, opaque, and bound to the first page's filters and limit. When continuing, omit the filters/limit or repeat them exactly; changed or duplicated query parameters are invalid. The cursor provides deterministic keyset continuation, not a cross-request snapshot guarantee: concurrent data changes may affect later pages. Unknown, empty, duplicate, malformed, or incompatible query parameters return `400`.",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "name": "payment_intent_id",
+                        "in": "query",
+                        "required": false,
+                        "description": "Exact canonical lowercase UUID of the internal payment intent; not a processor payment ID.",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "example": "5e41726d-b916-44cb-9c54-981f678caa91"
+                    },
+                    {
+                        "name": "external_reference",
+                        "in": "query",
+                        "required": false,
+                        "description": "Exact canonical lowercase internal intent UUID sent to Mercado Pago as external_reference at checkout creation. It is not a value returned by Mercado Pago or stored as an external transaction ID.",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "example": "5e41726d-b916-44cb-9c54-981f678caa91"
+                    },
+                    {
+                        "name": "external_payment_id",
+                        "in": "query",
+                        "required": false,
+                        "description": "Exact persisted external payment ID from the processor; partial/prefix matching is not performed.",
+                        "schema": {
+                            "type": "string",
+                            "maxLength": 255
+                        },
+                        "example": "mp-payment-9001"
+                    },
+                    {
+                        "name": "service_proposal_id",
+                        "in": "query",
+                        "required": false,
+                        "description": "Exact positive internal service proposal ID; returns each matching payment intent.",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 2147483647
+                        },
+                        "example": 34
+                    },
+                    {
+                        "name": "consumer_email",
+                        "in": "query",
+                        "required": false,
+                        "description": "Literal partial text match against consumer email, case insensitive. Wildcards are not interpreted.",
+                        "schema": {
+                            "type": "string",
+                            "maxLength": 255
+                        },
+                        "example": "ANA@EXAMPLE"
+                    },
+                    {
+                        "name": "provider_email",
+                        "in": "query",
+                        "required": false,
+                        "description": "Literal partial text match against provider email, case insensitive. Wildcards are not interpreted.",
+                        "schema": {
+                            "type": "string",
+                            "maxLength": 255
+                        },
+                        "example": "JUAN@EXAMPLE"
+                    },
+                    {
+                        "name": "purpose",
+                        "in": "query",
+                        "required": false,
+                        "description": "Payment intent purpose: booking deposit (seña) or service balance (saldo).",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "booking_deposit",
+                                "service_balance"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "intent_status",
+                        "in": "query",
+                        "required": false,
+                        "description": "Exact persisted intent status, including supported historical statuses. Does not represent transaction evidence.",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "requires_checkout",
+                                "checkout_ready",
+                                "processing",
+                                "paid",
+                                "rejected",
+                                "expired",
+                                "cancelled",
+                                "refunded",
+                                "disputed",
+                                "payment_mismatch"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "created_from",
+                        "in": "query",
+                        "required": false,
+                        "description": "Inclusive lower bound of payment-intent creation time (RFC 3339 timestamp with explicit offset).",
+                        "schema": {
+                            "type": "string",
+                            "format": "date-time"
+                        },
+                        "example": "2026-09-20T00:00:00-03:00"
+                    },
+                    {
+                        "name": "created_to",
+                        "in": "query",
+                        "required": false,
+                        "description": "Exclusive upper bound of payment-intent creation time (RFC 3339 timestamp with explicit offset).",
+                        "schema": {
+                            "type": "string",
+                            "format": "date-time"
+                        },
+                        "example": "2026-09-21T00:00:00-03:00"
+                    },
+                    {
+                        "name": "limit",
+                        "in": "query",
+                        "required": false,
+                        "description": "Number of payment intents per page; bound to the original limit when continuing with a cursor.",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 100,
+                            "default": 20
+                        },
+                        "example": 20
+                    },
+                    {
+                        "name": "cursor",
+                        "in": "query",
+                        "required": false,
+                        "description": "Opaque signed cursor from the preceding page. Omit filters/limit when continuing or repeat exactly the original values.",
+                        "schema": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 4096
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Paginated intents matching all supplied filters. Empty results return an empty non-null payments array.",
+                        "headers": {
+                            "Cache-Control": {
+                                "description": "Prevents caches from storing administrative payment results.",
+                                "schema": {
+                                    "type": "string",
+                                    "const": "private, no-store"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AdminPaymentPage"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Query parameter is unknown, empty, duplicated, malformed, invalid, or incompatible with the cursor. No payment result data is returned.",
+                        "headers": {
+                            "Cache-Control": {
+                                "description": "Prevents caches from storing administrative responses.",
+                                "schema": {
+                                    "type": "string",
+                                    "const": "private, no-store"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                },
+                                "example": {
+                                    "error": "invalid administrative payment query"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "The Bearer token is missing or invalid.",
+                        "headers": {
+                            "Cache-Control": {
+                                "description": "Prevents caches from storing administrative responses.",
+                                "schema": {
+                                    "type": "string",
+                                    "const": "private, no-store"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AuthErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "The Bearer token does not contain the `read:admin_payments` permission.",
+                        "headers": {
+                            "Cache-Control": {
+                                "description": "Prevents caches from storing administrative responses.",
+                                "schema": {
+                                    "type": "string",
+                                    "const": "private, no-store"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                },
+                                "example": {
+                                    "error": "insufficient permissions"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Audit persistence or payment query failed. If auditing cannot be persisted, no payment data is delivered.",
+                        "headers": {
+                            "Cache-Control": {
+                                "description": "Prevents caches from storing administrative responses.",
+                                "schema": {
+                                    "type": "string",
+                                    "const": "private, no-store"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                },
+                                "example": {
+                                    "error": "internal server error"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/providers": {
             "get": {
                 "tags": [
@@ -9864,6 +10134,425 @@
                     "delayed",
                     "stalled"
                 ]
+            },
+            "AdminPaymentPage": {
+                "type": "object",
+                "required": [
+                    "payments",
+                    "page"
+                ],
+                "properties": {
+                    "payments": {
+                        "type": "array",
+                        "description": "One item per persisted payment intent; never deduplicated by proposal, order, or transaction.",
+                        "items": {
+                            "$ref": "#/components/schemas/AdminPayment"
+                        }
+                    },
+                    "page": {
+                        "type": "object",
+                        "required": [
+                            "limit",
+                            "next_cursor"
+                        ],
+                        "properties": {
+                            "limit": {
+                                "type": "integer",
+                                "minimum": 1,
+                                "maximum": 100,
+                                "description": "Effective page size, including the default when omitted."
+                            },
+                            "next_cursor": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ],
+                                "description": "Opaque signed continuation token bound to the original filters and limit; null when no next page exists."
+                            }
+                        },
+                        "additionalProperties": false
+                    }
+                },
+                "additionalProperties": false
+            },
+            "AdminPayment": {
+                "type": "object",
+                "required": [
+                    "id",
+                    "service_proposal_id",
+                    "work_order_id",
+                    "consumer_id",
+                    "provider_id",
+                    "purpose",
+                    "intent_status",
+                    "currency",
+                    "seller_amount_cents",
+                    "platform_fee_cents",
+                    "total_amount_cents",
+                    "created_on",
+                    "updated_on",
+                    "transactions",
+                    "breakdown",
+                    "summary",
+                    "anomalies"
+                ],
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "Internal payment-intent UUID. Exact identifier used by payment_intent_id and the canonical value sent as Mercado Pago external_reference."
+                    },
+                    "service_proposal_id": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "description": "Internal service-proposal ID."
+                    },
+                    "work_order_id": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ],
+                        "minimum": 1,
+                        "description": "Internal work-order ID when one exists."
+                    },
+                    "consumer_id": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "description": "Internal consumer ID; email values are not exposed in result objects."
+                    },
+                    "provider_id": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "description": "Internal provider ID; email values are not exposed in result objects."
+                    },
+                    "purpose": {
+                        "type": "string",
+                        "enum": [
+                            "booking_deposit",
+                            "service_balance"
+                        ]
+                    },
+                    "intent_status": {
+                        "type": "string",
+                        "description": "Persisted payment-intent status. Historical statuses are returned as stored and do not imply a current flow transition.",
+                        "enum": [
+                            "requires_checkout",
+                            "checkout_ready",
+                            "processing",
+                            "paid",
+                            "rejected",
+                            "expired",
+                            "cancelled",
+                            "refunded",
+                            "disputed",
+                            "payment_mismatch"
+                        ]
+                    },
+                    "currency": {
+                        "type": "string",
+                        "description": "Persisted ISO-style currency code (the current intent contract is ARS)."
+                    },
+                    "seller_amount_cents": {
+                        "type": "integer",
+                        "format": "int64",
+                        "minimum": 1,
+                        "description": "Persisted contractual amount allocated to the provider, in integer minor units; this is not a Mercado Pago settlement."
+                    },
+                    "platform_fee_cents": {
+                        "type": "integer",
+                        "format": "int64",
+                        "minimum": 0,
+                        "description": "Persisted platform fee amount in integer minor units."
+                    },
+                    "total_amount_cents": {
+                        "type": "integer",
+                        "format": "int64",
+                        "minimum": 1,
+                        "description": "Persisted total intent amount in integer minor units; contract anomalies are reported, not reconciled by this read."
+                    },
+                    "created_on": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "updated_on": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "transactions": {
+                        "type": "array",
+                        "description": "Persisted transaction evidence associated with this intent; separate records are retained and not replaced by the most recent result.",
+                        "items": {
+                            "$ref": "#/components/schemas/AdminPaymentTransaction"
+                        }
+                    },
+                    "breakdown": {
+                        "$ref": "#/components/schemas/AdminPaymentBreakdown"
+                    },
+                    "summary": {
+                        "$ref": "#/components/schemas/AdminPaymentSummary"
+                    },
+                    "anomalies": {
+                        "type": "array",
+                        "description": "Anomalies observed for this intent and its persisted transactions; investigation signals only, never corrections.",
+                        "items": {
+                            "type": "string",
+                            "enum": [
+                                "intent_currency_mismatch",
+                                "intent_contract_amount_mismatch",
+                                "transaction_currency_mismatch",
+                                "transaction_amount_mismatch",
+                                "approved_amount_exceeds_intent_total",
+                                "multiple_approved_transactions",
+                                "paid_without_matching_approved_transaction",
+                                "approved_transaction_intent_status_mismatch"
+                            ]
+                        },
+                        "uniqueItems": true
+                    }
+                },
+                "additionalProperties": false
+            },
+            "AdminPaymentTransaction": {
+                "type": "object",
+                "required": [
+                    "id",
+                    "processor",
+                    "external_payment_id",
+                    "status",
+                    "currency",
+                    "amount_cents",
+                    "verified_on",
+                    "created_on",
+                    "updated_on",
+                    "processor_fee_cents",
+                    "net_settlement_cents"
+                ],
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "format": "int64",
+                        "minimum": 1,
+                        "description": "Internal persisted transaction row ID."
+                    },
+                    "processor": {
+                        "type": "string",
+                        "description": "Payment processor identifier."
+                    },
+                    "external_payment_id": {
+                        "type": "string",
+                        "maxLength": 255,
+                        "description": "Exact external payment ID from the processor; distinct from the intent UUID sent as external_reference."
+                    },
+                    "status": {
+                        "type": "string",
+                        "enum": [
+                            "approved",
+                            "processing",
+                            "rejected",
+                            "refunded",
+                            "disputed"
+                        ]
+                    },
+                    "currency": {
+                        "type": "string",
+                        "description": "Persisted transaction currency; it can differ from the intent currency in historical/anomalous data."
+                    },
+                    "amount_cents": {
+                        "type": "integer",
+                        "format": "int64",
+                        "minimum": 1,
+                        "description": "Persisted gross transaction amount in integer minor units."
+                    },
+                    "verified_on": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "date-time",
+                        "description": "Verification timestamp when available in the HTTP response."
+                    },
+                    "created_on": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "updated_on": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "processor_fee_cents": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ],
+                        "format": "int64",
+                        "description": "Always null while persisted processor-fee evidence is unavailable; null does not mean zero."
+                    },
+                    "net_settlement_cents": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ],
+                        "format": "int64",
+                        "description": "Always null while persisted settlement evidence is unavailable; null does not mean zero or that funds were paid to the provider."
+                    }
+                },
+                "additionalProperties": false
+            },
+            "AdminPaymentBreakdown": {
+                "type": "object",
+                "required": [
+                    "currency",
+                    "service_total_cents",
+                    "deposit_cents",
+                    "platform_fee_total_cents",
+                    "platform_fee_due_now_cents",
+                    "booking_payment_deadline",
+                    "amount_due_now_cents",
+                    "remaining_service_balance_cents",
+                    "remaining_platform_fee_cents",
+                    "remaining_amount_due_cents"
+                ],
+                "properties": {
+                    "currency": {
+                        "type": "string",
+                        "description": "Persisted contract currency."
+                    },
+                    "service_total_cents": {
+                        "type": "integer",
+                        "format": "int64",
+                        "minimum": 0,
+                        "description": "Persisted total service price in integer minor units."
+                    },
+                    "deposit_cents": {
+                        "type": "integer",
+                        "format": "int64",
+                        "minimum": 0,
+                        "description": "Persisted service portion of the booking deposit in integer minor units."
+                    },
+                    "platform_fee_total_cents": {
+                        "type": "integer",
+                        "format": "int64",
+                        "minimum": 0,
+                        "description": "Persisted total platform fee under the contract in integer minor units."
+                    },
+                    "platform_fee_due_now_cents": {
+                        "type": "integer",
+                        "format": "int64",
+                        "minimum": 0,
+                        "description": "Persisted platform-fee portion due with the booking deposit in integer minor units."
+                    },
+                    "booking_payment_deadline": {
+                        "type": "string",
+                        "format": "date-time",
+                        "description": "Persisted booking-payment deadline."
+                    },
+                    "amount_due_now_cents": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ],
+                        "format": "int64",
+                        "minimum": 0,
+                        "description": "Contractual booking amount derived from valid persisted terms; null when that derivation is unavailable."
+                    },
+                    "remaining_service_balance_cents": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ],
+                        "format": "int64",
+                        "minimum": 0,
+                        "description": "Contractual remaining service amount derived from valid persisted terms; not a claim that it is currently collectible."
+                    },
+                    "remaining_platform_fee_cents": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ],
+                        "format": "int64",
+                        "minimum": 0,
+                        "description": "Contractual remaining platform fee derived from valid persisted terms; null when unavailable."
+                    },
+                    "remaining_amount_due_cents": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ],
+                        "format": "int64",
+                        "minimum": 0,
+                        "description": "Contractual remaining total derived from valid persisted terms; null when unavailable and not evidence of a pending payment by itself."
+                    }
+                },
+                "additionalProperties": false
+            },
+            "AdminPaymentSummary": {
+                "type": "object",
+                "required": [
+                    "approved_amounts",
+                    "pending_amount",
+                    "anomalies"
+                ],
+                "properties": {
+                    "approved_amounts": {
+                        "type": "array",
+                        "description": "Gross amounts across all intents of this proposal/order, not only the current row or page. Each distinct (processor, external_payment_id) persisted as approved is counted once, grouped by currency, including anomalous currency or amount values. This is observed gross evidence, not net revenue, processor settlement, or a global collection total. An empty array means known zero approved transaction evidence.",
+                        "items": {
+                            "$ref": "#/components/schemas/AdminPaymentAmount"
+                        }
+                    },
+                    "pending_amount": {
+                        "anyOf": [
+                            {
+                                "$ref": "#/components/schemas/AdminPaymentAmount"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "description": "Nullable contractual pending amount for the proposal/order. Null when no order exists, contract terms are invalid, or a coherent contractual position cannot be established. Valid scheduled/awaiting-payment orders with a matching paid deposit report the nominal remaining contract amount; a paid order reports zero. This is not a processor settlement or a sum of pending transaction attempts. Anomalous gross approvals are not subtracted or converted when currencies differ."
+                    },
+                    "anomalies": {
+                        "type": "array",
+                        "description": "Proposal/order-wide anomaly flags repeated on each payment row in that proposal/order.",
+                        "items": {
+                            "type": "string",
+                            "enum": [
+                                "invalid_contract_terms",
+                                "intent_currency_mismatch",
+                                "intent_contract_amount_mismatch",
+                                "transaction_currency_mismatch",
+                                "transaction_amount_mismatch",
+                                "approved_amount_exceeds_intent_total",
+                                "multiple_approved_transactions",
+                                "paid_without_matching_approved_transaction",
+                                "approved_transaction_intent_status_mismatch",
+                                "contractual_pending_unavailable"
+                            ]
+                        },
+                        "uniqueItems": true
+                    }
+                },
+                "additionalProperties": false
+            },
+            "AdminPaymentAmount": {
+                "type": "object",
+                "required": [
+                    "currency",
+                    "amount_cents"
+                ],
+                "properties": {
+                    "currency": {
+                        "type": "string",
+                        "description": "Currency of this amount; amounts in different currencies are not converted or combined."
+                    },
+                    "amount_cents": {
+                        "type": "integer",
+                        "format": "int64",
+                        "minimum": 0,
+                        "description": "Integer minor-unit amount."
+                    }
+                },
+                "additionalProperties": false
             },
             "RegisterProviderRequest": {
                 "type": "object",

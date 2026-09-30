@@ -1,0 +1,67 @@
+type: object
+required:
+  - id
+  - processor
+  - external_payment_id
+  - status
+  - currency
+  - amount_cents
+  - verified_on
+  - created_on
+  - updated_on
+  - processor_fee_cents
+  - net_settlement_cents
+properties:
+  id:
+    type: integer
+    format: int64
+    minimum: 1
+    description: Internal persisted transaction row ID.
+  processor:
+    type: string
+    description: Payment processor identifier.
+  external_payment_id:
+    type: string
+    maxLength: 255
+    description: Exact external payment ID from the processor; distinct from the intent UUID sent as external_reference.
+  status:
+    type: string
+    enum:
+      - approved
+      - processing
+      - rejected
+      - refunded
+      - disputed
+  currency:
+    type: string
+    description: Persisted transaction currency; it can differ from the intent currency in historical/anomalous data.
+  amount_cents:
+    type: integer
+    format: int64
+    minimum: 1
+    description: Persisted gross transaction amount in integer minor units.
+  verified_on:
+    type:
+      - string
+      - 'null'
+    format: date-time
+    description: Verification timestamp when available in the HTTP response.
+  created_on:
+    type: string
+    format: date-time
+  updated_on:
+    type: string
+    format: date-time
+  processor_fee_cents:
+    type:
+      - integer
+      - 'null'
+    format: int64
+    description: Always null while persisted processor-fee evidence is unavailable; null does not mean zero.
+  net_settlement_cents:
+    type:
+      - integer
+      - 'null'
+    format: int64
+    description: Always null while persisted settlement evidence is unavailable; null does not mean zero or that funds were paid to the provider.
+additionalProperties: false

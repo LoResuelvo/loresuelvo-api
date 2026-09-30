@@ -1,0 +1,14 @@
+type: object
+required:
+  - currency
+  - amount_cents
+properties:
+  currency:
+    type: string
+    description: Currency of this amount; amounts in different currencies are not converted or combined.
+  amount_cents:
+    type: integer
+    format: int64
+    minimum: 0
+    description: Integer minor-unit amount.
+additionalProperties: false

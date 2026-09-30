@@ -76,6 +76,8 @@ paths:
     $ref: ./paths/admin-operation-chat.yaml
   /admin/operations/{id}/images/{file_id}:
     $ref: ./paths/admin-operation-image.yaml
+  /admin/payments:
+    $ref: ./paths/admin-payments.yaml
   /providers:
     $ref: ./paths/providers.yaml
   /providers/me/statistics/activity:
@@ -282,6 +284,18 @@ components:
       $ref: ./components/schemas/admin-operation-stage.yaml
     AdminOperationAlert:
       $ref: ./components/schemas/admin-operation-alert.yaml
+    AdminPaymentPage:
+      $ref: ./components/schemas/admin-payment-page.yaml
+    AdminPayment:
+      $ref: ./components/schemas/admin-payment.yaml
+    AdminPaymentTransaction:
+      $ref: ./components/schemas/admin-payment-transaction.yaml
+    AdminPaymentBreakdown:
+      $ref: ./components/schemas/admin-payment-breakdown.yaml
+    AdminPaymentSummary:
+      $ref: ./components/schemas/admin-payment-summary.yaml
+    AdminPaymentAmount:
+      $ref: ./components/schemas/admin-payment-amount.yaml
     RegisterProviderRequest:
       $ref: ./components/schemas/register-provider-request.yaml
     ProviderSummary:

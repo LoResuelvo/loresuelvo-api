@@ -1,0 +1,28 @@
+type: object
+required:
+  - payments
+  - page
+properties:
+  payments:
+    type: array
+    description: One item per persisted payment intent; never deduplicated by proposal, order, or transaction.
+    items:
+      $ref: '#/components/schemas/AdminPayment'
+  page:
+    type: object
+    required:
+      - limit
+      - next_cursor
+    properties:
+      limit:
+        type: integer
+        minimum: 1
+        maximum: 100
+        description: Effective page size, including the default when omitted.
+      next_cursor:
+        type:
+          - string
+          - 'null'
+        description: Opaque signed continuation token bound to the original filters and limit; null when no next page exists.
+    additionalProperties: false
+additionalProperties: false

@@ -1,0 +1,110 @@
+type: object
+required:
+  - id
+  - service_proposal_id
+  - work_order_id
+  - consumer_id
+  - provider_id
+  - purpose
+  - intent_status
+  - currency
+  - seller_amount_cents
+  - platform_fee_cents
+  - total_amount_cents
+  - created_on
+  - updated_on
+  - transactions
+  - breakdown
+  - summary
+  - anomalies
+properties:
+  id:
+    type: string
+    format: uuid
+    description: Internal payment-intent UUID. Exact identifier used by payment_intent_id and the canonical value sent as Mercado Pago external_reference.
+  service_proposal_id:
+    type: integer
+    minimum: 1
+    description: Internal service-proposal ID.
+  work_order_id:
+    type:
+      - integer
+      - 'null'
+    minimum: 1
+    description: Internal work-order ID when one exists.
+  consumer_id:
+    type: integer
+    minimum: 1
+    description: Internal consumer ID; email values are not exposed in result objects.
+  provider_id:
+    type: integer
+    minimum: 1
+    description: Internal provider ID; email values are not exposed in result objects.
+  purpose:
+    type: string
+    enum:
+      - booking_deposit
+      - service_balance
+  intent_status:
+    type: string
+    description: Persisted payment-intent status. Historical statuses are returned as stored and do not imply a current flow transition.
+    enum:
+      - requires_checkout
+      - checkout_ready
+      - processing
+      - paid
+      - rejected
+      - expired
+      - cancelled
+      - refunded
+      - disputed
+      - payment_mismatch
+  currency:
+    type: string
+    description: Persisted ISO-style currency code (the current intent contract is ARS).
+  seller_amount_cents:
+    type: integer
+    format: int64
+    minimum: 1
+    description: Persisted contractual amount allocated to the provider, in integer minor units; this is not a Mercado Pago settlement.
+  platform_fee_cents:
+    type: integer
+    format: int64
+    minimum: 0
+    description: Persisted platform fee amount in integer minor units.
+  total_amount_cents:
+    type: integer
+    format: int64
+    minimum: 1
+    description: Persisted total intent amount in integer minor units; contract anomalies are reported, not reconciled by this read.
+  created_on:
+    type: string
+    format: date-time
+  updated_on:
+    type: string
+    format: date-time
+  transactions:
+    type: array
+    description: Persisted transaction evidence associated with this intent; separate records are retained and not replaced by the most recent result.
+    items:
+      $ref: '#/components/schemas/AdminPaymentTransaction'
+  breakdown:
+    $ref: '#/components/schemas/AdminPaymentBreakdown'
+  summary:
+    $ref: '#/components/schemas/AdminPaymentSummary'
+  anomalies:
+    type: array
+    description: Anomalies observed for this intent and its persisted transactions; investigation signals only, never corrections.
+    items:
+      type: string
+      enum:
+        - intent_currency_mismatch
+        - intent_contract_amount_mismatch
+        - transaction_currency_mismatch
+        - transaction_amount_mismatch
+        - approved_amount_exceeds_intent_total
+        - multiple_approved_transactions
+        - paid_without_matching_approved_transaction
+        - approved_transaction_intent_status_mismatch
+    uniqueItems: true
+additionalProperties: false
