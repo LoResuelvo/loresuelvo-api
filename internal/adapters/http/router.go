@@ -5,6 +5,7 @@ import (
 	"log/slog"
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/admin_handler"
+	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/admin_payment_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/audit_log_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/calendar_connection_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/category_handler"
@@ -37,6 +38,7 @@ const readProvidersPermission = "read:providers"
 const readAdminAuditPermission = "read:admin_audit"
 const readAdminChatAuditPermission = "read:admin_chat_audit"
 const readAdminOperationsPermission = "read:admin_operations"
+const readAdminPaymentsPermission = "read:admin_payments"
 const createCategoriesPermission = "create:categories"
 
 type Environment string
@@ -53,6 +55,7 @@ type RouterConfig struct {
 	AdminHandler                *admin_handler.AdminHandler
 	ProviderDiagnosticHandler   *admin_handler.ProviderDiagnosticHandler
 	ConsumerHistoryHandler      *admin_handler.ConsumerHistoryHandler
+	AdminPaymentHandler         *admin_payment_handler.Handler
 	AuditLogHandler             *audit_log_handler.Handler
 	OperationInboxHandler       *operation_inbox_handler.Handler
 	OperationDetailHandler      *operation_detail_handler.Handler
@@ -86,6 +89,7 @@ type Router struct {
 	adminHandler                *admin_handler.AdminHandler
 	providerDiagnosticHandler   *admin_handler.ProviderDiagnosticHandler
 	consumerHistoryHandler      *admin_handler.ConsumerHistoryHandler
+	adminPaymentHandler         *admin_payment_handler.Handler
 	auditLogHandler             *audit_log_handler.Handler
 	operationInboxHandler       *operation_inbox_handler.Handler
 	operationDetailHandler      *operation_detail_handler.Handler
@@ -125,6 +129,7 @@ func NewRouter(config RouterConfig) *Router {
 		adminHandler:                config.AdminHandler,
 		providerDiagnosticHandler:   config.ProviderDiagnosticHandler,
 		consumerHistoryHandler:      config.ConsumerHistoryHandler,
+		adminPaymentHandler:         config.AdminPaymentHandler,
 		auditLogHandler:             config.AuditLogHandler,
 		operationInboxHandler:       config.OperationInboxHandler,
 		operationDetailHandler:      config.OperationDetailHandler,
@@ -200,6 +205,7 @@ func privateNoStore(c *gin.Context) {
 }
 
 func (router *Router) registerAdminRoutes(engine *gin.Engine, authMiddleware gin.HandlerFunc) {
+	engine.GET("/admin/payments", privateNoStore, authMiddleware, middleware.RequirePermissionLayer(readAdminPaymentsPermission), router.adminPaymentHandler.List)
 	engine.GET("/admin/consumers/:consumer_id/history", privateNoStore, authMiddleware, middleware.RequirePermissionLayer(readConsumersPermission), router.consumerHistoryHandler.Get)
 	engine.GET("/admin/providers/:provider_id/diagnostic", privateNoStore, authMiddleware, middleware.RequirePermissionLayer(readProvidersPermission), router.providerDiagnosticHandler.Get)
 	engine.GET("/admin/operations/:operation_id/conversation", privateNoStore, authMiddleware, middleware.RequirePermissionLayer(readAdminChatAuditPermission), router.operationChatHandler.Get)

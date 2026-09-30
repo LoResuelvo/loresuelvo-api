@@ -81,24 +81,29 @@ func (client *FakeCheckoutClient) AddRejectedPayment(
 	)
 }
 
+// AddPayment records a payment under its processor-assigned ID for notification fixtures.
+func (client *FakeCheckoutClient) AddPayment(externalPayment payment.ExternalPayment) string {
+	client.mu.Lock()
+	defer client.mu.Unlock()
+	client.payments[externalPayment.ID] = externalPayment
+	return externalPayment.ID
+}
+
 func (client *FakeCheckoutClient) addPayment(
 	externalReference,
 	sellerAccountID string,
 	amountCents int64,
 	status payment.ExternalPaymentStatus,
 ) string {
-	client.mu.Lock()
-	defer client.mu.Unlock()
 	externalPaymentID := "fake-payment-" + externalReference
-	client.payments[externalPaymentID] = payment.ExternalPayment{
+	return client.AddPayment(payment.ExternalPayment{
 		ID:                externalPaymentID,
 		SellerAccountID:   sellerAccountID,
 		ExternalReference: externalReference,
 		Status:            status,
 		Currency:          "ARS",
 		AmountCents:       amountCents,
-	}
-	return externalPaymentID
+	})
 }
 
 func (client *FakeCheckoutClient) GetPayment(

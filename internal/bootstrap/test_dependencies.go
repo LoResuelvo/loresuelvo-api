@@ -40,10 +40,17 @@ type ConsumerHistoryTestOptions struct {
 	AuditWriterDecorator func(audit.Writer) audit.Writer
 }
 
+type AdminPaymentTestOptions struct {
+	ReaderDecorator         func(payment.AdminPaymentReader) payment.AdminPaymentReader
+	OperatorFinderDecorator func(audit.OperatorIDFinder) audit.OperatorIDFinder
+	AuditWriterDecorator    func(audit.Writer) audit.Writer
+}
+
 type ProviderDiagnosticTestOptions struct {
 	ConsumerHistory      ConsumerHistoryTestOptions
 	ReaderDecorator      func(admin.ProviderDiagnosticReader) admin.ProviderDiagnosticReader
 	AuditWriterDecorator func(audit.Writer) audit.Writer
+	AdminPayments        AdminPaymentTestOptions
 }
 
 func NewTestDependencies(

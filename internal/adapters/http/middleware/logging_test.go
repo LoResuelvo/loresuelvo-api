@@ -78,6 +78,26 @@ func TestRequestLoggerDoesNotCaptureAuditLogResponse(t *testing.T) {
 	require.NotContains(t, logs.String(), "http.query_params")
 }
 
+func TestRequestLoggerDoesNotCaptureAdministrativePaymentPayloadOrCursor(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	var logs bytes.Buffer
+	router := gin.New()
+	router.Use(RequestLogger(slog.New(slog.NewTextHandler(&logs, nil))))
+	router.GET("/admin/payments", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{"external_payment_id": "private-payment-id", "amount_cents": 9001})
+	})
+	request := httptest.NewRequest(http.MethodGet, "/admin/payments?cursor=private-signed-cursor&external_payment_id=private-payment-id", strings.NewReader(`{"payload":"private-payment-body"}`))
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, request)
+
+	require.Equal(t, http.StatusOK, response.Code)
+	require.Contains(t, response.Body.String(), "private-payment-id")
+	require.Contains(t, logs.String(), "http.request.completed")
+	for _, private := range []string{"private-payment-id", "private-signed-cursor", "private-payment-body", "http.request_body", "http.response_body", "http.query_params"} {
+		require.NotContains(t, logs.String(), private)
+	}
+}
+
 func TestRequestLoggerDoesNotCaptureOperationDetailResponse(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 

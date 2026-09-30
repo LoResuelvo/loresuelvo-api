@@ -29,6 +29,7 @@ import (
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/admin"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/audit"
 	filedomain "github.com/LoResuelvo/loresuelvo-api/internal/domain/file"
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/payment"
 	"github.com/LoResuelvo/loresuelvo-api/internal/infrastructure/db"
 	"github.com/LoResuelvo/loresuelvo-api/internal/testsupport"
 	"github.com/auth0/go-jwt-middleware/v3/validator"
@@ -93,7 +94,9 @@ type testSuite struct {
 	operationChatMediaCapture               *operationChatMediaCapture
 	providerDiagnosticCapture               *providerDiagnosticTestCapture
 	consumerHistoryCapture                  *consumerHistoryTestCapture
+	adminPaymentCapture                     *adminPaymentTestCapture
 	consumerHistory                         consumerHistoryState
+	adminPayments                           adminPaymentState
 	operationDetailAuditSnapshot            *operationDetailAuditSnapshot
 	lastCategoryAuditEventIDs               []uuid.UUID
 	currentAuth0ID                          string
@@ -239,6 +242,7 @@ func (s *testSuite) registerAllSteps(sc *godog.ScenarioContext) {
 	registerAdminProviderDiagnosticSteps(sc, s)
 	registerAdminProviderDiagnosticActivitySteps(sc, s)
 	registerAdminConsumerHistorySteps(sc, s)
+	registerAdminPaymentSteps(sc, s)
 	registerGetActivityStatisticsSteps(sc, s)
 	registerGetCollectionStatisticsSteps(sc, s)
 }
@@ -416,11 +420,20 @@ func newTestSuite(tb testing.TB, database *sql.DB) *testSuite {
 	operationChatMediaCapture := &operationChatMediaCapture{}
 	providerDiagnosticCapture := &providerDiagnosticTestCapture{}
 	consumerHistoryCapture := &consumerHistoryTestCapture{}
+	adminPaymentCapture := &adminPaymentTestCapture{}
 	dependencies, doubles, err := bootstrap.NewTestDependenciesWithProviderDiagnosticOptions(
 		bootstrap.ProviderDiagnosticTestOptions{
 			ConsumerHistory: bootstrap.ConsumerHistoryTestOptions{
 				AuditWriterDecorator: func(writer audit.Writer) audit.Writer {
 					return consumerHistoryAuditWriterDecorator{inner: writer, capture: consumerHistoryCapture}
+				},
+			},
+			AdminPayments: bootstrap.AdminPaymentTestOptions{
+				ReaderDecorator: func(reader payment.AdminPaymentReader) payment.AdminPaymentReader {
+					return adminPaymentReaderDecorator{inner: reader, capture: adminPaymentCapture}
+				},
+				AuditWriterDecorator: func(writer audit.Writer) audit.Writer {
+					return adminPaymentAuditWriterDecorator{inner: writer, capture: adminPaymentCapture}
 				},
 			},
 			ReaderDecorator: func(reader admin.ProviderDiagnosticReader) admin.ProviderDiagnosticReader {
@@ -494,6 +507,7 @@ func newTestSuite(tb testing.TB, database *sql.DB) *testSuite {
 		operationChatMediaCapture:      operationChatMediaCapture,
 		providerDiagnosticCapture:      providerDiagnosticCapture,
 		consumerHistoryCapture:         consumerHistoryCapture,
+		adminPaymentCapture:            adminPaymentCapture,
 		scenarioContext:                context.Background(),
 
 		categoryIDsByName:                   map[string]int{},
@@ -527,7 +541,9 @@ func ScenarioInitializer(sc *godog.ScenarioContext, t *testing.T, database *sql.
 		testSuite.operationDetailAuditCapture.reset()
 		testSuite.operationChatMediaCapture.reset()
 		testSuite.consumerHistoryCapture.reset()
+		testSuite.adminPaymentCapture.reset()
 		testSuite.consumerHistory = consumerHistoryState{}
+		testSuite.adminPayments = adminPaymentState{}
 		if err := testSuite.cleanup(); err != nil {
 			return ctx, fmt.Errorf("could not clean test status: %w", err)
 		}

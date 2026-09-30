@@ -1,0 +1,2 @@
+DROP INDEX payment_intents_proposal_created_cursor_idx;
+DROP INDEX payment_intents_created_cursor_idx;

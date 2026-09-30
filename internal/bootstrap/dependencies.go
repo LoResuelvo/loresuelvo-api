@@ -13,6 +13,7 @@ import (
 	googlecalendar "github.com/LoResuelvo/loresuelvo-api/internal/adapters/google_calendar"
 	httpadapter "github.com/LoResuelvo/loresuelvo-api/internal/adapters/http"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/admin_handler"
+	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/admin_payment_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/audit_log_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/calendar_connection_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/category_handler"
@@ -401,6 +402,22 @@ func newDependencies(database *sql.DB, adapters dependencyAdapters) (*Dependenci
 	if err != nil {
 		return nil, fmt.Errorf("configuring consumer history cursor: %w", err)
 	}
+	adminPaymentReader := payment.AdminPaymentReader(persistence.AdminPaymentReader)
+	adminPaymentOperatorFinder := audit.OperatorIDFinder(persistence.UserRepository)
+	adminPaymentAuditWriter := audit.Writer(persistence.AuditEventRepository)
+	if options := adapters.providerDiagnosticTestOptions.AdminPayments; options.ReaderDecorator != nil {
+		adminPaymentReader = options.ReaderDecorator(adminPaymentReader)
+	}
+	if options := adapters.providerDiagnosticTestOptions.AdminPayments; options.OperatorFinderDecorator != nil {
+		adminPaymentOperatorFinder = options.OperatorFinderDecorator(adminPaymentOperatorFinder)
+	}
+	if options := adapters.providerDiagnosticTestOptions.AdminPayments; options.AuditWriterDecorator != nil {
+		adminPaymentAuditWriter = options.AuditWriterDecorator(adminPaymentAuditWriter)
+	}
+	adminPayments, err := admin_payment_handler.NewHandler(payment.NewAdminPaymentService(adminPaymentReader, adminPaymentOperatorFinder, adminPaymentAuditWriter, systemClock), adapters.auditCursorSigningKey)
+	if err != nil {
+		return nil, fmt.Errorf("configuring administrative payment cursor: %w", err)
+	}
 
 	return &Dependencies{
 		Persistence: persistence,
@@ -416,6 +433,7 @@ func newDependencies(database *sql.DB, adapters dependencyAdapters) (*Dependenci
 			AdminHandler:                admin_handler.NewAdminHandler(adminService),
 			ProviderDiagnosticHandler:   diagnosticHandler,
 			ConsumerHistoryHandler:      historyHandler,
+			AdminPaymentHandler:         adminPayments,
 			AuditLogHandler:             auditLogHandler,
 			OperationInboxHandler:       operation_inbox_handler.NewHandler(operation.NewInboxService(persistence.OperationInboxReader, systemClock)),
 			OperationDetailHandler:      operation_detail_handler.NewHandler(operation.NewDetailService(persistence.OperationDetailReader, persistence.UserRepository, operationDetailAuditWriter, systemClock)),
