@@ -11,7 +11,6 @@ Feature: Consultar mis cobros verificados y los saldos de mis trabajos
 
     Rule: Solo cuentan mis cobros aprobados y verificados, por el importe contractual que me corresponde
 
-        @wip
         Scenario: 71.1-CP Separar la seña y el saldo de un trabajo sin sumar comisiones
             Given que acordé con "ana@example.com" un trabajo de ARS 1.000,00 con seña de ARS 200,00 y comisión total de ARS 50,00
             And que la seña se verificó el 2 de septiembre de 2026 por ARS 210,00, incluidos ARS 10,00 de comisión
@@ -21,7 +20,6 @@ Feature: Consultar mis cobros verificados y los saldos de mis trabajos
             And el total coincide con la suma de señas y saldos
             And no veo datos de la cuenta de cobros ni de los medios de pago
 
-        @wip
         Scenario Outline: 71.2-CP Imputar cada cobro a la fecha en que se verificó
             Given que acordé con "ana@example.com" un trabajo de ARS 1.000,00 con seña de ARS 200,00 y comisión total de ARS 50,00
             And que inicié el pago de la seña el 1 de septiembre de 2026 a las 23:50 y se verificó el 2 de septiembre a las 00:10
@@ -35,7 +33,6 @@ Feature: Consultar mis cobros verificados y los saldos de mis trabajos
                 | desde el 2 hasta antes del 5 de septiembre de 2026         | ARS 200,00 | ARS 0,00   | ARS 200,00 |
                 | desde el 5 hasta antes del 10 de septiembre de 2026        | ARS 0,00   | ARS 800,00 | ARS 800,00 |
 
-        @wip
         Scenario: 71.3-CP Excluir pagos no aprobados sin perder cobros legítimos del mismo importe
             Given que tengo dos trabajos distintos con señas verificadas de ARS 100,00 cada una el 2 y el 3 de septiembre de 2026
             And que una de esas señas se aprobó en un nuevo intento después de uno rechazado el 1 de septiembre
@@ -45,7 +42,6 @@ Feature: Consultar mis cobros verificados y los saldos de mis trabajos
             Then veo exactamente ARS 200,00 en señas y ARS 0,00 en saldos
             And el detalle contiene solo dos cobros distintos de ARS 100,00
 
-        @wip
         Scenario: 71.4-CP No incluir cobros de otro prestador
             Given que "pedro@example.com" cobró una seña y un saldo entre el 1 y el 28 de septiembre de 2026
             And que yo cobré una seña de ARS 100,00 entre el 1 y el 28 de septiembre de 2026
@@ -55,7 +51,6 @@ Feature: Consultar mis cobros verificados y los saldos de mis trabajos
 
     Rule: Puedo seguir los cobros en el tiempo y compararlos sin inventar actividad
 
-        @wip
         Scenario: 71.5-CP Ver días sin cobros y respetar el límite final del período
             Given que cobré una seña de ARS 100,00 el 1 de septiembre de 2026 a las 00:00
             And que cobré un saldo de ARS 300,00 el 2 de septiembre de 2026 a las 23:59:59, cuya seña cobré en agosto
@@ -68,7 +63,6 @@ Feature: Consultar mis cobros verificados y los saldos de mis trabajos
                 | 3 de septiembre | ARS 0,00   | ARS 0,00   | ARS 0,00   |
             And la suma de esos días coincide con los importes del período
 
-        @wip
         Scenario: 71.6-CP Agrupar por semanas y recortar los extremos
             Given que cobré una seña de ARS 100,00 el domingo 6 de septiembre de 2026 a las 23:30
             And que cobré un saldo de ARS 300,00 el lunes 7 de septiembre de 2026 a las 00:30, cuya seña cobré en agosto
@@ -77,14 +71,12 @@ Feature: Consultar mis cobros verificados y los saldos de mis trabajos
             And veo el saldo en el tramo del lunes 7 a las 00:00 al martes 8 a las 12:00
             And no veo otros tramos en el período elegido
 
-        @wip
         Scenario: 71.7-CP Agrupar por meses e incluir un tramo sin cobros
             Given que cobré una seña de ARS 100,00 el 6 de septiembre de 2026
             And que cobré un saldo de ARS 300,00 el 7 de septiembre de 2026, cuya seña cobré el 20 de agosto de 2026
             When consulto mi evolución mensual desde el 31 de agosto a las 12:00 hasta el 8 de septiembre a las 12:00
             Then veo agosto sin cobros y septiembre con ARS 100,00 en señas y ARS 300,00 en saldos
 
-        @wip
         Scenario: 71.8-CP Comparar los importes con un período anterior de igual duración
             Given que cobré ARS 100,00 en señas y ARS 300,00 en saldos durante el 8 y 9 de septiembre de 2026
             And que cobré ARS 200,00 en señas y ARS 600,00 en saldos durante el 10 y 11 de septiembre de 2026
@@ -96,7 +88,6 @@ Feature: Consultar mis cobros verificados y los saldos de mis trabajos
                 | saldos   | ARS 600,00 | ARS 300,00 | ARS 300,00 | 100 %             |
                 | total    | ARS 800,00 | ARS 400,00 | ARS 400,00 | 100 %             |
 
-        @wip
         Scenario: 71.9-CP No inventar un porcentaje cuando el período anterior no tuvo cobros
             Given que no tuve cobros el 8 y 9 de septiembre de 2026
             And que cobré una seña de ARS 100,01 durante el 10 y 11 de septiembre de 2026
@@ -106,7 +97,6 @@ Feature: Consultar mis cobros verificados y los saldos de mis trabajos
 
     Rule: Los saldos pendientes describen mis trabajos actuales, no los cobros del período
 
-        @wip
         Scenario: 71.10-CP Ver los saldos de trabajos programados y finalizados aunque no haya un nuevo pago iniciado
             Given que tengo un trabajo programado de ARS 1.000,00 con seña de ARS 200,00 pagada antes del 20 de septiembre de 2026
             And que informé la finalización de otro trabajo de ARS 500,00 con seña de ARS 100,00 pagada antes del 20 de septiembre, cuyo saldo aún no se pagó
@@ -121,7 +111,6 @@ Feature: Consultar mis cobros verificados y los saldos de mis trabajos
 
     Rule: El detalle explica los importes del conjunto filtrado, no solo los de una página
 
-        @wip
         Scenario: 71.11-CP Reconocer cada operación y conciliar el detalle completo con el resumen
             Given que tengo tres cobros verificados entre el 1 y el 28 de septiembre de 2026: dos señas de ARS 100,00 y un saldo de ARS 300,00
             When consulto mis cobros y su detalle desde el 1 hasta antes del 29 de septiembre de 2026
@@ -130,7 +119,6 @@ Feature: Consultar mis cobros verificados y los saldos de mis trabajos
             And cada cobro muestra también el trabajo al que corresponde
             And la suma de señas y saldos del resumen coincide con el total del detalle
 
-        @wip
         Scenario: 71.12-CP Filtrar y recorrer páginas sin cambiar el período ni los totales del filtro
             Given que tengo dos señas de ARS 100,00 verificadas el 3 y el 5 de septiembre de 2026, y un saldo de ARS 300,00 verificado el 6 de septiembre
             When recorro el detalle de señas desde el 1 hasta antes del 29 de septiembre de 2026, de a un cobro por página
@@ -138,7 +126,6 @@ Feature: Consultar mis cobros verificados y los saldos de mis trabajos
             And cada página mantiene 2 cobros y ARS 200,00 para el conjunto filtrado
             And no aparece el saldo en ninguna de esas páginas
 
-        @wip
         Scenario: 71.13-CP Mantener fijo el período predeterminado al continuar una página
             Given que tengo dos cobros verificados dentro de los últimos 30 días, uno el 30 de agosto de 2026 a las 13:00 y otro el 28 de septiembre de 2026
             And que obtuve la primera página del detalle de a un cobro por página sin elegir período
@@ -146,7 +133,6 @@ Feature: Consultar mis cobros verificados y los saldos de mis trabajos
             When continúo a la siguiente página del detalle
             Then la segunda página conserva el período de la primera y muestra el cobro restante
 
-        @wip
         Scenario: 71.14-CP Recibir una respuesta vacía aunque tenga saldos pendientes
             Given que no tuve cobros verificados en los últimos 30 días
             And que tengo un trabajo programado con ARS 800,00 de saldo contractual pendiente
@@ -158,7 +144,6 @@ Feature: Consultar mis cobros verificados y los saldos de mis trabajos
 
     Rule: Una identidad o consulta inválida no revela datos ni produce importes incompletos
 
-        @wip
         Scenario Outline: 71.15-CP Rechazar períodos y opciones no admitidos
             When intento consultar mis cobros <elección>
             Then se me informa que la consulta no es válida y no se muestran cobros
@@ -178,7 +163,6 @@ Feature: Consultar mis cobros verificados y los saldos de mis trabajos
                 | con una continuación de otro prestador en el detalle |
                 | con una continuación combinada con opciones incompatibles en el detalle |
 
-        @wip
         Scenario Outline: 71.16-CP Impedir la consulta sin una identidad de prestador válida
             Given que <identidad>
             When intento consultar <vista>
