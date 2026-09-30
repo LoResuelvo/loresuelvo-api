@@ -1,0 +1,202 @@
+type: object
+description: >-
+  Aggregate-only administrative conversion funnel and delay statistics.
+  `period` selects origin units; linked milestones may occur after its end.
+  Cohorts are independent, counts represent distinct origin units rather
+  than downstream entity rows, and no personal, conversation, or financial
+  payloads are included.
+additionalProperties: false
+required:
+  - period
+  - timezone
+  - observed_at
+  - category_id
+  - rounding
+  - decimal_places
+  - cohorts
+properties:
+  period:
+    $ref: '#/components/schemas/AdminFunnelMetrics/$defs/Period'
+  timezone:
+    type: string
+    const: America/Argentina/Buenos_Aires
+    description: >-
+      Reporting/calculation time-zone metadata. Explicit RFC 3339 offsets are
+      used to interpret supplied bounds, which are normalized to UTC; this
+      time zone does not alter their interpretation or the default 30-day
+      window.
+  observed_at:
+    type: string
+    format: date-time
+    description: UTC instant captured once for the query and used to validate `to` and the default period.
+  category_id:
+    type: [integer, 'null']
+    format: int32
+    minimum: 1
+    description: Positive category filter, or null when no category filter was supplied.
+  rounding:
+    type: string
+    const: half_up
+    description: Decimal rounding mode used for percentage and delay-mean values.
+  decimal_places:
+    type: integer
+    const: 2
+    description: Number of decimal places used for percentage and delay-mean values.
+  cohorts:
+    type: object
+    additionalProperties: false
+    required: [ai, manual]
+    properties:
+      ai:
+        allOf:
+          - $ref: '#/components/schemas/AdminFunnelMetrics/$defs/Cohort'
+          - properties:
+              category_source:
+                const: assessment.problem_category_id
+              stages:
+                minItems: 7
+                maxItems: 7
+                items:
+                  allOf:
+                    - $ref: '#/components/schemas/AdminFunnelMetrics/$defs/Stage'
+                    - properties:
+                        stage:
+                          enum:
+                            - professional_assessment
+                            - request
+                            - proposal
+                            - confirmed_hiring
+                            - reported_completion
+                            - full_payment
+                            - review
+          - description: >-
+              AI-originated cohort, ordered as assessment, request, proposal,
+              confirmed hiring, reported completion, full payment, and review.
+      manual:
+        allOf:
+          - $ref: '#/components/schemas/AdminFunnelMetrics/$defs/Cohort'
+          - properties:
+              category_source:
+                const: provider.current_category_id
+              stages:
+                minItems: 6
+                maxItems: 6
+                items:
+                  allOf:
+                    - $ref: '#/components/schemas/AdminFunnelMetrics/$defs/Stage'
+                    - properties:
+                        stage:
+                          enum:
+                            - request
+                            - proposal
+                            - confirmed_hiring
+                            - reported_completion
+                            - full_payment
+                            - review
+          - description: >-
+              Manual cohort, ordered as request, proposal, confirmed hiring,
+              reported completion, full payment, and review.
+$defs:
+  Period:
+    type: object
+    additionalProperties: false
+    required: [from, to]
+    properties:
+      from:
+        type: string
+        format: date-time
+        description: Inclusive beginning of the effective origin-selection interval, normalized to UTC.
+      to:
+        type: string
+        format: date-time
+        description: Exclusive end of the effective origin-selection interval, normalized to UTC.
+  Cohort:
+    type: object
+    additionalProperties: false
+    required:
+      - category_source
+      - stages
+      - global_completion_conversion_percentage
+      - delays
+    properties:
+      category_source:
+        type: string
+        enum:
+          - assessment.problem_category_id
+          - provider.current_category_id
+        description: Persisted category source used when selecting origins for this cohort.
+      stages:
+        type: array
+        description: >-
+          Distinct origin-unit counts in stage order. Conversions are null for
+          the first stage and use the preceding stage as denominator thereafter.
+        items:
+          $ref: '#/components/schemas/AdminFunnelMetrics/$defs/Stage'
+      global_completion_conversion_percentage:
+        type: [number, 'null']
+        description: >-
+          Completion-report count divided by origin count as a percentage;
+          null when the origin cohort is empty.
+        example: 66.67
+      delays:
+        type: object
+        additionalProperties: false
+        required:
+          - request_to_first_proposal
+          - proposal_to_confirmed_hiring
+          - confirmed_hiring_to_reported_completion
+          - reported_completion_to_full_payment
+        properties:
+          request_to_first_proposal:
+            $ref: '#/components/schemas/AdminFunnelMetrics/$defs/Delay'
+          proposal_to_confirmed_hiring:
+            $ref: '#/components/schemas/AdminFunnelMetrics/$defs/Delay'
+          confirmed_hiring_to_reported_completion:
+            $ref: '#/components/schemas/AdminFunnelMetrics/$defs/Delay'
+          reported_completion_to_full_payment:
+            $ref: '#/components/schemas/AdminFunnelMetrics/$defs/Delay'
+  Stage:
+    type: object
+    additionalProperties: false
+    required: [stage, count, conversion_percentage]
+    properties:
+      stage:
+        type: string
+        enum:
+          - professional_assessment
+          - request
+          - proposal
+          - confirmed_hiring
+          - reported_completion
+          - full_payment
+          - review
+      count:
+        type: integer
+        format: int64
+        minimum: 0
+        description: Number of distinct cohort origin units that reached this stage, capped at one per unit.
+      conversion_percentage:
+        type: [number, 'null']
+        description: >-
+          Current-stage count divided by preceding-stage count as a percentage;
+          null for the first stage or when the preceding count is zero. A
+          positive denominator with no advancement is 0.00.
+        example: 66.67
+  Delay:
+    type: object
+    additionalProperties: false
+    required: [observations, mean_seconds]
+    properties:
+      observations:
+        type: integer
+        format: int64
+        minimum: 0
+        description: Number of persisted, chronologically valid linked intervals included in the mean.
+      mean_seconds:
+        type: [number, 'null']
+        minimum: 0
+        description: >-
+          Arithmetic mean interval duration in seconds, rounded half up to two
+          decimal places; null when observations is zero. A valid zero-length
+          interval has one observation and a mean of 0.00.
+        example: 33.34

@@ -78,6 +78,8 @@ paths:
     $ref: ./paths/admin-operation-image.yaml
   /admin/payments:
     $ref: ./paths/admin-payments.yaml
+  /admin/metrics/funnel:
+    $ref: ./paths/admin-metrics-funnel.yaml
   /providers:
     $ref: ./paths/providers.yaml
   /providers/me/statistics/activity:
@@ -296,6 +298,8 @@ components:
       $ref: ./components/schemas/admin-payment-summary.yaml
     AdminPaymentAmount:
       $ref: ./components/schemas/admin-payment-amount.yaml
+    AdminFunnelMetrics:
+      $ref: ./components/schemas/admin-funnel-metrics.yaml
     RegisterProviderRequest:
       $ref: ./components/schemas/register-provider-request.yaml
     ProviderSummary:
