@@ -1,0 +1,14 @@
+type: object
+description: Returned only when compare_previous=true was requested.
+required:
+- period
+- results
+- changes
+properties:
+  period:
+    $ref: ./provider-activity-period.yaml
+  results:
+    $ref: ./provider-activity-results.yaml
+  changes:
+    $ref: ./provider-activity-changes.yaml
+additionalProperties: false

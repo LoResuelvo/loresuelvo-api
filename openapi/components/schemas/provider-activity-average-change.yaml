@@ -1,0 +1,18 @@
+type: object
+required:
+- absolute
+- percentage
+properties:
+  absolute:
+    oneOf:
+    - type: integer
+      format: int64
+    - type: 'null'
+    description: Current average minus previous average; null when either period has no reported completions.
+  percentage:
+    oneOf:
+    - type: number
+      format: double
+    - type: 'null'
+    description: Percentage change rounded to two decimal places; null when either average is undefined or the previous average is zero.
+additionalProperties: false

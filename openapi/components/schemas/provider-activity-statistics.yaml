@@ -1,0 +1,26 @@
+type: object
+required:
+- period
+- calculated_at
+- results
+- evolution
+- current_pending
+properties:
+  period:
+    $ref: ./provider-activity-period.yaml
+  calculated_at:
+    type: string
+    format: date-time
+    description: UTC evaluation instant captured before the database transaction and used to resolve the default interval and validate that the interval does not end in the future; it is not the exact database snapshot time.
+  results:
+    $ref: ./provider-activity-results.yaml
+  evolution:
+    type: array
+    description: One bucket for every calendar bucket intersecting the requested interval, including empty buckets, sorted chronologically.
+    items:
+      $ref: ./provider-activity-bucket.yaml
+  current_pending:
+    $ref: ./provider-activity-pending.yaml
+  comparison:
+    $ref: ./provider-activity-comparison.yaml
+additionalProperties: false

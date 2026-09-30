@@ -1,0 +1,22 @@
+type: object
+required:
+- requests
+- scheduled_orders
+- awaiting_payment_orders
+properties:
+  requests:
+    type: integer
+    format: int64
+    minimum: 0
+    description: Current pending requests assigned to the authenticated provider.
+  scheduled_orders:
+    type: integer
+    format: int64
+    minimum: 0
+    description: Current scheduled orders assigned to the authenticated provider, including overdue orders.
+  awaiting_payment_orders:
+    type: integer
+    format: int64
+    minimum: 0
+    description: Current orders assigned to the authenticated provider that are awaiting payment after a completion report.
+additionalProperties: false

@@ -22,7 +22,7 @@ tags:
 - name: Consumers
   description: Consumer account registration endpoints.
 - name: Providers
-  description: Provider account registration and search endpoints.
+  description: Provider account registration, search, and own activity statistics endpoints.
 - name: PaymentAccounts
   description: Provider payment account connection endpoints.
 - name: CalendarConnections
@@ -78,6 +78,8 @@ paths:
     $ref: ./paths/admin-operation-image.yaml
   /providers:
     $ref: ./paths/providers.yaml
+  /providers/me/statistics/activity:
+    $ref: ./paths/provider-activity-statistics.yaml
   /providers/{providerID}:
     $ref: ./paths/provider-profile.yaml
   /providers/me/identity-verification-sessions:
@@ -290,6 +292,24 @@ components:
       $ref: ./components/schemas/provider-profile-completion-report.yaml
     ProviderProfileReview:
       $ref: ./components/schemas/provider-profile-review.yaml
+    ProviderActivityStatistics:
+      $ref: ./components/schemas/provider-activity-statistics.yaml
+    ProviderActivityPeriod:
+      $ref: ./components/schemas/provider-activity-period.yaml
+    ProviderActivityResults:
+      $ref: ./components/schemas/provider-activity-results.yaml
+    ProviderActivityBucket:
+      $ref: ./components/schemas/provider-activity-bucket.yaml
+    ProviderActivityPending:
+      $ref: ./components/schemas/provider-activity-pending.yaml
+    ProviderActivityComparison:
+      $ref: ./components/schemas/provider-activity-comparison.yaml
+    ProviderActivityChanges:
+      $ref: ./components/schemas/provider-activity-changes.yaml
+    ProviderActivityCountChange:
+      $ref: ./components/schemas/provider-activity-count-change.yaml
+    ProviderActivityAverageChange:
+      $ref: ./components/schemas/provider-activity-average-change.yaml
     IdentityVerificationSession:
       $ref: ./components/schemas/identity-verification-session.yaml
     PaymentAccountAuthorization:

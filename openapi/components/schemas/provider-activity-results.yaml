@@ -1,0 +1,58 @@
+type: object
+required:
+- confirmed_bookings
+- reported_completions
+- fully_paid_work_orders
+- clients_served
+- new_clients
+- returning_clients
+- agreed_value_cents
+- average_value_cents
+- currency
+properties:
+  confirmed_bookings:
+    type: integer
+    format: int64
+    minimum: 0
+    description: Orders accepted during the interval.
+  reported_completions:
+    type: integer
+    format: int64
+    minimum: 0
+    description: Completion reports first submitted during the interval, including reports whose orders were paid later.
+  fully_paid_work_orders:
+    type: integer
+    format: int64
+    minimum: 0
+    description: Orders fully paid during the interval.
+  clients_served:
+    type: integer
+    format: int64
+    minimum: 0
+    description: Distinct consumers with a reported completion during the interval.
+  new_clients:
+    type: integer
+    format: int64
+    minimum: 0
+    description: Served consumers with no earlier reported completion with this provider before the interval began.
+  returning_clients:
+    type: integer
+    format: int64
+    minimum: 0
+    description: Served consumers with an earlier reported completion with this provider before the interval began.
+  agreed_value_cents:
+    type: integer
+    format: int64
+    minimum: 0
+    description: Sum of persisted agreed service amounts for reported completions, excluding fees; values are ARS cents.
+  average_value_cents:
+    oneOf:
+    - type: integer
+      format: int64
+      minimum: 0
+    - type: 'null'
+    description: Agreed service amount divided by reported completions, rounded half up; null when there are no reported completions.
+  currency:
+    type: string
+    const: ARS
+additionalProperties: false

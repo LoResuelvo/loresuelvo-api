@@ -1,0 +1,22 @@
+type: object
+required:
+- from
+- to
+- granularity
+- time_zone
+properties:
+  from:
+    type: string
+    format: date-time
+    description: Inclusive start instant; serialized in UTC.
+  to:
+    type: string
+    format: date-time
+    description: Exclusive end instant; serialized in UTC.
+  granularity:
+    type: string
+    enum: [day, week, month]
+  time_zone:
+    type: string
+    const: America/Argentina/Buenos_Aires
+additionalProperties: false

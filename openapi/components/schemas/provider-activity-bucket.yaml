@@ -1,0 +1,29 @@
+type: object
+required:
+- from
+- to
+- confirmed_bookings
+- reported_completions
+- fully_paid_work_orders
+properties:
+  from:
+    type: string
+    format: date-time
+    description: Inclusive bucket start, clipped to the requested interval and serialized in UTC.
+  to:
+    type: string
+    format: date-time
+    description: Exclusive bucket end, clipped to the requested interval and serialized in UTC.
+  confirmed_bookings:
+    type: integer
+    format: int64
+    minimum: 0
+  reported_completions:
+    type: integer
+    format: int64
+    minimum: 0
+  fully_paid_work_orders:
+    type: integer
+    format: int64
+    minimum: 0
+additionalProperties: false

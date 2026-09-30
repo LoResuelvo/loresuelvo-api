@@ -1,0 +1,16 @@
+type: object
+required:
+- absolute
+- percentage
+properties:
+  absolute:
+    type: integer
+    format: int64
+    description: Current period value minus previous period value.
+  percentage:
+    oneOf:
+    - type: number
+      format: double
+    - type: 'null'
+    description: Percentage change rounded to two decimal places; null when the previous value is zero.
+additionalProperties: false

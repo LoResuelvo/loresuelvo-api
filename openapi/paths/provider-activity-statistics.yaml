@@ -1,0 +1,188 @@
+get:
+  tags:
+  - Providers
+  operationId: getMyProviderActivityStatistics
+  summary: Get activity statistics for the authenticated provider
+  description: >-
+    Returns activity counts and value totals for the provider profile belonging to
+    the authenticated user. This is a self-service read: the provider is resolved
+    from the Bearer token; the request cannot select another provider and does not
+    require an administrative permission. Only aggregate statistics are returned;
+    consumer identities and conversation content are not included. The results,
+    evolution buckets, optional comparison, and current pending counts are read
+    from one consistent database snapshot. `Cache-Control: private, no-store` is
+    applied to successful and error responses.
+
+    `from` and `to` must either both be supplied or both be omitted. Each supplied
+    value is an RFC 3339 timestamp with an explicit UTC offset (including `Z`),
+    interpreted as an instant. When a timestamp has a positive `+` offset, encode
+    the plus sign as `%2B` in the query string. The interval includes `from` and excludes `to`.
+    When omitted, the interval is the 30 days immediately preceding the time the
+    request is evaluated. The interval must be positive, no longer than 365 days,
+    and must not end in the future.
+
+    `granularity` selects `day`, `week`, or `month` buckets and defaults to `day`.
+    Calendar boundaries use Argentina/Buenos Aires time; weeks begin on Monday.
+    Evolution bucket boundaries are clipped to the requested interval, and empty
+    buckets are included with zero counts.
+
+    `compare_previous=true` adds statistics for the immediately preceding interval
+    of equal elapsed duration. Absolute changes are current minus previous. Percent
+    changes are relative to the previous value and rounded to two decimal places,
+    with halfway values rounded away from zero; they are `null` when the previous
+    value is zero. Average-value changes are
+    `null` when either period has no reported completions (and therefore no
+    average).
+
+    `confirmed_bookings` counts orders accepted during the interval;
+    `reported_completions` counts completion reports first submitted during it;
+    `fully_paid_work_orders` counts orders fully paid during it. `clients_served`
+    counts distinct consumers with a reported completion in the interval. Such a
+    consumer is new when they had no earlier reported completion with this provider
+    before the interval began; otherwise they are returning. `agreed_value_cents`
+    sums the persisted agreed service amounts, excluding fees, for reported
+    completions in the interval. Values are Argentine pesos in cents;
+    `average_value_cents` is the agreed value divided by reported completions,
+    rounded half up, or `null` if there were none. `current_pending` is a current
+    snapshot, not filtered by the requested interval.
+  security:
+  - BearerAuth: []
+  parameters:
+  - name: from
+    in: query
+    required: false
+    description: Inclusive beginning of the activity interval; provide together with `to`. Encode a positive `+` UTC offset as `%2B` in the query string.
+    schema:
+      type: string
+      format: date-time
+    example: '2026-09-01T00:00:00-03:00'
+  - name: to
+    in: query
+    required: false
+    description: Exclusive end of the activity interval; provide together with `from`. Encode a positive `+` UTC offset as `%2B` in the query string.
+    schema:
+      type: string
+      format: date-time
+    example: '2026-09-09T00:00:00-03:00'
+  - name: granularity
+    in: query
+    required: false
+    description: Calendar size of evolution buckets in Argentina/Buenos Aires time.
+    schema:
+      type: string
+      enum: [day, week, month]
+      default: day
+    example: week
+  - name: compare_previous
+    in: query
+    required: false
+    description: Include results and changes for the immediately preceding interval of equal duration.
+    schema:
+      type: boolean
+      default: false
+    example: true
+  responses:
+    '200':
+      description: Provider activity statistics were calculated from one consistent read snapshot.
+      headers:
+        Cache-Control:
+          description: Prevents caches from storing private provider activity statistics.
+          schema:
+            type: string
+            const: private, no-store
+        X-Request-ID:
+          description: Correlation identifier assigned to this request.
+          schema:
+            type: string
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ProviderActivityStatistics'
+    '400':
+      description: The interval is incomplete or invalid, a value is malformed, or a query parameter is empty, repeated, or unsupported.
+      headers:
+        Cache-Control:
+          description: Prevents caches from storing private provider activity statistics.
+          schema:
+            type: string
+            const: private, no-store
+        X-Request-ID:
+          description: Correlation identifier assigned to this request.
+          schema:
+            type: string
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: invalid activity query
+    '401':
+      description: The Bearer token is missing or invalid.
+      headers:
+        Cache-Control:
+          description: Prevents caches from storing private provider activity statistics.
+          schema:
+            type: string
+            const: private, no-store
+        X-Request-ID:
+          description: Correlation identifier assigned to this request.
+          schema:
+            type: string
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/AuthErrorResponse'
+    '403':
+      description: The authenticated user has a registered non-provider role, such as a consumer.
+      headers:
+        Cache-Control:
+          description: Prevents caches from storing private provider activity statistics.
+          schema:
+            type: string
+            const: private, no-store
+        X-Request-ID:
+          description: Correlation identifier assigned to this request.
+          schema:
+            type: string
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: provider access required
+    '404':
+      description: No user is registered for the authenticated identity, or the user has a provider role but no provider profile exists.
+      headers:
+        Cache-Control:
+          description: Prevents caches from storing private provider activity statistics.
+          schema:
+            type: string
+            const: private, no-store
+        X-Request-ID:
+          description: Correlation identifier assigned to this request.
+          schema:
+            type: string
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: provider not found
+    '500':
+      description: The activity statistics could not be calculated.
+      headers:
+        Cache-Control:
+          description: Prevents caches from storing private provider activity statistics.
+          schema:
+            type: string
+            const: private, no-store
+        X-Request-ID:
+          description: Correlation identifier assigned to this request.
+          schema:
+            type: string
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: internal server error

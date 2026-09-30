@@ -1,0 +1,28 @@
+type: object
+required:
+- confirmed_bookings
+- reported_completions
+- fully_paid_work_orders
+- clients_served
+- new_clients
+- returning_clients
+- agreed_value_cents
+- average_value_cents
+properties:
+  confirmed_bookings:
+    $ref: ./provider-activity-count-change.yaml
+  reported_completions:
+    $ref: ./provider-activity-count-change.yaml
+  fully_paid_work_orders:
+    $ref: ./provider-activity-count-change.yaml
+  clients_served:
+    $ref: ./provider-activity-count-change.yaml
+  new_clients:
+    $ref: ./provider-activity-count-change.yaml
+  returning_clients:
+    $ref: ./provider-activity-count-change.yaml
+  agreed_value_cents:
+    $ref: ./provider-activity-count-change.yaml
+  average_value_cents:
+    $ref: ./provider-activity-average-change.yaml
+additionalProperties: false
