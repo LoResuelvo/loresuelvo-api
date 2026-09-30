@@ -22,7 +22,6 @@ Feature: Consultar métricas administrativas del embudo de contrataciones
             Given que el reloj del sistema indica "2026-09-30T12:00:00-03:00"
             And que estoy autenticado como administrador "operador@example.com" con el permiso "read:admin_metrics"
 
-        @wip
         Scenario: 67.1-AM Aplicar los últimos treinta días e informar los metadatos del período
             Given que no existen evaluaciones profesionales ni solicitudes manuales en el período predeterminado
             When consulto el embudo administrativo sin filtros
@@ -32,7 +31,6 @@ Feature: Consultar métricas administrativas del embudo de contrataciones
             And ambos recorridos informan conteos cero, porcentajes sin denominador como nulos y medias sin observaciones como nulas
             And no se inventa actividad ni se aplica un umbral mínimo de muestras
 
-        @wip
         Scenario: 67.2-AM Seleccionar orígenes dentro de un período personalizado semiabierto
             Given que existen evaluaciones profesionales creadas en "2026-09-01T00:00:00-03:00" y "2026-09-03T00:00:00-03:00"
             And que existe una solicitud manual sin evaluación de origen creada en "2026-09-02T12:00:00-03:00"
@@ -41,7 +39,6 @@ Feature: Consultar métricas administrativas del embudo de contrataciones
             And el período efectivo incluye el origen creado exactamente en "2026-09-01T00:00:00-03:00" y excluye los creados exactamente al final
             And el recorrido IA cuenta una evaluación profesional y el recorrido manual una solicitud
 
-        @wip
         Scenario Outline: 67.3-AM Filtrar cada cohorte por el rubro que le corresponde
             Given que existe una evaluación profesional de "ana@example.com" del rubro "Plomería" en el período
             And que existe una solicitud manual de "beatriz@example.com" dirigida a un prestador cuyo rubro actual es "Electricidad" en el período
@@ -55,7 +52,6 @@ Feature: Consultar métricas administrativas del embudo de contrataciones
                 | Plomería     | una       | cero          |
                 | Electricidad | cero      | una           |
 
-        @wip
         Scenario: 67.4-AM Responder sin actividad con rubro desconocido
             Given que no existe actividad asociada al rubro 2147483000
             When consulto el embudo con el rubro con ID 2147483000
@@ -68,7 +64,6 @@ Feature: Consultar métricas administrativas del embudo de contrataciones
             Given que el reloj del sistema indica "2026-09-30T12:00:00-03:00"
             And que estoy autenticado como administrador "operador@example.com" con el permiso "read:admin_metrics"
 
-        @wip
         Scenario Outline: 67.5-AM Contar cada versión profesional persistida sin sustituir su evaluación de origen
             Given que la conversación asistida de "ana@example.com" tiene las siguientes evaluaciones persistidas en el período:
                 | evaluación | versión | resultado             | rubro        | creada                    |
@@ -87,7 +82,6 @@ Feature: Consultar métricas administrativas del embudo de contrataciones
                 | para el rubro "Plomería"     | 1            | 1             |
                 | para el rubro "Electricidad" | 1            | 0             |
 
-        @wip
         Scenario: 67.6-AM No crear otra unidad por resultado unchanged y excluir evaluaciones ajenas a la cohorte
             Given que existe una evaluación persistida "A1" con resultado "professional_required" en el período
             And que una respuesta posterior del asistente tiene acción "unchanged" y reutiliza el ID de "A1" sin persistir una nueva versión
@@ -97,7 +91,6 @@ Feature: Consultar métricas administrativas del embudo de contrataciones
             And los resultados "self_service" y "collecting_information" no se incluyen en la cohorte de contratación
             And los mensajes y la respuesta "unchanged" no incrementan el conteo de evaluaciones
 
-        @wip
         Scenario: 67.7-AM Separar solicitudes manuales de las solicitudes originadas en IA
             Given que existe una solicitud manual de "ana@example.com" con "juan@example.com" cuyo source_assessment_id está ausente
             And que existe otra solicitud de "beatriz@example.com" con "pedro@example.com" originada en una evaluación profesional persistida
@@ -111,7 +104,6 @@ Feature: Consultar métricas administrativas del embudo de contrataciones
             Given que el reloj del sistema indica "2026-09-30T12:00:00-03:00"
             And que estoy autenticado como administrador "operador@example.com" con el permiso "read:admin_metrics"
 
-        @wip
         Scenario: 67.8-AM No multiplicar las etapas de una cohorte IA con varias ramas e intentos de pago
             Given que existen tres evaluaciones profesionales del período: "A1", "A2" y "A3"
             And que "A1" se vinculó a dos solicitudes distintas para prestadores distintos y ambas tienen propuestas en sus propias conversaciones
@@ -132,7 +124,6 @@ Feature: Consultar métricas administrativas del embudo de contrataciones
             And las órdenes vinculadas y sus hitos persistidos determinan las etapas; los intentos o transacciones de pago no multiplican etapas ni representan por sí solos el pago completo
             And la conversión global desde el origen hasta "con finalización informada" es 66.67 por ciento aunque pago completo y reseña tengan otros conteos
 
-        @wip
         Scenario: 67.9-AM Contar las etapas y conversiones de la cohorte manual por separado
             Given que existen tres solicitudes manuales del período: "S1", "S2" y "S3"
             And que "S1" tiene dos propuestas en su conversación de trabajo, "S2" una propuesta y "S3" una propuesta cuyo intento de pago de seña está en checkout_ready y no tiene orden
@@ -151,7 +142,6 @@ Feature: Consultar métricas administrativas del embudo de contrataciones
             And las dos propuestas de "S1" no multiplican el conteo de solicitudes ni de etapas
             And el checkout_ready de la propuesta de "S3" no cuenta como contratación confirmada sin una orden vinculada
 
-        @wip
         Scenario: 67.10-AM No combinar hitos de órdenes distintas para completar una misma rama
             Given que una evaluación profesional "A1" originó solicitudes para dos prestadores en conversaciones de trabajo distintas
             And que la orden "O1" de la primera rama tiene un reporte persistido y no tiene "paid_on"
@@ -162,7 +152,6 @@ Feature: Consultar métricas administrativas del embudo de contrataciones
             And el recorrido IA no cuenta una unidad con pago completo porque ningún mismo recorrido de orden tiene ambos hitos de finalización y pago
             And el reporte de "O1" no se combina con el pago de "O2" para fabricar una cadena completa
 
-        @wip
         Scenario: 67.11-AM Conservar avances ocurridos después del período de origen
             Given que la evaluación profesional "A1" fue creada exactamente al inicio del período
             And que su solicitud, propuesta, orden aceptada, reporte de finalización, pago completo y reseña asociada a esa misma orden pagada ocurrieron después del final del período y antes del instante de observación
@@ -182,7 +171,6 @@ Feature: Consultar métricas administrativas del embudo de contrataciones
             And el período no vuelve a filtrar las fechas de solicitudes, propuestas, órdenes, reportes, pagos ni reseñas
             And las etapas anteriores siguen contándose cuando la unidad avanza a otra etapa
 
-        @wip
         Scenario: 67.12-AM Distinguir denominadores nulos de conversiones con cero avance
             Given que existen tres evaluaciones profesionales en el período y ninguna tiene una solicitud
             And que no existen solicitudes manuales en el período
@@ -197,7 +185,6 @@ Feature: Consultar métricas administrativas del embudo de contrataciones
             Given que el reloj del sistema indica "2026-09-30T12:00:00-03:00"
             And que estoy autenticado como administrador "operador@example.com" con el permiso "read:admin_metrics"
 
-        @wip
         Scenario: 67.13-AM Medir muestras por solicitud y por orden sin incluir espera pendiente
             Given que existen estas solicitudes manuales del período:
                 | solicitud | consumidor          | prestador         | creada                   |
@@ -224,7 +211,6 @@ Feature: Consultar métricas administrativas del embudo de contrataciones
             And los reportes y pagos posteriores al final del período se incluyen por pertenecer a la cohorte seleccionada por la fecha de sus solicitudes
             And la solicitud y la orden sin reporte no aportan como duración el tiempo que llevan esperando
 
-        @wip
         Scenario: 67.14-AM Excluir solo el intervalo con cronología inválida sin perder otras muestras
             Given que la solicitud "S1" fue creada a las "2026-09-10T10:00:00Z" y sus propuestas persistidas se crearon a las "2026-09-10T09:59:00Z" y "2026-09-10T10:02:00Z"
             And que la orden histórica de la primera propuesta fue aceptada a las "2026-09-10T10:03:00Z" y tiene un reporte anterior a su aceptación
@@ -239,14 +225,12 @@ Feature: Consultar métricas administrativas del embudo de contrataciones
             And la demora finalización→pago conserva una observación válida de "S2" y media 60.00 segundos
             And cada media informa su cantidad de observaciones válidas
 
-        @wip
         Scenario: 67.15-AM Informar medias nulas o cero según existan observaciones válidas
             Given que la única solicitud manual del período fue creada a las "2026-09-10T10:00:00Z" y su primera propuesta persistida se creó en ese mismo instante, sin orden
             When consulto el embudo desde "2026-09-10T00:00:00Z" hasta "2026-09-11T00:00:00Z"
             Then solicitud→primera propuesta informa una observación válida y una media de cero segundos
             And las otras medias informan cero observaciones y valor nulo
 
-        @wip
         Scenario: 67.16-AM Aceptar un período de exactamente 365 días que termina al observar
             Given que no hay actividad dentro del período
             When consulto el embudo desde "2025-09-30T15:00:00Z" hasta "2026-09-30T15:00:00Z"
@@ -257,7 +241,6 @@ Feature: Consultar métricas administrativas del embudo de contrataciones
         Background:
             Given que el reloj del sistema indica "2026-09-30T12:00:00-03:00"
 
-        @wip
         Scenario Outline: 67.17-AM Rechazar rangos incompletos o fuera de los límites permitidos
             Given que estoy autenticado como administrador "operador@example.com" con el permiso "read:admin_metrics"
             When consulto el embudo con los parámetros "<parámetros>"
@@ -281,7 +264,6 @@ Feature: Consultar métricas administrativas del embudo de contrataciones
                 | from=2026-09-01T00:00:00Z&from=2026-09-02T00:00:00Z&to=2026-09-03T00:00:00Z |
                 | diagnostico=true                                                            |
 
-        @wip
         Scenario: 67.18-AM Exigir el permiso de métricas administrativas
             Given que estoy autenticado con un JWT válido de administrador sin el permiso "read:admin_metrics"
             And que el JWT incluye otro permiso administrativo
@@ -289,7 +271,6 @@ Feature: Consultar métricas administrativas del embudo de contrataciones
             Then el sistema responde con estado 403 y no devuelve métricas
             And la respuesta incluye "Cache-Control: private, no-store"
 
-        @wip
         Scenario: 67.19-AM No entregar datos si falla la lectura coherente de métricas
             Given que existe actividad válida dentro del período
             And que el reader administrativo falla al obtener la instantánea coherente de lectura
@@ -300,7 +281,6 @@ Feature: Consultar métricas administrativas del embudo de contrataciones
             And no se entrega un agregado parcial
             And la respuesta incluye "Cache-Control: private, no-store"
 
-        @wip
         Scenario: 67.20-AM Proteger el acceso y limitar la respuesta a agregados sin auditoría ni efectos de negocio
             Given que existen evaluaciones, solicitudes, propuestas y órdenes con actividad en el período
             And que no existe un evento administrativo de auditoría para la consulta
@@ -312,7 +292,6 @@ Feature: Consultar métricas administrativas del embudo de contrataciones
             And no se registra auditoría administrativa persistente ni se modifica el estado de negocio
             And la consulta no depende de servicios externos
 
-        @wip
         Scenario Outline: 67.21-AM Rechazar identidades ausentes o inválidas
             Given que <identidad>
             When consulto el embudo administrativo
