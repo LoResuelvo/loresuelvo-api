@@ -1,0 +1,21 @@
+type: object
+description: >-
+  Registered review of an eligible paid work order. Only the order identifier,
+  rating and stored description are returned; no additional customer data or
+  fabricated comment is included.
+required: [work_order_id, rating, description]
+properties:
+  work_order_id:
+    type: integer
+    minimum: 1
+    description: Local paid work-order identifier used for descending deterministic pagination, not a review timestamp.
+  rating:
+    type: integer
+    minimum: 1
+    maximum: 5
+    description: Registered star rating, which also contributes to all global aggregates.
+  description:
+    type: string
+    maxLength: 500
+    description: Stored review description, including the empty string. An empty description does not exclude the review from any aggregate.
+additionalProperties: false

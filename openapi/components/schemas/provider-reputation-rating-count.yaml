@@ -1,0 +1,15 @@
+type: object
+description: Count of reviews with one rating in the provider's complete eligible paid-order set, not only the review page.
+required: [rating, count]
+properties:
+  rating:
+    type: integer
+    minimum: 1
+    maximum: 5
+    description: Star rating. The distribution contains each rating exactly once, in ascending order.
+  count:
+    type: integer
+    format: int64
+    minimum: 0
+    description: Global number of eligible reviews with this rating, including zero.
+additionalProperties: false

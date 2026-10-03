@@ -4386,6 +4386,383 @@
                 }
             }
         },
+        "/providers/me/statistics/reputation": {
+            "get": {
+                "tags": [
+                    "Providers"
+                ],
+                "operationId": "getMyProviderReputationStatistics",
+                "summary": "Get the authenticated provider's global reputation and review coverage",
+                "description": "Resolves the provider from the Bearer identity and returns only that provider's reputation. No administrative permission is required, and provider_id cannot select another owner. The eligible universe is the provider's own work orders in paid status, under the existing review rules. Requests and unpaid work orders are not eligible. Each eligible order contributes at most one review; images, payment attempts and other one-to-many relations do not duplicate it.\nreview_count equals reviewed_paid_orders and the sum of the five rating distribution counts, and never exceeds eligible_paid_orders. The average uses all registered eligible ratings, without treating unreviewed orders as zero. Coverage is 100 times reviewed_paid_orders divided by eligible_paid_orders. Average and coverage use exact HALF_UP rounding to two decimal places: 29 / 8 gives an average of 3.63, and one reviewed order out of 32 gives coverage of 3.13 percent. With eligible orders but no reviews, average is null and coverage is zero. Without eligible orders, all counts and buckets are zero and both average and coverage are null. Real absence of activity returns 200; persistence failures are controlled errors, not empty activity.\nReviews contain only work_order_id, rating and the stored description. An empty description remains empty and still contributes to the aggregates. Pages have limit 20 by default and at most 100 rows, ordered strictly by work_order_id descending. This identifier order is deterministic, not a guarantee of recency or review-registration order. Global aggregates include the entire eligible set independently of the page size or cursor.\nnext_cursor is null on the terminal page. Otherwise send the returned opaque token unchanged as cursor. It is signed and bound to the provider, reputation endpoint, effective limit and last position. A cursor may be sent alone; omitted limit inherits its signed value, whereas an explicit different limit returns 400. Altered, malformed or foreign-provider cursors also return 400. Only limit and cursor are accepted query parameters. Unknown, repeated, empty or malformed parameters, invalid limits and temporal or owner filters are rejected. No from, to, granularity, compare_previous or provider_id is accepted.\nAggregates, coverage and the page in one response share a coherent read-only database snapshot. Each subsequent request evaluates the current global set; the cursor does not freeze historical data across pages. calculated_at is the only query metadata, serialized in UTC; it is the evaluation instant, not an exact database-snapshot time or a review timestamp. There are no periods, series or comparisons in this global reputation contract.\nThis read does not alter reviews, work-order states, profile visibility or eligibility rules, generate administrative audit records or call external payment or calendar services. Existing technical and security logs are retained without logging the private query or response contents. Cache-Control: private, no-store applies to success and error responses.",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "name": "limit",
+                        "in": "query",
+                        "required": false,
+                        "description": "Maximum review rows in this page, supplied as decimal digits without a sign. Defaults to 20 for the first page. With cursor, omission inherits the token's limit; an explicit value must match it.",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 100,
+                            "default": 20
+                        }
+                    },
+                    {
+                        "name": "cursor",
+                        "in": "query",
+                        "required": false,
+                        "description": "Opaque signed continuation returned as next_cursor, bound to the provider, reputation endpoint, page size and last position. Send it unchanged; do not construct it or reuse a cursor from another endpoint or provider.",
+                        "schema": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 4096
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Global reputation, coverage and one ordered review page from a coherent read-only snapshot.",
+                        "headers": {
+                            "Cache-Control": {
+                                "description": "Prevents storage of private provider reputation.",
+                                "schema": {
+                                    "type": "string",
+                                    "const": "private, no-store"
+                                }
+                            },
+                            "X-Request-ID": {
+                                "description": "Request correlation identifier.",
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ProviderReputationStatistics"
+                                },
+                                "examples": {
+                                    "noEligibleOrders": {
+                                        "summary": "No paid work orders; both undefined ratios are null.",
+                                        "value": {
+                                            "calculated_at": "2026-10-03T12:00:00Z",
+                                            "average_rating": null,
+                                            "review_count": 0,
+                                            "rating_distribution": [
+                                                {
+                                                    "rating": 1,
+                                                    "count": 0
+                                                },
+                                                {
+                                                    "rating": 2,
+                                                    "count": 0
+                                                },
+                                                {
+                                                    "rating": 3,
+                                                    "count": 0
+                                                },
+                                                {
+                                                    "rating": 4,
+                                                    "count": 0
+                                                },
+                                                {
+                                                    "rating": 5,
+                                                    "count": 0
+                                                }
+                                            ],
+                                            "eligible_paid_orders": 0,
+                                            "reviewed_paid_orders": 0,
+                                            "coverage_percentage": null,
+                                            "reviews": [],
+                                            "next_cursor": null
+                                        }
+                                    },
+                                    "eligibleWithoutReviews": {
+                                        "summary": "Two paid orders without reviews; coverage is zero and average is null.",
+                                        "value": {
+                                            "calculated_at": "2026-10-03T12:00:00Z",
+                                            "average_rating": null,
+                                            "review_count": 0,
+                                            "rating_distribution": [
+                                                {
+                                                    "rating": 1,
+                                                    "count": 0
+                                                },
+                                                {
+                                                    "rating": 2,
+                                                    "count": 0
+                                                },
+                                                {
+                                                    "rating": 3,
+                                                    "count": 0
+                                                },
+                                                {
+                                                    "rating": 4,
+                                                    "count": 0
+                                                },
+                                                {
+                                                    "rating": 5,
+                                                    "count": 0
+                                                }
+                                            ],
+                                            "eligible_paid_orders": 2,
+                                            "reviewed_paid_orders": 0,
+                                            "coverage_percentage": 0,
+                                            "reviews": [],
+                                            "next_cursor": null
+                                        }
+                                    },
+                                    "partialCoverage": {
+                                        "summary": "Three reviews of four paid orders; average is 3.67 and coverage is 75 percent.",
+                                        "value": {
+                                            "calculated_at": "2026-10-03T12:00:00Z",
+                                            "average_rating": 3.67,
+                                            "review_count": 3,
+                                            "rating_distribution": [
+                                                {
+                                                    "rating": 1,
+                                                    "count": 0
+                                                },
+                                                {
+                                                    "rating": 2,
+                                                    "count": 1
+                                                },
+                                                {
+                                                    "rating": 3,
+                                                    "count": 0
+                                                },
+                                                {
+                                                    "rating": 4,
+                                                    "count": 1
+                                                },
+                                                {
+                                                    "rating": 5,
+                                                    "count": 1
+                                                }
+                                            ],
+                                            "eligible_paid_orders": 4,
+                                            "reviewed_paid_orders": 3,
+                                            "coverage_percentage": 75,
+                                            "reviews": [
+                                                {
+                                                    "work_order_id": 503,
+                                                    "rating": 5,
+                                                    "description": "Excellent work."
+                                                },
+                                                {
+                                                    "work_order_id": 502,
+                                                    "rating": 4,
+                                                    "description": ""
+                                                },
+                                                {
+                                                    "work_order_id": 501,
+                                                    "rating": 2,
+                                                    "description": "Arrived late."
+                                                }
+                                            ],
+                                            "next_cursor": null
+                                        }
+                                    },
+                                    "firstPage": {
+                                        "summary": "The same global totals with limit=2; the cursor string is illustrative, not usable.",
+                                        "value": {
+                                            "calculated_at": "2026-10-03T12:00:00Z",
+                                            "average_rating": 3.67,
+                                            "review_count": 3,
+                                            "rating_distribution": [
+                                                {
+                                                    "rating": 1,
+                                                    "count": 0
+                                                },
+                                                {
+                                                    "rating": 2,
+                                                    "count": 1
+                                                },
+                                                {
+                                                    "rating": 3,
+                                                    "count": 0
+                                                },
+                                                {
+                                                    "rating": 4,
+                                                    "count": 1
+                                                },
+                                                {
+                                                    "rating": 5,
+                                                    "count": 1
+                                                }
+                                            ],
+                                            "eligible_paid_orders": 4,
+                                            "reviewed_paid_orders": 3,
+                                            "coverage_percentage": 75,
+                                            "reviews": [
+                                                {
+                                                    "work_order_id": 503,
+                                                    "rating": 5,
+                                                    "description": "Excellent work."
+                                                },
+                                                {
+                                                    "work_order_id": 502,
+                                                    "rating": 4,
+                                                    "description": ""
+                                                }
+                                            ],
+                                            "next_cursor": "opaque-provider-bound-continuation"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid limit or cursor, foreign provider or incompatible limit; unsupported, malformed, empty or repeated query parameter, including temporal or owner filters.",
+                        "headers": {
+                            "Cache-Control": {
+                                "description": "Prevents storage of private provider reputation.",
+                                "schema": {
+                                    "type": "string",
+                                    "const": "private, no-store"
+                                }
+                            },
+                            "X-Request-ID": {
+                                "description": "Request correlation identifier.",
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                },
+                                "example": {
+                                    "error": "invalid reputation query"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "The Bearer token is missing or invalid.",
+                        "headers": {
+                            "Cache-Control": {
+                                "description": "Prevents storage of private provider reputation.",
+                                "schema": {
+                                    "type": "string",
+                                    "const": "private, no-store"
+                                }
+                            },
+                            "X-Request-ID": {
+                                "description": "Request correlation identifier.",
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AuthErrorResponse"
+                                },
+                                "example": {
+                                    "error": "invalid_token",
+                                    "message": "Failed to validate JWT."
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "The registered authenticated user does not have the provider role.",
+                        "headers": {
+                            "Cache-Control": {
+                                "description": "Prevents storage of private provider reputation.",
+                                "schema": {
+                                    "type": "string",
+                                    "const": "private, no-store"
+                                }
+                            },
+                            "X-Request-ID": {
+                                "description": "Request correlation identifier.",
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                },
+                                "example": {
+                                    "error": "provider access required"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "No user is registered for the authenticated identity, or its provider profile is missing.",
+                        "headers": {
+                            "Cache-Control": {
+                                "description": "Prevents storage of private provider reputation.",
+                                "schema": {
+                                    "type": "string",
+                                    "const": "private, no-store"
+                                }
+                            },
+                            "X-Request-ID": {
+                                "description": "Request correlation identifier.",
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                },
+                                "example": {
+                                    "error": "provider not found"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "The complete coherent reputation response could not be read or calculated; no partial or fabricated empty activity is returned.",
+                        "headers": {
+                            "Cache-Control": {
+                                "description": "Prevents storage of private provider reputation.",
+                                "schema": {
+                                    "type": "string",
+                                    "const": "private, no-store"
+                                }
+                            },
+                            "X-Request-ID": {
+                                "description": "Request correlation identifier.",
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                },
+                                "example": {
+                                    "error": "internal server error"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/providers/{providerID}": {
             "get": {
                 "tags": [
@@ -13881,6 +14258,201 @@
                         "type": "integer",
                         "minimum": 1,
                         "description": "Local work-order identifier associated with the approved collection."
+                    }
+                },
+                "additionalProperties": false
+            },
+            "ProviderReputationStatistics": {
+                "type": "object",
+                "description": "Global reputation for the authenticated provider's own paid work orders, together with one review page from the same coherent read-only snapshot. Each eligible order contributes at most one review. review_count equals reviewed_paid_orders, never exceeds eligible_paid_orders, and equals the sum of all five distribution counts. Aggregates describe the entire eligible set, not the current page.",
+                "required": [
+                    "calculated_at",
+                    "average_rating",
+                    "review_count",
+                    "rating_distribution",
+                    "eligible_paid_orders",
+                    "reviewed_paid_orders",
+                    "coverage_percentage",
+                    "reviews",
+                    "next_cursor"
+                ],
+                "properties": {
+                    "calculated_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "description": "UTC evaluation instant of this response, not the exact database snapshot time or a review timestamp."
+                    },
+                    "average_rating": {
+                        "oneOf": [
+                            {
+                                "type": "number",
+                                "format": "double",
+                                "minimum": 1,
+                                "maximum": 5
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "description": "Average of all registered ratings in the eligible set, rounded to two decimal places using exact HALF_UP arithmetic. Halfway values round up: 29 / 8 is 3.63. Orders without a review do not contribute zero ratings. Null when no eligible order has a review; JSON numbers need not display trailing zeros."
+                    },
+                    "review_count": {
+                        "type": "integer",
+                        "format": "int64",
+                        "minimum": 0,
+                        "description": "Global number of reviews of eligible paid orders; equals reviewed_paid_orders, independently of pagination."
+                    },
+                    "rating_distribution": {
+                        "type": "array",
+                        "minItems": 5,
+                        "maxItems": 5,
+                        "description": "Five buckets in ascending rating order from 1 through 5, including zero counts. Their counts sum to review_count.",
+                        "items": {
+                            "type": "object",
+                            "description": "Count of reviews with one rating in the provider's complete eligible paid-order set, not only the review page.",
+                            "required": [
+                                "rating",
+                                "count"
+                            ],
+                            "properties": {
+                                "rating": {
+                                    "type": "integer",
+                                    "minimum": 1,
+                                    "maximum": 5,
+                                    "description": "Star rating. The distribution contains each rating exactly once, in ascending order."
+                                },
+                                "count": {
+                                    "type": "integer",
+                                    "format": "int64",
+                                    "minimum": 0,
+                                    "description": "Global number of eligible reviews with this rating, including zero."
+                                }
+                            },
+                            "additionalProperties": false
+                        }
+                    },
+                    "eligible_paid_orders": {
+                        "type": "integer",
+                        "format": "int64",
+                        "minimum": 0,
+                        "description": "Global count of the provider's own work orders in paid status. Requests and unpaid work orders are excluded."
+                    },
+                    "reviewed_paid_orders": {
+                        "type": "integer",
+                        "format": "int64",
+                        "minimum": 0,
+                        "description": "Global count of eligible paid orders with a review; equals review_count and never exceeds eligible_paid_orders."
+                    },
+                    "coverage_percentage": {
+                        "oneOf": [
+                            {
+                                "type": "number",
+                                "format": "double",
+                                "minimum": 0,
+                                "maximum": 100
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "description": "100 times reviewed_paid_orders divided by eligible_paid_orders, rounded to two decimal places using exact HALF_UP arithmetic. Halfway values round up: one reviewed order out of 32 produces 3.13. Zero when eligible orders exist but none has a review; null when eligible_paid_orders is zero. JSON numbers need not display trailing zeros."
+                    },
+                    "reviews": {
+                        "type": "array",
+                        "maxItems": 100,
+                        "description": "One page of reviews of eligible paid orders in strictly descending work_order_id order. The identifier order is deterministic, not a promise of recency. Empty pages are arrays, never null.",
+                        "items": {
+                            "type": "object",
+                            "description": "Registered review of an eligible paid work order. Only the order identifier, rating and stored description are returned; no additional customer data or fabricated comment is included.",
+                            "required": [
+                                "work_order_id",
+                                "rating",
+                                "description"
+                            ],
+                            "properties": {
+                                "work_order_id": {
+                                    "type": "integer",
+                                    "minimum": 1,
+                                    "description": "Local paid work-order identifier used for descending deterministic pagination, not a review timestamp."
+                                },
+                                "rating": {
+                                    "type": "integer",
+                                    "minimum": 1,
+                                    "maximum": 5,
+                                    "description": "Registered star rating, which also contributes to all global aggregates."
+                                },
+                                "description": {
+                                    "type": "string",
+                                    "maxLength": 500,
+                                    "description": "Stored review description, including the empty string. An empty description does not exclude the review from any aggregate."
+                                }
+                            },
+                            "additionalProperties": false
+                        }
+                    },
+                    "next_cursor": {
+                        "oneOf": [
+                            {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 4096
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "description": "Opaque signed continuation bound to the authenticated provider, reputation endpoint, page size and last delivered work-order identifier. Pass the returned token unchanged as cursor. When limit is omitted it inherits the token's page size; an explicit different limit is invalid. Null when there is no further review page. The token does not freeze a historical snapshot across requests."
+                    }
+                },
+                "additionalProperties": false
+            },
+            "ProviderReputationRatingCount": {
+                "type": "object",
+                "description": "Count of reviews with one rating in the provider's complete eligible paid-order set, not only the review page.",
+                "required": [
+                    "rating",
+                    "count"
+                ],
+                "properties": {
+                    "rating": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 5,
+                        "description": "Star rating. The distribution contains each rating exactly once, in ascending order."
+                    },
+                    "count": {
+                        "type": "integer",
+                        "format": "int64",
+                        "minimum": 0,
+                        "description": "Global number of eligible reviews with this rating, including zero."
+                    }
+                },
+                "additionalProperties": false
+            },
+            "ProviderReputationReview": {
+                "type": "object",
+                "description": "Registered review of an eligible paid work order. Only the order identifier, rating and stored description are returned; no additional customer data or fabricated comment is included.",
+                "required": [
+                    "work_order_id",
+                    "rating",
+                    "description"
+                ],
+                "properties": {
+                    "work_order_id": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "description": "Local paid work-order identifier used for descending deterministic pagination, not a review timestamp."
+                    },
+                    "rating": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 5,
+                        "description": "Registered star rating, which also contributes to all global aggregates."
+                    },
+                    "description": {
+                        "type": "string",
+                        "maxLength": 500,
+                        "description": "Stored review description, including the empty string. An empty description does not exclude the review from any aggregate."
                     }
                 },
                 "additionalProperties": false

@@ -88,6 +88,8 @@ paths:
     $ref: ./paths/provider-collection-statistics.yaml
   /providers/me/statistics/collections/transactions:
     $ref: ./paths/provider-collection-transactions.yaml
+  /providers/me/statistics/reputation:
+    $ref: ./paths/provider-reputation-statistics.yaml
   /providers/{providerID}:
     $ref: ./paths/provider-profile.yaml
   /providers/me/identity-verification-sessions:
@@ -354,6 +356,12 @@ components:
       $ref: ./components/schemas/provider-collection-detail.yaml
     ProviderCollectionTransaction:
       $ref: ./components/schemas/provider-collection-transaction.yaml
+    ProviderReputationStatistics:
+      $ref: ./components/schemas/provider-reputation-statistics.yaml
+    ProviderReputationRatingCount:
+      $ref: ./components/schemas/provider-reputation-rating-count.yaml
+    ProviderReputationReview:
+      $ref: ./components/schemas/provider-reputation-review.yaml
     IdentityVerificationSession:
       $ref: ./components/schemas/identity-verification-session.yaml
     PaymentAccountAuthorization:
