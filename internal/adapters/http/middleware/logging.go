@@ -28,7 +28,7 @@ func RequestLogger(logger *slog.Logger) gin.HandlerFunc {
 		c.Request = c.Request.WithContext(observability.ContextWithLogger(c.Request.Context(), requestLogger))
 		c.Header(requestIDHeader, requestID)
 
-		// Admin reads and participant work chats contain private operator or message data.
+		// Private reads and participant work chats contain sensitive data.
 		// Keep request metadata, but never capture their bodies or query values.
 		privateRead := isPrivateAdminReadPath(c.Request.URL.Path) || isPrivateWorkChatPath(c.Request.URL.Path) || isPrivateProviderActivityPath(c.Request.URL.Path)
 		includeBodies := !privateRead && requestLogger.Enabled(c.Request.Context(), slog.LevelInfo)
@@ -103,7 +103,8 @@ func isPrivateWorkChatPath(path string) bool {
 }
 
 func isPrivateProviderActivityPath(path string) bool {
-	return path == "/providers/me/statistics/activity" ||
+	return path == "/providers/me/statistics/reputation" ||
+		path == "/providers/me/statistics/activity" ||
 		path == "/providers/me/statistics/collections" ||
 		path == "/providers/me/statistics/collections/transactions"
 }

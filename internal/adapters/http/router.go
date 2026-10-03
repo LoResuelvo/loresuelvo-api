@@ -71,6 +71,7 @@ type RouterConfig struct {
 	ProviderHandler             *provider_handler.ProviderHandler
 	ActivityHandler             *provider_handler.ActivityHandler
 	CollectionHandler           *provider_handler.CollectionHandler
+	ReputationHandler           *provider_handler.ReputationHandler
 	ConversationHandler         *conversation_handler.ConversationHandler
 	JobRequestHandler           *job_request_handler.JobRequestHandler
 	IdentityVerificationHandler *identity_verification_handler.IdentityVerificationHandler
@@ -106,6 +107,7 @@ type Router struct {
 	providerHandler             *provider_handler.ProviderHandler
 	activityHandler             *provider_handler.ActivityHandler
 	collectionHandler           *provider_handler.CollectionHandler
+	reputationHandler           *provider_handler.ReputationHandler
 	conversationHandler         *conversation_handler.ConversationHandler
 	jobRequestHandler           *job_request_handler.JobRequestHandler
 	identityVerificationHandler *identity_verification_handler.IdentityVerificationHandler
@@ -147,6 +149,7 @@ func NewRouter(config RouterConfig) *Router {
 		providerHandler:             config.ProviderHandler,
 		activityHandler:             config.ActivityHandler,
 		collectionHandler:           config.CollectionHandler,
+		reputationHandler:           config.ReputationHandler,
 		conversationHandler:         config.ConversationHandler,
 		jobRequestHandler:           config.JobRequestHandler,
 		identityVerificationHandler: config.IdentityVerificationHandler,
@@ -288,6 +291,7 @@ func (router *Router) registerConsumerRoutes(engine *gin.Engine, authMiddleware 
 
 func (router *Router) registerProviderRoutes(engine *gin.Engine, authMiddleware gin.HandlerFunc) {
 	engine.GET("/providers", router.providerHandler.FilterProvidersByCategory)
+	engine.GET("/providers/me/statistics/reputation", privateNoStore, authMiddleware, router.reputationHandler.Get)
 	engine.GET("/providers/me/statistics/activity", privateNoStore, authMiddleware, router.activityHandler.Get)
 	engine.GET("/providers/me/statistics/collections", privateNoStore, authMiddleware, router.collectionHandler.GetSummary)
 	engine.GET("/providers/me/statistics/collections/transactions", privateNoStore, authMiddleware, router.collectionHandler.GetDetail)

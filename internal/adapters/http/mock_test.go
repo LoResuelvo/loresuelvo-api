@@ -127,3 +127,13 @@ func (service *operationFunnelQueryServiceMock) Query(ctx context.Context, query
 	}
 	return operationreadmodel.FunnelMetrics{}, arguments.Error(1)
 }
+
+type reputationServiceMock struct{ mock.Mock }
+
+func (service *reputationServiceMock) Query(ctx context.Context, authID string, input provider.ReputationQueryInput) (*providerreadmodel.Reputation, int, error) {
+	arguments := service.Called(ctx, authID, input)
+	if value := arguments.Get(0); value != nil {
+		return value.(*providerreadmodel.Reputation), arguments.Int(1), arguments.Error(2)
+	}
+	return nil, arguments.Int(1), arguments.Error(2)
+}

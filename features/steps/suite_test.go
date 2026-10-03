@@ -83,6 +83,7 @@ type testSuite struct {
 	operationInbox                          operationInboxState
 	activityStatistics                      *activityStatisticsState
 	collectionStatistics                    *collectionStatisticsState
+	reputationStatistics                    *reputationStatisticsState
 	detailProposal                          detailProposalState
 	detailRequestEvidence                   detailRequestEvidenceState
 	detailMedia                             detailMediaState
@@ -249,6 +250,7 @@ func (s *testSuite) registerAllSteps(sc *godog.ScenarioContext) {
 	registerAdminFunnelSteps(sc, s)
 	registerGetActivityStatisticsSteps(sc, s)
 	registerGetCollectionStatisticsSteps(sc, s)
+	registerGetReputationStatisticsSteps(sc, s)
 }
 
 func (s *testSuite) cleanup() error {
@@ -386,6 +388,7 @@ func (s *testSuite) cleanup() error {
 	s.operationInbox = operationInboxState{}
 	s.activityStatistics = nil
 	s.collectionStatistics = nil
+	s.reputationStatistics = nil
 	s.detailProposal = detailProposalState{}
 	s.detailRequestEvidence = detailRequestEvidenceState{}
 	s.detailMedia = detailMediaState{}

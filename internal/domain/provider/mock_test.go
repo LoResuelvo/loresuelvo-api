@@ -91,3 +91,13 @@ func (reader *providerSearchReaderMock) FindByCategoryID(ctx context.Context, ca
 	args := reader.Called(ctx, categoryID)
 	return args.Get(0).([]readmodel.ProviderSearchResult), args.Error(1)
 }
+
+type reputationReaderMock struct{ mock.Mock }
+
+func (m *reputationReaderMock) Read(ctx context.Context, providerID int, query provider.ReputationQuery) (*readmodel.ReputationSnapshot, error) {
+	args := m.Called(ctx, providerID, query)
+	if value := args.Get(0); value != nil {
+		return value.(*readmodel.ReputationSnapshot), args.Error(1)
+	}
+	return nil, args.Error(1)
+}

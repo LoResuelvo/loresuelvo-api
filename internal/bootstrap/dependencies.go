@@ -254,6 +254,11 @@ func newDependencies(database *sql.DB, adapters dependencyAdapters) (*Dependenci
 		persistence.IdentityVerificationRepository,
 	)
 	activityService := provider.NewActivityService(persistence.ProviderActivityReader, persistence.ProviderActivityActorFinder, systemClock)
+	reputationService := provider.NewReputationService(persistence.ProviderReputationReader, persistence.ProviderActivityActorFinder, systemClock)
+	reputationHandler, err := provider_handler.NewReputationHandler(reputationService, adapters.auditCursorSigningKey)
+	if err != nil {
+		return nil, fmt.Errorf("configuring reputation cursor: %w", err)
+	}
 	collectionService := provider.NewCollectionService(persistence.ProviderCollectionReader, persistence.ProviderActivityActorFinder, systemClock)
 	collectionHandler, err := provider_handler.NewCollectionHandler(collectionService, adapters.auditCursorSigningKey)
 	if err != nil {
@@ -453,6 +458,7 @@ func newDependencies(database *sql.DB, adapters dependencyAdapters) (*Dependenci
 			ProviderHandler:             provider_handler.NewProviderHandler(providerService),
 			ActivityHandler:             provider_handler.NewActivityHandler(activityService),
 			CollectionHandler:           collectionHandler,
+			ReputationHandler:           reputationHandler,
 			ConversationHandler:         conversation_handler.NewConversationHandler(conversationService),
 			JobRequestHandler:           job_request_handler.NewJobRequestHandler(jobRequestService),
 			IdentityVerificationHandler: identityVerificationHandler,
