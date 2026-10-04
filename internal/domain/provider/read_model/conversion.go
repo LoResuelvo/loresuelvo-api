@@ -36,8 +36,6 @@ type Conversion struct {
 	Requests   ConversionRequests
 }
 
-// Calculate retains the distinct cohort and request denominators and rejects
-// incomplete or inconsistent persisted facts rather than reporting empty results.
 func (s ConversionSnapshot) Calculate(period ConversionPeriod, observedAt time.Time) (*Conversion, error) {
 	stages, requests := s.Stages, s.Requests
 	if stages.Paid < 0 || stages.Reported < stages.Paid || stages.Contracted < stages.Reported || stages.Issued < stages.Contracted || requests.Received < 0 || requests.Accepted < 0 || requests.Pending < 0 || requests.Accepted > requests.Received || requests.Pending != requests.Received-requests.Accepted {

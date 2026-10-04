@@ -214,7 +214,6 @@ func (s *testSuite) conversionCreateProposal(label, consumer, provider string, c
 		if err != nil {
 			return err
 		}
-		// Prepare an existing persisted rejected state; this read use case performs no transition.
 		proposal.Status = serviceproposal.StatusRejected
 		unit := repositories.NewPaymentUnitOfWork(s.database, s.paymentIntentRepository, s.paymentTransactionRepository, repository, s.workOrderRepository, s.notificationRepository)
 		return unit.Execute(s.scenarioContext, func(store payment.TransactionalStore) error {
@@ -877,7 +876,6 @@ func (s *testSuite) conversionCohortNotActivity() error {
 	if err := conversionAssertRatio(response.Proposals.Rates.Contracted.Cohort, 2, 4, conversionPercent(50)); err != nil {
 		return err
 	}
-	// Four older proposals plus P2 have confirmations in this period: 5/4 != cohort 2/4.
 	activityConfirmations := 0
 	for _, fixture := range s.conversionState().proposals {
 		if fixture.providerEmail == "juan@example.com" && !fixture.accepted.IsZero() && !fixture.accepted.Before(response.Period.From) && fixture.accepted.Before(response.Period.To) {
@@ -1332,7 +1330,6 @@ func (s *testSuite) conversionRecordsPreserved() error {
 	return nil
 }
 
-// Keep the strict schema assertion honest independently of the endpoint implementation.
 func TestConversionResponseShapeRejectsMissingNullPercentage(t *testing.T) {
 	valid := `{"period":{"from":"2026-09-01T00:00:00Z","to":"2026-09-02T00:00:00Z","time_zone":"America/Argentina/Buenos_Aires"},"observed_at":"2026-09-29T15:00:00Z","proposals":{"stages":{"issued":0,"contracted":0,"reported":0,"paid":0},"rates":{"contracted":{"cohort":{"numerator":0,"denominator":0,"percentage":null},"previous_stage":{"numerator":0,"denominator":0,"percentage":null}},"reported":{"cohort":{"numerator":0,"denominator":0,"percentage":null},"previous_stage":{"numerator":0,"denominator":0,"percentage":null}},"paid":{"cohort":{"numerator":0,"denominator":0,"percentage":null},"previous_stage":{"numerator":0,"denominator":0,"percentage":null}}},"uncontracted":0},"requests":{"received":0,"accepted":0,"pending":0,"acceptance_rate":{"numerator":0,"denominator":0,"percentage":null}}}`
 	if err := conversionResponseShape([]byte(valid)); err != nil {

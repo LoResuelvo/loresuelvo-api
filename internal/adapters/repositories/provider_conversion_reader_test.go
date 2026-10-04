@@ -117,7 +117,6 @@ func TestProviderConversionReaderPartitionsRequestsIndependently(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, readmodel.ConversionStages{}, result.Stages)
 	require.Equal(t, readmodel.ConversionRequestCounts{Received: 1, Accepted: 1, Pending: 0}, result.Requests)
-	// Updating status does not change membership or require an acceptance date.
 	_, err = testContext.database.ExecContext(t.Context(), `UPDATE job_requests SET status='pending' WHERE provider_id=$1`, first.providerID)
 	require.NoError(t, err)
 	result, err = reader.Read(t.Context(), first.providerID, provider.ConversionQuery{From: base, To: base.Add(time.Hour)})

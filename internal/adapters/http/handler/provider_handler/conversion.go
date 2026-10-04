@@ -84,7 +84,6 @@ func parseConversionQuery(values url.Values) (provider.ConversionQueryInput, err
 			if err != nil {
 				return input, provider.ErrInvalidConversionQuery
 			}
-			// Explicit offset or Z is required by RFC3339Nano. Preserve the instant.
 			if key == "from" {
 				input.From = &value
 			} else {

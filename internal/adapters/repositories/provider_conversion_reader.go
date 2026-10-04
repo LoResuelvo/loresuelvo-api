@@ -16,8 +16,6 @@ func NewProviderConversionReader(db *sql.DB) *ProviderConversionReader {
 	return &ProviderConversionReader{db: db}
 }
 
-// Each proposal is the unit of the cohort. Nested existence checks keep milestones
-// on the same order without multiplying proposals through child relations.
 const providerConversionStagesSQL = `
 WITH conversion_cohort AS (
  SELECT sp.id FROM service_proposals sp
@@ -38,9 +36,6 @@ const providerConversionRequestsSQL = `
 SELECT COUNT(*), COUNT(*) FILTER (WHERE status='accepted'), COUNT(*) FILTER (WHERE status='pending')
 FROM job_requests WHERE provider_id=$1 AND created_on >= $2 AND created_on < $3`
 
-// Read uses a single read-only REPEATABLE READ snapshot for both independent
-// populations. Milestone dates and current proposal/order statuses do not filter
-// the creation cohort.
 func (r *ProviderConversionReader) Read(ctx context.Context, providerID int, query provider.ConversionQuery) (_ *readmodel.ConversionSnapshot, err error) {
 	if providerID <= 0 {
 		return nil, errors.New("conversion provider ID must be positive")
