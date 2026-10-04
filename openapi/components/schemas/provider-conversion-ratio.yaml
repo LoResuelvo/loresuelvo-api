@@ -1,0 +1,27 @@
+type: object
+required:
+- numerator
+- denominator
+- percentage
+properties:
+  numerator:
+    type: integer
+    format: int64
+    minimum: 0
+    description: Distinct records reaching the measured stage, or accepted requests for the request ratio.
+  denominator:
+    type: integer
+    format: int64
+    minimum: 0
+    description: Explicit population used by this ratio; proposals and requests never share a denominator.
+  percentage:
+    oneOf:
+    - type: number
+      format: double
+      minimum: 0
+      maximum: 100
+    - type: 'null'
+    description: '100 × numerator / denominator rounded HALF_UP to two decimal places. Always present:
+      null when denominator is zero; zero when denominator is positive and numerator is zero. JSON numbers
+      need not contain trailing decimal zeros.'
+additionalProperties: false

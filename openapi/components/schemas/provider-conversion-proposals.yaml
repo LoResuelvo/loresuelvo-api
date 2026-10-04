@@ -1,0 +1,17 @@
+type: object
+required:
+- stages
+- rates
+- uncontracted
+properties:
+  stages:
+    $ref: ./provider-conversion-stages.yaml
+  rates:
+    $ref: ./provider-conversion-rates.yaml
+  uncontracted:
+    type: integer
+    format: int64
+    minimum: 0
+    description: issued minus contracted at observation. This is not a rejected/lost commercial state
+      and does not alter proposal status.
+additionalProperties: false

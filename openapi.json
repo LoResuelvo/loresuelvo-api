@@ -3692,6 +3692,489 @@
                 }
             }
         },
+        "/providers/me/statistics/conversion": {
+            "get": {
+                "tags": [
+                    "Providers"
+                ],
+                "operationId": "getMyProviderConversionStatistics",
+                "summary": "Get conversion of the authenticated provider's proposal cohort",
+                "description": "Returns only the authenticated provider's proposal cohort and independent request acceptance statistics. JWT identity resolves the provider; no provider selector or administrative permission is required. No consumer identities, conversations, credentials or financial payloads are returned. This read does not mutate proposals, requests, work orders or messages, create administrative audit records or call external services. An active payment connection is not required. Cache-Control: private, no-store applies to every success and error response.\n\nThe proposal cohort consists of distinct own proposals created in [from, to), regardless of current proposal status. Each later stage follows only those same proposals: a linked work order with accepted_on confirms contracting; a completion report on that order establishes reporting; paid_on on that reported order establishes full payment. Stages are nested and remain counted after further advancement; they are not mutually exclusive current-status buckets. Milestone dates are not filtered by the creation period and may occur after to. Multiple proposals sharing a conversation are distinct units; multiple images or payment attempts never multiply them. Results for an existing cohort can change when its proposals advance.\n\nSix proposal ratios expose their numerator, denominator and percentage. Contracted, reported and paid each have a cohort rate over issued, and a previous_stage rate over issued, contracted and reported respectively. Percentages are rounded HALF_UP to two decimal places (1/32 gives 3.13%). A zero denominator yields null; a positive denominator with zero advances yields zero. All percentage fields are always present. uncontracted is issued minus contracted, not a rejection/loss state.\n\nRequests are a separate population selected by their own created_on in [from, to). Current accepted and pending statuses partition received. A request accepted after to still counts as accepted when observed; no acceptance date is reconstructed. acceptance_rate uses accepted/received, never proposal denominators, and request acceptance is not contracting. Both populations use one coherent read-only database snapshot. Empty populations return 200 with zero counts and null percentages where denominators are zero; read failures return 500, never success-shaped empty statistics.\n\nOnly from and to are supported, each once and nonempty; send both or neither. Values must be valid RFC3339Nano timestamps with uppercase T and Z or an explicit signed HH:MM offset. Hours and offset hours range from 00 to 23; minutes and offset minutes from 00 to 59. Fractions are optional and use a dot with 1–9 digits; greater precision, comma fractions, malformed escapes, unknown or duplicate parameters are rejected. Encode a positive + offset as %2B in the query string. Without parameters, the range is [observed_at minus 30 × 24 hours, observed_at). Require from < to, elapsed duration at most 365 × 24 hours, and to <= observed_at. Zero timestamps are invalid. Returned bounds and observed_at are normalized to UTC; period.time_zone is America/Argentina/Buenos_Aires. PostgreSQL stores microseconds: both bounds are rounded upward to the next microsecond for database comparisons, preserving exact inclusive/exclusive membership of stored instants; returned bounds retain the effective requested nanosecond instants.\n\nThere are no comparisons, period variations, reserved fields, forecasts or historical/as-of query parameters. observed_at is captured once before the transaction, not the exact database snapshot timestamp.",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "name": "from",
+                        "in": "query",
+                        "required": false,
+                        "description": "Inclusive creation instant. Supply together with to. RFC3339Nano with at most nine fractional digits; encode a positive + offset as %2B.",
+                        "schema": {
+                            "type": "string",
+                            "format": "date-time",
+                            "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](\\.[0-9]{1,9})?(Z|[+-]([01][0-9]|2[0-3]):[0-5][0-9])$"
+                        },
+                        "example": "2026-09-01T00:00:00-03:00"
+                    },
+                    {
+                        "name": "to",
+                        "in": "query",
+                        "required": false,
+                        "description": "Exclusive creation instant. Supply together with from. RFC3339Nano with at most nine fractional digits; encode a positive + offset as %2B.",
+                        "schema": {
+                            "type": "string",
+                            "format": "date-time",
+                            "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](\\.[0-9]{1,9})?(Z|[+-]([01][0-9]|2[0-3]):[0-5][0-9])$"
+                        },
+                        "example": "2026-09-05T00:00:00-03:00"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Conversion cohort and independent request acceptance from one consistent current read snapshot.",
+                        "headers": {
+                            "Cache-Control": {
+                                "description": "Prevents storage of private conversion statistics, including error responses.",
+                                "schema": {
+                                    "type": "string",
+                                    "const": "private, no-store"
+                                }
+                            },
+                            "X-Request-ID": {
+                                "description": "Request correlation identifier.",
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ProviderConversionStatistics"
+                                },
+                                "examples": {
+                                    "cohort": {
+                                        "summary": "Four proposals; two contracted, one reported and paid; requests accepted independently",
+                                        "value": {
+                                            "period": {
+                                                "from": "2026-09-01T03:00:00Z",
+                                                "to": "2026-09-05T03:00:00Z",
+                                                "time_zone": "America/Argentina/Buenos_Aires"
+                                            },
+                                            "observed_at": "2026-09-29T15:00:00Z",
+                                            "proposals": {
+                                                "stages": {
+                                                    "issued": 4,
+                                                    "contracted": 2,
+                                                    "reported": 1,
+                                                    "paid": 1
+                                                },
+                                                "rates": {
+                                                    "contracted": {
+                                                        "cohort": {
+                                                            "numerator": 2,
+                                                            "denominator": 4,
+                                                            "percentage": 50.0
+                                                        },
+                                                        "previous_stage": {
+                                                            "numerator": 2,
+                                                            "denominator": 4,
+                                                            "percentage": 50.0
+                                                        }
+                                                    },
+                                                    "reported": {
+                                                        "cohort": {
+                                                            "numerator": 1,
+                                                            "denominator": 4,
+                                                            "percentage": 25.0
+                                                        },
+                                                        "previous_stage": {
+                                                            "numerator": 1,
+                                                            "denominator": 2,
+                                                            "percentage": 50.0
+                                                        }
+                                                    },
+                                                    "paid": {
+                                                        "cohort": {
+                                                            "numerator": 1,
+                                                            "denominator": 4,
+                                                            "percentage": 25.0
+                                                        },
+                                                        "previous_stage": {
+                                                            "numerator": 1,
+                                                            "denominator": 1,
+                                                            "percentage": 100.0
+                                                        }
+                                                    }
+                                                },
+                                                "uncontracted": 2
+                                            },
+                                            "requests": {
+                                                "received": 3,
+                                                "accepted": 2,
+                                                "pending": 1,
+                                                "acceptance_rate": {
+                                                    "numerator": 2,
+                                                    "denominator": 3,
+                                                    "percentage": 66.67
+                                                }
+                                            }
+                                        }
+                                    },
+                                    "emptyCohortWithRequests": {
+                                        "summary": "No proposals, with one pending request",
+                                        "value": {
+                                            "period": {
+                                                "from": "2026-09-01T03:00:00Z",
+                                                "to": "2026-09-05T03:00:00Z",
+                                                "time_zone": "America/Argentina/Buenos_Aires"
+                                            },
+                                            "observed_at": "2026-09-29T15:00:00Z",
+                                            "proposals": {
+                                                "stages": {
+                                                    "issued": 0,
+                                                    "contracted": 0,
+                                                    "reported": 0,
+                                                    "paid": 0
+                                                },
+                                                "rates": {
+                                                    "contracted": {
+                                                        "cohort": {
+                                                            "numerator": 0,
+                                                            "denominator": 0,
+                                                            "percentage": null
+                                                        },
+                                                        "previous_stage": {
+                                                            "numerator": 0,
+                                                            "denominator": 0,
+                                                            "percentage": null
+                                                        }
+                                                    },
+                                                    "reported": {
+                                                        "cohort": {
+                                                            "numerator": 0,
+                                                            "denominator": 0,
+                                                            "percentage": null
+                                                        },
+                                                        "previous_stage": {
+                                                            "numerator": 0,
+                                                            "denominator": 0,
+                                                            "percentage": null
+                                                        }
+                                                    },
+                                                    "paid": {
+                                                        "cohort": {
+                                                            "numerator": 0,
+                                                            "denominator": 0,
+                                                            "percentage": null
+                                                        },
+                                                        "previous_stage": {
+                                                            "numerator": 0,
+                                                            "denominator": 0,
+                                                            "percentage": null
+                                                        }
+                                                    }
+                                                },
+                                                "uncontracted": 0
+                                            },
+                                            "requests": {
+                                                "received": 1,
+                                                "accepted": 0,
+                                                "pending": 1,
+                                                "acceptance_rate": {
+                                                    "numerator": 0,
+                                                    "denominator": 1,
+                                                    "percentage": 0.0
+                                                }
+                                            }
+                                        }
+                                    },
+                                    "emptyPopulations": {
+                                        "summary": "No proposals or requests",
+                                        "value": {
+                                            "period": {
+                                                "from": "2026-09-01T03:00:00Z",
+                                                "to": "2026-09-05T03:00:00Z",
+                                                "time_zone": "America/Argentina/Buenos_Aires"
+                                            },
+                                            "observed_at": "2026-09-29T15:00:00Z",
+                                            "proposals": {
+                                                "stages": {
+                                                    "issued": 0,
+                                                    "contracted": 0,
+                                                    "reported": 0,
+                                                    "paid": 0
+                                                },
+                                                "rates": {
+                                                    "contracted": {
+                                                        "cohort": {
+                                                            "numerator": 0,
+                                                            "denominator": 0,
+                                                            "percentage": null
+                                                        },
+                                                        "previous_stage": {
+                                                            "numerator": 0,
+                                                            "denominator": 0,
+                                                            "percentage": null
+                                                        }
+                                                    },
+                                                    "reported": {
+                                                        "cohort": {
+                                                            "numerator": 0,
+                                                            "denominator": 0,
+                                                            "percentage": null
+                                                        },
+                                                        "previous_stage": {
+                                                            "numerator": 0,
+                                                            "denominator": 0,
+                                                            "percentage": null
+                                                        }
+                                                    },
+                                                    "paid": {
+                                                        "cohort": {
+                                                            "numerator": 0,
+                                                            "denominator": 0,
+                                                            "percentage": null
+                                                        },
+                                                        "previous_stage": {
+                                                            "numerator": 0,
+                                                            "denominator": 0,
+                                                            "percentage": null
+                                                        }
+                                                    }
+                                                },
+                                                "uncontracted": 0
+                                            },
+                                            "requests": {
+                                                "received": 0,
+                                                "accepted": 0,
+                                                "pending": 0,
+                                                "acceptance_rate": {
+                                                    "numerator": 0,
+                                                    "denominator": 0,
+                                                    "percentage": null
+                                                }
+                                            }
+                                        }
+                                    },
+                                    "halfUp": {
+                                        "summary": "One of 32 proposals contracted; 3.125% rounds HALF_UP to 3.13%",
+                                        "value": {
+                                            "period": {
+                                                "from": "2026-09-01T03:00:00Z",
+                                                "to": "2026-09-05T03:00:00Z",
+                                                "time_zone": "America/Argentina/Buenos_Aires"
+                                            },
+                                            "observed_at": "2026-09-29T15:00:00Z",
+                                            "proposals": {
+                                                "stages": {
+                                                    "issued": 32,
+                                                    "contracted": 1,
+                                                    "reported": 0,
+                                                    "paid": 0
+                                                },
+                                                "rates": {
+                                                    "contracted": {
+                                                        "cohort": {
+                                                            "numerator": 1,
+                                                            "denominator": 32,
+                                                            "percentage": 3.13
+                                                        },
+                                                        "previous_stage": {
+                                                            "numerator": 1,
+                                                            "denominator": 32,
+                                                            "percentage": 3.13
+                                                        }
+                                                    },
+                                                    "reported": {
+                                                        "cohort": {
+                                                            "numerator": 0,
+                                                            "denominator": 32,
+                                                            "percentage": 0.0
+                                                        },
+                                                        "previous_stage": {
+                                                            "numerator": 0,
+                                                            "denominator": 1,
+                                                            "percentage": 0.0
+                                                        }
+                                                    },
+                                                    "paid": {
+                                                        "cohort": {
+                                                            "numerator": 0,
+                                                            "denominator": 32,
+                                                            "percentage": 0.0
+                                                        },
+                                                        "previous_stage": {
+                                                            "numerator": 0,
+                                                            "denominator": 0,
+                                                            "percentage": null
+                                                        }
+                                                    }
+                                                },
+                                                "uncontracted": 31
+                                            },
+                                            "requests": {
+                                                "received": 0,
+                                                "accepted": 0,
+                                                "pending": 0,
+                                                "acceptance_rate": {
+                                                    "numerator": 0,
+                                                    "denominator": 0,
+                                                    "percentage": null
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Incomplete or invalid interval, malformed timestamp/query, unsupported parameter, empty or repeated parameter.",
+                        "headers": {
+                            "Cache-Control": {
+                                "description": "Prevents storage of private conversion statistics, including error responses.",
+                                "schema": {
+                                    "type": "string",
+                                    "const": "private, no-store"
+                                }
+                            },
+                            "X-Request-ID": {
+                                "description": "Request correlation identifier.",
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                },
+                                "example": {
+                                    "error": "invalid conversion query"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "The Bearer token is missing or invalid; defensive missing-identity errors also return 401.",
+                        "headers": {
+                            "Cache-Control": {
+                                "description": "Prevents storage of private conversion statistics, including error responses.",
+                                "schema": {
+                                    "type": "string",
+                                    "const": "private, no-store"
+                                }
+                            },
+                            "X-Request-ID": {
+                                "description": "Request correlation identifier.",
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AuthErrorResponse"
+                                },
+                                "example": {
+                                    "error": "invalid_token",
+                                    "message": "Failed to validate JWT."
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "The registered authenticated user has a non-provider role, such as consumer.",
+                        "headers": {
+                            "Cache-Control": {
+                                "description": "Prevents storage of private conversion statistics, including error responses.",
+                                "schema": {
+                                    "type": "string",
+                                    "const": "private, no-store"
+                                }
+                            },
+                            "X-Request-ID": {
+                                "description": "Request correlation identifier.",
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                },
+                                "example": {
+                                    "error": "provider access required"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "No user exists for the authenticated identity, or its provider profile is missing.",
+                        "headers": {
+                            "Cache-Control": {
+                                "description": "Prevents storage of private conversion statistics, including error responses.",
+                                "schema": {
+                                    "type": "string",
+                                    "const": "private, no-store"
+                                }
+                            },
+                            "X-Request-ID": {
+                                "description": "Request correlation identifier.",
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                },
+                                "example": {
+                                    "error": "provider not found"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "The complete conversion snapshot could not be read or calculated; partial or empty statistics are not substituted.",
+                        "headers": {
+                            "Cache-Control": {
+                                "description": "Prevents storage of private conversion statistics, including error responses.",
+                                "schema": {
+                                    "type": "string",
+                                    "const": "private, no-store"
+                                }
+                            },
+                            "X-Request-ID": {
+                                "description": "Request correlation identifier.",
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                },
+                                "example": {
+                                    "error": "internal server error"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/providers/me/statistics/activity": {
             "get": {
                 "tags": [
@@ -11935,6 +12418,1419 @@
                         "type": "string",
                         "maxLength": 500,
                         "example": "Trabajo prolijo y excelente atención."
+                    }
+                },
+                "additionalProperties": false
+            },
+            "ProviderConversionStatistics": {
+                "type": "object",
+                "required": [
+                    "period",
+                    "observed_at",
+                    "proposals",
+                    "requests"
+                ],
+                "properties": {
+                    "period": {
+                        "type": "object",
+                        "required": [
+                            "from",
+                            "to",
+                            "time_zone"
+                        ],
+                        "properties": {
+                            "from": {
+                                "type": "string",
+                                "format": "date-time",
+                                "description": "Inclusive creation bound, normalized to UTC without dropping nanosecond precision."
+                            },
+                            "to": {
+                                "type": "string",
+                                "format": "date-time",
+                                "description": "Exclusive creation bound, normalized to UTC without dropping nanosecond precision."
+                            },
+                            "time_zone": {
+                                "type": "string",
+                                "const": "America/Argentina/Buenos_Aires",
+                                "description": "Informational time zone; membership is determined by the supplied instants."
+                            }
+                        },
+                        "additionalProperties": false
+                    },
+                    "observed_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "description": "UTC evaluation instant captured once before the database transaction, used for the default range and future-bound validation. Not an exact database snapshot timestamp. Both populations are read from one coherent current database snapshot; this is not an as-of reconstruction."
+                    },
+                    "proposals": {
+                        "type": "object",
+                        "required": [
+                            "stages",
+                            "rates",
+                            "uncontracted"
+                        ],
+                        "properties": {
+                            "stages": {
+                                "type": "object",
+                                "required": [
+                                    "issued",
+                                    "contracted",
+                                    "reported",
+                                    "paid"
+                                ],
+                                "properties": {
+                                    "issued": {
+                                        "type": "integer",
+                                        "format": "int64",
+                                        "minimum": 0,
+                                        "description": "Distinct own proposals created in [from, to), regardless of current commercial status."
+                                    },
+                                    "contracted": {
+                                        "type": "integer",
+                                        "format": "int64",
+                                        "minimum": 0,
+                                        "description": "Cohort proposals with a linked work order having persisted accepted_on."
+                                    },
+                                    "reported": {
+                                        "type": "integer",
+                                        "format": "int64",
+                                        "minimum": 0,
+                                        "description": "Contracted cohort proposals whose linked work order has a persisted completion report."
+                                    },
+                                    "paid": {
+                                        "type": "integer",
+                                        "format": "int64",
+                                        "minimum": 0,
+                                        "description": "Reported cohort proposals whose same linked work order has persisted paid_on."
+                                    }
+                                },
+                                "additionalProperties": false,
+                                "description": "Nested counts: issued ≥ contracted ≥ reported ≥ paid. Child images or payment attempts do not multiply proposals; proposals sharing a conversation remain distinct."
+                            },
+                            "rates": {
+                                "type": "object",
+                                "required": [
+                                    "contracted",
+                                    "reported",
+                                    "paid"
+                                ],
+                                "properties": {
+                                    "contracted": {
+                                        "allOf": [
+                                            {
+                                                "type": "object",
+                                                "required": [
+                                                    "cohort",
+                                                    "previous_stage"
+                                                ],
+                                                "properties": {
+                                                    "cohort": {
+                                                        "allOf": [
+                                                            {
+                                                                "type": "object",
+                                                                "required": [
+                                                                    "numerator",
+                                                                    "denominator",
+                                                                    "percentage"
+                                                                ],
+                                                                "properties": {
+                                                                    "numerator": {
+                                                                        "type": "integer",
+                                                                        "format": "int64",
+                                                                        "minimum": 0,
+                                                                        "description": "Distinct records reaching the measured stage, or accepted requests for the request ratio."
+                                                                    },
+                                                                    "denominator": {
+                                                                        "type": "integer",
+                                                                        "format": "int64",
+                                                                        "minimum": 0,
+                                                                        "description": "Explicit population used by this ratio; proposals and requests never share a denominator."
+                                                                    },
+                                                                    "percentage": {
+                                                                        "oneOf": [
+                                                                            {
+                                                                                "type": "number",
+                                                                                "format": "double",
+                                                                                "minimum": 0,
+                                                                                "maximum": 100
+                                                                            },
+                                                                            {
+                                                                                "type": "null"
+                                                                            }
+                                                                        ],
+                                                                        "description": "100 × numerator / denominator rounded HALF_UP to two decimal places. Always present: null when denominator is zero; zero when denominator is positive and numerator is zero. JSON numbers need not contain trailing decimal zeros."
+                                                                    }
+                                                                },
+                                                                "additionalProperties": false
+                                                            }
+                                                        ],
+                                                        "description": "Stage count over all issued proposals in the selected creation cohort."
+                                                    },
+                                                    "previous_stage": {
+                                                        "allOf": [
+                                                            {
+                                                                "type": "object",
+                                                                "required": [
+                                                                    "numerator",
+                                                                    "denominator",
+                                                                    "percentage"
+                                                                ],
+                                                                "properties": {
+                                                                    "numerator": {
+                                                                        "type": "integer",
+                                                                        "format": "int64",
+                                                                        "minimum": 0,
+                                                                        "description": "Distinct records reaching the measured stage, or accepted requests for the request ratio."
+                                                                    },
+                                                                    "denominator": {
+                                                                        "type": "integer",
+                                                                        "format": "int64",
+                                                                        "minimum": 0,
+                                                                        "description": "Explicit population used by this ratio; proposals and requests never share a denominator."
+                                                                    },
+                                                                    "percentage": {
+                                                                        "oneOf": [
+                                                                            {
+                                                                                "type": "number",
+                                                                                "format": "double",
+                                                                                "minimum": 0,
+                                                                                "maximum": 100
+                                                                            },
+                                                                            {
+                                                                                "type": "null"
+                                                                            }
+                                                                        ],
+                                                                        "description": "100 × numerator / denominator rounded HALF_UP to two decimal places. Always present: null when denominator is zero; zero when denominator is positive and numerator is zero. JSON numbers need not contain trailing decimal zeros."
+                                                                    }
+                                                                },
+                                                                "additionalProperties": false
+                                                            }
+                                                        ],
+                                                        "description": "Stage count over its immediately preceding stage in the same cohort."
+                                                    }
+                                                },
+                                                "additionalProperties": false
+                                            }
+                                        ],
+                                        "description": "Both ratios use contracted as numerator and issued as denominator."
+                                    },
+                                    "reported": {
+                                        "allOf": [
+                                            {
+                                                "type": "object",
+                                                "required": [
+                                                    "cohort",
+                                                    "previous_stage"
+                                                ],
+                                                "properties": {
+                                                    "cohort": {
+                                                        "allOf": [
+                                                            {
+                                                                "type": "object",
+                                                                "required": [
+                                                                    "numerator",
+                                                                    "denominator",
+                                                                    "percentage"
+                                                                ],
+                                                                "properties": {
+                                                                    "numerator": {
+                                                                        "type": "integer",
+                                                                        "format": "int64",
+                                                                        "minimum": 0,
+                                                                        "description": "Distinct records reaching the measured stage, or accepted requests for the request ratio."
+                                                                    },
+                                                                    "denominator": {
+                                                                        "type": "integer",
+                                                                        "format": "int64",
+                                                                        "minimum": 0,
+                                                                        "description": "Explicit population used by this ratio; proposals and requests never share a denominator."
+                                                                    },
+                                                                    "percentage": {
+                                                                        "oneOf": [
+                                                                            {
+                                                                                "type": "number",
+                                                                                "format": "double",
+                                                                                "minimum": 0,
+                                                                                "maximum": 100
+                                                                            },
+                                                                            {
+                                                                                "type": "null"
+                                                                            }
+                                                                        ],
+                                                                        "description": "100 × numerator / denominator rounded HALF_UP to two decimal places. Always present: null when denominator is zero; zero when denominator is positive and numerator is zero. JSON numbers need not contain trailing decimal zeros."
+                                                                    }
+                                                                },
+                                                                "additionalProperties": false
+                                                            }
+                                                        ],
+                                                        "description": "Stage count over all issued proposals in the selected creation cohort."
+                                                    },
+                                                    "previous_stage": {
+                                                        "allOf": [
+                                                            {
+                                                                "type": "object",
+                                                                "required": [
+                                                                    "numerator",
+                                                                    "denominator",
+                                                                    "percentage"
+                                                                ],
+                                                                "properties": {
+                                                                    "numerator": {
+                                                                        "type": "integer",
+                                                                        "format": "int64",
+                                                                        "minimum": 0,
+                                                                        "description": "Distinct records reaching the measured stage, or accepted requests for the request ratio."
+                                                                    },
+                                                                    "denominator": {
+                                                                        "type": "integer",
+                                                                        "format": "int64",
+                                                                        "minimum": 0,
+                                                                        "description": "Explicit population used by this ratio; proposals and requests never share a denominator."
+                                                                    },
+                                                                    "percentage": {
+                                                                        "oneOf": [
+                                                                            {
+                                                                                "type": "number",
+                                                                                "format": "double",
+                                                                                "minimum": 0,
+                                                                                "maximum": 100
+                                                                            },
+                                                                            {
+                                                                                "type": "null"
+                                                                            }
+                                                                        ],
+                                                                        "description": "100 × numerator / denominator rounded HALF_UP to two decimal places. Always present: null when denominator is zero; zero when denominator is positive and numerator is zero. JSON numbers need not contain trailing decimal zeros."
+                                                                    }
+                                                                },
+                                                                "additionalProperties": false
+                                                            }
+                                                        ],
+                                                        "description": "Stage count over its immediately preceding stage in the same cohort."
+                                                    }
+                                                },
+                                                "additionalProperties": false
+                                            }
+                                        ],
+                                        "description": "Both numerators are reported. Cohort denominator is issued; previous_stage denominator is contracted."
+                                    },
+                                    "paid": {
+                                        "allOf": [
+                                            {
+                                                "type": "object",
+                                                "required": [
+                                                    "cohort",
+                                                    "previous_stage"
+                                                ],
+                                                "properties": {
+                                                    "cohort": {
+                                                        "allOf": [
+                                                            {
+                                                                "type": "object",
+                                                                "required": [
+                                                                    "numerator",
+                                                                    "denominator",
+                                                                    "percentage"
+                                                                ],
+                                                                "properties": {
+                                                                    "numerator": {
+                                                                        "type": "integer",
+                                                                        "format": "int64",
+                                                                        "minimum": 0,
+                                                                        "description": "Distinct records reaching the measured stage, or accepted requests for the request ratio."
+                                                                    },
+                                                                    "denominator": {
+                                                                        "type": "integer",
+                                                                        "format": "int64",
+                                                                        "minimum": 0,
+                                                                        "description": "Explicit population used by this ratio; proposals and requests never share a denominator."
+                                                                    },
+                                                                    "percentage": {
+                                                                        "oneOf": [
+                                                                            {
+                                                                                "type": "number",
+                                                                                "format": "double",
+                                                                                "minimum": 0,
+                                                                                "maximum": 100
+                                                                            },
+                                                                            {
+                                                                                "type": "null"
+                                                                            }
+                                                                        ],
+                                                                        "description": "100 × numerator / denominator rounded HALF_UP to two decimal places. Always present: null when denominator is zero; zero when denominator is positive and numerator is zero. JSON numbers need not contain trailing decimal zeros."
+                                                                    }
+                                                                },
+                                                                "additionalProperties": false
+                                                            }
+                                                        ],
+                                                        "description": "Stage count over all issued proposals in the selected creation cohort."
+                                                    },
+                                                    "previous_stage": {
+                                                        "allOf": [
+                                                            {
+                                                                "type": "object",
+                                                                "required": [
+                                                                    "numerator",
+                                                                    "denominator",
+                                                                    "percentage"
+                                                                ],
+                                                                "properties": {
+                                                                    "numerator": {
+                                                                        "type": "integer",
+                                                                        "format": "int64",
+                                                                        "minimum": 0,
+                                                                        "description": "Distinct records reaching the measured stage, or accepted requests for the request ratio."
+                                                                    },
+                                                                    "denominator": {
+                                                                        "type": "integer",
+                                                                        "format": "int64",
+                                                                        "minimum": 0,
+                                                                        "description": "Explicit population used by this ratio; proposals and requests never share a denominator."
+                                                                    },
+                                                                    "percentage": {
+                                                                        "oneOf": [
+                                                                            {
+                                                                                "type": "number",
+                                                                                "format": "double",
+                                                                                "minimum": 0,
+                                                                                "maximum": 100
+                                                                            },
+                                                                            {
+                                                                                "type": "null"
+                                                                            }
+                                                                        ],
+                                                                        "description": "100 × numerator / denominator rounded HALF_UP to two decimal places. Always present: null when denominator is zero; zero when denominator is positive and numerator is zero. JSON numbers need not contain trailing decimal zeros."
+                                                                    }
+                                                                },
+                                                                "additionalProperties": false
+                                                            }
+                                                        ],
+                                                        "description": "Stage count over its immediately preceding stage in the same cohort."
+                                                    }
+                                                },
+                                                "additionalProperties": false
+                                            }
+                                        ],
+                                        "description": "Both numerators are paid. Cohort denominator is issued; previous_stage denominator is reported."
+                                    }
+                                },
+                                "additionalProperties": false
+                            },
+                            "uncontracted": {
+                                "type": "integer",
+                                "format": "int64",
+                                "minimum": 0,
+                                "description": "issued minus contracted at observation. This is not a rejected/lost commercial state and does not alter proposal status."
+                            }
+                        },
+                        "additionalProperties": false
+                    },
+                    "requests": {
+                        "type": "object",
+                        "required": [
+                            "received",
+                            "accepted",
+                            "pending",
+                            "acceptance_rate"
+                        ],
+                        "properties": {
+                            "received": {
+                                "type": "integer",
+                                "format": "int64",
+                                "minimum": 0,
+                                "description": "Distinct own requests created in [from, to), independently of proposal membership."
+                            },
+                            "accepted": {
+                                "type": "integer",
+                                "format": "int64",
+                                "minimum": 0,
+                                "description": "Received requests whose observed persisted status is accepted, even if accepted after to."
+                            },
+                            "pending": {
+                                "type": "integer",
+                                "format": "int64",
+                                "minimum": 0,
+                                "description": "Received requests whose observed persisted status is pending. accepted + pending = received."
+                            },
+                            "acceptance_rate": {
+                                "allOf": [
+                                    {
+                                        "type": "object",
+                                        "required": [
+                                            "numerator",
+                                            "denominator",
+                                            "percentage"
+                                        ],
+                                        "properties": {
+                                            "numerator": {
+                                                "type": "integer",
+                                                "format": "int64",
+                                                "minimum": 0,
+                                                "description": "Distinct records reaching the measured stage, or accepted requests for the request ratio."
+                                            },
+                                            "denominator": {
+                                                "type": "integer",
+                                                "format": "int64",
+                                                "minimum": 0,
+                                                "description": "Explicit population used by this ratio; proposals and requests never share a denominator."
+                                            },
+                                            "percentage": {
+                                                "oneOf": [
+                                                    {
+                                                        "type": "number",
+                                                        "format": "double",
+                                                        "minimum": 0,
+                                                        "maximum": 100
+                                                    },
+                                                    {
+                                                        "type": "null"
+                                                    }
+                                                ],
+                                                "description": "100 × numerator / denominator rounded HALF_UP to two decimal places. Always present: null when denominator is zero; zero when denominator is positive and numerator is zero. JSON numbers need not contain trailing decimal zeros."
+                                            }
+                                        },
+                                        "additionalProperties": false
+                                    }
+                                ],
+                                "description": "Numerator is accepted; denominator is received. Not a stage of the proposal funnel or a measure of contracting."
+                            }
+                        },
+                        "additionalProperties": false
+                    }
+                },
+                "additionalProperties": false
+            },
+            "ProviderConversionPeriod": {
+                "type": "object",
+                "required": [
+                    "from",
+                    "to",
+                    "time_zone"
+                ],
+                "properties": {
+                    "from": {
+                        "type": "string",
+                        "format": "date-time",
+                        "description": "Inclusive creation bound, normalized to UTC without dropping nanosecond precision."
+                    },
+                    "to": {
+                        "type": "string",
+                        "format": "date-time",
+                        "description": "Exclusive creation bound, normalized to UTC without dropping nanosecond precision."
+                    },
+                    "time_zone": {
+                        "type": "string",
+                        "const": "America/Argentina/Buenos_Aires",
+                        "description": "Informational time zone; membership is determined by the supplied instants."
+                    }
+                },
+                "additionalProperties": false
+            },
+            "ProviderConversionRatio": {
+                "type": "object",
+                "required": [
+                    "numerator",
+                    "denominator",
+                    "percentage"
+                ],
+                "properties": {
+                    "numerator": {
+                        "type": "integer",
+                        "format": "int64",
+                        "minimum": 0,
+                        "description": "Distinct records reaching the measured stage, or accepted requests for the request ratio."
+                    },
+                    "denominator": {
+                        "type": "integer",
+                        "format": "int64",
+                        "minimum": 0,
+                        "description": "Explicit population used by this ratio; proposals and requests never share a denominator."
+                    },
+                    "percentage": {
+                        "oneOf": [
+                            {
+                                "type": "number",
+                                "format": "double",
+                                "minimum": 0,
+                                "maximum": 100
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "description": "100 × numerator / denominator rounded HALF_UP to two decimal places. Always present: null when denominator is zero; zero when denominator is positive and numerator is zero. JSON numbers need not contain trailing decimal zeros."
+                    }
+                },
+                "additionalProperties": false
+            },
+            "ProviderConversionStageRates": {
+                "type": "object",
+                "required": [
+                    "cohort",
+                    "previous_stage"
+                ],
+                "properties": {
+                    "cohort": {
+                        "allOf": [
+                            {
+                                "type": "object",
+                                "required": [
+                                    "numerator",
+                                    "denominator",
+                                    "percentage"
+                                ],
+                                "properties": {
+                                    "numerator": {
+                                        "type": "integer",
+                                        "format": "int64",
+                                        "minimum": 0,
+                                        "description": "Distinct records reaching the measured stage, or accepted requests for the request ratio."
+                                    },
+                                    "denominator": {
+                                        "type": "integer",
+                                        "format": "int64",
+                                        "minimum": 0,
+                                        "description": "Explicit population used by this ratio; proposals and requests never share a denominator."
+                                    },
+                                    "percentage": {
+                                        "oneOf": [
+                                            {
+                                                "type": "number",
+                                                "format": "double",
+                                                "minimum": 0,
+                                                "maximum": 100
+                                            },
+                                            {
+                                                "type": "null"
+                                            }
+                                        ],
+                                        "description": "100 × numerator / denominator rounded HALF_UP to two decimal places. Always present: null when denominator is zero; zero when denominator is positive and numerator is zero. JSON numbers need not contain trailing decimal zeros."
+                                    }
+                                },
+                                "additionalProperties": false
+                            }
+                        ],
+                        "description": "Stage count over all issued proposals in the selected creation cohort."
+                    },
+                    "previous_stage": {
+                        "allOf": [
+                            {
+                                "type": "object",
+                                "required": [
+                                    "numerator",
+                                    "denominator",
+                                    "percentage"
+                                ],
+                                "properties": {
+                                    "numerator": {
+                                        "type": "integer",
+                                        "format": "int64",
+                                        "minimum": 0,
+                                        "description": "Distinct records reaching the measured stage, or accepted requests for the request ratio."
+                                    },
+                                    "denominator": {
+                                        "type": "integer",
+                                        "format": "int64",
+                                        "minimum": 0,
+                                        "description": "Explicit population used by this ratio; proposals and requests never share a denominator."
+                                    },
+                                    "percentage": {
+                                        "oneOf": [
+                                            {
+                                                "type": "number",
+                                                "format": "double",
+                                                "minimum": 0,
+                                                "maximum": 100
+                                            },
+                                            {
+                                                "type": "null"
+                                            }
+                                        ],
+                                        "description": "100 × numerator / denominator rounded HALF_UP to two decimal places. Always present: null when denominator is zero; zero when denominator is positive and numerator is zero. JSON numbers need not contain trailing decimal zeros."
+                                    }
+                                },
+                                "additionalProperties": false
+                            }
+                        ],
+                        "description": "Stage count over its immediately preceding stage in the same cohort."
+                    }
+                },
+                "additionalProperties": false
+            },
+            "ProviderConversionStages": {
+                "type": "object",
+                "required": [
+                    "issued",
+                    "contracted",
+                    "reported",
+                    "paid"
+                ],
+                "properties": {
+                    "issued": {
+                        "type": "integer",
+                        "format": "int64",
+                        "minimum": 0,
+                        "description": "Distinct own proposals created in [from, to), regardless of current commercial status."
+                    },
+                    "contracted": {
+                        "type": "integer",
+                        "format": "int64",
+                        "minimum": 0,
+                        "description": "Cohort proposals with a linked work order having persisted accepted_on."
+                    },
+                    "reported": {
+                        "type": "integer",
+                        "format": "int64",
+                        "minimum": 0,
+                        "description": "Contracted cohort proposals whose linked work order has a persisted completion report."
+                    },
+                    "paid": {
+                        "type": "integer",
+                        "format": "int64",
+                        "minimum": 0,
+                        "description": "Reported cohort proposals whose same linked work order has persisted paid_on."
+                    }
+                },
+                "additionalProperties": false,
+                "description": "Nested counts: issued ≥ contracted ≥ reported ≥ paid. Child images or payment attempts do not multiply proposals; proposals sharing a conversation remain distinct."
+            },
+            "ProviderConversionRates": {
+                "type": "object",
+                "required": [
+                    "contracted",
+                    "reported",
+                    "paid"
+                ],
+                "properties": {
+                    "contracted": {
+                        "allOf": [
+                            {
+                                "type": "object",
+                                "required": [
+                                    "cohort",
+                                    "previous_stage"
+                                ],
+                                "properties": {
+                                    "cohort": {
+                                        "allOf": [
+                                            {
+                                                "type": "object",
+                                                "required": [
+                                                    "numerator",
+                                                    "denominator",
+                                                    "percentage"
+                                                ],
+                                                "properties": {
+                                                    "numerator": {
+                                                        "type": "integer",
+                                                        "format": "int64",
+                                                        "minimum": 0,
+                                                        "description": "Distinct records reaching the measured stage, or accepted requests for the request ratio."
+                                                    },
+                                                    "denominator": {
+                                                        "type": "integer",
+                                                        "format": "int64",
+                                                        "minimum": 0,
+                                                        "description": "Explicit population used by this ratio; proposals and requests never share a denominator."
+                                                    },
+                                                    "percentage": {
+                                                        "oneOf": [
+                                                            {
+                                                                "type": "number",
+                                                                "format": "double",
+                                                                "minimum": 0,
+                                                                "maximum": 100
+                                                            },
+                                                            {
+                                                                "type": "null"
+                                                            }
+                                                        ],
+                                                        "description": "100 × numerator / denominator rounded HALF_UP to two decimal places. Always present: null when denominator is zero; zero when denominator is positive and numerator is zero. JSON numbers need not contain trailing decimal zeros."
+                                                    }
+                                                },
+                                                "additionalProperties": false
+                                            }
+                                        ],
+                                        "description": "Stage count over all issued proposals in the selected creation cohort."
+                                    },
+                                    "previous_stage": {
+                                        "allOf": [
+                                            {
+                                                "type": "object",
+                                                "required": [
+                                                    "numerator",
+                                                    "denominator",
+                                                    "percentage"
+                                                ],
+                                                "properties": {
+                                                    "numerator": {
+                                                        "type": "integer",
+                                                        "format": "int64",
+                                                        "minimum": 0,
+                                                        "description": "Distinct records reaching the measured stage, or accepted requests for the request ratio."
+                                                    },
+                                                    "denominator": {
+                                                        "type": "integer",
+                                                        "format": "int64",
+                                                        "minimum": 0,
+                                                        "description": "Explicit population used by this ratio; proposals and requests never share a denominator."
+                                                    },
+                                                    "percentage": {
+                                                        "oneOf": [
+                                                            {
+                                                                "type": "number",
+                                                                "format": "double",
+                                                                "minimum": 0,
+                                                                "maximum": 100
+                                                            },
+                                                            {
+                                                                "type": "null"
+                                                            }
+                                                        ],
+                                                        "description": "100 × numerator / denominator rounded HALF_UP to two decimal places. Always present: null when denominator is zero; zero when denominator is positive and numerator is zero. JSON numbers need not contain trailing decimal zeros."
+                                                    }
+                                                },
+                                                "additionalProperties": false
+                                            }
+                                        ],
+                                        "description": "Stage count over its immediately preceding stage in the same cohort."
+                                    }
+                                },
+                                "additionalProperties": false
+                            }
+                        ],
+                        "description": "Both ratios use contracted as numerator and issued as denominator."
+                    },
+                    "reported": {
+                        "allOf": [
+                            {
+                                "type": "object",
+                                "required": [
+                                    "cohort",
+                                    "previous_stage"
+                                ],
+                                "properties": {
+                                    "cohort": {
+                                        "allOf": [
+                                            {
+                                                "type": "object",
+                                                "required": [
+                                                    "numerator",
+                                                    "denominator",
+                                                    "percentage"
+                                                ],
+                                                "properties": {
+                                                    "numerator": {
+                                                        "type": "integer",
+                                                        "format": "int64",
+                                                        "minimum": 0,
+                                                        "description": "Distinct records reaching the measured stage, or accepted requests for the request ratio."
+                                                    },
+                                                    "denominator": {
+                                                        "type": "integer",
+                                                        "format": "int64",
+                                                        "minimum": 0,
+                                                        "description": "Explicit population used by this ratio; proposals and requests never share a denominator."
+                                                    },
+                                                    "percentage": {
+                                                        "oneOf": [
+                                                            {
+                                                                "type": "number",
+                                                                "format": "double",
+                                                                "minimum": 0,
+                                                                "maximum": 100
+                                                            },
+                                                            {
+                                                                "type": "null"
+                                                            }
+                                                        ],
+                                                        "description": "100 × numerator / denominator rounded HALF_UP to two decimal places. Always present: null when denominator is zero; zero when denominator is positive and numerator is zero. JSON numbers need not contain trailing decimal zeros."
+                                                    }
+                                                },
+                                                "additionalProperties": false
+                                            }
+                                        ],
+                                        "description": "Stage count over all issued proposals in the selected creation cohort."
+                                    },
+                                    "previous_stage": {
+                                        "allOf": [
+                                            {
+                                                "type": "object",
+                                                "required": [
+                                                    "numerator",
+                                                    "denominator",
+                                                    "percentage"
+                                                ],
+                                                "properties": {
+                                                    "numerator": {
+                                                        "type": "integer",
+                                                        "format": "int64",
+                                                        "minimum": 0,
+                                                        "description": "Distinct records reaching the measured stage, or accepted requests for the request ratio."
+                                                    },
+                                                    "denominator": {
+                                                        "type": "integer",
+                                                        "format": "int64",
+                                                        "minimum": 0,
+                                                        "description": "Explicit population used by this ratio; proposals and requests never share a denominator."
+                                                    },
+                                                    "percentage": {
+                                                        "oneOf": [
+                                                            {
+                                                                "type": "number",
+                                                                "format": "double",
+                                                                "minimum": 0,
+                                                                "maximum": 100
+                                                            },
+                                                            {
+                                                                "type": "null"
+                                                            }
+                                                        ],
+                                                        "description": "100 × numerator / denominator rounded HALF_UP to two decimal places. Always present: null when denominator is zero; zero when denominator is positive and numerator is zero. JSON numbers need not contain trailing decimal zeros."
+                                                    }
+                                                },
+                                                "additionalProperties": false
+                                            }
+                                        ],
+                                        "description": "Stage count over its immediately preceding stage in the same cohort."
+                                    }
+                                },
+                                "additionalProperties": false
+                            }
+                        ],
+                        "description": "Both numerators are reported. Cohort denominator is issued; previous_stage denominator is contracted."
+                    },
+                    "paid": {
+                        "allOf": [
+                            {
+                                "type": "object",
+                                "required": [
+                                    "cohort",
+                                    "previous_stage"
+                                ],
+                                "properties": {
+                                    "cohort": {
+                                        "allOf": [
+                                            {
+                                                "type": "object",
+                                                "required": [
+                                                    "numerator",
+                                                    "denominator",
+                                                    "percentage"
+                                                ],
+                                                "properties": {
+                                                    "numerator": {
+                                                        "type": "integer",
+                                                        "format": "int64",
+                                                        "minimum": 0,
+                                                        "description": "Distinct records reaching the measured stage, or accepted requests for the request ratio."
+                                                    },
+                                                    "denominator": {
+                                                        "type": "integer",
+                                                        "format": "int64",
+                                                        "minimum": 0,
+                                                        "description": "Explicit population used by this ratio; proposals and requests never share a denominator."
+                                                    },
+                                                    "percentage": {
+                                                        "oneOf": [
+                                                            {
+                                                                "type": "number",
+                                                                "format": "double",
+                                                                "minimum": 0,
+                                                                "maximum": 100
+                                                            },
+                                                            {
+                                                                "type": "null"
+                                                            }
+                                                        ],
+                                                        "description": "100 × numerator / denominator rounded HALF_UP to two decimal places. Always present: null when denominator is zero; zero when denominator is positive and numerator is zero. JSON numbers need not contain trailing decimal zeros."
+                                                    }
+                                                },
+                                                "additionalProperties": false
+                                            }
+                                        ],
+                                        "description": "Stage count over all issued proposals in the selected creation cohort."
+                                    },
+                                    "previous_stage": {
+                                        "allOf": [
+                                            {
+                                                "type": "object",
+                                                "required": [
+                                                    "numerator",
+                                                    "denominator",
+                                                    "percentage"
+                                                ],
+                                                "properties": {
+                                                    "numerator": {
+                                                        "type": "integer",
+                                                        "format": "int64",
+                                                        "minimum": 0,
+                                                        "description": "Distinct records reaching the measured stage, or accepted requests for the request ratio."
+                                                    },
+                                                    "denominator": {
+                                                        "type": "integer",
+                                                        "format": "int64",
+                                                        "minimum": 0,
+                                                        "description": "Explicit population used by this ratio; proposals and requests never share a denominator."
+                                                    },
+                                                    "percentage": {
+                                                        "oneOf": [
+                                                            {
+                                                                "type": "number",
+                                                                "format": "double",
+                                                                "minimum": 0,
+                                                                "maximum": 100
+                                                            },
+                                                            {
+                                                                "type": "null"
+                                                            }
+                                                        ],
+                                                        "description": "100 × numerator / denominator rounded HALF_UP to two decimal places. Always present: null when denominator is zero; zero when denominator is positive and numerator is zero. JSON numbers need not contain trailing decimal zeros."
+                                                    }
+                                                },
+                                                "additionalProperties": false
+                                            }
+                                        ],
+                                        "description": "Stage count over its immediately preceding stage in the same cohort."
+                                    }
+                                },
+                                "additionalProperties": false
+                            }
+                        ],
+                        "description": "Both numerators are paid. Cohort denominator is issued; previous_stage denominator is reported."
+                    }
+                },
+                "additionalProperties": false
+            },
+            "ProviderConversionProposals": {
+                "type": "object",
+                "required": [
+                    "stages",
+                    "rates",
+                    "uncontracted"
+                ],
+                "properties": {
+                    "stages": {
+                        "type": "object",
+                        "required": [
+                            "issued",
+                            "contracted",
+                            "reported",
+                            "paid"
+                        ],
+                        "properties": {
+                            "issued": {
+                                "type": "integer",
+                                "format": "int64",
+                                "minimum": 0,
+                                "description": "Distinct own proposals created in [from, to), regardless of current commercial status."
+                            },
+                            "contracted": {
+                                "type": "integer",
+                                "format": "int64",
+                                "minimum": 0,
+                                "description": "Cohort proposals with a linked work order having persisted accepted_on."
+                            },
+                            "reported": {
+                                "type": "integer",
+                                "format": "int64",
+                                "minimum": 0,
+                                "description": "Contracted cohort proposals whose linked work order has a persisted completion report."
+                            },
+                            "paid": {
+                                "type": "integer",
+                                "format": "int64",
+                                "minimum": 0,
+                                "description": "Reported cohort proposals whose same linked work order has persisted paid_on."
+                            }
+                        },
+                        "additionalProperties": false,
+                        "description": "Nested counts: issued ≥ contracted ≥ reported ≥ paid. Child images or payment attempts do not multiply proposals; proposals sharing a conversation remain distinct."
+                    },
+                    "rates": {
+                        "type": "object",
+                        "required": [
+                            "contracted",
+                            "reported",
+                            "paid"
+                        ],
+                        "properties": {
+                            "contracted": {
+                                "allOf": [
+                                    {
+                                        "type": "object",
+                                        "required": [
+                                            "cohort",
+                                            "previous_stage"
+                                        ],
+                                        "properties": {
+                                            "cohort": {
+                                                "allOf": [
+                                                    {
+                                                        "type": "object",
+                                                        "required": [
+                                                            "numerator",
+                                                            "denominator",
+                                                            "percentage"
+                                                        ],
+                                                        "properties": {
+                                                            "numerator": {
+                                                                "type": "integer",
+                                                                "format": "int64",
+                                                                "minimum": 0,
+                                                                "description": "Distinct records reaching the measured stage, or accepted requests for the request ratio."
+                                                            },
+                                                            "denominator": {
+                                                                "type": "integer",
+                                                                "format": "int64",
+                                                                "minimum": 0,
+                                                                "description": "Explicit population used by this ratio; proposals and requests never share a denominator."
+                                                            },
+                                                            "percentage": {
+                                                                "oneOf": [
+                                                                    {
+                                                                        "type": "number",
+                                                                        "format": "double",
+                                                                        "minimum": 0,
+                                                                        "maximum": 100
+                                                                    },
+                                                                    {
+                                                                        "type": "null"
+                                                                    }
+                                                                ],
+                                                                "description": "100 × numerator / denominator rounded HALF_UP to two decimal places. Always present: null when denominator is zero; zero when denominator is positive and numerator is zero. JSON numbers need not contain trailing decimal zeros."
+                                                            }
+                                                        },
+                                                        "additionalProperties": false
+                                                    }
+                                                ],
+                                                "description": "Stage count over all issued proposals in the selected creation cohort."
+                                            },
+                                            "previous_stage": {
+                                                "allOf": [
+                                                    {
+                                                        "type": "object",
+                                                        "required": [
+                                                            "numerator",
+                                                            "denominator",
+                                                            "percentage"
+                                                        ],
+                                                        "properties": {
+                                                            "numerator": {
+                                                                "type": "integer",
+                                                                "format": "int64",
+                                                                "minimum": 0,
+                                                                "description": "Distinct records reaching the measured stage, or accepted requests for the request ratio."
+                                                            },
+                                                            "denominator": {
+                                                                "type": "integer",
+                                                                "format": "int64",
+                                                                "minimum": 0,
+                                                                "description": "Explicit population used by this ratio; proposals and requests never share a denominator."
+                                                            },
+                                                            "percentage": {
+                                                                "oneOf": [
+                                                                    {
+                                                                        "type": "number",
+                                                                        "format": "double",
+                                                                        "minimum": 0,
+                                                                        "maximum": 100
+                                                                    },
+                                                                    {
+                                                                        "type": "null"
+                                                                    }
+                                                                ],
+                                                                "description": "100 × numerator / denominator rounded HALF_UP to two decimal places. Always present: null when denominator is zero; zero when denominator is positive and numerator is zero. JSON numbers need not contain trailing decimal zeros."
+                                                            }
+                                                        },
+                                                        "additionalProperties": false
+                                                    }
+                                                ],
+                                                "description": "Stage count over its immediately preceding stage in the same cohort."
+                                            }
+                                        },
+                                        "additionalProperties": false
+                                    }
+                                ],
+                                "description": "Both ratios use contracted as numerator and issued as denominator."
+                            },
+                            "reported": {
+                                "allOf": [
+                                    {
+                                        "type": "object",
+                                        "required": [
+                                            "cohort",
+                                            "previous_stage"
+                                        ],
+                                        "properties": {
+                                            "cohort": {
+                                                "allOf": [
+                                                    {
+                                                        "type": "object",
+                                                        "required": [
+                                                            "numerator",
+                                                            "denominator",
+                                                            "percentage"
+                                                        ],
+                                                        "properties": {
+                                                            "numerator": {
+                                                                "type": "integer",
+                                                                "format": "int64",
+                                                                "minimum": 0,
+                                                                "description": "Distinct records reaching the measured stage, or accepted requests for the request ratio."
+                                                            },
+                                                            "denominator": {
+                                                                "type": "integer",
+                                                                "format": "int64",
+                                                                "minimum": 0,
+                                                                "description": "Explicit population used by this ratio; proposals and requests never share a denominator."
+                                                            },
+                                                            "percentage": {
+                                                                "oneOf": [
+                                                                    {
+                                                                        "type": "number",
+                                                                        "format": "double",
+                                                                        "minimum": 0,
+                                                                        "maximum": 100
+                                                                    },
+                                                                    {
+                                                                        "type": "null"
+                                                                    }
+                                                                ],
+                                                                "description": "100 × numerator / denominator rounded HALF_UP to two decimal places. Always present: null when denominator is zero; zero when denominator is positive and numerator is zero. JSON numbers need not contain trailing decimal zeros."
+                                                            }
+                                                        },
+                                                        "additionalProperties": false
+                                                    }
+                                                ],
+                                                "description": "Stage count over all issued proposals in the selected creation cohort."
+                                            },
+                                            "previous_stage": {
+                                                "allOf": [
+                                                    {
+                                                        "type": "object",
+                                                        "required": [
+                                                            "numerator",
+                                                            "denominator",
+                                                            "percentage"
+                                                        ],
+                                                        "properties": {
+                                                            "numerator": {
+                                                                "type": "integer",
+                                                                "format": "int64",
+                                                                "minimum": 0,
+                                                                "description": "Distinct records reaching the measured stage, or accepted requests for the request ratio."
+                                                            },
+                                                            "denominator": {
+                                                                "type": "integer",
+                                                                "format": "int64",
+                                                                "minimum": 0,
+                                                                "description": "Explicit population used by this ratio; proposals and requests never share a denominator."
+                                                            },
+                                                            "percentage": {
+                                                                "oneOf": [
+                                                                    {
+                                                                        "type": "number",
+                                                                        "format": "double",
+                                                                        "minimum": 0,
+                                                                        "maximum": 100
+                                                                    },
+                                                                    {
+                                                                        "type": "null"
+                                                                    }
+                                                                ],
+                                                                "description": "100 × numerator / denominator rounded HALF_UP to two decimal places. Always present: null when denominator is zero; zero when denominator is positive and numerator is zero. JSON numbers need not contain trailing decimal zeros."
+                                                            }
+                                                        },
+                                                        "additionalProperties": false
+                                                    }
+                                                ],
+                                                "description": "Stage count over its immediately preceding stage in the same cohort."
+                                            }
+                                        },
+                                        "additionalProperties": false
+                                    }
+                                ],
+                                "description": "Both numerators are reported. Cohort denominator is issued; previous_stage denominator is contracted."
+                            },
+                            "paid": {
+                                "allOf": [
+                                    {
+                                        "type": "object",
+                                        "required": [
+                                            "cohort",
+                                            "previous_stage"
+                                        ],
+                                        "properties": {
+                                            "cohort": {
+                                                "allOf": [
+                                                    {
+                                                        "type": "object",
+                                                        "required": [
+                                                            "numerator",
+                                                            "denominator",
+                                                            "percentage"
+                                                        ],
+                                                        "properties": {
+                                                            "numerator": {
+                                                                "type": "integer",
+                                                                "format": "int64",
+                                                                "minimum": 0,
+                                                                "description": "Distinct records reaching the measured stage, or accepted requests for the request ratio."
+                                                            },
+                                                            "denominator": {
+                                                                "type": "integer",
+                                                                "format": "int64",
+                                                                "minimum": 0,
+                                                                "description": "Explicit population used by this ratio; proposals and requests never share a denominator."
+                                                            },
+                                                            "percentage": {
+                                                                "oneOf": [
+                                                                    {
+                                                                        "type": "number",
+                                                                        "format": "double",
+                                                                        "minimum": 0,
+                                                                        "maximum": 100
+                                                                    },
+                                                                    {
+                                                                        "type": "null"
+                                                                    }
+                                                                ],
+                                                                "description": "100 × numerator / denominator rounded HALF_UP to two decimal places. Always present: null when denominator is zero; zero when denominator is positive and numerator is zero. JSON numbers need not contain trailing decimal zeros."
+                                                            }
+                                                        },
+                                                        "additionalProperties": false
+                                                    }
+                                                ],
+                                                "description": "Stage count over all issued proposals in the selected creation cohort."
+                                            },
+                                            "previous_stage": {
+                                                "allOf": [
+                                                    {
+                                                        "type": "object",
+                                                        "required": [
+                                                            "numerator",
+                                                            "denominator",
+                                                            "percentage"
+                                                        ],
+                                                        "properties": {
+                                                            "numerator": {
+                                                                "type": "integer",
+                                                                "format": "int64",
+                                                                "minimum": 0,
+                                                                "description": "Distinct records reaching the measured stage, or accepted requests for the request ratio."
+                                                            },
+                                                            "denominator": {
+                                                                "type": "integer",
+                                                                "format": "int64",
+                                                                "minimum": 0,
+                                                                "description": "Explicit population used by this ratio; proposals and requests never share a denominator."
+                                                            },
+                                                            "percentage": {
+                                                                "oneOf": [
+                                                                    {
+                                                                        "type": "number",
+                                                                        "format": "double",
+                                                                        "minimum": 0,
+                                                                        "maximum": 100
+                                                                    },
+                                                                    {
+                                                                        "type": "null"
+                                                                    }
+                                                                ],
+                                                                "description": "100 × numerator / denominator rounded HALF_UP to two decimal places. Always present: null when denominator is zero; zero when denominator is positive and numerator is zero. JSON numbers need not contain trailing decimal zeros."
+                                                            }
+                                                        },
+                                                        "additionalProperties": false
+                                                    }
+                                                ],
+                                                "description": "Stage count over its immediately preceding stage in the same cohort."
+                                            }
+                                        },
+                                        "additionalProperties": false
+                                    }
+                                ],
+                                "description": "Both numerators are paid. Cohort denominator is issued; previous_stage denominator is reported."
+                            }
+                        },
+                        "additionalProperties": false
+                    },
+                    "uncontracted": {
+                        "type": "integer",
+                        "format": "int64",
+                        "minimum": 0,
+                        "description": "issued minus contracted at observation. This is not a rejected/lost commercial state and does not alter proposal status."
+                    }
+                },
+                "additionalProperties": false
+            },
+            "ProviderConversionRequests": {
+                "type": "object",
+                "required": [
+                    "received",
+                    "accepted",
+                    "pending",
+                    "acceptance_rate"
+                ],
+                "properties": {
+                    "received": {
+                        "type": "integer",
+                        "format": "int64",
+                        "minimum": 0,
+                        "description": "Distinct own requests created in [from, to), independently of proposal membership."
+                    },
+                    "accepted": {
+                        "type": "integer",
+                        "format": "int64",
+                        "minimum": 0,
+                        "description": "Received requests whose observed persisted status is accepted, even if accepted after to."
+                    },
+                    "pending": {
+                        "type": "integer",
+                        "format": "int64",
+                        "minimum": 0,
+                        "description": "Received requests whose observed persisted status is pending. accepted + pending = received."
+                    },
+                    "acceptance_rate": {
+                        "allOf": [
+                            {
+                                "type": "object",
+                                "required": [
+                                    "numerator",
+                                    "denominator",
+                                    "percentage"
+                                ],
+                                "properties": {
+                                    "numerator": {
+                                        "type": "integer",
+                                        "format": "int64",
+                                        "minimum": 0,
+                                        "description": "Distinct records reaching the measured stage, or accepted requests for the request ratio."
+                                    },
+                                    "denominator": {
+                                        "type": "integer",
+                                        "format": "int64",
+                                        "minimum": 0,
+                                        "description": "Explicit population used by this ratio; proposals and requests never share a denominator."
+                                    },
+                                    "percentage": {
+                                        "oneOf": [
+                                            {
+                                                "type": "number",
+                                                "format": "double",
+                                                "minimum": 0,
+                                                "maximum": 100
+                                            },
+                                            {
+                                                "type": "null"
+                                            }
+                                        ],
+                                        "description": "100 × numerator / denominator rounded HALF_UP to two decimal places. Always present: null when denominator is zero; zero when denominator is positive and numerator is zero. JSON numbers need not contain trailing decimal zeros."
+                                    }
+                                },
+                                "additionalProperties": false
+                            }
+                        ],
+                        "description": "Numerator is accepted; denominator is received. Not a stage of the proposal funnel or a measure of contracting."
                     }
                 },
                 "additionalProperties": false

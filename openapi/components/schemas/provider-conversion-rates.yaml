@@ -1,0 +1,21 @@
+type: object
+required:
+- contracted
+- reported
+- paid
+properties:
+  contracted:
+    allOf:
+    - $ref: ./provider-conversion-stage-rates.yaml
+    description: Both ratios use contracted as numerator and issued as denominator.
+  reported:
+    allOf:
+    - $ref: ./provider-conversion-stage-rates.yaml
+    description: Both numerators are reported. Cohort denominator is issued; previous_stage denominator
+      is contracted.
+  paid:
+    allOf:
+    - $ref: ./provider-conversion-stage-rates.yaml
+    description: Both numerators are paid. Cohort denominator is issued; previous_stage denominator is
+      reported.
+additionalProperties: false

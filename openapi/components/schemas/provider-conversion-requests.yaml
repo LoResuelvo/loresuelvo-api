@@ -1,0 +1,29 @@
+type: object
+required:
+- received
+- accepted
+- pending
+- acceptance_rate
+properties:
+  received:
+    type: integer
+    format: int64
+    minimum: 0
+    description: Distinct own requests created in [from, to), independently of proposal membership.
+  accepted:
+    type: integer
+    format: int64
+    minimum: 0
+    description: Received requests whose observed persisted status is accepted, even if accepted after
+      to.
+  pending:
+    type: integer
+    format: int64
+    minimum: 0
+    description: Received requests whose observed persisted status is pending. accepted + pending = received.
+  acceptance_rate:
+    allOf:
+    - $ref: ./provider-conversion-ratio.yaml
+    description: Numerator is accepted; denominator is received. Not a stage of the proposal funnel or
+      a measure of contracting.
+additionalProperties: false

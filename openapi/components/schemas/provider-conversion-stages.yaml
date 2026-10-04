@@ -1,0 +1,30 @@
+type: object
+required:
+- issued
+- contracted
+- reported
+- paid
+properties:
+  issued:
+    type: integer
+    format: int64
+    minimum: 0
+    description: Distinct own proposals created in [from, to), regardless of current commercial status.
+  contracted:
+    type: integer
+    format: int64
+    minimum: 0
+    description: Cohort proposals with a linked work order having persisted accepted_on.
+  reported:
+    type: integer
+    format: int64
+    minimum: 0
+    description: Contracted cohort proposals whose linked work order has a persisted completion report.
+  paid:
+    type: integer
+    format: int64
+    minimum: 0
+    description: Reported cohort proposals whose same linked work order has persisted paid_on.
+additionalProperties: false
+description: 'Nested counts: issued ≥ contracted ≥ reported ≥ paid. Child images or payment attempts do
+  not multiply proposals; proposals sharing a conversation remain distinct.'

@@ -82,6 +82,8 @@ paths:
     $ref: ./paths/admin-metrics-funnel.yaml
   /providers:
     $ref: ./paths/providers.yaml
+  /providers/me/statistics/conversion:
+    $ref: ./paths/provider-conversion-statistics.yaml
   /providers/me/statistics/activity:
     $ref: ./paths/provider-activity-statistics.yaml
   /providers/me/statistics/collections:
@@ -316,6 +318,22 @@ components:
       $ref: ./components/schemas/provider-profile-completion-report.yaml
     ProviderProfileReview:
       $ref: ./components/schemas/provider-profile-review.yaml
+    ProviderConversionStatistics:
+      $ref: ./components/schemas/provider-conversion-statistics.yaml
+    ProviderConversionPeriod:
+      $ref: ./components/schemas/provider-conversion-period.yaml
+    ProviderConversionRatio:
+      $ref: ./components/schemas/provider-conversion-ratio.yaml
+    ProviderConversionStageRates:
+      $ref: ./components/schemas/provider-conversion-stage-rates.yaml
+    ProviderConversionStages:
+      $ref: ./components/schemas/provider-conversion-stages.yaml
+    ProviderConversionRates:
+      $ref: ./components/schemas/provider-conversion-rates.yaml
+    ProviderConversionProposals:
+      $ref: ./components/schemas/provider-conversion-proposals.yaml
+    ProviderConversionRequests:
+      $ref: ./components/schemas/provider-conversion-requests.yaml
     ProviderActivityStatistics:
       $ref: ./components/schemas/provider-activity-statistics.yaml
     ProviderActivityPeriod:

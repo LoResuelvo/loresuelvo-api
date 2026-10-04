@@ -1,0 +1,14 @@
+type: object
+required:
+- cohort
+- previous_stage
+properties:
+  cohort:
+    allOf:
+    - $ref: ./provider-conversion-ratio.yaml
+    description: Stage count over all issued proposals in the selected creation cohort.
+  previous_stage:
+    allOf:
+    - $ref: ./provider-conversion-ratio.yaml
+    description: Stage count over its immediately preceding stage in the same cohort.
+additionalProperties: false

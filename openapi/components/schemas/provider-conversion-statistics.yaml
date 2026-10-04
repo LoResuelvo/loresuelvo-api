@@ -1,0 +1,20 @@
+type: object
+required:
+- period
+- observed_at
+- proposals
+- requests
+properties:
+  period:
+    $ref: ./provider-conversion-period.yaml
+  observed_at:
+    type: string
+    format: date-time
+    description: UTC evaluation instant captured once before the database transaction, used for the default
+      range and future-bound validation. Not an exact database snapshot timestamp. Both populations are
+      read from one coherent current database snapshot; this is not an as-of reconstruction.
+  proposals:
+    $ref: ./provider-conversion-proposals.yaml
+  requests:
+    $ref: ./provider-conversion-requests.yaml
+additionalProperties: false
