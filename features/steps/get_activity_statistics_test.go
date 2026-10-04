@@ -1330,6 +1330,9 @@ func (suite *testSuite) activityEmptyDayCount(dayCount string) error {
 }
 
 func (suite *testSuite) activityPeriodRejected() error {
+	if suite.conversionStatistics != nil {
+		return suite.conversionPeriodRejected()
+	}
 	if suite.lastStatus != http.StatusBadRequest {
 		return fmt.Errorf("invalid activity period returned %d, want 400: %s", suite.lastStatus, suite.lastBody)
 	}
@@ -1340,6 +1343,9 @@ func (suite *testSuite) activityPeriodRejected() error {
 }
 
 func (suite *testSuite) activityIdentityRejected(message string) error {
+	if suite.conversionStatistics != nil {
+		return suite.conversionIdentityRejected(message)
+	}
 	wantStatus := http.StatusUnauthorized
 	if strings.Contains(message, "no soy prestador") {
 		wantStatus = http.StatusForbidden

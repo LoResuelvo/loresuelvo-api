@@ -105,6 +105,7 @@ func isPrivateWorkChatPath(path string) bool {
 func isPrivateProviderActivityPath(path string) bool {
 	return path == "/providers/me/statistics/reputation" ||
 		path == "/providers/me/statistics/activity" ||
+		path == "/providers/me/statistics/conversion" ||
 		path == "/providers/me/statistics/collections" ||
 		path == "/providers/me/statistics/collections/transactions"
 }

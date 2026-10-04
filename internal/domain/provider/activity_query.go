@@ -41,18 +41,12 @@ func (q ActivityQuery) PreviousPeriod() readmodel.ActivityPeriod {
 }
 
 func (input ActivityQueryInput) resolve(now time.Time) (ActivityQuery, error) {
-	if (input.From == nil) != (input.To == nil) {
+	from, to, valid := resolveStatisticsPeriod(now, input.From, input.To)
+	if !valid {
 		return ActivityQuery{}, ErrInvalidActivityQuery
 	}
-	q := ActivityQuery{ComparePrevious: input.ComparePrevious}
-	if input.From == nil {
-		q.From, q.To = now.Add(-activityDefaultDuration), now
-	} else {
-		q.From, q.To = input.From.UTC(), input.To.UTC()
-	}
-	if q.From.IsZero() || q.To.IsZero() || !q.From.Before(q.To) || q.To.After(now) || q.To.Sub(q.From) > activityMaxDuration {
-		return ActivityQuery{}, ErrInvalidActivityQuery
-	}
+	q := ActivityQuery{From: from, To: to, ComparePrevious: input.ComparePrevious}
+
 	switch input.Granularity {
 	case "", string(ActivityDay):
 		q.Granularity = ActivityDay

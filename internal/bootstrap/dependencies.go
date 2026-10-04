@@ -254,6 +254,7 @@ func newDependencies(database *sql.DB, adapters dependencyAdapters) (*Dependenci
 		persistence.IdentityVerificationRepository,
 	)
 	activityService := provider.NewActivityService(persistence.ProviderActivityReader, persistence.ProviderActivityActorFinder, systemClock)
+	conversionService := provider.NewConversionService(persistence.ProviderConversionReader, persistence.ProviderActivityActorFinder, systemClock)
 	reputationService := provider.NewReputationService(persistence.ProviderReputationReader, persistence.ProviderActivityActorFinder, systemClock)
 	reputationHandler, err := provider_handler.NewReputationHandler(reputationService, adapters.auditCursorSigningKey)
 	if err != nil {
@@ -457,6 +458,7 @@ func newDependencies(database *sql.DB, adapters dependencyAdapters) (*Dependenci
 			ConsumerHandler:             consumer_handler.NewConsumerHandler(consumerService),
 			ProviderHandler:             provider_handler.NewProviderHandler(providerService),
 			ActivityHandler:             provider_handler.NewActivityHandler(activityService),
+			ConversionHandler:           provider_handler.NewConversionHandler(conversionService),
 			CollectionHandler:           collectionHandler,
 			ReputationHandler:           reputationHandler,
 			ConversationHandler:         conversation_handler.NewConversationHandler(conversationService),

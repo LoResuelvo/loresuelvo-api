@@ -101,3 +101,13 @@ func (m *reputationReaderMock) Read(ctx context.Context, providerID int, query p
 	}
 	return nil, args.Error(1)
 }
+
+type conversionReaderMock struct{ mock.Mock }
+
+func (m *conversionReaderMock) Read(ctx context.Context, providerID int, query provider.ConversionQuery) (*readmodel.ConversionSnapshot, error) {
+	args := m.Called(ctx, providerID, query)
+	if value := args.Get(0); value != nil {
+		return value.(*readmodel.ConversionSnapshot), args.Error(1)
+	}
+	return nil, args.Error(1)
+}

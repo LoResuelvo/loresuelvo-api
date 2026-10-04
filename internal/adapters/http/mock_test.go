@@ -137,3 +137,13 @@ func (service *reputationServiceMock) Query(ctx context.Context, authID string, 
 	}
 	return nil, arguments.Int(1), arguments.Error(2)
 }
+
+type conversionServiceMock struct{ mock.Mock }
+
+func (service *conversionServiceMock) Query(ctx context.Context, authID string, input provider.ConversionQueryInput) (*providerreadmodel.Conversion, error) {
+	arguments := service.Called(ctx, authID, input)
+	if value := arguments.Get(0); value != nil {
+		return value.(*providerreadmodel.Conversion), arguments.Error(1)
+	}
+	return nil, arguments.Error(1)
+}

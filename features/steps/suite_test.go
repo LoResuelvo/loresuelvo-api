@@ -84,6 +84,7 @@ type testSuite struct {
 	activityStatistics                      *activityStatisticsState
 	collectionStatistics                    *collectionStatisticsState
 	reputationStatistics                    *reputationStatisticsState
+	conversionStatistics                    *conversionStatisticsState
 	detailProposal                          detailProposalState
 	detailRequestEvidence                   detailRequestEvidenceState
 	detailMedia                             detailMediaState
@@ -251,6 +252,7 @@ func (s *testSuite) registerAllSteps(sc *godog.ScenarioContext) {
 	registerGetActivityStatisticsSteps(sc, s)
 	registerGetCollectionStatisticsSteps(sc, s)
 	registerGetReputationStatisticsSteps(sc, s)
+	registerGetConversionStatisticsSteps(sc, s)
 }
 
 func (s *testSuite) cleanup() error {
@@ -389,6 +391,7 @@ func (s *testSuite) cleanup() error {
 	s.activityStatistics = nil
 	s.collectionStatistics = nil
 	s.reputationStatistics = nil
+	s.conversionStatistics = nil
 	s.detailProposal = detailProposalState{}
 	s.detailRequestEvidence = detailRequestEvidenceState{}
 	s.detailMedia = detailMediaState{}
