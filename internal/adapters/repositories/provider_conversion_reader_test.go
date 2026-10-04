@@ -1,81 +1,19 @@
 package repositories_test
 
 import (
-	"errors"
-	"github.com/DATA-DOG/go-sqlmock"
+	"context"
+	"net/url"
+	"testing"
+	"time"
+
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/repositories"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/provider"
 	readmodel "github.com/LoResuelvo/loresuelvo-api/internal/domain/provider/read_model"
+	"github.com/LoResuelvo/loresuelvo-api/internal/infrastructure/db"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/stretchr/testify/require"
-	"testing"
-	"time"
 )
-
-func TestProviderConversionReaderUnitRollsBackFailures(t *testing.T) {
-	failure := errors.New("unavailable")
-	for _, stage := range []string{"begin", "actor", "missing actor", "proposals", "requests", "commit"} {
-		t.Run(stage, func(t *testing.T) {
-			db, mock, err := sqlmock.New()
-			require.NoError(t, err)
-			defer db.Close()
-			if stage == "begin" {
-				mock.ExpectBegin().WillReturnError(failure)
-			} else {
-				mock.ExpectBegin()
-				actor := mock.ExpectQuery("SELECT EXISTS").WithArgs(42)
-				if stage == "actor" {
-					actor.WillReturnError(failure)
-				} else if stage == "missing actor" {
-					actor.WillReturnRows(sqlmock.NewRows([]string{"exists"}).AddRow(false))
-				} else {
-					actor.WillReturnRows(sqlmock.NewRows([]string{"exists"}).AddRow(true))
-					proposals := mock.ExpectQuery("WITH conversion_cohort AS").WithArgs(42, sqlmock.AnyArg(), sqlmock.AnyArg())
-					if stage == "proposals" {
-						proposals.WillReturnError(failure)
-					} else {
-						proposals.WillReturnRows(sqlmock.NewRows([]string{"issued", "contracted", "reported", "paid"}).AddRow(4, 2, 1, 1))
-						requests := mock.ExpectQuery("SELECT COUNT").WithArgs(42, sqlmock.AnyArg(), sqlmock.AnyArg())
-						if stage == "requests" {
-							requests.WillReturnError(failure)
-						} else {
-							requests.WillReturnRows(sqlmock.NewRows([]string{"received", "accepted", "pending"}).AddRow(3, 2, 1))
-							mock.ExpectCommit().WillReturnError(failure)
-						}
-					}
-				}
-				if stage != "commit" {
-					mock.ExpectRollback()
-				}
-			}
-			result, err := repositories.NewProviderConversionReader(db).Read(t.Context(), 42, provider.ConversionQuery{From: time.Now().Add(-time.Hour), To: time.Now()})
-			require.Nil(t, result)
-			require.Error(t, err)
-			if stage == "missing actor" {
-				require.ErrorIs(t, err, provider.ErrConversionProviderNotFound)
-			} else {
-				require.ErrorIs(t, err, failure)
-			}
-			require.NoError(t, mock.ExpectationsWereMet())
-		})
-	}
-}
-func TestProviderConversionReaderUnitCommitsAndCeilsBounds(t *testing.T) {
-	db, mock, err := sqlmock.New()
-	require.NoError(t, err)
-	defer db.Close()
-	instant := time.Date(2026, 9, 1, 0, 0, 0, 0, time.UTC)
-	from, to := instant.Add(time.Nanosecond), instant.Add(time.Microsecond+time.Nanosecond)
-	mock.ExpectBegin()
-	mock.ExpectQuery("SELECT EXISTS").WithArgs(42).WillReturnRows(sqlmock.NewRows([]string{"exists"}).AddRow(true))
-	mock.ExpectQuery("WITH conversion_cohort AS").WithArgs(42, instant.Add(time.Microsecond), instant.Add(2*time.Microsecond)).WillReturnRows(sqlmock.NewRows([]string{"issued", "contracted", "reported", "paid"}).AddRow(4, 2, 1, 1))
-	mock.ExpectQuery("SELECT COUNT").WithArgs(42, instant.Add(time.Microsecond), instant.Add(2*time.Microsecond)).WillReturnRows(sqlmock.NewRows([]string{"received", "accepted", "pending"}).AddRow(3, 2, 1))
-	mock.ExpectCommit()
-	result, err := repositories.NewProviderConversionReader(db).Read(t.Context(), 42, provider.ConversionQuery{From: from, To: to})
-	require.NoError(t, err)
-	require.Equal(t, &readmodel.ConversionSnapshot{Stages: readmodel.ConversionStages{Issued: 4, Contracted: 2, Reported: 1, Paid: 1}, Requests: readmodel.ConversionRequestCounts{Received: 3, Accepted: 2, Pending: 1}}, result)
-	require.NoError(t, mock.ExpectationsWereMet())
-}
 
 func TestProviderConversionReaderCountsCohortNotMilestonePeriod(t *testing.T) {
 	testContext := newServiceProposalRepositoryTest(t)
@@ -233,30 +171,64 @@ func TestProviderConversionReaderKeepsSnapshotAcrossProposalsAndRequests(t *test
 	require.Equal(t, readmodel.ConversionRequestCounts{Received: 1, Accepted: 1, Pending: 0}, final.Requests)
 }
 
-func TestProviderConversionReaderUnitRejectsUnavailableInputs(t *testing.T) {
-	result, err := repositories.NewProviderConversionReader(nil).Read(t.Context(), 42, provider.ConversionQuery{})
-	require.Error(t, err)
-	require.Nil(t, result)
-	db, mock, err := sqlmock.New()
-	require.NoError(t, err)
-	defer db.Close()
-	result, err = repositories.NewProviderConversionReader(db).Read(t.Context(), 0, provider.ConversionQuery{})
-	require.Error(t, err)
-	require.Nil(t, result)
-	require.NoError(t, mock.ExpectationsWereMet())
+func TestProviderConversionReaderRejectsUnavailableInputs(t *testing.T) {
+	reader := repositories.NewProviderConversionReader(nil)
+	for _, test := range []struct {
+		id      int
+		message string
+	}{
+		{42, "conversion database is unavailable"},
+		{0, "conversion provider ID must be positive"},
+		{-1, "conversion provider ID must be positive"},
+	} {
+		snapshot, err := reader.Read(t.Context(), test.id, provider.ConversionQuery{})
+		require.Nil(t, snapshot)
+		require.ErrorContains(t, err, test.message)
+	}
 }
-func TestProviderConversionReaderUnitPreservesRollbackFailure(t *testing.T) {
-	db, mock, err := sqlmock.New()
+
+func TestProviderConversionReaderRejectsMissingProviderAndCancelledContext(t *testing.T) {
+	testContext := newServiceProposalRepositoryTest(t)
+	reader := repositories.NewProviderConversionReader(testContext.database)
+	snapshot, err := reader.Read(t.Context(), 2147483647, provider.ConversionQuery{})
+	require.Nil(t, snapshot)
+	require.ErrorIs(t, err, provider.ErrConversionProviderNotFound)
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+	snapshot, err = reader.Read(ctx, 2147483647, provider.ConversionQuery{})
+	require.Nil(t, snapshot)
+	require.ErrorIs(t, err, context.Canceled)
+}
+
+func TestProviderConversionReaderDoesNotConvertSQLSourceFailureToEmptyConversion(t *testing.T) {
+	config, err := db.NewTestPostgresConfigFromEnv()
 	require.NoError(t, err)
-	defer db.Close()
-	readFailure := errors.New("read failed")
-	rollbackFailure := errors.New("rollback failed")
-	mock.ExpectBegin()
-	mock.ExpectQuery("SELECT EXISTS").WithArgs(42).WillReturnError(readFailure)
-	mock.ExpectRollback().WillReturnError(rollbackFailure)
-	result, err := repositories.NewProviderConversionReader(db).Read(t.Context(), 42, provider.ConversionQuery{})
-	require.Nil(t, result)
-	require.ErrorIs(t, err, readFailure)
-	require.ErrorIs(t, err, rollbackFailure)
-	require.NoError(t, mock.ExpectationsWereMet())
+	parsed, err := url.Parse(config.URL)
+	require.NoError(t, err)
+	values := parsed.Query()
+	values.Set("search_path", "conversion_missing_test_schema")
+	parsed.RawQuery = values.Encode()
+	config.URL = parsed.String()
+	database, err := db.ConnectPostgres(t.Context(), config)
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, database.Close()) })
+	snapshot, err := repositories.NewProviderConversionReader(database).Read(t.Context(), 7, provider.ConversionQuery{})
+	require.Nil(t, snapshot)
+	require.ErrorContains(t, err, "checking conversion provider")
+	var sourceError *pgconn.PgError
+	require.ErrorAs(t, err, &sourceError)
+	require.Equal(t, "42P01", sourceError.Code)
+}
+
+func TestProviderConversionReaderRejectsClosedDatabase(t *testing.T) {
+	config, err := db.NewTestPostgresConfigFromEnv()
+	require.NoError(t, err)
+	database, err := db.ConnectPostgres(t.Context(), config)
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, database.Close()) })
+	require.NoError(t, database.Close())
+	snapshot, err := repositories.NewProviderConversionReader(database).Read(t.Context(), 7, provider.ConversionQuery{})
+	require.Nil(t, snapshot)
+	require.ErrorContains(t, err, "beginning provider conversion snapshot")
+	require.ErrorContains(t, err, "database is closed")
 }
