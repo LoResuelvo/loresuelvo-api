@@ -1,4 +1,3 @@
-@wip
 Feature: Consultar la conversión de mis propuestas de servicio
     Como prestador de LoResuelvo
     quiero conocer qué proporción de mis propuestas se convirtió en contrataciones, finalizaciones informadas y pagos completos
