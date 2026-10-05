@@ -46,7 +46,7 @@ func TestDispatcherDoesNotDeliverLocallyWhenDistributionFails(t *testing.T) {
 	}
 	hub.addConnection(connection)
 	eventBus := new(eventBusMock)
-	eventBus.On("Publish", mock.Anything, mock.Anything).Return(errors.New("postgres unavailable")).Once()
+	eventBus.On("Publish", mock.Anything, mock.Anything).Return(errors.New("broker unavailable")).Once()
 	dispatcher := NewDispatcher(hub, eventBus)
 
 	err := dispatcher.Publish(
@@ -57,7 +57,7 @@ func TestDispatcherDoesNotDeliverLocallyWhenDistributionFails(t *testing.T) {
 		[]byte(`{"type":"notification.created"}`),
 	)
 
-	require.ErrorContains(t, err, "postgres unavailable")
+	require.ErrorContains(t, err, "broker unavailable")
 	select {
 	case <-connection.send:
 		t.Fatal("delivered an event that was not distributed")

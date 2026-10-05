@@ -42,7 +42,7 @@ func (dispatcher *Dispatcher) Run(ctx context.Context) error {
 	return dispatcher.eventBus.Listen(ctx, dispatcher.receive)
 }
 
-// Publish persists and distributes an event, then applies the local fast path.
+// Publish distributes an event, then applies the local fast path.
 // Callers must invoke it only after their business transaction has committed.
 func (dispatcher *Dispatcher) Publish(ctx context.Context, authID, role string, profileID int, payload []byte) error {
 	if dispatcher == nil || dispatcher.eventBus == nil || dispatcher.hub == nil {

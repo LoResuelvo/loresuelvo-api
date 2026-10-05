@@ -87,6 +87,7 @@ type RuntimeDependencies struct {
 }
 
 type dependencyAdapters struct {
+	realtimeEventBus                    realtime.EventBus
 	chatbot                             conversation.Chatbot
 	paymentAccountOAuthConnector        paymentaccount.OAuthConnector
 	paymentGateway                      payment.Gateway
@@ -168,7 +169,16 @@ func NewDependencies(database *sql.DB) (*Dependencies, error) {
 	if err != nil {
 		return nil, fmt.Errorf("configuring identity verification webhook: %w", err)
 	}
+	exchange := os.Getenv("AMQP_EXCHANGE")
+	if exchange == "" {
+		exchange = "loresuelvo.realtime"
+	}
+	realtimeEventBus, err := realtime.NewAMQPEventBus(os.Getenv("AMQP_URL"), exchange)
+	if err != nil {
+		return nil, fmt.Errorf("configuring realtime transport: %w", err)
+	}
 	return newDependencies(database, dependencyAdapters{
+		realtimeEventBus:             realtimeEventBus,
 		chatbot:                      chatbot,
 		paymentAccountOAuthConnector: paymentAccountOAuthConnector,
 		paymentGateway:               paymentGateway,
@@ -208,9 +218,8 @@ func newDependencies(database *sql.DB, adapters dependencyAdapters) (*Dependenci
 	systemClock := clockadapter.NewSystemClock()
 
 	// Realtime infrastructure
-	realtimeEventBus := realtime.NewPostgresEventBus(database)
 	hub := realtime.NewHub()
-	dispatcher := realtime.NewDispatcher(hub, realtimeEventBus)
+	dispatcher := realtime.NewDispatcher(hub, adapters.realtimeEventBus)
 
 	ticketStore := realtime.NewPostgresTicketStore(database)
 

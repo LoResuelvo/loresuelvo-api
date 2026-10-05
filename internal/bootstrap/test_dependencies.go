@@ -1,6 +1,7 @@
 package bootstrap
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 
@@ -12,6 +13,7 @@ import (
 	didit "github.com/LoResuelvo/loresuelvo-api/internal/adapters/identityverification/didit"
 	identityverificationfake "github.com/LoResuelvo/loresuelvo-api/internal/adapters/identityverification/fake"
 	locationadapter "github.com/LoResuelvo/loresuelvo-api/internal/adapters/location"
+	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/realtime"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/admin"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/audit"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/category"
@@ -99,6 +101,7 @@ func NewTestDependenciesWithProviderDiagnosticOptions(
 		categoryDecorator = categoryUnitOfWorkDecorator[0]
 	}
 	dependencies, err := newDependencies(database, dependencyAdapters{
+		realtimeEventBus:              localTestEventBus{},
 		chatbot:                       chatbot,
 		providerDiagnosticTestOptions: options,
 		paymentAccountOAuthConnector:  paymentAccountOAuthConnector,
@@ -131,4 +134,17 @@ func NewTestDependenciesWithProviderDiagnosticOptions(
 		ConsumerAddressResolver: consumerAddressResolver,
 		IdentityVerifier:        identityVerifier,
 	}, nil
+}
+
+// localTestEventBus keeps single-process BDD scenarios on the dispatcher's local
+// path. Multi-instance transport is covered against a real broker separately.
+type localTestEventBus struct{}
+
+func (localTestEventBus) Publish(ctx context.Context, _ realtime.EventEnvelope) error {
+	return ctx.Err()
+}
+
+func (localTestEventBus) Listen(ctx context.Context, _ func(realtime.EventEnvelope)) error {
+	<-ctx.Done()
+	return ctx.Err()
 }

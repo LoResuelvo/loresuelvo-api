@@ -12,6 +12,9 @@ services:
     environment:
       DATABASE_URL: "postgres://postgres:example@dev-db:5432/loresuelvo?sslmode=disable"
       TEST_DATABASE_URL: "postgres://postgres:example@test-db:5432/loresuelvo_test?sslmode=disable"
+      AMQP_URL: "${AMQP_URL:-amqp://loresuelvo:loresuelvo-local@rabbitmq:5672/}"
+      AMQP_EXCHANGE: "${AMQP_EXCHANGE:-loresuelvo.realtime}"
+      TEST_AMQP_URL: "amqp://loresuelvo:loresuelvo-local@rabbitmq:5672/"
       ENVIRONMENT: "${ENVIRONMENT:-dev}"
       LOG_LEVEL: "${LOG_LEVEL:-debug}"
       AUDIT_CURSOR_HMAC_KEY: "${AUDIT_CURSOR_HMAC_KEY:-local-only-audit-cursor-signing-key-2026-change-me}"
@@ -67,6 +70,8 @@ services:
     env_file:
       - .env
     depends_on:
+      rabbitmq:
+        condition: service_healthy
       dev-db:
         condition: service_healthy
       test-db:
@@ -232,6 +237,20 @@ services:
     entrypoint: ["/bin/sh", "/minio-init/clean-test-buckets.sh"]
     profiles:
       - tools
+
+  # Development/test broker only. Deployed APIs use an external managed broker.
+  rabbitmq:
+    image: rabbitmq:4.1-alpine
+    environment:
+      RABBITMQ_DEFAULT_USER: loresuelvo
+      RABBITMQ_DEFAULT_PASS: loresuelvo-local
+    ports:
+      - "127.0.0.1:${AMQP_LOCAL_PORT:-5673}:5672"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 3s
+      timeout: 5s
+      retries: 30
 
   dev-db:
     image: postgres:16-alpine

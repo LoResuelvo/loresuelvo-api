@@ -26,7 +26,7 @@ jobs:
 
       - name: Iniciar dependencias de prueba
         run: |
-          docker compose up -d --wait test-db minio
+          docker compose up -d --wait test-db minio rabbitmq
           docker compose run --rm --no-deps minio-init
 
       - name: Ejecutar pruebas
