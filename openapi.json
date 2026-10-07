@@ -6705,7 +6705,7 @@
                 ],
                 "operationId": "getMyClaim",
                 "summary": "Get my claim",
-                "description": "Returns the authenticated claimant's own claim, including original testimony, linked evidence IDs, actual recorded dates, and a formal resolution only if one exists. An inaccessible and a nonexistent claim are indistinguishable.",
+                "description": "Returns the authenticated claimant's own claim, including original testimony, temporary private URLs for linked evidence images, actual recorded dates, and a formal resolution only if one exists. Evidence URLs are resolved only for files linked to this claim. An inaccessible and a nonexistent claim are indistinguishable.",
                 "security": [
                     {
                         "BearerAuth": []
@@ -6800,159 +6800,7 @@
                         }
                     },
                     "500": {
-                        "description": "Unexpected error while reading the claim.",
-                        "headers": {
-                            "Cache-Control": {
-                                "schema": {
-                                    "type": "string",
-                                    "const": "private, no-store"
-                                }
-                            }
-                        },
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/ErrorResponse"
-                                },
-                                "examples": {
-                                    "internalError": {
-                                        "value": {
-                                            "error": "internal server error"
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        "/claims/{id}/images/{file_id}": {
-            "parameters": [
-                {
-                    "name": "id",
-                    "in": "path",
-                    "required": true,
-                    "description": "Positive 32-bit claim identifier.",
-                    "schema": {
-                        "type": "integer",
-                        "format": "int32",
-                        "minimum": 1
-                    }
-                },
-                {
-                    "name": "file_id",
-                    "in": "path",
-                    "required": true,
-                    "description": "UUID of a private evidence image linked to the owned claim.",
-                    "schema": {
-                        "type": "string",
-                        "format": "uuid"
-                    }
-                }
-            ],
-            "get": {
-                "tags": [
-                    "Claims"
-                ],
-                "operationId": "getMyClaimEvidenceImage",
-                "summary": "Resolve my claim evidence image",
-                "description": "Authorizes the claim owner and verifies that the image is linked to that claim before returning a temporary private URL. The URL is not a public or permanent evidence reference.",
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "Temporary private image URL resolved.",
-                        "headers": {
-                            "Cache-Control": {
-                                "description": "Private response that must not be stored.",
-                                "schema": {
-                                    "type": "string",
-                                    "const": "private, no-store"
-                                }
-                            }
-                        },
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/ClaimImageURL"
-                                }
-                            }
-                        }
-                    },
-                    "401": {
-                        "description": "Authentication failed or authenticated user could not be obtained.",
-                        "headers": {
-                            "Cache-Control": {
-                                "schema": {
-                                    "type": "string",
-                                    "const": "private, no-store"
-                                }
-                            }
-                        },
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/AuthErrorResponse"
-                                }
-                            }
-                        }
-                    },
-                    "403": {
-                        "description": "The authenticated account is not enabled to access claim endpoints.",
-                        "headers": {
-                            "Cache-Control": {
-                                "schema": {
-                                    "type": "string",
-                                    "const": "private, no-store"
-                                }
-                            }
-                        },
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/ErrorResponse"
-                                },
-                                "examples": {
-                                    "accountNotEnabled": {
-                                        "value": {
-                                            "error": "claimant account is not enabled"
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    },
-                    "404": {
-                        "description": "Claim does not exist, is not owned by the authenticated user, or the image is not linked and available for that claim.",
-                        "headers": {
-                            "Cache-Control": {
-                                "schema": {
-                                    "type": "string",
-                                    "const": "private, no-store"
-                                }
-                            }
-                        },
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "$ref": "#/components/schemas/ErrorResponse"
-                                },
-                                "examples": {
-                                    "claimNotFound": {
-                                        "value": {
-                                            "error": "claim resource not found"
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    },
-                    "500": {
-                        "description": "Unexpected error while resolving the evidence image.",
+                        "description": "Unexpected error while reading the claim or resolving linked evidence images. No partial claim detail or evidence URLs are returned.",
                         "headers": {
                             "Cache-Control": {
                                 "schema": {
@@ -17895,12 +17743,12 @@
                     "amount_minor": {
                         "type": "integer",
                         "format": "int64",
-                        "description": "Suggested amount in the currency's minor unit; this is not an executed transfer.",
+                        "description": "Suggested compensation amount in integer ARS cents; this is not an executed transfer.",
                         "example": 1500
                     },
                     "currency": {
                         "type": "string",
-                        "description": "Currency code associated with the suggested amount.",
+                        "description": "Currency code for the suggested compensation. The business operates in ARS.",
                         "example": "ARS"
                     },
                     "unit": {
@@ -17970,7 +17818,7 @@
                     "review_started_on",
                     "closed_on",
                     "description",
-                    "image_file_ids",
+                    "images",
                     "resolution"
                 ],
                 "properties": {
@@ -18036,12 +17884,30 @@
                         "description": "Original testimony submitted by the claimant.",
                         "example": "El servicio acordado no fue completado."
                     },
-                    "image_file_ids": {
+                    "images": {
                         "type": "array",
-                        "description": "IDs of the private evidence images linked to this claim. Resolve an image through GET /claims/{id}/images/{file_id}.",
+                        "description": "Private evidence images linked to this claim, each with a temporary private URL. Only images linked to this claim are included.",
+                        "maxItems": 3,
                         "items": {
-                            "type": "string",
-                            "format": "uuid"
+                            "type": "object",
+                            "required": [
+                                "file_id",
+                                "url"
+                            ],
+                            "properties": {
+                                "file_id": {
+                                    "type": "string",
+                                    "format": "uuid",
+                                    "description": "Stable identifier of the linked private evidence image."
+                                },
+                                "url": {
+                                    "type": "string",
+                                    "format": "uri",
+                                    "minLength": 1,
+                                    "description": "Temporary private URL for the image. Its expiry does not remove the evidence."
+                                }
+                            },
+                            "additionalProperties": false
                         }
                     },
                     "resolution": {
@@ -18094,21 +17960,6 @@
                         "minimum": 0,
                         "description": "Number of claims matching the authenticated owner and optional status filter.",
                         "example": 1
-                    }
-                },
-                "additionalProperties": false
-            },
-            "ClaimImageURL": {
-                "type": "object",
-                "required": [
-                    "url"
-                ],
-                "properties": {
-                    "url": {
-                        "type": "string",
-                        "format": "uri",
-                        "description": "Temporary private URL for the authorized claim evidence image. Its expiry does not remove the evidence.",
-                        "example": "https://storage.example/private-image?signature=temporary"
                     }
                 },
                 "additionalProperties": false

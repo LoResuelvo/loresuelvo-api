@@ -7,11 +7,11 @@ properties:
   amount_minor:
     type: integer
     format: int64
-    description: Suggested amount in the currency's minor unit; this is not an executed transfer.
+    description: Suggested compensation amount in integer ARS cents; this is not an executed transfer.
     example: 1500
   currency:
     type: string
-    description: Currency code associated with the suggested amount.
+    description: Currency code for the suggested compensation. The business operates in ARS.
     example: ARS
   unit:
     type: string

@@ -9,7 +9,7 @@ required:
 - review_started_on
 - closed_on
 - description
-- image_file_ids
+- images
 - resolution
 properties:
   id:
@@ -57,12 +57,26 @@ properties:
     type: string
     description: Original testimony submitted by the claimant.
     example: El servicio acordado no fue completado.
-  image_file_ids:
+  images:
     type: array
-    description: IDs of the private evidence images linked to this claim. Resolve an image through GET /claims/{id}/images/{file_id}.
+    description: Private evidence images linked to this claim, each with a temporary private URL. Only images linked to this claim are included.
+    maxItems: 3
     items:
-      type: string
-      format: uuid
+      type: object
+      required:
+      - file_id
+      - url
+      properties:
+        file_id:
+          type: string
+          format: uuid
+          description: Stable identifier of the linked private evidence image.
+        url:
+          type: string
+          format: uri
+          minLength: 1
+          description: Temporary private URL for the image. Its expiry does not remove the evidence.
+      additionalProperties: false
   resolution:
     oneOf:
     - $ref: '#/components/schemas/ClaimResolution'

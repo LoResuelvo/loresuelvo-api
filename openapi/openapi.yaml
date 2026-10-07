@@ -122,8 +122,6 @@ paths:
     $ref: ./paths/claims.yaml
   /claims/{id}:
     $ref: ./paths/claim-detail.yaml
-  /claims/{id}/images/{file_id}:
-    $ref: ./paths/claim-image.yaml
   /conversations:
     $ref: ./paths/conversations.yaml
   /chatbot/conversations:
@@ -439,8 +437,6 @@ components:
       $ref: ./components/schemas/claim-detail.yaml
     ClaimListPage:
       $ref: ./components/schemas/claim-list-page.yaml
-    ClaimImageURL:
-      $ref: ./components/schemas/claim-image-url.yaml
     FileAudioMetadata:
       $ref: ./components/schemas/file-audio-metadata.yaml
     FileResponse:

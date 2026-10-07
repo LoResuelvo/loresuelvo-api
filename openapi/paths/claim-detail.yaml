@@ -12,7 +12,7 @@ get:
   - Claims
   operationId: getMyClaim
   summary: Get my claim
-  description: Returns the authenticated claimant's own claim, including original testimony, linked evidence IDs, actual recorded dates, and a formal resolution only if one exists. An inaccessible and a nonexistent claim are indistinguishable.
+  description: Returns the authenticated claimant's own claim, including original testimony, temporary private URLs for linked evidence images, actual recorded dates, and a formal resolution only if one exists. Evidence URLs are resolved only for files linked to this claim. An inaccessible and a nonexistent claim are indistinguishable.
   security:
   - BearerAuth: []
   responses:
@@ -70,7 +70,7 @@ get:
               value:
                 error: claim resource not found
     '500':
-      description: Unexpected error while reading the claim.
+      description: Unexpected error while reading the claim or resolving linked evidence images. No partial claim detail or evidence URLs are returned.
       headers:
         Cache-Control:
           schema:
