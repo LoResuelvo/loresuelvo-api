@@ -65,7 +65,6 @@ Feature: Consultar reclamos propios
             And la respuesta no expone la identidad privada del operador, auditorías de acceso, evidencias ajenas ni transacciones financieras completas
             And la respuesta incluye "Cache-Control: private, no-store"
 
-        @wip
         Scenario: 31.18-CC Incluir evidencia privada propia con acceso temporal en el detalle
             Given que "ana@example.com" tiene el reclamo "C1" con la imagen privada confirmada "IMG1" vinculada
             And que estoy autenticado como consumidor "ana@example.com"
@@ -74,7 +73,6 @@ Feature: Consultar reclamos propios
             And el detalle incluye la imagen "IMG1" con una URL temporal privada
             And la respuesta no expone claves de almacenamiento ni credenciales
 
-        @wip
         Scenario: 31.19-CC No revelar el detalle ni las evidencias de otro participante
             Given que "ana@example.com" tiene el reclamo "C1" con la imagen privada confirmada "IMG1" vinculada
             And que estoy autenticado como prestador "juan@example.com"
@@ -82,7 +80,6 @@ Feature: Consultar reclamos propios
             Then el sistema responde con estado 404 sin incluir testimonio, operación ni evidencias
             And la respuesta no entrega una URL temporal
 
-        @wip
         Scenario: 31.19a-CC No incluir evidencia vinculada a otro reclamo en el detalle propio
             Given que "ana@example.com" tiene el reclamo "C1" y "juan@example.com" tiene el reclamo "C2" en la misma operación
             And que la imagen privada confirmada "IMG1" está vinculada a "C1" y no a "C2"
