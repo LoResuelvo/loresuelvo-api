@@ -57,6 +57,10 @@
             "description": "File upload endpoints."
         },
         {
+            "name": "Claims",
+            "description": "Authenticated participants' own claim submission and follow-up endpoints."
+        },
+        {
             "name": "Conversations",
             "description": "Provider work request conversation endpoints."
         },
@@ -6098,7 +6102,7 @@
                 ],
                 "operationId": "presignFileUpload",
                 "summary": "Request a file upload URL",
-                "description": "Creates a pending file record and returns a direct upload URL. Conversation audio must be WebM with Opus, no larger than 5 MiB and 300 seconds. Conversation video must be MP4 with H.264 and optional AAC audio, no larger than 50 MiB; the server validates the object contents, codecs, dimensions, and duration during confirmation, up to 120 seconds.",
+                "description": "Creates a pending file record and returns a direct upload URL. For claim_evidence_image, only private JPEG or PNG images up to 5 MiB are accepted; the upload is create-only and all returned headers (including If-None-Match: *) must be sent unchanged. Confirm the uploaded object before referencing its file_id in POST /claims. Conversation audio must be WebM with Opus, no larger than 5 MiB and 300 seconds. Conversation video must be MP4 with H.264 and optional AAC audio, no larger than 50 MiB; the server validates object contents, codecs, dimensions, and duration during confirmation, up to 120 seconds.",
                 "security": [
                     {
                         "BearerAuth": []
@@ -6137,6 +6141,11 @@
                                         "value": {
                                             "error": "Profile photo could not be uploaded"
                                         }
+                                    },
+                                    "invalidClaimEvidenceImage": {
+                                        "value": {
+                                            "error": "Claim evidence image is not available"
+                                        }
                                     }
                                 }
                             }
@@ -6172,7 +6181,7 @@
                 ],
                 "operationId": "confirmFileUpload",
                 "summary": "Confirm a file upload",
-                "description": "Confirms that the uploaded object exists and that its metadata matches the original upload request.",
+                "description": "Confirms that the uploaded object exists and that its metadata and purpose-specific policy match the original upload request. Claim evidence is private JPEG/PNG up to 5 MiB; its effective decoded format is checked with a bounded metadata decode, not a guarantee that all image pixels have been decoded.",
                 "security": [
                     {
                         "BearerAuth": []
@@ -6223,6 +6232,11 @@
                                         "value": {
                                             "error": "Profile photo could not be uploaded"
                                         }
+                                    },
+                                    "invalidClaimEvidenceImage": {
+                                        "value": {
+                                            "error": "Claim evidence image is not available"
+                                        }
                                     }
                                 }
                             }
@@ -6244,6 +6258,720 @@
                             "application/json": {
                                 "schema": {
                                     "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/claims": {
+            "get": {
+                "tags": [
+                    "Claims"
+                ],
+                "operationId": "listMyClaims",
+                "summary": "List my claims",
+                "description": "Returns only claims owned by the authenticated user. Items are ordered by creation time descending, then claim ID descending. Testimony, evidence contents, and administrative actions are not included.",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "name": "status",
+                        "in": "query",
+                        "required": false,
+                        "description": "Filter by claim status. Omit to include all statuses.",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "open",
+                                "in_review",
+                                "resolved",
+                                "dismissed"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "required": false,
+                        "description": "1-based page number.",
+                        "schema": {
+                            "type": "integer",
+                            "format": "int32",
+                            "minimum": 1,
+                            "default": 1
+                        }
+                    },
+                    {
+                        "name": "limit",
+                        "in": "query",
+                        "required": false,
+                        "description": "Number of items per page.",
+                        "schema": {
+                            "type": "integer",
+                            "format": "int32",
+                            "minimum": 1,
+                            "maximum": 100,
+                            "default": 20
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Owned claims page. An empty result is returned as an empty items array.",
+                        "headers": {
+                            "Cache-Control": {
+                                "description": "Private response that must not be stored.",
+                                "schema": {
+                                    "type": "string",
+                                    "const": "private, no-store"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ClaimListPage"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid status, repeated or unknown query parameter, or invalid pagination value.",
+                        "headers": {
+                            "Cache-Control": {
+                                "schema": {
+                                    "type": "string",
+                                    "const": "private, no-store"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                },
+                                "examples": {
+                                    "invalidCriteria": {
+                                        "value": {
+                                            "error": "invalid claim list criteria"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Authentication failed or authenticated user could not be obtained.",
+                        "headers": {
+                            "Cache-Control": {
+                                "schema": {
+                                    "type": "string",
+                                    "const": "private, no-store"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AuthErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "The authenticated account is not enabled to access claim endpoints.",
+                        "headers": {
+                            "Cache-Control": {
+                                "schema": {
+                                    "type": "string",
+                                    "const": "private, no-store"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                },
+                                "examples": {
+                                    "accountNotEnabled": {
+                                        "value": {
+                                            "error": "claimant account is not enabled"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Unexpected error while listing claims.",
+                        "headers": {
+                            "Cache-Control": {
+                                "schema": {
+                                    "type": "string",
+                                    "const": "private, no-store"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                },
+                                "examples": {
+                                    "internalError": {
+                                        "value": {
+                                            "error": "internal server error"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "post": {
+                "tags": [
+                    "Claims"
+                ],
+                "operationId": "submitClaim",
+                "summary": "Submit a claim",
+                "description": "Creates a claim for an operation in which the authenticated consumer or provider participates. The claimant is derived from authentication. Evidence images must already be uploaded and confirmed using the file endpoints. Replaying the same key and normalized request returns the same claim in its current state; the replay does not create another claim.",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "name": "Idempotency-Key",
+                        "in": "header",
+                        "required": true,
+                        "description": "Non-zero UUID identifying this submission for the authenticated claimant. Reuse only when retrying the same request.",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "example": "5e1ad84e-190c-46ee-8da5-4e88fb64ba87"
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ClaimSubmissionRequest"
+                            },
+                            "examples": {
+                                "jobRequestClaim": {
+                                    "summary": "Claim for an operation identified by a job request",
+                                    "value": {
+                                        "reference": {
+                                            "job_request_id": 12
+                                        },
+                                        "reason": "non_compliance",
+                                        "description": "El servicio acordado no fue completado.",
+                                        "image_file_ids": []
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Claim created. The initial status is open.",
+                        "headers": {
+                            "Location": {
+                                "description": "Relative path of the newly created claim.",
+                                "schema": {
+                                    "type": "string",
+                                    "example": "/claims/7"
+                                }
+                            },
+                            "Cache-Control": {
+                                "description": "Private response that must not be stored.",
+                                "schema": {
+                                    "type": "string",
+                                    "const": "private, no-store"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ClaimAcknowledgment"
+                                }
+                            }
+                        }
+                    },
+                    "200": {
+                        "description": "Idempotent replay of a previously confirmed submission. Returns that claim's current status and original creation time; no Location header is set.",
+                        "headers": {
+                            "Cache-Control": {
+                                "description": "Private response that must not be stored.",
+                                "schema": {
+                                    "type": "string",
+                                    "const": "private, no-store"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ClaimAcknowledgment"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid body, reference, reason, testimony, evidence list, or idempotency key.",
+                        "headers": {
+                            "Cache-Control": {
+                                "schema": {
+                                    "type": "string",
+                                    "const": "private, no-store"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                },
+                                "examples": {
+                                    "invalidSubmission": {
+                                        "value": {
+                                            "error": "invalid claim submission"
+                                        }
+                                    },
+                                    "invalidIdempotencyKey": {
+                                        "value": {
+                                            "error": "invalid claim idempotency key"
+                                        }
+                                    },
+                                    "invalidEvidence": {
+                                        "value": {
+                                            "error": "invalid claim evidence"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Authentication failed or authenticated user could not be obtained.",
+                        "headers": {
+                            "Cache-Control": {
+                                "schema": {
+                                    "type": "string",
+                                    "const": "private, no-store"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AuthErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "The authenticated account is not enabled to submit claims.",
+                        "headers": {
+                            "Cache-Control": {
+                                "schema": {
+                                    "type": "string",
+                                    "const": "private, no-store"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                },
+                                "examples": {
+                                    "accountNotEnabled": {
+                                        "value": {
+                                            "error": "claimant account is not enabled"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "The referenced resource does not exist or is not accessible to the authenticated participant.",
+                        "headers": {
+                            "Cache-Control": {
+                                "schema": {
+                                    "type": "string",
+                                    "const": "private, no-store"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "The key was already used with different content, or this claimant already has an unfinished claim for the same operation.",
+                        "headers": {
+                            "Cache-Control": {
+                                "schema": {
+                                    "type": "string",
+                                    "const": "private, no-store"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                },
+                                "examples": {
+                                    "idempotencyKeyConflict": {
+                                        "summary": "Key reused with different content",
+                                        "value": {
+                                            "error": "claim submission key already used with different content"
+                                        }
+                                    },
+                                    "unfinishedClaimConflict": {
+                                        "summary": "An unfinished claim already exists for this claimant and operation",
+                                        "value": {
+                                            "error": "an unfinished claim already exists for this operation"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Unexpected error while submitting the claim.",
+                        "headers": {
+                            "Cache-Control": {
+                                "schema": {
+                                    "type": "string",
+                                    "const": "private, no-store"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                },
+                                "examples": {
+                                    "internalError": {
+                                        "value": {
+                                            "error": "internal server error"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/claims/{id}": {
+            "parameters": [
+                {
+                    "name": "id",
+                    "in": "path",
+                    "required": true,
+                    "description": "Positive 32-bit claim identifier.",
+                    "schema": {
+                        "type": "integer",
+                        "format": "int32",
+                        "minimum": 1
+                    }
+                }
+            ],
+            "get": {
+                "tags": [
+                    "Claims"
+                ],
+                "operationId": "getMyClaim",
+                "summary": "Get my claim",
+                "description": "Returns the authenticated claimant's own claim, including original testimony, linked evidence IDs, actual recorded dates, and a formal resolution only if one exists. An inaccessible and a nonexistent claim are indistinguishable.",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Owned claim detail.",
+                        "headers": {
+                            "Cache-Control": {
+                                "description": "Private response that must not be stored.",
+                                "schema": {
+                                    "type": "string",
+                                    "const": "private, no-store"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ClaimDetail"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Authentication failed or authenticated user could not be obtained.",
+                        "headers": {
+                            "Cache-Control": {
+                                "schema": {
+                                    "type": "string",
+                                    "const": "private, no-store"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AuthErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "The authenticated account is not enabled to access claim endpoints.",
+                        "headers": {
+                            "Cache-Control": {
+                                "schema": {
+                                    "type": "string",
+                                    "const": "private, no-store"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                },
+                                "examples": {
+                                    "accountNotEnabled": {
+                                        "value": {
+                                            "error": "claimant account is not enabled"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Claim does not exist or is not owned by the authenticated user.",
+                        "headers": {
+                            "Cache-Control": {
+                                "schema": {
+                                    "type": "string",
+                                    "const": "private, no-store"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                },
+                                "examples": {
+                                    "claimNotFound": {
+                                        "value": {
+                                            "error": "claim resource not found"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Unexpected error while reading the claim.",
+                        "headers": {
+                            "Cache-Control": {
+                                "schema": {
+                                    "type": "string",
+                                    "const": "private, no-store"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                },
+                                "examples": {
+                                    "internalError": {
+                                        "value": {
+                                            "error": "internal server error"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/claims/{id}/images/{file_id}": {
+            "parameters": [
+                {
+                    "name": "id",
+                    "in": "path",
+                    "required": true,
+                    "description": "Positive 32-bit claim identifier.",
+                    "schema": {
+                        "type": "integer",
+                        "format": "int32",
+                        "minimum": 1
+                    }
+                },
+                {
+                    "name": "file_id",
+                    "in": "path",
+                    "required": true,
+                    "description": "UUID of a private evidence image linked to the owned claim.",
+                    "schema": {
+                        "type": "string",
+                        "format": "uuid"
+                    }
+                }
+            ],
+            "get": {
+                "tags": [
+                    "Claims"
+                ],
+                "operationId": "getMyClaimEvidenceImage",
+                "summary": "Resolve my claim evidence image",
+                "description": "Authorizes the claim owner and verifies that the image is linked to that claim before returning a temporary private URL. The URL is not a public or permanent evidence reference.",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Temporary private image URL resolved.",
+                        "headers": {
+                            "Cache-Control": {
+                                "description": "Private response that must not be stored.",
+                                "schema": {
+                                    "type": "string",
+                                    "const": "private, no-store"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ClaimImageURL"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Authentication failed or authenticated user could not be obtained.",
+                        "headers": {
+                            "Cache-Control": {
+                                "schema": {
+                                    "type": "string",
+                                    "const": "private, no-store"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AuthErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "The authenticated account is not enabled to access claim endpoints.",
+                        "headers": {
+                            "Cache-Control": {
+                                "schema": {
+                                    "type": "string",
+                                    "const": "private, no-store"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                },
+                                "examples": {
+                                    "accountNotEnabled": {
+                                        "value": {
+                                            "error": "claimant account is not enabled"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Claim does not exist, is not owned by the authenticated user, or the image is not linked and available for that claim.",
+                        "headers": {
+                            "Cache-Control": {
+                                "schema": {
+                                    "type": "string",
+                                    "const": "private, no-store"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                },
+                                "examples": {
+                                    "claimNotFound": {
+                                        "value": {
+                                            "error": "claim resource not found"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Unexpected error while resolving the evidence image.",
+                        "headers": {
+                            "Cache-Control": {
+                                "schema": {
+                                    "type": "string",
+                                    "const": "private, no-store"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                },
+                                "examples": {
+                                    "internalError": {
+                                        "value": {
+                                            "error": "internal server error"
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -16836,13 +17564,13 @@
                     },
                     "mime_type": {
                         "type": "string",
-                        "description": "File MIME type. Profile photos accept image/jpeg, image/png, and image/webp; conversation audio accepts audio/webm; conversation videos accept video/mp4.",
+                        "description": "File MIME type. Profile photos accept image/jpeg, image/png, and image/webp; claim evidence images accept image/jpeg and image/png; conversation audio accepts audio/webm; conversation videos accept video/mp4.",
                         "example": "image/jpeg"
                     },
                     "size_bytes": {
                         "type": "integer",
                         "format": "int32",
-                        "description": "File size in bytes. Profile photos must not exceed 5 MB.",
+                        "description": "File size in bytes. Profile photos and claim evidence images must not exceed 5 MiB.",
                         "example": 1048576
                     },
                     "purpose": {
@@ -16850,6 +17578,7 @@
                         "description": "Intended business use for the file.",
                         "enum": [
                             "profile_photo",
+                            "claim_evidence_image",
                             "conversation_message_audio",
                             "conversation_message_video"
                         ],
@@ -16889,9 +17618,10 @@
                         "additionalProperties": {
                             "type": "string"
                         },
-                        "description": "Headers the client must include when uploading the file bytes.",
+                        "description": "Include every returned header unchanged when uploading the file bytes. For claim evidence, this includes If-None-Match: * to make the object upload create-only; omitting a signed header can cause storage to reject the upload.",
                         "example": {
-                            "Content-Type": "image/jpeg"
+                            "Content-Type": "image/jpeg",
+                            "If-None-Match": "*"
                         }
                     }
                 },
@@ -16912,7 +17642,7 @@
                     },
                     "mime_type": {
                         "type": "string",
-                        "description": "MIME type originally requested for the upload.",
+                        "description": "MIME type originally requested for the upload. Claim evidence accepts image/jpeg or image/png only.",
                         "example": "image/jpeg"
                     },
                     "size_bytes": {
@@ -16920,6 +17650,465 @@
                         "format": "int32",
                         "description": "File size originally requested for the upload.",
                         "example": 1048576
+                    }
+                },
+                "additionalProperties": false
+            },
+            "ClaimReference": {
+                "oneOf": [
+                    {
+                        "type": "object",
+                        "required": [
+                            "job_request_id"
+                        ],
+                        "properties": {
+                            "job_request_id": {
+                                "type": "integer",
+                                "format": "int32",
+                                "minimum": 1,
+                                "description": "Existing job request identifier. Operation identity resolves to jr-N, where N is the request ID.",
+                                "example": 12
+                            }
+                        },
+                        "additionalProperties": false
+                    },
+                    {
+                        "type": "object",
+                        "required": [
+                            "service_proposal_id"
+                        ],
+                        "properties": {
+                            "service_proposal_id": {
+                                "type": "integer",
+                                "format": "int32",
+                                "minimum": 1,
+                                "description": "Existing service proposal identifier. The first proposal shares its request operation identity (jr-N); a later proposal has its own identity (sp-N).",
+                                "example": 34
+                            }
+                        },
+                        "additionalProperties": false
+                    },
+                    {
+                        "type": "object",
+                        "required": [
+                            "work_order_id"
+                        ],
+                        "properties": {
+                            "work_order_id": {
+                                "type": "integer",
+                                "format": "int32",
+                                "minimum": 1,
+                                "description": "Existing work order identifier; its operation identity resolves through its associated proposal, using jr-N for the first proposal and sp-N for a later proposal.",
+                                "example": 56
+                            }
+                        },
+                        "additionalProperties": false
+                    },
+                    {
+                        "type": "object",
+                        "required": [
+                            "payment_intent_id"
+                        ],
+                        "properties": {
+                            "payment_intent_id": {
+                                "type": "string",
+                                "format": "uuid",
+                                "description": "Existing payment intent UUID; its operation identity resolves through its service proposal, using jr-N for the first proposal and sp-N for a later proposal.",
+                                "example": "4af47f1b-97b6-4b32-baa0-b95d6077f919"
+                            }
+                        },
+                        "additionalProperties": false
+                    }
+                ],
+                "description": "Exactly one reference to an existing resource the authenticated participant is authorized to access."
+            },
+            "ClaimSubmissionRequest": {
+                "type": "object",
+                "required": [
+                    "reference",
+                    "reason",
+                    "description"
+                ],
+                "properties": {
+                    "reference": {
+                        "$ref": "#/components/schemas/ClaimReference"
+                    },
+                    "reason": {
+                        "type": "string",
+                        "enum": [
+                            "non_compliance",
+                            "improper_charge",
+                            "damage",
+                            "poor_quality"
+                        ],
+                        "description": "Structured claim reason; it records the claimant's allegation and does not establish that it is proven.",
+                        "example": "non_compliance"
+                    },
+                    "description": {
+                        "type": "string",
+                        "description": "Original testimony after trimming surrounding whitespace. The trimmed value must contain 1 to 5000 Unicode code points and cannot contain NUL. The runtime trims before applying the limit, so whitespace outside the value is not counted by that limit.",
+                        "example": "El servicio acordado no fue completado."
+                    },
+                    "image_file_ids": {
+                        "type": "array",
+                        "maxItems": 3,
+                        "uniqueItems": true,
+                        "description": "Optional IDs of confirmed, private claim evidence images uploaded before claim submission. Omitted is equivalent to an empty array.",
+                        "items": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "example": [
+                            "4af47f1b-97b6-4b32-baa0-b95d6077f919"
+                        ]
+                    }
+                },
+                "additionalProperties": false
+            },
+            "ClaimAcknowledgment": {
+                "type": "object",
+                "required": [
+                    "id",
+                    "operation_id",
+                    "reference",
+                    "status",
+                    "created_on"
+                ],
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "format": "int32",
+                        "minimum": 1,
+                        "description": "Claim identifier.",
+                        "example": 7
+                    },
+                    "operation_id": {
+                        "type": "string",
+                        "pattern": "^(jr|sp)-[1-9][0-9]*$",
+                        "description": "Canonical operation identifier. A request and its first proposal use jr-N; a later proposal uses sp-N.",
+                        "example": "jr-12"
+                    },
+                    "reference": {
+                        "$ref": "#/components/schemas/ClaimReference"
+                    },
+                    "status": {
+                        "type": "string",
+                        "enum": [
+                            "open",
+                            "in_review",
+                            "resolved",
+                            "dismissed"
+                        ],
+                        "example": "open"
+                    },
+                    "created_on": {
+                        "type": "string",
+                        "format": "date-time",
+                        "description": "Server-recorded creation time in UTC.",
+                        "example": "2026-10-07T12:30:00Z"
+                    }
+                },
+                "additionalProperties": false
+            },
+            "ClaimSummary": {
+                "type": "object",
+                "required": [
+                    "id",
+                    "operation_id",
+                    "reference",
+                    "status",
+                    "created_on",
+                    "reason",
+                    "review_started_on",
+                    "closed_on"
+                ],
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "format": "int32",
+                        "minimum": 1,
+                        "description": "Claim identifier.",
+                        "example": 7
+                    },
+                    "operation_id": {
+                        "type": "string",
+                        "pattern": "^(jr|sp)-[1-9][0-9]*$",
+                        "description": "Canonical operation identifier. A request and its first proposal use jr-N; a later proposal uses sp-N.",
+                        "example": "jr-12"
+                    },
+                    "reference": {
+                        "$ref": "#/components/schemas/ClaimReference"
+                    },
+                    "status": {
+                        "type": "string",
+                        "enum": [
+                            "open",
+                            "in_review",
+                            "resolved",
+                            "dismissed"
+                        ],
+                        "example": "open"
+                    },
+                    "created_on": {
+                        "type": "string",
+                        "format": "date-time",
+                        "description": "Server-recorded creation time in UTC.",
+                        "example": "2026-10-07T12:30:00Z"
+                    },
+                    "reason": {
+                        "type": "string",
+                        "enum": [
+                            "non_compliance",
+                            "improper_charge",
+                            "damage",
+                            "poor_quality"
+                        ]
+                    },
+                    "review_started_on": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "date-time",
+                        "description": "Actual server-recorded start time of review, or null if review has not started."
+                    },
+                    "closed_on": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "date-time",
+                        "description": "Actual server-recorded closure time, or null while the claim is not finalized."
+                    }
+                },
+                "description": "Owned claim summary. Does not expose testimony, evidence, or administrative actions.",
+                "additionalProperties": false
+            },
+            "ClaimSuggestedCompensation": {
+                "type": "object",
+                "required": [
+                    "amount_minor",
+                    "currency",
+                    "unit"
+                ],
+                "properties": {
+                    "amount_minor": {
+                        "type": "integer",
+                        "format": "int64",
+                        "description": "Suggested amount in the currency's minor unit; this is not an executed transfer.",
+                        "example": 1500
+                    },
+                    "currency": {
+                        "type": "string",
+                        "description": "Currency code associated with the suggested amount.",
+                        "example": "ARS"
+                    },
+                    "unit": {
+                        "type": "string",
+                        "description": "Monetary unit used by the amount representation; currently minor.",
+                        "enum": [
+                            "minor"
+                        ],
+                        "example": "minor"
+                    }
+                },
+                "additionalProperties": false
+            },
+            "ClaimResolution": {
+                "type": "object",
+                "required": [
+                    "type",
+                    "reasoning",
+                    "resolved_on",
+                    "suggested_compensation"
+                ],
+                "properties": {
+                    "type": {
+                        "type": "string",
+                        "enum": [
+                            "consumer_favor",
+                            "provider_favor",
+                            "agreement",
+                            "without_merit"
+                        ],
+                        "example": "consumer_favor"
+                    },
+                    "reasoning": {
+                        "type": "string",
+                        "description": "Formal reasoning recorded for the resolution and returned to the claimant.",
+                        "example": "Se constató el incumplimiento informado."
+                    },
+                    "resolved_on": {
+                        "type": "string",
+                        "format": "date-time",
+                        "description": "Actual server-recorded resolution time.",
+                        "example": "2026-10-08T12:30:00Z"
+                    },
+                    "suggested_compensation": {
+                        "oneOf": [
+                            {
+                                "$ref": "#/components/schemas/ClaimSuggestedCompensation"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "description": "Optional recommendation only; it does not execute or imply a payment or refund."
+                    }
+                },
+                "additionalProperties": false
+            },
+            "ClaimDetail": {
+                "type": "object",
+                "required": [
+                    "id",
+                    "operation_id",
+                    "reference",
+                    "status",
+                    "created_on",
+                    "reason",
+                    "review_started_on",
+                    "closed_on",
+                    "description",
+                    "image_file_ids",
+                    "resolution"
+                ],
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "format": "int32",
+                        "minimum": 1,
+                        "description": "Claim identifier.",
+                        "example": 7
+                    },
+                    "operation_id": {
+                        "type": "string",
+                        "pattern": "^(jr|sp)-[1-9][0-9]*$",
+                        "description": "Canonical operation identifier. A request and its first proposal use jr-N; a later proposal uses sp-N.",
+                        "example": "jr-12"
+                    },
+                    "reference": {
+                        "$ref": "#/components/schemas/ClaimReference"
+                    },
+                    "status": {
+                        "type": "string",
+                        "enum": [
+                            "open",
+                            "in_review",
+                            "resolved",
+                            "dismissed"
+                        ],
+                        "example": "open"
+                    },
+                    "created_on": {
+                        "type": "string",
+                        "format": "date-time",
+                        "description": "Server-recorded creation time in UTC.",
+                        "example": "2026-10-07T12:30:00Z"
+                    },
+                    "reason": {
+                        "type": "string",
+                        "enum": [
+                            "non_compliance",
+                            "improper_charge",
+                            "damage",
+                            "poor_quality"
+                        ]
+                    },
+                    "review_started_on": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "date-time",
+                        "description": "Actual server-recorded start time of review, or null if review has not started."
+                    },
+                    "closed_on": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "date-time",
+                        "description": "Actual server-recorded closure time, or null while the claim is not finalized."
+                    },
+                    "description": {
+                        "type": "string",
+                        "description": "Original testimony submitted by the claimant.",
+                        "example": "El servicio acordado no fue completado."
+                    },
+                    "image_file_ids": {
+                        "type": "array",
+                        "description": "IDs of the private evidence images linked to this claim. Resolve an image through GET /claims/{id}/images/{file_id}.",
+                        "items": {
+                            "type": "string",
+                            "format": "uuid"
+                        }
+                    },
+                    "resolution": {
+                        "oneOf": [
+                            {
+                                "$ref": "#/components/schemas/ClaimResolution"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "description": "Formal resolution once one exists; null before then."
+                    }
+                },
+                "description": "Owned claim detail. The other operation participant cannot access this resource unless they are its claimant.",
+                "additionalProperties": false
+            },
+            "ClaimListPage": {
+                "type": "object",
+                "required": [
+                    "items",
+                    "page",
+                    "limit",
+                    "total"
+                ],
+                "properties": {
+                    "items": {
+                        "type": "array",
+                        "description": "Owned claim summaries; empty when the page has no results.",
+                        "items": {
+                            "$ref": "#/components/schemas/ClaimSummary"
+                        }
+                    },
+                    "page": {
+                        "type": "integer",
+                        "format": "int32",
+                        "minimum": 1,
+                        "example": 1
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "format": "int32",
+                        "minimum": 1,
+                        "maximum": 100,
+                        "example": 20
+                    },
+                    "total": {
+                        "type": "integer",
+                        "format": "int32",
+                        "minimum": 0,
+                        "description": "Number of claims matching the authenticated owner and optional status filter.",
+                        "example": 1
+                    }
+                },
+                "additionalProperties": false
+            },
+            "ClaimImageURL": {
+                "type": "object",
+                "required": [
+                    "url"
+                ],
+                "properties": {
+                    "url": {
+                        "type": "string",
+                        "format": "uri",
+                        "description": "Temporary private URL for the authorized claim evidence image. Its expiry does not remove the evidence.",
+                        "example": "https://storage.example/private-image?signature=temporary"
                     }
                 },
                 "additionalProperties": false

@@ -3,7 +3,16 @@ post:
   - Files
   operationId: presignFileUpload
   summary: Request a file upload URL
-  description: Creates a pending file record and returns a direct upload URL. Conversation audio must be WebM with Opus, no larger than 5 MiB and 300 seconds. Conversation video must be MP4 with H.264 and optional AAC audio, no larger than 50 MiB; the server validates the object contents, codecs, dimensions, and duration during confirmation, up to 120 seconds.
+  description: >-
+    Creates a pending file record and returns a direct upload URL. For
+    claim_evidence_image, only private JPEG or PNG images up to 5 MiB are
+    accepted; the upload is create-only and all returned headers (including
+    If-None-Match: *) must be sent unchanged. Confirm the uploaded object before
+    referencing its file_id in POST /claims. Conversation audio must be WebM
+    with Opus, no larger than 5 MiB and 300 seconds. Conversation video must be
+    MP4 with H.264 and optional AAC audio, no larger than 50 MiB; the server
+    validates object contents, codecs, dimensions, and duration during
+    confirmation, up to 120 seconds.
   security:
   - BearerAuth: []
   requestBody:
@@ -29,6 +38,9 @@ post:
             invalidProfilePhoto:
               value:
                 error: Profile photo could not be uploaded
+            invalidClaimEvidenceImage:
+              value:
+                error: Claim evidence image is not available
     '401':
       description: Authentication failed.
       content:

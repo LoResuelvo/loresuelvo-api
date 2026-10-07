@@ -1,0 +1,32 @@
+type: object
+required:
+- reference
+- reason
+- description
+properties:
+  reference:
+    $ref: '#/components/schemas/ClaimReference'
+  reason:
+    type: string
+    enum:
+    - non_compliance
+    - improper_charge
+    - damage
+    - poor_quality
+    description: Structured claim reason; it records the claimant's allegation and does not establish that it is proven.
+    example: non_compliance
+  description:
+    type: string
+    description: Original testimony after trimming surrounding whitespace. The trimmed value must contain 1 to 5000 Unicode code points and cannot contain NUL. The runtime trims before applying the limit, so whitespace outside the value is not counted by that limit.
+    example: El servicio acordado no fue completado.
+  image_file_ids:
+    type: array
+    maxItems: 3
+    uniqueItems: true
+    description: Optional IDs of confirmed, private claim evidence images uploaded before claim submission. Omitted is equivalent to an empty array.
+    items:
+      type: string
+      format: uuid
+    example:
+    - 4af47f1b-97b6-4b32-baa0-b95d6077f919
+additionalProperties: false

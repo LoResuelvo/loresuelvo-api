@@ -31,6 +31,8 @@ tags:
   description: Checkout and verified payment processing endpoints.
 - name: Files
   description: File upload endpoints.
+- name: Claims
+  description: Authenticated participants' own claim submission and follow-up endpoints.
 - name: Conversations
   description: Provider work request conversation endpoints.
 - name: JobRequests
@@ -116,6 +118,12 @@ paths:
     $ref: ./paths/files-presign.yaml
   /files/{fileID}/confirm:
     $ref: ./paths/file-confirm.yaml
+  /claims:
+    $ref: ./paths/claims.yaml
+  /claims/{id}:
+    $ref: ./paths/claim-detail.yaml
+  /claims/{id}/images/{file_id}:
+    $ref: ./paths/claim-image.yaml
   /conversations:
     $ref: ./paths/conversations.yaml
   /chatbot/conversations:
@@ -415,6 +423,24 @@ components:
       $ref: ./components/schemas/presign-file-response.yaml
     ConfirmFileRequest:
       $ref: ./components/schemas/confirm-file-request.yaml
+    ClaimReference:
+      $ref: ./components/schemas/claim-reference.yaml
+    ClaimSubmissionRequest:
+      $ref: ./components/schemas/claim-submission-request.yaml
+    ClaimAcknowledgment:
+      $ref: ./components/schemas/claim-acknowledgment.yaml
+    ClaimSummary:
+      $ref: ./components/schemas/claim-summary.yaml
+    ClaimSuggestedCompensation:
+      $ref: ./components/schemas/claim-suggested-compensation.yaml
+    ClaimResolution:
+      $ref: ./components/schemas/claim-resolution.yaml
+    ClaimDetail:
+      $ref: ./components/schemas/claim-detail.yaml
+    ClaimListPage:
+      $ref: ./components/schemas/claim-list-page.yaml
+    ClaimImageURL:
+      $ref: ./components/schemas/claim-image-url.yaml
     FileAudioMetadata:
       $ref: ./components/schemas/file-audio-metadata.yaml
     FileResponse:

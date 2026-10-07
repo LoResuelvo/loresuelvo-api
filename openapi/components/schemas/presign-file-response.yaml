@@ -23,7 +23,12 @@ properties:
     type: object
     additionalProperties:
       type: string
-    description: Headers the client must include when uploading the file bytes.
+    description: >-
+      Include every returned header unchanged when uploading the file bytes. For
+      claim evidence, this includes If-None-Match: * to make the object upload
+      create-only; omitting a signed header can cause storage to reject the
+      upload.
     example:
       Content-Type: image/jpeg
+      If-None-Match: '*'
 additionalProperties: false

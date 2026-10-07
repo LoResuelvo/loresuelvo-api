@@ -1,0 +1,10 @@
+type: object
+required:
+- url
+properties:
+  url:
+    type: string
+    format: uri
+    description: Temporary private URL for the authorized claim evidence image. Its expiry does not remove the evidence.
+    example: https://storage.example/private-image?signature=temporary
+additionalProperties: false

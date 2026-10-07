@@ -1,0 +1,22 @@
+type: object
+required:
+- amount_minor
+- currency
+- unit
+properties:
+  amount_minor:
+    type: integer
+    format: int64
+    description: Suggested amount in the currency's minor unit; this is not an executed transfer.
+    example: 1500
+  currency:
+    type: string
+    description: Currency code associated with the suggested amount.
+    example: ARS
+  unit:
+    type: string
+    description: Monetary unit used by the amount representation; currently minor.
+    enum:
+    - minor
+    example: minor
+additionalProperties: false

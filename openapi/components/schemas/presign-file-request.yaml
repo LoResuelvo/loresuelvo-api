@@ -12,18 +12,19 @@ properties:
     example: foto-perfil.jpg
   mime_type:
     type: string
-    description: File MIME type. Profile photos accept image/jpeg, image/png, and image/webp; conversation audio accepts audio/webm; conversation videos accept video/mp4.
+    description: File MIME type. Profile photos accept image/jpeg, image/png, and image/webp; claim evidence images accept image/jpeg and image/png; conversation audio accepts audio/webm; conversation videos accept video/mp4.
     example: image/jpeg
   size_bytes:
     type: integer
     format: int32
-    description: File size in bytes. Profile photos must not exceed 5 MB.
+    description: File size in bytes. Profile photos and claim evidence images must not exceed 5 MiB.
     example: 1048576
   purpose:
     type: string
     description: Intended business use for the file.
     enum:
     - profile_photo
+    - claim_evidence_image
     - conversation_message_audio
     - conversation_message_video
     example: profile_photo

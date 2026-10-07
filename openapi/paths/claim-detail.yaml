@@ -1,0 +1,86 @@
+parameters:
+- name: id
+  in: path
+  required: true
+  description: Positive 32-bit claim identifier.
+  schema:
+    type: integer
+    format: int32
+    minimum: 1
+get:
+  tags:
+  - Claims
+  operationId: getMyClaim
+  summary: Get my claim
+  description: Returns the authenticated claimant's own claim, including original testimony, linked evidence IDs, actual recorded dates, and a formal resolution only if one exists. An inaccessible and a nonexistent claim are indistinguishable.
+  security:
+  - BearerAuth: []
+  responses:
+    '200':
+      description: Owned claim detail.
+      headers:
+        Cache-Control:
+          description: Private response that must not be stored.
+          schema:
+            type: string
+            const: private, no-store
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ClaimDetail'
+    '401':
+      description: Authentication failed or authenticated user could not be obtained.
+      headers:
+        Cache-Control:
+          schema:
+            type: string
+            const: private, no-store
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/AuthErrorResponse'
+    '403':
+      description: The authenticated account is not enabled to access claim endpoints.
+      headers:
+        Cache-Control:
+          schema:
+            type: string
+            const: private, no-store
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            accountNotEnabled:
+              value:
+                error: claimant account is not enabled
+    '404':
+      description: Claim does not exist or is not owned by the authenticated user.
+      headers:
+        Cache-Control:
+          schema:
+            type: string
+            const: private, no-store
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            claimNotFound:
+              value:
+                error: claim resource not found
+    '500':
+      description: Unexpected error while reading the claim.
+      headers:
+        Cache-Control:
+          schema:
+            type: string
+            const: private, no-store
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            internalError:
+              value:
+                error: internal server error

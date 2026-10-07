@@ -1,0 +1,45 @@
+oneOf:
+- type: object
+  required:
+  - job_request_id
+  properties:
+    job_request_id:
+      type: integer
+      format: int32
+      minimum: 1
+      description: Existing job request identifier. Operation identity resolves to jr-N, where N is the request ID.
+      example: 12
+  additionalProperties: false
+- type: object
+  required:
+  - service_proposal_id
+  properties:
+    service_proposal_id:
+      type: integer
+      format: int32
+      minimum: 1
+      description: Existing service proposal identifier. The first proposal shares its request operation identity (jr-N); a later proposal has its own identity (sp-N).
+      example: 34
+  additionalProperties: false
+- type: object
+  required:
+  - work_order_id
+  properties:
+    work_order_id:
+      type: integer
+      format: int32
+      minimum: 1
+      description: Existing work order identifier; its operation identity resolves through its associated proposal, using jr-N for the first proposal and sp-N for a later proposal.
+      example: 56
+  additionalProperties: false
+- type: object
+  required:
+  - payment_intent_id
+  properties:
+    payment_intent_id:
+      type: string
+      format: uuid
+      description: Existing payment intent UUID; its operation identity resolves through its service proposal, using jr-N for the first proposal and sp-N for a later proposal.
+      example: 4af47f1b-97b6-4b32-baa0-b95d6077f919
+  additionalProperties: false
+description: Exactly one reference to an existing resource the authenticated participant is authorized to access.

@@ -3,7 +3,7 @@ post:
   - Files
   operationId: confirmFileUpload
   summary: Confirm a file upload
-  description: Confirms that the uploaded object exists and that its metadata matches the original upload request.
+  description: Confirms that the uploaded object exists and that its metadata and purpose-specific policy match the original upload request. Claim evidence is private JPEG/PNG up to 5 MiB; its effective decoded format is checked with a bounded metadata decode, not a guarantee that all image pixels have been decoded.
   security:
   - BearerAuth: []
   parameters:
@@ -37,6 +37,9 @@ post:
             cannotConfirm:
               value:
                 error: Profile photo could not be uploaded
+            invalidClaimEvidenceImage:
+              value:
+                error: Claim evidence image is not available
     '401':
       description: Authentication failed.
       content:

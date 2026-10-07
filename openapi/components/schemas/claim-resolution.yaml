@@ -1,0 +1,30 @@
+type: object
+required:
+- type
+- reasoning
+- resolved_on
+- suggested_compensation
+properties:
+  type:
+    type: string
+    enum:
+    - consumer_favor
+    - provider_favor
+    - agreement
+    - without_merit
+    example: consumer_favor
+  reasoning:
+    type: string
+    description: Formal reasoning recorded for the resolution and returned to the claimant.
+    example: Se constató el incumplimiento informado.
+  resolved_on:
+    type: string
+    format: date-time
+    description: Actual server-recorded resolution time.
+    example: '2026-10-08T12:30:00Z'
+  suggested_compensation:
+    oneOf:
+    - $ref: '#/components/schemas/ClaimSuggestedCompensation'
+    - type: 'null'
+    description: Optional recommendation only; it does not execute or imply a payment or refund.
+additionalProperties: false
