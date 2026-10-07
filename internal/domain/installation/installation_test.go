@@ -103,3 +103,27 @@ func TestUnregisterIsIdempotentAndRejectsLateSameBindingRenewal(t *testing.T) {
 	require.False(t, i.Enabled)
 	require.ErrorIs(t, i.Register(10, "consumer", r), ErrConflict)
 }
+
+func TestInvalidTokenCanRenewInSameLiveBinding(t *testing.T) {
+	r := validRegistration()
+	i, err := NewRegistered(10, "consumer", r)
+	require.NoError(t, err)
+	i.Invalidate()
+	require.False(t, i.Enabled)
+	require.False(t, i.Revoked)
+	require.ErrorIs(t, i.Register(10, "consumer", r), ErrConflict)
+	r.Token = "fresh-token"
+	require.NoError(t, i.Register(10, "consumer", r))
+	require.True(t, i.Enabled)
+	require.Equal(t, r.BindingID, i.BindingID)
+}
+func TestRevokedBindingCannotRenewEvenWithFreshToken(t *testing.T) {
+	r := validRegistration()
+	i, err := NewRegistered(10, "consumer", r)
+	require.NoError(t, err)
+	require.NoError(t, i.Unregister(10, r.Secret, r.BindingID))
+	r.Token = "fresh-token"
+	require.ErrorIs(t, i.Register(10, "consumer", r), ErrConflict)
+	require.True(t, i.Revoked)
+	require.False(t, i.Enabled)
+}

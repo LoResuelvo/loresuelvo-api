@@ -33,6 +33,7 @@ func (stub identityVerificationWebhookSignerStub) Sign(body []byte) string {
 type pushRequestCapture struct {
 	mu       sync.Mutex
 	requests []pushCapturedRequest
+	status   int
 }
 type pushCapturedRequest struct {
 	Message struct {
@@ -53,9 +54,13 @@ func newPushRequestCapture(tb testing.TB) (*pushRequestCapture, *httptest.Server
 		}
 		capture.mu.Lock()
 		capture.requests = append(capture.requests, request)
+		status := capture.status
 		capture.mu.Unlock()
+		if status == 0 {
+			status = http.StatusOK
+		}
 		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
+		w.WriteHeader(status)
 	}))
 	tb.Cleanup(server.Close)
 	return capture, server
@@ -65,4 +70,10 @@ func (c *pushRequestCapture) snapshot() []pushCapturedRequest {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	return append([]pushCapturedRequest(nil), c.requests...)
+}
+
+func (c *pushRequestCapture) setStatus(status int) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.status = status
 }

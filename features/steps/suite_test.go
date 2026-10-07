@@ -188,6 +188,7 @@ type testSuite struct {
 func (s *testSuite) registerAllSteps(sc *godog.ScenarioContext) {
 	registerServiceNoticeSteps(sc, s)
 	registerPhoneSteps(sc, s)
+	registerNoticeDeliverySteps(sc, s)
 	registerConsumerAccountSteps(sc, s)
 	registerProviderAccountSteps(sc, s)
 	registerProviderWithProfilePhotoSteps(sc, s)
@@ -264,6 +265,7 @@ func (s *testSuite) registerAllSteps(sc *godog.ScenarioContext) {
 
 func (s *testSuite) cleanup() error {
 	s.pushCapture.reset()
+	s.pushCapture.setStatus(0)
 	s.closeRealtimeConnections()
 	if err := s.identityVerificationRepository.DeleteAll(); err != nil {
 		return fmt.Errorf("could not clean identity verifications: %w", err)

@@ -1,4 +1,4 @@
-@wip @US-20
+@US-20
 Feature: Conservar el trabajo realizado aunque falle un aviso
     Como usuario de LoResuelvo
     quiero que mis mensajes queden guardados aunque falle el aviso al teléfono

@@ -16,6 +16,7 @@ type Installation struct {
 	Locale     string
 	BindingID  string
 	Enabled    bool
+	Revoked    bool
 	SecretHash []byte
 	Revision   int64
 }
@@ -89,7 +90,7 @@ func (i *Installation) Register(userID int, role string, r Registration) error {
 		if i.UserID != userID {
 			return ErrForbidden
 		}
-		if !i.Enabled {
+		if !i.Enabled && (i.Revoked || i.Token == r.Token) {
 			return ErrConflict
 		}
 	} else if r.PreviousBindingID != i.BindingID {
@@ -100,6 +101,7 @@ func (i *Installation) Register(userID int, role string, r Registration) error {
 		return err
 	}
 	i.UserID, i.Token, i.Locale, i.BindingID, i.Enabled = renewed.UserID, renewed.Token, renewed.Locale, renewed.BindingID, true
+	i.Revoked = false
 	return nil
 }
 func (i *Installation) Unregister(userID int, secret, bindingID string) error {
@@ -113,5 +115,9 @@ func (i *Installation) Unregister(userID int, secret, bindingID string) error {
 		return ErrConflict
 	}
 	i.Enabled = false
+	i.Revoked = true
 	return nil
 }
+
+// Invalidate disables a confirmed invalid delivery token while preserving the login.
+func (i *Installation) Invalidate() { i.Enabled = false }

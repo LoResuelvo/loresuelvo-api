@@ -6,6 +6,7 @@ import (
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/repositories"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/installation"
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 )
 
@@ -64,7 +65,7 @@ func TestInstallationRepositoryRejectsStaleRevision(t *testing.T) {
 	stale := *current
 	current.Token = "renewed-revision-token"
 	require.NoError(t, repository.Save(t.Context(), current))
-	stale.Enabled = false
+	stale.Invalidate()
 	require.ErrorIs(t, repository.Save(t.Context(), &stale), installation.ErrConflict)
 	found, err := repository.FindByID(t.Context(), i.ID)
 	require.NoError(t, err)
@@ -102,4 +103,43 @@ func TestInstallationRepositoryExcludesDisabledDevices(t *testing.T) {
 	devices, err := repository.FindByUserID(t.Context(), id)
 	require.NoError(t, err)
 	require.Empty(t, devices)
+}
+
+func TestInstallationRepositoryPersistsInvalidationAndRevocation(t *testing.T) {
+	fixture := newNotificationRepositoryTest(t)
+	user := consumerWithAddress(t, fixture.database, "auth0|push-state", "push-state@example.com", "Ana", "Perez")
+	_, err := fixture.userRepository.Save(t.Context(), user)
+	require.NoError(t, err)
+	id, err := fixture.userRepository.FindIDByEmail(user.Email())
+	require.NoError(t, err)
+	repository := repositories.NewInstallationRepository(fixture.database)
+	for _, revoked := range []bool{false, true} {
+		r := installation.Registration{ID: uuid.NewString(), Secret: uuid.NewString(), App: "consumer", Token: uuid.NewString(), BindingID: uuid.NewString()}
+		i, err := installation.NewRegistered(id, "consumer", r)
+		require.NoError(t, err)
+		require.NoError(t, repository.Save(t.Context(), i))
+		if revoked {
+			require.NoError(t, i.Unregister(id, r.Secret, r.BindingID))
+		} else {
+			i.Invalidate()
+		}
+		require.NoError(t, repository.Save(t.Context(), i))
+		found, err := repository.FindByID(t.Context(), i.ID)
+		require.NoError(t, err)
+		require.False(t, found.Enabled)
+		require.Equal(t, revoked, found.Revoked)
+		r.Token = uuid.NewString()
+		err = found.Register(id, "consumer", r)
+		if revoked {
+			require.ErrorIs(t, err, installation.ErrConflict)
+			continue
+		}
+		require.NoError(t, err)
+		require.NoError(t, repository.Save(t.Context(), found))
+		renewed, err := repository.FindByID(t.Context(), i.ID)
+		require.NoError(t, err)
+		require.True(t, renewed.Enabled)
+		require.False(t, renewed.Revoked)
+		require.Equal(t, r.Token, renewed.Token)
+	}
 }

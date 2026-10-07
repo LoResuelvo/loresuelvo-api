@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -15,6 +16,8 @@ import (
 	"cloud.google.com/go/auth/credentials"
 	"cloud.google.com/go/auth/httptransport"
 )
+
+var ErrInvalidToken = errors.New("FCM registration token invalid")
 
 type Sender struct {
 	Client  *http.Client
@@ -57,11 +60,7 @@ func NewSenderFromEnv() (*Sender, error) {
 	return &Sender{Client: client, URL: "https://fcm.googleapis.com/v1/projects/" + project + "/messages:send", Timeout: timeout}, nil
 }
 func (s *Sender) Send(ctx context.Context, token string, data map[string]string, ttl time.Duration) error {
-	timeout := s.Timeout
-	if timeout <= 0 {
-		timeout = 5 * time.Second
-	}
-	ctx, cancel := context.WithTimeout(ctx, timeout)
+	ctx, cancel := context.WithTimeout(ctx, s.timeout())
 	defer cancel()
 	body, err := json.Marshal(map[string]any{"message": map[string]any{"token": token, "data": data, "android": map[string]string{"priority": "high", "ttl": strconv.FormatInt(int64(ttl/time.Second), 10) + "s"}}})
 	if err != nil {
@@ -77,11 +76,48 @@ func (s *Sender) Send(ctx context.Context, token string, data map[string]string,
 		return fmt.Errorf("FCM transport failed")
 	}
 	defer response.Body.Close()
-	if _, err := io.Copy(io.Discard, io.LimitReader(response.Body, 65536)); err != nil {
+
+	if response.StatusCode >= 200 && response.StatusCode < 300 {
+		if _, err := io.Copy(io.Discard, io.LimitReader(response.Body, 65536)); err != nil {
+			return fmt.Errorf("reading FCM response")
+		}
+		return nil
+	}
+	body, err = io.ReadAll(io.LimitReader(response.Body, 65537))
+	if err != nil {
 		return fmt.Errorf("reading FCM response")
 	}
-	if response.StatusCode < 200 || response.StatusCode >= 300 {
-		return fmt.Errorf("FCM rejected request: status %d", response.StatusCode)
+	if len(body) <= 65536 && invalidRegistrationToken(response.StatusCode, body) {
+		return ErrInvalidToken
 	}
-	return nil
+	return fmt.Errorf("FCM rejected request: status %d", response.StatusCode)
+}
+func (s *Sender) timeout() time.Duration {
+	if s.Timeout > 0 {
+		return s.Timeout
+	}
+	return 5 * time.Second
+}
+func invalidRegistrationToken(status int, body []byte) bool {
+	var response struct {
+		Error struct {
+			Details []struct {
+				Type string `json:"@type"`
+				Code string `json:"errorCode"`
+			} `json:"details"`
+		} `json:"error"`
+	}
+	if err := json.Unmarshal(body, &response); err != nil {
+		return false
+	}
+	invalid := false
+	for _, detail := range response.Error.Details {
+		if detail.Type == "type.googleapis.com/google.rpc.BadRequest" {
+			return false
+		}
+		if detail.Type == "type.googleapis.com/google.firebase.fcm.v1.FcmError" && ((status == http.StatusNotFound && detail.Code == "UNREGISTERED") || (status == http.StatusBadRequest && detail.Code == "INVALID_ARGUMENT")) {
+			invalid = true
+		}
+	}
+	return invalid
 }

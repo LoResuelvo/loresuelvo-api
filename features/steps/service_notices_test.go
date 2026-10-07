@@ -2,6 +2,7 @@ package steps_test
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"net/http"
@@ -177,6 +178,13 @@ func (s *testSuite) noticePhones() error {
 	return s.noticePhone("Juan", "es")
 }
 func (s *testSuite) noticeConversation() error {
+	if _, err := s.userRepository.FindIDByEmail("ana@example.com"); errors.Is(err, sql.ErrNoRows) {
+		if err := s.noticeParticipants(); err != nil {
+			return err
+		}
+	} else if err != nil {
+		return err
+	}
 	return s.thereIsActiveChatBetweenConsumerAndProvider("ana@example.com", "juan.plomero@example.com")
 }
 func (s *testSuite) noticeProposalReady() error {

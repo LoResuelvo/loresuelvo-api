@@ -2,6 +2,7 @@ package notificationadapter
 
 import (
 	"context"
+
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/conversation"
 )
 

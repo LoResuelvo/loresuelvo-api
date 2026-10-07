@@ -59,42 +59,57 @@ func TestNotificationNotificatorSendsNotificationToConnectedConsumer(t *testing.
 }
 
 func TestNotificationNotificatorSendsNotificationToConnectedProvider(t *testing.T) {
-	hub := NewHub()
-	authID := "auth0|provider"
-	connection := &Connection{
-		hub:       hub,
-		send:      make(chan []byte, 1),
-		authID:    authID,
-		role:      provider.Role,
-		profileID: 20,
-	}
-	hub.addConnection(connection)
-	eventBus := new(eventBusMock)
-	eventBus.On("Publish", mock.Anything, mock.Anything).Return(nil).Once()
-	dispatcher := NewDispatcher(hub, eventBus)
-	notificator := NewNotificationNotificator(dispatcher, notificationRecipientFinderStub{
-		authID: authID,
-		role:   provider.Role,
-	})
-	notificationToSend := &notification.Notification{
-		ID:           6,
-		UserID:       20,
-		Type:         notification.TypeServiceProposalAccepted,
-		ResourceType: notification.ResourceServiceProposal,
-		ResourceID:   100,
-		CreatedAt:    time.Now().UTC(),
-	}
+	for _, test := range []struct {
+		name     string
+		kind     notification.Type
+		resource notification.ResourceType
+	}{
+		{"accepted proposal", notification.TypeServiceProposalAccepted, notification.ResourceServiceProposal},
+		{"final payment", notification.TypeWorkOrderFinalPaymentApproved, notification.ResourceWorkOrder},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			hub := NewHub()
+			authID := "auth0|provider"
+			connection := &Connection{
+				hub:       hub,
+				send:      make(chan []byte, 1),
+				authID:    authID,
+				role:      provider.Role,
+				profileID: 20,
+			}
+			hub.addConnection(connection)
+			eventBus := new(eventBusMock)
+			eventBus.On("Publish", mock.Anything, mock.Anything).Return(nil).Once()
+			dispatcher := NewDispatcher(hub, eventBus)
+			notificator := NewNotificationNotificator(dispatcher, notificationRecipientFinderStub{
+				authID: authID,
+				role:   provider.Role,
+			})
+			notificationToSend := &notification.Notification{
+				ID:           6,
+				UserID:       20,
+				Type:         test.kind,
+				ResourceType: test.resource,
+				ResourceID:   100,
+				CreatedAt:    time.Now().UTC(),
+			}
 
-	err := notificator.Notify(context.Background(), notificationToSend)
+			err := notificator.Notify(context.Background(), notificationToSend)
 
-	require.NoError(t, err)
-	eventBus.AssertExpectations(t)
-	payload := <-connection.send
-	var event realtimeNotificationEvent
-	require.NoError(t, json.Unmarshal(payload, &event))
-	assert.Equal(t, notificationToSend.ID, event.Notification.ID)
-	assert.Equal(t, notificationToSend.UserID, event.Notification.UserID)
-	assert.Equal(t, string(notification.TypeServiceProposalAccepted), event.Notification.Type)
+			require.NoError(t, err)
+			eventBus.AssertExpectations(t)
+			payload := <-connection.send
+			var event realtimeNotificationEvent
+			require.NoError(t, json.Unmarshal(payload, &event))
+			assert.Equal(t, notificationToSend.ID, event.Notification.ID)
+			assert.Equal(t, notificationToSend.UserID, event.Notification.UserID)
+			assert.Equal(t, "notification.created", event.Type)
+			assert.Equal(t, string(test.kind), event.Notification.Type)
+			assert.Equal(t, string(test.resource), event.Notification.ResourceType)
+			assert.Equal(t, notificationToSend.ResourceID, event.Notification.ResourceID)
+
+		})
+	}
 }
 
 func TestNotificationNotificatorIgnoresDisconnectedConsumer(t *testing.T) {
