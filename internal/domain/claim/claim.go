@@ -105,4 +105,3 @@ func (c *Claim) SubmissionFingerprint() string { return c.submissionFingerprint 
 func (c *Claim) MatchesSubmission(input Submission) bool {
 	return c.submissionFingerprint == input.Fingerprint()
 }
-func (c *Claim) HasImage(id string) bool { return slices.Contains(c.ImageFileIDs, id) }

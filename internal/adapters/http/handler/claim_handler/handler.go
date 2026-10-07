@@ -22,8 +22,7 @@ import (
 type service interface {
 	Submit(context.Context, string, string, claim.Submission) (*claim.SubmissionResult, error)
 	List(context.Context, string, claim.ListCriteria) (*claim.Page, error)
-	Get(context.Context, string, int) (*claim.Claim, error)
-	ResolveImage(context.Context, string, int, string) (string, error)
+	Get(context.Context, string, int) (*claim.GetResult, error)
 }
 type Handler struct{ service service }
 
@@ -35,11 +34,13 @@ func respondError(c *gin.Context, err error) {
 		err    error
 		status int
 	}{
-		{filedomain.ErrClaimEvidenceImageNotAvailable, 400}, {claim.ErrInvalidSubmission, 400}, {claim.ErrInvalidIdempotencyKey, 400}, {claim.ErrInvalidCriteria, 400}, {claim.ErrInvalidEvidence, 400}, {claim.ErrForbidden, 403}, {claim.ErrNotFound, 404}, {claim.ErrSubmissionKeyConflict, 409}, {claim.ErrOpenClaimConflict, 409},
+		{claim.ErrEvidenceAccessUnavailable, 500}, {filedomain.ErrClaimEvidenceImageNotAvailable, 400}, {claim.ErrInvalidSubmission, 400}, {claim.ErrInvalidIdempotencyKey, 400}, {claim.ErrInvalidCriteria, 400}, {claim.ErrInvalidEvidence, 400}, {claim.ErrForbidden, 403}, {claim.ErrNotFound, 404}, {claim.ErrSubmissionKeyConflict, 409}, {claim.ErrOpenClaimConflict, 409},
 	} {
 		if errors.Is(err, entry.err) {
 			status = entry.status
-			message = entry.err.Error()
+			if status != http.StatusInternalServerError {
+				message = entry.err.Error()
+			}
 			break
 		}
 	}
@@ -293,26 +294,6 @@ func (h *Handler) Get(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, detail(found))
 }
-func (h *Handler) ResolveImage(c *gin.Context) {
-	auth, ok := httphandler.GetAuthenticatedUserID(c)
-	if !ok {
-		return
-	}
-	id, err := claimID(c)
-	if err != nil {
-		respondError(c, err)
-		return
-	}
-	url, err := h.service.ResolveImage(c.Request.Context(), auth, id, c.Param("file_id"))
-	if err != nil {
-		if errors.Is(err, filedomain.ErrClaimEvidenceImageNotAvailable) {
-			err = claim.ErrNotFound
-		}
-		respondError(c, err)
-		return
-	}
-	c.JSON(http.StatusOK, gin.H{"url": url})
-}
 
 type acknowledgment struct {
 	ID          int            `json:"id"`
@@ -360,14 +341,23 @@ type resolutionResponse struct {
 }
 type detailResponse struct {
 	summaryResponse
-	Description  string              `json:"description"`
-	ImageFileIDs []string            `json:"image_file_ids"`
-	Resolution   *resolutionResponse `json:"resolution"`
+	Description string                  `json:"description"`
+	Images      []evidenceImageResponse `json:"images"`
+	Resolution  *resolutionResponse     `json:"resolution"`
 }
 
-func detail(c *claim.Claim) detailResponse {
-	images := append([]string{}, c.ImageFileIDs...)
-	result := detailResponse{summaryResponse: summaryResponse{acknowledgment: acknowledge(c), Reason: string(c.Reason), ReviewStartedOn: c.ReviewStartedOn, ClosedOn: c.ClosedOn}, Description: c.Description, ImageFileIDs: images}
+type evidenceImageResponse struct {
+	FileID string `json:"file_id"`
+	URL    string `json:"url"`
+}
+
+func detail(found *claim.GetResult) detailResponse {
+	c := found.Claim
+	images := make([]evidenceImageResponse, 0, len(found.Images))
+	for _, image := range found.Images {
+		images = append(images, evidenceImageResponse{FileID: image.FileID, URL: image.URL})
+	}
+	result := detailResponse{summaryResponse: summaryResponse{acknowledgment: acknowledge(c), Reason: string(c.Reason), ReviewStartedOn: c.ReviewStartedOn, ClosedOn: c.ClosedOn}, Description: c.Description, Images: images}
 	if c.Resolution != nil {
 		resolution := c.Resolution
 		result.Resolution = &resolutionResponse{Type: resolution.Type, Reasoning: resolution.Reasoning, ResolvedOn: resolution.ResolvedOn}

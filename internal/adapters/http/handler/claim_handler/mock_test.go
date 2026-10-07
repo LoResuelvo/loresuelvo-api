@@ -21,14 +21,10 @@ func (m *serviceMock) List(ctx context.Context, auth string, criteria claim.List
 	result, _ := a.Get(0).(*claim.Page)
 	return result, a.Error(1)
 }
-func (m *serviceMock) Get(ctx context.Context, auth string, id int) (*claim.Claim, error) {
+func (m *serviceMock) Get(ctx context.Context, auth string, id int) (*claim.GetResult, error) {
 	a := m.Called(ctx, auth, id)
-	result, _ := a.Get(0).(*claim.Claim)
+	result, _ := a.Get(0).(*claim.GetResult)
 	return result, a.Error(1)
-}
-func (m *serviceMock) ResolveImage(ctx context.Context, auth string, id int, fileID string) (string, error) {
-	a := m.Called(ctx, auth, id, fileID)
-	return a.String(0), a.Error(1)
 }
 
 type claimRepositoryMock struct{ mock.Mock }

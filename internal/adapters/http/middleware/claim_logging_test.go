@@ -13,7 +13,7 @@ import (
 )
 
 func TestClaimAndFileLoggingKeepsOnlyTechnicalMetadata(t *testing.T) {
-	for _, path := range []string{"/claims", "/claims/7", "/claims/7/images/private-file-sentinel", "/files/presign", "/files/private-file-sentinel/confirm"} {
+	for _, path := range []string{"/claims", "/claims/7", "/files/presign", "/files/private-file-sentinel/confirm"} {
 		for _, status := range []int{200, 400, 401, 404, 500} {
 			t.Run(path+strconv.Itoa(status), func(t *testing.T) {
 				gin.SetMode(gin.TestMode)
@@ -24,8 +24,9 @@ func TestClaimAndFileLoggingKeepsOnlyTechnicalMetadata(t *testing.T) {
 				engine.POST("/claims", func(c *gin.Context) {
 					c.JSON(status, gin.H{"description": "testimony-secret", "resolution": "reasoning-secret", "url": "https://private/signed-secret", "image_file_ids": []string{"private-file-sentinel"}})
 				})
-				engine.POST("/claims/:id", func(c *gin.Context) { c.JSON(status, gin.H{"resolution": "reasoning-secret"}) })
-				engine.POST("/claims/:id/images/:file_id", func(c *gin.Context) { c.JSON(status, gin.H{"url": "https://private/signed-secret"}) })
+				engine.POST("/claims/:id", func(c *gin.Context) {
+					c.JSON(status, gin.H{"resolution": "reasoning-secret", "images": []gin.H{{"file_id": "private-file-sentinel", "url": "https://private/signed-secret"}}})
+				})
 				engine.POST("/files/presign", func(c *gin.Context) {
 					c.JSON(status, gin.H{"key": "bucket-key-secret", "url": "signed-secret", "file_id": "private-file-sentinel"})
 				})

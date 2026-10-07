@@ -404,5 +404,4 @@ func (router *Router) registerClaimRoutes(engine *gin.Engine, authMiddleware gin
 	engine.POST("/claims", privateNoStore, authMiddleware, router.claimHandler.Submit)
 	engine.GET("/claims", privateNoStore, authMiddleware, router.claimHandler.List)
 	engine.GET("/claims/:id", privateNoStore, authMiddleware, router.claimHandler.Get)
-	engine.GET("/claims/:id/images/:file_id", privateNoStore, authMiddleware, router.claimHandler.ResolveImage)
 }

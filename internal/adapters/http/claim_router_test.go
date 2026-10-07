@@ -22,7 +22,7 @@ func TestClaimRoutesSetPrivateCacheBeforeAuthentication(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	engine := gin.New()
 	router.registerClaimRoutes(engine, auth)
-	for _, route := range []struct{ method, path string }{{"POST", "/claims"}, {"GET", "/claims"}, {"GET", "/claims/1"}, {"GET", "/claims/1/images/file"}} {
+	for _, route := range []struct{ method, path string }{{"POST", "/claims"}, {"GET", "/claims"}, {"GET", "/claims/1"}} {
 		response := httptest.NewRecorder()
 		engine.ServeHTTP(response, httptest.NewRequest(route.method, route.path, nil))
 		require.Equal(t, 401, response.Code)
@@ -45,7 +45,6 @@ func TestClaimRoutesKeepCachePolicyOnServiceResults(t *testing.T) {
 		{"technical failure", "GET", "/claims/1", 500, errors.New("private storage failure")},
 		{"detail", "GET", "/claims/1", 200, nil},
 		{"created", "POST", "/claims", 201, nil},
-		{"image URL", "GET", "/claims/1/images/file", 200, nil},
 		{"empty list", "GET", "/claims", 200, nil},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -56,8 +55,6 @@ func TestClaimRoutesKeepCachePolicyOnServiceResults(t *testing.T) {
 				body = `{}`
 			case tc.path == "/claims" && tc.method == "GET":
 				svc.On("List", mock.Anything, "subject", mock.Anything).Return(&claim.Page{}, nil).Once()
-			case strings.Contains(tc.path, "/images/"):
-				svc.On("ResolveImage", mock.Anything, "subject", 1, "file").Return("https://private.example/image?signature=temporary", nil).Once()
 			case tc.method == "POST":
 				var result *claim.SubmissionResult
 				if tc.err == nil {
@@ -65,9 +62,9 @@ func TestClaimRoutesKeepCachePolicyOnServiceResults(t *testing.T) {
 				}
 				svc.On("Submit", mock.Anything, "subject", mock.Anything, mock.Anything).Return(result, tc.err).Once()
 			default:
-				var found *claim.Claim
+				var found *claim.GetResult
 				if tc.err == nil {
-					found = &claim.Claim{ID: 1}
+					found = &claim.GetResult{Claim: &claim.Claim{ID: 1}}
 				}
 				svc.On("Get", mock.Anything, "subject", 1).Return(found, tc.err).Once()
 			}
@@ -91,4 +88,24 @@ func TestClaimRoutesKeepCachePolicyOnServiceResults(t *testing.T) {
 			svc.AssertExpectations(t)
 		})
 	}
+}
+
+func TestClaimImageRouteIsRemoved(t *testing.T) {
+	svc := new(claimServiceMock)
+	router := NewRouter(RouterConfig{Auth0Validator: auth0.NewFakeValidator(), ClaimHandler: claim_handler.NewHandler(svc)})
+	auth, err := middleware.BaseAutheticationLayer(router.auth0Validator)
+	require.NoError(t, err)
+	engine := gin.New()
+	router.registerClaimRoutes(engine, auth)
+	for _, authenticated := range []bool{false, true} {
+		req := httptest.NewRequest("GET", "/claims/1/images/file", nil)
+		if authenticated {
+			req.Header.Set("Authorization", "Bearer "+auth0.NewTokenBuilder().BuildToken("subject", nil))
+		}
+		response := httptest.NewRecorder()
+		engine.ServeHTTP(response, req)
+		require.Equal(t, 404, response.Code)
+		require.NotContains(t, response.Body.String(), "url")
+	}
+	require.Empty(t, svc.Calls)
 }

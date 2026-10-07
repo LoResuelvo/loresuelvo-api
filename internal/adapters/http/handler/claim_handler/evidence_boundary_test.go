@@ -133,8 +133,8 @@ func TestFileEndpointsRealServiceClassifiesClaimEvidenceErrors(t *testing.T) {
 	}
 }
 
-func TestResolveImageRealServicesClassifyUnavailableAndTechnicalFailure(t *testing.T) {
-	for _, mode := range []string{"pending", "database failure", "storage failure"} {
+func TestDetailRealServicesFailClosedOnUnavailableAndTechnicalEvidence(t *testing.T) {
+	for _, mode := range []string{"pending", "missing metadata", "foreign owner", "wrong purpose", "database failure", "storage failure"} {
 		t.Run(mode, func(t *testing.T) {
 			files, objects := new(fileRepositoryMock), new(storageMock)
 			images := filedomain.NewService(files, objects, "public", "private", clockadapter.NewSystemClock(), nil)
@@ -153,17 +153,24 @@ func TestResolveImageRealServicesClassifyUnavailableAndTechnicalFailure(t *testi
 			if mode != "pending" {
 				f.Confirm(time.Now())
 			}
-			files.On("FindByIDs", mock.Anything, []string{imageID}).Return([]filedomain.File{*f}, findErr).Once()
+			switch mode {
+			case "foreign owner":
+				f.UploadedByAuthID = "other"
+			case "wrong purpose":
+				f.Purpose = filedomain.PurposeConversationMessageImage
+			}
+			foundFiles := []filedomain.File{*f}
+			if mode == "missing metadata" {
+				foundFiles = nil
+			}
+			files.On("FindByIDs", mock.Anything, []string{imageID}).Return(foundFiles, findErr).Once()
 			if mode == "storage failure" {
 				objects.On("GenerateDownloadURL", mock.Anything, mock.Anything).Return("", fmt.Errorf("private storage failure")).Once()
 			}
 			svc := claim.NewService(claims, users, nil, images, clockadapter.NewSystemClock())
-			response := perform(svc, "GET", "/claims/3/images/"+imageID, "", true)
-			expected := 500
-			if mode == "pending" {
-				expected = 404
-			}
-			require.Equal(t, expected, response.Code)
+			response := perform(svc, "GET", "/claims/3", "", true)
+			require.Equal(t, 500, response.Code)
+			require.JSONEq(t, `{"error":"internal server error"}`, response.Body.String())
 			require.NotContains(t, response.Body.String(), "private database")
 			require.NotContains(t, response.Body.String(), "private storage")
 			require.NotContains(t, response.Body.String(), "url")
@@ -171,5 +178,35 @@ func TestResolveImageRealServicesClassifyUnavailableAndTechnicalFailure(t *testi
 				m.AssertExpectations(t)
 			}
 		})
+	}
+}
+
+func TestDetailDiscardsResolvedURLsWhenLaterEvidenceFails(t *testing.T) {
+	files, objects := new(fileRepositoryMock), new(storageMock)
+	images := filedomain.NewService(files, objects, "public", "private", clockadapter.NewSystemClock(), nil)
+	claims, users := new(claimRepositoryMock), new(claimantFinderMock)
+	ids := []string{uuid.NewString(), uuid.NewString(), uuid.NewString()}
+	users.On("FindClaimantByAuthID", mock.Anything, "subject").Return(&claim.Claimant{ID: 1, Party: claim.PartyConsumer}, nil).Once()
+	claims.On("FindOwnedByID", mock.Anything, 1, 3).Return(&claim.Claim{ID: 3, Description: "Private testimony", ImageFileIDs: ids}, nil).Once()
+	for i, id := range ids {
+		metadata, err := filedomain.NewFileMetadata("image.png", "image/png", 32)
+		require.NoError(t, err)
+		f, err := filedomain.NewPendingFile(id, id, "private", metadata, filedomain.VisibilityPrivate, filedomain.PurposeClaimEvidenceImage, "subject", time.Now())
+		require.NoError(t, err)
+		f.Confirm(time.Now())
+		files.On("FindByIDs", mock.Anything, []string{id}).Return([]filedomain.File{*f}, nil).Once()
+		target := filedomain.ObjectToDownload{Bucket: "private", Key: id}
+		if i == len(ids)-1 {
+			objects.On("GenerateDownloadURL", mock.Anything, target).Return("", fmt.Errorf("private storage failure")).Once()
+		} else {
+			objects.On("GenerateDownloadURL", mock.Anything, target).Return("https://private/"+id+"?signature=temporary", nil).Once()
+		}
+	}
+	svc := claim.NewService(claims, users, nil, images, clockadapter.NewSystemClock())
+	response := perform(svc, "GET", "/claims/3", "", true)
+	require.Equal(t, 500, response.Code)
+	require.JSONEq(t, `{"error":"internal server error"}`, response.Body.String())
+	for _, m := range []*mock.Mock{&claims.Mock, &users.Mock, &files.Mock, &objects.Mock} {
+		m.AssertExpectations(t)
 	}
 }

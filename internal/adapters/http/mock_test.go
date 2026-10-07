@@ -161,12 +161,8 @@ func (m *claimServiceMock) List(ctx context.Context, auth string, criteria claim
 	v, _ := a.Get(0).(*claim.Page)
 	return v, a.Error(1)
 }
-func (m *claimServiceMock) Get(ctx context.Context, auth string, id int) (*claim.Claim, error) {
+func (m *claimServiceMock) Get(ctx context.Context, auth string, id int) (*claim.GetResult, error) {
 	a := m.Called(ctx, auth, id)
-	v, _ := a.Get(0).(*claim.Claim)
+	v, _ := a.Get(0).(*claim.GetResult)
 	return v, a.Error(1)
-}
-func (m *claimServiceMock) ResolveImage(ctx context.Context, auth string, id int, fileID string) (string, error) {
-	a := m.Called(ctx, auth, id, fileID)
-	return a.String(0), a.Error(1)
 }

@@ -48,3 +48,9 @@ type SubmissionResult struct {
 	Claim   *Claim
 	Created bool
 }
+
+// GetResult combines an authorized aggregate with temporary evidence access.
+type GetResult struct {
+	Claim  *Claim
+	Images []readmodel.EvidenceImage
+}

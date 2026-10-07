@@ -5,8 +5,8 @@ import (
 	"errors"
 	"fmt"
 
+	readmodel "github.com/LoResuelvo/loresuelvo-api/internal/domain/claim/read_model"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/clock"
-	"github.com/google/uuid"
 )
 
 type Service struct {
@@ -102,7 +102,7 @@ func (s *Service) List(ctx context.Context, authID string, criteria ListCriteria
 	}
 	return page, nil
 }
-func (s *Service) Get(ctx context.Context, authID string, id int) (*Claim, error) {
+func (s *Service) Get(ctx context.Context, authID string, id int) (*GetResult, error) {
 	claimant, err := s.claimant(ctx, authID)
 	if err != nil {
 		return nil, err
@@ -117,20 +117,13 @@ func (s *Service) Get(ctx context.Context, authID string, id int) (*Claim, error
 	if found == nil {
 		return nil, ErrNotFound
 	}
-	return found, nil
-}
-func (s *Service) ResolveImage(ctx context.Context, authID string, claimID int, fileID string) (string, error) {
-	found, err := s.Get(ctx, authID, claimID)
-	if err != nil {
-		return "", err
+	images := make([]readmodel.EvidenceImage, 0, len(found.ImageFileIDs))
+	for _, fileID := range found.ImageFileIDs {
+		url, err := s.images.ResolveClaimEvidenceImage(ctx, authID, fileID)
+		if err != nil {
+			return nil, fmt.Errorf("%w: %w", ErrEvidenceAccessUnavailable, err)
+		}
+		images = append(images, readmodel.EvidenceImage{FileID: fileID, URL: url})
 	}
-	parsed, err := uuid.Parse(fileID)
-	if err != nil || len(fileID) != 36 || !found.HasImage(parsed.String()) {
-		return "", ErrNotFound
-	}
-	url, err := s.images.ResolveClaimEvidenceImage(ctx, authID, parsed.String())
-	if err != nil {
-		return "", fmt.Errorf("resolving claim evidence: %w", err)
-	}
-	return url, nil
+	return &GetResult{Claim: found, Images: images}, nil
 }

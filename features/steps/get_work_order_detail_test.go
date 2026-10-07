@@ -349,6 +349,9 @@ func (suite *testSuite) workOrderDetailHasReportAndPaymentDates() error {
 }
 
 func (suite *testSuite) workOrderDetailHasImageWithPrivateURL(name string) error {
+	if suite.claims.selected != "" {
+		return suite.claimImageAuthorized(name)
+	}
 	detail, err := suite.workOrderDetailResponse()
 	if err != nil {
 		return err

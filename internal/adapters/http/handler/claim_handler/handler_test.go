@@ -10,6 +10,7 @@ import (
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/middleware"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/claim"
+	readmodel "github.com/LoResuelvo/loresuelvo-api/internal/domain/claim/read_model"
 	filedomain "github.com/LoResuelvo/loresuelvo-api/internal/domain/file"
 	operationmodel "github.com/LoResuelvo/loresuelvo-api/internal/domain/operation/read_model"
 	"github.com/gin-gonic/gin"
@@ -27,7 +28,6 @@ func perform(s service, method, path, body string, authenticated bool) *httptest
 	r.POST("/claims", h.Submit)
 	r.GET("/claims", h.List)
 	r.GET("/claims/:id", h.Get)
-	r.GET("/claims/:id/images/:file_id", h.ResolveImage)
 	req := httptest.NewRequest(method, path, strings.NewReader(body))
 	req.Header.Set("Idempotency-Key", "550e8400-e29b-41d4-a716-446655440000")
 	w := httptest.NewRecorder()
@@ -67,7 +67,7 @@ func TestErrorsAreStableAndPrivate(t *testing.T) {
 		message string
 	}{{claim.ErrInvalidSubmission, 400, "invalid claim submission"}, {claim.ErrForbidden, 403, "claimant account is not enabled"}, {claim.ErrNotFound, 404, "claim resource not found"}, {claim.ErrSubmissionKeyConflict, 409, "claim submission key already used with different content"}, {claim.ErrOpenClaimConflict, 409, "an unfinished claim already exists for this operation"}, {errors.New("SQL secret"), 500, "internal server error"}} {
 		s := newServiceMock(t)
-		s.On("Get", mock.Anything, "subject", 1).Return((*claim.Claim)(nil), tc.err).Once()
+		s.On("Get", mock.Anything, "subject", 1).Return((*claim.GetResult)(nil), tc.err).Once()
 		w := perform(s, "GET", "/claims/1", "", true)
 		require.Equal(t, tc.code, w.Code)
 		require.JSONEq(t, `{"error":"`+tc.message+`"}`, w.Body.String())
@@ -75,11 +75,11 @@ func TestErrorsAreStableAndPrivate(t *testing.T) {
 }
 func TestDetailEmptyResolutionAndCollections(t *testing.T) {
 	s := newServiceMock(t)
-	s.On("Get", mock.Anything, "subject", mock.Anything).Return(&claim.Claim{ID: 1}, nil).Once()
+	s.On("Get", mock.Anything, "subject", mock.Anything).Return(&claim.GetResult{Claim: &claim.Claim{ID: 1}}, nil).Once()
 	w := perform(s, "GET", "/claims/1", "", true)
 	require.Equal(t, 200, w.Code)
 	require.Contains(t, w.Body.String(), `"resolution":null`)
-	require.Contains(t, w.Body.String(), `"image_file_ids":[]`)
+	require.Contains(t, w.Body.String(), `"images":[]`)
 	for _, field := range []string{"Actions", "actions", "claimant_id", "operator", "submissionKey"} {
 		require.NotContains(t, w.Body.String(), field)
 	}
@@ -110,7 +110,7 @@ func TestMissingIdentityIsUnauthorized(t *testing.T) {
 func TestDetailFormalResolutionUsesParticipantDTO(t *testing.T) {
 	closed := time.Date(2026, 9, 24, 12, 0, 0, 0, time.UTC)
 	s := newServiceMock(t)
-	s.On("Get", mock.Anything, "subject", mock.Anything).Return(&claim.Claim{ID: 4, ClaimantID: 99, ClaimantParty: claim.PartyConsumer, Description: "Original testimony", ImageFileIDs: []string{"private-file"}, Actions: []claim.Action{{ActorID: 100}}, Resolution: &claim.Resolution{Type: claim.ResolutionTypeConsumerFavor, Reasoning: "Formal reasoning", ResolvedOn: closed, SuggestedCompensation: &claim.SuggestedCompensation{AmountMinor: 1500, Currency: "ARS", Unit: "minor"}}}, nil).Once()
+	s.On("Get", mock.Anything, "subject", mock.Anything).Return(&claim.GetResult{Claim: &claim.Claim{ID: 4, ClaimantID: 99, ClaimantParty: claim.PartyConsumer, Description: "Original testimony", ImageFileIDs: []string{"private-file"}, Actions: []claim.Action{{ActorID: 100}}, Resolution: &claim.Resolution{Type: claim.ResolutionTypeConsumerFavor, Reasoning: "Formal reasoning", ResolvedOn: closed, SuggestedCompensation: &claim.SuggestedCompensation{AmountMinor: 1500, Currency: "ARS", Unit: "minor"}}}}, nil).Once()
 	w := perform(s, "GET", "/claims/4", "", true)
 	require.Equal(t, 200, w.Code)
 	var result map[string]any
@@ -120,18 +120,18 @@ func TestDetailFormalResolutionUsesParticipantDTO(t *testing.T) {
 		require.NotContains(t, result, field)
 	}
 }
-func TestImageErrorsDoNotLeakStorage(t *testing.T) {
-	for _, err := range []error{claim.ErrNotFound, filedomain.ErrClaimEvidenceImageNotAvailable, errors.New("s3 secret key bucket")} {
+func TestDetailEvidenceErrorsDoNotLeakStorage(t *testing.T) {
+	for _, err := range []error{claim.ErrNotFound, errors.New("s3 secret key bucket")} {
 		s := newServiceMock(t)
-		s.On("ResolveImage", mock.Anything, "subject", 3, "private").Return("", err).Once()
-		w := perform(s, "GET", "/claims/3/images/private", "", true)
-		if errors.Is(err, claim.ErrNotFound) || errors.Is(err, filedomain.ErrClaimEvidenceImageNotAvailable) {
-			require.Equal(t, 404, w.Code)
-		} else {
-			require.Equal(t, 500, w.Code)
+		s.On("Get", mock.Anything, "subject", 3).Return((*claim.GetResult)(nil), err).Once()
+		response := perform(s, "GET", "/claims/3", "", true)
+		expected := 500
+		if errors.Is(err, claim.ErrNotFound) {
+			expected = 404
 		}
-		require.NotContains(t, w.Body.String(), "url")
-		require.NotContains(t, w.Body.String(), "s3 secret")
+		require.Equal(t, expected, response.Code)
+		require.NotContains(t, response.Body.String(), "url")
+		require.NotContains(t, response.Body.String(), "s3 secret")
 	}
 }
 func TestSubmissionInvalidEvidenceAndInternalFailureAreDistinct(t *testing.T) {
@@ -154,4 +154,16 @@ func TestDetailRejectsInvalidClaimIDBeforeService(t *testing.T) {
 		require.Equal(t, 404, response.Code)
 		require.Empty(t, s.Calls)
 	}
+}
+
+func TestDetailIncludesResolvedImagesInsteadOfSeparateIDs(t *testing.T) {
+	s := newServiceMock(t)
+	s.On("Get", mock.Anything, "subject", 1).Return(&claim.GetResult{Claim: &claim.Claim{ID: 1, ImageFileIDs: []string{"private-file"}}, Images: []readmodel.EvidenceImage{{FileID: "private-file", URL: "https://private/image?signature=temporary"}}}, nil).Once()
+	response := perform(s, "GET", "/claims/1", "", true)
+	require.Equal(t, 200, response.Code)
+	var result map[string]json.RawMessage
+	require.NoError(t, json.Unmarshal(response.Body.Bytes(), &result))
+	require.Contains(t, result, "images")
+	require.NotContains(t, result, "image_file_ids")
+	require.JSONEq(t, `[{"file_id":"private-file","url":"https://private/image?signature=temporary"}]`, string(result["images"]))
 }

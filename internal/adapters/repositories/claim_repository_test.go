@@ -12,7 +12,9 @@ import (
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/repositories"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/claim"
+	filedomain "github.com/LoResuelvo/loresuelvo-api/internal/domain/file"
 	operationmodel "github.com/LoResuelvo/loresuelvo-api/internal/domain/operation/read_model"
+	"github.com/LoResuelvo/loresuelvo-api/internal/testsupport"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 )
@@ -212,4 +214,47 @@ func TestClaimReadersPropagateCancellationAndDatabaseFailures(t *testing.T) {
 	require.Error(t, err)
 	_, err = repositories.NewClaimUserFinder(database).FindClaimantByAuthID(t.Context(), "auth")
 	require.Error(t, err)
+}
+
+func TestClaimEvidenceFixtureKeepsFingerprintAndLinksAtomic(t *testing.T) {
+	for _, linkFails := range []bool{false, true} {
+		t.Run(fmt.Sprintf("link failure %t", linkFails), func(t *testing.T) {
+			fixture := newOperationInboxFixture(t)
+			consumerID, providerID := savedJobRequestParticipants(t, fixture.testContext)
+			request := fixture.jobRequest(t, consumerID, providerID, time.Now(), "pending")
+			repository := repositories.NewClaimRepository(fixture.testContext.database)
+			found := newStoredClaim(t, consumerID, request.ID, claim.PartyConsumer, uuid.NewString())
+			require.NoError(t, repository.Save(t.Context(), found))
+			metadata, err := filedomain.NewFileMetadata("image.png", "image/png", 32)
+			require.NoError(t, err)
+			files := repositories.NewFileRepository(fixture.testContext.database)
+			ids := []string{uuid.NewString(), uuid.NewString()}
+			for _, id := range ids {
+				file, err := filedomain.NewPendingFile(id, id, "private", metadata, filedomain.VisibilityPrivate, filedomain.PurposeClaimEvidenceImage, "auth0|job-request-consumer", time.Now())
+				require.NoError(t, err)
+				file.Confirm(time.Now())
+				require.NoError(t, files.Save(t.Context(), *file))
+			}
+			evidence := testsupport.ClaimLifecycleFixture{DB: fixture.testContext.database}
+			require.NoError(t, evidence.SetEvidence(t.Context(), found, ids[:1]))
+			expectedIDs := ids[1:]
+			attemptedIDs := ids[1:]
+			if linkFails {
+				attemptedIDs = append(attemptedIDs, uuid.NewString())
+				expectedIDs = ids[:1]
+			}
+			err = evidence.SetEvidence(t.Context(), found, attemptedIDs)
+			if linkFails {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+			hydrated, err := repository.FindOwnedByID(t.Context(), consumerID, found.ID)
+			require.NoError(t, err)
+			require.Equal(t, expectedIDs, hydrated.ImageFileIDs)
+			input, err := (claim.Submission{Reference: found.Reference, Reason: found.Reason, Description: found.Description, ImageFileIDs: expectedIDs}).Normalize()
+			require.NoError(t, err)
+			require.True(t, hydrated.MatchesSubmission(input))
+		})
+	}
 }

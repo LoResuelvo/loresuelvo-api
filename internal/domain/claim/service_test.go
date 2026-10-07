@@ -77,19 +77,28 @@ func TestSubmitDoesNotMaskReplayLookupFailure(t *testing.T) {
 	require.ErrorIs(t, err, failure)
 	repo.AssertExpectations(t)
 }
-func TestResolveImageDoesNotCallStorageBeforeOwnershipAndLink(t *testing.T) {
-	for _, found := range []*Claim{nil, {ID: 7, ImageFileIDs: []string{}}} {
-		t.Run("unavailable", func(t *testing.T) {
-			users := &userFinderMock{}
-			repo := &repositoryMock{}
-			users.On("FindClaimantByAuthID", mock.Anything, "auth").Return(&Claimant{ID: 1, Party: PartyProvider}, nil).Once()
-			repo.On("FindOwnedByID", mock.Anything, 1, 7).Return(found, nil).Once()
-			url, err := NewService(repo, users, nil, nil, nil).ResolveImage(t.Context(), "auth", 7, testFile)
-			require.Empty(t, url)
-			require.ErrorIs(t, err, ErrNotFound)
-			repo.AssertExpectations(t)
-		})
-	}
+func TestGetDoesNotResolveEvidenceBeforeOwnership(t *testing.T) {
+	users, repo, images := new(userFinderMock), new(repositoryMock), new(evidenceImagesMock)
+	users.On("FindClaimantByAuthID", mock.Anything, "auth").Return(&Claimant{ID: 1, Party: PartyProvider}, nil).Once()
+	repo.On("FindOwnedByID", mock.Anything, 1, 7).Return((*Claim)(nil), nil).Once()
+	result, err := NewService(repo, users, nil, images, nil).Get(t.Context(), "auth", 7)
+	require.Nil(t, result)
+	require.ErrorIs(t, err, ErrNotFound)
+	images.AssertNotCalled(t, "ResolveClaimEvidenceImage", mock.Anything, mock.Anything, mock.Anything)
+	repo.AssertExpectations(t)
+	users.AssertExpectations(t)
+}
+
+func TestGetDoesNotResolveUnlinkedOwnedEvidence(t *testing.T) {
+	users, repo, images := new(userFinderMock), new(repositoryMock), new(evidenceImagesMock)
+	users.On("FindClaimantByAuthID", mock.Anything, "auth").Return(&Claimant{ID: 1, Party: PartyConsumer}, nil).Once()
+	repo.On("FindOwnedByID", mock.Anything, 1, 7).Return(&Claim{ID: 7}, nil).Once()
+	result, err := NewService(repo, users, nil, images, nil).Get(t.Context(), "auth", 7)
+	require.NoError(t, err)
+	require.Empty(t, result.Images)
+	images.AssertNotCalled(t, "ResolveClaimEvidenceImage", mock.Anything, mock.Anything, testFile)
+	repo.AssertExpectations(t)
+	users.AssertExpectations(t)
 }
 func TestListCriteriaDefaultsAndLimits(t *testing.T) {
 	normalized, err := (ListCriteria{}).Normalize()
@@ -128,19 +137,23 @@ func TestSubmitValidatesEvidenceAndPersistsOneAggregate(t *testing.T) {
 	require.Equal(t, 7, result.Claim.ID)
 	repo.AssertExpectations(t)
 	images.AssertExpectations(t)
+	images.AssertNotCalled(t, "ResolveClaimEvidenceImage", mock.Anything, mock.Anything, mock.Anything)
 }
-func TestResolveImagePropagatesStorageFailureAfterAuthorization(t *testing.T) {
+func TestGetFailsClosedWhenAnEvidenceURLCannotBeResolved(t *testing.T) {
 	failure := errors.New("storage unavailable")
-	users := &userFinderMock{}
-	repo := &repositoryMock{}
-	images := &evidenceImagesMock{}
+	secondFile := "550e8400-e29b-41d4-a716-446655440002"
+	users, repo, images := new(userFinderMock), new(repositoryMock), new(evidenceImagesMock)
 	users.On("FindClaimantByAuthID", mock.Anything, "auth").Return(&Claimant{ID: 1, Party: PartyConsumer}, nil).Once()
-	repo.On("FindOwnedByID", mock.Anything, 1, 7).Return(&Claim{ID: 7, ImageFileIDs: []string{testFile}}, nil).Once()
-	images.On("ResolveClaimEvidenceImage", mock.Anything, "auth", testFile).Return("", failure).Once()
-	url, err := NewService(repo, users, nil, images, nil).ResolveImage(t.Context(), "auth", 7, testFile)
-	require.Empty(t, url)
+	repo.On("FindOwnedByID", mock.Anything, 1, 7).Return(&Claim{ID: 7, ImageFileIDs: []string{testFile, secondFile}}, nil).Once()
+	images.On("ResolveClaimEvidenceImage", mock.Anything, "auth", testFile).Return("https://private/first?signature=temporary", nil).Once()
+	images.On("ResolveClaimEvidenceImage", mock.Anything, "auth", secondFile).Return("", failure).Once()
+	result, err := NewService(repo, users, nil, images, nil).Get(t.Context(), "auth", 7)
+	require.Nil(t, result)
 	require.ErrorIs(t, err, failure)
+	require.ErrorIs(t, err, ErrEvidenceAccessUnavailable)
 	images.AssertExpectations(t)
+	users.AssertExpectations(t)
+	repo.AssertExpectations(t)
 }
 func TestSubmissionEnforcesExactReasonAndThreeImages(t *testing.T) {
 	ref, err := NewReference(ReferenceKindJobRequest, "1")
@@ -164,4 +177,30 @@ func TestGetRejectsOutOfRangeIDBeforePersistence(t *testing.T) {
 	require.ErrorIs(t, err, ErrNotFound)
 	repo.AssertNotCalled(t, "FindOwnedByID", mock.Anything, mock.Anything, mock.Anything)
 	users.AssertExpectations(t)
+}
+
+func TestGetResolvesOnlyLinkedEvidenceAfterOwnership(t *testing.T) {
+	users, repo, images := new(userFinderMock), new(repositoryMock), new(evidenceImagesMock)
+	users.On("FindClaimantByAuthID", mock.Anything, "auth").Return(&Claimant{ID: 1, Party: PartyConsumer}, nil).Once()
+	repo.On("FindOwnedByID", mock.Anything, 1, 7).Return(&Claim{ID: 7, ImageFileIDs: []string{testFile}}, nil).Once()
+	images.On("ResolveClaimEvidenceImage", mock.Anything, "auth", testFile).Return("https://private/image?signature=temporary", nil).Once()
+	result, err := NewService(repo, users, nil, images, nil).Get(t.Context(), "auth", 7)
+	require.NoError(t, err)
+	require.Len(t, result.Images, 1)
+	require.Equal(t, testFile, result.Images[0].FileID)
+	require.Equal(t, "https://private/image?signature=temporary", result.Images[0].URL)
+	images.AssertExpectations(t)
+	users.AssertExpectations(t)
+	repo.AssertExpectations(t)
+}
+
+func TestListDoesNotResolveEvidenceURLs(t *testing.T) {
+	users, repo, images := new(userFinderMock), new(repositoryMock), new(evidenceImagesMock)
+	users.On("FindClaimantByAuthID", mock.Anything, "auth").Return(&Claimant{ID: 1, Party: PartyConsumer}, nil).Once()
+	repo.On("FindOwnedPage", mock.Anything, 1, ListCriteria{Page: 1, Limit: 20}).Return(&Page{}, nil).Once()
+	_, err := NewService(repo, users, nil, images, nil).List(t.Context(), "auth", ListCriteria{})
+	require.NoError(t, err)
+	require.Empty(t, images.Calls)
+	users.AssertExpectations(t)
+	repo.AssertExpectations(t)
 }

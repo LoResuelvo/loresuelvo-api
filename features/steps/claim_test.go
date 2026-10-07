@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/url"
 	"reflect"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -139,13 +140,11 @@ func registerClaimSteps(sc *godog.ScenarioContext, s *testSuite) {
 	sc.Step(`^informa exactamente la compensación sugerida de (\d+) centavos ARS, sin afirmar que se ejecutó$`, s.claimCompensationMatches)
 	sc.Step(`^la respuesta no expone la identidad privada del operador, auditorías de acceso, evidencias ajenas ni transacciones financieras completas$`, s.claimProjectionPrivate)
 	sc.Step(`^que "([^"]*)" tiene el reclamo "([^"]*)" con la imagen privada confirmada "([^"]*)" vinculada$`, s.claimLinkedImage)
-	sc.Step(`^solicito acceso a la imagen "([^"]*)" del reclamo propio "([^"]*)"$`, s.claimImageGet)
-	sc.Step(`^el sistema autoriza un acceso temporal a la imagen "([^"]*)"$`, s.claimImageAuthorized)
-	sc.Step(`^que "([^"]*)" tiene el reclamo "([^"]*)" y la imagen privada confirmada "([^"]*)" (.*)$`, s.claimImageLinkFixture)
-	sc.Step(`^que "([^"]*)" tiene su propio reclamo "([^"]*)" en la misma operación$`, s.claimFixtureSameOperation)
-	sc.Step(`^solicito acceso a la imagen "([^"]*)" del reclamo "([^"]*)"$`, s.claimImageGet)
-	sc.Step(`^el sistema responde con estado 404 sin entregar una URL temporal$`, func() error { return s.claimError(404) })
-	sc.Step(`^el almacenamiento y las credenciales no se exponen en la respuesta$`, s.claimProjectionPrivate)
+	sc.Step(`^que "([^"]*)" tiene el reclamo "([^"]*)" y "([^"]*)" tiene el reclamo "([^"]*)" en la misma operación$`, s.claimTwoOwners)
+	sc.Step(`^que la imagen privada confirmada "([^"]*)" está vinculada a "([^"]*)" y no a "([^"]*)"$`, s.claimImageLinkedOnlyTo)
+	sc.Step(`^la respuesta no entrega una URL temporal$`, s.claimResponseHasNoURL)
+	sc.Step(`^el detalle no incluye la imagen "([^"]*)" ni una URL temporal para ella$`, s.claimDetailExcludesImage)
+	sc.Step(`^la respuesta no expone claves de almacenamiento ni credenciales$`, s.claimProjectionPrivate)
 }
 func (s *testSuite) claimAccounts(consumer, provider string) error {
 	s.claimMaps()
@@ -985,7 +984,7 @@ func (s *testSuite) claimProjectionPrivate() error {
 		}
 	}
 	for _, fixture := range s.claims.claims {
-		if fixture.owner == "juan@example.com" {
+		if s.claimAuth(fixture.owner) != s.currentAuth0ID {
 			for _, imageID := range fixture.claim.ImageFileIDs {
 				if strings.Contains(string(s.lastBody), imageID) {
 					return fmt.Errorf("foreign evidence exposed")
@@ -996,37 +995,76 @@ func (s *testSuite) claimProjectionPrivate() error {
 	return nil
 }
 func (s *testSuite) claimLinkedImage(email, label, imageLabel string) error {
-	return s.claimImageLinkFixture(email, label, imageLabel, `vinculada a "`+label+`"`)
-}
-func (s *testSuite) claimImageLinkFixture(email, label, imageLabel, link string) error {
 	if err := s.claimUploadImage(email, imageLabel, "image/png"); err != nil {
 		return err
 	}
-	images := []string{}
-	if !strings.HasPrefix(link, "no vinculada") {
-		images = append(images, s.claims.images[imageLabel])
-	}
-	return s.fixtureClaim(email, label, "S1", uuid.NewString(), "damage", "Private evidence testimony", images, claim.StatusOpen, s.clock.Now())
+	return s.fixtureClaim(email, label, "S1", uuid.NewString(), "damage", "Private evidence testimony", []string{s.claims.images[imageLabel]}, claim.StatusOpen, s.clock.Now())
 }
-func (s *testSuite) claimFixtureSameOperation(email, label string) error {
-	return s.claimFixtureKey(email, label, uuid.NewString())
-}
-func (s *testSuite) claimImageGet(imageLabel, label string) error {
-	return s.claimSend(http.MethodGet, fmt.Sprintf("/claims/%d/images/%s", s.claims.claims[label].claim.ID, s.claims.images[imageLabel]), "", nil)
-}
-func (s *testSuite) claimImageAuthorized(imageLabel string) error {
-	var response struct{ URL string }
-	if err := json.Unmarshal(s.lastBody, &response); err != nil {
+func (s *testSuite) claimTwoOwners(firstEmail, firstLabel, secondEmail, secondLabel string) error {
+	if err := s.claimFixtureKey(firstEmail, firstLabel, uuid.NewString()); err != nil {
 		return err
 	}
-	target, err := url.Parse(response.URL)
+	return s.claimFixtureKey(secondEmail, secondLabel, uuid.NewString())
+}
+func (s *testSuite) claimImageLinkedOnlyTo(imageLabel, linkedLabel, otherLabel string) error {
+	fixture := s.claims.claims[linkedLabel]
+	if err := s.claimUploadImage(fixture.owner, imageLabel, "image/png"); err != nil {
+		return err
+	}
+	input := fixture.input
+	input.ImageFileIDs = []string{s.claims.images[imageLabel]}
+	normalized, err := input.Normalize()
 	if err != nil {
 		return err
 	}
-	if s.lastStatus != 200 || target.Host == "" || target.Query().Get("X-Amz-Expires") == "" || target.Query().Get("X-Amz-Signature") == "" {
+	if err := (testsupport.ClaimLifecycleFixture{DB: s.database}).SetEvidence(context.Background(), fixture.claim, normalized.ImageFileIDs); err != nil {
+		return err
+	}
+	fixture.input = normalized
+	if err := s.claimSnapshot(linkedLabel); err != nil {
+		return err
+	}
+	if !fixture.claim.MatchesSubmission(normalized) || slices.Contains(s.claims.claims[otherLabel].claim.ImageFileIDs, s.claims.images[imageLabel]) {
+		return fmt.Errorf("unexpected evidence links or submission fingerprint")
+	}
+	return nil
+}
+func (s *testSuite) claimResponseHasNoURL() error {
+	if strings.Contains(string(s.lastBody), `"url":`) {
+		return fmt.Errorf("unexpected temporary URL in response")
+	}
+	return nil
+}
+func (s *testSuite) claimDetailExcludesImage(imageLabel string) error {
+	if s.lastStatus != 200 {
+		return fmt.Errorf("detail returned %d", s.lastStatus)
+	}
+	if strings.Contains(string(s.lastBody), s.claims.images[imageLabel]) {
+		return fmt.Errorf("unlinked evidence exposed")
+	}
+	return s.claimResponseHasNoURL()
+}
+func (s *testSuite) claimImageAuthorized(imageLabel string) error {
+	var response struct {
+		Images []struct {
+			FileID string `json:"file_id"`
+			URL    string `json:"url"`
+		}
+	}
+	if err := json.Unmarshal(s.lastBody, &response); err != nil {
+		return err
+	}
+	if s.lastStatus != 200 || len(response.Images) != 1 || response.Images[0].FileID != s.claims.images[imageLabel] {
+		return fmt.Errorf("expected linked private evidence in detail: %s", s.lastBody)
+	}
+	target, err := url.Parse(response.Images[0].URL)
+	if err != nil {
+		return err
+	}
+	if target.Host == "" || target.Query().Get("X-Amz-Expires") == "" || target.Query().Get("X-Amz-Signature") == "" {
 		return fmt.Errorf("missing private temporary URL")
 	}
-	req, err := http.NewRequest(http.MethodGet, response.URL, nil)
+	req, err := http.NewRequest(http.MethodGet, response.Images[0].URL, nil)
 	if err != nil {
 		return err
 	}
