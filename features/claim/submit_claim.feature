@@ -9,7 +9,6 @@ Feature: Presentar un reclamo sobre una operación propia
 
     Rule: El ingreso resuelve al reclamante y la operación desde datos persistidos
 
-        @wip
         Scenario Outline: 31.1-IC Presentar un reclamo propio antes de que exista una orden o un pago
             Given que estoy autenticado como <parte> "<correo>"
             And que la solicitud "S1" no tiene propuesta, orden ni intento de pago
@@ -24,7 +23,6 @@ Feature: Presentar un reclamo sobre una operación propia
                 | consumidor | ana@example.com  | consumer |
                 | prestador  | juan@example.com | provider |
 
-        @wip
         Scenario: 31.2-IC Resolver cada propuesta posterior como una operación independiente
             Given que existen dos propuestas de servicio de la conversación de "S1": "P1" es la primera y "P2" es posterior
             And que estoy autenticado como prestador "juan@example.com"
@@ -32,7 +30,6 @@ Feature: Presentar un reclamo sobre una operación propia
             Then el expediente queda vinculado a "sp-" seguido del ID persistido de "P2" y conserva la referencia "service_proposal_id" con el ID persistido de "P2"
             And el expediente no se atribuye a "jr-" seguido del ID persistido de "S1" por compartir conversación o participantes
 
-        @wip
         Scenario: 31.3-IC Evitar un segundo reclamo abierto propio aunque se use otra referencia de la misma operación
             Given que "ana@example.com" ya presentó el reclamo "C1" sobre "S1" usando la solicitud como referencia y el expediente sigue "open"
             And que "P1" es la primera propuesta de la conversación de "S1"
@@ -41,7 +38,6 @@ Feature: Presentar un reclamo sobre una operación propia
             Then el sistema responde con estado 409 sin revelar información de reclamos ajenos
             And el reclamo "C1" conserva su testimonio, estado y evidencia sin duplicar actuaciones
 
-        @wip
         Scenario: 31.4-IC Permitir que la contraparte presente su propio expediente en la misma operación
             Given que "ana@example.com" presentó el reclamo "C1" sobre "S1" con la clave "550e8400-e29b-41d4-a716-446655440004", motivo "improper_charge" y testimonio "El cobro solicitado no corresponde"
             And que estoy autenticado como prestador "juan@example.com"
@@ -49,7 +45,6 @@ Feature: Presentar un reclamo sobre una operación propia
             Then el sistema responde con estado 201 y crea un expediente propio distinto de "C1" para "juan@example.com"
             And la respuesta no identifica ni devuelve el expediente "C1" de "ana@example.com"
 
-        @wip
         Scenario: 31.5-IC Adjuntar imágenes privadas confirmadas a una presentación
             Given que "ana@example.com" cargó y confirmó la imagen JPEG válida "IMG1" y la imagen PNG válida "IMG2" con finalidad "claim_evidence_image"
             And que ambas imágenes son privadas y de hasta 5 MiB cada una
@@ -58,7 +53,6 @@ Feature: Presentar un reclamo sobre una operación propia
             Then el expediente conserva los IDs estables "IMG1" y "IMG2" como evidencias vinculadas
             And la evidencia no se representa mediante una URL firmada ni se expone públicamente
 
-        @wip
         Scenario Outline: 31.6-IC Rechazar referencias de operación ajenas, inexistentes o intentos de pago privados
             Given que la solicitud "S2" pertenece a otra persona, "S404" no existe y "P1" es una propuesta de "S1" con el intento de pago "PI1"
             And que el prestador no está autorizado a consultar "PI1" por las reglas del módulo de pagos
@@ -73,7 +67,6 @@ Feature: Presentar un reclamo sobre una operación propia
                 | solicitud inexistente "S404"                             |
                 | intento de pago privado "PI1" de su propia operación     |
 
-        @wip
         Scenario Outline: 31.7-IC Rechazar una credencial ausente, inválida o sin cuenta local habilitada
             Given que la credencial de autenticación es "<credencial>"
             When intento presentar un reclamo sobre la solicitud "S1"
@@ -87,7 +80,6 @@ Feature: Presentar un reclamo sobre una operación propia
 
     Rule: La clave de idempotencia identifica una presentación sin duplicar su expediente
 
-        @wip
         Scenario Outline: 31.8-IC Recuperar el expediente actual al reintentar una presentación confirmada
             Given que "ana@example.com" presentó el reclamo "C1" con la clave "550e8400-e29b-41d4-a716-446655440001" y el contenido original está asociado a esa clave
             And que el estado actual del reclamo "C1" es "<estado>"
@@ -103,14 +95,12 @@ Feature: Presentar un reclamo sobre una operación propia
                 | resolved  |
                 | dismissed |
 
-        @wip
         Scenario: 31.9-IC Rechazar la reutilización de una clave con contenido diferente
             Given que "ana@example.com" presentó el reclamo "C1" con la clave "550e8400-e29b-41d4-a716-446655440003"
             And que estoy autenticado como consumidor "ana@example.com"
             When intento presentar contenido distinto usando la clave ya asociada a "C1"
             Then el sistema responde con estado 409 sin crear ni modificar un expediente
 
-        @wip
         Scenario: 31.10-IC Presentar un nuevo reclamo después de finalizar el anterior
             Given que "ana@example.com" tiene el reclamo finalizado "C1" con su dictamen formal persistido por el contrato compartido con US-68
             And que estoy autenticado como consumidor "ana@example.com"

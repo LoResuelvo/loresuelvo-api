@@ -9,7 +9,6 @@ Feature: Consultar reclamos propios
 
     Rule: El listado propio devuelve únicamente los expedientes del usuario autenticado
 
-        @wip
         Scenario Outline: 31.13-CC Paginar reclamos propios con fechas deterministas y desempate descendente
             Given que el reloj del sistema indica "2026-09-25T12:00:00Z"
             And que "ana@example.com" tiene los reclamos abiertos "C1" y "C2" creados ambos el "2026-09-24T10:00:00Z", con el ID persistido de "C2" mayor que el de "C1", y "C3" creado el "2026-09-23T10:00:00Z", en operaciones distintas
@@ -27,7 +26,6 @@ Feature: Consultar reclamos propios
                 | 2      | C3       |
                 | 3      | ninguno  |
 
-        @wip
         Scenario: 31.14-CC Devolver una página vacía como colección vacía
             Given que "ana@example.com" no tiene reclamos en estado "dismissed"
             And que estoy autenticado como consumidor "ana@example.com"
@@ -37,7 +35,6 @@ Feature: Consultar reclamos propios
 
     Rule: El detalle, resultado y evidencias respetan la propiedad del reclamante
 
-        @wip
         Scenario Outline: 31.15-CC No revelar si un reclamo propio existe para otro participante
             Given que el reclamo "<reclamo>" <existencia>
             And que estoy autenticado como prestador "juan@example.com"
@@ -50,14 +47,12 @@ Feature: Consultar reclamos propios
                 | C1      | pertenece a "ana@example.com" sobre "S1"         |
                 | C404    | no existe                                  |
 
-        @wip
         Scenario: 31.16-CC Devolver resolución vacía antes de un dictamen formal
             Given que "ana@example.com" presentó el reclamo "C1" y no existe resolución registrada en el contrato compartido con US-68
             And que estoy autenticado como consumidor "ana@example.com"
             When consulto el detalle propio del reclamo "C1"
             Then el detalle informa la resolución como vacía
 
-        @wip
         Scenario: 31.17-CC Exponer sólo el resultado formal del expediente propio
             Given que "ana@example.com" presentó el reclamo finalizado "C1" con una resolución formal persistida por el contrato compartido con US-68
             And que el dictamen de "C1" tiene tipo semántico "a favor del consumidor", fundamentación "Se verificó el incumplimiento acordado" y fecha "2026-09-24T12:00:00Z"
@@ -70,14 +65,12 @@ Feature: Consultar reclamos propios
             And la respuesta no expone la identidad privada del operador, auditorías de acceso, evidencias ajenas ni transacciones financieras completas
             And la respuesta incluye "Cache-Control: private, no-store"
 
-        @wip
         Scenario: 31.18-CC Permitir al reclamante resolver temporalmente su evidencia privada
             Given que "ana@example.com" tiene el reclamo "C1" con la imagen privada confirmada "IMG1" vinculada
             And que estoy autenticado como consumidor "ana@example.com"
             When solicito acceso a la imagen "IMG1" del reclamo propio "C1"
             Then el sistema autoriza un acceso temporal a la imagen "IMG1"
 
-        @wip
         Scenario Outline: 31.19-CC No resolver una imagen fuera de la propiedad y vínculo del reclamo
             Given que "ana@example.com" tiene el reclamo "C1" y la imagen privada confirmada "IMG1" <vinculo>
             And que "juan@example.com" tiene su propio reclamo "C2" en la misma operación
