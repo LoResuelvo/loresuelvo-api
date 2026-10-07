@@ -10,9 +10,10 @@ import (
 )
 
 type MemoryStorage struct {
-	publicBaseURL string
-	objects       map[string]memoryObject
-	mu            sync.RWMutex
+	publicBaseURL  string
+	objects        map[string]memoryObject
+	mu             sync.RWMutex
+	uploadPolicies map[string]filedomain.ObjectToUpload
 }
 
 type memoryObject struct {
@@ -25,27 +26,33 @@ func NewMemoryStorage(publicBaseURL string) *MemoryStorage {
 		publicBaseURL = "http://storage.local"
 	}
 	return &MemoryStorage{
-		publicBaseURL: strings.TrimRight(publicBaseURL, "/"),
-		objects:       map[string]memoryObject{},
+		publicBaseURL:  strings.TrimRight(publicBaseURL, "/"),
+		objects:        map[string]memoryObject{},
+		uploadPolicies: map[string]filedomain.ObjectToUpload{},
 	}
 }
 
 func (storage *MemoryStorage) GenerateUploadURL(_ context.Context, object filedomain.ObjectToUpload) (*filedomain.UploadTarget, error) {
 	storage.mu.Lock()
-	storage.objects[objectIdentity(object.Bucket, object.Key)] = memoryObject{
-		metadata: filedomain.ObjectMetadata{
-			MimeType:  object.MimeType,
-			SizeBytes: object.SizeBytes,
-		},
-		data: make([]byte, object.SizeBytes),
+	storage.uploadPolicies[objectIdentity(object.Bucket, object.Key)] = object
+	if !object.CreateOnly {
+		storage.objects[objectIdentity(object.Bucket, object.Key)] = memoryObject{
+			metadata: filedomain.ObjectMetadata{
+				MimeType:  object.MimeType,
+				SizeBytes: object.SizeBytes,
+			},
+			data: make([]byte, object.SizeBytes),
+		}
 	}
 	storage.mu.Unlock()
 
+	headers := map[string]string{"Content-Type": object.MimeType}
+	if object.CreateOnly {
+		headers["If-None-Match"] = "*"
+	}
 	return &filedomain.UploadTarget{
-		URL: fmt.Sprintf("%s/upload/%s/%s", storage.publicBaseURL, object.Bucket, object.Key),
-		Headers: map[string]string{
-			"Content-Type": object.MimeType,
-		},
+		URL:     fmt.Sprintf("%s/upload/%s/%s", storage.publicBaseURL, object.Bucket, object.Key),
+		Headers: headers,
 	}, nil
 }
 
@@ -91,4 +98,31 @@ func (storage *MemoryStorage) PublicURL(bucket, key string) string {
 
 func objectIdentity(bucket, key string) string {
 	return bucket + "/" + key
+}
+
+// PutObject simulates a signed upload, enforcing its required headers atomically.
+func (storage *MemoryStorage) PutObject(ctx context.Context, bucket, key string, headers map[string]string, data []byte) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	storage.mu.Lock()
+	defer storage.mu.Unlock()
+	identity := objectIdentity(bucket, key)
+	policy, ok := storage.uploadPolicies[identity]
+	if !ok {
+		return fmt.Errorf("upload target not found")
+	}
+	if headers["Content-Type"] != policy.MimeType || len(data) != policy.SizeBytes {
+		return fmt.Errorf("upload metadata mismatch")
+	}
+	if policy.CreateOnly {
+		if headers["If-None-Match"] != "*" {
+			return fmt.Errorf("required upload header missing")
+		}
+		if _, exists := storage.objects[identity]; exists {
+			return fmt.Errorf("object already exists")
+		}
+	}
+	storage.objects[identity] = memoryObject{metadata: filedomain.ObjectMetadata{MimeType: policy.MimeType, SizeBytes: len(data)}, data: append([]byte(nil), data...)}
+	return nil
 }

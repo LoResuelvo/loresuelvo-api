@@ -9,6 +9,7 @@ import (
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/audit_log_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/calendar_connection_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/category_handler"
+	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/claim_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/consumer_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/conversation_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/coverage_zone_handler"
@@ -54,6 +55,7 @@ const (
 )
 
 type RouterConfig struct {
+	ClaimHandler                *claim_handler.Handler
 	InstallationHandler         *installation_handler.Handler
 	Environment                 Environment
 	AdminHandler                *admin_handler.AdminHandler
@@ -92,6 +94,7 @@ type RouterConfig struct {
 }
 
 type Router struct {
+	claimHandler                *claim_handler.Handler
 	installationHandler         *installation_handler.Handler
 	environment                 Environment
 	adminHandler                *admin_handler.AdminHandler
@@ -136,6 +139,7 @@ func NewRouter(config RouterConfig) *Router {
 	}
 
 	router := &Router{
+		claimHandler:                config.ClaimHandler,
 		installationHandler:         config.InstallationHandler,
 		environment:                 config.Environment,
 		adminHandler:                config.AdminHandler,
@@ -209,6 +213,7 @@ func (router *Router) SetUp() (*gin.Engine, error) {
 	router.registerWorkOrderRoutes(engine, authMiddleware)
 	router.registerAuthenticatedRoutes(engine, authMiddleware)
 	router.registerFileRoutes(engine, authMiddleware)
+	router.registerClaimRoutes(engine, authMiddleware)
 	router.registerRealtimeRoutes(engine, authMiddleware)
 	router.registerTestRoutes(engine)
 
@@ -393,4 +398,11 @@ func testRoutesEnabled(environment Environment) bool {
 	default:
 		return false
 	}
+}
+
+func (router *Router) registerClaimRoutes(engine *gin.Engine, authMiddleware gin.HandlerFunc) {
+	engine.POST("/claims", privateNoStore, authMiddleware, router.claimHandler.Submit)
+	engine.GET("/claims", privateNoStore, authMiddleware, router.claimHandler.List)
+	engine.GET("/claims/:id", privateNoStore, authMiddleware, router.claimHandler.Get)
+	engine.GET("/claims/:id/images/:file_id", privateNoStore, authMiddleware, router.claimHandler.ResolveImage)
 }

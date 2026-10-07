@@ -68,12 +68,16 @@ func NewS3Storage(config Config) *S3Storage {
 
 func (storage *S3Storage) GenerateUploadURL(ctx context.Context, object filedomain.ObjectToUpload) (*filedomain.UploadTarget, error) {
 	contentLength := int64(object.SizeBytes)
-	result, err := storage.presignClient.PresignPutObject(ctx, &s3.PutObjectInput{
+	input := &s3.PutObjectInput{
 		Bucket:        aws.String(object.Bucket),
 		Key:           aws.String(object.Key),
 		ContentType:   aws.String(object.MimeType),
 		ContentLength: aws.Int64(contentLength),
-	}, storage.presignExpiresIn)
+	}
+	if object.CreateOnly {
+		input.IfNoneMatch = aws.String("*")
+	}
+	result, err := storage.presignClient.PresignPutObject(ctx, input, storage.presignExpiresIn)
 	if err != nil {
 		return nil, fmt.Errorf("presigning put object: %w", err)
 	}

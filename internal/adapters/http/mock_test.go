@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/claim"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/operation"
 	operationreadmodel "github.com/LoResuelvo/loresuelvo-api/internal/domain/operation/read_model"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/payment"
@@ -146,4 +147,26 @@ func (service *conversionServiceMock) Query(ctx context.Context, authID string, 
 		return value.(*providerreadmodel.Conversion), arguments.Error(1)
 	}
 	return nil, arguments.Error(1)
+}
+
+type claimServiceMock struct{ mock.Mock }
+
+func (m *claimServiceMock) Submit(ctx context.Context, auth, key string, input claim.Submission) (*claim.SubmissionResult, error) {
+	a := m.Called(ctx, auth, key, input)
+	v, _ := a.Get(0).(*claim.SubmissionResult)
+	return v, a.Error(1)
+}
+func (m *claimServiceMock) List(ctx context.Context, auth string, criteria claim.ListCriteria) (*claim.Page, error) {
+	a := m.Called(ctx, auth, criteria)
+	v, _ := a.Get(0).(*claim.Page)
+	return v, a.Error(1)
+}
+func (m *claimServiceMock) Get(ctx context.Context, auth string, id int) (*claim.Claim, error) {
+	a := m.Called(ctx, auth, id)
+	v, _ := a.Get(0).(*claim.Claim)
+	return v, a.Error(1)
+}
+func (m *claimServiceMock) ResolveImage(ctx context.Context, auth string, id int, fileID string) (string, error) {
+	a := m.Called(ctx, auth, id, fileID)
+	return a.String(0), a.Error(1)
 }

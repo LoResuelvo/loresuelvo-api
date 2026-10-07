@@ -3,6 +3,7 @@ package file
 import "errors"
 
 var (
+	ErrClaimEvidenceImageNotAvailable       = errors.New("Claim evidence image is not available")
 	ErrFileIDRequired                       = errors.New("File id is required")
 	ErrFileKeyRequired                      = errors.New("File key is required")
 	ErrFileBucketRequired                   = errors.New("File bucket is required")

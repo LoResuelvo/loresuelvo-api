@@ -42,6 +42,7 @@ import (
 )
 
 type testSuite struct {
+	claims                         claimState
 	phoneIDs                       []string
 	phoneRegistrations             []phoneRegistration
 	pushCapture                    *pushRequestCapture
@@ -186,6 +187,7 @@ type testSuite struct {
 }
 
 func (s *testSuite) registerAllSteps(sc *godog.ScenarioContext) {
+	registerClaimSteps(sc, s)
 	registerServiceNoticeSteps(sc, s)
 	registerPhoneSteps(sc, s)
 	registerNoticeDeliverySteps(sc, s)
@@ -264,6 +266,10 @@ func (s *testSuite) registerAllSteps(sc *godog.ScenarioContext) {
 }
 
 func (s *testSuite) cleanup() error {
+	if err := (testsupport.ClaimLifecycleFixture{DB: s.database}).DeleteAll(context.Background()); err != nil {
+		return err
+	}
+	s.claims = claimState{}
 	s.pushCapture.reset()
 	s.pushCapture.setStatus(0)
 	s.closeRealtimeConnections()

@@ -28,10 +28,11 @@ func RequestLogger(logger *slog.Logger) gin.HandlerFunc {
 		c.Request = c.Request.WithContext(observability.ContextWithLogger(c.Request.Context(), requestLogger))
 		c.Header(requestIDHeader, requestID)
 
-		// Private reads and participant work chats contain sensitive data.
+		// Private reads, evidence files, and participant work chats contain sensitive data.
 		// Keep request metadata, but never capture their bodies or query values.
 		privateInstallation := c.Request.URL.Path == "/installations" || strings.HasPrefix(c.Request.URL.Path, "/installations/")
-		privateRead := privateInstallation || isPrivateAdminReadPath(c.Request.URL.Path) || isPrivateWorkChatPath(c.Request.URL.Path) || isPrivateProviderActivityPath(c.Request.URL.Path)
+		privateEvidence := c.Request.URL.Path == "/claims" || strings.HasPrefix(c.Request.URL.Path, "/claims/") || c.Request.URL.Path == "/files" || strings.HasPrefix(c.Request.URL.Path, "/files/")
+		privateRead := privateEvidence || privateInstallation || isPrivateAdminReadPath(c.Request.URL.Path) || isPrivateWorkChatPath(c.Request.URL.Path) || isPrivateProviderActivityPath(c.Request.URL.Path)
 		includeBodies := !privateRead && requestLogger.Enabled(c.Request.Context(), slog.LevelInfo)
 		var requestBody *limitedBodyCapture
 		var responseBody *limitedBodyCapture
@@ -60,7 +61,7 @@ func RequestLogger(logger *slog.Logger) gin.HandlerFunc {
 			"http.status_code", status,
 			"duration_ms", time.Since(startedOn).Milliseconds(),
 		}
-		if pathParams := pathParameters(c.Params); !privateInstallation && len(pathParams) > 0 {
+		if pathParams := pathParameters(c.Params); !privateInstallation && !privateEvidence && len(pathParams) > 0 {
 			attributes = append(attributes, "http.path_params", pathParams)
 		}
 		if !privateRead {

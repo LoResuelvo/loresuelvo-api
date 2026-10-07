@@ -2,6 +2,7 @@ package file
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -81,10 +82,11 @@ func (s *Service) RequestUpload(ctx context.Context, request PresignRequest) (*P
 	key := buildObjectKey(createdOn, request.Purpose, fileID, metadata.OriginalName())
 
 	target, err := s.storage.GenerateUploadURL(ctx, ObjectToUpload{
-		Bucket:    bucket,
-		Key:       key,
-		MimeType:  metadata.MimeType(),
-		SizeBytes: metadata.SizeBytes(),
+		CreateOnly: request.Purpose == PurposeClaimEvidenceImage,
+		Bucket:     bucket,
+		Key:        key,
+		MimeType:   metadata.MimeType(),
+		SizeBytes:  metadata.SizeBytes(),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("generating upload url: %w", err)
@@ -109,7 +111,10 @@ func (s *Service) RequestUpload(ctx context.Context, request PresignRequest) (*P
 func (s *Service) ConfirmUpload(ctx context.Context, request ConfirmRequest) (*ConfirmUploadResult, error) {
 	file, err := s.repository.FindByID(ctx, request.FileID)
 	if err != nil {
-		return nil, ErrFileNotAvailable
+		if errors.Is(err, ErrFileNotAvailable) {
+			return nil, ErrFileNotAvailable
+		}
+		return nil, fmt.Errorf("finding upload file: %w", err)
 	}
 
 	if file.UploadedByAuthID != request.AuthID || file.Key != request.Key {
@@ -121,13 +126,20 @@ func (s *Service) ConfirmUpload(ctx context.Context, request ConfirmRequest) (*C
 
 	metadata, err := s.storage.ReadObjectMetadata(ctx, file.Bucket, file.Key)
 	if err != nil {
+		if file.HasPurpose(PurposeClaimEvidenceImage) {
+			return nil, fmt.Errorf("reading claim evidence metadata: %w", err)
+		}
 		return nil, ErrFileNotAvailable
 	}
 	if metadata.MimeType != file.MimeType() || metadata.SizeBytes != file.SizeBytes() {
 		return nil, ErrFileNotAvailable
 	}
 
-	if file.IsAudio() {
+	if file.HasPurpose(PurposeClaimEvidenceImage) {
+		if err := s.confirmClaimEvidenceImage(ctx, file); err != nil {
+			return nil, err
+		}
+	} else if file.IsAudio() {
 		if err := s.confirmAudioFile(ctx, file); err != nil {
 			return nil, err
 		}

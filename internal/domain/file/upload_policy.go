@@ -1,6 +1,8 @@
 package file
 
 const (
+	maxClaimEvidenceImageBytes                 = 5 * 1024 * 1024
+	MaxClaimEvidenceImages                     = 3
 	maxProfilePhotoBytes                       = 5 * 1024 * 1024
 	maxConversationMessageImageBytes           = 5 * 1024 * 1024
 	maxConversationMessageAudioBytes           = 5 * 1024 * 1024
@@ -161,8 +163,17 @@ var workOrderCompletionImagePolicy = UploadPolicy{
 	InvalidMetadataError: ErrWorkOrderCompletionImageNotAvailable,
 }
 
+var claimEvidenceImagePolicy = UploadPolicy{
+	Purpose:              PurposeClaimEvidenceImage,
+	Visibility:           VisibilityPrivate,
+	MaxSizeBytes:         maxClaimEvidenceImageBytes,
+	AllowedMimeTypes:     map[string]struct{}{"image/jpeg": {}, "image/png": {}},
+	InvalidMetadataError: ErrClaimEvidenceImageNotAvailable,
+}
+
 func defaultUploadPolicies() map[string]UploadPolicy {
 	return map[string]UploadPolicy{
+		PurposeClaimEvidenceImage:       claimEvidenceImagePolicy,
 		PurposeProfilePhoto:             profilePhotoPolicy,
 		PurposeConversationMessageImage: conversationMessageImagePolicy,
 		PurposeConversationMessageAudio: conversationMessageAudioPolicy,

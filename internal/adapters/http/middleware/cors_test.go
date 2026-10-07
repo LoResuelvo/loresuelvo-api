@@ -74,3 +74,18 @@ func TestCORSLayerAnswersPreflightRequest(t *testing.T) {
 	assert.Equal(t, http.StatusNoContent, resp.Code)
 	assert.Equal(t, "http://localhost:8081", resp.Header().Get("Access-Control-Allow-Origin"))
 }
+
+func TestCORSClaimPreflightAllowsIdempotencyKey(t *testing.T) {
+	t.Setenv("CORS_ALLOWED_ORIGINS", "https://app.example.com")
+	gin.SetMode(gin.TestMode)
+	engine := gin.New()
+	engine.Use(CORSLayer(NewCORSConfigFromEnv()))
+	request := httptest.NewRequest(http.MethodOptions, "/claims", nil)
+	request.Header.Set("Origin", "https://app.example.com")
+	request.Header.Set("Access-Control-Request-Method", "POST")
+	request.Header.Set("Access-Control-Request-Headers", "Authorization, Content-Type, Idempotency-Key")
+	response := httptest.NewRecorder()
+	engine.ServeHTTP(response, request)
+	assert.Equal(t, http.StatusNoContent, response.Code)
+	assert.Contains(t, response.Header().Get("Access-Control-Allow-Headers"), "Idempotency-Key")
+}

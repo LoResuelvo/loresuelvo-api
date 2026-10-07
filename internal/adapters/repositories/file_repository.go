@@ -3,6 +3,7 @@ package repositories
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -144,6 +145,9 @@ func (repository *FileRepository) syncVideoMetadataWithTx(ctx context.Context, t
 
 func (repository *FileRepository) FindByID(ctx context.Context, id string) (*filedomain.File, error) {
 	file, err := repository.findOne(ctx, fileSelectQuery+`WHERE f.id = $1`, id)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, filedomain.ErrFileNotAvailable
+	}
 	if err != nil {
 		return nil, fmt.Errorf("finding file by id: %w", err)
 	}

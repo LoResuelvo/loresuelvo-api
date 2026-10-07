@@ -14,6 +14,10 @@ func handleFileError(c *gin.Context, err error) {
 		httphandler.RespondError(c, http.StatusBadRequest, filedomain.ErrProfilePhotoNotAvailable.Error())
 		return
 	}
+	if errors.Is(err, filedomain.ErrClaimEvidenceImageNotAvailable) {
+		httphandler.RespondError(c, http.StatusBadRequest, filedomain.ErrClaimEvidenceImageNotAvailable.Error())
+		return
+	}
 	if errors.Is(err, filedomain.ErrMessageImageNotAvailable) {
 		httphandler.RespondError(c, http.StatusBadRequest, err.Error())
 		return

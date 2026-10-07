@@ -9,6 +9,7 @@ const (
 	VisibilityPublic  = "public"
 	VisibilityPrivate = "private"
 
+	PurposeClaimEvidenceImage       = "claim_evidence_image"
 	PurposeProfilePhoto             = "profile_photo"
 	PurposeConversationMessageImage = "conversation_message_image"
 	PurposeConversationMessageAudio = "conversation_message_audio"

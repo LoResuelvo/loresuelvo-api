@@ -17,10 +17,11 @@ type ObjectToDownload struct {
 }
 
 type ObjectToUpload struct {
-	Bucket    string
-	Key       string
-	MimeType  string
-	SizeBytes int
+	CreateOnly bool
+	Bucket     string
+	Key        string
+	MimeType   string
+	SizeBytes  int
 }
 
 type UploadTarget struct {

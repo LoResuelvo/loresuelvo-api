@@ -17,6 +17,7 @@ import (
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/audit_log_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/calendar_connection_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/category_handler"
+	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/claim_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/consumer_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/conversation_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/coverage_zone_handler"
@@ -53,6 +54,7 @@ import (
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/audit"
 	calendarconnection "github.com/LoResuelvo/loresuelvo-api/internal/domain/calendar_connection"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/category"
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/claim"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/consumer"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/conversation"
 	coveragezone "github.com/LoResuelvo/loresuelvo-api/internal/domain/coverage_zone"
@@ -474,6 +476,7 @@ func newDependencies(database *sql.DB, adapters dependencyAdapters) (*Dependenci
 			OperationChatHandler:        operationChatHandler,
 			OperationMediaHandler:       operation_media_handler.NewHandler(operation.NewMediaService(persistence.OperationMediaReader, repositories.NewOperationMediaFileFinder(persistence.FileRepository), storageComponents.Storage)),
 			CategoryHandler:             category_handler.NewCategoryHandler(categoryService),
+			ClaimHandler:                claim_handler.NewHandler(claim.NewService(repositories.NewClaimRepository(database), repositories.NewClaimUserFinder(database), repositories.NewClaimOperationReferenceResolver(database), fileService, systemClock)),
 			CalendarConnectionHandler:   calendar_connection_handler.NewCalendarConnectionHandler(calendarConnectionService, adapters.calendarHandlerConfig),
 			CoverageZoneHandler:         coverage_zone_handler.NewCoverageZoneHandler(coverageZoneService),
 			ConsumerHandler:             consumer_handler.NewConsumerHandler(consumerService),

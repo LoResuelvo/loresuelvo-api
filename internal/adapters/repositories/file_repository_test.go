@@ -128,3 +128,20 @@ func TestFileRepositoryCanFindFilesByIDs(t *testing.T) {
 	require.Len(t, found, 1)
 	assert.Equal(t, file.ID, found[0].ID)
 }
+
+func TestFileRepositoryDistinguishesMissingFromDatabaseFailure(t *testing.T) {
+	repository, _ := newFileRepositoryTest(t)
+	_, err := repository.FindByID(t.Context(), "00000000-0000-0000-0000-000000000001")
+	require.ErrorIs(t, err, filedomain.ErrFileNotAvailable)
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+	_, err = repository.FindByID(ctx, "00000000-0000-0000-0000-000000000001")
+	require.ErrorIs(t, err, context.Canceled)
+	require.NotErrorIs(t, err, filedomain.ErrFileNotAvailable)
+	closed, err := sql.Open("pgx", "postgres://unused")
+	require.NoError(t, err)
+	require.NoError(t, closed.Close())
+	_, err = repositories.NewFileRepository(closed).FindByID(t.Context(), "00000000-0000-0000-0000-000000000001")
+	require.Error(t, err)
+	require.NotErrorIs(t, err, filedomain.ErrFileNotAvailable)
+}
