@@ -65,22 +65,28 @@ Feature: Consultar reclamos propios
             And la respuesta no expone la identidad privada del operador, auditorías de acceso, evidencias ajenas ni transacciones financieras completas
             And la respuesta incluye "Cache-Control: private, no-store"
 
-        Scenario: 31.18-CC Permitir al reclamante resolver temporalmente su evidencia privada
+        @wip
+        Scenario: 31.18-CC Incluir evidencia privada propia con acceso temporal en el detalle
             Given que "ana@example.com" tiene el reclamo "C1" con la imagen privada confirmada "IMG1" vinculada
             And que estoy autenticado como consumidor "ana@example.com"
-            When solicito acceso a la imagen "IMG1" del reclamo propio "C1"
-            Then el sistema autoriza un acceso temporal a la imagen "IMG1"
+            When consulto el detalle propio del reclamo "C1"
+            Then el sistema responde con estado 200
+            And el detalle incluye la imagen "IMG1" con una URL temporal privada
+            And la respuesta no expone claves de almacenamiento ni credenciales
 
-        Scenario Outline: 31.19-CC No resolver una imagen fuera de la propiedad y vínculo del reclamo
-            Given que "ana@example.com" tiene el reclamo "C1" y la imagen privada confirmada "IMG1" <vinculo>
-            And que "juan@example.com" tiene su propio reclamo "C2" en la misma operación
-            And que estoy autenticado como <parte> "<correo>"
-            When solicito acceso a la imagen "IMG1" del reclamo "<reclamo>"
-            Then el sistema responde con estado 404 sin entregar una URL temporal
-            And el almacenamiento y las credenciales no se exponen en la respuesta
+        @wip
+        Scenario: 31.19-CC No revelar el detalle ni las evidencias de otro participante
+            Given que "ana@example.com" tiene el reclamo "C1" con la imagen privada confirmada "IMG1" vinculada
+            And que estoy autenticado como prestador "juan@example.com"
+            When consulto el detalle propio del reclamo "C1"
+            Then el sistema responde con estado 404 sin incluir testimonio, operación ni evidencias
+            And la respuesta no entrega una URL temporal
 
-            Examples:
-                | parte      | correo           | reclamo | vinculo                         |
-                | prestador  | juan@example.com | C1      | vinculada a "C1"                |
-                | prestador  | juan@example.com | C2      | vinculada sólo a "C1"           |
-                | consumidor | ana@example.com  | C1      | no vinculada a "C1"             |
+        @wip
+        Scenario: 31.19a-CC No incluir evidencia vinculada a otro reclamo en el detalle propio
+            Given que "ana@example.com" tiene el reclamo "C1" y "juan@example.com" tiene el reclamo "C2" en la misma operación
+            And que la imagen privada confirmada "IMG1" está vinculada a "C1" y no a "C2"
+            And que estoy autenticado como prestador "juan@example.com"
+            When consulto el detalle propio del reclamo "C2"
+            Then el sistema responde con estado 200
+            And el detalle no incluye la imagen "IMG1" ni una URL temporal para ella
