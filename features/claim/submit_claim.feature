@@ -51,7 +51,7 @@ Feature: Presentar un reclamo sobre una operación propia
 
         @wip
         Scenario: 31.5-IC Adjuntar imágenes privadas confirmadas a una presentación
-            Given que "ana@example.com" cargó y confirmó la imagen JPEG válida "IMG1" y la imagen WebP válida "IMG2" con finalidad "claim_evidence_image"
+            Given que "ana@example.com" cargó y confirmó la imagen JPEG válida "IMG1" y la imagen PNG válida "IMG2" con finalidad "claim_evidence_image"
             And que ambas imágenes son privadas y de hasta 5 MiB cada una
             And que estoy autenticado como consumidor "ana@example.com"
             When presento un reclamo sobre la solicitud "S1" con esas imágenes y el testimonio "Adjunto evidencia del incumplimiento"
