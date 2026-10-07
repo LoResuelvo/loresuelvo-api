@@ -1,0 +1,101 @@
+type: object
+description: |
+  Version 1 of FCM message.data; every value is a string. This is an outbound
+  messaging contract, not an HTTP response. The API sends data-only messages
+  with Android priority high and a transport TTL capped at 24 hours. There is
+  no FCM notification block: Android validates the recipient and login binding
+  before showing a system notice, including in the background.
+
+  Drop expired notices and notices whose recipient_user_id, recipient_app,
+  installation_id, or binding_id differs from the current local login. Use
+  event_id to deduplicate within that binding. Suppression for an active chat
+  is local to the receiving installation; WebSocket presence never suppresses
+  the API's FCM attempt. Open the resource through its authenticated API flow.
+required:
+  - version
+  - event_id
+  - type
+  - resource_type
+  - resource_id
+  - destination
+  - recipient_user_id
+  - recipient_app
+  - installation_id
+  - binding_id
+  - title
+  - body
+  - expires_at
+properties:
+  version:
+    type: string
+    const: '1'
+  event_id:
+    type: string
+    pattern: '^(message:[1-9][0-9]*:[1-9][0-9]*|notification:[a-z_]+:[1-9][0-9]*)$'
+    description: |
+      Stable across the recipient's devices. Chat uses message:<message_id>:<recipient_user_id>;
+      service notices use notification:<type>:<persisted_notification_id>.
+      The namespaces keep unrelated events distinct. This ID is separate from
+      the WebSocket envelope ID and does not promise exactly-once delivery.
+  type:
+    type: string
+    enum:
+      - conversation.message.created
+      - service_proposal_received
+      - service_proposal_accepted
+      - work_order_close_to_scheduled_time
+      - work_order_completion_reported
+      - work_order_final_payment_approved
+  resource_type:
+    type: string
+    enum: [conversation, service_proposal, work_order]
+    description: Conversation for chat, proposal for a received proposal, and work order for the other four service notices.
+  resource_id:
+    type: string
+    pattern: '^[1-9][0-9]*$'
+    description: ID of the conversation, proposal, or work order to open. Proposal acceptance references the generated order here.
+  destination:
+    type: string
+    enum: [conversation, service_proposal, work_order]
+    description: Destination screen, equal to resource_type in version 1.
+  recipient_user_id:
+    type: string
+    pattern: '^[1-9][0-9]*$'
+    description: Account that owns the current installation binding.
+  recipient_app:
+    type: string
+    enum: [consumer, provider]
+  installation_id:
+    type: string
+    format: uuid
+  binding_id:
+    type: string
+    format: uuid
+    description: Login binding captured for this send. Discard queued notices after an account or login change.
+  title:
+    type: string
+    minLength: 1
+    description: API-owned constant template in the installation's es/en language, Spanish by default. Show this text without rebuilding it from chat data.
+  body:
+    type: string
+    minLength: 1
+    description: API-owned safe template. Contains no chat content, names, addresses, amounts, or private links. Final payment approval does not imply withdrawable funds.
+  expires_at:
+    type: string
+    format: date-time
+    description: UTC RFC 3339 expiry. Appointment reminders expire at the scheduled time; other notices expire 24 hours after creation. The API skips expired notices.
+additionalProperties: false
+example:
+  version: '1'
+  event_id: notification:work_order_final_payment_approved:15
+  type: work_order_final_payment_approved
+  resource_type: work_order
+  resource_id: '42'
+  destination: work_order
+  recipient_user_id: '7'
+  recipient_app: provider
+  installation_id: 1d6c97bd-1d7d-4f17-8816-4d08e2b13d27
+  binding_id: aa2e943d-51ed-4a48-85a5-1d817ce26110
+  title: Pago final confirmado
+  body: Se aprobó el pago del saldo de tu servicio.
+  expires_at: '2026-10-07T12:00:00Z'

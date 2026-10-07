@@ -87,6 +87,10 @@
         {
             "name": "Realtime",
             "description": "WebSocket real-time messaging endpoints."
+        },
+        {
+            "name": "Installations",
+            "description": "Authenticated phone registration and login binding for FCM system notices."
         }
     ],
     "paths": {
@@ -624,6 +628,237 @@
                     },
                     "503": {
                         "description": "The location service is temporarily unavailable and the registration was not persisted.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/installations/{installation_id}": {
+            "parameters": [
+                {
+                    "name": "installation_id",
+                    "in": "path",
+                    "required": true,
+                    "description": "Random, canonical lowercase RFC 4122 version 4 ID generated per app installation, not a hardware identifier or possession proof.",
+                    "schema": {
+                        "type": "string",
+                        "format": "uuid",
+                        "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                    }
+                }
+            ],
+            "put": {
+                "tags": [
+                    "Installations"
+                ],
+                "operationId": "registerInstallation",
+                "summary": "Register or renew a phone for the current account",
+                "description": "Idempotently create or update one installation using a Bearer JWT. Several\ninstallations may belong to one account. The app must match the account\nrole. Send the current FCM token and es/en locale (Spanish by default).\n\nGenerate and privately retain installation_id and installation_secret.\nKeep binding_id for token/language renewal; create a fresh binding_id on\neach login and supply previous_binding_id when replacing an existing\nbinding, including an account change. The possession proof permits that\nintentional change but knowledge of the installation ID alone does not.\nThe original app is immutable. Old queued registrations cannot restore\na superseded binding. A logged-out binding requires a new login binding.\nA confirmed invalid FCM token can be renewed in the same live binding by\nproviding a different token.\n\nResponses use Cache-Control: no-store and omit credentials. Concurrent\nconflicting writes return 409; repeating the same completed registration\nreturns 200 without creating another installation. PushNotice documents\nthe outbound FCM data contract. Registration is available even when FCM\nsending is disabled by configuration.\n",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/InstallationRegistrationRequest"
+                            },
+                            "examples": {
+                                "firstRegistration": {
+                                    "summary": "First login on a consumer installation (illustrative values)",
+                                    "value": {
+                                        "installation_secret": "f76b1db1-93ce-4b48-9067-aa9f06af2c7f",
+                                        "app": "consumer",
+                                        "fcm_token": "example-fcm-registration-token",
+                                        "locale": "es",
+                                        "binding_id": "aa2e943d-51ed-4a48-85a5-1d817ce26110"
+                                    }
+                                },
+                                "changeAccount": {
+                                    "summary": "Current JWT account takes over the same installation",
+                                    "value": {
+                                        "installation_secret": "f76b1db1-93ce-4b48-9067-aa9f06af2c7f",
+                                        "app": "consumer",
+                                        "fcm_token": "example-renewed-fcm-token",
+                                        "locale": "en",
+                                        "binding_id": "93080a55-35f4-4b53-bff9-97d1b4e70e18",
+                                        "previous_binding_id": "aa2e943d-51ed-4a48-85a5-1d817ce26110"
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "New installation registered.",
+                        "headers": {
+                            "Location": {
+                                "description": "Relative URL of the installation.",
+                                "schema": {
+                                    "type": "string",
+                                    "example": "/installations/1d6c97bd-1d7d-4f17-8816-4d08e2b13d27"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/InstallationResponse"
+                                },
+                                "example": {
+                                    "installation_id": "1d6c97bd-1d7d-4f17-8816-4d08e2b13d27",
+                                    "binding_id": "aa2e943d-51ed-4a48-85a5-1d817ce26110",
+                                    "app": "consumer",
+                                    "locale": "es",
+                                    "enabled": true
+                                }
+                            }
+                        }
+                    },
+                    "200": {
+                        "description": "Existing installation renewed, rebound to the current login/account, or registered again idempotently.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/InstallationResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid JSON, UUID version/format, token, app, locale, or oversized request.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid Bearer JWT.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AuthErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Unregistered account, incompatible role/app, invalid possession proof, or another account using the current binding.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Stale or revoked binding, invalid token reused without renewal, FCM token already assigned to another installation, or concurrent write conflict.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Installation could not be persisted or loaded. Error details do not expose credentials.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "tags": [
+                    "Installations"
+                ],
+                "operationId": "unregisterInstallation",
+                "summary": "Unlink the current phone login",
+                "description": "Send a JSON body with the installation's possession proof and binding ID.\nOnly its authenticated owner can unlink an existing binding. The API keeps\na disabled record so an old queued PUT cannot revive the logged-out binding.\nA later login uses a new binding_id and the current previous_binding_id.\nRepeating the deletion, or deleting an absent installation with valid UUIDs,\nsucceeds with 204. Old bindings cannot disable a newer login. Responses use\nCache-Control: no-store.\n",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/InstallationRemovalRequest"
+                            },
+                            "example": {
+                                "installation_secret": "f76b1db1-93ce-4b48-9067-aa9f06af2c7f",
+                                "binding_id": "aa2e943d-51ed-4a48-85a5-1d817ce26110"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "204": {
+                        "description": "Binding unlinked, already unlinked, or installation absent. No response body."
+                    },
+                    "400": {
+                        "description": "Invalid JSON, UUID version/format, or oversized request.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid Bearer JWT.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AuthErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Unregistered account, invalid possession proof, or installation owned by another account.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Binding has been superseded or the record changed concurrently.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Installation could not be persisted or loaded.",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -8968,7 +9203,7 @@
         "/ws": {
             "get": {
                 "summary": "WebSocket for realtime events",
-                "description": "Establishes a WebSocket connection for realtime event delivery.\nThe client must first request a ticket with `POST /ws-tickets`, then open\n`/ws?ticket={ticket}&role={consumer|provider}`. The ticket is one-time use.\n\nOnce connected, the client receives push events for activity relevant to\nthe authenticated user and selected role.\n\n**Conversation message event:**\n```json\n{\n  \"type\": \"conversation.message.created\",\n  \"conversation_id\": 123,\n  \"message\": {\n    \"id\": 456,\n    \"sender_role\": \"consumer\",\n    \"content\": \"Hola, necesito un presupuesto\",\n    \"created_on\": \"2026-06-04T12:00:00Z\"\n  }\n}\n```\n\n**Notification created event:**\n```json\n{\n  \"type\": \"notification.created\",\n  \"notification\": {\n    \"id\": 15,\n    \"user_id\": 1,\n    \"type\": \"service_proposal_received\",\n    \"resource_type\": \"service_proposal\",\n    \"resource_id\": 10,\n    \"read_at\": null,\n    \"created_at\": \"2026-07-04T13:00:00Z\"\n  }\n}\n```\n",
+                "description": "Establishes a WebSocket connection for realtime event delivery.\nThe client must first request a ticket with `POST /ws-tickets`, then open\n`/ws?ticket={ticket}&role={consumer|provider}`. The ticket is one-time use.\n\nOnce connected, the client receives realtime events for activity relevant\nto the authenticated user and selected role, preserving screen updates.\nSystem notices use the independent data-only FCM contract in PushNotice.\nAndroid decides whether to show a notice per installation and current\nlogin; a connected WebSocket does not suppress FCM delivery.\n\nThe new work_order_final_payment_approved notification is emitted only\nto the provider after verified balance approval and committed paid order\nstate. Its resource_type is work_order. Proposal acceptance keeps its\nexisting service_proposal resource here; its FCM notice opens the\ngenerated work_order instead.\n\n**Conversation message event:**\n```json\n{\n  \"type\": \"conversation.message.created\",\n  \"conversation_id\": 123,\n  \"message\": {\n    \"id\": 456,\n    \"sender_role\": \"consumer\",\n    \"content\": \"Hola, necesito un presupuesto\",\n    \"created_on\": \"2026-06-04T12:00:00Z\"\n  }\n}\n```\n\n**Notification created event:**\n```json\n{\n  \"type\": \"notification.created\",\n  \"notification\": {\n    \"id\": 15,\n    \"user_id\": 1,\n    \"type\": \"service_proposal_received\",\n    \"resource_type\": \"service_proposal\",\n    \"resource_id\": 10,\n    \"read_at\": null,\n    \"created_at\": \"2026-07-04T13:00:00Z\"\n  }\n}\n```\n",
                 "tags": [
                     "Realtime"
                 ],
@@ -18856,7 +19091,9 @@
                             "service_proposal_received",
                             "service_proposal_accepted",
                             "service_proposal_rejected",
-                            "work_order_close_to_scheduled_time"
+                            "work_order_close_to_scheduled_time",
+                            "work_order_completion_reported",
+                            "work_order_final_payment_approved"
                         ],
                         "example": "service_proposal_received"
                     },
@@ -18918,6 +19155,252 @@
                     }
                 },
                 "additionalProperties": false
+            },
+            "InstallationRegistrationRequest": {
+                "type": "object",
+                "description": "Register the current login for one app installation. The authenticated user\nand role come from the JWT and persisted account, never from request fields.\nUnknown fields are ignored. Keep the installation ID and secret in private\napp storage across token renewals and account changes; create a new binding\nID for each login. UUIDs must be canonical lowercase RFC 4122 version 4.\n",
+                "required": [
+                    "installation_secret",
+                    "app",
+                    "fcm_token",
+                    "binding_id"
+                ],
+                "properties": {
+                    "installation_secret": {
+                        "type": "string",
+                        "format": "uuid",
+                        "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                        "writeOnly": true,
+                        "description": "Random possession proof generated by the app. It is hashed at rest and never included in push data or responses."
+                    },
+                    "app": {
+                        "type": "string",
+                        "enum": [
+                            "consumer",
+                            "provider"
+                        ],
+                        "description": "Must match the authenticated account role and the installation's original app."
+                    },
+                    "fcm_token": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 4096,
+                        "writeOnly": true,
+                        "description": "Current FCM registration token, without whitespace. A token may belong to only one installation."
+                    },
+                    "locale": {
+                        "type": "string",
+                        "enum": [
+                            "",
+                            "es",
+                            "en"
+                        ],
+                        "default": "es",
+                        "description": "Language for API-owned notice templates; omitted or empty means Spanish."
+                    },
+                    "binding_id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                        "description": "Random ID for the current login. Keep it unchanged when renewing its token or language."
+                    },
+                    "previous_binding_id": {
+                        "anyOf": [
+                            {
+                                "type": "string",
+                                "const": ""
+                            },
+                            {
+                                "type": "string",
+                                "format": "uuid",
+                                "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
+                            }
+                        ],
+                        "description": "Required when replacing an existing login or switching accounts. Must identify its current binding; omit on first registration. Empty is also accepted as omitted."
+                    }
+                },
+                "additionalProperties": true
+            },
+            "InstallationRemovalRequest": {
+                "type": "object",
+                "description": "Stop delivery for the authenticated owner's current installation binding. Unknown fields are ignored.",
+                "required": [
+                    "installation_secret",
+                    "binding_id"
+                ],
+                "properties": {
+                    "installation_secret": {
+                        "type": "string",
+                        "format": "uuid",
+                        "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                        "writeOnly": true,
+                        "description": "The installation's original possession proof."
+                    },
+                    "binding_id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$",
+                        "description": "The login being unlinked. A stale binding cannot disable a newer login."
+                    }
+                },
+                "additionalProperties": true
+            },
+            "InstallationResponse": {
+                "type": "object",
+                "description": "Public registration result. Contains no FCM token, possession proof, or stored hash.",
+                "required": [
+                    "installation_id",
+                    "binding_id",
+                    "app",
+                    "locale",
+                    "enabled"
+                ],
+                "properties": {
+                    "installation_id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "binding_id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "app": {
+                        "type": "string",
+                        "enum": [
+                            "consumer",
+                            "provider"
+                        ]
+                    },
+                    "locale": {
+                        "type": "string",
+                        "enum": [
+                            "es",
+                            "en"
+                        ]
+                    },
+                    "enabled": {
+                        "type": "boolean",
+                        "const": true,
+                        "description": "A successful registration enables delivery for this binding."
+                    }
+                },
+                "additionalProperties": false
+            },
+            "PushNotice": {
+                "type": "object",
+                "description": "Version 1 of FCM message.data; every value is a string. This is an outbound\nmessaging contract, not an HTTP response. The API sends data-only messages\nwith Android priority high and a transport TTL capped at 24 hours. There is\nno FCM notification block: Android validates the recipient and login binding\nbefore showing a system notice, including in the background.\n\nDrop expired notices and notices whose recipient_user_id, recipient_app,\ninstallation_id, or binding_id differs from the current local login. Use\nevent_id to deduplicate within that binding. Suppression for an active chat\nis local to the receiving installation; WebSocket presence never suppresses\nthe API's FCM attempt. Open the resource through its authenticated API flow.\n",
+                "required": [
+                    "version",
+                    "event_id",
+                    "type",
+                    "resource_type",
+                    "resource_id",
+                    "destination",
+                    "recipient_user_id",
+                    "recipient_app",
+                    "installation_id",
+                    "binding_id",
+                    "title",
+                    "body",
+                    "expires_at"
+                ],
+                "properties": {
+                    "version": {
+                        "type": "string",
+                        "const": "1"
+                    },
+                    "event_id": {
+                        "type": "string",
+                        "pattern": "^(message:[1-9][0-9]*:[1-9][0-9]*|notification:[a-z_]+:[1-9][0-9]*)$",
+                        "description": "Stable across the recipient's devices. Chat uses message:<message_id>:<recipient_user_id>;\nservice notices use notification:<type>:<persisted_notification_id>.\nThe namespaces keep unrelated events distinct. This ID is separate from\nthe WebSocket envelope ID and does not promise exactly-once delivery.\n"
+                    },
+                    "type": {
+                        "type": "string",
+                        "enum": [
+                            "conversation.message.created",
+                            "service_proposal_received",
+                            "service_proposal_accepted",
+                            "work_order_close_to_scheduled_time",
+                            "work_order_completion_reported",
+                            "work_order_final_payment_approved"
+                        ]
+                    },
+                    "resource_type": {
+                        "type": "string",
+                        "enum": [
+                            "conversation",
+                            "service_proposal",
+                            "work_order"
+                        ],
+                        "description": "Conversation for chat, proposal for a received proposal, and work order for the other four service notices."
+                    },
+                    "resource_id": {
+                        "type": "string",
+                        "pattern": "^[1-9][0-9]*$",
+                        "description": "ID of the conversation, proposal, or work order to open. Proposal acceptance references the generated order here."
+                    },
+                    "destination": {
+                        "type": "string",
+                        "enum": [
+                            "conversation",
+                            "service_proposal",
+                            "work_order"
+                        ],
+                        "description": "Destination screen, equal to resource_type in version 1."
+                    },
+                    "recipient_user_id": {
+                        "type": "string",
+                        "pattern": "^[1-9][0-9]*$",
+                        "description": "Account that owns the current installation binding."
+                    },
+                    "recipient_app": {
+                        "type": "string",
+                        "enum": [
+                            "consumer",
+                            "provider"
+                        ]
+                    },
+                    "installation_id": {
+                        "type": "string",
+                        "format": "uuid"
+                    },
+                    "binding_id": {
+                        "type": "string",
+                        "format": "uuid",
+                        "description": "Login binding captured for this send. Discard queued notices after an account or login change."
+                    },
+                    "title": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "API-owned constant template in the installation's es/en language, Spanish by default. Show this text without rebuilding it from chat data."
+                    },
+                    "body": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "API-owned safe template. Contains no chat content, names, addresses, amounts, or private links. Final payment approval does not imply withdrawable funds."
+                    },
+                    "expires_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "description": "UTC RFC 3339 expiry. Appointment reminders expire at the scheduled time; other notices expire 24 hours after creation. The API skips expired notices."
+                    }
+                },
+                "additionalProperties": false,
+                "example": {
+                    "version": "1",
+                    "event_id": "notification:work_order_final_payment_approved:15",
+                    "type": "work_order_final_payment_approved",
+                    "resource_type": "work_order",
+                    "resource_id": "42",
+                    "destination": "work_order",
+                    "recipient_user_id": "7",
+                    "recipient_app": "provider",
+                    "installation_id": "1d6c97bd-1d7d-4f17-8816-4d08e2b13d27",
+                    "binding_id": "aa2e943d-51ed-4a48-85a5-1d817ce26110",
+                    "title": "Pago final confirmado",
+                    "body": "Se aprobó el pago del saldo de tu servicio.",
+                    "expires_at": "2026-10-07T12:00:00Z"
+                }
             }
         }
     }

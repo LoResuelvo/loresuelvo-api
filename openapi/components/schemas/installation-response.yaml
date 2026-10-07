@@ -1,0 +1,26 @@
+type: object
+description: Public registration result. Contains no FCM token, possession proof, or stored hash.
+required:
+  - installation_id
+  - binding_id
+  - app
+  - locale
+  - enabled
+properties:
+  installation_id:
+    type: string
+    format: uuid
+  binding_id:
+    type: string
+    format: uuid
+  app:
+    type: string
+    enum: [consumer, provider]
+  locale:
+    type: string
+    enum: [es, en]
+  enabled:
+    type: boolean
+    const: true
+    description: A successful registration enables delivery for this binding.
+additionalProperties: false

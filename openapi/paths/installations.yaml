@@ -1,0 +1,170 @@
+parameters:
+  - name: installation_id
+    in: path
+    required: true
+    description: Random, canonical lowercase RFC 4122 version 4 ID generated per app installation, not a hardware identifier or possession proof.
+    schema:
+      type: string
+      format: uuid
+      pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+put:
+  tags: [Installations]
+  operationId: registerInstallation
+  summary: Register or renew a phone for the current account
+  description: |
+    Idempotently create or update one installation using a Bearer JWT. Several
+    installations may belong to one account. The app must match the account
+    role. Send the current FCM token and es/en locale (Spanish by default).
+
+    Generate and privately retain installation_id and installation_secret.
+    Keep binding_id for token/language renewal; create a fresh binding_id on
+    each login and supply previous_binding_id when replacing an existing
+    binding, including an account change. The possession proof permits that
+    intentional change but knowledge of the installation ID alone does not.
+    The original app is immutable. Old queued registrations cannot restore
+    a superseded binding. A logged-out binding requires a new login binding.
+    A confirmed invalid FCM token can be renewed in the same live binding by
+    providing a different token.
+
+    Responses use Cache-Control: no-store and omit credentials. Concurrent
+    conflicting writes return 409; repeating the same completed registration
+    returns 200 without creating another installation. PushNotice documents
+    the outbound FCM data contract. Registration is available even when FCM
+    sending is disabled by configuration.
+  security:
+    - BearerAuth: []
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/InstallationRegistrationRequest'
+        examples:
+          firstRegistration:
+            summary: First login on a consumer installation (illustrative values)
+            value:
+              installation_secret: f76b1db1-93ce-4b48-9067-aa9f06af2c7f
+              app: consumer
+              fcm_token: example-fcm-registration-token
+              locale: es
+              binding_id: aa2e943d-51ed-4a48-85a5-1d817ce26110
+          changeAccount:
+            summary: Current JWT account takes over the same installation
+            value:
+              installation_secret: f76b1db1-93ce-4b48-9067-aa9f06af2c7f
+              app: consumer
+              fcm_token: example-renewed-fcm-token
+              locale: en
+              binding_id: 93080a55-35f4-4b53-bff9-97d1b4e70e18
+              previous_binding_id: aa2e943d-51ed-4a48-85a5-1d817ce26110
+  responses:
+    '201':
+      description: New installation registered.
+      headers:
+        Location:
+          description: Relative URL of the installation.
+          schema:
+            type: string
+            example: /installations/1d6c97bd-1d7d-4f17-8816-4d08e2b13d27
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/InstallationResponse'
+          example:
+            installation_id: 1d6c97bd-1d7d-4f17-8816-4d08e2b13d27
+            binding_id: aa2e943d-51ed-4a48-85a5-1d817ce26110
+            app: consumer
+            locale: es
+            enabled: true
+    '200':
+      description: Existing installation renewed, rebound to the current login/account, or registered again idempotently.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/InstallationResponse'
+    '400':
+      description: Invalid JSON, UUID version/format, token, app, locale, or oversized request.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    '401':
+      description: Missing or invalid Bearer JWT.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/AuthErrorResponse'
+    '403':
+      description: Unregistered account, incompatible role/app, invalid possession proof, or another account using the current binding.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    '409':
+      description: Stale or revoked binding, invalid token reused without renewal, FCM token already assigned to another installation, or concurrent write conflict.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    '500':
+      description: Installation could not be persisted or loaded. Error details do not expose credentials.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+delete:
+  tags: [Installations]
+  operationId: unregisterInstallation
+  summary: Unlink the current phone login
+  description: |
+    Send a JSON body with the installation's possession proof and binding ID.
+    Only its authenticated owner can unlink an existing binding. The API keeps
+    a disabled record so an old queued PUT cannot revive the logged-out binding.
+    A later login uses a new binding_id and the current previous_binding_id.
+    Repeating the deletion, or deleting an absent installation with valid UUIDs,
+    succeeds with 204. Old bindings cannot disable a newer login. Responses use
+    Cache-Control: no-store.
+  security:
+    - BearerAuth: []
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/InstallationRemovalRequest'
+        example:
+          installation_secret: f76b1db1-93ce-4b48-9067-aa9f06af2c7f
+          binding_id: aa2e943d-51ed-4a48-85a5-1d817ce26110
+  responses:
+    '204':
+      description: Binding unlinked, already unlinked, or installation absent. No response body.
+    '400':
+      description: Invalid JSON, UUID version/format, or oversized request.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    '401':
+      description: Missing or invalid Bearer JWT.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/AuthErrorResponse'
+    '403':
+      description: Unregistered account, invalid possession proof, or installation owned by another account.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    '409':
+      description: Binding has been superseded or the record changed concurrently.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    '500':
+      description: Installation could not be persisted or loaded.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'

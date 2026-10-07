@@ -27,6 +27,8 @@ properties:
       - service_proposal_accepted
       - service_proposal_rejected
       - work_order_close_to_scheduled_time
+      - work_order_completion_reported
+      - work_order_final_payment_approved
     example: service_proposal_received
   resource_type:
     type: string

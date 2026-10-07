@@ -47,6 +47,8 @@ tags:
   description: Identity-verification status processing endpoints.
 - name: Realtime
   description: WebSocket real-time messaging endpoints.
+- name: Installations
+  description: Authenticated phone registration and login binding for FCM system notices.
 paths:
   /:
     $ref: ./paths/health-live.yaml
@@ -58,6 +60,8 @@ paths:
     $ref: ./paths/coverage-zones.yaml
   /consumers:
     $ref: ./paths/consumers.yaml
+  /installations/{installation_id}:
+    $ref: ./paths/installations.yaml
   /admin/consumers:
     $ref: ./paths/admin-consumers.yaml
   /admin/consumers/{consumer_id}/history:
@@ -195,8 +199,17 @@ paths:
         The client must first request a ticket with `POST /ws-tickets`, then open
         `/ws?ticket={ticket}&role={consumer|provider}`. The ticket is one-time use.
 
-        Once connected, the client receives push events for activity relevant to
-        the authenticated user and selected role.
+        Once connected, the client receives realtime events for activity relevant
+        to the authenticated user and selected role, preserving screen updates.
+        System notices use the independent data-only FCM contract in PushNotice.
+        Android decides whether to show a notice per installation and current
+        login; a connected WebSocket does not suppress FCM delivery.
+
+        The new work_order_final_payment_approved notification is emitted only
+        to the provider after verified balance approval and committed paid order
+        state. Its resource_type is work_order. Proposal acceptance keeps its
+        existing service_proposal resource here; its FCM notice opens the
+        generated work_order instead.
 
         **Conversation message event:**
         ```json
@@ -508,3 +521,11 @@ components:
       $ref: ./components/schemas/realtime-notification.yaml
     RealtimeNotificationCreatedEvent:
       $ref: ./components/schemas/realtime-notification-created-event.yaml
+    InstallationRegistrationRequest:
+      $ref: ./components/schemas/installation-registration-request.yaml
+    InstallationRemovalRequest:
+      $ref: ./components/schemas/installation-removal-request.yaml
+    InstallationResponse:
+      $ref: ./components/schemas/installation-response.yaml
+    PushNotice:
+      $ref: ./components/schemas/push-notice.yaml

@@ -1,0 +1,18 @@
+type: object
+description: Stop delivery for the authenticated owner's current installation binding. Unknown fields are ignored.
+required:
+  - installation_secret
+  - binding_id
+properties:
+  installation_secret:
+    type: string
+    format: uuid
+    pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+    writeOnly: true
+    description: The installation's original possession proof.
+  binding_id:
+    type: string
+    format: uuid
+    pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+    description: The login being unlinked. A stale binding cannot disable a newer login.
+additionalProperties: true
