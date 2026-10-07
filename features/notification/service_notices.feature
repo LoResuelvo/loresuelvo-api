@@ -1,4 +1,4 @@
-@wip @US-20
+@US-20
 Feature: Recibir avisos sobre mis servicios
     Como consumidor o prestador
     quiero recibir avisos en mi teléfono aunque no esté usando LoResuelvo

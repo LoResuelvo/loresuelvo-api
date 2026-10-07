@@ -3,6 +3,7 @@ package notification
 type Type string
 
 const (
+	TypeWorkOrderFinalPaymentApproved   Type = "work_order_final_payment_approved"
 	TypeServiceProposalReceived         Type = "service_proposal_received"
 	TypeServiceProposalAccepted         Type = "service_proposal_accepted"
 	TypeServiceProposalRejected         Type = "service_proposal_rejected"

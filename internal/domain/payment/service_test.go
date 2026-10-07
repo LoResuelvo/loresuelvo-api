@@ -740,7 +740,10 @@ func TestProcessApprovedServiceBalanceAtomicallyPaysWorkOrder(t *testing.T) {
 	assert.Same(t, intent, unitOfWork.intent)
 	assert.Same(t, order, unitOfWork.order)
 	assert.Nil(t, unitOfWork.proposal)
-	assert.Nil(t, unitOfWork.notification)
+	require.NotNil(t, unitOfWork.notification)
+	assert.Equal(t, notification.TypeWorkOrderFinalPaymentApproved, unitOfWork.notification.Type)
+	assert.Equal(t, order.ProviderID(), unitOfWork.notification.UserID)
+	assert.Equal(t, order.ID(), unitOfWork.notification.ResourceID)
 	assert.Equal(t, workorder.StatusPaid, order.Status())
 
 	transactionRepository.found = unitOfWork.transaction

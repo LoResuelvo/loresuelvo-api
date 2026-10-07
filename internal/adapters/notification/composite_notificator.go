@@ -2,7 +2,7 @@ package notificationadapter
 
 import (
 	"context"
-	"fmt"
+	"errors"
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/notification"
 )
@@ -16,13 +16,14 @@ func NewCompositeNotificator(channels ...notification.Notificator) *CompositeNot
 }
 
 func (n *CompositeNotificator) Notify(ctx context.Context, notification *notification.Notification) error {
+	var failures []error
 	for _, channel := range n.channels {
 		if channel == nil {
 			continue
 		}
 		if err := channel.Notify(ctx, notification); err != nil {
-			return fmt.Errorf("notifying through channel: %w", err)
+			failures = append(failures, err)
 		}
 	}
-	return nil
+	return errors.Join(failures...)
 }

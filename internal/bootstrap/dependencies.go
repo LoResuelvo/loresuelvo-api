@@ -43,6 +43,7 @@ import (
 	notificationadapter "github.com/LoResuelvo/loresuelvo-api/internal/adapters/notification"
 	mercadopagopayment "github.com/LoResuelvo/loresuelvo-api/internal/adapters/payment/mercadopago"
 	paymentaccountadapter "github.com/LoResuelvo/loresuelvo-api/internal/adapters/payment_account"
+	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/push"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/realtime"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/repositories"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/scheduler"
@@ -87,6 +88,7 @@ type RuntimeDependencies struct {
 }
 
 type dependencyAdapters struct {
+	pushSender                          *push.Sender
 	realtimeEventBus                    realtime.EventBus
 	chatbot                             conversation.Chatbot
 	paymentAccountOAuthConnector        paymentaccount.OAuthConnector
@@ -177,7 +179,12 @@ func NewDependencies(database *sql.DB) (*Dependencies, error) {
 	if err != nil {
 		return nil, fmt.Errorf("configuring realtime transport: %w", err)
 	}
+	pushSender, err := push.NewSenderFromEnv()
+	if err != nil {
+		return nil, err
+	}
 	return newDependencies(database, dependencyAdapters{
+		pushSender:                   pushSender,
 		realtimeEventBus:             realtimeEventBus,
 		chatbot:                      chatbot,
 		paymentAccountOAuthConnector: paymentAccountOAuthConnector,
@@ -223,9 +230,11 @@ func newDependencies(database *sql.DB, adapters dependencyAdapters) (*Dependenci
 
 	ticketStore := realtime.NewPostgresTicketStore(database)
 
-	messagePublisher := realtime.NewPublisher(dispatcher, persistence.UserRepository)
+	realtimeMessagePublisher := realtime.NewPublisher(dispatcher, persistence.UserRepository)
+	pushPublisher := push.NewPublisher(adapters.pushSender, persistence.InstallationRepository, persistence.WorkOrderRepository, systemClock)
+	messagePublisher := notificationadapter.NewCompositeMessagePublisher(realtimeMessagePublisher, pushPublisher)
 	realtimeNotificationNotificator := realtime.NewNotificationNotificator(dispatcher, persistence.UserRepository)
-	notificator := notificationadapter.NewCompositeNotificator(realtimeNotificationNotificator)
+	notificator := notificationadapter.NewCompositeNotificator(realtimeNotificationNotificator, pushPublisher)
 	realtimeHandler := realtime.NewHandler(hub, persistence.UserRepository, ticketStore)
 
 	fileService := filedomain.NewService(

@@ -4,6 +4,11 @@ import (
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"sync"
+	"testing"
 )
 
 const testDiditWebhookSecret = "test-didit-webhook-secret"
@@ -22,4 +27,42 @@ func (stub identityVerificationWebhookSignerStub) Sign(body []byte) string {
 		panic(err)
 	}
 	return hex.EncodeToString(mac.Sum(nil))
+}
+
+// pushRequestCapture observes the real FCM HTTP boundary, never manufactures notices.
+type pushRequestCapture struct {
+	mu       sync.Mutex
+	requests []pushCapturedRequest
+}
+type pushCapturedRequest struct {
+	Message struct {
+		Token        string            `json:"token"`
+		Data         map[string]string `json:"data"`
+		Android      map[string]string `json:"android"`
+		Notification json.RawMessage   `json:"notification"`
+	} `json:"message"`
+}
+
+func newPushRequestCapture(tb testing.TB) (*pushRequestCapture, *httptest.Server) {
+	capture := &pushRequestCapture{}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var request pushCapturedRequest
+		if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+			http.Error(w, "invalid request", 400)
+			return
+		}
+		capture.mu.Lock()
+		capture.requests = append(capture.requests, request)
+		capture.mu.Unlock()
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+	}))
+	tb.Cleanup(server.Close)
+	return capture, server
+}
+func (c *pushRequestCapture) reset() { c.mu.Lock(); defer c.mu.Unlock(); c.requests = nil }
+func (c *pushRequestCapture) snapshot() []pushCapturedRequest {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return append([]pushCapturedRequest(nil), c.requests...)
 }

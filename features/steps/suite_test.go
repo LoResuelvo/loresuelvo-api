@@ -23,6 +23,7 @@ import (
 	locationadapter "github.com/LoResuelvo/loresuelvo-api/internal/adapters/location"
 	paymentmercadopago "github.com/LoResuelvo/loresuelvo-api/internal/adapters/payment/mercadopago"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/payment_account/mercadopago"
+	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/push"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/repositories"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/scheduler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/bootstrap"
@@ -41,6 +42,7 @@ import (
 )
 
 type testSuite struct {
+	pushCapture                    *pushRequestCapture
 	server                         *httptest.Server
 	dependencies                   *bootstrap.Dependencies
 	database                       *sql.DB
@@ -181,6 +183,7 @@ type testSuite struct {
 }
 
 func (s *testSuite) registerAllSteps(sc *godog.ScenarioContext) {
+	registerServiceNoticeSteps(sc, s)
 	registerConsumerAccountSteps(sc, s)
 	registerProviderAccountSteps(sc, s)
 	registerProviderWithProfilePhotoSteps(sc, s)
@@ -256,6 +259,7 @@ func (s *testSuite) registerAllSteps(sc *godog.ScenarioContext) {
 }
 
 func (s *testSuite) cleanup() error {
+	s.pushCapture.reset()
 	s.closeRealtimeConnections()
 	if err := s.identityVerificationRepository.DeleteAll(); err != nil {
 		return fmt.Errorf("could not clean identity verifications: %w", err)
@@ -420,6 +424,7 @@ func newTestDb() *sql.DB {
 }
 
 func newTestSuite(tb testing.TB, database *sql.DB) *testSuite {
+	pushCapture, pushServer := newPushRequestCapture(tb)
 	chatbot := chatbotadapter.NewFakeChatbot()
 	credentialCipher, err := cryptography.NewAESGCMCipher(
 		base64.StdEncoding.EncodeToString(bytes.Repeat([]byte{1}, 32)),
@@ -462,6 +467,7 @@ func newTestSuite(tb testing.TB, database *sql.DB) *testSuite {
 				return providerDiagnosticAuditWriterDecorator{inner: writer, capture: providerDiagnosticCapture}
 			},
 		},
+		&push.Sender{Client: pushServer.Client(), URL: pushServer.URL},
 		database,
 		chatbot,
 		mercadopago.NewFakeOAuthClient(),
@@ -491,6 +497,7 @@ func newTestSuite(tb testing.TB, database *sql.DB) *testSuite {
 	})
 
 	return &testSuite{
+		pushCapture:                    pushCapture,
 		server:                         server,
 		dependencies:                   dependencies,
 		database:                       database,
@@ -580,6 +587,10 @@ func TestFeatures(t *testing.T) {
 
 	paths := []string{"../"}
 	tags := "~@wip"
+	if feature := strings.TrimSpace(os.Getenv("GODOG_FEATURE")); feature != "" {
+		paths = []string{filepath.Join("../", feature)}
+		tags = ""
+	}
 	if scenarioFilter := strings.TrimSpace(os.Getenv("GODOG_SCENARIO")); scenarioFilter != "" {
 		var filteredPaths []string
 		err := filepath.WalkDir("../", func(path string, entry os.DirEntry, walkErr error) error {

@@ -430,7 +430,8 @@ func (persistence *paymentOutcomePersistence) VisitServiceBalanceApproved(outcom
 	if err := order.RegisterApprovedBalancePayment(persistence.service.clock.Now().UTC()); err != nil {
 		return err
 	}
-	return persistence.service.unitOfWork.Execute(
+	paidNotification := order.CreateFinalPaymentNotification(persistence.service.clock)
+	err = persistence.service.unitOfWork.Execute(
 		persistence.ctx,
 		func(store TransactionalStore) error {
 			if err := store.SaveTransaction(persistence.ctx, outcome.Transaction); err != nil {
@@ -439,7 +440,17 @@ func (persistence *paymentOutcomePersistence) VisitServiceBalanceApproved(outcom
 			if err := store.SaveIntent(persistence.ctx, outcome.Intent); err != nil {
 				return err
 			}
-			return store.SaveWorkOrder(persistence.ctx, order)
+			if err := store.SaveWorkOrder(persistence.ctx, order); err != nil {
+				return err
+			}
+			return store.SaveNotification(persistence.ctx, paidNotification)
 		},
 	)
+	if err != nil {
+		return err
+	}
+	if err := persistence.service.notificator.Notify(persistence.ctx, paidNotification); err != nil {
+		return fmt.Errorf("notifying provider about final payment: %w", err)
+	}
+	return nil
 }

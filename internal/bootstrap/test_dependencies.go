@@ -13,6 +13,7 @@ import (
 	didit "github.com/LoResuelvo/loresuelvo-api/internal/adapters/identityverification/didit"
 	identityverificationfake "github.com/LoResuelvo/loresuelvo-api/internal/adapters/identityverification/fake"
 	locationadapter "github.com/LoResuelvo/loresuelvo-api/internal/adapters/location"
+	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/push"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/realtime"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/admin"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/audit"
@@ -73,11 +74,12 @@ func NewTestDependencies(
 	operationChatMediaResolverDecorator func(operation.ChatMediaResolver) operation.ChatMediaResolver,
 	categoryUnitOfWorkDecorator ...func(category.UnitOfWork) category.UnitOfWork,
 ) (*Dependencies, TestDoubles, error) {
-	return NewTestDependenciesWithProviderDiagnosticOptions(ProviderDiagnosticTestOptions{}, database, chatbot, paymentAccountOAuthConnector, paymentGateway, webhookVerifier, credentialProtector, secretGenerator, paymentAccountHandlerConfig, operationDetailAuditWriterDecorator, operationChatMediaResolverDecorator, categoryUnitOfWorkDecorator...)
+	return NewTestDependenciesWithProviderDiagnosticOptions(ProviderDiagnosticTestOptions{}, nil, database, chatbot, paymentAccountOAuthConnector, paymentGateway, webhookVerifier, credentialProtector, secretGenerator, paymentAccountHandlerConfig, operationDetailAuditWriterDecorator, operationChatMediaResolverDecorator, categoryUnitOfWorkDecorator...)
 }
 
 func NewTestDependenciesWithProviderDiagnosticOptions(
 	options ProviderDiagnosticTestOptions,
+	pushSender *push.Sender,
 	database *sql.DB,
 	chatbot conversation.Chatbot,
 	paymentAccountOAuthConnector paymentaccount.OAuthConnector,
@@ -102,6 +104,7 @@ func NewTestDependenciesWithProviderDiagnosticOptions(
 	}
 	dependencies, err := newDependencies(database, dependencyAdapters{
 		realtimeEventBus:              localTestEventBus{},
+		pushSender:                    pushSender,
 		chatbot:                       chatbot,
 		providerDiagnosticTestOptions: options,
 		paymentAccountOAuthConnector:  paymentAccountOAuthConnector,

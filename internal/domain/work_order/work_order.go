@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/clock"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/consumer"
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/notification"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/user"
 )
 
@@ -215,4 +217,8 @@ func (wo *WorkOrder) AddReview(reviewer *consumer.Consumer, review *Review) erro
 	}
 	wo.state = nextState
 	return nil
+}
+
+func (wo *WorkOrder) CreateFinalPaymentNotification(clock clock.Clock) *notification.Notification {
+	return notification.NewNotification(wo.ProviderID(), notification.TypeWorkOrderFinalPaymentApproved, notification.ResourceWorkOrder, wo.ID(), clock)
 }
