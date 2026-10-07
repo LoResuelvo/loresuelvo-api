@@ -2,6 +2,7 @@ package steps_test
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -159,6 +160,13 @@ func (s *testSuite) noticePhone(name, locale string) error {
 	i, err := installation.New("phone-"+name, id, app, "token-"+name, locale, "binding-"+name)
 	if err != nil {
 		return err
+	}
+	existing, findErr := s.dependencies.Persistence.InstallationRepository.FindByID(context.Background(), i.ID)
+	if findErr == nil {
+		i.Revision = existing.Revision
+		i.SecretHash = existing.SecretHash
+	} else if !errors.Is(findErr, installation.ErrNotFound) {
+		return findErr
 	}
 	return s.dependencies.Persistence.InstallationRepository.Save(context.Background(), i)
 }

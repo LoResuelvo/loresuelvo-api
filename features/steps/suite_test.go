@@ -42,7 +42,10 @@ import (
 )
 
 type testSuite struct {
+	phoneIDs                       []string
+	phoneRegistrations             []phoneRegistration
 	pushCapture                    *pushRequestCapture
+	pushServer                     *httptest.Server
 	server                         *httptest.Server
 	dependencies                   *bootstrap.Dependencies
 	database                       *sql.DB
@@ -184,6 +187,7 @@ type testSuite struct {
 
 func (s *testSuite) registerAllSteps(sc *godog.ScenarioContext) {
 	registerServiceNoticeSteps(sc, s)
+	registerPhoneSteps(sc, s)
 	registerConsumerAccountSteps(sc, s)
 	registerProviderAccountSteps(sc, s)
 	registerProviderWithProfilePhotoSteps(sc, s)
@@ -498,6 +502,7 @@ func newTestSuite(tb testing.TB, database *sql.DB) *testSuite {
 
 	return &testSuite{
 		pushCapture:                    pushCapture,
+		pushServer:                     pushServer,
 		server:                         server,
 		dependencies:                   dependencies,
 		database:                       database,
@@ -561,6 +566,7 @@ func ScenarioInitializer(sc *godog.ScenarioContext, t *testing.T, database *sql.
 	sc.After(func(ctx context.Context, _ *godog.Scenario, _ error) (context.Context, error) {
 		testSuite.dependencies.Runtime.Close()
 		testSuite.server.Close()
+		testSuite.pushServer.Close()
 		return ctx, nil
 	})
 	sc.Before(func(ctx context.Context, _ *godog.Scenario) (context.Context, error) {

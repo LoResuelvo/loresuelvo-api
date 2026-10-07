@@ -23,6 +23,7 @@ import (
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/file_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/health_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/identity_verification_handler"
+	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/installation_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/job_request_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/operation_chat_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/operation_detail_handler"
@@ -57,6 +58,7 @@ import (
 	coveragezone "github.com/LoResuelvo/loresuelvo-api/internal/domain/coverage_zone"
 	filedomain "github.com/LoResuelvo/loresuelvo-api/internal/domain/file"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/identityverification"
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/installation"
 	jobrequest "github.com/LoResuelvo/loresuelvo-api/internal/domain/job_request"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/operation"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/payment"
@@ -460,6 +462,7 @@ func newDependencies(database *sql.DB, adapters dependencyAdapters) (*Dependenci
 		},
 		Clock: systemClock,
 		routerConfig: httpadapter.RouterConfig{
+			InstallationHandler:         installation_handler.NewHandler(installation.NewService(persistence.InstallationRepository, persistence.UserRepository)),
 			AdminHandler:                admin_handler.NewAdminHandler(adminService),
 			ProviderDiagnosticHandler:   diagnosticHandler,
 			ConsumerHistoryHandler:      historyHandler,

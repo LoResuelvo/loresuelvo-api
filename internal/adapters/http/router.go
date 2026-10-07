@@ -15,6 +15,7 @@ import (
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/file_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/health_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/identity_verification_handler"
+	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/installation_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/job_request_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/operation_chat_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/operation_detail_handler"
@@ -53,6 +54,7 @@ const (
 )
 
 type RouterConfig struct {
+	InstallationHandler         *installation_handler.Handler
 	Environment                 Environment
 	AdminHandler                *admin_handler.AdminHandler
 	ProviderDiagnosticHandler   *admin_handler.ProviderDiagnosticHandler
@@ -90,6 +92,7 @@ type RouterConfig struct {
 }
 
 type Router struct {
+	installationHandler         *installation_handler.Handler
 	environment                 Environment
 	adminHandler                *admin_handler.AdminHandler
 	providerDiagnosticHandler   *admin_handler.ProviderDiagnosticHandler
@@ -133,6 +136,7 @@ func NewRouter(config RouterConfig) *Router {
 	}
 
 	router := &Router{
+		installationHandler:         config.InstallationHandler,
 		environment:                 config.Environment,
 		adminHandler:                config.AdminHandler,
 		providerDiagnosticHandler:   config.ProviderDiagnosticHandler,
@@ -192,6 +196,7 @@ func (router *Router) SetUp() (*gin.Engine, error) {
 	router.registerCategoryRoutes(engine, authMiddleware)
 	router.registerCalendarConnectionRoutes(engine, authMiddleware)
 	router.registerCoverageZoneRoutes(engine, authMiddleware)
+	router.registerInstallationRoutes(engine, authMiddleware)
 	router.registerConsumerRoutes(engine, authMiddleware)
 	router.registerProviderRoutes(engine, authMiddleware)
 	router.registerPaymentAccountRoutes(engine, authMiddleware)
@@ -286,6 +291,13 @@ func (router *Router) registerCategoryRoutes(engine *gin.Engine, authMiddleware 
 
 func (router *Router) registerCoverageZoneRoutes(engine *gin.Engine, authMiddleware gin.HandlerFunc) {
 	engine.GET("/coverage-zones", authMiddleware, router.coverageZoneHandler.ListAvailable)
+}
+
+func (router *Router) registerInstallationRoutes(engine *gin.Engine, authMiddleware gin.HandlerFunc) {
+	if router.installationHandler != nil {
+		engine.PUT("/installations/:installation_id", privateNoStore, authMiddleware, router.installationHandler.Register)
+		engine.DELETE("/installations/:installation_id", privateNoStore, authMiddleware, router.installationHandler.Unregister)
+	}
 }
 
 func (router *Router) registerConsumerRoutes(engine *gin.Engine, authMiddleware gin.HandlerFunc) {

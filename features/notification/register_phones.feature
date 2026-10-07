@@ -1,4 +1,4 @@
-@wip @US-20
+@US-20
 Feature: Recibir mis avisos en los teléfonos donde uso mi cuenta
     Como consumidor o prestador
     quiero recibir los avisos que me corresponden en mis teléfonos
