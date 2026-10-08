@@ -1,0 +1,41 @@
+type: object
+description: Separate counts by persisted resource identity. They are not disjoint sets and must not be added together as a total.
+required:
+- assigned_providers
+- pending_requests
+- accepted_requests_without_proposal
+- pending_proposals
+- scheduled_orders
+- awaiting_payment_orders
+properties:
+  assigned_providers:
+    type: integer
+    minimum: 0
+    description: Providers currently assigned to the category.
+    example: 8
+  pending_requests:
+    type: integer
+    minimum: 0
+    description: Persisted job requests in `pending` status for providers currently assigned to the category.
+    example: 2
+  accepted_requests_without_proposal:
+    type: integer
+    minimum: 0
+    description: Persisted job requests in `accepted` status whose conversation has no service proposal.
+    example: 1
+  pending_proposals:
+    type: integer
+    minimum: 0
+    description: Pending service proposals whose `scheduled_on` is later than `observed_at`.
+    example: 3
+  scheduled_orders:
+    type: integer
+    minimum: 0
+    description: Work orders in `scheduled` status, regardless of whether their service time is in the future.
+    example: 1
+  awaiting_payment_orders:
+    type: integer
+    minimum: 0
+    description: Work orders in `awaiting_payment` status.
+    example: 0
+additionalProperties: false

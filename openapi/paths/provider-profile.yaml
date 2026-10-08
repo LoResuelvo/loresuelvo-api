@@ -8,7 +8,9 @@ get:
     Email, authentication identity, and private documents are not exposed.
     The rating average and count include all registered ratings, even when a
     review's text is hidden. A hidden review is omitted from the provider's
-    public work history while the completed work order remains listed.
+    public work history while the completed work order remains listed. Disabling
+    the provider's category does not suspend the provider account or remove this
+    profile; it only prevents discovery for new requests and new request creation.
   security:
   - BearerAuth: []
   parameters:

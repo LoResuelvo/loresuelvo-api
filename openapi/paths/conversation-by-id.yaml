@@ -3,7 +3,12 @@ get:
   - Conversations
   operationId: getConversation
   summary: Get a conversation detail
-  description: Returns a conversation with its messages when the authenticated user is either the consumer or provider participant.
+  description: >-
+    Returns a conversation with its messages when the authenticated user is
+    either the consumer or provider participant. For chatbot conversations,
+    currently disabled-category providers are omitted from the recommendation
+    list, even if the recommendation was persisted before the category was
+    disabled. The conversation and its existing operations remain accessible.
   security:
   - BearerAuth: []
   parameters:
@@ -27,18 +32,21 @@ get:
             pendingConversation:
               value:
                 id: 1
+                type: work
                 status: pending
-                counterpart:
-                  id: 20
-                  role: provider
-                  name: Juan
-                  surname: Gómez
-                  category_name: Plomería
-                  profile_photo_url: https://cdn.example/files/2026/06/profile_photo/juan.jpg
+                work:
+                  counterpart:
+                    id: 20
+                    role: provider
+                    name: Juan
+                    surname: Gómez
+                    category_name: Plomería
+                    profile_photo_url: https://cdn.example/files/2026/06/profile_photo/juan.jpg
                 messages:
                 - id: 1
                   sender_role: consumer
                   content: Hola Juan, necesito reparar una pérdida de agua en la cocina. ¿Podrías ayudarme esta semana?
+                  images: []
                   created_on: '2026-05-29T18:01:00Z'
                 updated_on: '2026-05-29T18:01:00Z'
     '400':

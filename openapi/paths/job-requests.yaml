@@ -49,7 +49,11 @@ post:
   - JobRequests
   operationId: createJobRequest
   summary: Create a job request
-  description: Creates a job request from the authenticated consumer to a provider and links it to a pending conversation.
+  description: >-
+    Creates a job request from the authenticated consumer to a provider and
+    links it to a pending conversation. The provider's current category must be
+    enabled when the request is persisted; disabling a category does not cancel
+    requests and negotiations that already exist.
   security:
   - BearerAuth: []
   requestBody:
@@ -132,15 +136,23 @@ post:
               value:
                 error: Provider does not exist
     '409':
-      description: A job request or conversation between this consumer and provider already exists.
+      description: >-
+        A job request or conversation between this consumer and provider already
+        exists, or the provider's category is disabled and cannot accept a new
+        request.
       content:
         application/json:
           schema:
             $ref: '#/components/schemas/ErrorResponse'
           examples:
             alreadyExists:
+              summary: A request or conversation already exists
               value:
                 error: Job request already exists
+            categoryDisabled:
+              summary: The provider's category is disabled
+              value:
+                error: Category is disabled
     '500':
       description: Unexpected error while creating the job request.
       content:

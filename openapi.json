@@ -138,25 +138,57 @@
                 ],
                 "operationId": "listCategories",
                 "summary": "List service categories",
-                "description": "Returns all registered categories. Each list item contains only id and name; normalized_name is intentionally omitted by the current handler.",
+                "description": "Returns categories ordered by name. By default, the shared catalog contains only enabled categories and each item contains `id` and `name`; this mode requires a valid Bearer JWT but no administrative permission. Set `include_disabled=true` to include enabled and disabled categories and receive their `id`, `name`, `enabled`, and `version`; that mode requires `read:categories`, returns `Cache-Control: private, no-store`, and does not create an audit event. A disabled category remains an existing resource; its identifier is not treated as not found.",
                 "security": [
                     {
                         "BearerAuth": []
                     }
                 ],
+                "parameters": [
+                    {
+                        "name": "include_disabled",
+                        "in": "query",
+                        "required": false,
+                        "description": "Include disabled categories. Only `true` selects the administrative representation and requires `read:categories`; omitted or `false` keeps the enabled-only public catalog.",
+                        "schema": {
+                            "type": "boolean",
+                            "default": false
+                        }
+                    }
+                ],
                 "responses": {
                     "200": {
-                        "description": "Categories returned successfully. The array may be empty.",
+                        "description": "Categories returned successfully. The array may be empty. The item representation depends on `include_disabled`; an empty array is valid in either mode.",
+                        "headers": {
+                            "Cache-Control": {
+                                "description": "Present as `private, no-store` when `include_disabled=true`.",
+                                "schema": {
+                                    "type": "string",
+                                    "const": "private, no-store"
+                                }
+                            }
+                        },
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "type": "array",
-                                    "items": {
-                                        "$ref": "#/components/schemas/CategoryListItem"
-                                    }
+                                    "anyOf": [
+                                        {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/CategoryListItem"
+                                            }
+                                        },
+                                        {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/AdminCategory"
+                                            }
+                                        }
+                                    ]
                                 },
                                 "examples": {
                                     "withCategories": {
+                                        "summary": "Enabled-only catalog (`include_disabled` omitted or false)",
                                         "value": [
                                             {
                                                 "id": 1,
@@ -168,6 +200,23 @@
                                             }
                                         ]
                                     },
+                                    "withDisabledCategories": {
+                                        "summary": "Administrative catalog (`include_disabled=true`)",
+                                        "value": [
+                                            {
+                                                "id": 1,
+                                                "name": "Electricidad",
+                                                "enabled": true,
+                                                "version": 2
+                                            },
+                                            {
+                                                "id": 2,
+                                                "name": "Plomería",
+                                                "enabled": false,
+                                                "version": 3
+                                            }
+                                        ]
+                                    },
                                     "empty": {
                                         "value": []
                                     }
@@ -175,8 +224,30 @@
                             }
                         }
                     },
+                    "400": {
+                        "description": "`include_disabled` is not a valid boolean value.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                },
+                                "example": {
+                                    "error": "Invalid include_disabled"
+                                }
+                            }
+                        }
+                    },
                     "401": {
                         "description": "Authentication failed or the authenticated user id could not be obtained from the request context.",
+                        "headers": {
+                            "Cache-Control": {
+                                "description": "Present as `private, no-store` when `include_disabled=true`.",
+                                "schema": {
+                                    "type": "string",
+                                    "const": "private, no-store"
+                                }
+                            }
+                        },
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -206,8 +277,39 @@
                             }
                         }
                     },
+                    "403": {
+                        "description": "The Bearer JWT lacks `read:categories` when `include_disabled=true`.",
+                        "headers": {
+                            "Cache-Control": {
+                                "description": "Prevents storage of administrative catalog responses.",
+                                "schema": {
+                                    "type": "string",
+                                    "const": "private, no-store"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                },
+                                "example": {
+                                    "error": "insufficient permissions"
+                                }
+                            }
+                        }
+                    },
                     "500": {
                         "description": "The category repository returned an unexpected error.",
+                        "headers": {
+                            "Cache-Control": {
+                                "description": "Present as `private, no-store` when `include_disabled=true`.",
+                                "schema": {
+                                    "type": "string",
+                                    "const": "private, no-store"
+                                }
+                            }
+                        },
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -382,6 +484,437 @@
                     },
                     "500": {
                         "description": "Category or audit-event persistence failed. The API returns a controlled error, and neither the new category nor a successful audit event is committed.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                },
+                                "example": {
+                                    "error": "Internal Server Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/categories/{id}": {
+            "patch": {
+                "tags": [
+                    "Categories"
+                ],
+                "operationId": "editCategory",
+                "summary": "Edit or change the availability of a service category",
+                "description": "Updates the category with the supplied `name`, `enabled`, or both, using the same resource identity. Requires `write:categories`. At least one business field is required together with a positive `expected_version`. The name is trimmed before validation, must contain 1–100 Unicode code points after trimming, and keeps its display capitalization and accents; uniqueness also includes disabled categories. An effective enabled-state change requires a nonblank printable UTF-8 `reason` of at most 500 bytes after trimming. A no-op (including an `enabled` value equal to the current state) returns the current representation without consuming a version or creating an audit event. Effective changes increment `version` and are audited atomically; the version is a concurrency token, not a stored name history. When disabling a category with scheduled or awaiting-payment orders, `confirm_ongoing_orders=true` is required. Impact is revalidated when this mutation is applied; a previous impact response does not reserve its counts. Disabling prevents new provider registrations and new job requests, including requests from older chatbot recommendations, while previously created negotiations and operations can continue. Reactivating the same category restores eligibility for new activity without changing existing relationships. Request bodies and reasons are not copied to technical logs. Responses use `Cache-Control: private, no-store`.",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "description": "Existing category identifier.",
+                        "schema": {
+                            "type": "integer",
+                            "format": "int32",
+                            "minimum": 1
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/EditCategoryRequest"
+                            },
+                            "examples": {
+                                "rename": {
+                                    "summary": "Rename an existing category",
+                                    "value": {
+                                        "expected_version": 1,
+                                        "name": "Instalaciones sanitarias"
+                                    }
+                                },
+                                "disable": {
+                                    "summary": "Disable a category without ongoing orders",
+                                    "value": {
+                                        "expected_version": 1,
+                                        "enabled": false,
+                                        "reason": "Retiro del rubro"
+                                    }
+                                },
+                                "confirmDisable": {
+                                    "summary": "Confirm disabling while orders are ongoing",
+                                    "value": {
+                                        "expected_version": 1,
+                                        "enabled": false,
+                                        "reason": "Retiro del rubro",
+                                        "confirm_ongoing_orders": true
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "The current category representation after the request. A no-op returns the unchanged version.",
+                        "headers": {
+                            "Cache-Control": {
+                                "description": "Prevents storage of category administration responses.",
+                                "schema": {
+                                    "type": "string",
+                                    "const": "private, no-store"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AdminCategory"
+                                },
+                                "example": {
+                                    "id": 17,
+                                    "name": "Instalaciones sanitarias",
+                                    "enabled": true,
+                                    "version": 2
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "The category identifier or request is invalid. This includes malformed JSON, duplicate keys, trailing JSON values, unknown or null properties, a body larger than 64 KiB, a missing or nonpositive `expected_version`, no business field, an invalid name, or a supplied invalid reason.",
+                        "headers": {
+                            "Cache-Control": {
+                                "schema": {
+                                    "type": "string",
+                                    "const": "private, no-store"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                },
+                                "examples": {
+                                    "invalidRequest": {
+                                        "value": {
+                                            "error": "Invalid request body"
+                                        }
+                                    },
+                                    "invalidIdentifier": {
+                                        "value": {
+                                            "error": "Category id is required"
+                                        }
+                                    },
+                                    "versionRequired": {
+                                        "value": {
+                                            "error": "Category expected version must be positive"
+                                        }
+                                    },
+                                    "noBusinessFields": {
+                                        "value": {
+                                            "error": "Category business fields are required"
+                                        }
+                                    },
+                                    "invalidName": {
+                                        "value": {
+                                            "error": "Category name is required"
+                                        }
+                                    },
+                                    "invalidReason": {
+                                        "value": {
+                                            "error": "Category reason must be 1-500 bytes of printable UTF-8"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "The Bearer token is missing or invalid.",
+                        "headers": {
+                            "Cache-Control": {
+                                "schema": {
+                                    "type": "string",
+                                    "const": "private, no-store"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AuthErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "The Bearer JWT lacks the `write:categories` permission.",
+                        "headers": {
+                            "Cache-Control": {
+                                "schema": {
+                                    "type": "string",
+                                    "const": "private, no-store"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                },
+                                "example": {
+                                    "error": "insufficient permissions"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "No category exists with the requested identifier.",
+                        "headers": {
+                            "Cache-Control": {
+                                "schema": {
+                                    "type": "string",
+                                    "const": "private, no-store"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                },
+                                "example": {
+                                    "error": "Category does not exist"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "The expected version is stale, the name conflicts with another category, or confirmation is required because ongoing orders exist.",
+                        "headers": {
+                            "Cache-Control": {
+                                "schema": {
+                                    "type": "string",
+                                    "const": "private, no-store"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                },
+                                "examples": {
+                                    "staleVersion": {
+                                        "summary": "The category changed after the client read it",
+                                        "value": {
+                                            "error": "Category version changed"
+                                        }
+                                    },
+                                    "duplicateName": {
+                                        "summary": "Another category already uses this name",
+                                        "value": {
+                                            "error": "Category already exists"
+                                        }
+                                    },
+                                    "confirmationRequired": {
+                                        "summary": "Ongoing orders require explicit confirmation",
+                                        "value": {
+                                            "error": "Category ongoing orders confirmation is required"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "The category change or its audit event could not be committed.",
+                        "headers": {
+                            "Cache-Control": {
+                                "schema": {
+                                    "type": "string",
+                                    "const": "private, no-store"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                },
+                                "example": {
+                                    "error": "Internal Server Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/categories/{id}/impact": {
+            "get": {
+                "tags": [
+                    "Categories"
+                ],
+                "operationId": "getCategoryImpact",
+                "summary": "Read the operational impact of a category",
+                "description": "Returns aggregate operational counts for an existing category. Requires `read:categories`. `observed_at` is the reference time used to determine whether pending proposals are still eligible for the count; the category and all counts are read from one coherent database statement snapshot. Counts use the provider's current category assignment, not an order-time category snapshot. The counts are informational and do not reserve state; `PATCH /categories/{id}` rechecks current impact when applying a change. Existing negotiations may continue after disabling and can create new orders, so this response does not promise that category activity will immediately reach zero. The response contains no individual provider or customer records, creates no audit event, and uses `Cache-Control: private, no-store`.",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "description": "Existing category identifier.",
+                        "schema": {
+                            "type": "integer",
+                            "format": "int32",
+                            "minimum": 1
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The category and its aggregate impact at the observation time.",
+                        "headers": {
+                            "Cache-Control": {
+                                "description": "Prevents storage of private administrative data.",
+                                "schema": {
+                                    "type": "string",
+                                    "const": "private, no-store"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/CategoryImpact"
+                                },
+                                "example": {
+                                    "category": {
+                                        "id": 17,
+                                        "name": "Plomería",
+                                        "enabled": true,
+                                        "version": 3
+                                    },
+                                    "observed_at": "2026-07-04T13:00:00Z",
+                                    "counts": {
+                                        "assigned_providers": 8,
+                                        "pending_requests": 2,
+                                        "accepted_requests_without_proposal": 1,
+                                        "pending_proposals": 3,
+                                        "scheduled_orders": 1,
+                                        "awaiting_payment_orders": 0
+                                    },
+                                    "has_ongoing_orders": true,
+                                    "requires_confirmation": true,
+                                    "existing_operations_can_continue": true
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "The category identifier is invalid.",
+                        "headers": {
+                            "Cache-Control": {
+                                "schema": {
+                                    "type": "string",
+                                    "const": "private, no-store"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                },
+                                "example": {
+                                    "error": "Category id is required"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "The Bearer token is missing or invalid.",
+                        "headers": {
+                            "Cache-Control": {
+                                "schema": {
+                                    "type": "string",
+                                    "const": "private, no-store"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AuthErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "The Bearer JWT lacks the `read:categories` permission.",
+                        "headers": {
+                            "Cache-Control": {
+                                "schema": {
+                                    "type": "string",
+                                    "const": "private, no-store"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                },
+                                "example": {
+                                    "error": "insufficient permissions"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "No category exists with the requested identifier.",
+                        "headers": {
+                            "Cache-Control": {
+                                "schema": {
+                                    "type": "string",
+                                    "const": "private, no-store"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                },
+                                "example": {
+                                    "error": "Category does not exist"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "The impact could not be read.",
+                        "headers": {
+                            "Cache-Control": {
+                                "schema": {
+                                    "type": "string",
+                                    "const": "private, no-store"
+                                }
+                            }
+                        },
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -4791,7 +5324,7 @@
                 ],
                 "operationId": "filterProvidersByCategory",
                 "summary": "Filter providers by category",
-                "description": "Returns providers whose registered category matches the `category_id` query parameter selected from GET /categories. Provider rating averages and counts include all registered ratings, including ratings whose review text is hidden.",
+                "description": "Returns providers whose registered category matches the `category_id` query parameter selected from GET /categories. Provider rating averages and counts include all registered ratings, including ratings whose review text is hidden. A disabled category still exists, but is not available for discovery: using its previously saved identifier returns an empty array with `200`, not `404`. Only an unknown category identifier returns `404`.",
                 "security": [
                     {
                         "BearerAuth": []
@@ -4802,7 +5335,7 @@
                         "name": "category_id",
                         "in": "query",
                         "required": true,
-                        "description": "Existing category identifier selected from GET /categories.",
+                        "description": "Existing category identifier, usually selected from GET /categories while enabled. A saved identifier may refer to a category that has since been disabled.",
                         "schema": {
                             "type": "integer",
                             "format": "int32",
@@ -4812,7 +5345,7 @@
                 ],
                 "responses": {
                     "200": {
-                        "description": "Providers matching the requested category. The array is empty when the category exists but has no registered providers.",
+                        "description": "Providers matching the requested category. The array is empty when the category is disabled or has no registered providers.",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -4923,7 +5456,7 @@
                 ],
                 "operationId": "registerProvider",
                 "summary": "Register the authenticated user as a provider",
-                "description": "Creates a provider account for the authenticated Auth0 subject. The Auth0 subject is taken from the Bearer JWT and persisted as the user auth identifier. The implementation consumes email, name, surname, category_id, a confirmed profile_photo_file_id, and the selected internal coverage_zone_ids.",
+                "description": "Creates a provider account for the authenticated Auth0 subject. The Auth0 subject is taken from the Bearer JWT and persisted as the user auth identifier. The implementation consumes email, name, surname, category_id, a confirmed profile_photo_file_id, and the selected internal coverage_zone_ids. The category must currently be enabled; a disabled category cannot be used for a new provider registration.",
                 "security": [
                     {
                         "BearerAuth": []
@@ -5080,7 +5613,7 @@
                         }
                     },
                     "409": {
-                        "description": "A user with the same email already exists.",
+                        "description": "A user with the same email already exists or the selected category is disabled.",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -5088,8 +5621,15 @@
                                 },
                                 "examples": {
                                     "emailAlreadyRegistered": {
+                                        "summary": "Email is already registered",
                                         "value": {
                                             "error": "Email is already registered"
+                                        }
+                                    },
+                                    "categoryDisabled": {
+                                        "summary": "The selected category is disabled",
+                                        "value": {
+                                            "error": "Category is disabled"
                                         }
                                     }
                                 }
@@ -6659,7 +7199,7 @@
                 ],
                 "operationId": "getProviderProfile",
                 "summary": "Get a Provider public profile",
-                "description": "Returns the currently available public information for an existing Provider. Email, authentication identity, and private documents are not exposed. The rating average and count include all registered ratings, even when a review's text is hidden. A hidden review is omitted from the provider's public work history while the completed work order remains listed.",
+                "description": "Returns the currently available public information for an existing Provider. Email, authentication identity, and private documents are not exposed. The rating average and count include all registered ratings, even when a review's text is hidden. A hidden review is omitted from the provider's public work history while the completed work order remains listed. Disabling the provider's category does not suspend the provider account or remove this profile; it only prevents discovery for new requests and new request creation.",
                 "security": [
                     {
                         "BearerAuth": []
@@ -8216,7 +8756,7 @@
                 ],
                 "operationId": "createChatbotConversation",
                 "summary": "Send a message to the AI-assisted chatbot",
-                "description": "Creates a chatbot conversation for the authenticated consumer and returns the persisted consumer message, chatbot answer, and AI-ranked providers selected from the diagnosed category and the consumer's active coverage zone when the chatbot concludes a pre-diagnosis. The first consumer message may include text, confirmed private image file ids, or both.",
+                "description": "Creates a chatbot conversation for the authenticated consumer and returns the persisted consumer message, chatbot answer, and AI-ranked providers selected from the diagnosed enabled category and the consumer's active coverage zone when the chatbot concludes a pre-diagnosis. Disabled categories are not included in new provider recommendations. The first consumer message may include text, confirmed private image file ids, or both.",
                 "security": [
                     {
                         "BearerAuth": []
@@ -8283,12 +8823,14 @@
                                                     "id": 1,
                                                     "sender_role": "consumer",
                                                     "content": "Hay agua acumulada dentro del mueble bajo mesada cada vez que uso la pileta.",
+                                                    "images": [],
                                                     "created_on": "2026-06-16T12:00:00Z"
                                                 },
                                                 {
                                                     "id": 2,
                                                     "sender_role": "chatbot",
                                                     "content": "El problema parece ser una pérdida en el sifón o en una conexión flexible de la bacha. Te recomiendo contactar a un plomero.",
+                                                    "images": [],
                                                     "created_on": "2026-06-16T12:00:01Z"
                                                 }
                                             ],
@@ -8296,6 +8838,7 @@
                                                 "id": 2,
                                                 "sender_role": "chatbot",
                                                 "content": "El problema parece ser una pérdida en el sifón o en una conexión flexible de la bacha. Te recomiendo contactar a un plomero.",
+                                                "images": [],
                                                 "created_on": "2026-06-16T12:00:01Z"
                                             },
                                             "recommended_providers": [
@@ -8411,7 +8954,7 @@
                 ],
                 "operationId": "continueChatbotConversation",
                 "summary": "Send a message to an existing AI-assisted chatbot conversation",
-                "description": "Adds a consumer message to an existing chatbot conversation, sends the persisted context summary plus recent relevant messages and current-turn images to the stateless chatbot, persists the chatbot response, and returns the messages created for this turn with AI-ranked providers selected from the diagnosed category and the consumer's active coverage zone when applicable.",
+                "description": "Adds a consumer message to an existing chatbot conversation, sends the persisted context summary plus recent relevant messages and current-turn images to the stateless chatbot, persists the chatbot response, and returns the messages created for this turn with AI-ranked providers selected from the diagnosed enabled category and the consumer's active coverage zone when applicable. Providers whose category is disabled are not recommended.",
                 "security": [
                     {
                         "BearerAuth": []
@@ -8488,12 +9031,14 @@
                                                     "id": 3,
                                                     "sender_role": "consumer",
                                                     "content": "El agua aparece solamente cuando abro la canilla.",
+                                                    "images": [],
                                                     "created_on": "2026-06-17T12:00:00Z"
                                                 },
                                                 {
                                                     "id": 4,
                                                     "sender_role": "chatbot",
                                                     "content": "Si el agua aparece solo al usar la bacha, revisá primero el sifón y las conexiones flexibles.",
+                                                    "images": [],
                                                     "created_on": "2026-06-17T12:00:01Z"
                                                 }
                                             ],
@@ -8501,6 +9046,7 @@
                                                 "id": 4,
                                                 "sender_role": "chatbot",
                                                 "content": "Si el agua aparece solo al usar la bacha, revisá primero el sifón y las conexiones flexibles.",
+                                                "images": [],
                                                 "created_on": "2026-06-17T12:00:01Z"
                                             },
                                             "recommended_providers": []
@@ -8633,7 +9179,7 @@
                 ],
                 "operationId": "createJobRequestFromChatbotAssessment",
                 "summary": "Contact a provider from a chatbot assessment",
-                "description": "Creates a pending job request and work conversation using an immutable copy of the authenticated consumer's current professional assessment.",
+                "description": "Creates a pending job request and work conversation using an immutable copy of the authenticated consumer's current professional assessment. A provider from a recommendation saved before its category was disabled cannot be contacted for a new request; the category is checked again when this operation is persisted. Existing negotiations remain unaffected.",
                 "security": [
                     {
                         "BearerAuth": []
@@ -8708,11 +9254,19 @@
                         }
                     },
                     "409": {
-                        "description": "Assessment state, category mismatch, or duplicate request conflict.",
+                        "description": "Assessment state, category mismatch, disabled provider category, or duplicate request conflict. A previously saved recommendation does not bypass the current category-availability check.",
                         "content": {
                             "application/json": {
                                 "schema": {
                                     "$ref": "#/components/schemas/ErrorResponse"
+                                },
+                                "examples": {
+                                    "categoryDisabled": {
+                                        "summary": "A saved recommendation belongs to a disabled category",
+                                        "value": {
+                                            "error": "Category is disabled"
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -8812,7 +9366,7 @@
                 ],
                 "operationId": "createJobRequest",
                 "summary": "Create a job request",
-                "description": "Creates a job request from the authenticated consumer to a provider and links it to a pending conversation.",
+                "description": "Creates a job request from the authenticated consumer to a provider and links it to a pending conversation. The provider's current category must be enabled when the request is persisted; disabling a category does not cancel requests and negotiations that already exist.",
                 "security": [
                     {
                         "BearerAuth": []
@@ -8946,7 +9500,7 @@
                         }
                     },
                     "409": {
-                        "description": "A job request or conversation between this consumer and provider already exists.",
+                        "description": "A job request or conversation between this consumer and provider already exists, or the provider's category is disabled and cannot accept a new request.",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -8954,8 +9508,15 @@
                                 },
                                 "examples": {
                                     "alreadyExists": {
+                                        "summary": "A request or conversation already exists",
                                         "value": {
                                             "error": "Job request already exists"
+                                        }
+                                    },
+                                    "categoryDisabled": {
+                                        "summary": "The provider's category is disabled",
+                                        "value": {
+                                            "error": "Category is disabled"
                                         }
                                     }
                                 }
@@ -9785,6 +10346,7 @@
                 "tags": [
                     "WorkOrders"
                 ],
+                "description": "Lists persisted work orders involving the authenticated user, ordered by scheduled service date ascending. A provider's `counterpart.category_name` reflects the provider's current category assignment, not a category-name snapshot taken when the order was created. Disabling that category does not remove the category name or the existing work order from the participants' list.",
                 "security": [
                     {
                         "BearerAuth": []
@@ -9792,7 +10354,7 @@
                 ],
                 "responses": {
                     "200": {
-                        "description": "Work orders involving the authenticated user, ordered by scheduled service date ascending. The array is empty when there are no work orders.",
+                        "description": "Work orders involving the authenticated user. The array is empty when there are no work orders.",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -10604,7 +11166,7 @@
                 ],
                 "operationId": "getConversation",
                 "summary": "Get a conversation detail",
-                "description": "Returns a conversation with its messages when the authenticated user is either the consumer or provider participant.",
+                "description": "Returns a conversation with its messages when the authenticated user is either the consumer or provider participant. For chatbot conversations, currently disabled-category providers are omitted from the recommendation list, even if the recommendation was persisted before the category was disabled. The conversation and its existing operations remain accessible.",
                 "security": [
                     {
                         "BearerAuth": []
@@ -10636,20 +11198,24 @@
                                     "pendingConversation": {
                                         "value": {
                                             "id": 1,
+                                            "type": "work",
                                             "status": "pending",
-                                            "counterpart": {
-                                                "id": 20,
-                                                "role": "provider",
-                                                "name": "Juan",
-                                                "surname": "Gómez",
-                                                "category_name": "Plomería",
-                                                "profile_photo_url": "https://cdn.example/files/2026/06/profile_photo/juan.jpg"
+                                            "work": {
+                                                "counterpart": {
+                                                    "id": 20,
+                                                    "role": "provider",
+                                                    "name": "Juan",
+                                                    "surname": "Gómez",
+                                                    "category_name": "Plomería",
+                                                    "profile_photo_url": "https://cdn.example/files/2026/06/profile_photo/juan.jpg"
+                                                }
                                             },
                                             "messages": [
                                                 {
                                                     "id": 1,
                                                     "sender_role": "consumer",
                                                     "content": "Hola Juan, necesito reparar una pérdida de agua en la cocina. ¿Podrías ayudarme esta semana?",
+                                                    "images": [],
                                                     "created_on": "2026-05-29T18:01:00Z"
                                                 }
                                             ],
@@ -22057,6 +22623,180 @@
                     "name": {
                         "type": "string",
                         "example": "Plomería"
+                    }
+                },
+                "additionalProperties": false
+            },
+            "AdminCategory": {
+                "type": "object",
+                "description": "Current administrative category representation. `version` is a concurrency token; it does not expose a snapshot history.",
+                "required": [
+                    "id",
+                    "name",
+                    "enabled",
+                    "version"
+                ],
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "format": "int32",
+                        "minimum": 1,
+                        "example": 17
+                    },
+                    "name": {
+                        "type": "string",
+                        "example": "Plomería"
+                    },
+                    "enabled": {
+                        "type": "boolean",
+                        "example": true
+                    },
+                    "version": {
+                        "type": "integer",
+                        "format": "int32",
+                        "minimum": 1,
+                        "example": 3
+                    }
+                },
+                "additionalProperties": false
+            },
+            "EditCategoryRequest": {
+                "type": "object",
+                "description": "Request to edit a category using optimistic concurrency. At least one of `name` or `enabled` must be supplied. Unknown properties, null values, duplicate keys, and trailing JSON values are rejected. The request body is limited to 64 KiB.",
+                "required": [
+                    "expected_version"
+                ],
+                "properties": {
+                    "expected_version": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "description": "Current category version returned by an administrative category read.",
+                        "example": 1
+                    },
+                    "name": {
+                        "type": "string",
+                        "description": "Optional display name. The server trims surrounding whitespace, then requires 1–100 Unicode code points. The trimmed spelling, capitalization, and accents are preserved for display. Uniqueness uses the same lowercase normalization as category creation and covers disabled categories.",
+                        "example": "Instalaciones sanitarias"
+                    },
+                    "enabled": {
+                        "type": "boolean",
+                        "description": "Optional availability state. Effective changes require a reason.",
+                        "example": false
+                    },
+                    "reason": {
+                        "type": "string",
+                        "description": "Optional human-authored reason. It is required for an effective enabled state change and, when nonempty, is trimmed and must contain 1–500 bytes of printable UTF-8. The byte bound applies after trimming; this schema's string length is not an equivalent byte-count constraint.",
+                        "example": "Retiro del rubro"
+                    },
+                    "confirm_ongoing_orders": {
+                        "type": "boolean",
+                        "description": "Confirm disabling when the latest mutation-time check finds orders in `scheduled` or `awaiting_payment`. Required only for that effective disable transition; an impact read does not reserve the count.",
+                        "example": true
+                    }
+                },
+                "additionalProperties": false,
+                "anyOf": [
+                    {
+                        "required": [
+                            "name"
+                        ]
+                    },
+                    {
+                        "required": [
+                            "enabled"
+                        ]
+                    }
+                ]
+            },
+            "CategoryImpact": {
+                "type": "object",
+                "description": "Aggregate impact of a category observed without exposing individual providers, consumers, or operations. The provider association is current, not a historical category snapshot.",
+                "required": [
+                    "category",
+                    "observed_at",
+                    "counts",
+                    "has_ongoing_orders",
+                    "requires_confirmation",
+                    "existing_operations_can_continue"
+                ],
+                "properties": {
+                    "category": {
+                        "$ref": "#/components/schemas/AdminCategory"
+                    },
+                    "observed_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "description": "UTC reference time used to determine whether pending proposals are included.",
+                        "example": "2026-07-04T13:00:00Z"
+                    },
+                    "counts": {
+                        "$ref": "#/components/schemas/CategoryImpactCounts"
+                    },
+                    "has_ongoing_orders": {
+                        "type": "boolean",
+                        "description": "True when at least one counted order is `scheduled` or `awaiting_payment`.",
+                        "example": true
+                    },
+                    "requires_confirmation": {
+                        "type": "boolean",
+                        "description": "True when the category is enabled and ongoing orders require explicit confirmation before disabling.",
+                        "example": true
+                    },
+                    "existing_operations_can_continue": {
+                        "type": "boolean",
+                        "description": "Existing negotiations and operations remain eligible to continue after disabling.",
+                        "const": true
+                    }
+                },
+                "additionalProperties": false
+            },
+            "CategoryImpactCounts": {
+                "type": "object",
+                "description": "Separate counts by persisted resource identity. They are not disjoint sets and must not be added together as a total.",
+                "required": [
+                    "assigned_providers",
+                    "pending_requests",
+                    "accepted_requests_without_proposal",
+                    "pending_proposals",
+                    "scheduled_orders",
+                    "awaiting_payment_orders"
+                ],
+                "properties": {
+                    "assigned_providers": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "description": "Providers currently assigned to the category.",
+                        "example": 8
+                    },
+                    "pending_requests": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "description": "Persisted job requests in `pending` status for providers currently assigned to the category.",
+                        "example": 2
+                    },
+                    "accepted_requests_without_proposal": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "description": "Persisted job requests in `accepted` status whose conversation has no service proposal.",
+                        "example": 1
+                    },
+                    "pending_proposals": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "description": "Pending service proposals whose `scheduled_on` is later than `observed_at`.",
+                        "example": 3
+                    },
+                    "scheduled_orders": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "description": "Work orders in `scheduled` status, regardless of whether their service time is in the future.",
+                        "example": 1
+                    },
+                    "awaiting_payment_orders": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "description": "Work orders in `awaiting_payment` status.",
+                        "example": 0
                     }
                 },
                 "additionalProperties": false

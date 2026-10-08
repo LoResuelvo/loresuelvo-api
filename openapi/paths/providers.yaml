@@ -7,21 +7,28 @@ get:
     Returns providers whose registered category matches the `category_id` query
     parameter selected from GET /categories. Provider rating averages and counts
     include all registered ratings, including ratings whose review text is hidden.
+    A disabled category still exists, but is not available for discovery: using
+    its previously saved identifier returns an empty array with `200`, not
+    `404`. Only an unknown category identifier returns `404`.
   security:
   - BearerAuth: []
   parameters:
   - name: category_id
     in: query
     required: true
-    description: Existing category identifier selected from GET /categories.
+    description: >-
+      Existing category identifier, usually selected from GET /categories
+      while enabled. A saved identifier may refer to a category that has since
+      been disabled.
     schema:
       type: integer
       format: int32
       example: 1
   responses:
     '200':
-      description: Providers matching the requested category. The array is empty when
-        the category exists but has no registered providers.
+      description: >-
+        Providers matching the requested category. The array is empty when the
+        category is disabled or has no registered providers.
       content:
         application/json:
           schema:
@@ -95,7 +102,8 @@ post:
   description: Creates a provider account for the authenticated Auth0 subject. The
     Auth0 subject is taken from the Bearer JWT and persisted as the user auth identifier.
     The implementation consumes email, name, surname, category_id, a confirmed profile_photo_file_id,
-    and the selected internal coverage_zone_ids.
+    and the selected internal coverage_zone_ids. The category must currently be enabled;
+    a disabled category cannot be used for a new provider registration.
   security:
   - BearerAuth: []
   requestBody:
@@ -202,12 +210,17 @@ post:
               value:
                 error: missing user id
     '409':
-      description: A user with the same email already exists.
+      description: A user with the same email already exists or the selected category is disabled.
       content:
         application/json:
           schema:
             $ref: '#/components/schemas/ErrorResponse'
           examples:
             emailAlreadyRegistered:
+              summary: Email is already registered
               value:
                 error: Email is already registered
+            categoryDisabled:
+              summary: The selected category is disabled
+              value:
+                error: Category is disabled

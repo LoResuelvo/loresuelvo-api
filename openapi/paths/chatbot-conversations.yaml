@@ -57,7 +57,14 @@ post:
   - Conversations
   operationId: createChatbotConversation
   summary: Send a message to the AI-assisted chatbot
-  description: Creates a chatbot conversation for the authenticated consumer and returns the persisted consumer message, chatbot answer, and AI-ranked providers selected from the diagnosed category and the consumer's active coverage zone when the chatbot concludes a pre-diagnosis. The first consumer message may include text, confirmed private image file ids, or both.
+  description: >-
+    Creates a chatbot conversation for the authenticated consumer and returns
+    the persisted consumer message, chatbot answer, and AI-ranked providers
+    selected from the diagnosed enabled category and the consumer's active
+    coverage zone when the chatbot concludes a pre-diagnosis. Disabled
+    categories are not included in new provider recommendations. The first
+    consumer message may include text, confirmed private image file ids, or
+    both.
   security:
   - BearerAuth: []
   requestBody:
@@ -104,15 +111,18 @@ post:
                 - id: 1
                   sender_role: consumer
                   content: Hay agua acumulada dentro del mueble bajo mesada cada vez que uso la pileta.
+                  images: []
                   created_on: '2026-06-16T12:00:00Z'
                 - id: 2
                   sender_role: chatbot
                   content: El problema parece ser una pérdida en el sifón o en una conexión flexible de la bacha. Te recomiendo contactar a un plomero.
+                  images: []
                   created_on: '2026-06-16T12:00:01Z'
                 response:
                   id: 2
                   sender_role: chatbot
                   content: El problema parece ser una pérdida en el sifón o en una conexión flexible de la bacha. Te recomiendo contactar a un plomero.
+                  images: []
                   created_on: '2026-06-16T12:00:01Z'
                 recommended_providers:
                 - id: 10

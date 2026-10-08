@@ -3,7 +3,13 @@ post:
   - Conversations
   operationId: continueChatbotConversation
   summary: Send a message to an existing AI-assisted chatbot conversation
-  description: Adds a consumer message to an existing chatbot conversation, sends the persisted context summary plus recent relevant messages and current-turn images to the stateless chatbot, persists the chatbot response, and returns the messages created for this turn with AI-ranked providers selected from the diagnosed category and the consumer's active coverage zone when applicable.
+  description: >-
+    Adds a consumer message to an existing chatbot conversation, sends the
+    persisted context summary plus recent relevant messages and current-turn
+    images to the stateless chatbot, persists the chatbot response, and returns
+    the messages created for this turn with AI-ranked providers selected from
+    the diagnosed enabled category and the consumer's active coverage zone when
+    applicable. Providers whose category is disabled are not recommended.
   security:
   - BearerAuth: []
   parameters:
@@ -57,15 +63,18 @@ post:
                 - id: 3
                   sender_role: consumer
                   content: El agua aparece solamente cuando abro la canilla.
+                  images: []
                   created_on: '2026-06-17T12:00:00Z'
                 - id: 4
                   sender_role: chatbot
                   content: Si el agua aparece solo al usar la bacha, revisá primero el sifón y las conexiones flexibles.
+                  images: []
                   created_on: '2026-06-17T12:00:01Z'
                 response:
                   id: 4
                   sender_role: chatbot
                   content: Si el agua aparece solo al usar la bacha, revisá primero el sifón y las conexiones flexibles.
+                  images: []
                   created_on: '2026-06-17T12:00:01Z'
                 recommended_providers: []
     '400':

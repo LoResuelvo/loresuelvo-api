@@ -1,0 +1,190 @@
+patch:
+  tags:
+  - Categories
+  operationId: editCategory
+  summary: Edit or change the availability of a service category
+  description: >-
+    Updates the category with the supplied `name`, `enabled`, or both, using
+    the same resource identity. Requires `write:categories`. At least one
+    business field is required together with a positive `expected_version`.
+    The name is trimmed before validation, must contain 1–100 Unicode code
+    points after trimming, and keeps its display capitalization and accents;
+    uniqueness also includes disabled categories. An effective enabled-state
+    change requires a nonblank printable UTF-8 `reason` of at most 500 bytes
+    after trimming. A no-op (including an `enabled` value equal to the current
+    state) returns the current representation without consuming a version or
+    creating an audit event. Effective changes increment `version` and are
+    audited atomically; the version is a concurrency token, not a stored name
+    history. When disabling a category with scheduled or awaiting-payment
+    orders, `confirm_ongoing_orders=true` is required. Impact is revalidated
+    when this mutation is applied; a previous impact response does not reserve
+    its counts. Disabling prevents new provider registrations and new job
+    requests, including requests from older chatbot recommendations, while
+    previously created negotiations and operations can continue. Reactivating
+    the same category restores eligibility for new activity without changing
+    existing relationships. Request bodies and reasons are not copied to
+    technical logs. Responses use `Cache-Control: private, no-store`.
+  security:
+  - BearerAuth: []
+  parameters:
+  - name: id
+    in: path
+    required: true
+    description: Existing category identifier.
+    schema:
+      type: integer
+      format: int32
+      minimum: 1
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/EditCategoryRequest'
+        examples:
+          rename:
+            summary: Rename an existing category
+            value:
+              expected_version: 1
+              name: Instalaciones sanitarias
+          disable:
+            summary: Disable a category without ongoing orders
+            value:
+              expected_version: 1
+              enabled: false
+              reason: Retiro del rubro
+          confirmDisable:
+            summary: Confirm disabling while orders are ongoing
+            value:
+              expected_version: 1
+              enabled: false
+              reason: Retiro del rubro
+              confirm_ongoing_orders: true
+  responses:
+    '200':
+      description: The current category representation after the request. A no-op returns the unchanged version.
+      headers:
+        Cache-Control:
+          description: Prevents storage of category administration responses.
+          schema:
+            type: string
+            const: private, no-store
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/AdminCategory'
+          example:
+            id: 17
+            name: Instalaciones sanitarias
+            enabled: true
+            version: 2
+    '400':
+      description: >-
+        The category identifier or request is invalid. This includes malformed
+        JSON, duplicate keys, trailing JSON values, unknown or null properties,
+        a body larger than 64 KiB, a missing or nonpositive `expected_version`,
+        no business field, an invalid name, or a supplied invalid reason.
+      headers:
+        Cache-Control:
+          schema:
+            type: string
+            const: private, no-store
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            invalidRequest:
+              value:
+                error: Invalid request body
+            invalidIdentifier:
+              value:
+                error: Category id is required
+            versionRequired:
+              value:
+                error: Category expected version must be positive
+            noBusinessFields:
+              value:
+                error: Category business fields are required
+            invalidName:
+              value:
+                error: Category name is required
+            invalidReason:
+              value:
+                error: Category reason must be 1-500 bytes of printable UTF-8
+    '401':
+      description: The Bearer token is missing or invalid.
+      headers:
+        Cache-Control:
+          schema:
+            type: string
+            const: private, no-store
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/AuthErrorResponse'
+    '403':
+      description: The Bearer JWT lacks the `write:categories` permission.
+      headers:
+        Cache-Control:
+          schema:
+            type: string
+            const: private, no-store
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: insufficient permissions
+    '404':
+      description: No category exists with the requested identifier.
+      headers:
+        Cache-Control:
+          schema:
+            type: string
+            const: private, no-store
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: Category does not exist
+    '409':
+      description: >-
+        The expected version is stale, the name conflicts with another
+        category, or confirmation is required because ongoing orders exist.
+      headers:
+        Cache-Control:
+          schema:
+            type: string
+            const: private, no-store
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            staleVersion:
+              summary: The category changed after the client read it
+              value:
+                error: Category version changed
+            duplicateName:
+              summary: Another category already uses this name
+              value:
+                error: Category already exists
+            confirmationRequired:
+              summary: Ongoing orders require explicit confirmation
+              value:
+                error: Category ongoing orders confirmation is required
+    '500':
+      description: The category change or its audit event could not be committed.
+      headers:
+        Cache-Control:
+          schema:
+            type: string
+            const: private, no-store
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: Internal Server Error

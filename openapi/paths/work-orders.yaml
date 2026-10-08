@@ -2,11 +2,18 @@ get:
   summary: List the authenticated user's work orders
   tags:
     - WorkOrders
+  description: >-
+    Lists persisted work orders involving the authenticated user, ordered by
+    scheduled service date ascending. A provider's `counterpart.category_name`
+    reflects the provider's current category assignment, not a category-name
+    snapshot taken when the order was created. Disabling that category does not
+    remove the category name or the existing work order from the participants'
+    list.
   security:
     - BearerAuth: []
   responses:
     '200':
-      description: Work orders involving the authenticated user, ordered by scheduled service date ascending. The array is empty when there are no work orders.
+      description: Work orders involving the authenticated user. The array is empty when there are no work orders.
       content:
         application/json:
           schema:

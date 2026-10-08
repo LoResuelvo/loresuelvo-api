@@ -11,7 +11,12 @@ post:
   - JobRequests
   operationId: createJobRequestFromChatbotAssessment
   summary: Contact a provider from a chatbot assessment
-  description: Creates a pending job request and work conversation using an immutable copy of the authenticated consumer's current professional assessment.
+  description: >-
+    Creates a pending job request and work conversation using an immutable copy
+    of the authenticated consumer's current professional assessment. A provider
+    from a recommendation saved before its category was disabled cannot be
+    contacted for a new request; the category is checked again when this
+    operation is persisted. Existing negotiations remain unaffected.
   security:
   - BearerAuth: []
   requestBody:
@@ -56,11 +61,19 @@ post:
           schema:
             $ref: '#/components/schemas/ErrorResponse'
     '409':
-      description: Assessment state, category mismatch, or duplicate request conflict.
+      description: >-
+        Assessment state, category mismatch, disabled provider category, or
+        duplicate request conflict. A previously saved recommendation does not
+        bypass the current category-availability check.
       content:
         application/json:
           schema:
             $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            categoryDisabled:
+              summary: A saved recommendation belongs to a disabled category
+              value:
+                error: Category is disabled
     '500':
       description: Unexpected error.
       content:

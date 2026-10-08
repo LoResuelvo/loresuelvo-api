@@ -1,0 +1,25 @@
+type: object
+description: Current administrative category representation. `version` is a concurrency token; it does not expose a snapshot history.
+required:
+- id
+- name
+- enabled
+- version
+properties:
+  id:
+    type: integer
+    format: int32
+    minimum: 1
+    example: 17
+  name:
+    type: string
+    example: Plomería
+  enabled:
+    type: boolean
+    example: true
+  version:
+    type: integer
+    format: int32
+    minimum: 1
+    example: 3
+additionalProperties: false

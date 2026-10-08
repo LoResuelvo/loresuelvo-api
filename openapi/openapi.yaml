@@ -58,6 +58,10 @@ paths:
     $ref: ./paths/health-ready.yaml
   /categories:
     $ref: ./paths/categories.yaml
+  /categories/{id}:
+    $ref: ./paths/category-edit.yaml
+  /admin/categories/{id}/impact:
+    $ref: ./paths/category-impact.yaml
   /coverage-zones:
     $ref: ./paths/coverage-zones.yaml
   /consumers:
@@ -585,6 +589,14 @@ components:
       $ref: ./components/schemas/category.yaml
     CategoryListItem:
       $ref: ./components/schemas/category-list-item.yaml
+    AdminCategory:
+      $ref: ./components/schemas/admin-category.yaml
+    EditCategoryRequest:
+      $ref: ./components/schemas/edit-category-request.yaml
+    CategoryImpact:
+      $ref: ./components/schemas/category-impact.yaml
+    CategoryImpactCounts:
+      $ref: ./components/schemas/category-impact-counts.yaml
     CoverageZoneListItem:
       $ref: ./components/schemas/coverage-zone-list-item.yaml
     CoverageZoneBoundary:

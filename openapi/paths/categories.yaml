@@ -3,31 +3,88 @@ get:
   - Categories
   operationId: listCategories
   summary: List service categories
-  description: Returns all registered categories. Each list item contains only id
-    and name; normalized_name is intentionally omitted by the current handler.
+  description: >-
+    Returns categories ordered by name. By default, the shared catalog contains
+    only enabled categories and each item contains `id` and `name`; this mode
+    requires a valid Bearer JWT but no administrative permission. Set
+    `include_disabled=true` to include enabled and disabled categories and
+    receive their `id`, `name`, `enabled`, and `version`; that mode requires
+    `read:categories`, returns `Cache-Control: private, no-store`, and does not
+    create an audit event. A disabled category remains an existing resource;
+    its identifier is not treated as not found.
   security:
   - BearerAuth: []
+  parameters:
+  - name: include_disabled
+    in: query
+    required: false
+    description: >-
+      Include disabled categories. Only `true` selects the administrative
+      representation and requires `read:categories`; omitted or `false` keeps
+      the enabled-only public catalog.
+    schema:
+      type: boolean
+      default: false
   responses:
     '200':
-      description: Categories returned successfully. The array may be empty.
+      description: >-
+        Categories returned successfully. The array may be empty. The item
+        representation depends on `include_disabled`; an empty array is valid
+        in either mode.
+      headers:
+        Cache-Control:
+          description: Present as `private, no-store` when `include_disabled=true`.
+          schema:
+            type: string
+            const: private, no-store
       content:
         application/json:
           schema:
-            type: array
-            items:
-              $ref: '#/components/schemas/CategoryListItem'
+            anyOf:
+            - type: array
+              items:
+                $ref: '#/components/schemas/CategoryListItem'
+            - type: array
+              items:
+                $ref: '#/components/schemas/AdminCategory'
           examples:
             withCategories:
+              summary: Enabled-only catalog (`include_disabled` omitted or false)
               value:
               - id: 1
                 name: Electricidad
               - id: 2
                 name: Plomería
+            withDisabledCategories:
+              summary: Administrative catalog (`include_disabled=true`)
+              value:
+              - id: 1
+                name: Electricidad
+                enabled: true
+                version: 2
+              - id: 2
+                name: Plomería
+                enabled: false
+                version: 3
             empty:
               value: []
+    '400':
+      description: '`include_disabled` is not a valid boolean value.'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: Invalid include_disabled
     '401':
       description: Authentication failed or the authenticated user id could not be
         obtained from the request context.
+      headers:
+        Cache-Control:
+          description: Present as `private, no-store` when `include_disabled=true`.
+          schema:
+            type: string
+            const: private, no-store
       content:
         application/json:
           schema:
@@ -46,8 +103,28 @@ get:
               summary: Subject claim is missing or empty
               value:
                 error: missing user id
+    '403':
+      description: The Bearer JWT lacks `read:categories` when `include_disabled=true`.
+      headers:
+        Cache-Control:
+          description: Prevents storage of administrative catalog responses.
+          schema:
+            type: string
+            const: private, no-store
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: insufficient permissions
     '500':
       description: The category repository returned an unexpected error.
+      headers:
+        Cache-Control:
+          description: Present as `private, no-store` when `include_disabled=true`.
+          schema:
+            type: string
+            const: private, no-store
       content:
         application/json:
           schema:

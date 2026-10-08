@@ -1,0 +1,45 @@
+type: object
+description: >-
+  Request to edit a category using optimistic concurrency. At least one of
+  `name` or `enabled` must be supplied. Unknown properties, null values,
+  duplicate keys, and trailing JSON values are rejected. The request body is
+  limited to 64 KiB.
+required:
+- expected_version
+properties:
+  expected_version:
+    type: integer
+    minimum: 1
+    description: Current category version returned by an administrative category read.
+    example: 1
+  name:
+    type: string
+    description: >-
+      Optional display name. The server trims surrounding whitespace, then
+      requires 1–100 Unicode code points. The trimmed spelling, capitalization,
+      and accents are preserved for display. Uniqueness uses the same lowercase
+      normalization as category creation and covers disabled categories.
+    example: Instalaciones sanitarias
+  enabled:
+    type: boolean
+    description: Optional availability state. Effective changes require a reason.
+    example: false
+  reason:
+    type: string
+    description: >-
+      Optional human-authored reason. It is required for an effective enabled
+      state change and, when nonempty, is trimmed and must contain 1–500 bytes
+      of printable UTF-8. The byte bound applies after trimming; this schema's
+      string length is not an equivalent byte-count constraint.
+    example: Retiro del rubro
+  confirm_ongoing_orders:
+    type: boolean
+    description: >-
+      Confirm disabling when the latest mutation-time check finds orders in
+      `scheduled` or `awaiting_payment`. Required only for that effective
+      disable transition; an impact read does not reserve the count.
+    example: true
+additionalProperties: false
+anyOf:
+- required: [name]
+- required: [enabled]

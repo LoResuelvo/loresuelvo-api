@@ -1,0 +1,122 @@
+get:
+  tags:
+  - Categories
+  operationId: getCategoryImpact
+  summary: Read the operational impact of a category
+  description: >-
+    Returns aggregate operational counts for an existing category. Requires
+    `read:categories`. `observed_at` is the reference time used to determine
+    whether pending proposals are still eligible for the count; the category
+    and all counts are read from one coherent database statement snapshot.
+    Counts use the provider's current category assignment, not an order-time
+    category snapshot. The counts are informational and do not reserve state;
+    `PATCH /categories/{id}` rechecks current impact when applying a change.
+    Existing negotiations may continue after disabling and can create new
+    orders, so this response does not promise that category activity will
+    immediately reach zero. The response contains no individual provider or
+    customer records, creates no audit event, and uses
+    `Cache-Control: private, no-store`.
+  security:
+  - BearerAuth: []
+  parameters:
+  - name: id
+    in: path
+    required: true
+    description: Existing category identifier.
+    schema:
+      type: integer
+      format: int32
+      minimum: 1
+  responses:
+    '200':
+      description: The category and its aggregate impact at the observation time.
+      headers:
+        Cache-Control:
+          description: Prevents storage of private administrative data.
+          schema:
+            type: string
+            const: private, no-store
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/CategoryImpact'
+          example:
+            category:
+              id: 17
+              name: Plomería
+              enabled: true
+              version: 3
+            observed_at: '2026-07-04T13:00:00Z'
+            counts:
+              assigned_providers: 8
+              pending_requests: 2
+              accepted_requests_without_proposal: 1
+              pending_proposals: 3
+              scheduled_orders: 1
+              awaiting_payment_orders: 0
+            has_ongoing_orders: true
+            requires_confirmation: true
+            existing_operations_can_continue: true
+    '400':
+      description: The category identifier is invalid.
+      headers:
+        Cache-Control:
+          schema:
+            type: string
+            const: private, no-store
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: Category id is required
+    '401':
+      description: The Bearer token is missing or invalid.
+      headers:
+        Cache-Control:
+          schema:
+            type: string
+            const: private, no-store
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/AuthErrorResponse'
+    '403':
+      description: The Bearer JWT lacks the `read:categories` permission.
+      headers:
+        Cache-Control:
+          schema:
+            type: string
+            const: private, no-store
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: insufficient permissions
+    '404':
+      description: No category exists with the requested identifier.
+      headers:
+        Cache-Control:
+          schema:
+            type: string
+            const: private, no-store
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: Category does not exist
+    '500':
+      description: The impact could not be read.
+      headers:
+        Cache-Control:
+          schema:
+            type: string
+            const: private, no-store
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: Internal Server Error

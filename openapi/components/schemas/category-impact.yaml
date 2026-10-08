@@ -1,0 +1,35 @@
+type: object
+description: >-
+  Aggregate impact of a category observed without exposing individual
+  providers, consumers, or operations. The provider association is current,
+  not a historical category snapshot.
+required:
+- category
+- observed_at
+- counts
+- has_ongoing_orders
+- requires_confirmation
+- existing_operations_can_continue
+properties:
+  category:
+    $ref: '#/components/schemas/AdminCategory'
+  observed_at:
+    type: string
+    format: date-time
+    description: UTC reference time used to determine whether pending proposals are included.
+    example: '2026-07-04T13:00:00Z'
+  counts:
+    $ref: '#/components/schemas/CategoryImpactCounts'
+  has_ongoing_orders:
+    type: boolean
+    description: True when at least one counted order is `scheduled` or `awaiting_payment`.
+    example: true
+  requires_confirmation:
+    type: boolean
+    description: True when the category is enabled and ongoing orders require explicit confirmation before disabling.
+    example: true
+  existing_operations_can_continue:
+    type: boolean
+    description: Existing negotiations and operations remain eligible to continue after disabling.
+    const: true
+additionalProperties: false
