@@ -10,7 +10,6 @@ Feature: Consultar la bandeja administrativa de reclamos
 
     Rule: La bandeja filtra y pagina expedientes sin duplicar sus relaciones
 
-        @wip
         Scenario Outline: 68.1-QC Ordenar y paginar reclamos por fecha real e ID persistido
             Given que la fecha y hora actual del sistema es "2026-09-25T12:00:00-03:00"
             And "ana@example.com" tiene los reclamos abiertos "C1", "C2" y "C3" reportados respectivamente el "2026-09-24T10:00:00-03:00", "2026-09-24T10:00:00-03:00" y "2026-09-23T10:00:00-03:00", con "C1", "C2" y "C3" vinculados a las operaciones distintas "S1", "S2" y "S3", y con el ID persistido de "C2" mayor que el de "C1"
@@ -31,7 +30,6 @@ Feature: Consultar la bandeja administrativa de reclamos
                 | 2      | C3       | C3: 50 horas                 |
                 | 3      | ninguno  | ninguna                      |
 
-        @wip
         Scenario Outline: 68.2-QC Buscar por correo del reclamante o identidad canónica de operación
             Given "ana@example.com" tiene el reclamo "C1" sobre la operación de la solicitud "S1"
             And que existen dos propuestas de servicio de la conversación de "S1": "P1" es la primera y "P2" es posterior
@@ -48,7 +46,6 @@ Feature: Consultar la bandeja administrativa de reclamos
                 | jr- seguido del ID de S1  | C1       |
                 | sp- seguido del ID de P2  | C2       |
 
-        @wip
         Scenario Outline: 68.3-QC Filtrar por cada estado válido sin incluir otros estados
             Given que "ana@example.com" tiene un reclamo por cada estado del expediente: open, in_review, resolved y dismissed, vinculados respectivamente a las operaciones distintas "S1", "S2", "S3" y "S4"
             And estoy autenticado como administrador "operador@example.com" con el permiso "read:admin_claims"
@@ -62,7 +59,6 @@ Feature: Consultar la bandeja administrativa de reclamos
                 | resolved  |
                 | dismissed |
 
-        @wip
         Scenario: 68.4-QC Devolver una colección vacía cuando ningún reclamo coincide
             Given que "ana@example.com" tiene el reclamo "C1" en estado "open" sobre "S1"
             And que "juan@example.com" tiene el reclamo "C2" en estado "dismissed" sobre "S1"
@@ -70,7 +66,6 @@ Feature: Consultar la bandeja administrativa de reclamos
             When consulto la bandeja administrativa de reclamos con búsqueda "ana@example.com" y estado "dismissed"
             Then el sistema responde con estado 200 y una colección vacía, no nula
 
-        @wip
         Scenario Outline: 68.5-QC Rechazar filtros y límites de paginación inválidos
             Given que estoy autenticado como administrador "operador@example.com" con el permiso "read:admin_claims"
             When consulto la bandeja administrativa de reclamos con <entrada>
@@ -83,7 +78,6 @@ Feature: Consultar la bandeja administrativa de reclamos
                 | el límite 0                          |
                 | el límite 101                        |
 
-        @wip
         Scenario: 68.6-QC Exigir el permiso de lectura de reclamos
             Given que estoy autenticado como administrador "operador@example.com" solamente con el permiso "read:admin_audit"
             When consulto la bandeja administrativa de reclamos

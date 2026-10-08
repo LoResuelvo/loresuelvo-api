@@ -10,7 +10,6 @@ Feature: Iniciar la revisión administrativa de un reclamo
 
     Rule: Sólo un expediente abierto puede iniciar revisión
 
-        @wip
         Scenario: 68.14-RC Iniciar revisión sin alterar el testimonio ni la operación
             Given que la fecha y hora actual del sistema es "2026-09-25T12:00:00-03:00"
             And que "ana@example.com" presentó el reclamo abierto "C1" sobre "S1" con motivo "non_compliance" y testimonio "El servicio acordado no se realizó"
@@ -25,7 +24,6 @@ Feature: Iniciar la revisión administrativa de un reclamo
             And la operación, sus propuestas, órdenes y pagos permanecen sin cambios
             And la respuesta incluye la cabecera "Cache-Control" con valor "private, no-store"
 
-        @wip
         Scenario Outline: 68.15-RC Rechazar el inicio de revisión cuando el expediente no está abierto
             Given que "ana@example.com" tiene el reclamo "C1" en estado "<estado>"
             And estoy autenticado como administrador "operador@example.com" con el permiso "write:admin_claims"
@@ -41,7 +39,6 @@ Feature: Iniciar la revisión administrativa de un reclamo
 
     Rule: La clave de idempotencia conserva la actuación original
 
-        @wip
         Scenario: 68.16-RC Recuperar la revisión original después de que el expediente finaliza
             Given que la fecha y hora actual del sistema es "2026-09-24T08:00:00-03:00"
             And que "ana@example.com" tiene el reclamo "C1" abierto sobre la operación "S1"
@@ -54,7 +51,6 @@ Feature: Iniciar la revisión administrativa de un reclamo
             And la respuesta recupera la actuación original con el operador y el instante originales
             And no se duplica la actuación de revisión ni su auditoría
 
-        @wip
         Scenario Outline: 68.17-RC Rechazar una clave ausente o que no es un UUID
             Given que "ana@example.com" tiene el reclamo abierto "C1"
             And estoy autenticado como administrador "operador@example.com" con el permiso "write:admin_claims"
@@ -69,7 +65,6 @@ Feature: Iniciar la revisión administrativa de un reclamo
 
     Rule: El permiso específico autoriza el inicio de revisión
 
-        @wip
         Scenario: 68.18-RC Rechazar el inicio sin permiso de escritura de reclamos
             Given que "ana@example.com" tiene el reclamo abierto "C1"
             And estoy autenticado como administrador "operador@example.com" solamente con el permiso "read:admin_claims"

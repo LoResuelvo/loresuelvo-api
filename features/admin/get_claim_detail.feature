@@ -10,7 +10,6 @@ Feature: Consultar el detalle administrativo de un reclamo
 
     Rule: El detalle expone el expediente y sólo sus evidencias vinculadas
 
-        @wip
         Scenario: 68.7-GC Entregar el detalle con enlaces temporales de evidencias privadas
             Given que la solicitud "S1" no tiene propuesta, orden ni intento de pago
             And que "juan@example.com" tiene el reclamo "C1" sobre "S1" en estado "open", reportado el "2026-09-24T10:00:00-03:00", con motivo "non_compliance" y testimonio "La reparación pactada no quedó completa"
@@ -26,7 +25,6 @@ Feature: Consultar el detalle administrativo de un reclamo
             And la respuesta no expone claves de almacenamiento ni credenciales
             And la respuesta incluye la cabecera "Cache-Control" con valor "private, no-store"
 
-        @wip
         Scenario: 68.8-GC Incluir resolución y actuaciones sin reproducir transacciones financieras
             Given que "ana@example.com" tiene el reclamo finalizado "C1" con su dictamen formal persistido por el contrato compartido con US-31
             And que el dictamen de "C1" tiene tipo "consumer_favor", fundamentación "Se verificó el incumplimiento acordado" y fecha "2026-09-24T12:00:00Z"
@@ -39,7 +37,6 @@ Feature: Consultar el detalle administrativo de un reclamo
             And la respuesta no contiene mensajes de chat ni transacciones financieras completas
             And la compensación se identifica como sugerida y no ejecutada
 
-        @wip
         Scenario: 68.9-GC Informar una colección vacía cuando el expediente no tiene evidencias
             Given que "ana@example.com" tiene el reclamo "C1" sin evidencias vinculadas
             And estoy autenticado como administrador "operador@example.com" con el permiso "read:admin_claims"
@@ -47,7 +44,6 @@ Feature: Consultar el detalle administrativo de un reclamo
             Then el sistema responde con estado 200
             And el detalle informa las evidencias como una colección vacía, no nula
 
-        @wip
         Scenario: 68.10-GC No incluir evidencias de otro reclamo aunque pertenezcan a la misma operación
             Given que "ana@example.com" tiene el reclamo "C1" y "juan@example.com" tiene el reclamo "C2" sobre la misma operación
             And la imagen privada confirmada "IMG1" está vinculada a "C1" y no a "C2"
@@ -58,7 +54,6 @@ Feature: Consultar el detalle administrativo de un reclamo
 
     Rule: La lectura administrativa se audita antes de resolver las evidencias
 
-        @wip
         Scenario: 68.11-GC Auditar el acceso antes de entregar detalle y URLs temporales
             Given que "ana@example.com" tiene el reclamo "C1" con la imagen privada confirmada "IMG1" vinculada
             And no existe un evento de auditoría para la correlación "claim-detail-1"
@@ -68,7 +63,6 @@ Feature: Consultar el detalle administrativo de un reclamo
             And antes de generar cualquier URL temporal queda persistido exactamente un evento de acceso al reclamo "C1" por "operador@example.com" y la correlación "claim-detail-1" con resultado "prepared"
             And el expediente y sus actuaciones permanecen sin cambios
 
-        @wip
         Scenario: 68.12-GC No entregar detalle ni URLs cuando falla la auditoría de acceso
             Given que "ana@example.com" tiene el reclamo "C1" con la imagen privada confirmada "IMG1" vinculada
             And falla el registro de auditoría de acceso al reclamo "C1"
@@ -80,7 +74,6 @@ Feature: Consultar el detalle administrativo de un reclamo
 
     Rule: El permiso específico y la identidad del expediente limitan el detalle
 
-        @wip
         Scenario: 68.13-GC Rechazar el detalle sin permiso de lectura de reclamos
             Given que "ana@example.com" tiene el reclamo "C1" con la imagen privada confirmada "IMG1" vinculada
             And estoy autenticado como administrador "operador@example.com" solamente con el permiso "read:admin_audit"

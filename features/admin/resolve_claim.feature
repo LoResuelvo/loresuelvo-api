@@ -12,7 +12,6 @@ Feature: Registrar un dictamen administrativo para un reclamo
 
     Rule: El dictamen finaliza el expediente según su tipo
 
-        @wip
         Scenario Outline: 68.19-DC Registrar cada tipo de dictamen con su estado final
             Given que la fecha y hora actual del sistema es "2026-09-24T08:00:00-03:00"
             And que "ana@example.com" tiene el reclamo "C1" en estado "in_review"
@@ -34,7 +33,6 @@ Feature: Registrar un dictamen administrativo para un reclamo
                 | agreement       | Ambas partes aceptaron el acuerdo registrado   | resolved  |
                 | without_merit   | La evidencia no acredita mérito suficiente     | dismissed |
 
-        @wip
         Scenario: 68.20-DC Registrar una compensación sugerida en ARS sin ejecutarla
             Given que "ana@example.com" tiene el reclamo "C1" en estado "in_review" sobre la solicitud de trabajo "S1"
             And estoy autenticado como administrador "operador@example.com" con el permiso "write:admin_claims"
@@ -45,7 +43,6 @@ Feature: Registrar un dictamen administrativo para un reclamo
 
     Rule: La fundamentación y la compensación deben ser válidas
 
-        @wip
         Scenario Outline: 68.21-DC Rechazar una fundamentación vacía, excesiva o con texto inválido
             Given que "ana@example.com" tiene el reclamo "C1" en estado "in_review"
             And estoy autenticado como administrador "operador@example.com" con el permiso "write:admin_claims"
@@ -59,7 +56,6 @@ Feature: Registrar un dictamen administrativo para un reclamo
                 | una fundamentación de 5001 caracteres Unicode "ñ" |
                 | sin el campo de fundamentación                     |
 
-        @wip
         Scenario Outline: 68.22-DC Rechazar una compensación con importe ausente, no positivo, fraccionario o fuera de rango
             Given que "ana@example.com" tiene el reclamo "C1" en estado "in_review"
             And estoy autenticado como administrador "operador@example.com" con el permiso "write:admin_claims"
@@ -75,7 +71,6 @@ Feature: Registrar un dictamen administrativo para un reclamo
                 | sin importe                           |
                 | superior al máximo entero de 64 bits  |
 
-        @wip
         Scenario Outline: 68.23-DC Rechazar una solicitud de dictamen con tipo o clave inválidos
             Given que "ana@example.com" tiene el reclamo "C1" en estado "in_review"
             And estoy autenticado como administrador "operador@example.com" con el permiso "write:admin_claims"
@@ -92,7 +87,6 @@ Feature: Registrar un dictamen administrativo para un reclamo
 
     Rule: El dictamen sólo puede registrarse una vez y desde revisión
 
-        @wip
         Scenario Outline: 68.24-DC Rechazar dictaminar un expediente fuera de revisión
             Given que "ana@example.com" tiene el reclamo "C1" en estado "<estado>"
             And estoy autenticado como administrador "operador@example.com" con el permiso "write:admin_claims"
@@ -106,7 +100,6 @@ Feature: Registrar un dictamen administrativo para un reclamo
                 | resolved  |
                 | dismissed |
 
-        @wip
         Scenario: 68.25-DC Recuperar el dictamen original al reintentar incluso después de finalizar
             Given que la fecha y hora actual del sistema es "2026-09-24T08:00:00-03:00"
             And que "ana@example.com" tiene el reclamo "C1" en estado "in_review" sobre la solicitud de trabajo "S1"
@@ -121,7 +114,6 @@ Feature: Registrar un dictamen administrativo para un reclamo
             And el reclamo conserva la referencia original a la solicitud de trabajo "S1"
             And no se duplican el dictamen, la actuación ni su auditoría
 
-        @wip
         Scenario Outline: 68.26-DC Rechazar la reutilización de una clave para otra actuación o contenido
             Given que la fecha y hora actual del sistema es "2026-09-24T08:00:00-03:00"
             And que "ana@example.com" tiene el reclamo "C1" en estado "<estado_c1>" sobre "S1"
@@ -142,7 +134,6 @@ Feature: Registrar un dictamen administrativo para un reclamo
 
     Rule: La escritura requiere el permiso administrativo específico
 
-        @wip
         Scenario: 68.27-DC Rechazar el dictamen sin permiso de escritura de reclamos
             Given que "ana@example.com" tiene el reclamo "C1" en estado "in_review"
             And estoy autenticado como administrador "operador@example.com" solamente con el permiso "read:admin_claims"
