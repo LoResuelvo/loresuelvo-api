@@ -47,10 +47,17 @@ func (unit *WorkOrderUnitOfWork) Execute(
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("committing work order unit of work: %w", err)
 	}
+	for _, saved := range store.reviews {
+		saved.review.SetID(saved.orderID)
+	}
 	return nil
 }
 
 type workOrderTransactionalStore struct {
+	reviews []struct {
+		review  *workorder.Review
+		orderID int
+	}
 	unit *WorkOrderUnitOfWork
 	tx   *sql.Tx
 }
@@ -59,6 +66,12 @@ func (store *workOrderTransactionalStore) SaveWorkOrder(ctx context.Context, ord
 	saved, err := store.unit.workOrderRepository.saveWithTx(ctx, store.tx, order)
 	if err != nil {
 		return err
+	}
+	if saved.Review() != nil && saved.Review().ID() == 0 {
+		store.reviews = append(store.reviews, struct {
+			review  *workorder.Review
+			orderID int
+		}{saved.Review(), saved.ID()})
 	}
 	*order = *saved
 	return nil

@@ -21,6 +21,7 @@ type reputationResponse struct {
 	CalculatedAt       time.Time                        `json:"calculated_at"`
 	AverageRating      *float64                         `json:"average_rating"`
 	ReviewCount        int64                            `json:"review_count"`
+	VisibleReviewCount int64                            `json:"visible_review_count"`
 	RatingDistribution [5]reputationRatingCountResponse `json:"rating_distribution"`
 	EligiblePaidOrders int64                            `json:"eligible_paid_orders"`
 	ReviewedPaidOrders int64                            `json:"reviewed_paid_orders"`
@@ -34,6 +35,7 @@ func reputationResponseFromDomain(result *readmodel.Reputation) reputationRespon
 		CalculatedAt:       result.CalculatedAt.UTC(),
 		AverageRating:      result.AverageRating,
 		ReviewCount:        result.ReviewedPaidOrders,
+		VisibleReviewCount: result.VisibleReviews,
 		EligiblePaidOrders: result.EligiblePaidOrders,
 		ReviewedPaidOrders: result.ReviewedPaidOrders,
 		CoveragePercentage: result.CoveragePercentage,

@@ -43,6 +43,7 @@ import (
 )
 
 type testSuite struct {
+	reviewModeration               reviewModerationState
 	claims                         claimState
 	adminClaims                    adminClaimState
 	adminClaimCapture              *adminClaimCapture
@@ -221,6 +222,7 @@ func (s *testSuite) registerAllSteps(sc *godog.ScenarioContext) {
 	registerCompleteServicePaymentSteps(sc, s)
 	registerReviewPaidWorkOrderSteps(sc, s)
 	registerReportReviewSteps(sc, s)
+	registerReviewModerationSteps(sc, s)
 	registerConnectMercadoPagoAccountSteps(sc, s)
 	registerConnectGoogleCalendarSteps(sc, s)
 	registerAddWorkOrderToCalendarSteps(sc, s)
@@ -598,6 +600,7 @@ func ScenarioInitializer(sc *godog.ScenarioContext, t *testing.T, database *sql.
 		return ctx, nil
 	})
 	sc.Before(func(ctx context.Context, _ *godog.Scenario) (context.Context, error) {
+		testSuite.reviewModeration = reviewModerationState{}
 		testSuite.categoryAuditCapture.reset()
 		testSuite.operationDetailAuditCapture.reset()
 		testSuite.operationChatMediaCapture.reset()

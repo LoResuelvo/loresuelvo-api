@@ -47,7 +47,7 @@ func TestReportReviewService(t *testing.T) {
 			actors := new(reviewReportActorFinderMock)
 			actors.On("FindByAuthID", mock.Anything, "auth").Return(actorID, "provider", nil).Once()
 			orders := new(readerMock)
-			reports := new(reviewReportRepositoryMock)
+			reports := new(reviewStoreMock)
 			clock := new(clockMock)
 			orderErr := error(nil)
 			expectedErr := error(nil)
@@ -64,37 +64,47 @@ func TestReportReviewService(t *testing.T) {
 			}
 			orders.On("FindByID", mock.Anything, order.ID()).Return(foundOrder, orderErr).Once()
 			if scenario != "wrong provider" && scenario != "order database failure" && scenario != "missing order" {
-				lookupErr := workorder.ErrReviewReportNotFound
-				var prior *workorder.ReviewReport
-				if scenario == "existing handled report" {
-					var err error
-					prior, err = workorder.RestoreReviewReport(9, order.ID(), actorID, "personal_data", "", "dismissed", time.Now())
-					require.NoError(t, err)
-					lookupErr = nil
-					expectedErr = workorder.ErrReviewReportAlreadyExists
-				}
-				if scenario == "report lookup failure" {
-					lookupErr = errors.New("report db")
-					expectedErr = lookupErr
-				}
-				reports.On("FindByWorkOrderID", mock.Anything, order.ID()).Return(prior, lookupErr).Once()
-				if scenario != "existing handled report" && scenario != "report lookup failure" {
-					clock.On("Now").Return(time.Date(2026, 8, 17, 15, 0, 0, 0, time.UTC)).Once()
-					if scenario == "missing review" {
-						expectedErr = workorder.ErrReviewNotAvailable
-					} else {
-						saveErr := error(nil)
-						if scenario == "save failure" {
-							saveErr = errors.New("save db")
-							expectedErr = saveErr
+				if scenario == "missing review" {
+					reports.On("FindReview", mock.Anything, order.ID()).Return(nil, workorder.ErrReviewNotAvailable).Once()
+					expectedErr = workorder.ErrReviewNotAvailable
+				} else {
+					reports.On("FindReview", mock.Anything, order.ID()).Return(order.Review(), nil).Once()
+					lookupErr := workorder.ErrReviewReportNotFound
+					var prior *workorder.ReviewReport
+					if scenario == "existing handled report" {
+						var err error
+						prior, err = workorder.RestoreReviewReport(9, order.ID(), actorID, "personal_data", "", "dismissed", time.Now())
+						require.NoError(t, err)
+						lookupErr = nil
+						expectedErr = workorder.ErrReviewReportAlreadyExists
+					}
+					if scenario == "report lookup failure" {
+						lookupErr = errors.New("report db")
+						expectedErr = lookupErr
+					}
+					reports.On("FindReport", mock.Anything, order.ID()).Return(prior, lookupErr).Once()
+					if scenario != "existing handled report" && scenario != "report lookup failure" {
+						clock.On("Now").Return(time.Date(2026, 8, 17, 15, 0, 0, 0, time.UTC)).Once()
+						if scenario == "missing review" {
+							expectedErr = workorder.ErrReviewNotAvailable
+						} else {
+							saveErr := error(nil)
+							if scenario == "save failure" {
+								saveErr = errors.New("save db")
+								expectedErr = saveErr
+							}
+							reports.On("SaveReport", mock.Anything, mock.MatchedBy(func(r *workorder.ReviewReport) bool {
+								return r.ReporterID() == actorID && r.WorkOrderID() == order.ID() && r.Explanation() == "private text" && r.Status() == "pending"
+							})).Return(saveErr).Once()
 						}
-						reports.On("Save", mock.Anything, mock.MatchedBy(func(r *workorder.ReviewReport) bool {
-							return r.ReporterID() == actorID && r.WorkOrderID() == order.ID() && r.Explanation() == "private text" && r.Status() == "pending"
-						})).Return(saveErr).Once()
 					}
 				}
 			}
-			service := workorder.NewReportReviewService(actors, orders, reports, clock)
+			unit := &reviewUnitOfWorkMock{store: reports}
+			if scenario != "wrong provider" && scenario != "order database failure" && scenario != "missing order" {
+				unit.On("Execute", mock.Anything, mock.Anything).Return(nil).Once()
+			}
+			service := workorder.NewReportReviewService(actors, orders, unit, clock)
 			result, err := service.Report(t.Context(), "auth", order.ID(), "personal_data", "  private text  ")
 			if expectedErr != nil {
 				require.ErrorIs(t, err, expectedErr)
@@ -106,6 +116,7 @@ func TestReportReviewService(t *testing.T) {
 			actors.AssertExpectations(t)
 			orders.AssertExpectations(t)
 			reports.AssertExpectations(t)
+			unit.AssertExpectations(t)
 			clock.AssertExpectations(t)
 		})
 	}
@@ -118,16 +129,20 @@ func TestReportReviewRejectsInvalidExplanationWithoutPersistence(t *testing.T) {
 	actors.On("FindByAuthID", mock.Anything, "auth").Return(order.ServiceProposal().ProviderID(), "provider", nil).Once()
 	orders := new(readerMock)
 	orders.On("FindByID", mock.Anything, order.ID()).Return(order, nil).Once()
-	reports := new(reviewReportRepositoryMock)
-	reports.On("FindByWorkOrderID", mock.Anything, order.ID()).Return(nil, workorder.ErrReviewReportNotFound).Once()
+	reports := new(reviewStoreMock)
+	reports.On("FindReview", mock.Anything, order.ID()).Return(order.Review(), nil).Once()
+	reports.On("FindReport", mock.Anything, order.ID()).Return(nil, workorder.ErrReviewReportNotFound).Once()
 	clock := new(clockMock)
 	clock.On("Now").Return(time.Now()).Once()
-	service := workorder.NewReportReviewService(actors, orders, reports, clock)
+	unit := &reviewUnitOfWorkMock{store: reports}
+	unit.On("Execute", mock.Anything, mock.Anything).Return(nil).Once()
+	service := workorder.NewReportReviewService(actors, orders, unit, clock)
 	_, err := service.Report(t.Context(), "auth", order.ID(), "personal_data", "bad\x00text")
 	require.ErrorIs(t, err, workorder.ErrInvalidReviewReport)
-	reports.AssertNotCalled(t, "Save", mock.Anything, mock.Anything)
+	reports.AssertNotCalled(t, "SaveReport", mock.Anything, mock.Anything)
 	actors.AssertExpectations(t)
 	orders.AssertExpectations(t)
 	reports.AssertExpectations(t)
+	unit.AssertExpectations(t)
 	clock.AssertExpectations(t)
 }

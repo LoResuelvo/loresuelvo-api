@@ -22,11 +22,22 @@ func newUserRepositoryTest(t *testing.T) (*repositories.UserRepository, *sql.DB)
 	require.NoError(t, err, "could not connect to test database")
 
 	t.Cleanup(func() {
-		_, _ = database.Exec("DELETE FROM users")
-		database.Close()
+		cleanUserRepositoryTestDatabase(t, database)
+		require.NoError(t, database.Close())
 	})
+	cleanUserRepositoryTestDatabase(t, database)
 
 	return repositories.NewUserRepository(database), database
+}
+
+func cleanUserRepositoryTestDatabase(t *testing.T, database *sql.DB) {
+	t.Helper()
+
+	_, err := database.Exec("DELETE FROM work_orders")
+	require.NoError(t, err, "could not clean work orders")
+
+	_, err = database.Exec("DELETE FROM users")
+	require.NoError(t, err, "could not clean users")
 }
 
 func validUser(t *testing.T, database *sql.DB) *consumer.Consumer {

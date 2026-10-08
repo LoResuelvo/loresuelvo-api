@@ -25,6 +25,8 @@ type CompletionReportRestoreInput struct {
 }
 
 type ReviewRestoreInput struct {
+	Version          int
+	HidingDecisionID int
 	// Visible is optional for callers restoring legacy, always-visible reviews.
 	Visible     *bool
 	Rating      int
@@ -47,6 +49,9 @@ func (RestoreFactory) Restore(input RestoreInput) (*WorkOrder, error) {
 		return nil, err
 	}
 	review, err := restoreReview(input.Review)
+	if review != nil {
+		review.SetID(input.ID)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -83,6 +88,10 @@ func restoreReview(input *ReviewRestoreInput) (*Review, error) {
 	if err != nil {
 		return nil, fmt.Errorf("restoring review: %w", err)
 	}
+	if input.Version > 0 {
+		review.version = input.Version
+	}
+	review.hidingDecisionID = input.HidingDecisionID
 	if input.Visible != nil {
 		review.visible = *input.Visible
 	}

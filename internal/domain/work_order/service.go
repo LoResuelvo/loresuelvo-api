@@ -174,9 +174,13 @@ func reviewToReadModel(review *Review) *readmodel.Review {
 	if review == nil {
 		return nil
 	}
+	description := review.Description()
+	if !review.Visible() {
+		description = ""
+	}
 	return &readmodel.Review{
 		Rating:      review.Rating(),
-		Description: review.Description(),
+		Description: description,
 	}
 }
 

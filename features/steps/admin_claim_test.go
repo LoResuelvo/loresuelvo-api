@@ -328,7 +328,7 @@ func (s *testSuite) adminClaimWrite(label, action, key, correlation string, payl
 	s.adminClaims.expectedPayload = payload
 	s.adminRequest.sentHeaders = http.Header{}
 	s.adminRequest.sentHeaders.Set("X-Request-ID", correlation)
-	return s.claimSend(http.MethodPost, adminClaimsPath+"/"+strconv.Itoa(s.claims.claims[label].claim.ID)+"/"+action, key, payload)
+	return s.sendAuthenticatedJSON(http.MethodPost, adminClaimsPath+"/"+strconv.Itoa(s.claims.claims[label].claim.ID)+"/"+action, key, payload)
 }
 func (s *testSuite) adminClaimHistoricalReview(email, label, key, instant string) error {
 	now, err := time.Parse(time.RFC3339, instant)

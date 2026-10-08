@@ -73,12 +73,12 @@ func TestProviderReputationRouteMapsOnlyRequiredPrivateFields(t *testing.T) {
 	service := &reputationServiceMock{}
 	instant := time.Date(2026, 10, 3, 9, 0, 0, 0, time.FixedZone("local", -3*60*60))
 	service.On("Query", mock.Anything, "auth0|provider", provider.ReputationQueryInput{Limit: 20}).Return(&readmodel.Reputation{
-		CalculatedAt: instant, AverageRating: &average, CoveragePercentage: &coverage, EligiblePaidOrders: 4, ReviewedPaidOrders: 3, RatingDistribution: [5]int64{0, 1, 0, 1, 1}, Reviews: []readmodel.ReputationReview{{WorkOrderID: 12, Rating: 5, Description: ""}},
+		CalculatedAt: instant, AverageRating: &average, CoveragePercentage: &coverage, EligiblePaidOrders: 4, ReviewedPaidOrders: 3, VisibleReviews: 3, RatingDistribution: [5]int64{0, 1, 0, 1, 1}, Reviews: []readmodel.ReputationReview{{WorkOrderID: 12, Rating: 5, Description: ""}},
 	}, 7, nil).Once()
 	response := collectionRequest(reputationRoute(t, service), reputationPath, auth0.NewTokenBuilder().BuildToken("auth0|provider", nil))
 	require.Equal(t, http.StatusOK, response.Code)
 	require.Equal(t, "private, no-store", response.Header().Get("Cache-Control"))
-	require.JSONEq(t, `{"calculated_at":"2026-10-03T12:00:00Z","average_rating":3.67,"review_count":3,"rating_distribution":[{"rating":1,"count":0},{"rating":2,"count":1},{"rating":3,"count":0},{"rating":4,"count":1},{"rating":5,"count":1}],"eligible_paid_orders":4,"reviewed_paid_orders":3,"coverage_percentage":75,"reviews":[{"work_order_id":12,"rating":5,"description":""}],"next_cursor":null}`, response.Body.String())
+	require.JSONEq(t, `{"calculated_at":"2026-10-03T12:00:00Z","average_rating":3.67,"review_count":3,"visible_review_count":3,"rating_distribution":[{"rating":1,"count":0},{"rating":2,"count":1},{"rating":3,"count":0},{"rating":4,"count":1},{"rating":5,"count":1}],"eligible_paid_orders":4,"reviewed_paid_orders":3,"coverage_percentage":75,"reviews":[{"work_order_id":12,"rating":5,"description":""}],"next_cursor":null}`, response.Body.String())
 	service.AssertExpectations(t)
 }
 

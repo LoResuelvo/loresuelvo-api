@@ -35,6 +35,8 @@ type workOrderRecord struct {
 	ReviewRating                 sql.NullInt64
 	ReviewDescription            sql.NullString
 	ReviewVisible                *bool
+	ReviewVersion                int
+	ReviewHidingDecisionID       int
 }
 
 func (record workOrderRecord) Restore(proposal workorder.ServiceProposal) (*workorder.WorkOrder, error) {
@@ -86,9 +88,11 @@ func (record workOrderRecord) review() *workorder.ReviewRestoreInput {
 	}
 
 	return &workorder.ReviewRestoreInput{
-		Rating:      int(record.ReviewRating.Int64),
-		Description: record.ReviewDescription.String,
-		Visible:     record.ReviewVisible,
+		Rating:           int(record.ReviewRating.Int64),
+		Description:      record.ReviewDescription.String,
+		Visible:          record.ReviewVisible,
+		Version:          record.ReviewVersion,
+		HidingDecisionID: record.ReviewHidingDecisionID,
 	}
 }
 
@@ -117,6 +121,9 @@ func (r *WorkOrderRepository) Save(ctx context.Context, order *workorder.WorkOrd
 	}
 	if err := tx.Commit(); err != nil {
 		return nil, fmt.Errorf("committing work order transaction: %w", err)
+	}
+	if savedOrder.Review() != nil {
+		savedOrder.Review().SetID(savedOrder.ID())
 	}
 	return savedOrder, nil
 }
@@ -195,6 +202,8 @@ func (record *workOrderRecord) setReview(review *workorder.ReviewRestoreInput) {
 	record.ReviewRating = sql.NullInt64{Int64: int64(review.Rating), Valid: true}
 	record.ReviewDescription = sql.NullString{String: review.Description, Valid: true}
 	record.ReviewVisible = review.Visible
+	record.ReviewVersion = review.Version
+	record.ReviewHidingDecisionID = review.HidingDecisionID
 }
 
 func (r *WorkOrderRepository) findCompletionReport(ctx context.Context, workOrderID int) (*workorder.CompletionReportRestoreInput, error) {
@@ -252,13 +261,15 @@ func (r *WorkOrderRepository) findReview(ctx context.Context, workOrderID int) (
 	var rating sql.NullInt64
 	var description sql.NullString
 	var visible bool
+	var version int
+	var hidingDecisionID sql.NullInt64
 	err := r.db.QueryRowContext(
 		ctx,
-		`SELECT rating, description, visible
+		`SELECT rating, description, visible, moderation_version, hiding_decision_id
 		FROM work_order_reviews
 		WHERE work_order_id = $1`,
 		workOrderID,
-	).Scan(&rating, &description, &visible)
+	).Scan(&rating, &description, &visible, &version, &hidingDecisionID)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
@@ -267,9 +278,11 @@ func (r *WorkOrderRepository) findReview(ctx context.Context, workOrderID int) (
 	}
 
 	return &workorder.ReviewRestoreInput{
-		Rating:      int(rating.Int64),
-		Description: description.String,
-		Visible:     &visible,
+		Rating:           int(rating.Int64),
+		Description:      description.String,
+		Visible:          &visible,
+		Version:          version,
+		HidingDecisionID: int(hidingDecisionID.Int64),
 	}, nil
 }
 
@@ -389,7 +402,7 @@ func (r *WorkOrderRepository) FindPaidWorkHistoryByProviderIDs(ctx context.Conte
 		LEFT JOIN work_order_completion_reports completion_report
 			ON completion_report.work_order_id = wo.id
 		LEFT JOIN work_order_reviews review
-			ON review.work_order_id = wo.id
+			ON review.work_order_id = wo.id AND review.visible
 		WHERE sp.provider_id = ANY($1) AND wo.status = $2
 		ORDER BY sp.provider_id, sp.scheduled_on DESC, wo.id DESC`,
 		providerIDs,
@@ -875,32 +888,19 @@ func (r *WorkOrderRepository) saveReviewWithTx(
 	}
 
 	review := order.Review()
-	if review == nil {
-		if _, err := tx.ExecContext(
-			ctx,
-			`DELETE FROM work_order_reviews WHERE work_order_id = $1`,
-			order.ID(),
-		); err != nil {
-			return fmt.Errorf("removing work order review: %w", err)
-		}
+	if review == nil || review.ID() > 0 {
 		return nil
 	}
-
-	if _, err := tx.ExecContext(
-		ctx,
-		`INSERT INTO work_order_reviews (work_order_id, rating, description, visible)
-		VALUES ($1, $2, $3, $4)
-		ON CONFLICT (work_order_id) DO UPDATE SET
-			rating = EXCLUDED.rating,
-			description = EXCLUDED.description,
-			visible = EXCLUDED.visible`,
-		order.ID(),
-		review.Rating(),
-		review.Description(),
-		review.Visible(),
-	); err != nil {
+	if _, err := tx.ExecContext(ctx,
+		`INSERT INTO work_order_reviews(work_order_id,rating,description) VALUES($1,$2,$3)`,
+		order.ID(), review.Rating(), review.Description()); err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == uniqueViolationCode && pgErr.ConstraintName == "work_order_reviews_pkey" {
+			return workorder.ErrReviewAlreadyExists
+		}
 		return fmt.Errorf("saving work order review: %w", err)
 	}
+
 	return nil
 }
 

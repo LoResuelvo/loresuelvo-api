@@ -23,6 +23,12 @@ type providerSummaryResponse struct {
 }
 
 func registerFilterProvidersByCategorySteps(sc *godog.ScenarioContext, suite *testSuite) {
+	sc.Step(`^existe un prestador registrado con correo "([^"]*)"$`, func(email string) error {
+		if err := suite.thereIsCategoryNamed("Plomería"); err != nil {
+			return err
+		}
+		return suite.thereIsRegisteredProviderWithEmailNameSurnameAndCategory(email, "Juan", "Gómez", "Plomería")
+	})
 	sc.Step(`^existe un prestador registrado con correo "([^"]*)", nombre "([^"]*)", apellido "([^"]*)" y rubro "([^"]*)"$`, suite.thereIsRegisteredProviderWithEmailNameSurnameAndCategory)
 	sc.Step(`^filtro técnicos por el rubro "([^"]*)"$`, suite.filterProvidersByCategory)
 	sc.Step(`^intento filtrar técnicos sin indicar rubro$`, suite.tryFilterProvidersWithoutCategory)

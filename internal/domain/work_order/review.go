@@ -14,9 +14,12 @@ const (
 // Review is the consumer's immutable assessment of a paid work order.
 // Ownership, identity, and persistence belong to the work order aggregate.
 type Review struct {
-	rating      int
-	description string
-	visible     bool
+	workOrderID      int
+	rating           int
+	description      string
+	visible          bool
+	version          int
+	hidingDecisionID int
 }
 
 func NewReview(rating int, description string) (*Review, error) {
@@ -33,6 +36,7 @@ func NewReview(rating int, description string) (*Review, error) {
 		rating:      rating,
 		description: description,
 		visible:     true,
+		version:     1,
 	}, nil
 }
 
@@ -51,3 +55,6 @@ func (review *Review) Description() string {
 }
 
 func (review *Review) Visible() bool { return review != nil && review.visible }
+
+func (r *Review) ID() int      { return r.workOrderID }
+func (r *Review) SetID(id int) { r.workOrderID = id }

@@ -6,6 +6,7 @@ import (
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/admin_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/admin_payment_handler"
+	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/admin_review_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/audit_log_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/calendar_connection_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/category_handler"
@@ -50,13 +51,16 @@ const createCategoriesPermission = "create:categories"
 type Environment string
 
 const (
-	DevelopmentEnvironment Environment = "development"
-	TestEnvironment        Environment = "test"
-	StagingEnvironment     Environment = "staging"
-	ProductionEnvironment  Environment = "production"
+	readAdminReviewsPermission              = "read:admin_reviews"
+	writeAdminReviewsPermission             = "write:admin_reviews"
+	DevelopmentEnvironment      Environment = "development"
+	TestEnvironment             Environment = "test"
+	StagingEnvironment          Environment = "staging"
+	ProductionEnvironment       Environment = "production"
 )
 
 type RouterConfig struct {
+	AdminReviewHandler          *admin_review_handler.Handler
 	AdminClaimHandler           *claim_handler.AdminHandler
 	ClaimHandler                *claim_handler.Handler
 	InstallationHandler         *installation_handler.Handler
@@ -98,6 +102,7 @@ type RouterConfig struct {
 }
 
 type Router struct {
+	adminReviewHandler          *admin_review_handler.Handler
 	adminClaimHandler           *claim_handler.AdminHandler
 	claimHandler                *claim_handler.Handler
 	installationHandler         *installation_handler.Handler
@@ -145,6 +150,7 @@ func NewRouter(config RouterConfig) *Router {
 	}
 
 	router := &Router{
+		adminReviewHandler:          config.AdminReviewHandler,
 		claimHandler:                config.ClaimHandler,
 		adminClaimHandler:           config.AdminClaimHandler,
 		installationHandler:         config.InstallationHandler,
@@ -219,6 +225,7 @@ func (router *Router) SetUp() (*gin.Engine, error) {
 	router.registerPaymentRoutes(engine, authMiddleware)
 	router.registerIdentityVerificationRoutes(engine)
 	router.registerWorkOrderRoutes(engine, authMiddleware)
+	router.registerAdminReviewRoutes(engine, authMiddleware)
 	router.registerAuthenticatedRoutes(engine, authMiddleware)
 	router.registerFileRoutes(engine, authMiddleware)
 	router.registerClaimRoutes(engine, authMiddleware)
@@ -420,4 +427,13 @@ func (router *Router) registerClaimRoutes(engine *gin.Engine, authMiddleware gin
 	engine.POST("/claims", privateNoStore, authMiddleware, router.claimHandler.Submit)
 	engine.GET("/claims", privateNoStore, authMiddleware, router.claimHandler.List)
 	engine.GET("/claims/:id", privateNoStore, authMiddleware, router.claimHandler.Get)
+}
+
+func (router *Router) registerAdminReviewRoutes(engine *gin.Engine, auth gin.HandlerFunc) {
+	if router.adminReviewHandler == nil {
+		return
+	}
+	engine.GET("/admin/reviews", privateNoStore, auth, middleware.RequirePermissionLayer(readAdminReviewsPermission), router.adminReviewHandler.List)
+	engine.GET("/admin/reviews/:id", privateNoStore, auth, middleware.RequirePermissionLayer(readAdminReviewsPermission), router.adminReviewHandler.Get)
+	engine.POST("/admin/reviews/:id/moderate", privateNoStore, auth, middleware.RequirePermissionLayer(writeAdminReviewsPermission), router.adminReviewHandler.Moderate)
 }

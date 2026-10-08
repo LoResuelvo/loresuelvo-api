@@ -15,9 +15,7 @@ type ReviewReport struct {
 
 func NewReviewReport(orderID, reporterID int, category, explanation string, createdOn time.Time) (*ReviewReport, error) {
 	explanation = strings.TrimSpace(explanation)
-	switch category {
-	case "abusive_language", "personal_data", "spam_advertising", "unrelated_content":
-	default:
+	if !validReviewReportCategory(category) {
 		return nil, ErrInvalidReviewReport
 	}
 	if orderID <= 0 || reporterID <= 0 || createdOn.IsZero() || !utf8.ValidString(explanation) || strings.ContainsRune(explanation, 0) || utf8.RuneCountInString(explanation) > 500 {
@@ -54,3 +52,33 @@ func (r *ReviewReport) Category() string     { return r.category }
 func (r *ReviewReport) Explanation() string  { return r.explanation }
 func (r *ReviewReport) Status() string       { return r.status }
 func (r *ReviewReport) CreatedOn() time.Time { return r.createdOn }
+
+func validReviewReportCategory(category string) bool {
+	switch category {
+	case "abusive_language", "personal_data", "spam_advertising", "unrelated_content":
+		return true
+	default:
+		return false
+	}
+}
+
+func (report *ReviewReport) ValidatePendingForReview(orderID, reportID int) error {
+	if report == nil || report.id != reportID || report.workOrderID != orderID || report.status != "pending" {
+		return ErrInvalidReviewModeration
+	}
+	return nil
+}
+func (report *ReviewReport) Uphold(orderID, reportID int) error {
+	if err := report.ValidatePendingForReview(orderID, reportID); err != nil {
+		return err
+	}
+	report.status = "upheld"
+	return nil
+}
+func (report *ReviewReport) Dismiss(orderID, reportID int) error {
+	if err := report.ValidatePendingForReview(orderID, reportID); err != nil {
+		return err
+	}
+	report.status = "dismissed"
+	return nil
+}

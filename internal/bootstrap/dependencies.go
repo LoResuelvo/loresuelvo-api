@@ -14,6 +14,7 @@ import (
 	httpadapter "github.com/LoResuelvo/loresuelvo-api/internal/adapters/http"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/admin_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/admin_payment_handler"
+	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/admin_review_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/audit_log_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/calendar_connection_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/category_handler"
@@ -358,7 +359,8 @@ func newDependencies(database *sql.DB, adapters dependencyAdapters) (*Dependenci
 		adapters.paymentAccountOAuthConnector.Provider(),
 		serviceproposal.NewBookingPolicy(),
 		systemClock)
-	reportReviewService := workorder.NewReportReviewService(persistence.ProviderActivityActorFinder, persistence.WorkOrderRepository, persistence.ReviewReportRepository, systemClock)
+	adminReviewService := workorder.NewAdminReviewService(persistence.AdminReviewReader, persistence.UserRepository, persistence.ReviewUnitOfWork, persistence.AuditEventRepository, systemClock)
+	reportReviewService := workorder.NewReportReviewService(persistence.ProviderActivityActorFinder, persistence.WorkOrderRepository, persistence.ReviewUnitOfWork, systemClock)
 	workOrderService := workorder.NewService(
 		persistence.WorkOrderRepository,
 		persistence.UserRepository,
@@ -508,6 +510,7 @@ func newDependencies(database *sql.DB, adapters dependencyAdapters) (*Dependenci
 			ServiceProposalHandler:      service_proposal_handler.NewServiceProposalHandler(servicePorposalService),
 			WorkOrderHandler:            work_order_handler.NewWorkOrderHandler(workOrderService),
 			ReviewReportHandler:         work_order_handler.NewReviewReportHandler(reportReviewService),
+			AdminReviewHandler:          admin_review_handler.New(adminReviewService),
 			TestHandler:                 test_handler.NewTestHandler(systemClock),
 			RealtimeHandler:             realtimeHandler,
 		},

@@ -175,3 +175,17 @@ func insertDetailImageFile(t *testing.T, fixture operationInboxFixture, id, stat
 		VALUES ($1, $2, 'private', 'evidence.jpg', 'image/jpeg', 100, $3, 'private', $4, 'auth0|test', $5, $5)`, id, "files/"+id, status, purpose, now)
 	require.NoError(t, err)
 }
+
+func TestOperationDetailReaderSuppressesHiddenOriginalAndKeepsRating(t *testing.T) {
+	fixture := newOperationInboxFixture(t)
+	now := time.Date(2026, 9, 27, 12, 0, 0, 0, time.UTC)
+	consumerID, providerID := savedJobRequestParticipants(t, fixture.testContext)
+	request := fixture.jobRequest(t, consumerID, providerID, now, jobrequest.StatusAccepted)
+	proposal := fixture.proposal(t, request, now.Add(time.Hour), serviceproposal.StatusAccepted)
+	orderID := fixture.workOrder(t, proposal, now.Add(2*time.Hour), "paid")
+	_, err := fixture.testContext.database.ExecContext(t.Context(), `INSERT INTO work_order_reviews (work_order_id, rating, description, visible) VALUES ($1, 5, 'Restricted original', FALSE)`, orderID)
+	require.NoError(t, err)
+	detail, err := repositories.NewOperationDetailReader(fixture.testContext.database).FindByID(t.Context(), readmodel.ID{Kind: readmodel.KindJobRequest, ResourceID: request.ID})
+	require.NoError(t, err)
+	require.Equal(t, &readmodel.WorkOrderReview{Rating: 5, Description: ""}, detail.WorkOrder.Review)
+}

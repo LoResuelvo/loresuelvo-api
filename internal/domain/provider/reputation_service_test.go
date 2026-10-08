@@ -21,7 +21,7 @@ func TestReputationComputesGlobalWeightedRatingAndCoverage(t *testing.T) {
 	clock.On("Now").Return(now).Once()
 	actors.On("FindByAuthID", t.Context(), "actor").Return(7, provider.Role, nil).Once()
 	reader.On("Read", t.Context(), 7, provider.ReputationQuery{Limit: 1}).Return(&readmodel.ReputationSnapshot{
-		EligiblePaidOrders: 6, ReviewedPaidOrders: 4, RatingDistribution: [5]int64{1, 0, 0, 1, 2},
+		EligiblePaidOrders: 6, ReviewedPaidOrders: 4, VisibleReviews: 4, RatingDistribution: [5]int64{1, 0, 0, 1, 2},
 		Reviews: []readmodel.ReputationReview{{WorkOrderID: 9, Rating: 5, Description: ""}}, Next: &readmodel.ReputationPosition{WorkOrderID: 9},
 	}, nil).Once()
 	result, id, err := provider.NewReputationService(reader, actors, clock).Query(t.Context(), "actor", provider.ReputationQueryInput{Limit: 1})
@@ -56,7 +56,7 @@ func TestReputationRoundsHalfUpWithoutWeightedOverflow(t *testing.T) {
 			if test.distribution[4] > 0 {
 				rating = 5
 			}
-			snapshot := &readmodel.ReputationSnapshot{EligiblePaidOrders: test.eligible, ReviewedPaidOrders: test.reviewed, RatingDistribution: test.distribution, Reviews: []readmodel.ReputationReview{{WorkOrderID: 9, Rating: rating}}}
+			snapshot := &readmodel.ReputationSnapshot{EligiblePaidOrders: test.eligible, ReviewedPaidOrders: test.reviewed, VisibleReviews: test.reviewed, RatingDistribution: test.distribution, Reviews: []readmodel.ReputationReview{{WorkOrderID: 9, Rating: rating}}}
 			if test.reviewed > 1 {
 				snapshot.Next = &readmodel.ReputationPosition{WorkOrderID: 9}
 			}
@@ -140,7 +140,7 @@ func TestReputationResolvesOnlyProviderAndOwnCursor(t *testing.T) {
 
 func TestReputationRejectsInconsistentSnapshot(t *testing.T) {
 	valid := func() *readmodel.ReputationSnapshot {
-		return &readmodel.ReputationSnapshot{EligiblePaidOrders: 3, ReviewedPaidOrders: 2, RatingDistribution: [5]int64{0, 0, 0, 1, 1}, Reviews: []readmodel.ReputationReview{{WorkOrderID: 9, Rating: 5}, {WorkOrderID: 8, Rating: 4}}}
+		return &readmodel.ReputationSnapshot{EligiblePaidOrders: 3, ReviewedPaidOrders: 2, VisibleReviews: 2, RatingDistribution: [5]int64{0, 0, 0, 1, 1}, Reviews: []readmodel.ReputationReview{{WorkOrderID: 9, Rating: 5}, {WorkOrderID: 8, Rating: 4}}}
 	}
 	for name, mutate := range map[string]func(*readmodel.ReputationSnapshot){
 		"negative eligible":                func(s *readmodel.ReputationSnapshot) { s.EligiblePaidOrders = -1 },
@@ -196,7 +196,7 @@ func TestReputationPassesOwnedCursorAndContext(t *testing.T) {
 	clock.On("Now").Return(time.Now()).Once()
 	actors.On("FindByAuthID", t.Context(), "actor").Return(7, provider.Role, nil).Once()
 	after := &readmodel.ReputationPosition{WorkOrderID: 10}
-	reader.On("Read", t.Context(), 7, provider.ReputationQuery{Limit: 100, After: after}).Return(&readmodel.ReputationSnapshot{EligiblePaidOrders: 1, ReviewedPaidOrders: 1, RatingDistribution: [5]int64{1}, Reviews: []readmodel.ReputationReview{{WorkOrderID: 9, Rating: 1}}}, nil).Once()
+	reader.On("Read", t.Context(), 7, provider.ReputationQuery{Limit: 100, After: after}).Return(&readmodel.ReputationSnapshot{EligiblePaidOrders: 1, ReviewedPaidOrders: 1, VisibleReviews: 1, RatingDistribution: [5]int64{1}, Reviews: []readmodel.ReputationReview{{WorkOrderID: 9, Rating: 1}}}, nil).Once()
 	result, id, err := provider.NewReputationService(reader, actors, clock).Query(t.Context(), "actor", provider.ReputationQueryInput{Limit: 100, After: after, CursorProviderID: 7})
 	require.NoError(t, err)
 	require.Equal(t, 7, id)
@@ -213,27 +213,27 @@ func TestReputationRejectsInvalidContinuationFacts(t *testing.T) {
 	}{
 		"page exceeds limit": {
 			input:    provider.ReputationQueryInput{Limit: 1},
-			snapshot: &readmodel.ReputationSnapshot{EligiblePaidOrders: 2, ReviewedPaidOrders: 2, RatingDistribution: [5]int64{2}, Reviews: []readmodel.ReputationReview{{WorkOrderID: 9, Rating: 1}, {WorkOrderID: 8, Rating: 1}}},
+			snapshot: &readmodel.ReputationSnapshot{EligiblePaidOrders: 2, ReviewedPaidOrders: 2, VisibleReviews: 2, RatingDistribution: [5]int64{2}, Reviews: []readmodel.ReputationReview{{WorkOrderID: 9, Rating: 1}, {WorkOrderID: 8, Rating: 1}}},
 		},
 		"missing first continuation": {
 			input:    provider.ReputationQueryInput{Limit: 1},
-			snapshot: &readmodel.ReputationSnapshot{EligiblePaidOrders: 2, ReviewedPaidOrders: 2, RatingDistribution: [5]int64{2}, Reviews: []readmodel.ReputationReview{{WorkOrderID: 9, Rating: 1}}},
+			snapshot: &readmodel.ReputationSnapshot{EligiblePaidOrders: 2, ReviewedPaidOrders: 2, VisibleReviews: 2, RatingDistribution: [5]int64{2}, Reviews: []readmodel.ReputationReview{{WorkOrderID: 9, Rating: 1}}},
 		},
 		"next differs from last delivered": {
 			input:    provider.ReputationQueryInput{Limit: 1},
-			snapshot: &readmodel.ReputationSnapshot{EligiblePaidOrders: 2, ReviewedPaidOrders: 2, RatingDistribution: [5]int64{2}, Reviews: []readmodel.ReputationReview{{WorkOrderID: 9, Rating: 1}}, Next: &readmodel.ReputationPosition{WorkOrderID: 8}},
+			snapshot: &readmodel.ReputationSnapshot{EligiblePaidOrders: 2, ReviewedPaidOrders: 2, VisibleReviews: 2, RatingDistribution: [5]int64{2}, Reviews: []readmodel.ReputationReview{{WorkOrderID: 9, Rating: 1}}, Next: &readmodel.ReputationPosition{WorkOrderID: 8}},
 		},
 		"next on empty continuation": {
 			input:    provider.ReputationQueryInput{Limit: 1, After: &readmodel.ReputationPosition{WorkOrderID: 9}, CursorProviderID: 7},
-			snapshot: &readmodel.ReputationSnapshot{EligiblePaidOrders: 2, ReviewedPaidOrders: 2, RatingDistribution: [5]int64{2}, Next: &readmodel.ReputationPosition{WorkOrderID: 8}},
+			snapshot: &readmodel.ReputationSnapshot{EligiblePaidOrders: 2, ReviewedPaidOrders: 2, VisibleReviews: 2, RatingDistribution: [5]int64{2}, Next: &readmodel.ReputationPosition{WorkOrderID: 8}},
 		},
 		"page at cursor boundary": {
 			input:    provider.ReputationQueryInput{Limit: 1, After: &readmodel.ReputationPosition{WorkOrderID: 9}, CursorProviderID: 7},
-			snapshot: &readmodel.ReputationSnapshot{EligiblePaidOrders: 2, ReviewedPaidOrders: 2, RatingDistribution: [5]int64{2}, Reviews: []readmodel.ReputationReview{{WorkOrderID: 9, Rating: 1}}},
+			snapshot: &readmodel.ReputationSnapshot{EligiblePaidOrders: 2, ReviewedPaidOrders: 2, VisibleReviews: 2, RatingDistribution: [5]int64{2}, Reviews: []readmodel.ReputationReview{{WorkOrderID: 9, Rating: 1}}},
 		},
 		"short continuation with next": {
 			input:    provider.ReputationQueryInput{Limit: 2, After: &readmodel.ReputationPosition{WorkOrderID: 9}, CursorProviderID: 7},
-			snapshot: &readmodel.ReputationSnapshot{EligiblePaidOrders: 3, ReviewedPaidOrders: 3, RatingDistribution: [5]int64{3}, Reviews: []readmodel.ReputationReview{{WorkOrderID: 8, Rating: 1}}, Next: &readmodel.ReputationPosition{WorkOrderID: 8}},
+			snapshot: &readmodel.ReputationSnapshot{EligiblePaidOrders: 3, ReviewedPaidOrders: 3, VisibleReviews: 3, RatingDistribution: [5]int64{3}, Reviews: []readmodel.ReputationReview{{WorkOrderID: 8, Rating: 1}}, Next: &readmodel.ReputationPosition{WorkOrderID: 8}},
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
@@ -256,7 +256,7 @@ func TestReputationAllowsExhaustedContinuationWithoutChangingGlobalResults(t *te
 	clock.On("Now").Return(time.Now()).Once()
 	actors.On("FindByAuthID", t.Context(), "actor").Return(7, provider.Role, nil).Once()
 	after := &readmodel.ReputationPosition{WorkOrderID: 1}
-	reader.On("Read", t.Context(), 7, provider.ReputationQuery{Limit: 20, After: after}).Return(&readmodel.ReputationSnapshot{EligiblePaidOrders: 2, ReviewedPaidOrders: 1, RatingDistribution: [5]int64{0, 0, 0, 0, 1}}, nil).Once()
+	reader.On("Read", t.Context(), 7, provider.ReputationQuery{Limit: 20, After: after}).Return(&readmodel.ReputationSnapshot{EligiblePaidOrders: 2, ReviewedPaidOrders: 1, VisibleReviews: 1, RatingDistribution: [5]int64{0, 0, 0, 0, 1}}, nil).Once()
 	result, _, err := provider.NewReputationService(reader, actors, clock).Query(t.Context(), "actor", provider.ReputationQueryInput{After: after, CursorProviderID: 7})
 	require.NoError(t, err)
 	require.Empty(t, result.Reviews)

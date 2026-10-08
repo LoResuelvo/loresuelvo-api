@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/audit"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/consumer"
 	filedomain "github.com/LoResuelvo/loresuelvo-api/internal/domain/file"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/notification"
@@ -237,15 +238,74 @@ func (m *reviewReportActorFinderMock) FindByAuthID(ctx context.Context, authID s
 	return a.Int(0), a.String(1), a.Error(2)
 }
 
-type reviewReportRepositoryMock struct{ mock.Mock }
+type reviewUnitOfWorkMock struct {
+	mock.Mock
+	store workorder.ReviewStore
+}
 
-func (m *reviewReportRepositoryMock) FindByWorkOrderID(ctx context.Context, id int) (*workorder.ReviewReport, error) {
+func (m *reviewUnitOfWorkMock) Execute(ctx context.Context, op func(workorder.ReviewStore) error) error {
+	a := m.Called(ctx, op)
+	if err := a.Error(0); err != nil {
+		return err
+	}
+	return op(m.store)
+}
+
+type reviewStoreMock struct{ mock.Mock }
+
+func (m *reviewStoreMock) FindReview(ctx context.Context, id int) (*workorder.Review, error) {
+	a := m.Called(ctx, id)
+	if a.Get(0) == nil {
+		return nil, a.Error(1)
+	}
+	return a.Get(0).(*workorder.Review), a.Error(1)
+}
+func (m *reviewStoreMock) FindReport(ctx context.Context, id int) (*workorder.ReviewReport, error) {
 	a := m.Called(ctx, id)
 	if a.Get(0) == nil {
 		return nil, a.Error(1)
 	}
 	return a.Get(0).(*workorder.ReviewReport), a.Error(1)
 }
-func (m *reviewReportRepositoryMock) Save(ctx context.Context, r *workorder.ReviewReport) error {
+func (m *reviewStoreMock) SaveReview(ctx context.Context, id int, r *workorder.Review) error {
+	return m.Called(ctx, id, r).Error(0)
+}
+func (m *reviewStoreMock) SaveReport(ctx context.Context, r *workorder.ReviewReport) error {
 	return m.Called(ctx, r).Error(0)
+}
+func (m *reviewStoreMock) SaveDecision(ctx context.Context, d *workorder.ReviewDecision) error {
+	return m.Called(ctx, d).Error(0)
+}
+func (m *reviewStoreMock) SaveAuditEvent(ctx context.Context, e *audit.Event) error {
+	return m.Called(ctx, e).Error(0)
+}
+
+type reviewOperatorFinderMock struct{ mock.Mock }
+
+func (m *reviewOperatorFinderMock) FindOperatorIDByAuthID(ctx context.Context, auth string) (int, error) {
+	a := m.Called(ctx, auth)
+	return a.Int(0), a.Error(1)
+}
+
+type reviewAuditWriterMock struct{ mock.Mock }
+
+func (m *reviewAuditWriterMock) Save(ctx context.Context, event *audit.Event) error {
+	return m.Called(ctx, event).Error(0)
+}
+
+type adminReviewReaderMock struct{ mock.Mock }
+
+func (m *adminReviewReaderMock) FindPage(ctx context.Context, input workorder.ReviewListInput) (*workorder.AdminReviewPage, error) {
+	a := m.Called(ctx, input)
+	if a.Get(0) == nil {
+		return nil, a.Error(1)
+	}
+	return a.Get(0).(*workorder.AdminReviewPage), a.Error(1)
+}
+func (m *adminReviewReaderMock) FindByID(ctx context.Context, id int, page workorder.ReviewPageInput) (*workorder.AdminReviewDetail, error) {
+	a := m.Called(ctx, id, page)
+	if a.Get(0) == nil {
+		return nil, a.Error(1)
+	}
+	return a.Get(0).(*workorder.AdminReviewDetail), a.Error(1)
 }

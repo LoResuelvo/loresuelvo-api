@@ -33,7 +33,8 @@ func RequestLogger(logger *slog.Logger) gin.HandlerFunc {
 		privateInstallation := c.Request.URL.Path == "/installations" || strings.HasPrefix(c.Request.URL.Path, "/installations/")
 		privateEvidence := c.Request.URL.Path == "/admin/claims" || strings.HasPrefix(c.Request.URL.Path, "/admin/claims/") || c.Request.URL.Path == "/claims" || strings.HasPrefix(c.Request.URL.Path, "/claims/") || c.Request.URL.Path == "/files" || strings.HasPrefix(c.Request.URL.Path, "/files/")
 		privateReviewReport := strings.HasPrefix(c.Request.URL.Path, "/work-orders/") && strings.HasSuffix(c.Request.URL.Path, "/reviews/reports")
-		privateRead := privateReviewReport || privateEvidence || privateInstallation || isPrivateAdminReadPath(c.Request.URL.Path) || isPrivateWorkChatPath(c.Request.URL.Path) || isPrivateProviderActivityPath(c.Request.URL.Path)
+		privateAdminReviews := c.Request.URL.Path == "/admin/reviews" || strings.HasPrefix(c.Request.URL.Path, "/admin/reviews/")
+		privateRead := privateAdminReviews || privateReviewReport || privateEvidence || privateInstallation || isPrivateAdminReadPath(c.Request.URL.Path) || isPrivateWorkChatPath(c.Request.URL.Path) || isPrivateProviderActivityPath(c.Request.URL.Path)
 		includeBodies := !privateRead && requestLogger.Enabled(c.Request.Context(), slog.LevelInfo)
 		var requestBody *limitedBodyCapture
 		var responseBody *limitedBodyCapture

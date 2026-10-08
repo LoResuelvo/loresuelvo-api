@@ -21,6 +21,7 @@ type ReputationReview struct {
 type ReputationSnapshot struct {
 	EligiblePaidOrders int64
 	ReviewedPaidOrders int64
+	VisibleReviews     int64
 	RatingDistribution [5]int64
 	Reviews            []ReputationReview
 	Next               *ReputationPosition
@@ -32,6 +33,7 @@ type Reputation struct {
 	CoveragePercentage *float64
 	EligiblePaidOrders int64
 	ReviewedPaidOrders int64
+	VisibleReviews     int64
 	RatingDistribution [5]int64
 	Reviews            []ReputationReview
 	Next               *ReputationPosition
@@ -45,7 +47,7 @@ func (s ReputationSnapshot) Calculate(now time.Time, limit, afterID int) (*Reput
 	}
 	result := &Reputation{
 		CalculatedAt: now.UTC(), EligiblePaidOrders: s.EligiblePaidOrders,
-		ReviewedPaidOrders: s.ReviewedPaidOrders, RatingDistribution: s.RatingDistribution,
+		ReviewedPaidOrders: s.ReviewedPaidOrders, VisibleReviews: s.VisibleReviews, RatingDistribution: s.RatingDistribution,
 		Reviews: slices.Clone(s.Reviews),
 	}
 	if result.Reviews == nil {
@@ -69,7 +71,8 @@ func (s ReputationSnapshot) Calculate(now time.Time, limit, afterID int) (*Reput
 }
 
 func (s ReputationSnapshot) validate(limit, afterID int) error {
-	if limit <= 0 || afterID < 0 || s.EligiblePaidOrders < 0 || s.ReviewedPaidOrders < 0 || s.ReviewedPaidOrders > s.EligiblePaidOrders {
+	if limit <= 0 || afterID < 0 || s.EligiblePaidOrders < 0 || s.ReviewedPaidOrders < 0 || s.ReviewedPaidOrders > s.EligiblePaidOrders ||
+		s.VisibleReviews < 0 || s.VisibleReviews > s.ReviewedPaidOrders {
 		return errors.New("reputation snapshot contains invalid totals")
 	}
 	var counted int64
@@ -83,10 +86,10 @@ func (s ReputationSnapshot) validate(limit, afterID int) error {
 	if counted != s.ReviewedPaidOrders {
 		return errors.New("reputation distribution differs from reviewed orders")
 	}
-	if len(s.Reviews) > limit || int64(len(s.Reviews)) > s.ReviewedPaidOrders {
+	if len(s.Reviews) > limit || int64(len(s.Reviews)) > s.VisibleReviews {
 		return errors.New("reputation page exceeds its limit or global total")
 	}
-	if afterID == 0 && int64(len(s.Reviews)) != min(s.ReviewedPaidOrders, int64(limit)) {
+	if afterID == 0 && int64(len(s.Reviews)) != min(s.VisibleReviews, int64(limit)) {
 		return errors.New("reputation snapshot has an incomplete first page")
 	}
 	var pageDistribution [5]int64
@@ -101,10 +104,10 @@ func (s ReputationSnapshot) validate(limit, afterID int) error {
 			return errors.New("reputation page distribution exceeds global distribution")
 		}
 	}
-	if s.Next != nil && (len(s.Reviews) != limit || s.Next.WorkOrderID != previousID || s.Next.WorkOrderID <= 0 || s.ReviewedPaidOrders <= int64(len(s.Reviews))) {
+	if s.Next != nil && (len(s.Reviews) != limit || s.Next.WorkOrderID != previousID || s.Next.WorkOrderID <= 0 || s.VisibleReviews <= int64(len(s.Reviews))) {
 		return errors.New("reputation snapshot has an invalid continuation position")
 	}
-	if afterID == 0 && s.ReviewedPaidOrders > int64(limit) && s.Next == nil {
+	if afterID == 0 && s.VisibleReviews > int64(limit) && s.Next == nil {
 		return errors.New("reputation snapshot is missing its continuation position")
 	}
 	return nil

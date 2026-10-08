@@ -40,3 +40,8 @@ var (
 	ErrReviewReportAlreadyExists = errors.New("review already has a report")
 	ErrReviewReportNotFound      = errors.New("review report not found")
 )
+
+var (
+	ErrInvalidReviewModeration  = errors.New("invalid review moderation")
+	ErrReviewModerationConflict = errors.New("review moderation version or state conflict")
+)

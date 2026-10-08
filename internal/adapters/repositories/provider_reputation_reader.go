@@ -22,6 +22,7 @@ func NewProviderReputationReader(db *sql.DB) *ProviderReputationReader {
 // or other one-to-many relation participates in either reputation query.
 const providerReputationTotalsSQL = `
 SELECT COUNT(*), COUNT(review.work_order_id),
+	COUNT(review.work_order_id) FILTER (WHERE review.visible),
 	COUNT(*) FILTER (WHERE review.rating = 1),
 	COUNT(*) FILTER (WHERE review.rating = 2),
 	COUNT(*) FILTER (WHERE review.rating = 3),
@@ -37,7 +38,7 @@ SELECT wo.id, review.rating, review.description
 FROM work_orders wo
 JOIN service_proposals sp ON sp.id = wo.service_proposal_id
 JOIN work_order_reviews review ON review.work_order_id = wo.id
-WHERE sp.provider_id = $1 AND wo.status = 'paid' AND ($2 = 0 OR wo.id < $2)
+WHERE sp.provider_id = $1 AND wo.status = 'paid' AND review.visible AND ($2 = 0 OR wo.id < $2)
 ORDER BY wo.id DESC
 LIMIT $3`
 
@@ -74,7 +75,7 @@ func (r *ProviderReputationReader) Read(ctx context.Context, providerID int, que
 
 	snapshot := &readmodel.ReputationSnapshot{Reviews: make([]readmodel.ReputationReview, 0)}
 	if err := tx.QueryRowContext(ctx, providerReputationTotalsSQL, providerID).Scan(
-		&snapshot.EligiblePaidOrders, &snapshot.ReviewedPaidOrders,
+		&snapshot.EligiblePaidOrders, &snapshot.ReviewedPaidOrders, &snapshot.VisibleReviews,
 		&snapshot.RatingDistribution[0], &snapshot.RatingDistribution[1],
 		&snapshot.RatingDistribution[2], &snapshot.RatingDistribution[3],
 		&snapshot.RatingDistribution[4],

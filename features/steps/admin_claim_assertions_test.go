@@ -18,7 +18,6 @@ import (
 func registerAdminClaimAssertions(sc *godog.ScenarioContext, s *testSuite) {
 	sc.Step(`^el sistema responde con estado 200 y contiene exactamente los reclamos "([^"]*)"$`, s.claimListExact)
 	sc.Step(`^el sistema responde con estado 200 y contiene únicamente reclamos en estado "([^"]*)"$`, s.adminClaimListState)
-	sc.Step(`^el sistema responde con estado 200 y una colección vacía, no nula$`, func() error { return s.claimListExact("ninguno") })
 	sc.Step(`^el sistema responde con estado 400 sin datos de reclamos$`, func() error { return s.claimError(400) })
 	sc.Step(`^la respuesta no contiene datos de expedientes$`, s.adminClaimErrorNoData)
 	sc.Step(`^la respuesta no contiene datos del expediente ni URLs temporales$`, s.adminClaimErrorNoData)

@@ -1,13 +1,16 @@
 package steps_test
 
 import (
+	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"strings"
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/admin"
+
 	"github.com/cucumber/godog"
 )
 
@@ -52,6 +55,17 @@ func registerLoginSteps(sc *godog.ScenarioContext, suite *testSuite) {
 }
 
 func (suite *testSuite) thereIsProvisionedAdmin(email, name, surname string) error {
+	existing, err := suite.userRepository.FindByAuthID(auth0IDForAdminEmail(email))
+	if err == nil {
+		if existing.Role() != admin.Role || existing.Name() != name || existing.Surname() != surname {
+			return fmt.Errorf("existing admin fixture differs from declared identity")
+		}
+		return nil
+	}
+	if !errors.Is(err, sql.ErrNoRows) {
+		return err
+	}
+
 	adminUser, err := admin.NewAdmin(auth0IDForAdminEmail(email), email, name, surname, nil)
 	if err != nil {
 		return fmt.Errorf("could not build admin fixture: %w", err)

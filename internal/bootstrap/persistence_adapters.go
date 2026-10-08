@@ -7,6 +7,9 @@ import (
 )
 
 type PersistenceAdapters struct {
+	ReviewModerationRepository             *repositories.ReviewModerationRepository
+	ReviewUnitOfWork                       *repositories.ReviewUnitOfWork
+	AdminReviewReader                      *repositories.AdminReviewReader
 	ReviewReportRepository                 *repositories.ReviewReportRepository
 	InstallationRepository                 *repositories.InstallationRepository
 	AdminDirectoryReader                   *repositories.AdminDirectoryReader
@@ -94,8 +97,14 @@ func NewPersistenceAdapters(database *sql.DB) *PersistenceAdapters {
 	workOrderCalendarEventRepository := repositories.NewWorkOrderCalendarEventRepository(database)
 	identityVerificationRepository := repositories.NewIdentityVerificationRepository(database)
 	identityVerificationUnitOfWork := repositories.NewIdentityVerificationUnitOfWork(database, identityVerificationRepository)
+	reviews := repositories.NewReviewModerationRepository()
+	reports := repositories.NewReviewReportRepository(database)
+	reviewUnit := repositories.NewReviewUnitOfWork(database, reviews, reports, auditEventRepository)
 	return &PersistenceAdapters{
-		ReviewReportRepository:                 repositories.NewReviewReportRepository(database),
+		ReviewModerationRepository:             reviews,
+		ReviewUnitOfWork:                       reviewUnit,
+		AdminReviewReader:                      repositories.NewAdminReviewReader(database, reviews, reports),
+		ReviewReportRepository:                 reports,
 		InstallationRepository:                 repositories.NewInstallationRepository(database),
 		AdminDirectoryReader:                   repositories.NewAdminDirectoryReader(database),
 		AdminPaymentReader:                     repositories.NewAdminPaymentReader(database),

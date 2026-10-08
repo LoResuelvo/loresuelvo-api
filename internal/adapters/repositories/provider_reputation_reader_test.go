@@ -290,3 +290,73 @@ func TestProviderReputationReaderKeepsRepeatableReadSnapshotAcrossTotalsAndPage(
 	require.Equal(t, [5]int64{1, 0, 0, 0, 0}, fresh.RatingDistribution)
 	require.Equal(t, "Concurrent review", fresh.Reviews[0].Description)
 }
+
+func TestProviderReputationReaderHidesOriginalWithoutInvalidatingRatings(t *testing.T) {
+	testContext := newServiceProposalRepositoryTest(t)
+	fixture := newProviderWorkOrderTestFixture(t, testContext, "reputation-moderated")
+	base := time.Now().UTC().Truncate(time.Microsecond)
+	visible := savePaidWorkOrderWithReviewForFixture(t, testContext, fixture, base.Add(26*time.Hour), uuid.NewString(), 3, "Visible review")
+	hidden := savePaidWorkOrderWithReviewForFixture(t, testContext, fixture, base.Add(27*time.Hour), uuid.NewString(), 5, "Restricted original")
+	_, err := testContext.database.ExecContext(t.Context(), `UPDATE work_order_reviews SET visible = FALSE WHERE work_order_id = $1`, hidden.ID())
+	require.NoError(t, err)
+	reader := repositories.NewProviderReputationReader(testContext.database)
+	snapshot, err := reader.Read(t.Context(), fixture.providerID, provider.ReputationQuery{Limit: 1})
+	require.NoError(t, err)
+	result, err := snapshot.Calculate(base, 1, 0)
+	require.NoError(t, err)
+	require.Equal(t, int64(2), result.ReviewedPaidOrders)
+	require.Equal(t, int64(1), result.VisibleReviews)
+	require.Equal(t, [5]int64{0, 0, 1, 0, 1}, result.RatingDistribution)
+	require.Equal(t, float64(4), *result.AverageRating)
+	require.Equal(t, []readmodel.ReputationReview{{WorkOrderID: visible.ID(), Rating: 3, Description: "Visible review"}}, result.Reviews)
+	require.Nil(t, result.Next)
+}
+
+func TestProviderReputationReaderPaginatesVisibleReviewsAcrossHiddenGaps(t *testing.T) {
+	testContext := newServiceProposalRepositoryTest(t)
+	fixture := newProviderWorkOrderTestFixture(t, testContext, "reputation-hidden-pagination")
+	base := time.Now().UTC().Truncate(time.Microsecond)
+	var visibleIDs []int
+	for index := 0; index < 5; index++ {
+		order := savePaidWorkOrderWithReviewForFixture(t, testContext, fixture, base.Add(time.Duration(index+26)*time.Hour), uuid.NewString(), 4, "Original")
+		if index%2 == 0 {
+			_, err := testContext.database.ExecContext(t.Context(), `UPDATE work_order_reviews SET visible = FALSE WHERE work_order_id = $1`, order.ID())
+			require.NoError(t, err)
+		} else {
+			visibleIDs = append(visibleIDs, order.ID())
+		}
+	}
+	slices.Reverse(visibleIDs)
+	reader := repositories.NewProviderReputationReader(testContext.database)
+	first, err := reader.Read(t.Context(), fixture.providerID, provider.ReputationQuery{Limit: 1})
+	require.NoError(t, err)
+	_, err = first.Calculate(base, 1, 0)
+	require.NoError(t, err)
+	require.Equal(t, visibleIDs[0], first.Reviews[0].WorkOrderID)
+	require.NotNil(t, first.Next)
+	last, err := reader.Read(t.Context(), fixture.providerID, provider.ReputationQuery{Limit: 1, After: first.Next})
+	require.NoError(t, err)
+	_, err = last.Calculate(base, 1, first.Next.WorkOrderID)
+	require.NoError(t, err)
+	require.Equal(t, visibleIDs[1], last.Reviews[0].WorkOrderID)
+	require.Equal(t, int64(5), last.ReviewedPaidOrders)
+	require.Equal(t, int64(2), last.VisibleReviews)
+	require.Nil(t, last.Next)
+}
+
+func TestProviderReputationReaderAllHiddenReviewsReturnsEmptyPageAndRatingFacts(t *testing.T) {
+	testContext := newServiceProposalRepositoryTest(t)
+	fixture := newProviderWorkOrderTestFixture(t, testContext, "reputation-all-hidden")
+	base := time.Now().UTC().Truncate(time.Microsecond)
+	order := savePaidWorkOrderWithReviewForFixture(t, testContext, fixture, base.Add(26*time.Hour), uuid.NewString(), 5, "Restricted original")
+	_, err := testContext.database.ExecContext(t.Context(), `UPDATE work_order_reviews SET visible = FALSE WHERE work_order_id = $1`, order.ID())
+	require.NoError(t, err)
+	snapshot, err := repositories.NewProviderReputationReader(testContext.database).Read(t.Context(), fixture.providerID, provider.ReputationQuery{Limit: 1})
+	require.NoError(t, err)
+	result, err := snapshot.Calculate(base, 1, 0)
+	require.NoError(t, err)
+	require.Empty(t, result.Reviews)
+	require.Zero(t, result.VisibleReviews)
+	require.Equal(t, float64(5), *result.AverageRating)
+	require.Nil(t, result.Next)
+}

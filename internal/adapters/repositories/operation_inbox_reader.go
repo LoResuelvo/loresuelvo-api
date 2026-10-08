@@ -15,7 +15,7 @@ import (
 )
 
 // Filters use the values computed once in "derived".
-const operationInboxSQL = `WITH first_proposals AS (
+const operationRootsSQL = `WITH first_proposals AS (
 	SELECT DISTINCT ON (conversation_id) conversation_id, id
 	FROM service_proposals
 	ORDER BY conversation_id, id
@@ -31,7 +31,9 @@ operations AS (
 	LEFT JOIN job_requests jr ON jr.conversation_id = sp.conversation_id
 	LEFT JOIN first_proposals fp ON fp.conversation_id = sp.conversation_id
 	WHERE jr.id IS NULL OR fp.id <> sp.id
-),
+),`
+
+const operationInboxSQL = operationRootsSQL + `
 resources AS (
 	SELECT o.kind, o.resource_id, o.started_on,
 		CASE

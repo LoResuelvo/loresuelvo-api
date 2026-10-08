@@ -273,44 +273,7 @@ func (s *testSuite) claimFinalFixture(email, label string) error {
 	}
 	return s.claimSnapshot(label)
 }
-func (s *testSuite) claimSend(method, path, key string, payload any) error {
-	var body io.Reader
-	if payload != nil {
-		data, err := json.Marshal(payload)
-		if err != nil {
-			return err
-		}
-		body = bytes.NewReader(data)
-	}
-	req, err := http.NewRequest(method, s.server.URL+path, body)
-	if err != nil {
-		return err
-	}
-	req.Header.Set("Content-Type", "application/json")
-	if correlation := s.adminRequest.sentHeaders.Get("X-Request-ID"); strings.HasPrefix(path, adminClaimsPath) && correlation != "" {
-		req.Header.Set("X-Request-ID", correlation)
-	}
-	if key != "" {
-		req.Header.Set("Idempotency-Key", key)
-	}
-	if !s.adminRequest.omitBearer {
-		token := s.tokenBuilder.BuildToken(s.currentAuth0ID, s.currentPermissions)
-		if s.adminRequest.invalidBearer {
-			token = "invalid"
-		}
-		req.Header.Set("Authorization", "Bearer "+token)
-	}
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-	s.lastStatus = resp.StatusCode
-	s.lastBody, err = io.ReadAll(resp.Body)
-	s.adminRequest.headers = resp.Header.Clone()
-	s.lastLocation = resp.Header.Get("Location")
-	return err
-}
+
 func (s *testSuite) submitClaimReference(kind, label, key, reason, text string, images []string) error {
 	ref, err := s.claimReference(kind, label)
 	if err != nil {
@@ -333,7 +296,7 @@ func (s *testSuite) claimSubmit(key string, input claim.Submission) error {
 	}
 	s.claims.lastInput = input
 	s.claims.lastKey = key
-	if err := s.claimSend(http.MethodPost, "/claims", key, map[string]any{"reference": map[string]any{string(input.Reference.Kind()) + "_id": id}, "reason": input.Reason, "description": input.Description, "image_file_ids": input.ImageFileIDs}); err != nil {
+	if err := s.sendAuthenticatedJSON(http.MethodPost, "/claims", key, map[string]any{"reference": map[string]any{string(input.Reference.Kind()) + "_id": id}, "reason": input.Reason, "description": input.Description, "image_file_ids": input.ImageFileIDs}); err != nil {
 		return err
 	}
 	if s.lastStatus == 200 || s.lastStatus == 201 {
@@ -808,7 +771,7 @@ func (s *testSuite) claimOtherRecent(email, instant string) error {
 	return s.fixtureClaim(email, "other-claim", "S1", uuid.NewString(), "damage", "Other testimony", nil, claim.StatusOpen, now)
 }
 func (s *testSuite) claimList(status string, page, limit int) error {
-	return s.claimSend(http.MethodGet, fmt.Sprintf("/claims?status=%s&page=%d&limit=%d", url.QueryEscape(status), page, limit), "", nil)
+	return s.sendAuthenticatedJSON(http.MethodGet, fmt.Sprintf("/claims?status=%s&page=%d&limit=%d", url.QueryEscape(status), page, limit), "", nil)
 }
 func (s *testSuite) claimPage() (struct {
 	Items              []struct{ ID int }
@@ -909,7 +872,7 @@ func (s *testSuite) claimExistence(label, existence string) error {
 }
 func (s *testSuite) claimGet(label string) error {
 	s.claims.selected = label
-	return s.claimSend(http.MethodGet, "/claims/"+strconv.Itoa(s.claims.claims[label].claim.ID), "", nil)
+	return s.sendAuthenticatedJSON(http.MethodGet, "/claims/"+strconv.Itoa(s.claims.claims[label].claim.ID), "", nil)
 }
 func (s *testSuite) claimResolutionNull() error {
 	response, err := s.claimResponse()

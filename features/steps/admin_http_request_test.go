@@ -1,6 +1,7 @@
 package steps_test
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -18,6 +19,19 @@ type adminRequestState struct {
 }
 
 func registerAdminHTTPRequestSteps(sc *godog.ScenarioContext, suite *testSuite) {
+	sc.Step(`^el sistema responde con estado 200 y una colección vacía, no nula$`, func() error {
+		var response struct {
+			Items json.RawMessage `json:"items"`
+		}
+		if err := json.Unmarshal(suite.lastBody, &response); err != nil {
+			return err
+		}
+		if suite.lastStatus != 200 || string(response.Items) != "[]" {
+			return fmt.Errorf("expected empty non-null review page: %s", suite.lastBody)
+		}
+		return nil
+	})
+
 	sc.Step(`^que no envío un token Bearer$`, suite.doNotSendAdminBearer)
 	sc.Step(`^que envío un token Bearer inválido$`, suite.sendInvalidAdminBearer)
 	sc.Step(`^la respuesta incluye la cabecera "([^"]*)" con valor "([^"]*)"$`, suite.adminResponseHeaderEquals)
@@ -104,4 +118,43 @@ func (suite *testSuite) adminPageIsEmpty() error {
 		}
 	}
 	return nil
+}
+
+func (s *testSuite) sendAuthenticatedJSON(method, path, key string, payload any) error {
+	var body io.Reader
+	if payload != nil {
+		data, err := json.Marshal(payload)
+		if err != nil {
+			return err
+		}
+		body = bytes.NewReader(data)
+	}
+	req, err := http.NewRequest(method, s.server.URL+path, body)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	if correlation := s.adminRequest.sentHeaders.Get("X-Request-ID"); correlation != "" {
+		req.Header.Set("X-Request-ID", correlation)
+	}
+	if key != "" {
+		req.Header.Set("Idempotency-Key", key)
+	}
+	if !s.adminRequest.omitBearer {
+		token := s.tokenBuilder.BuildToken(s.currentAuth0ID, s.currentPermissions)
+		if s.adminRequest.invalidBearer {
+			token = "invalid"
+		}
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	s.lastStatus = resp.StatusCode
+	s.lastBody, err = io.ReadAll(resp.Body)
+	s.adminRequest.headers = resp.Header.Clone()
+	s.lastLocation = resp.Header.Get("Location")
+	return err
 }

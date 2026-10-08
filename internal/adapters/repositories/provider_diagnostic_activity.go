@@ -12,7 +12,7 @@ const diagnosticActivitySQL = `SELECT type,id,status,occurred_on FROM (
  UNION ALL SELECT 'service_proposal',id,status,created_on FROM service_proposals WHERE provider_id=$1
  UNION ALL SELECT 'work_order',w.id,w.status,w.accepted_on FROM work_orders w JOIN service_proposals p ON p.id=w.service_proposal_id WHERE p.provider_id=$1
  ) activity ORDER BY occurred_on DESC,type DESC,id DESC LIMIT $2`
-const diagnosticReviewsSQL = `SELECT r.work_order_id,r.rating,r.description FROM work_order_reviews r JOIN work_orders w ON w.id=r.work_order_id JOIN service_proposals p ON p.id=w.service_proposal_id WHERE p.provider_id=$1 ORDER BY w.accepted_on DESC,w.id DESC LIMIT $2`
+const diagnosticReviewsSQL = `SELECT r.work_order_id,r.rating,r.description FROM work_order_reviews r JOIN work_orders w ON w.id=r.work_order_id JOIN service_proposals p ON p.id=w.service_proposal_id WHERE p.provider_id=$1 AND r.visible ORDER BY w.accepted_on DESC,w.id DESC LIMIT $2`
 const diagnosticRatingSQL = `SELECT COALESCE(SUM(r.rating),0),COUNT(*) FROM work_order_reviews r JOIN work_orders w ON w.id=r.work_order_id JOIN service_proposals p ON p.id=w.service_proposal_id WHERE p.provider_id=$1`
 const diagnosticOrderSyncSQL = `SELECT w.id,e.synced_on FROM work_orders w JOIN service_proposals p ON p.id=w.service_proposal_id LEFT JOIN work_order_calendar_events e ON e.work_order_id=w.id AND e.user_id=p.provider_id WHERE p.provider_id=$1 ORDER BY w.accepted_on DESC,w.id DESC LIMIT $2`
 

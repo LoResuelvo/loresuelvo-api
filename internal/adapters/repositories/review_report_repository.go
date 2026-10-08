@@ -20,8 +20,15 @@ func NewReviewReportRepository(db *sql.DB) *ReviewReportRepository {
 var _ workorder.ReviewReportRepository = (*ReviewReportRepository)(nil)
 
 func (r *ReviewReportRepository) Save(ctx context.Context, report *workorder.ReviewReport) error {
+	return r.saveWithExecutor(ctx, r.db, report)
+}
+func (r *ReviewReportRepository) saveWithExecutor(ctx context.Context, e reviewExecutor, report *workorder.ReviewReport) error {
+	if report.ID() > 0 {
+		_, err := e.ExecContext(ctx, `UPDATE review_reports SET status=$2 WHERE id=$1`, report.ID(), report.Status())
+		return err
+	}
 	var id int
-	err := r.db.QueryRowContext(ctx,
+	err := e.QueryRowContext(ctx,
 		`INSERT INTO review_reports (work_order_id, reporter_id, category, explanation, status, created_on)
  VALUES ($1, $2, $3, $4, $5, $6)
  RETURNING id`,
@@ -38,10 +45,13 @@ func (r *ReviewReportRepository) Save(ctx context.Context, report *workorder.Rev
 	return nil
 }
 func (r *ReviewReportRepository) FindByWorkOrderID(ctx context.Context, orderID int) (*workorder.ReviewReport, error) {
+	return r.findWithExecutor(ctx, r.db, orderID)
+}
+func (r *ReviewReportRepository) findWithExecutor(ctx context.Context, e reviewExecutor, orderID int) (*workorder.ReviewReport, error) {
 	var id, reporterID int
 	var category, explanation, status string
 	var at time.Time
-	err := r.db.QueryRowContext(ctx,
+	err := e.QueryRowContext(ctx,
 		`SELECT id, reporter_id, category, explanation, status, created_on
  FROM review_reports WHERE work_order_id = $1`,
 		orderID,

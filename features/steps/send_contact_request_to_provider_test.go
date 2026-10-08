@@ -15,6 +15,9 @@ const (
 )
 
 func registerSendContactRequestToProviderSteps(sc *godog.ScenarioContext, suite *testSuite) {
+	sc.Step(`^que existe un consumidor registrado con correo "([^"]*)"$`, func(email string) error {
+		return suite.thereIsRegisteredConsumerWithEmailNameAndSurname(email, "Ana", "Pérez")
+	})
 	sc.Step(`^que existe un consumidor registrado con correo "([^"]*)", nombre "([^"]*)" y apellido "([^"]*)"$`, suite.thereIsRegisteredConsumerWithEmailNameAndSurname)
 	sc.Step(`^que no existe una conversación entre el consumidor "([^"]*)" y el prestador "([^"]*)"$`, suite.thereIsNoConversationBetweenConsumerAndProvider)
 	sc.Step(`^que estoy autenticado como consumidor "([^"]*)"$`, suite.iAmAuthenticatedAsConsumer)
