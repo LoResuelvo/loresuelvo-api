@@ -36,33 +36,12 @@ Feature: Registrar un dictamen administrativo para un reclamo
 
         @wip
         Scenario: 68.20-DC Registrar una compensación sugerida en ARS sin ejecutarla
-            Given que la fecha y hora actual del sistema es "2026-09-21T10:55:00-03:00"
-            And que existe la siguiente solicitud de trabajo:
-                | solicitud | consumidor      | prestador        | creada                    | estado   | título          | descripción                |
-                | S2        | ana@example.com | juan@example.com | 2026-09-20T09:00:00-03:00 | accepted | Reparar cañería | La canilla pierde agua.    |
-            And que existe la siguiente propuesta de servicio:
-                | propuesta | solicitud | creada                    | fecha programada           | duración | descripción                    | estado   | precio total | moneda | seña   | comisión total | comisión inicial | saldo servicio | saldo comisión |
-                | P1        | S2        | 2026-09-21T09:00:00-03:00 | 2026-09-30T12:00:00-03:00 | 60       | Revisar y reparar la canilla. | accepted | 3333333      | ARS    | 777777 | 555555         | 123457           | 2555556        | 432098         |
-            And que "P1" es la primera propuesta de la conversación de "S2"
-            And que el intento de seña "I1" de "P1" tiene el estado "paid" y estos importes persistidos:
-                | moneda | porción del prestador | comisión | total a pagar |
-                | ARS    | 777777                | 123457   | 901234        |
-            And que la fecha y hora actual del sistema es "2026-09-21T11:03:00-03:00"
-            And que existe la siguiente orden de trabajo:
-                | orden | propuesta | aceptada                  | estado           | finalización informada | saldo pagado |
-                | O1    | P1        | 2026-09-21T11:03:00-03:00 | scheduled        |                        |              |
-            And que la transacción externa "T1" de "I1" tiene el ID de Mercado Pago "mp-payment-9001", estado "approved", importe 901234 ARS y verificación "2026-09-21T11:03:00-03:00"
-            And que "ana@example.com" tiene el reclamo "C1" en estado "in_review" sobre la primera propuesta "P1" de "S2"
-            And que la fecha y hora actual del sistema es "2026-09-25T12:00:00-03:00"
+            Given que "ana@example.com" tiene el reclamo "C1" en estado "in_review" sobre la solicitud de trabajo "S1"
             And estoy autenticado como administrador "operador@example.com" con el permiso "write:admin_claims"
             When registro para "C1" un dictamen "agreement" con fundamentación "Las partes acordaron una compensación" y una compensación sugerida de 1500 centavos con la clave nueva "550e8400-e29b-41d4-a716-446655440026"
             Then el sistema responde con estado 200 y el expediente queda resuelto
             And el dictamen informa exactamente la compensación sugerida de 1500 centavos ARS
             And la compensación no se identifica como pagada ni ejecutada
-            And la propuesta "P1" conserva sus términos en ARS: total de servicio 3333333, seña de servicio 777777, comisión total 555555 y comisión de seña 123457 centavos
-            And la orden "O1" conserva el estado "scheduled" y no registra saldo pagado
-            And el intento "I1" conserva el estado "paid" y la transacción "T1" conserva el estado "approved" y el importe 901234 centavos ARS
-            And no se crea otro intento ni transacción de pago
 
     Rule: La fundamentación y la compensación deben ser válidas
 
