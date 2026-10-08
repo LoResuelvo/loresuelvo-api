@@ -21,7 +21,6 @@ Feature: Reportar una reseña para revisión administrativa
         Background:
             Given que la orden ya tiene una reseña de 5 estrellas con la descripción "Trabajo prolijo y excelente atención."
 
-        @wip
         Scenario Outline: 30.2.1-RR Registrar un reporte con una categoría admitida
             Given que estoy autenticado como prestador "juan.plomero@example.com"
             When reporto la reseña de la orden con categoría "<categoria>" y sin explicación
@@ -37,7 +36,6 @@ Feature: Reportar una reseña para revisión administrativa
                 | spam_advertising   |
                 | unrelated_content  |
 
-        @wip
         Scenario Outline: 30.2.2-RR Aceptar una explicación vacía o compuesta solo por espacios
             Given que estoy autenticado como prestador "juan.plomero@example.com"
             When reporto la reseña de la orden con categoría "spam_advertising" y explicación <forma>
@@ -49,7 +47,6 @@ Feature: Reportar una reseña para revisión administrativa
                 | vacía                        |
                 | compuesta solo por espacios  |
 
-        @wip
         Scenario Outline: 30.2.3-RR Validar el límite de caracteres Unicode de la explicación
             Given que estoy autenticado como prestador "juan.plomero@example.com"
             When reporto la reseña de la orden con categoría "unrelated_content" y una explicación de <cantidad> caracteres
@@ -60,13 +57,11 @@ Feature: Reportar una reseña para revisión administrativa
                 | 500      | 201    |
                 | 501      | 400    |
 
-        @wip
         Scenario: 30.2.4-RR Rechazar un reporte sin categoría
             Given que estoy autenticado como prestador "juan.plomero@example.com"
             When intento reportar la reseña de la orden sin especificar categoría
             Then el sistema responde con estado 400
 
-        @wip
         Scenario: 30.2.5-RR Rechazar un reporte con una categoría no admitida
             Given que estoy autenticado como prestador "juan.plomero@example.com"
             When intento reportar la reseña de la orden con categoría no admitida "other"
@@ -77,7 +72,6 @@ Feature: Reportar una reseña para revisión administrativa
         Background:
             Given que la orden ya tiene una reseña de 5 estrellas con la descripción "Trabajo prolijo y excelente atención."
 
-        @wip
         Scenario: 30.2.6-RR Rechazar un segundo reporte de la misma reseña
             Given que estoy autenticado como prestador "juan.plomero@example.com"
             And reporté la reseña de la orden con categoría "personal_data" y explicación "El comentario contiene datos personales del prestador."
@@ -91,7 +85,6 @@ Feature: Reportar una reseña para revisión administrativa
         Background:
             Given que la orden ya tiene una reseña de 5 estrellas con la descripción "Trabajo prolijo y excelente atención."
 
-        @wip
         Scenario Outline: 30.2.7-RR Rechazar el reporte de una reseña por <actor>
             Given que están habilitadas las zonas de cobertura "Comuna 6"
             And existe un prestador registrado con correo "pedro.plomero@example.com", nombre "Pedro", apellido "Dib", rubro "Plomería" y zona de cobertura "Comuna 6"
