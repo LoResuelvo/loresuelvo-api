@@ -10,7 +10,6 @@ Feature: Moderar la visibilidad de una reseña
 
     Rule: Cada decisión identifica su motivo y los reportes que atiende
 
-        @wip
         Scenario: 69.6-MR Ocultar una reseña atendiendo su reporte pendiente
             Given que la fecha y hora actual del sistema es "2026-09-25T12:00:00Z"
             And que la orden pagada "O1", programada más de 24 horas después de aceptar su propuesta, tiene una reseña visible de 5 estrellas con comentario original
@@ -24,7 +23,6 @@ Feature: Moderar la visibilidad de una reseña
             And "R1" queda atendido como procedente
             And la respuesta incluye la cabecera "Cache-Control" con valor "private, no-store"
 
-        @wip
         Scenario Outline: 69.7-MR Ocultar directamente una reseña sin reportes según la categoría
             Given que la orden pagada "O1" tiene una reseña visible de 3 estrellas y no tiene reportes
             And que estoy autenticado como administrador "operador@example.com" con el permiso "write:admin_reviews"
@@ -39,7 +37,6 @@ Feature: Moderar la visibilidad de una reseña
                 | spam_advertising   | El comentario incluye publicidad ajena    |
                 | unrelated_content  | El comentario no trata sobre el servicio  |
 
-        @wip
         Scenario: 69.8-MR Desestimar reportes pendientes sin cambiar la visibilidad
             Given que la orden pagada "O1" tiene una reseña visible de 4 estrellas
             And que "juan@example.com", prestador calificado en "O1", reportó la reseña mientras estaba visible y su único reporte pendiente es "R1"
@@ -49,7 +46,6 @@ Feature: Moderar la visibilidad de una reseña
             And "R1" queda atendido como no procedente
             And queda registrada una decisión nueva sin ocultar la reseña ni modificar su calificación
 
-        @wip
         Scenario: 69.9-MR Restablecer la visibilidad conservando la decisión de ocultación revisada
             Given que la orden pagada "O1" tiene una reseña visible en la versión 1
             And que "juan@example.com", prestador calificado en "O1", reportó la reseña mientras estaba visible y el reporte pendiente "R1" existe
@@ -60,7 +56,6 @@ Feature: Moderar la visibilidad de una reseña
             And queda registrada la decisión nueva "D2" vinculada a la decisión de ocultación "D1"
             And el historial conserva intacta "D1" y "R1" sigue atendido como procedente
 
-        @wip
         Scenario: 69.10-MR Rechazar un reintento de ocultación cuya versión quedó desactualizada
             Given que la orden pagada "O1" tiene una reseña visible de 5 estrellas en la versión 1
             And que estoy autenticado como administrador "operador@example.com" con el permiso "write:admin_reviews"
@@ -70,7 +65,6 @@ Feature: Moderar la visibilidad de una reseña
             Then el sistema responde con estado 409
             And la reseña permanece visible en la versión 3, con dos decisiones y dos eventos históricos, sin una nueva decisión ni otro evento
 
-        @wip
         Scenario Outline: 69.11-MR Rechazar entradas inválidas de una solicitud de moderación
             Given que la orden pagada "O1" tiene una reseña visible en la versión 1 y el único reporte pendiente "R1" de "juan@example.com", su prestador calificado
             And que para la entrada indicada el resto de la solicitud es válido y estoy autenticado como administrador "operador@example.com" con el permiso "write:admin_reviews"
@@ -84,7 +78,6 @@ Feature: Moderar la visibilidad de una reseña
                 | el motivo que excede 500 bytes UTF-8 al ocultar con categoría "personal_data" y versión 1 |
                 | desestimar sin identificar reportes, con versión 1                           |
 
-        @wip
         Scenario: 69.12-MR Denegar una decisión sin permiso de escritura de moderación
             Given que la orden pagada "O1" tiene una reseña visible
             And que estoy autenticado como administrador "operador@example.com" solamente con el permiso "read:admin_reviews"
@@ -92,7 +85,6 @@ Feature: Moderar la visibilidad de una reseña
             Then el sistema responde con estado 403
             And la reseña permanece visible y no se registra una decisión
 
-        @wip
         Scenario: 69.13-MR No atender automáticamente un reporte recibido tras cargar la reseña
             Given que la orden pagada "O1" tiene una reseña visible en la versión 1 y aún no tiene reportes
             And que el administrador "operador@example.com" consulta la reseña antes de que exista un reporte

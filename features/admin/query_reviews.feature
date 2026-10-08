@@ -10,7 +10,6 @@ Feature: Consultar la bandeja administrativa de reseñas
 
     Rule: La bandeja separa visibilidad de atención de reportes y resume cada reseña una sola vez
 
-        @wip
         Scenario: 69.1-QR Devolver una bandeja vacía cuando no hay reportes pendientes
             Given que la orden pagada "O1" tiene una reseña visible y no tiene reportes pendientes
             And que estoy autenticado como administrador "operador@example.com" con el permiso "read:admin_reviews"
@@ -18,7 +17,6 @@ Feature: Consultar la bandeja administrativa de reseñas
             Then el sistema responde con estado 200 y una colección vacía, no nula
             And la respuesta incluye la cabecera "Cache-Control" con valor "private, no-store"
 
-        @wip
         Scenario Outline: 69.2-QR Filtrar reseñas con el único reporte posible por reseña
             Given que la fecha y hora actual del sistema es "2026-09-25T12:00:00Z"
             And que las órdenes "O1", "O2" y "O3" corresponden a servicios completados y pagados, programados más de 24 horas después de aceptar sus propuestas y con fecha ya transcurrida, con reseñas elegibles
@@ -40,7 +38,6 @@ Feature: Consultar la bandeja administrativa de reseñas
                 | hidden   | O3        | O3=0       |
                 | all      | O1, O2, O3| O1=1, O2=0, O3=0 |
 
-        @wip
         Scenario Outline: 69.3-QR Paginar por identidad estable de la orden
             Given que existen tres órdenes pagadas creadas en este orden: "O1", "O2" y "O3", cada una con una reseña visible, y se captura para cada etiqueta el identificador generado por el sistema
             And que estoy autenticado como administrador "operador@example.com" con el permiso "read:admin_reviews"

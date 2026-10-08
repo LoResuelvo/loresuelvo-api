@@ -10,7 +10,6 @@ Feature: Consultar el detalle administrativo de una reseña
 
     Rule: El detalle conserva la identidad de la orden y limita el contexto sensible al permiso de moderación
 
-        @wip
         Scenario: 69.4-GRD Mostrar el reporte único y el historial acotado de decisiones
             Given que la fecha y hora actual del sistema es "2026-09-25T12:00:00Z"
             And que la orden pagada "O1", programada más de 24 horas después de aceptar su propuesta, tiene una reseña visible de 5 estrellas con el comentario "Quedó impecable y limpio"
@@ -32,7 +31,6 @@ Feature: Consultar el detalle administrativo de una reseña
 
     Rule: El rol administrativo por sí solo no permite recuperar el original
 
-        @wip
         Scenario: 69.5-GRD Rechazar la lectura del detalle sin el permiso de moderación
             Given que la orden pagada "O1" tiene una reseña oculta con comentario original
             And que estoy autenticado como administrador "operador@example.com" solamente con el permiso "read:admin_operations"

@@ -9,7 +9,6 @@ Feature: Respetar la visibilidad moderada de una reseña
 
     Rule: Las consultas públicas ocultan el original moderado y conservan el trabajo y los agregados
 
-        @wip
         Scenario: 69.14-RV Excluir el comentario oculto del perfil público y su historial de trabajos
             Given que "juan@example.com" tiene dos trabajos pagados reseñados: "O1" con 5 estrellas, oculta y con el comentario "Quedó impecable y limpio", y "O2" con 3 estrellas visibles
             And que estoy autenticado como consumidor "ana@example.com"
@@ -18,7 +17,6 @@ Feature: Respetar la visibilidad moderada de una reseña
             And el perfil incluye el trabajo pagado "O1" en su historial y no incluye el comentario "Quedó impecable y limpio"
             And el perfil informa dos calificaciones registradas y un promedio de 4,00
 
-        @wip
         Scenario: 69.15-RV Mantener la calificación oculta en los indicadores de reputación
             Given que "juan@example.com" tiene dos trabajos pagados con reseñas: una reseña oculta de 5 estrellas con el comentario "Quedó impecable y limpio" y una reseña visible de 3 estrellas
             And que estoy autenticado como prestador "juan@example.com"
@@ -27,7 +25,6 @@ Feature: Respetar la visibilidad moderada de una reseña
             And la distribución conserva una calificación de 5 estrellas y una de 3 estrellas
             And la respuesta de reputación no incluye el comentario oculto "Quedó impecable y limpio"
 
-        @wip
         Scenario: 69.16-RV Informar que la orden ya tiene reseña aunque esté oculta
             Given que la orden pagada "O1", programada más de 24 horas después de aceptar su propuesta, ya tiene una reseña oculta de 5 estrellas
             And que estoy autenticado como consumidor "ana@example.com"
@@ -36,7 +33,6 @@ Feature: Respetar la visibilidad moderada de una reseña
 
     Rule: Las consultas administrativas ordinarias tampoco recuperan el original oculto
 
-        @wip
         Scenario: 69.17-RV Omitir el comentario oculto del detalle administrativo de operación
             Given que la orden pagada "O1" tiene una reseña oculta de 5 estrellas con el comentario "Quedó impecable y limpio"
             And que existe un administrador provisionado con correo "operador@example.com", nombre "Sofía" y apellido "López"
@@ -45,7 +41,6 @@ Feature: Respetar la visibilidad moderada de una reseña
             Then el sistema responde con estado 200
             And el detalle administrativo conserva las 5 estrellas y no incluye el comentario original
 
-        @wip
         Scenario: 69.18-RV Omitir el comentario oculto del diagnóstico administrativo del prestador
             Given que la orden pagada "O1" tiene una reseña oculta de 5 estrellas con el comentario "Quedó impecable y limpio"
             And que existe un administrador provisionado con correo "operador@example.com", nombre "Sofía" y apellido "López"
@@ -56,7 +51,6 @@ Feature: Respetar la visibilidad moderada de una reseña
 
     Rule: Las consultas de participantes conservan la calificación sin revelar el original oculto
 
-        @wip
         Scenario Outline: 69.19-RV Ocultar el comentario moderado en el detalle propio de la orden
             Given que la orden pagada "O1" pertenece a "ana@example.com" como consumidor y a "juan@example.com" como prestador, y tiene una reseña oculta de 5 estrellas con el comentario "Quedó impecable y limpio"
             And que estoy autenticado como <rol> "<correo>"
