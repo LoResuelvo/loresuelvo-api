@@ -22,7 +22,7 @@ func TestProviderSearchResolvesPhotosAndPreservesReadModel(t *testing.T) {
 		ProfilePhoto:  &filedomain.Image{FileID: "photo", OriginalName: "photo.jpg"}, RatingAverage: 4.7, RatingCount: 3, IdentityVerified: true}, {ID: 13}}
 	reader.On("FindByCategoryID", ctx, 1).Return(expected, nil).Once()
 	files := &profilePhotoValidatorMock{profilePhotoURLsByFile: map[string]string{"photo": "https://cdn.example/photo.jpg"}}
-	service := provider.NewService(reader, nil, categoryFinderWithExistingCategory(), files, nil, nil)
+	service := newProviderServiceForTest(reader, nil, categoryFinderWithExistingCategory(), files, nil, nil)
 	results, err := service.SearchProvidersByCategoryID(ctx, 1)
 	require.NoError(t, err)
 	require.Equal(t, expected, results)
@@ -33,7 +33,7 @@ func TestProviderSearchResolvesPhotosAndPreservesReadModel(t *testing.T) {
 
 func TestProviderSearchValidatesCategoryBeforeReading(t *testing.T) {
 	for _, id := range []int{-1, 0, 2} {
-		service := provider.NewService(nil, nil, categoryFinderWithExistingCategory(), nil, nil, nil)
+		service := newProviderServiceForTest(nil, nil, categoryFinderWithExistingCategory(), nil, nil, nil)
 		results, err := service.SearchProvidersByCategoryID(t.Context(), id)
 		require.Nil(t, results)
 		if id <= 0 {
@@ -48,7 +48,7 @@ func TestProviderSearchSkipsFilesWithoutPhotos(t *testing.T) {
 	for _, results := range [][]readmodel.ProviderSearchResult{{}, {{ID: 1, ProfilePhoto: &filedomain.Image{}}}, {{ID: 1}}} {
 		reader := &providerSearchReaderMock{}
 		reader.On("FindByCategoryID", t.Context(), 1).Return(results, nil).Once()
-		service := provider.NewService(reader, nil, categoryFinderWithExistingCategory(), nil, nil, nil)
+		service := newProviderServiceForTest(reader, nil, categoryFinderWithExistingCategory(), nil, nil, nil)
 		actual, err := service.SearchProvidersByCategoryID(t.Context(), 1)
 		require.NoError(t, err)
 		require.Equal(t, results, actual)
@@ -66,7 +66,7 @@ func TestProviderSearchPropagatesErrors(t *testing.T) {
 				readErr = failure
 			}
 			reader.On("FindByCategoryID", t.Context(), 1).Return([]readmodel.ProviderSearchResult{{ID: 1, ProfilePhoto: &filedomain.Image{FileID: "photo"}}}, readErr).Once()
-			service := provider.NewService(reader, nil, categoryFinderWithExistingCategory(), &profilePhotoValidatorMock{resolveErr: failure}, nil, nil)
+			service := newProviderServiceForTest(reader, nil, categoryFinderWithExistingCategory(), &profilePhotoValidatorMock{resolveErr: failure}, nil, nil)
 			results, err := service.SearchProvidersByCategoryID(t.Context(), 1)
 			require.ErrorIs(t, err, failure)
 			require.Nil(t, results)
@@ -76,7 +76,7 @@ func TestProviderSearchPropagatesErrors(t *testing.T) {
 }
 
 func TestProviderSearchRequiresReader(t *testing.T) {
-	service := provider.NewService(nil, nil, categoryFinderWithExistingCategory(), nil, nil, nil)
+	service := newProviderServiceForTest(nil, nil, categoryFinderWithExistingCategory(), nil, nil, nil)
 	results, err := service.SearchProvidersByCategoryID(t.Context(), 1)
 	require.Nil(t, results)
 	require.ErrorIs(t, err, provider.ErrSearchReaderNotConfigured)

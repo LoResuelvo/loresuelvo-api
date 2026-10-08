@@ -153,11 +153,14 @@ func savedCategoryForProvider(t *testing.T, categoryRepository *repositories.Cat
 	categoryToSave, err := category.New(categoryName)
 	require.NoError(t, err, "could not prepare provider category")
 
-	existingCategory := categoryRepository.FindByNormalizedName(categoryToSave.NormalizedName)
-	if existingCategory != nil {
+	existingCategory, findErr := categoryRepository.FindByNormalizedName(t.Context(), categoryToSave.NormalizedName)
+	if findErr == nil {
 		return existingCategory
 	}
 
+	if !errors.Is(findErr, category.ErrDoesNotExist) {
+		require.NoError(t, findErr)
+	}
 	savedCategory, err := categoryRepository.Save(*categoryToSave)
 	require.NoError(t, err, "could not prepare provider category")
 	require.NotNil(t, &savedCategory, "provider category should exist")

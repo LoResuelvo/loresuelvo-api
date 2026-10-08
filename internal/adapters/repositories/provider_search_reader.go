@@ -50,7 +50,7 @@ SELECT p.user_id, u.name, u.surname, c.name,
  COALESCE(i.status, '')
 FROM selected_providers p
 JOIN users u ON u.id = p.user_id
-JOIN categories c ON c.id = $1
+JOIN categories c ON c.id = $1 AND c.enabled = TRUE
 LEFT JOIN files photo ON photo.id = u.profile_photo_file_id
 LEFT JOIN zones z ON z.provider_id = p.user_id
 LEFT JOIN ratings r ON r.provider_id = p.user_id

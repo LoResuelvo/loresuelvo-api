@@ -24,6 +24,10 @@ func handleRegisterProviderError(c *gin.Context, err error) {
 		return
 	}
 
+	if errors.Is(err, category.ErrDisabled) {
+		httphandler.RespondError(c, http.StatusConflict, category.ErrDisabled.Error())
+		return
+	}
 	if errors.Is(err, category.ErrIDRequired) || errors.Is(err, category.ErrDoesNotExist) {
 		httphandler.RespondError(c, http.StatusBadRequest, err.Error())
 		return
@@ -37,7 +41,7 @@ func handleRegisterProviderError(c *gin.Context, err error) {
 		return
 	}
 
-	httphandler.RespondError(c, http.StatusInternalServerError, err.Error())
+	httphandler.RespondError(c, http.StatusInternalServerError, http.StatusText(http.StatusInternalServerError))
 }
 
 func handleFilterProvidersError(c *gin.Context, err error) {
@@ -51,7 +55,7 @@ func handleFilterProvidersError(c *gin.Context, err error) {
 		return
 	}
 
-	httphandler.RespondError(c, http.StatusInternalServerError, err.Error())
+	httphandler.RespondError(c, http.StatusInternalServerError, http.StatusText(http.StatusInternalServerError))
 }
 
 func handleGetProviderProfileError(c *gin.Context, err error) {
@@ -60,5 +64,5 @@ func handleGetProviderProfileError(c *gin.Context, err error) {
 		return
 	}
 
-	httphandler.RespondError(c, http.StatusInternalServerError, err.Error())
+	httphandler.RespondError(c, http.StatusInternalServerError, http.StatusText(http.StatusInternalServerError))
 }

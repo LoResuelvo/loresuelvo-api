@@ -16,7 +16,7 @@ import (
 
 func TestCreateCategoryStoresCategoryAndAuditEventInOneUnitOfWork(t *testing.T) {
 	service, unit, finder, store := newCategoryServiceForTest()
-	expected := &category.Category{ID: 17, Name: "Plomería", NormalizedName: "plomería"}
+	expected := &category.Category{ID: 17, Name: "Plomería", NormalizedName: "plomería", Enabled: true, Version: 1}
 	finder.On("FindOperatorIDByAuthID", mock.Anything, "auth0|supervisor").Return(31, nil).Once()
 	expectCategoryTransaction(unit, store)
 	store.On("SaveCategory", mock.Anything, mock.MatchedBy(func(toSave category.Category) bool {
@@ -115,12 +115,12 @@ func TestCreateCategoryReturnsAuditErrorFromUnitOfWork(t *testing.T) {
 
 func TestListCategoriesReturnsRepositoryCategories(t *testing.T) {
 	expected := []category.Category{
-		{ID: 1, Name: "Electricidad", NormalizedName: "electricidad"},
-		{ID: 2, Name: "Plomería", NormalizedName: "plomería"},
+		{ID: 1, Name: "Electricidad", NormalizedName: "electricidad", Enabled: true, Version: 1},
+		{ID: 2, Name: "Plomería", NormalizedName: "plomería", Enabled: true, Version: 1},
 	}
 	repository := new(categoryRepositoryMock)
 	repository.On("ListAll").Return(expected, nil).Once()
-	service := category.NewService(repository, nil, nil, nil)
+	service := category.NewService(repository, nil, nil, nil, nil)
 	categories, err := service.ListCategories()
 	require.NoError(t, err)
 	assert.Equal(t, expected, categories)
@@ -130,7 +130,7 @@ func TestListCategoriesReturnsRepositoryCategories(t *testing.T) {
 func TestListCategoriesReturnsEmptyCollection(t *testing.T) {
 	repository := new(categoryRepositoryMock)
 	repository.On("ListAll").Return([]category.Category{}, nil).Once()
-	service := category.NewService(repository, nil, nil, nil)
+	service := category.NewService(repository, nil, nil, nil, nil)
 	categories, err := service.ListCategories()
 	require.NoError(t, err)
 	assert.Empty(t, categories)
@@ -142,9 +142,70 @@ func TestListCategoriesWrapsRepositoryError(t *testing.T) {
 	repositoryError := errors.New("repository unavailable")
 	repository := new(categoryRepositoryMock)
 	repository.On("ListAll").Return(([]category.Category)(nil), repositoryError).Once()
-	service := category.NewService(repository, nil, nil, nil)
+	service := category.NewService(repository, nil, nil, nil, nil)
 	categories, err := service.ListCategories()
 	assert.ErrorIs(t, err, repositoryError)
 	assert.Nil(t, categories)
 	repository.AssertExpectations(t)
+}
+
+func TestEditCategoryNoOpDoesNotWriteOrAudit(t *testing.T) {
+	service, unit, finder, store := newCategoryServiceForTest()
+	finder.On("FindOperatorIDByAuthID", mock.Anything, "auth0|supervisor").Return(31, nil).Once()
+	expectCategoryTransaction(unit, store)
+	current := &category.Category{ID: 17, Name: "Plomería", NormalizedName: "plomería", Enabled: true, Version: 1}
+	store.On("FindCategory", mock.Anything, 17).Return(current, nil).Once()
+	result, err := service.EditCategory(context.Background(), 17, category.Edit{ExpectedVersion: 1, Name: new("Plomería"), Enabled: new(true)}, "auth0|supervisor", "request-123")
+	require.NoError(t, err)
+	assert.Equal(t, 1, result.Version)
+	store.AssertNotCalled(t, "SaveCategory", mock.Anything, mock.Anything)
+	store.AssertNotCalled(t, "SaveAuditEvent", mock.Anything, mock.Anything)
+	store.AssertExpectations(t)
+}
+
+func TestEditCategoryChecksFreshImpactAndDoesNotPartiallyRename(t *testing.T) {
+	service, unit, finder, store := newCategoryServiceForTest()
+	finder.On("FindOperatorIDByAuthID", mock.Anything, "auth0|supervisor").Return(31, nil).Once()
+	expectCategoryTransaction(unit, store)
+	current := &category.Category{ID: 17, Name: "Plomería", NormalizedName: "plomería", Enabled: true, Version: 1}
+	store.On("FindCategory", mock.Anything, 17).Return(current, nil).Once()
+	store.On("FindImpact", mock.Anything, 17, mock.Anything).Return(&category.Impact{Counts: category.ImpactCounts{AwaitingPaymentOrders: 1}}, nil).Once()
+	result, err := service.EditCategory(context.Background(), 17, category.Edit{ExpectedVersion: 1, Name: new("Instalaciones"), Enabled: new(false), Reason: "Retirar oferta"}, "auth0|supervisor", "request-123")
+	assert.ErrorIs(t, err, category.ErrConfirmationRequired)
+	assert.Nil(t, result)
+	assert.Equal(t, "Plomería", current.Name)
+	store.AssertNotCalled(t, "SaveCategory", mock.Anything, mock.Anything)
+	store.AssertExpectations(t)
+}
+
+func TestEditCategoryAuditsCombinedEditOnceWithoutNameHistory(t *testing.T) {
+	service, unit, finder, store := newCategoryServiceForTest()
+	finder.On("FindOperatorIDByAuthID", mock.Anything, "auth0|supervisor").Return(31, nil).Once()
+	expectCategoryTransaction(unit, store)
+	current := &category.Category{ID: 17, Name: "Plomería", NormalizedName: "plomería", Enabled: true, Version: 1}
+	store.On("FindCategory", mock.Anything, 17).Return(current, nil).Once()
+	store.On("FindImpact", mock.Anything, 17, mock.Anything).Return(&category.Impact{}, nil).Once()
+	expected := &category.Category{ID: 17, Name: "Instalaciones", NormalizedName: "instalaciones", Enabled: false, Version: 2}
+	store.On("SaveCategory", mock.Anything, *expected).Return(expected, nil).Once()
+	store.On("SaveAuditEvent", mock.Anything, mock.MatchedBy(func(event *audit.Event) bool {
+		return event.Action() == audit.ActionExecute && event.ResourceID() == "17" && event.OperatorID() == 31 && event.Reason().Text() == "Retirar oferta" && event.StateChange().Field() == "enabled" && event.StateChange().From() == "enabled" && event.StateChange().To() == "disabled"
+	})).Return(nil).Once()
+	result, err := service.EditCategory(context.Background(), 17, category.Edit{ExpectedVersion: 1, Name: new("Instalaciones"), Enabled: new(false), Reason: "Retirar oferta"}, "auth0|supervisor", "request-123")
+	require.NoError(t, err)
+	assert.Equal(t, expected, result)
+	store.AssertExpectations(t)
+}
+
+func TestEditCategoryDoesNotTreatImpactFailureAsZero(t *testing.T) {
+	service, unit, finder, store := newCategoryServiceForTest()
+	finder.On("FindOperatorIDByAuthID", mock.Anything, "auth0|supervisor").Return(31, nil).Once()
+	expectCategoryTransaction(unit, store)
+	store.On("FindCategory", mock.Anything, 17).Return(&category.Category{ID: 17, Enabled: true, Version: 1}, nil).Once()
+	failure := errors.New("impact unavailable")
+	store.On("FindImpact", mock.Anything, 17, mock.Anything).Return((*category.Impact)(nil), failure).Once()
+	result, err := service.EditCategory(context.Background(), 17, category.Edit{ExpectedVersion: 1, Enabled: new(false), Reason: "Retirar oferta"}, "auth0|supervisor", "request-123")
+	assert.ErrorIs(t, err, failure)
+	assert.Nil(t, result)
+	store.AssertNotCalled(t, "SaveCategory", mock.Anything, mock.Anything)
+	store.AssertExpectations(t)
 }

@@ -2,6 +2,8 @@ package provider_test
 
 import (
 	"context"
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/category"
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/user"
 	"time"
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/provider"
@@ -110,4 +112,43 @@ func (m *conversionReaderMock) Read(ctx context.Context, providerID int, query p
 		return value.(*readmodel.ConversionSnapshot), args.Error(1)
 	}
 	return nil, args.Error(1)
+}
+
+type registrationUnitMock struct{ mock.Mock }
+
+func (unit *registrationUnitMock) Execute(ctx context.Context, operation func(provider.RegistrationStore) error) error {
+	args := unit.Called(ctx, operation)
+	if run, ok := args.Get(0).(func(context.Context, func(provider.RegistrationStore) error) error); ok {
+		return run(ctx, operation)
+	}
+	return args.Error(0)
+}
+
+type registrationStoreMock struct{ mock.Mock }
+
+func (store *registrationStoreMock) FindCategory(ctx context.Context, id int) (*category.Category, error) {
+	args := store.Called(ctx, id)
+	if run, ok := args.Get(0).(func(context.Context, int) (*category.Category, error)); ok {
+		return run(ctx, id)
+	}
+	found, _ := args.Get(0).(*category.Category)
+	return found, args.Error(1)
+}
+func (store *registrationStoreMock) SaveUser(ctx context.Context, toSave user.User) (user.User, error) {
+	args := store.Called(ctx, toSave)
+	if run, ok := args.Get(0).(func(context.Context, user.User) (user.User, error)); ok {
+		return run(ctx, toSave)
+	}
+	saved, _ := args.Get(0).(user.User)
+	return saved, args.Error(1)
+}
+func newProviderServiceForTest(search provider.ProviderSearchReader, repository provider.UserRepository, finder provider.CategoryFinder, files provider.FileService, profiles provider.ProviderProfileReader, zones provider.CoverageZoneFinder, identities ...provider.IdentityApprovalReader) *provider.Service {
+	unit := new(registrationUnitMock)
+	store := new(registrationStoreMock)
+	unit.On("Execute", mock.Anything, mock.Anything).Return(func(ctx context.Context, operation func(provider.RegistrationStore) error) error {
+		return operation(store)
+	})
+	store.On("FindCategory", mock.Anything, mock.Anything).Return(func(ctx context.Context, id int) (*category.Category, error) { return finder.FindByID(ctx, id) })
+	store.On("SaveUser", mock.Anything, mock.Anything).Return(func(ctx context.Context, toSave user.User) (user.User, error) { return repository.Save(ctx, toSave) })
+	return provider.NewService(unit, search, repository, finder, files, profiles, zones, identities...)
 }

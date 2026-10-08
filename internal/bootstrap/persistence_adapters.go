@@ -27,9 +27,12 @@ type PersistenceAdapters struct {
 	OperationFunnelReader                  *repositories.OperationFunnelReader
 	ProviderSearchReader                   *repositories.ProviderSearchReader
 	UserRepository                         *repositories.UserRepository
+	ProviderRegistrationUnitOfWork         *repositories.ProviderRegistrationUnitOfWork
+	JobRequestCreationUnitOfWork           *repositories.JobRequestCreationUnitOfWork
 	CategoryRepository                     *repositories.CategoryRepository
 	AuditEventRepository                   *repositories.AuditEventRepository
 	CategoryUnitOfWork                     *repositories.CategoryUnitOfWork
+	CategoryImpactReader                   *repositories.CategoryImpactReader
 	CoverageZoneRepository                 *repositories.CoverageZoneRepository
 	ConversationRepository                 *repositories.ConversationRepository
 	MessageRepository                      *repositories.MessageRepository
@@ -59,6 +62,7 @@ func NewPersistenceAdapters(database *sql.DB) *PersistenceAdapters {
 	userRepository := repositories.NewUserRepository(database)
 	categoryRepository := repositories.NewCategoryRepository(database)
 	auditEventRepository := repositories.NewAuditEventRepository(database)
+	categoryImpactReader := repositories.NewCategoryImpactReader(database)
 	categoryUnitOfWork := repositories.NewCategoryUnitOfWork(database, categoryRepository, auditEventRepository)
 	coverageZoneRepository := repositories.NewCoverageZoneRepository(database)
 	messageImageRepository := repositories.NewMessageImageRepository(database)
@@ -121,9 +125,12 @@ func NewPersistenceAdapters(database *sql.DB) *PersistenceAdapters {
 		OperationFunnelReader:                  repositories.NewOperationFunnelReader(database),
 		ProviderSearchReader:                   repositories.NewProviderSearchReader(database),
 		UserRepository:                         userRepository,
+		ProviderRegistrationUnitOfWork:         repositories.NewProviderRegistrationUnitOfWork(database, userRepository, categoryRepository),
+		JobRequestCreationUnitOfWork:           repositories.NewJobRequestCreationUnitOfWork(database, jobRequestRepository, categoryRepository, userRepository),
 		CategoryRepository:                     categoryRepository,
 		AuditEventRepository:                   auditEventRepository,
 		CategoryUnitOfWork:                     categoryUnitOfWork,
+		CategoryImpactReader:                   categoryImpactReader,
 		CoverageZoneRepository:                 coverageZoneRepository,
 		ConversationRepository:                 conversationRepository,
 		MessageRepository:                      messageRepository,

@@ -17,7 +17,7 @@ type UserRepository interface {
 }
 
 type CategoryFinder interface {
-	FindByID(id int) *category.Category
+	FindByID(ctx context.Context, id int) (*category.Category, error)
 }
 
 type CoverageZoneFinder interface {
@@ -36,4 +36,12 @@ type IdentityApprovalReader interface {
 
 type ProviderSearchReader interface {
 	FindByCategoryID(ctx context.Context, categoryID int) ([]readmodel.ProviderSearchResult, error)
+}
+
+type RegistrationStore interface {
+	FindCategory(ctx context.Context, id int) (*category.Category, error)
+	SaveUser(ctx context.Context, user user.User) (user.User, error)
+}
+type RegistrationUnitOfWork interface {
+	Execute(ctx context.Context, operation func(RegistrationStore) error) error
 }

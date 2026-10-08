@@ -124,7 +124,12 @@ func executeServiceContract(ctx context.Context, id string, input contractInput)
 	users := &contractUsers{}
 	store := &contractStore{}
 	bot := &contractChatbot{response: conversation.ChatbotResponse{Status: conversation.ChatbotResponseAnswered, Title: "Contract", Content: "Controlled response", Assessment: conversation.ChatbotAssessmentResponse{Action: conversation.ChatbotAssessmentReplace, Outcome: conversation.AssessmentProfessionalRequired, ProblemCategoryName: "Plumbing", ProblemTitle: "Leak", ProblemDescription: "Leak requiring repair"}}}
-	categories := contractCategories{{ID: 1, Name: "Plumbing", NormalizedName: "plumbing"}}
+	defaultCategory, err := category.New("Plumbing")
+	if err != nil {
+		return r, err
+	}
+	defaultCategory.ID = 1
+	categories := contractCategories{*defaultCategory}
 	config := conversation.DefaultProviderRecommendationConfig()
 	if len(input.AvailableCategories) > 0 {
 		categories = nil

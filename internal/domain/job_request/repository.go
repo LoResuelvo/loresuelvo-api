@@ -2,6 +2,7 @@ package jobrequest
 
 import (
 	"context"
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/category"
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/conversation"
 	readmodel "github.com/LoResuelvo/loresuelvo-api/internal/domain/job_request/read_model"
@@ -25,4 +26,12 @@ type UserRepository interface {
 type ConversationRepository interface {
 	FindByID(ctx context.Context, conversationID int) (conversation.Conversation, error)
 	SaveConversation(ctx context.Context, conversation conversation.Conversation) (conversation.Conversation, error)
+}
+
+type CreationStore interface {
+	FindProviderCategory(ctx context.Context, providerID int) (*category.Category, error)
+	SaveWithConversation(ctx context.Context, request JobRequest, pendingConversation conversation.Conversation) (*JobRequest, error)
+}
+type CreationUnitOfWork interface {
+	Execute(ctx context.Context, operation func(CreationStore) error) error
 }

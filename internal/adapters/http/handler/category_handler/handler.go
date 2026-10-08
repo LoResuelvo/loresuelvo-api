@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strconv"
 
 	httphandler "github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/middleware"
@@ -55,6 +56,29 @@ func (h *CategoryHandler) CreateCategory(c *gin.Context) {
 }
 
 func (h *CategoryHandler) ListCategories(c *gin.Context) {
+	includeDisabled := false
+	if value, exists := c.GetQuery("include_disabled"); exists {
+		parsed, err := strconv.ParseBool(value)
+		if err != nil {
+			httphandler.RespondError(c, http.StatusBadRequest, "Invalid include_disabled")
+			return
+		}
+		includeDisabled = parsed
+	}
+	if includeDisabled {
+		c.Header("Cache-Control", "private, no-store")
+		categories, err := h.categoryService.ListAllCategories()
+		if err != nil {
+			handleCategoryError(c, err)
+			return
+		}
+		result := make([]administrativeCategoryResponse, 0, len(categories))
+		for _, current := range categories {
+			result = append(result, administrativeCategoryFromDomain(current))
+		}
+		c.JSON(http.StatusOK, result)
+		return
+	}
 	categories, err := h.categoryService.ListCategories()
 	if err != nil {
 		httphandler.RespondError(c, http.StatusInternalServerError, http.StatusText(http.StatusInternalServerError))

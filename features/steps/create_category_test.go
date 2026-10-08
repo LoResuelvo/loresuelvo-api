@@ -62,7 +62,10 @@ func (suite *testSuite) thereIsCategoryNamed(name string) error {
 		if !errors.Is(err, category.ErrAlreadyExists) {
 			return fmt.Errorf("saving category fixture: %w", err)
 		}
-		savedCategory = suite.categoryRepository.FindByNormalizedName(categoryToSave.NormalizedName)
+		savedCategory, err = suite.categoryRepository.FindByNormalizedName(suite.scenarioContext, categoryToSave.NormalizedName)
+		if err != nil {
+			return fmt.Errorf("finding existing category fixture: %w", err)
+		}
 		if savedCategory == nil {
 			return fmt.Errorf("finding existing category fixture %q", name)
 		}

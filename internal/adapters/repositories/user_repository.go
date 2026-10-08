@@ -21,7 +21,7 @@ type UserRepository struct {
 }
 
 const userWithProfileSelectSQL = `SELECT u.id, u.auth_id, u.email, u.name, u.surname, u.role,
-	c.user_id, p.user_id, cat.id, cat.name, cat.normalized_name,
+	c.user_id, p.user_id, cat.id, cat.name, cat.normalized_name, cat.enabled, cat.version,
 	COALESCE(u.profile_photo_file_id::text, ''), COALESCE(profile_photo.original_name, ''),
 	consumer_address.street, consumer_address.street_number, consumer_address.floor,
 	consumer_address.unit, consumer_address.latitude, consumer_address.longitude,
@@ -50,9 +50,21 @@ func (repository *UserRepository) Save(ctx context.Context, userToSave user.User
 		return nil, fmt.Errorf("beginning user transaction: %w", err)
 	}
 
-	userID, err := saveBaseUser(ctx, tx, userToSave)
+	defer func() { _ = tx.Rollback() }()
+	saved, err := repository.saveWithTx(ctx, tx, userToSave)
 	if err != nil {
 		return nil, rollbackUserTx(tx, err)
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, fmt.Errorf("committing user transaction: %w", err)
+	}
+	return saved, nil
+}
+
+func (repository *UserRepository) saveWithTx(ctx context.Context, tx *sql.Tx, userToSave user.User) (user.User, error) {
+	userID, err := saveBaseUser(ctx, tx, userToSave)
+	if err != nil {
+		return nil, err
 	}
 	userToSave.SetPersistenceID(userID)
 
@@ -85,10 +97,7 @@ func (repository *UserRepository) Save(ctx context.Context, userToSave user.User
 		err = fmt.Errorf("saving user: unsupported user type %T", userToSave)
 	}
 	if err != nil {
-		return nil, rollbackUserTx(tx, fmt.Errorf("saving user profile: %w", err))
-	}
-	if err := tx.Commit(); err != nil {
-		return nil, fmt.Errorf("committing user transaction: %w", err)
+		return nil, fmt.Errorf("saving user profile: %w", err)
 	}
 	return userToSave, nil
 }
@@ -271,6 +280,8 @@ func scanUserWithProfile(row rowScanner, lookup string) (user.User, error) {
 	var authID, email, name, surname, role string
 	var consumerID, providerID, categoryID sql.NullInt64
 	var categoryName, normalizedCategoryName sql.NullString
+	var categoryEnabled sql.NullBool
+	var categoryVersion sql.NullInt64
 	var profilePhotoFileID, profilePhotoOriginalName string
 	var addressStreet, addressStreetNumber, addressFloor, addressUnit sql.NullString
 	var addressLatitude, addressLongitude sql.NullFloat64
@@ -279,7 +290,7 @@ func scanUserWithProfile(row rowScanner, lookup string) (user.User, error) {
 	var coverageZoneEnabled sql.NullBool
 	err := row.Scan(
 		&id, &authID, &email, &name, &surname, &role,
-		&consumerID, &providerID, &categoryID, &categoryName, &normalizedCategoryName,
+		&consumerID, &providerID, &categoryID, &categoryName, &normalizedCategoryName, &categoryEnabled, &categoryVersion,
 		&profilePhotoFileID, &profilePhotoOriginalName,
 		&addressStreet, &addressStreetNumber, &addressFloor, &addressUnit,
 		&addressLatitude, &addressLongitude, &addressCoverageZoneID,
@@ -328,6 +339,7 @@ func scanUserWithProfile(row rowScanner, lookup string) (user.User, error) {
 				ID:             int(categoryID.Int64),
 				Name:           categoryName.String,
 				NormalizedName: normalizedCategoryName.String,
+				Enabled:        categoryEnabled.Bool, Version: int(categoryVersion.Int64),
 			},
 		}, nil
 	default:
@@ -513,7 +525,7 @@ func (repository *UserRepository) FindProviderByAuthID(authID string) (*provider
 
 func (repository *UserRepository) FindProvidersByCategoryID(categoryID int) ([]provider.Provider, error) {
 	rows, err := repository.db.Query(
-		providerSelectSQL+` WHERE providers.category_id = $1
+		providerSelectSQL+` WHERE providers.category_id = $1 AND categories.enabled = TRUE
 		ORDER BY users.name ASC, users.surname ASC`,
 		categoryID,
 	)
@@ -564,7 +576,7 @@ func (repository *UserRepository) FindProvidersByCategoryAndCoverageZoneID(ctx c
 		ON coverage_zones.id = provider_coverage_zones.coverage_zone_id
 	INNER JOIN coverage_markets
 		ON coverage_markets.id = coverage_zones.market_id
-	WHERE providers.category_id = $1
+	WHERE providers.category_id = $1 AND categories.enabled = TRUE
 		AND provider_coverage_zones.coverage_zone_id = $2
 		AND coverage_zones.enabled = TRUE
 		AND coverage_markets.enabled = TRUE
@@ -615,6 +627,7 @@ const providerSelectSQL = `SELECT providers.user_id,
 	categories.id,
 	categories.name,
 	categories.normalized_name,
+ categories.enabled, categories.version,
 	COALESCE(users.profile_photo_file_id::text, ''),
 	COALESCE(profile_photo.original_name, '')
 FROM providers
@@ -641,6 +654,7 @@ func scanProvider(scanner providerScanner) (*provider.Provider, error) {
 		&providerCategory.ID,
 		&providerCategory.Name,
 		&providerCategory.NormalizedName,
+		&providerCategory.Enabled, &providerCategory.Version,
 		&profilePhotoFileID,
 		&profilePhotoOriginalName,
 	); err != nil {
@@ -674,4 +688,16 @@ func (repository *UserRepository) DeleteAll() error {
 func (repository *UserRepository) DeleteAllOf(role string) error {
 	_, err := repository.db.Exec(`DELETE FROM users WHERE role = $1`, role)
 	return err
+}
+
+func (repository *UserRepository) findProviderCategoryIDWithExecutor(ctx context.Context, executor categoryQueryExecutor, providerID int) (int, error) {
+	var id int
+	err := executor.QueryRowContext(ctx, `SELECT category_id FROM providers WHERE user_id=$1`, providerID).Scan(&id)
+	if errors.Is(err, sql.ErrNoRows) {
+		return 0, provider.ErrDoesNotExist
+	}
+	if err != nil {
+		return 0, fmt.Errorf("finding provider category: %w", err)
+	}
+	return id, nil
 }

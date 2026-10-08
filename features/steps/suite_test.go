@@ -45,6 +45,7 @@ import (
 type testSuite struct {
 	reviewModeration               reviewModerationState
 	claims                         claimState
+	categoryAdministration         categoryAdministrationState
 	adminClaims                    adminClaimState
 	adminClaimCapture              *adminClaimCapture
 	phoneIDs                       []string
@@ -201,6 +202,10 @@ func (s *testSuite) registerAllSteps(sc *godog.ScenarioContext) {
 	registerProviderWithProfilePhotoSteps(sc, s)
 	registerProviderWithCoverageZonesSteps(sc, s)
 	registerCreateCategorySteps(sc, s)
+	registerCategoryAdministrationSteps(sc, s)
+	registerCategoryAvailabilitySteps(sc, s)
+	registerCategoryImpactSteps(sc, s)
+	registerCategoryOperationFixtureSteps(sc, s)
 	registerListCategoriesSteps(sc, s)
 	registerListAvailableCoverageZonesSteps(sc, s)
 	registerFilterProvidersByCategorySteps(sc, s)
@@ -277,6 +282,7 @@ func (s *testSuite) cleanup() error {
 		return err
 	}
 	s.claims = claimState{}
+	s.categoryAdministration = categoryAdministrationState{}
 	s.adminClaims = adminClaimState{}
 	if s.adminClaimCapture != nil {
 		s.adminClaimCapture.reset()

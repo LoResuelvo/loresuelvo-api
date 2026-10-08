@@ -26,7 +26,9 @@ type jobRequestRepositoryTestContext struct {
 func cleanJobRequestRepositoryTestDatabase(t *testing.T, database *sql.DB) {
 	t.Helper()
 
-	_, err := database.Exec("DELETE FROM job_requests")
+	_, err := database.Exec("DELETE FROM work_orders")
+	require.NoError(t, err, "could not clean work orders")
+	_, err = database.Exec("DELETE FROM job_requests")
 	require.NoError(t, err, "could not clean job requests")
 
 	_, err = database.Exec("DELETE FROM messages")

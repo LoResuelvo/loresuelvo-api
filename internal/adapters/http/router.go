@@ -3,6 +3,7 @@ package httpadapter
 import (
 	"fmt"
 	"log/slog"
+	"strconv"
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/admin_handler"
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler/admin_payment_handler"
@@ -300,7 +301,19 @@ func (router *Router) registerHealthRoutes(engine *gin.Engine) {
 }
 
 func (router *Router) registerCategoryRoutes(engine *gin.Engine, authMiddleware gin.HandlerFunc) {
-	engine.GET("/categories", authMiddleware, router.categoryHandler.ListCategories)
+	engine.PATCH("/categories/:id", privateNoStore, authMiddleware, middleware.RequirePermissionLayer("write:categories"), router.categoryHandler.EditCategory)
+	engine.GET("/admin/categories/:id/impact", privateNoStore, authMiddleware, middleware.RequirePermissionLayer("read:categories"), router.categoryHandler.GetImpact)
+	engine.GET("/categories", func(c *gin.Context) {
+		value, _ := strconv.ParseBool(c.Query("include_disabled"))
+		if value {
+			privateNoStore(c)
+		}
+	}, authMiddleware, func(c *gin.Context) {
+		value, _ := strconv.ParseBool(c.Query("include_disabled"))
+		if value {
+			middleware.RequirePermissionLayer("read:categories")(c)
+		}
+	}, router.categoryHandler.ListCategories)
 	engine.POST(
 		"/categories",
 		authMiddleware,

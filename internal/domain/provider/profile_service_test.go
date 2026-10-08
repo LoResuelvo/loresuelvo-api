@@ -59,7 +59,7 @@ func TestServiceIncludesIdentityApprovalInPublicProfile(t *testing.T) {
 	identityReader := &identityApprovalReaderMock{
 		approvedByProviderID: map[int]bool{12: true},
 	}
-	providerService := provider.NewService(
+	providerService := newProviderServiceForTest(
 		nil,
 		&providerRepositoryMock{providerByID: providerForProfileService(t)},
 		categoryFinderWithExistingCategory(),
@@ -79,7 +79,7 @@ func TestServiceIncludesIdentityApprovalInPublicProfile(t *testing.T) {
 func TestServicePropagatesRatingStatsError(t *testing.T) {
 	expectedErr := errors.New("rating stats unavailable")
 	repository := &providerRepositoryMock{providerByID: providerForProfileService(t)}
-	providerService := provider.NewService(
+	providerService := newProviderServiceForTest(
 		nil,
 		repository,
 		categoryFinderWithExistingCategory(),
@@ -96,7 +96,7 @@ func TestServicePropagatesRatingStatsError(t *testing.T) {
 func TestServicePropagatesPaidWorkHistoryError(t *testing.T) {
 	expectedErr := errors.New("work history unavailable")
 	repository := &providerRepositoryMock{providerByID: providerForProfileService(t)}
-	providerService := provider.NewService(
+	providerService := newProviderServiceForTest(
 		nil,
 		repository,
 		categoryFinderWithExistingCategory(),
@@ -112,7 +112,7 @@ func TestServicePropagatesPaidWorkHistoryError(t *testing.T) {
 
 func TestServicePropagatesIdentityApprovalErrorInPublicProfile(t *testing.T) {
 	expectedErr := errors.New("identity approval unavailable")
-	providerService := provider.NewService(
+	providerService := newProviderServiceForTest(
 		nil,
 		&providerRepositoryMock{providerByID: providerForProfileService(t)},
 		categoryFinderWithExistingCategory(),
@@ -130,7 +130,7 @@ func TestServicePropagatesIdentityApprovalErrorInPublicProfile(t *testing.T) {
 func newProviderServiceWithProfileReader(t *testing.T, stats provider.RatingStats, workOrders []readmodel.WorkOrder) (*provider.Service, *providerRepositoryMock) {
 	t.Helper()
 	repository := &providerRepositoryMock{providerByID: providerForProfileService(t)}
-	providerService := provider.NewService(
+	providerService := newProviderServiceForTest(
 		nil,
 		repository,
 		categoryFinderWithExistingCategory(),

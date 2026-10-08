@@ -13,6 +13,7 @@ import (
 )
 
 type Service struct {
+	registrationUnit       RegistrationUnitOfWork
 	searchReader           ProviderSearchReader
 	userRepository         UserRepository
 	categoryFinder         CategoryFinder
@@ -23,6 +24,7 @@ type Service struct {
 }
 
 func NewService(
+	registrationUnit RegistrationUnitOfWork,
 	searchReader ProviderSearchReader,
 	repository UserRepository,
 	categoryFinder CategoryFinder,
@@ -32,6 +34,7 @@ func NewService(
 	identityApprovalReaders ...IdentityApprovalReader,
 ) *Service {
 	service := &Service{
+		registrationUnit:   registrationUnit,
 		searchReader:       searchReader,
 		userRepository:     repository,
 		categoryFinder:     categoryFinder,
@@ -50,8 +53,11 @@ func (s *Service) RegisterProvider(ctx context.Context, authID, email, name, sur
 		return nil, validator.ErrEmailAlreadyRegistered
 	}
 
-	category, err := s.validateCategory(categoryID)
+	selectedCategory, err := s.validateCategory(ctx, categoryID)
 	if err != nil {
+		return nil, err
+	}
+	if err := selectedCategory.RequireEnabled(); err != nil {
 		return nil, err
 	}
 	coverageZones, err := s.resolveCoverageZones(ctx, coverageZoneIDs)
@@ -63,7 +69,7 @@ func (s *Service) RegisterProvider(ctx context.Context, authID, email, name, sur
 		email,
 		name,
 		surname,
-		category,
+		selectedCategory,
 		&filedomain.Image{FileID: profilePhotoFileID},
 		coverageZones,
 	)
@@ -81,12 +87,33 @@ func (s *Service) RegisterProvider(ctx context.Context, authID, email, name, sur
 	}
 	provider.SetProfilePhotoURL(profilePhotoURL)
 
-	savedUser, err := s.userRepository.Save(ctx, provider)
+	var savedID int
+	var savedCategory *category.Category
+	err = s.registrationUnit.Execute(ctx, func(store RegistrationStore) error {
+		current, err := store.FindCategory(ctx, categoryID)
+		if err != nil {
+			return err
+		}
+		if err := current.RequireEnabled(); err != nil {
+			return err
+		}
+		copyToSave := *provider
+		base := *provider.BaseUser
+		copyToSave.BaseUser = &base
+		copyToSave.Category = current
+		savedUser, err := store.SaveUser(ctx, &copyToSave)
+		if err != nil {
+			return err
+		}
+		savedID = savedUser.ID()
+		savedCategory = current
+		return nil
+	})
 	if err != nil {
 		return nil, err
 	}
-
-	provider.SetPersistenceID(savedUser.ID())
+	provider.SetPersistenceID(savedID)
+	provider.Category = savedCategory
 	return provider, nil
 }
 
@@ -123,8 +150,12 @@ func (s *Service) resolveCoverageZones(ctx context.Context, ids []int) ([]covera
 }
 
 func (s *Service) FilterProvidersByCategoryID(ctx context.Context, categoryID int) ([]Provider, error) {
-	if _, err := s.validateCategory(categoryID); err != nil {
+	current, err := s.validateCategory(ctx, categoryID)
+	if err != nil {
 		return nil, err
+	}
+	if !current.Enabled {
+		return []Provider{}, nil
 	}
 
 	providers, err := s.userRepository.FindProvidersByCategoryID(categoryID)
@@ -146,8 +177,12 @@ func (s *Service) FilterProvidersByCategoryID(ctx context.Context, categoryID in
 }
 
 func (s *Service) SearchProvidersByCategoryID(ctx context.Context, categoryID int) ([]readmodel.ProviderSearchResult, error) {
-	if _, err := s.validateCategory(categoryID); err != nil {
+	current, err := s.validateCategory(ctx, categoryID)
+	if err != nil {
 		return nil, err
+	}
+	if !current.Enabled {
+		return []readmodel.ProviderSearchResult{}, nil
 	}
 	if s.searchReader == nil {
 		return nil, ErrSearchReaderNotConfigured
@@ -251,14 +286,14 @@ func categoryName(foundProvider *Provider) string {
 	return foundProvider.Category.Name
 }
 
-func (s *Service) validateCategory(categoryID int) (*category.Category, error) {
+func (s *Service) validateCategory(ctx context.Context, categoryID int) (*category.Category, error) {
 	if categoryID <= 0 {
 		return nil, category.ErrIDRequired
 	}
 
-	existingCategory := s.categoryFinder.FindByID(categoryID)
-	if existingCategory == nil {
-		return nil, category.ErrDoesNotExist
+	existingCategory, err := s.categoryFinder.FindByID(ctx, categoryID)
+	if err != nil {
+		return nil, err
 	}
 
 	return existingCategory, nil

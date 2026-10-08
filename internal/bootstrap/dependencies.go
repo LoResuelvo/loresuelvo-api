@@ -255,7 +255,7 @@ func newDependencies(database *sql.DB, adapters dependencyAdapters) (*Dependenci
 	if adapters.categoryUnitOfWorkDecorator != nil {
 		categoryUnitOfWork = adapters.categoryUnitOfWorkDecorator(categoryUnitOfWork)
 	}
-	categoryService := category.NewService(persistence.CategoryRepository, categoryUnitOfWork, persistence.UserRepository, systemClock)
+	categoryService := category.NewService(persistence.CategoryRepository, categoryUnitOfWork, persistence.UserRepository, systemClock, persistence.CategoryImpactReader)
 	auditLogQueryService := audit.NewLogQueryService(
 		persistence.AuditEventRepository,
 		persistence.AuditEventRepository,
@@ -268,6 +268,7 @@ func newDependencies(database *sql.DB, adapters dependencyAdapters) (*Dependenci
 	}
 	coverageZoneService := coveragezone.NewService(persistence.CoverageZoneRepository)
 	providerService := provider.NewService(
+		persistence.ProviderRegistrationUnitOfWork,
 		persistence.ProviderSearchReader,
 		persistence.UserRepository,
 		persistence.CategoryRepository,
@@ -302,6 +303,7 @@ func newDependencies(database *sql.DB, adapters dependencyAdapters) (*Dependenci
 		persistence.WorkOrderRepository,
 	)
 	jobRequestService := jobrequest.NewService(
+		persistence.JobRequestCreationUnitOfWork,
 		persistence.JobRequestRepository,
 		persistence.UserRepository,
 		persistence.ConversationRepository,

@@ -12,6 +12,7 @@ import (
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/user"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/validator"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
@@ -87,13 +88,13 @@ func categoryFinderWithExistingCategory() *categoryFinderMock {
 	return &categoryFinderMock{categories: []category.Category{existingCategory()}}
 }
 
-func (finder *categoryFinderMock) FindByID(id int) *category.Category {
+func (finder *categoryFinderMock) FindByID(_ context.Context, id int) (*category.Category, error) {
 	for i := range finder.categories {
 		if finder.categories[i].ID == id {
-			return &finder.categories[i]
+			return &finder.categories[i], nil
 		}
 	}
-	return nil
+	return nil, category.ErrDoesNotExist
 }
 
 func (finder *coverageZoneFinderMock) FindByID(_ context.Context, id int) (*coveragezone.CoverageZone, error) {
@@ -165,7 +166,7 @@ func TestRegisterProviderWithValidData(t *testing.T) {
 	repository := &providerRepositoryMock{}
 	categoryFinder := categoryFinderWithExistingCategory()
 	profilePhotoValidator := &profilePhotoValidatorMock{profilePhotoURLsByFile: map[string]string{"profile-photo-file-id": "https://cdn/profile-photo.jpg"}}
-	providerManager := provider.NewService(nil, repository, categoryFinder, profilePhotoValidator, nil, coverageZoneFinderWithDefaultZone())
+	providerManager := newProviderServiceForTest(nil, repository, categoryFinder, profilePhotoValidator, nil, coverageZoneFinderWithDefaultZone())
 
 	createdProvider, err := providerManager.RegisterProvider(
 		context.Background(),
@@ -194,7 +195,7 @@ func TestRegisterProviderIncludesSelectedCoverageZones(t *testing.T) {
 	repository := &providerRepositoryMock{}
 	categoryFinder := categoryFinderWithExistingCategory()
 	profilePhotoValidator := &profilePhotoValidatorMock{profilePhotoURLsByFile: map[string]string{"profile-photo-file-id": "https://cdn/profile-photo.jpg"}}
-	providerManager := provider.NewService(nil, repository, categoryFinder, profilePhotoValidator, nil, coverageZoneFinderWithDefaultZone())
+	providerManager := newProviderServiceForTest(nil, repository, categoryFinder, profilePhotoValidator, nil, coverageZoneFinderWithDefaultZone())
 
 	createdProvider, err := providerManager.RegisterProvider(
 		context.Background(),
@@ -221,7 +222,7 @@ func TestRegisterProviderRejectsNonExistingCoverageZone(t *testing.T) {
 	profilePhotoValidator := &profilePhotoValidatorMock{profilePhotoURLsByFile: map[string]string{
 		"profile-photo-file-id": "https://cdn/profile-photo.jpg",
 	}}
-	providerManager := provider.NewService(nil, repository, categoryFinder, profilePhotoValidator, nil, coverageZoneFinder)
+	providerManager := newProviderServiceForTest(nil, repository, categoryFinder, profilePhotoValidator, nil, coverageZoneFinder)
 
 	createdProvider, err := providerManager.RegisterProvider(
 		context.Background(),
@@ -252,7 +253,7 @@ func TestRegisterProviderRejectsUnavailableCoverageZone(t *testing.T) {
 	profilePhotoValidator := &profilePhotoValidatorMock{profilePhotoURLsByFile: map[string]string{
 		"profile-photo-file-id": "https://cdn/profile-photo.jpg",
 	}}
-	providerManager := provider.NewService(nil, repository, categoryFinder, profilePhotoValidator, nil, coverageZoneFinder)
+	providerManager := newProviderServiceForTest(nil, repository, categoryFinder, profilePhotoValidator, nil, coverageZoneFinder)
 
 	createdProvider, err := providerManager.RegisterProvider(
 		context.Background(),
@@ -278,7 +279,7 @@ func TestRegisterProviderRejectsDuplicateCoverageZone(t *testing.T) {
 	profilePhotoValidator := &profilePhotoValidatorMock{profilePhotoURLsByFile: map[string]string{
 		"profile-photo-file-id": "https://cdn/profile-photo.jpg",
 	}}
-	providerManager := provider.NewService(nil, repository, categoryFinderWithExistingCategory(), profilePhotoValidator, nil, coverageZoneFinder)
+	providerManager := newProviderServiceForTest(nil, repository, categoryFinderWithExistingCategory(), profilePhotoValidator, nil, coverageZoneFinder)
 
 	createdProvider, err := providerManager.RegisterProvider(
 		context.Background(),
@@ -320,7 +321,7 @@ func TestNewProviderExposesUserFieldsThroughAccessors(t *testing.T) {
 func TestRegisterProviderWithEmailWithoutArroba(t *testing.T) {
 	repository := &providerRepositoryMock{}
 	categoryFinder := categoryFinderWithExistingCategory()
-	providerManager := provider.NewService(nil, repository, categoryFinder, &profilePhotoValidatorMock{}, nil, coverageZoneFinderWithDefaultZone())
+	providerManager := newProviderServiceForTest(nil, repository, categoryFinder, &profilePhotoValidatorMock{}, nil, coverageZoneFinderWithDefaultZone())
 
 	_, err := providerManager.RegisterProvider(
 		context.Background(),
@@ -342,7 +343,7 @@ func TestRegisterProviderReturnsRepositorySaveError(t *testing.T) {
 	repository := &providerRepositoryMock{saveErr: expectedErr}
 	categoryFinder := categoryFinderWithExistingCategory()
 	profilePhotoValidator := &profilePhotoValidatorMock{profilePhotoURLsByFile: map[string]string{"profile-photo-file-id": "https://cdn/profile-photo.jpg"}}
-	providerManager := provider.NewService(nil, repository, categoryFinder, profilePhotoValidator, nil, coverageZoneFinderWithDefaultZone())
+	providerManager := newProviderServiceForTest(nil, repository, categoryFinder, profilePhotoValidator, nil, coverageZoneFinderWithDefaultZone())
 
 	createdProvider, err := providerManager.RegisterProvider(
 		context.Background(),
@@ -365,7 +366,7 @@ func TestRegisterProviderReturnsProfilePhotoURLResolutionErrorBeforeSaving(t *te
 	repository := &providerRepositoryMock{}
 	categoryFinder := categoryFinderWithExistingCategory()
 	profilePhotoValidator := &profilePhotoValidatorMock{resolveErr: expectedErr}
-	providerManager := provider.NewService(nil, repository, categoryFinder, profilePhotoValidator, nil, coverageZoneFinderWithDefaultZone())
+	providerManager := newProviderServiceForTest(nil, repository, categoryFinder, profilePhotoValidator, nil, coverageZoneFinderWithDefaultZone())
 
 	createdProvider, err := providerManager.RegisterProvider(
 		context.Background(),
@@ -387,7 +388,7 @@ func TestRegisterProviderReturnsProfilePhotoURLResolutionErrorBeforeSaving(t *te
 func TestRegisterProviderWithEmailWithoutDomain(t *testing.T) {
 	repository := &providerRepositoryMock{}
 	categoryFinder := categoryFinderWithExistingCategory()
-	providerManager := provider.NewService(nil, repository, categoryFinder, &profilePhotoValidatorMock{}, nil, coverageZoneFinderWithDefaultZone())
+	providerManager := newProviderServiceForTest(nil, repository, categoryFinder, &profilePhotoValidatorMock{}, nil, coverageZoneFinderWithDefaultZone())
 
 	_, err := providerManager.RegisterProvider(
 		context.Background(),
@@ -407,7 +408,7 @@ func TestRegisterProviderWithEmailWithoutDomain(t *testing.T) {
 func TestRegisterProviderWithEmailWithoutName(t *testing.T) {
 	repository := &providerRepositoryMock{}
 	categoryFinder := categoryFinderWithExistingCategory()
-	providerManager := provider.NewService(nil, repository, categoryFinder, &profilePhotoValidatorMock{}, nil, coverageZoneFinderWithDefaultZone())
+	providerManager := newProviderServiceForTest(nil, repository, categoryFinder, &profilePhotoValidatorMock{}, nil, coverageZoneFinderWithDefaultZone())
 
 	_, err := providerManager.RegisterProvider(
 		context.Background(),
@@ -427,7 +428,7 @@ func TestRegisterProviderWithEmailWithoutName(t *testing.T) {
 func TestRegisterProviderWithAlreadyRegisteredEmail(t *testing.T) {
 	repository := &providerRepositoryMock{existsByEmailValue: true}
 	categoryFinder := categoryFinderWithExistingCategory()
-	providerManager := provider.NewService(nil, repository, categoryFinder, &profilePhotoValidatorMock{}, nil, nil)
+	providerManager := newProviderServiceForTest(nil, repository, categoryFinder, &profilePhotoValidatorMock{}, nil, nil)
 
 	_, err := providerManager.RegisterProvider(
 		context.Background(),
@@ -448,7 +449,7 @@ func TestRegisterProviderWithAlreadyRegisteredEmail(t *testing.T) {
 func TestRegisterProviderWithMissingCategory(t *testing.T) {
 	repository := &providerRepositoryMock{}
 	categoryFinder := categoryFinderWithExistingCategory()
-	providerManager := provider.NewService(nil, repository, categoryFinder, &profilePhotoValidatorMock{}, nil, nil)
+	providerManager := newProviderServiceForTest(nil, repository, categoryFinder, &profilePhotoValidatorMock{}, nil, nil)
 
 	_, err := providerManager.RegisterProvider(
 		context.Background(),
@@ -468,7 +469,7 @@ func TestRegisterProviderWithMissingCategory(t *testing.T) {
 func TestRegisterProviderWithNonExistingCategory(t *testing.T) {
 	repository := &providerRepositoryMock{}
 	categoryFinder := categoryFinderWithExistingCategory()
-	providerManager := provider.NewService(nil, repository, categoryFinder, &profilePhotoValidatorMock{}, nil, nil)
+	providerManager := newProviderServiceForTest(nil, repository, categoryFinder, &profilePhotoValidatorMock{}, nil, nil)
 
 	_, err := providerManager.RegisterProvider(
 		context.Background(),
@@ -488,7 +489,7 @@ func TestRegisterProviderWithNonExistingCategory(t *testing.T) {
 func TestRegisterProviderWithWrongCategoryID(t *testing.T) {
 	repository := &providerRepositoryMock{}
 	categoryFinder := categoryFinderWithExistingCategory()
-	providerManager := provider.NewService(nil, repository, categoryFinder, &profilePhotoValidatorMock{}, nil, nil)
+	providerManager := newProviderServiceForTest(nil, repository, categoryFinder, &profilePhotoValidatorMock{}, nil, nil)
 
 	_, err := providerManager.RegisterProvider(
 		context.Background(),
@@ -517,7 +518,7 @@ func TestFilterProvidersByCategoryID(t *testing.T) {
 	}
 	categoryFinder := categoryFinderWithExistingCategory()
 	profilePhotoValidator := &profilePhotoValidatorMock{profilePhotoURLsByFile: map[string]string{"profile-photo-file-id": "https://cdn/profile-photo.jpg"}}
-	providerManager := provider.NewService(nil, repository, categoryFinder, profilePhotoValidator, nil, coverageZoneFinderWithDefaultZone())
+	providerManager := newProviderServiceForTest(nil, repository, categoryFinder, profilePhotoValidator, nil, coverageZoneFinderWithDefaultZone())
 
 	providers, err := providerManager.FilterProvidersByCategoryID(context.Background(), 1)
 
@@ -536,7 +537,7 @@ func TestFilterProvidersByCategoryID(t *testing.T) {
 func TestFilterProvidersByCategoryIDFindsExistingCategory(t *testing.T) {
 	repository := &providerRepositoryMock{providersByCategoryID: map[int][]provider.Provider{}}
 	categoryFinder := categoryFinderWithExistingCategory()
-	providerManager := provider.NewService(nil, repository, categoryFinder, &profilePhotoValidatorMock{}, nil, nil)
+	providerManager := newProviderServiceForTest(nil, repository, categoryFinder, &profilePhotoValidatorMock{}, nil, nil)
 
 	_, err := providerManager.FilterProvidersByCategoryID(context.Background(), 1)
 
@@ -548,7 +549,7 @@ func TestFilterProvidersByCategoryIDFindsExistingCategory(t *testing.T) {
 func TestFilterProvidersByCategoryIDReturnsEmptyListWhenNoProvidersExist(t *testing.T) {
 	repository := &providerRepositoryMock{providersByCategoryID: map[int][]provider.Provider{}}
 	categoryFinder := categoryFinderWithExistingCategory()
-	providerManager := provider.NewService(nil, repository, categoryFinder, &profilePhotoValidatorMock{}, nil, nil)
+	providerManager := newProviderServiceForTest(nil, repository, categoryFinder, &profilePhotoValidatorMock{}, nil, nil)
 
 	providers, err := providerManager.FilterProvidersByCategoryID(context.Background(), 1)
 
@@ -560,7 +561,7 @@ func TestFilterProvidersByCategoryIDReturnsRepositoryError(t *testing.T) {
 	expectedErr := errors.New("find providers")
 	repository := &providerRepositoryMock{findByCategoryIDErr: expectedErr}
 	categoryFinder := categoryFinderWithExistingCategory()
-	providerManager := provider.NewService(nil, repository, categoryFinder, &profilePhotoValidatorMock{}, nil, nil)
+	providerManager := newProviderServiceForTest(nil, repository, categoryFinder, &profilePhotoValidatorMock{}, nil, nil)
 
 	providers, err := providerManager.FilterProvidersByCategoryID(context.Background(), 1)
 
@@ -579,7 +580,7 @@ func TestFilterProvidersByCategoryIDWrapsProfilePhotoURLResolutionError(t *testi
 		},
 	}
 	categoryFinder := categoryFinderWithExistingCategory()
-	providerManager := provider.NewService(nil, repository, categoryFinder, &profilePhotoValidatorMock{resolveErr: expectedErr}, nil, nil)
+	providerManager := newProviderServiceForTest(nil, repository, categoryFinder, &profilePhotoValidatorMock{resolveErr: expectedErr}, nil, nil)
 
 	providers, err := providerManager.FilterProvidersByCategoryID(context.Background(), 1)
 
@@ -602,7 +603,7 @@ func TestGetProviderProfileResolvesProfilePhotoURL(t *testing.T) {
 	fileService := &profilePhotoValidatorMock{profilePhotoURLsByFile: map[string]string{
 		"profile-photo-id": "https://cdn.example/juan.jpg",
 	}}
-	providerManager := provider.NewService(nil, repository, categoryFinderWithExistingCategory(), fileService, nil, nil)
+	providerManager := newProviderServiceForTest(nil, repository, categoryFinderWithExistingCategory(), fileService, nil, nil)
 
 	profile, err := providerManager.GetProviderProfile(context.Background(), 12)
 
@@ -615,7 +616,7 @@ func TestGetProviderProfileResolvesProfilePhotoURL(t *testing.T) {
 
 func TestGetProviderProfileReturnsNotFoundError(t *testing.T) {
 	repository := &providerRepositoryMock{findProviderByIDErr: provider.ErrDoesNotExist}
-	providerManager := provider.NewService(nil, repository, categoryFinderWithExistingCategory(), &profilePhotoValidatorMock{}, nil, nil)
+	providerManager := newProviderServiceForTest(nil, repository, categoryFinderWithExistingCategory(), &profilePhotoValidatorMock{}, nil, nil)
 
 	profile, err := providerManager.GetProviderProfile(context.Background(), 999)
 
@@ -632,7 +633,7 @@ func TestGetProviderProfileWrapsProfilePhotoURLResolutionError(t *testing.T) {
 	)
 	require.NoError(t, err)
 	expectedErr := errors.New("storage unavailable")
-	providerManager := provider.NewService(
+	providerManager := newProviderServiceForTest(
 		nil,
 		&providerRepositoryMock{providerByID: foundProvider},
 		categoryFinderWithExistingCategory(),
@@ -650,7 +651,7 @@ func TestGetProviderProfileWrapsProfilePhotoURLResolutionError(t *testing.T) {
 func TestFilterProvidersByCategoryIDRequiresCategoryID(t *testing.T) {
 	repository := &providerRepositoryMock{}
 	categoryFinder := categoryFinderWithExistingCategory()
-	providerManager := provider.NewService(nil, repository, categoryFinder, &profilePhotoValidatorMock{}, nil, nil)
+	providerManager := newProviderServiceForTest(nil, repository, categoryFinder, &profilePhotoValidatorMock{}, nil, nil)
 
 	providers, err := providerManager.FilterProvidersByCategoryID(context.Background(), 0)
 
@@ -662,7 +663,7 @@ func TestFilterProvidersByCategoryIDRequiresCategoryID(t *testing.T) {
 func TestFilterProvidersByCategoryIDRequiresExistingCategory(t *testing.T) {
 	repository := &providerRepositoryMock{}
 	categoryFinder := categoryFinderWithExistingCategory()
-	providerManager := provider.NewService(nil, repository, categoryFinder, &profilePhotoValidatorMock{}, nil, nil)
+	providerManager := newProviderServiceForTest(nil, repository, categoryFinder, &profilePhotoValidatorMock{}, nil, nil)
 
 	providers, err := providerManager.FilterProvidersByCategoryID(context.Background(), 999)
 
@@ -675,7 +676,7 @@ func TestRegisterProviderRequiresProfilePhoto(t *testing.T) {
 	repository := &providerRepositoryMock{}
 	categoryFinder := categoryFinderWithExistingCategory()
 	profilePhotoValidator := &profilePhotoValidatorMock{err: filedomain.ErrProfilePhotoRequired}
-	providerManager := provider.NewService(nil, repository, categoryFinder, profilePhotoValidator, nil, coverageZoneFinderWithDefaultZone())
+	providerManager := newProviderServiceForTest(nil, repository, categoryFinder, profilePhotoValidator, nil, coverageZoneFinderWithDefaultZone())
 
 	_, err := providerManager.RegisterProvider(
 		context.Background(),
@@ -696,7 +697,7 @@ func TestRegisterProviderRequiresCoverageZone(t *testing.T) {
 	repository := &providerRepositoryMock{}
 	categoryFinder := categoryFinderWithExistingCategory()
 	profilePhotoValidator := &profilePhotoValidatorMock{profilePhotoURLsByFile: map[string]string{"profile-photo-file-id": "https://cdn/profile-photo.jpg"}}
-	providerManager := provider.NewService(nil, repository, categoryFinder, profilePhotoValidator, nil, coverageZoneFinderWithDefaultZone())
+	providerManager := newProviderServiceForTest(nil, repository, categoryFinder, profilePhotoValidator, nil, coverageZoneFinderWithDefaultZone())
 
 	createdProvider, err := providerManager.RegisterProvider(
 		context.Background(),
@@ -719,7 +720,7 @@ func TestRegisterProviderRejectsUnavailableProfilePhoto(t *testing.T) {
 	repository := &providerRepositoryMock{}
 	categoryFinder := categoryFinderWithExistingCategory()
 	profilePhotoValidator := &profilePhotoValidatorMock{err: filedomain.ErrProfilePhotoNotAvailable}
-	providerManager := provider.NewService(nil, repository, categoryFinder, profilePhotoValidator, nil, coverageZoneFinderWithDefaultZone())
+	providerManager := newProviderServiceForTest(nil, repository, categoryFinder, profilePhotoValidator, nil, coverageZoneFinderWithDefaultZone())
 
 	_, err := providerManager.RegisterProvider(
 		context.Background(),
@@ -742,7 +743,7 @@ func TestRegisterProviderMapsUnexpectedProfilePhotoValidationError(t *testing.T)
 	repository := &providerRepositoryMock{}
 	categoryFinder := categoryFinderWithExistingCategory()
 	profilePhotoValidator := &profilePhotoValidatorMock{err: errors.New("storage unavailable")}
-	providerManager := provider.NewService(nil, repository, categoryFinder, profilePhotoValidator, nil, coverageZoneFinderWithDefaultZone())
+	providerManager := newProviderServiceForTest(nil, repository, categoryFinder, profilePhotoValidator, nil, coverageZoneFinderWithDefaultZone())
 
 	_, err := providerManager.RegisterProvider(
 		context.Background(),
@@ -757,4 +758,49 @@ func TestRegisterProviderMapsUnexpectedProfilePhotoValidationError(t *testing.T)
 
 	assert.ErrorIs(t, err, filedomain.ErrProfilePhotoNotAvailable)
 	assert.False(t, repository.saveCalled, "provider should not be saved with unavailable profile photo")
+}
+
+func TestRegisterProviderRechecksFreshCategoryBeforeSaving(t *testing.T) {
+	repository := &providerRepositoryMock{}
+	finder := categoryFinderWithExistingCategory()
+	unit := new(registrationUnitMock)
+	store := new(registrationStoreMock)
+	unit.On("Execute", mock.Anything, mock.Anything).Return(func(_ context.Context, operation func(provider.RegistrationStore) error) error {
+		return operation(store)
+	}).Once()
+	store.On("FindCategory", mock.Anything, 1).Return(&category.Category{ID: 1, Name: "Plomería", Enabled: false, Version: 2}, nil).Once()
+	service := provider.NewService(unit, nil, repository, finder, &profilePhotoValidatorMock{}, nil, coverageZoneFinderWithDefaultZone())
+	result, err := service.RegisterProvider(t.Context(), "auth0|provider", "juan@example.com", "Juan", "Gomez", 1, "photo", []int{6})
+	require.ErrorIs(t, err, category.ErrDisabled)
+	require.Nil(t, result)
+	store.AssertNotCalled(t, "SaveUser", mock.Anything, mock.Anything)
+	store.AssertExpectations(t)
+	unit.AssertExpectations(t)
+}
+
+func TestRegisterProviderDoesNotExposeIDWhenCommitFails(t *testing.T) {
+	repository := &providerRepositoryMock{}
+	finder := categoryFinderWithExistingCategory()
+	unit := new(registrationUnitMock)
+	store := new(registrationStoreMock)
+	failure := errors.New("commit failed")
+	var persistedCandidate user.User
+	unit.On("Execute", mock.Anything, mock.Anything).Return(func(ctx context.Context, operation func(provider.RegistrationStore) error) error {
+		if err := operation(store); err != nil {
+			return err
+		}
+		return failure
+	}).Once()
+	store.On("FindCategory", mock.Anything, 1).Return(new(existingCategory()), nil).Once()
+	store.On("SaveUser", mock.Anything, mock.Anything).Return(func(_ context.Context, toSave user.User) (user.User, error) {
+		persistedCandidate = toSave
+		toSave.SetPersistenceID(17)
+		return toSave, nil
+	}).Once()
+	service := provider.NewService(unit, nil, repository, finder, &profilePhotoValidatorMock{}, nil, coverageZoneFinderWithDefaultZone())
+	result, err := service.RegisterProvider(t.Context(), "auth0|provider", "juan@example.com", "Juan", "Gomez", 1, "photo", []int{6})
+	require.ErrorIs(t, err, failure)
+	require.Nil(t, result)
+	require.NotNil(t, persistedCandidate)
+	store.AssertExpectations(t)
 }

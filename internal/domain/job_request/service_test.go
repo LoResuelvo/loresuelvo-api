@@ -14,6 +14,7 @@ import (
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/provider"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/user"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
@@ -143,6 +144,7 @@ func TestCreateFromChatbotAssessmentCopiesCurrentAssessment(t *testing.T) {
 	}
 	repo := &jobRequestRepositoryMock{}
 	service := jobrequest.NewService(
+		newCreationUnitForTest(repo),
 		repo,
 		newUserRepositoryMock(&consumerRepo{consumerID: 10}, &providerRepo{exists: true, categoryID: categoryID}),
 		&conversationRepo{foundConversation: &conversation.ChatBotConversation{
@@ -167,6 +169,7 @@ func TestCreateFromChatbotAssessmentCopiesCurrentAssessment(t *testing.T) {
 func TestCreateFromChatbotAssessmentRejectsSelfServiceOutcome(t *testing.T) {
 	categoryID := 3
 	service := jobrequest.NewService(
+		nil,
 		&jobRequestRepositoryMock{},
 		newUserRepositoryMock(&consumerRepo{consumerID: 10}, &providerRepo{exists: true}),
 		&conversationRepo{foundConversation: &conversation.ChatBotConversation{
@@ -190,6 +193,7 @@ func TestCreateFromChatbotAssessmentRejectsSelfServiceOutcome(t *testing.T) {
 
 func TestCreateFromChatbotAssessmentRejectsDifferentOwner(t *testing.T) {
 	service := jobrequest.NewService(
+		nil,
 		&jobRequestRepositoryMock{},
 		newUserRepositoryMock(&consumerRepo{consumerID: 11}, &providerRepo{exists: true}),
 		&conversationRepo{foundConversation: &conversation.ChatBotConversation{
@@ -288,6 +292,7 @@ func fileServiceForJobRequestTest() jobrequest.FileService {
 func TestCreateJobRequestSavesRequestWithPendingConversation(t *testing.T) {
 	repo := &jobRequestRepositoryMock{}
 	service := jobrequest.NewService(
+		newCreationUnitForTest(repo),
 		repo,
 		newUserRepositoryMock(&consumerRepo{consumerID: 10}, &providerRepo{exists: true}),
 		&conversationRepo{},
@@ -323,6 +328,7 @@ func TestCreateJobRequestValidatesImagesWithFileService(t *testing.T) {
 		images: []filedomain.Image{{FileID: "file-1", OriginalName: "problema.jpg", URL: "https://files/file-1"}},
 	}
 	service := jobrequest.NewService(
+		newCreationUnitForTest(repo),
 		repo,
 		newUserRepositoryMock(&consumerRepo{consumerID: 10}, &providerRepo{exists: true}),
 		&conversationRepo{},
@@ -344,6 +350,7 @@ func TestCreateJobRequestValidatesImagesWithFileService(t *testing.T) {
 func TestCreateJobRequestAllowsEmptyDescription(t *testing.T) {
 	repo := &jobRequestRepositoryMock{}
 	service := jobrequest.NewService(
+		newCreationUnitForTest(repo),
 		repo,
 		newUserRepositoryMock(&consumerRepo{consumerID: 10}, &providerRepo{exists: true}),
 		&conversationRepo{},
@@ -361,6 +368,7 @@ func TestCreateJobRequestAllowsEmptyDescription(t *testing.T) {
 func TestCreateJobRequestRejectsMissingTitle(t *testing.T) {
 	repo := &jobRequestRepositoryMock{}
 	service := jobrequest.NewService(
+		newCreationUnitForTest(repo),
 		repo,
 		newUserRepositoryMock(&consumerRepo{consumerID: 10}, &providerRepo{exists: true}),
 		&conversationRepo{},
@@ -378,6 +386,7 @@ func TestCreateJobRequestRejectsMissingTitle(t *testing.T) {
 func TestCreateJobRequestRejectsNonConsumer(t *testing.T) {
 	repo := &jobRequestRepositoryMock{}
 	service := jobrequest.NewService(
+		newCreationUnitForTest(repo),
 		repo,
 		newUserRepositoryMock(&consumerRepo{err: errors.New("consumer not found")}, &providerRepo{exists: true}),
 		&conversationRepo{},
@@ -395,6 +404,7 @@ func TestCreateJobRequestRejectsNonConsumer(t *testing.T) {
 func TestCreateJobRequestRejectsNonExistingProvider(t *testing.T) {
 	repo := &jobRequestRepositoryMock{}
 	service := jobrequest.NewService(
+		newCreationUnitForTest(repo),
 		repo,
 		newUserRepositoryMock(&consumerRepo{consumerID: 10}, &providerRepo{exists: false}),
 		&conversationRepo{},
@@ -412,6 +422,7 @@ func TestCreateJobRequestRejectsNonExistingProvider(t *testing.T) {
 func TestCreateJobRequestRejectsExistingOpenRequestBetweenConsumerAndProvider(t *testing.T) {
 	repo := &jobRequestRepositoryMock{openExists: true}
 	service := jobrequest.NewService(
+		newCreationUnitForTest(repo),
 		repo,
 		newUserRepositoryMock(&consumerRepo{consumerID: 10}, &providerRepo{exists: true}),
 		&conversationRepo{},
@@ -431,6 +442,7 @@ func TestCreateJobRequestRejectsExistingOpenRequestBetweenConsumerAndProvider(t 
 func TestCreateJobRequestPropagatesOpenRequestLookupError(t *testing.T) {
 	repo := &jobRequestRepositoryMock{err: errors.New("lookup failed")}
 	service := jobrequest.NewService(
+		newCreationUnitForTest(repo),
 		repo,
 		newUserRepositoryMock(&consumerRepo{consumerID: 10}, &providerRepo{exists: true}),
 		&conversationRepo{},
@@ -449,6 +461,7 @@ func TestCreateJobRequestPropagatesOpenRequestLookupError(t *testing.T) {
 
 func TestShouldGetNoJobRequests(t *testing.T) {
 	service := jobrequest.NewService(
+		nil,
 		&jobRequestRepositoryMock{},
 		newUserRepositoryMock(&consumerRepo{consumerID: 10}, &providerRepo{exists: true}),
 		&conversationRepo{},
@@ -465,6 +478,7 @@ func TestShouldGetNoJobRequests(t *testing.T) {
 func TestSHouldGetListOfJobRequests(t *testing.T) {
 	repo := &jobRequestRepositoryMock{}
 	service := jobrequest.NewService(
+		newCreationUnitForTest(repo),
 		repo,
 		newUserRepositoryMock(&consumerRepo{consumerID: 10}, &providerRepo{exists: true}),
 		&conversationRepo{},
@@ -504,6 +518,7 @@ func TestAcceptJobRequestActivatesLinkedConversationForAssignedProvider(t *testi
 		},
 	}
 	service := jobrequest.NewService(
+		newCreationUnitForTest(repo),
 		repo,
 		newUserRepositoryMock(&consumerRepo{}, &providerRepo{providerID: 20}),
 		conversationRepo,
@@ -538,6 +553,7 @@ func TestAcceptJobRequestRejectsProviderThatIsNotAssigned(t *testing.T) {
 	}
 	conversationRepo := &conversationRepo{}
 	service := jobrequest.NewService(
+		newCreationUnitForTest(repo),
 		repo,
 		newUserRepositoryMock(&consumerRepo{}, &providerRepo{providerID: 99}),
 		conversationRepo,
@@ -559,6 +575,7 @@ func TestAcceptJobRequestReturnsNotFoundWhenRequestDoesNotExist(t *testing.T) {
 	repo := &jobRequestRepositoryMock{err: jobrequest.ErrJobRequestNotFound}
 	conversationRepo := &conversationRepo{}
 	service := jobrequest.NewService(
+		newCreationUnitForTest(repo),
 		repo,
 		newUserRepositoryMock(&consumerRepo{}, &providerRepo{providerID: 20}),
 		conversationRepo,
@@ -589,6 +606,7 @@ func TestAcceptJobRequestRejectsAlreadyAcceptedRequest(t *testing.T) {
 	}
 	conversationRepo := &conversationRepo{}
 	service := jobrequest.NewService(
+		newCreationUnitForTest(repo),
 		repo,
 		newUserRepositoryMock(&consumerRepo{}, &providerRepo{providerID: 20}),
 		conversationRepo,
@@ -610,4 +628,34 @@ type jobRequestTestClock struct{}
 
 func (jobRequestTestClock) Now() time.Time {
 	return time.Date(2026, 9, 25, 15, 0, 0, 0, time.UTC)
+}
+
+func TestCreateJobRequestRejectsFreshDisabledCategoryWithoutSaving(t *testing.T) {
+	repository := &jobRequestRepositoryMock{}
+	unit := new(creationUnitMock)
+	store := new(creationStoreMock)
+	unit.On("Execute", mock.Anything, mock.Anything).Return(func(_ context.Context, operation func(jobrequest.CreationStore) error) error { return operation(store) }).Once()
+	store.On("FindProviderCategory", mock.Anything, 20).Return(&category.Category{ID: 3, Name: "Plomería", Enabled: false, Version: 2}, nil).Once()
+	service := jobrequest.NewService(unit, repository, newUserRepositoryMock(&consumerRepo{consumerID: 10}, &providerRepo{exists: true}), &conversationRepo{}, fileServiceForJobRequestTest(), jobRequestTestClock{})
+	result, err := service.Create(t.Context(), "auth0|consumer", 20, "Repair", "Leak", nil)
+	require.ErrorIs(t, err, category.ErrDisabled)
+	require.Nil(t, result)
+	store.AssertNotCalled(t, "SaveWithConversation", mock.Anything, mock.Anything, mock.Anything)
+	store.AssertExpectations(t)
+	unit.AssertExpectations(t)
+}
+
+func TestCreateJobRequestPreservesCategoryLookupFailure(t *testing.T) {
+	repository := &jobRequestRepositoryMock{}
+	unit := new(creationUnitMock)
+	store := new(creationStoreMock)
+	unit.On("Execute", mock.Anything, mock.Anything).Return(func(_ context.Context, operation func(jobrequest.CreationStore) error) error { return operation(store) }).Once()
+	failure := errors.New("category database unavailable")
+	store.On("FindProviderCategory", mock.Anything, 20).Return((*category.Category)(nil), failure).Once()
+	service := jobrequest.NewService(unit, repository, newUserRepositoryMock(&consumerRepo{consumerID: 10}, &providerRepo{exists: true}), &conversationRepo{}, fileServiceForJobRequestTest(), jobRequestTestClock{})
+	result, err := service.Create(t.Context(), "auth0|consumer", 20, "Repair", "Leak", nil)
+	require.ErrorIs(t, err, failure)
+	require.Nil(t, result)
+	store.AssertNotCalled(t, "SaveWithConversation", mock.Anything, mock.Anything, mock.Anything)
+	store.AssertExpectations(t)
 }

@@ -2,6 +2,7 @@ package job_request_handler
 
 import (
 	"errors"
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/category"
 	"net/http"
 
 	httphandler "github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/handler"
@@ -11,6 +12,10 @@ import (
 )
 
 func handleCreateJobRequestError(c *gin.Context, err error) {
+	if errors.Is(err, category.ErrDisabled) {
+		httphandler.RespondError(c, http.StatusConflict, category.ErrDisabled.Error())
+		return
+	}
 	if errors.Is(err, jobrequest.ErrTitleRequired) || errors.Is(err, jobrequest.ErrProviderRequired) || errors.Is(err, jobrequest.ErrJobRequestImageNotAvailable) {
 		httphandler.RespondError(c, http.StatusBadRequest, err.Error())
 		return
@@ -28,11 +33,13 @@ func handleCreateJobRequestError(c *gin.Context, err error) {
 		return
 	}
 
-	httphandler.RespondError(c, http.StatusInternalServerError, err.Error())
+	httphandler.RespondError(c, http.StatusInternalServerError, http.StatusText(http.StatusInternalServerError))
 }
 
 func handleCreateFromChatbotAssessmentError(c *gin.Context, err error) {
 	switch {
+	case errors.Is(err, category.ErrDisabled):
+		httphandler.RespondError(c, http.StatusConflict, category.ErrDisabled.Error())
 	case errors.Is(err, conversation.ErrConversationDoesNotExist), errors.Is(err, jobrequest.ErrProviderDoesNotExist):
 		httphandler.RespondError(c, http.StatusNotFound, err.Error())
 	case errors.Is(err, jobrequest.ErrOnlyConsumerCanCreateJobRequest), errors.Is(err, jobrequest.ErrChatbotConversationAccessDenied):
@@ -43,7 +50,7 @@ func handleCreateFromChatbotAssessmentError(c *gin.Context, err error) {
 		errors.Is(err, jobrequest.ErrAlreadyExists):
 		httphandler.RespondError(c, http.StatusConflict, err.Error())
 	default:
-		httphandler.RespondError(c, http.StatusInternalServerError, err.Error())
+		httphandler.RespondError(c, http.StatusInternalServerError, http.StatusText(http.StatusInternalServerError))
 	}
 }
 
@@ -65,5 +72,5 @@ func handleAcceptJobRequestError(c *gin.Context, err error) {
 		return
 	}
 
-	httphandler.RespondError(c, http.StatusInternalServerError, err.Error())
+	httphandler.RespondError(c, http.StatusInternalServerError, http.StatusText(http.StatusInternalServerError))
 }

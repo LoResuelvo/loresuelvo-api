@@ -47,7 +47,7 @@ func newCategoryServiceForTest() (*category.Service, *categoryUnitOfWorkMock, *o
 	finder := new(operatorIDFinderMock)
 	store := new(categoryTransactionalStoreMock)
 	service := category.NewService(new(categoryRepositoryMock), unit, finder,
-		fixedCategoryClock{at: time.Date(2026, 8, 15, 14, 0, 0, 0, time.FixedZone("ART", -3*60*60))})
+		fixedCategoryClock{at: time.Date(2026, 8, 15, 14, 0, 0, 0, time.FixedZone("ART", -3*60*60))}, nil)
 	return service, unit, finder, store
 }
 
@@ -74,8 +74,19 @@ func (repository *categoryRepositoryMock) ListAll() ([]category.Category, error)
 	return categories, arguments.Error(1)
 }
 
-func (repository *categoryRepositoryMock) FindByID(id int) *category.Category {
-	arguments := repository.Called(id)
+func (repository *categoryRepositoryMock) FindByID(ctx context.Context, id int) (*category.Category, error) {
+	arguments := repository.Called(ctx, id)
 	foundCategory, _ := arguments.Get(0).(*category.Category)
-	return foundCategory
+	return foundCategory, arguments.Error(1)
+}
+
+func (store *categoryTransactionalStoreMock) FindCategory(ctx context.Context, id int) (*category.Category, error) {
+	args := store.Called(ctx, id)
+	found, _ := args.Get(0).(*category.Category)
+	return found, args.Error(1)
+}
+func (store *categoryTransactionalStoreMock) FindImpact(ctx context.Context, id int, at time.Time) (*category.Impact, error) {
+	args := store.Called(ctx, id, at)
+	found, _ := args.Get(0).(*category.Impact)
+	return found, args.Error(1)
 }

@@ -114,7 +114,7 @@ func TestProviderSearchQueryBudget(t *testing.T) {
 	defer database.Close()
 	files := filedomain.NewService(repositories.NewFileRepository(database), storage.NewMemoryStorage("https://cdn.example"), "public-bucket", "private-bucket", nil, nil)
 	categories := repositories.NewCategoryRepository(database)
-	service := provider.NewService(repositories.NewProviderSearchReader(database), nil, categories, files, nil, nil)
+	service := provider.NewService(nil,repositories.NewProviderSearchReader(database), nil, categories, files, nil, nil)
 
 	for _, status := range []string{"confirmed", "pending"} {
 		_, err = fixture.database.Exec(`UPDATE files SET status = $1 WHERE id = $2`, status, found.ProfilePhoto().FileID)

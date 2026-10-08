@@ -34,7 +34,9 @@ func RequestLogger(logger *slog.Logger) gin.HandlerFunc {
 		privateEvidence := c.Request.URL.Path == "/admin/claims" || strings.HasPrefix(c.Request.URL.Path, "/admin/claims/") || c.Request.URL.Path == "/claims" || strings.HasPrefix(c.Request.URL.Path, "/claims/") || c.Request.URL.Path == "/files" || strings.HasPrefix(c.Request.URL.Path, "/files/")
 		privateReviewReport := strings.HasPrefix(c.Request.URL.Path, "/work-orders/") && strings.HasSuffix(c.Request.URL.Path, "/reviews/reports")
 		privateAdminReviews := c.Request.URL.Path == "/admin/reviews" || strings.HasPrefix(c.Request.URL.Path, "/admin/reviews/")
-		privateRead := privateAdminReviews || privateReviewReport || privateEvidence || privateInstallation || isPrivateAdminReadPath(c.Request.URL.Path) || isPrivateWorkChatPath(c.Request.URL.Path) || isPrivateProviderActivityPath(c.Request.URL.Path)
+		includeDisabled, _ := strconv.ParseBool(c.Request.URL.Query().Get("include_disabled"))
+		privateCategories := (c.Request.Method == http.MethodPatch && strings.HasPrefix(c.Request.URL.Path, "/categories/")) || strings.HasPrefix(c.Request.URL.Path, "/admin/categories/") || (c.Request.Method == http.MethodGet && c.Request.URL.Path == "/categories" && includeDisabled)
+		privateRead := privateCategories || privateAdminReviews || privateReviewReport || privateEvidence || privateInstallation || isPrivateAdminReadPath(c.Request.URL.Path) || isPrivateWorkChatPath(c.Request.URL.Path) || isPrivateProviderActivityPath(c.Request.URL.Path)
 		includeBodies := !privateRead && requestLogger.Enabled(c.Request.Context(), slog.LevelInfo)
 		var requestBody *limitedBodyCapture
 		var responseBody *limitedBodyCapture

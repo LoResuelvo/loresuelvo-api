@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"sync"
+	"time"
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/audit"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/category"
@@ -150,4 +151,11 @@ func (decorator categoryAuditTransactionalStoreDecorator) SaveAuditEvent(ctx con
 	}
 	decorator.onSaved(event)
 	return nil
+}
+
+func (decorator categoryAuditTransactionalStoreDecorator) FindCategory(ctx context.Context, id int) (*category.Category, error) {
+	return decorator.delegate.FindCategory(ctx, id)
+}
+func (decorator categoryAuditTransactionalStoreDecorator) FindImpact(ctx context.Context, id int, at time.Time) (*category.Impact, error) {
+	return decorator.delegate.FindImpact(ctx, id, at)
 }

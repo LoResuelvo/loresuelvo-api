@@ -679,14 +679,14 @@ func TestCreateChatbotConversationAcceptsImageOnlyMessage(t *testing.T) {
 func TestCreateChatbotConversationIncludesRecommendedProvidersWhenDiagnosisIsCompleted(t *testing.T) {
 	repo := &conversationRepositoryMock{}
 	consumerIDFinder := &consumerIDFinderMock{consumerID: 10}
-	plumbingCategory := &category.Category{ID: 3, Name: "Plomería", NormalizedName: "plomería"}
+	plumbingCategory := &category.Category{ID: 3, Name: "Plomería", NormalizedName: "plomería", Enabled: true, Version: 1}
 	recommendedProvider, err := provider.NewProvider("auth0|provider", "juan@example.com", "Juan", "Gómez", plumbingCategory, &filedomain.Image{FileID: "provider-photo-file-id"}, []coveragezone.CoverageZone{{ID: 6, Name: "Comuna 6", Enabled: true}})
 	require.NoError(t, err)
 	recommendedProvider.SetPersistenceID(20)
 	outsideProvider, err := provider.NewProvider("auth0|outside-provider", "pedro@example.com", "Pedro", "López", plumbingCategory, nil, []coveragezone.CoverageZone{{ID: 14, Name: "Comuna 14", Enabled: true}})
 	require.NoError(t, err)
 	outsideProvider.SetPersistenceID(21)
-	electricityCategory := &category.Category{ID: 4, Name: "Electricidad", NormalizedName: "electricidad"}
+	electricityCategory := &category.Category{ID: 4, Name: "Electricidad", NormalizedName: "electricidad", Enabled: true, Version: 1}
 	otherCategoryProvider, err := provider.NewProvider("auth0|electrician", "laura@example.com", "Laura", "Suárez", electricityCategory, nil, []coveragezone.CoverageZone{{ID: 6, Name: "Comuna 6", Enabled: true}})
 	require.NoError(t, err)
 	otherCategoryProvider.SetPersistenceID(22)
@@ -731,7 +731,7 @@ func TestCreateChatbotConversationIncludesRecommendedProvidersWhenDiagnosisIsCom
 func TestCreateChatbotConversationBuildsRecommendationEvidenceFromWorkOrderReads(t *testing.T) {
 	repo := &conversationRepositoryMock{}
 	consumerIDFinder := &consumerIDFinderMock{consumerID: 10}
-	plumbingCategory := &category.Category{ID: 3, Name: "Plomería", NormalizedName: "plomería"}
+	plumbingCategory := &category.Category{ID: 3, Name: "Plomería", NormalizedName: "plomería", Enabled: true, Version: 1}
 	recommendedProvider, err := provider.NewProvider(
 		"auth0|provider",
 		"juan@example.com",
@@ -806,7 +806,7 @@ func TestCreateChatbotConversationBuildsRecommendationEvidenceFromWorkOrderReads
 func TestCreateChatbotConversationDoesNotRecommendProvidersBeforeDiagnosisIsCompleted(t *testing.T) {
 	repo := &conversationRepositoryMock{}
 	consumerIDFinder := &consumerIDFinderMock{consumerID: 10}
-	categoryLister := &recommendationCategoryListerMock{categories: []category.Category{{ID: 3, Name: "Plomería", NormalizedName: "plomería"}}}
+	categoryLister := &recommendationCategoryListerMock{categories: []category.Category{{ID: 3, Name: "Plomería", NormalizedName: "plomería", Enabled: true, Version: 1}}}
 	providerFinder := &providerIDFinderMock{}
 	chatbot := &chatbotMock{response: &conversation.ChatbotResponse{
 		Status:  conversation.ChatbotResponseAnswered,
@@ -977,7 +977,7 @@ func newProfessionalRecommendationService(t *testing.T, chatbot *chatbotMock) (*
 	t.Helper()
 	repo := &conversationRepositoryMock{}
 	consumerIDFinder := &consumerIDFinderMock{consumerID: 10}
-	plumbingCategory := &category.Category{ID: 3, Name: "Plomería", NormalizedName: "plomería"}
+	plumbingCategory := &category.Category{ID: 3, Name: "Plomería", NormalizedName: "plomería", Enabled: true, Version: 1}
 	recommendedProvider, err := provider.NewProvider(
 		"auth0|provider",
 		"juan@example.com",
@@ -1218,7 +1218,7 @@ func TestGetByIDReturnsChatbotConversationDetailForOwnerConsumer(t *testing.T) {
 		},
 	}}
 	consumerIDFinder := &consumerIDFinderMock{consumerID: 10}
-	plumbingCategory := &category.Category{ID: recommendedCategoryID, Name: "Plomería", NormalizedName: "plomería"}
+	plumbingCategory := &category.Category{ID: recommendedCategoryID, Name: "Plomería", NormalizedName: "plomería", Enabled: true, Version: 1}
 	recommendedProvider, err := provider.NewProvider("auth0|provider", "juan@example.com", "Juan", "Gómez", plumbingCategory, &filedomain.Image{FileID: "provider-photo-file-id"}, []coveragezone.CoverageZone{{ID: 6, Name: "Comuna 6", Enabled: true}})
 	require.NoError(t, err)
 	recommendedProvider.SetPersistenceID(20)

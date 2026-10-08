@@ -1088,6 +1088,9 @@ func (s *Service) providersForCurrentRecommendation(ctx context.Context, current
 		if foundProvider == nil {
 			return nil, fmt.Errorf("finding persisted recommended provider %d: %w", recommendation.ProviderID, ErrProviderRecommendationInvalid)
 		}
+		if foundProvider.Category == nil || !foundProvider.Category.Enabled {
+			continue
+		}
 		providers = append(providers, *foundProvider)
 	}
 	return s.providersWithProfilePhotoURLs(ctx, providers)
@@ -1116,7 +1119,13 @@ func (s *Service) availableCategoriesForChatbot() ([]category.Category, error) {
 		return nil, fmt.Errorf("listing categories for chatbot prompt: %w", err)
 	}
 
-	return categories, nil
+	enabled := make([]category.Category, 0, len(categories))
+	for _, current := range categories {
+		if current.Enabled {
+			enabled = append(enabled, current)
+		}
+	}
+	return enabled, nil
 }
 
 func findCategoryByNormalizedName(categories []category.Category, normalizedName string) *category.Category {

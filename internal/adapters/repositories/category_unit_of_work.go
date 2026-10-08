@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"time"
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/audit"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/category"
@@ -60,4 +61,11 @@ func rollbackCategoryUnitOfWork(tx *sql.Tx, cause error) error {
 		return fmt.Errorf("%w: rolling back category unit of work: %v", cause, rollbackErr)
 	}
 	return cause
+}
+
+func (store *categoryTransactionalStore) FindCategory(ctx context.Context, id int) (*category.Category, error) {
+	return store.categories.findWithExecutor(ctx, store.tx, id, " FOR UPDATE")
+}
+func (store *categoryTransactionalStore) FindImpact(ctx context.Context, id int, at time.Time) (*category.Impact, error) {
+	return findCategoryImpactWithExecutor(ctx, store.tx, id, at)
 }

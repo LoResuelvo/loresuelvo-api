@@ -13,6 +13,7 @@ import (
 )
 
 type Service struct {
+	creationUnit           CreationUnitOfWork
 	repository             Repository
 	userRepository         UserRepository
 	conversationRepository ConversationRepository
@@ -21,6 +22,7 @@ type Service struct {
 }
 
 func NewService(
+	creationUnit CreationUnitOfWork,
 	repository Repository,
 	userRepository UserRepository,
 	conversationRepository ConversationRepository,
@@ -28,6 +30,7 @@ func NewService(
 	clock clock.Clock,
 ) *Service {
 	return &Service{
+		creationUnit:           creationUnit,
 		repository:             repository,
 		userRepository:         userRepository,
 		conversationRepository: conversationRepository,
@@ -65,7 +68,7 @@ func (s *Service) Create(ctx context.Context, consumerAuthID string, providerID 
 	}
 	jobRequest.CreatedOn = s.clock.Now()
 
-	return s.repository.SaveWithConversation(*jobRequest, pendingConversation)
+	return s.saveNewRequest(ctx, *jobRequest, pendingConversation)
 }
 
 func (s *Service) jobRequestImages(ctx context.Context, consumerAuthID string, imageFileIDs []string) ([]filedomain.Image, error) {
@@ -124,7 +127,7 @@ func (s *Service) CreateFromChatbotAssessment(ctx context.Context, consumerAuthI
 	if err != nil {
 		return nil, err
 	}
-	return s.repository.SaveWithConversation(*jobRequest, pendingConversation)
+	return s.saveNewRequest(ctx, *jobRequest, pendingConversation)
 }
 
 func (s *Service) GetJobRequests(ctx context.Context, userAuthID string) ([]readmodel.JobRequestSummary, error) {
@@ -215,4 +218,26 @@ func (s *Service) ensureNoOpenJobRequest(consumerID, providerID int) error {
 	}
 
 	return nil
+}
+
+func (s *Service) saveNewRequest(ctx context.Context, request JobRequest, pendingConversation conversation.Conversation) (*JobRequest, error) {
+	var saved *JobRequest
+	err := s.creationUnit.Execute(ctx, func(store CreationStore) error {
+		currentCategory, err := store.FindProviderCategory(ctx, request.ProviderID)
+		if errors.Is(err, provider.ErrDoesNotExist) {
+			return ErrProviderDoesNotExist
+		}
+		if err != nil {
+			return err
+		}
+		if err := currentCategory.RequireEnabled(); err != nil {
+			return err
+		}
+		saved, err = store.SaveWithConversation(ctx, request, pendingConversation)
+		return err
+	})
+	if err != nil {
+		return nil, err
+	}
+	return saved, nil
 }

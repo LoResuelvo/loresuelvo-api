@@ -38,8 +38,20 @@ func (repository *JobRequestRepository) SaveWithConversation(jobRequest jobreque
 		return nil, fmt.Errorf("beginning job request transaction: %w", err)
 	}
 
+	defer func() { _ = tx.Rollback() }()
+	saved, err := repository.saveWithConversationWithTx(ctx, tx, jobRequest, workConversation)
+	if err != nil {
+		return nil, rollbackJobRequestTx(tx, err)
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, fmt.Errorf("committing job request transaction: %w", err)
+	}
+	return saved, nil
+}
+
+func (repository *JobRequestRepository) saveWithConversationWithTx(ctx context.Context, tx *sql.Tx, jobRequest jobrequest.JobRequest, workConversation *conversation.WorkConversation) (*jobrequest.JobRequest, error) {
 	var conversationID int
-	err = tx.QueryRowContext(
+	err := tx.QueryRowContext(
 		ctx,
 		`INSERT INTO conversations (type, status, created_on, updated_on)
 		VALUES ($1, $2, $3, $3)
@@ -49,7 +61,7 @@ func (repository *JobRequestRepository) SaveWithConversation(jobRequest jobreque
 		jobRequest.CreatedOn.UTC(),
 	).Scan(&conversationID)
 	if err != nil {
-		return nil, rollbackJobRequestTx(tx, mapJobRequestInsertError(err))
+		return nil, mapJobRequestInsertError(err)
 	}
 
 	_, err = tx.ExecContext(
@@ -61,7 +73,7 @@ func (repository *JobRequestRepository) SaveWithConversation(jobRequest jobreque
 		workConversation.ProviderID,
 	)
 	if err != nil {
-		return nil, rollbackJobRequestTx(tx, mapJobRequestInsertError(err))
+		return nil, mapJobRequestInsertError(err)
 	}
 
 	var savedJobRequest jobrequest.JobRequest
@@ -90,16 +102,12 @@ func (repository *JobRequestRepository) SaveWithConversation(jobRequest jobreque
 		&savedJobRequest.CreatedOn,
 	)
 	if err != nil {
-		return nil, rollbackJobRequestTx(tx, mapJobRequestInsertError(err))
+		return nil, mapJobRequestInsertError(err)
 	}
 	savedJobRequest.Images = append([]filedomain.Image(nil), jobRequest.Images...)
 
 	if err := saveJobRequestImagesWithTx(ctx, tx, savedJobRequest.ID, savedJobRequest.Images); err != nil {
-		return nil, rollbackJobRequestTx(tx, err)
-	}
-
-	if err := tx.Commit(); err != nil {
-		return nil, fmt.Errorf("committing job request transaction: %w", err)
+		return nil, err
 	}
 
 	return &savedJobRequest, nil
