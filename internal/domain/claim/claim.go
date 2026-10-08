@@ -12,6 +12,7 @@ type Party string
 const (
 	PartyConsumer Party = "consumer"
 	PartyProvider Party = "provider"
+	PartyOperator Party = "operator"
 )
 
 type Status string

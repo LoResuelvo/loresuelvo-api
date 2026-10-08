@@ -20,7 +20,7 @@ type detailAuditSuccessState struct {
 }
 
 func registerAdminOperationDetailAuditSuccessSteps(sc *godog.ScenarioContext, suite *testSuite) {
-	sc.Step(`^que no existe un evento de auditoría para la correlación "([^"]*)"$`, suite.detailAuditCorrelationIsAbsent)
+	sc.Step(`^(?:que )?no existe un evento de auditoría para la correlación "([^"]*)"$`, suite.detailAuditCorrelationIsAbsent)
 	sc.Step(`^consulto el detalle administrativo de la solicitud "([^"]*)" con la correlación "([^"]*)"$`, suite.queryDetailWithCorrelation)
 	sc.Step(`^el sistema responde con estado 200 y el detalle completo de "([^"]*)"$`, suite.detailAuditSuccessResponse)
 	sc.Step(`^antes de entregar el detalle queda preparado exactamente un evento de acceso a "([^"]*)" con el ID persistido de "([^"]*)", el operador "([^"]*)" y la correlación "([^"]*)"$`, suite.detailAuditPreparedOnce)

@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"slices"
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/claim"
 	claimmodel "github.com/LoResuelvo/loresuelvo-api/internal/domain/claim/read_model"
@@ -92,20 +93,12 @@ func (r *ClaimRepository) Save(ctx context.Context, found *claim.Claim) error {
 			return rollbackClaimTx(tx, err)
 		}
 	}
-	actionIDs := make([]int, len(found.Actions))
-	for i, action := range found.Actions {
-		if err := tx.QueryRowContext(ctx, `INSERT INTO claim_actions(claim_id,type,actor_id,actor_party,created_on) VALUES($1,$2,$3,$4,$5) RETURNING id`, id, action.Type, action.ActorID, action.ActorParty, action.CreatedOn).Scan(&actionIDs[i]); err != nil {
-			return rollbackClaimTx(tx, err)
-		}
+	actions := slices.Clone(found.Actions)
+	if err := r.saveActionsWithExecutor(ctx, tx, id, actions); err != nil {
+		return rollbackClaimTx(tx, err)
 	}
-	if resolution := found.Resolution; resolution != nil {
-		var amount, currency, unit any
-		if suggested := resolution.SuggestedCompensation; suggested != nil {
-			amount = suggested.AmountMinor
-			currency = suggested.Currency
-			unit = suggested.Unit
-		}
-		if _, err := tx.ExecContext(ctx, `INSERT INTO claim_resolutions(claim_id,type,reasoning,resolved_on,suggested_amount_minor,suggested_currency,suggested_unit) VALUES($1,$2,$3,$4,$5,$6,$7)`, id, resolution.Type, resolution.Reasoning, resolution.ResolvedOn, amount, currency, unit); err != nil {
+	if found.Resolution != nil {
+		if err := r.saveResolutionWithExecutor(ctx, tx, id, found.Resolution); err != nil {
 			return rollbackClaimTx(tx, err)
 		}
 	}
@@ -113,9 +106,7 @@ func (r *ClaimRepository) Save(ctx context.Context, found *claim.Claim) error {
 		return fmt.Errorf("committing claim transaction: %w", claimConstraintError(err))
 	}
 	found.ID = id
-	for i := range found.Actions {
-		found.Actions[i].ID = actionIDs[i]
-	}
+	found.Actions = actions
 	return nil
 }
 
@@ -135,14 +126,24 @@ func (r *ClaimRepository) FindBySubmissionKey(ctx context.Context, claimantID in
 func (r *ClaimRepository) FindOwnedByID(ctx context.Context, claimantID, id int) (*claim.Claim, error) {
 	return r.find(ctx, claimSelectSQL+` WHERE c.claimant_id=$1 AND c.id=$2`, claimantID, id)
 }
+
+type claimExecutor interface {
+	QueryRowContext(context.Context, string, ...any) *sql.Row
+	QueryContext(context.Context, string, ...any) (*sql.Rows, error)
+	ExecContext(context.Context, string, ...any) (sql.Result, error)
+}
+
 func (r *ClaimRepository) find(ctx context.Context, query string, args ...any) (*claim.Claim, error) {
+	return r.findWithExecutor(ctx, r.db, query, args...)
+}
+func (r *ClaimRepository) findWithExecutor(ctx context.Context, executor claimExecutor, query string, args ...any) (*claim.Claim, error) {
 	var found claim.Claim
 	var referenceKind claim.ReferenceKind
 	var referenceID, key, fingerprint string
 	var review, closed, resolved sql.NullTime
 	var resolutionType, reasoning, currency, unit sql.NullString
 	var amount sql.NullInt64
-	err := r.db.QueryRowContext(ctx, query, args...).Scan(&found.ID, &found.ClaimantID, &found.ClaimantParty, &found.OperationID.Kind, &found.OperationID.ResourceID, &referenceKind, &referenceID, &found.Reason, &found.Description, &found.Status, &found.CreatedOn, &review, &closed, &key, &fingerprint, &resolutionType, &reasoning, &resolved, &amount, &currency, &unit)
+	err := executor.QueryRowContext(ctx, query, args...).Scan(&found.ID, &found.ClaimantID, &found.ClaimantParty, &found.OperationID.Kind, &found.OperationID.ResourceID, &referenceKind, &referenceID, &found.Reason, &found.Description, &found.Status, &found.CreatedOn, &review, &closed, &key, &fingerprint, &resolutionType, &reasoning, &resolved, &amount, &currency, &unit)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
@@ -169,18 +170,18 @@ func (r *ClaimRepository) find(ctx context.Context, query string, args ...any) (
 			found.Resolution.SuggestedCompensation = &claim.SuggestedCompensation{AmountMinor: amount.Int64, Currency: currency.String, Unit: unit.String}
 		}
 	}
-	found.ImageFileIDs, err = r.findImages(ctx, found.ID)
+	found.ImageFileIDs, err = r.findImagesWithExecutor(ctx, executor, found.ID)
 	if err != nil {
 		return nil, err
 	}
-	found.Actions, err = r.findActions(ctx, found.ID)
+	found.Actions, err = r.findActionsWithExecutor(ctx, executor, found.ID)
 	if err != nil {
 		return nil, err
 	}
 	return claim.Rehydrate(found, key, fingerprint), nil
 }
-func (r *ClaimRepository) findImages(ctx context.Context, id int) ([]string, error) {
-	rows, err := r.db.QueryContext(ctx, `SELECT file_id::text FROM claim_images WHERE claim_id=$1 ORDER BY file_id`, id)
+func (r *ClaimRepository) findImagesWithExecutor(ctx context.Context, executor claimExecutor, id int) ([]string, error) {
+	rows, err := executor.QueryContext(ctx, `SELECT file_id::text FROM claim_images WHERE claim_id=$1 ORDER BY file_id`, id)
 	if err != nil {
 		return nil, fmt.Errorf("querying claim images: %w", err)
 	}
@@ -198,8 +199,8 @@ func (r *ClaimRepository) findImages(ctx context.Context, id int) ([]string, err
 	}
 	return found, nil
 }
-func (r *ClaimRepository) findActions(ctx context.Context, id int) ([]claim.Action, error) {
-	rows, err := r.db.QueryContext(ctx, `SELECT id,type,actor_id,actor_party,created_on FROM claim_actions WHERE claim_id=$1 ORDER BY id`, id)
+func (r *ClaimRepository) findActionsWithExecutor(ctx context.Context, executor claimExecutor, id int) ([]claim.Action, error) {
+	rows, err := executor.QueryContext(ctx, `SELECT id,type,actor_id,actor_party,created_on FROM claim_actions WHERE claim_id=$1 ORDER BY id`, id)
 	if err != nil {
 		return nil, fmt.Errorf("querying claim actions: %w", err)
 	}

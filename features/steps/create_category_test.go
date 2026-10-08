@@ -36,7 +36,7 @@ func registerCreateCategorySteps(sc *godog.ScenarioContext, suite *testSuite) {
 	sc.Step(`^intento crear un rubro con solamente espacios$`, suite.tryCreateCategoryWithWhitespaceName)
 	sc.Step(`^intento crear un rubro con un nombre de 101 caracteres$`, suite.tryCreateCategoryWithTooLongName)
 	sc.Step(`^intento crear un rubro con un nombre numérico$`, suite.tryCreateCategoryWithNumericName)
-	sc.Step(`^que estoy autenticado como administrador "([^"]*)" solamente con el permiso "([^"]*)"$`, suite.iAmAuthenticatedAsAdminWithPermission)
+	sc.Step(`^(?:que )?estoy autenticado como administrador "([^"]*)" solamente con el permiso "([^"]*)"$`, suite.iAmAuthenticatedAsAdminWithPermission)
 	sc.Step(`^el sistema crea el rubro$`, suite.systemCreatesCategory)
 	sc.Step(`^la respuesta contiene el identificador, el nombre "([^"]*)" y el nombre normalizado "([^"]*)"$`, suite.categoryCreationResponseContains)
 	sc.Step(`^la ubicación del recurso creado corresponde al identificador del rubro$`, suite.createdCategoryLocationMatchesID)

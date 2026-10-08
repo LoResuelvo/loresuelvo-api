@@ -166,3 +166,26 @@ func (m *claimServiceMock) Get(ctx context.Context, auth string, id int) (*claim
 	v, _ := a.Get(0).(*claim.GetResult)
 	return v, a.Error(1)
 }
+
+type adminClaimServiceMock struct{ mock.Mock }
+
+func (m *adminClaimServiceMock) List(ctx context.Context, criteria claim.AdminCriteria) (*claim.AdminPage, error) {
+	a := m.Called(ctx, criteria)
+	v, _ := a.Get(0).(*claim.AdminPage)
+	return v, a.Error(1)
+}
+func (m *adminClaimServiceMock) Get(ctx context.Context, auth string, id int, correlation string) (*claim.AdminDetail, error) {
+	a := m.Called(ctx, auth, id, correlation)
+	v, _ := a.Get(0).(*claim.AdminDetail)
+	return v, a.Error(1)
+}
+func (m *adminClaimServiceMock) StartReview(ctx context.Context, auth string, id int, key, correlation string) (*claim.AdministrationResult, error) {
+	a := m.Called(ctx, auth, id, key, correlation)
+	v, _ := a.Get(0).(*claim.AdministrationResult)
+	return v, a.Error(1)
+}
+func (m *adminClaimServiceMock) Resolve(ctx context.Context, auth string, id int, key, correlation string, input claim.ResolutionInput) (*claim.AdministrationResult, error) {
+	a := m.Called(ctx, auth, id, key, correlation, input)
+	v, _ := a.Get(0).(*claim.AdministrationResult)
+	return v, a.Error(1)
+}

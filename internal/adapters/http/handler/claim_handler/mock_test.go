@@ -2,11 +2,12 @@ package claim_handler
 
 import (
 	"context"
+	"testing"
+
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/claim"
 	filedomain "github.com/LoResuelvo/loresuelvo-api/internal/domain/file"
 	operationmodel "github.com/LoResuelvo/loresuelvo-api/internal/domain/operation/read_model"
 	"github.com/stretchr/testify/mock"
-	"testing"
 )
 
 type serviceMock struct{ mock.Mock }
@@ -110,4 +111,27 @@ func newServiceMock(t *testing.T) *serviceMock {
 	m.Test(t)
 	t.Cleanup(func() { m.AssertExpectations(t) })
 	return m
+}
+
+type adminServiceMock struct{ mock.Mock }
+
+func (m *adminServiceMock) List(ctx context.Context, criteria claim.AdminCriteria) (*claim.AdminPage, error) {
+	a := m.Called(ctx, criteria)
+	v, _ := a.Get(0).(*claim.AdminPage)
+	return v, a.Error(1)
+}
+func (m *adminServiceMock) Get(ctx context.Context, auth string, id int, correlation string) (*claim.AdminDetail, error) {
+	a := m.Called(ctx, auth, id, correlation)
+	v, _ := a.Get(0).(*claim.AdminDetail)
+	return v, a.Error(1)
+}
+func (m *adminServiceMock) StartReview(ctx context.Context, auth string, id int, key, correlation string) (*claim.AdministrationResult, error) {
+	a := m.Called(ctx, auth, id, key, correlation)
+	v, _ := a.Get(0).(*claim.AdministrationResult)
+	return v, a.Error(1)
+}
+func (m *adminServiceMock) Resolve(ctx context.Context, auth string, id int, key, correlation string, input claim.ResolutionInput) (*claim.AdministrationResult, error) {
+	a := m.Called(ctx, auth, id, key, correlation, input)
+	v, _ := a.Get(0).(*claim.AdministrationResult)
+	return v, a.Error(1)
 }

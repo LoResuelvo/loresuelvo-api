@@ -37,6 +37,9 @@ type registrationResponse struct {
 }
 
 func registerConsumerAccountSteps(sc *godog.ScenarioContext, suite *testSuite) {
+	sc.Step(`^que existe el consumidor registrado "([^"]*)"$`, func(email string) error {
+		return suite.thereIsRegisteredConsumerWithEmailNameAndSurname(email, "Fixture", "Consumer")
+	})
 	sc.Step(`^existe un consumidor registrado con correo "([^"]*)"$`, suite.thereIsRegisteredConsumerWithEmail)
 	sc.Step(`^que cargué una foto de perfil válida para mi registro como consumidor$`, suite.uploadValidConsumerProfilePhoto)
 	sc.Step(`^me registro como usuario consumidor con correo "([^"]*)", nombre "([^"]*)" y apellido "([^"]*)"$`, suite.requestConsumerAccountRegistration)

@@ -12,7 +12,10 @@ import (
 
 // ClaimLifecycleFixture prepares persisted US-68 lifecycle states without exposing an administrative API in US-31.
 // This helper is for acceptance fixtures only; production behavior belongs to the claim aggregate.
-type ClaimLifecycleFixture struct{ DB *sql.DB }
+type ClaimLifecycleFixture struct {
+	DB         *sql.DB
+	OperatorID int
+}
 
 func (f ClaimLifecycleFixture) SetState(ctx context.Context, id int, status claim.Status, resolution *claim.Resolution) error {
 	if !status.Valid() {
@@ -45,6 +48,24 @@ func (f ClaimLifecycleFixture) SetState(ctx context.Context, id int, status clai
 	}
 	if _, err := tx.ExecContext(ctx, `UPDATE claims SET status=$1,review_started_on=$2,closed_on=$3 WHERE id=$4`, status, reviewed, closed, id); err != nil {
 		return rollbackClaimFixture(tx, err)
+	}
+	// Rebuild only fixture lifecycle evidence, preserving the submitted action.
+	if _, err := tx.ExecContext(ctx, `DELETE FROM claim_resolutions WHERE claim_id=$1`, id); err != nil {
+		return rollbackClaimFixture(tx, err)
+	}
+	if _, err := tx.ExecContext(ctx, `DELETE FROM claim_actions WHERE claim_id=$1 AND type<>'submitted'`, id); err != nil {
+		return rollbackClaimFixture(tx, err)
+	}
+	if status != claim.StatusOpen && f.OperatorID > 0 {
+		operatorID := f.OperatorID
+		if _, err := tx.ExecContext(ctx, `INSERT INTO claim_actions(claim_id,type,actor_id,actor_party,created_on) VALUES($1,'review_started',$2,'operator',$3)`, id, operatorID, reviewed); err != nil {
+			return rollbackClaimFixture(tx, err)
+		}
+		if resolution != nil {
+			if _, err := tx.ExecContext(ctx, `INSERT INTO claim_actions(claim_id,type,actor_id,actor_party,created_on) VALUES($1,'resolved',$2,'operator',$3)`, id, operatorID, closed); err != nil {
+				return rollbackClaimFixture(tx, err)
+			}
+		}
 	}
 	if resolution != nil {
 		var amount, currency, unit any

@@ -59,7 +59,7 @@ type adminCoverageZoneResponse struct {
 func registerAdminListUsersSteps(sc *godog.ScenarioContext, suite *testSuite) {
 	sc.Step(`^que existen los siguientes consumidores registrados:$`, suite.thereAreRegisteredConsumers)
 	sc.Step(`^que no existen consumidores registrados$`, suite.thereAreNoRegisteredConsumers)
-	sc.Step(`^que estoy autenticado como administrador "([^"]*)" con el permiso "([^"]*)"$`, suite.iAmAuthenticatedAsAdminWithPermission)
+	sc.Step(`^(?:que )?estoy autenticado como administrador "([^"]*)" con el permiso "([^"]*)"$`, suite.iAmAuthenticatedAsAdminWithPermission)
 	sc.Step(`^consulto el directorio de consumidores$`, suite.requestConsumerDirectory)
 	sc.Step(`^el directorio de consumidores contiene exactamente a:$`, suite.consumerDirectoryContainsExactly)
 	sc.Step(`^el directorio de consumidores no incluye a "([^"]*)"$`, suite.consumerDirectoryDoesNotInclude)

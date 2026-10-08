@@ -453,6 +453,16 @@ func newDependencies(database *sql.DB, adapters dependencyAdapters) (*Dependenci
 	}
 	funnelHandler := operation_funnel_handler.NewHandler(operation.NewFunnelService(funnelReader, systemClock))
 
+	claimRepository := repositories.NewClaimRepository(database)
+	claimAuditWriter := audit.Writer(persistence.AuditEventRepository)
+	claimEvidenceImages := claim.AdministrativeEvidenceImages(fileService)
+	if decorator := adapters.providerDiagnosticTestOptions.AdminClaims.AuditWriterDecorator; decorator != nil {
+		claimAuditWriter = decorator(claimAuditWriter)
+	}
+	if decorator := adapters.providerDiagnosticTestOptions.AdminClaims.EvidenceImagesDecorator; decorator != nil {
+		claimEvidenceImages = decorator(claimEvidenceImages)
+	}
+	claimAdminService := claim.NewAdminService(claimRepository, persistence.UserRepository, repositories.NewClaimAdministrationUnitOfWork(database, claimRepository, persistence.AuditEventRepository), claimAuditWriter, claimEvidenceImages, systemClock)
 	return &Dependencies{
 		Persistence: persistence,
 		Runtime: RuntimeDependencies{
@@ -476,7 +486,8 @@ func newDependencies(database *sql.DB, adapters dependencyAdapters) (*Dependenci
 			OperationChatHandler:        operationChatHandler,
 			OperationMediaHandler:       operation_media_handler.NewHandler(operation.NewMediaService(persistence.OperationMediaReader, repositories.NewOperationMediaFileFinder(persistence.FileRepository), storageComponents.Storage)),
 			CategoryHandler:             category_handler.NewCategoryHandler(categoryService),
-			ClaimHandler:                claim_handler.NewHandler(claim.NewService(repositories.NewClaimRepository(database), repositories.NewClaimUserFinder(database), repositories.NewClaimOperationReferenceResolver(database), fileService, systemClock)),
+			AdminClaimHandler:           claim_handler.NewAdminHandler(claimAdminService),
+			ClaimHandler:                claim_handler.NewHandler(claim.NewService(claimRepository, repositories.NewClaimUserFinder(database), repositories.NewClaimOperationReferenceResolver(database), fileService, systemClock)),
 			CalendarConnectionHandler:   calendar_connection_handler.NewCalendarConnectionHandler(calendarConnectionService, adapters.calendarHandlerConfig),
 			CoverageZoneHandler:         coverage_zone_handler.NewCoverageZoneHandler(coverageZoneService),
 			ConsumerHandler:             consumer_handler.NewConsumerHandler(consumerService),

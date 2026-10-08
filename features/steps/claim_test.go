@@ -287,6 +287,9 @@ func (s *testSuite) claimSend(method, path, key string, payload any) error {
 		return err
 	}
 	req.Header.Set("Content-Type", "application/json")
+	if correlation := s.adminRequest.sentHeaders.Get("X-Request-ID"); strings.HasPrefix(path, adminClaimsPath) && correlation != "" {
+		req.Header.Set("X-Request-ID", correlation)
+	}
 	if key != "" {
 		req.Header.Set("Idempotency-Key", key)
 	}
@@ -753,6 +756,17 @@ func (s *testSuite) claimCreatedDistinct(label, status string) error {
 	s.claims.claims[label] = &claimFixture{claim: found, input: s.claims.lastInput, owner: "ana@example.com", snapshot: found}
 	return nil
 }
+
+// claimDistinctRequest prepares a separate operation using the existing page-fixture pattern.
+func (s *testSuite) claimDistinctRequest(request, consumer string, created time.Time) error {
+	return s.withInboxFixtureClock(func() error {
+		providerEmail := "provider-" + request + "@example.com"
+		if err := s.thereIsRegisteredProviderWithEmailNameSurnameAndCategory(providerEmail, "Fixture", request, "Claims"); err != nil {
+			return err
+		}
+		return s.createInboxJobRequest(request, consumer, providerEmail, created, "pending")
+	})
+}
 func (s *testSuite) claimPageFixture(email, first, second, instant, higher, lower, third, thirdInstant string) error {
 	now, err := time.Parse(time.RFC3339, instant)
 	if err != nil {
@@ -767,11 +781,7 @@ func (s *testSuite) claimPageFixture(email, first, second, instant, higher, lowe
 		now   time.Time
 	}{{first, now}, {second, now}, {third, last}} {
 		request := "request-" + entry.label
-		providerEmail := "provider-" + entry.label + "@example.com"
-		if err := s.thereIsRegisteredProviderWithEmailNameSurnameAndCategory(providerEmail, "Fixture", entry.label, "Claims"); err != nil {
-			return err
-		}
-		if err := s.createInboxJobRequest(request, email, providerEmail, entry.now, "pending"); err != nil {
+		if err := s.claimDistinctRequest(request, email, entry.now); err != nil {
 			return err
 		}
 		if err := s.fixtureClaim(email, entry.label, request, uuid.NewString(), "damage", "Original testimony", nil, claim.StatusOpen, entry.now); err != nil {
@@ -977,6 +987,9 @@ func (s *testSuite) claimProjectionPrivate() error {
 	response, err := s.claimResponse()
 	if err != nil {
 		return err
+	}
+	if s.adminClaims.selected != "" {
+		return s.adminClaimProjectionPrivate()
 	}
 	for _, field := range []string{"claimant_id", "auth_id", "operator", "operator_id", "actions", "audit", "transactions", "bucket", "key", "credentials", "executed"} {
 		if _, exists := response[field]; exists {

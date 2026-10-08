@@ -58,3 +58,23 @@ func (s *Service) confirmClaimEvidenceImage(ctx context.Context, file *File) err
 	file.Confirm(s.clock.Now())
 	return nil
 }
+
+// ResolveAdministrativeClaimEvidenceImage is an explicit capability for an authorized,
+// audited administrative claim detail. Its caller must restrict access to linked file IDs.
+func (s *Service) ResolveAdministrativeClaimEvidenceImage(ctx context.Context, fileID string) (string, error) {
+	if _, err := uuid.Parse(fileID); err != nil {
+		return "", ErrClaimEvidenceImageNotAvailable
+	}
+	files, err := s.repository.FindByIDs(ctx, []string{fileID})
+	if err != nil {
+		return "", fmt.Errorf("finding administrative claim evidence: %w", err)
+	}
+	if len(files) != 1 || files[0].ID != fileID || !isAvailableImageForPolicy(files[0], claimEvidenceImagePolicy) {
+		return "", ErrClaimEvidenceImageNotAvailable
+	}
+	resolved, err := s.resolveImage(ctx, files[0])
+	if err != nil {
+		return "", err
+	}
+	return resolved.URL, nil
+}

@@ -42,6 +42,8 @@ const readAdminAuditPermission = "read:admin_audit"
 const readAdminChatAuditPermission = "read:admin_chat_audit"
 const readAdminOperationsPermission = "read:admin_operations"
 const readAdminPaymentsPermission = "read:admin_payments"
+const readAdminClaimsPermission = "read:admin_claims"
+const writeAdminClaimsPermission = "write:admin_claims"
 const readAdminMetricsPermission = "read:admin_metrics"
 const createCategoriesPermission = "create:categories"
 
@@ -55,6 +57,7 @@ const (
 )
 
 type RouterConfig struct {
+	AdminClaimHandler           *claim_handler.AdminHandler
 	ClaimHandler                *claim_handler.Handler
 	InstallationHandler         *installation_handler.Handler
 	Environment                 Environment
@@ -94,6 +97,7 @@ type RouterConfig struct {
 }
 
 type Router struct {
+	adminClaimHandler           *claim_handler.AdminHandler
 	claimHandler                *claim_handler.Handler
 	installationHandler         *installation_handler.Handler
 	environment                 Environment
@@ -140,6 +144,7 @@ func NewRouter(config RouterConfig) *Router {
 
 	router := &Router{
 		claimHandler:                config.ClaimHandler,
+		adminClaimHandler:           config.AdminClaimHandler,
 		installationHandler:         config.InstallationHandler,
 		environment:                 config.Environment,
 		adminHandler:                config.AdminHandler,
@@ -401,6 +406,11 @@ func testRoutesEnabled(environment Environment) bool {
 }
 
 func (router *Router) registerClaimRoutes(engine *gin.Engine, authMiddleware gin.HandlerFunc) {
+	engine.GET("/admin/claims", privateNoStore, authMiddleware, middleware.RequirePermissionLayer(readAdminClaimsPermission), router.adminClaimHandler.List)
+	engine.GET("/admin/claims/:id", privateNoStore, authMiddleware, middleware.RequirePermissionLayer(readAdminClaimsPermission), router.adminClaimHandler.Get)
+	engine.POST("/admin/claims/:id/review", privateNoStore, authMiddleware, middleware.RequirePermissionLayer(writeAdminClaimsPermission), router.adminClaimHandler.StartReview)
+	engine.POST("/admin/claims/:id/resolution", privateNoStore, authMiddleware, middleware.RequirePermissionLayer(writeAdminClaimsPermission), router.adminClaimHandler.Resolve)
+
 	engine.POST("/claims", privateNoStore, authMiddleware, router.claimHandler.Submit)
 	engine.GET("/claims", privateNoStore, authMiddleware, router.claimHandler.List)
 	engine.GET("/claims/:id", privateNoStore, authMiddleware, router.claimHandler.Get)

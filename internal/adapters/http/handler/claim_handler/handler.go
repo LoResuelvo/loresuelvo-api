@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"slices"
 	"strconv"
 	"time"
@@ -34,7 +35,7 @@ func respondError(c *gin.Context, err error) {
 		err    error
 		status int
 	}{
-		{claim.ErrEvidenceAccessUnavailable, 500}, {filedomain.ErrClaimEvidenceImageNotAvailable, 400}, {claim.ErrInvalidSubmission, 400}, {claim.ErrInvalidIdempotencyKey, 400}, {claim.ErrInvalidCriteria, 400}, {claim.ErrInvalidEvidence, 400}, {claim.ErrForbidden, 403}, {claim.ErrNotFound, 404}, {claim.ErrSubmissionKeyConflict, 409}, {claim.ErrOpenClaimConflict, 409},
+		{claim.ErrInvalidResolution, 400}, {claim.ErrInvalidTransition, 409}, {claim.ErrAdministrationKeyConflict, 409}, {claim.ErrEvidenceAccessUnavailable, 500}, {filedomain.ErrClaimEvidenceImageNotAvailable, 400}, {claim.ErrInvalidSubmission, 400}, {claim.ErrInvalidIdempotencyKey, 400}, {claim.ErrInvalidCriteria, 400}, {claim.ErrInvalidEvidence, 400}, {claim.ErrForbidden, 403}, {claim.ErrNotFound, 404}, {claim.ErrSubmissionKeyConflict, 409}, {claim.ErrOpenClaimConflict, 409},
 	} {
 		if errors.Is(err, entry.err) {
 			status = entry.status
@@ -243,8 +244,11 @@ func (h *Handler) List(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"items": items, "page": page.Page, "limit": page.Limit, "total": page.Total})
 }
 func parseCriteria(c *gin.Context) (claim.ListCriteria, error) {
+	return parseCriteriaValues(c.Request.URL.Query())
+}
+func parseCriteriaValues(values url.Values) (claim.ListCriteria, error) {
 	criteria := claim.ListCriteria{Page: 1, Limit: 20}
-	for key, values := range c.Request.URL.Query() {
+	for key, values := range values {
 		if len(values) != 1 {
 			return criteria, claim.ErrInvalidCriteria
 		}

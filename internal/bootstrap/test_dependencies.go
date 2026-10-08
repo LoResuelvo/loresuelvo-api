@@ -18,6 +18,7 @@ import (
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/admin"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/audit"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/category"
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/claim"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/conversation"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/operation"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/payment"
@@ -53,7 +54,12 @@ type AdminFunnelTestOptions struct {
 	ReaderDecorator func(operation.FunnelReader) operation.FunnelReader
 }
 
+type AdminClaimsTestOptions struct {
+	AuditWriterDecorator    func(audit.Writer) audit.Writer
+	EvidenceImagesDecorator func(claim.AdministrativeEvidenceImages) claim.AdministrativeEvidenceImages
+}
 type ProviderDiagnosticTestOptions struct {
+	AdminClaims          AdminClaimsTestOptions
 	ConsumerHistory      ConsumerHistoryTestOptions
 	ReaderDecorator      func(admin.ProviderDiagnosticReader) admin.ProviderDiagnosticReader
 	AuditWriterDecorator func(audit.Writer) audit.Writer

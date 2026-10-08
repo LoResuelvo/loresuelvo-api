@@ -29,6 +29,7 @@ import (
 	"github.com/LoResuelvo/loresuelvo-api/internal/bootstrap"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/admin"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/audit"
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/claim"
 	filedomain "github.com/LoResuelvo/loresuelvo-api/internal/domain/file"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/operation"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/payment"
@@ -43,6 +44,8 @@ import (
 
 type testSuite struct {
 	claims                         claimState
+	adminClaims                    adminClaimState
+	adminClaimCapture              *adminClaimCapture
 	phoneIDs                       []string
 	phoneRegistrations             []phoneRegistration
 	pushCapture                    *pushRequestCapture
@@ -188,6 +191,7 @@ type testSuite struct {
 
 func (s *testSuite) registerAllSteps(sc *godog.ScenarioContext) {
 	registerClaimSteps(sc, s)
+	registerAdminClaimSteps(sc, s)
 	registerServiceNoticeSteps(sc, s)
 	registerPhoneSteps(sc, s)
 	registerNoticeDeliverySteps(sc, s)
@@ -270,6 +274,10 @@ func (s *testSuite) cleanup() error {
 		return err
 	}
 	s.claims = claimState{}
+	s.adminClaims = adminClaimState{}
+	if s.adminClaimCapture != nil {
+		s.adminClaimCapture.reset()
+	}
 	s.pushCapture.reset()
 	s.pushCapture.setStatus(0)
 	s.closeRealtimeConnections()
@@ -452,8 +460,17 @@ func newTestSuite(tb testing.TB, database *sql.DB) *testSuite {
 	consumerHistoryCapture := &consumerHistoryTestCapture{}
 	adminPaymentCapture := &adminPaymentTestCapture{}
 	adminFunnelCapture := &adminFunnelTestCapture{}
+	adminClaimCapture := &adminClaimCapture{}
 	dependencies, doubles, err := bootstrap.NewTestDependenciesWithProviderDiagnosticOptions(
 		bootstrap.ProviderDiagnosticTestOptions{
+			AdminClaims: bootstrap.AdminClaimsTestOptions{
+				AuditWriterDecorator: func(writer audit.Writer) audit.Writer {
+					return adminClaimAuditWriter{inner: writer, capture: adminClaimCapture}
+				},
+				EvidenceImagesDecorator: func(images claim.AdministrativeEvidenceImages) claim.AdministrativeEvidenceImages {
+					return adminClaimEvidenceImages{inner: images, capture: adminClaimCapture}
+				},
+			},
 			ConsumerHistory: bootstrap.ConsumerHistoryTestOptions{
 				AuditWriterDecorator: func(writer audit.Writer) audit.Writer {
 					return consumerHistoryAuditWriterDecorator{inner: writer, capture: consumerHistoryCapture}
@@ -496,6 +513,7 @@ func newTestSuite(tb testing.TB, database *sql.DB) *testSuite {
 		auditCapture.decorate,
 	)
 	require.NoError(tb, err, "could not initialize dependencies")
+	adminClaimCapture.reader = dependencies.Persistence.AuditEventRepository
 	auth0Validator := auth0.NewFakeValidator()
 	tokenBuilder := auth0.NewTokenBuilder()
 
@@ -548,6 +566,7 @@ func newTestSuite(tb testing.TB, database *sql.DB) *testSuite {
 		consumerHistoryCapture:         consumerHistoryCapture,
 		adminPaymentCapture:            adminPaymentCapture,
 		adminFunnelCapture:             adminFunnelCapture,
+		adminClaimCapture:              adminClaimCapture,
 		scenarioContext:                context.Background(),
 
 		categoryIDsByName:                   map[string]int{},
