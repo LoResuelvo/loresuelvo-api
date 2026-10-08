@@ -32,3 +32,11 @@ var (
 	ErrWorkOrderNotPaid                     = errors.New("only paid work orders can have a review")
 	ErrReviewAlreadyExists                  = errors.New("work order already has a review")
 )
+
+var (
+	ErrInvalidReviewReport       = errors.New("invalid review report")
+	ErrReviewReportForbidden     = errors.New("only the rated provider can report a review")
+	ErrReviewNotAvailable        = errors.New("review is not available")
+	ErrReviewReportAlreadyExists = errors.New("review already has a report")
+	ErrReviewReportNotFound      = errors.New("review report not found")
+)

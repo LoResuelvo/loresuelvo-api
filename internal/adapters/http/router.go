@@ -90,6 +90,7 @@ type RouterConfig struct {
 	HealthHandler               *health_handler.HealthHandler
 	ServiceProposalHandler      *service_proposal_handler.ServiceProposalHandler
 	WorkOrderHandler            *work_order_handler.WorkOrderHandler
+	ReviewReportHandler         *work_order_handler.ReviewReportHandler
 	TestHandler                 *test_handler.TestHandler
 	RealtimeHandler             *realtime.Handler
 	Auth0Validator              *validator.Validator
@@ -130,6 +131,7 @@ type Router struct {
 	healthHandler               *health_handler.HealthHandler
 	serviceProposalHandler      *service_proposal_handler.ServiceProposalHandler
 	workOrderHandler            *work_order_handler.WorkOrderHandler
+	reviewReportHandler         *work_order_handler.ReviewReportHandler
 	testHandler                 *test_handler.TestHandler
 	realtimeHandler             *realtime.Handler
 	auth0Validator              *validator.Validator
@@ -176,6 +178,7 @@ func NewRouter(config RouterConfig) *Router {
 		healthHandler:               config.HealthHandler,
 		serviceProposalHandler:      config.ServiceProposalHandler,
 		workOrderHandler:            config.WorkOrderHandler,
+		reviewReportHandler:         config.ReviewReportHandler,
 		testHandler:                 config.TestHandler,
 		realtimeHandler:             config.RealtimeHandler,
 		auth0Validator:              config.Auth0Validator,
@@ -367,6 +370,9 @@ func (router *Router) registerIdentityVerificationRoutes(engine *gin.Engine) {
 }
 
 func (router *Router) registerWorkOrderRoutes(engine *gin.Engine, authMiddleware gin.HandlerFunc) {
+	if router.reviewReportHandler != nil {
+		engine.POST("/work-orders/:workOrderID/reviews/reports", privateNoStore, authMiddleware, router.reviewReportHandler.Report)
+	}
 	engine.GET("/work-orders", authMiddleware, router.workOrderHandler.GetWorkOrders)
 	engine.GET("/work-orders/:workOrderID", authMiddleware, router.workOrderHandler.GetWorkOrder)
 	engine.POST("/work-orders/:workOrderID/completion-reports", authMiddleware, router.workOrderHandler.ReportCompletion)

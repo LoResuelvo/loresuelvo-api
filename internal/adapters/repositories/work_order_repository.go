@@ -34,6 +34,7 @@ type workOrderRecord struct {
 	CompletionReportImageFileIDs []string
 	ReviewRating                 sql.NullInt64
 	ReviewDescription            sql.NullString
+	ReviewVisible                *bool
 }
 
 func (record workOrderRecord) Restore(proposal workorder.ServiceProposal) (*workorder.WorkOrder, error) {
@@ -87,6 +88,7 @@ func (record workOrderRecord) review() *workorder.ReviewRestoreInput {
 	return &workorder.ReviewRestoreInput{
 		Rating:      int(record.ReviewRating.Int64),
 		Description: record.ReviewDescription.String,
+		Visible:     record.ReviewVisible,
 	}
 }
 
@@ -192,6 +194,7 @@ func (record *workOrderRecord) setReview(review *workorder.ReviewRestoreInput) {
 	}
 	record.ReviewRating = sql.NullInt64{Int64: int64(review.Rating), Valid: true}
 	record.ReviewDescription = sql.NullString{String: review.Description, Valid: true}
+	record.ReviewVisible = review.Visible
 }
 
 func (r *WorkOrderRepository) findCompletionReport(ctx context.Context, workOrderID int) (*workorder.CompletionReportRestoreInput, error) {
@@ -248,13 +251,14 @@ func (r *WorkOrderRepository) findCompletionReport(ctx context.Context, workOrde
 func (r *WorkOrderRepository) findReview(ctx context.Context, workOrderID int) (*workorder.ReviewRestoreInput, error) {
 	var rating sql.NullInt64
 	var description sql.NullString
+	var visible bool
 	err := r.db.QueryRowContext(
 		ctx,
-		`SELECT rating, description
+		`SELECT rating, description, visible
 		FROM work_order_reviews
 		WHERE work_order_id = $1`,
 		workOrderID,
-	).Scan(&rating, &description)
+	).Scan(&rating, &description, &visible)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
@@ -265,6 +269,7 @@ func (r *WorkOrderRepository) findReview(ctx context.Context, workOrderID int) (
 	return &workorder.ReviewRestoreInput{
 		Rating:      int(rating.Int64),
 		Description: description.String,
+		Visible:     &visible,
 	}, nil
 }
 
@@ -883,14 +888,16 @@ func (r *WorkOrderRepository) saveReviewWithTx(
 
 	if _, err := tx.ExecContext(
 		ctx,
-		`INSERT INTO work_order_reviews (work_order_id, rating, description)
-		VALUES ($1, $2, $3)
+		`INSERT INTO work_order_reviews (work_order_id, rating, description, visible)
+		VALUES ($1, $2, $3, $4)
 		ON CONFLICT (work_order_id) DO UPDATE SET
 			rating = EXCLUDED.rating,
-			description = EXCLUDED.description`,
+			description = EXCLUDED.description,
+			visible = EXCLUDED.visible`,
 		order.ID(),
 		review.Rating(),
 		review.Description(),
+		review.Visible(),
 	); err != nil {
 		return fmt.Errorf("saving work order review: %w", err)
 	}

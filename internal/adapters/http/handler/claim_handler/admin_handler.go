@@ -152,7 +152,7 @@ func (h *AdminHandler) StartReview(c *gin.Context) {
 		return
 	}
 	if len(bytes.TrimSpace(data)) != 0 {
-		fields, err := strictObject(data)
+		fields, err := httphandler.StrictObject(data)
 		if err != nil || len(fields) != 0 || !json.Valid(data) {
 			respondError(c, claim.ErrInvalidSubmission)
 			return
@@ -174,7 +174,7 @@ func decodeResolution(c *gin.Context) (claim.ResolutionInput, error) {
 	if !json.Valid(data) {
 		return claim.ResolutionInput{}, claim.ErrInvalidResolution
 	}
-	fields, err := strictObject(data, "type", "reasoning", "suggested_compensation")
+	fields, err := httphandler.StrictObject(data, "type", "reasoning", "suggested_compensation")
 	if err != nil {
 		return claim.ResolutionInput{}, claim.ErrInvalidResolution
 	}
@@ -187,7 +187,7 @@ func decodeResolution(c *gin.Context) (claim.ResolutionInput, error) {
 			err = json.Unmarshal(value, &input.Reasoning)
 		case "suggested_compensation":
 			var amountFields map[string]json.RawMessage
-			amountFields, err = strictObject(value, "amount_minor")
+			amountFields, err = httphandler.StrictObject(value, "amount_minor")
 			if err == nil {
 				amount, exists := amountFields["amount_minor"]
 				if !exists || bytes.Equal(bytes.TrimSpace(amount), []byte("null")) {

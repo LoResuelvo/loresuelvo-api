@@ -358,6 +358,7 @@ func newDependencies(database *sql.DB, adapters dependencyAdapters) (*Dependenci
 		adapters.paymentAccountOAuthConnector.Provider(),
 		serviceproposal.NewBookingPolicy(),
 		systemClock)
+	reportReviewService := workorder.NewReportReviewService(persistence.ProviderActivityActorFinder, persistence.WorkOrderRepository, persistence.ReviewReportRepository, systemClock)
 	workOrderService := workorder.NewService(
 		persistence.WorkOrderRepository,
 		persistence.UserRepository,
@@ -506,6 +507,7 @@ func newDependencies(database *sql.DB, adapters dependencyAdapters) (*Dependenci
 			HealthHandler:               health_handler.NewHealthHandler(readiness),
 			ServiceProposalHandler:      service_proposal_handler.NewServiceProposalHandler(servicePorposalService),
 			WorkOrderHandler:            work_order_handler.NewWorkOrderHandler(workOrderService),
+			ReviewReportHandler:         work_order_handler.NewReviewReportHandler(reportReviewService),
 			TestHandler:                 test_handler.NewTestHandler(systemClock),
 			RealtimeHandler:             realtimeHandler,
 		},

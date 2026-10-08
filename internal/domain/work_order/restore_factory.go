@@ -25,6 +25,8 @@ type CompletionReportRestoreInput struct {
 }
 
 type ReviewRestoreInput struct {
+	// Visible is optional for callers restoring legacy, always-visible reviews.
+	Visible     *bool
 	Rating      int
 	Description string
 }
@@ -80,6 +82,9 @@ func restoreReview(input *ReviewRestoreInput) (*Review, error) {
 	review, err := NewReview(input.Rating, input.Description)
 	if err != nil {
 		return nil, fmt.Errorf("restoring review: %w", err)
+	}
+	if input.Visible != nil {
+		review.visible = *input.Visible
 	}
 	return review, nil
 }

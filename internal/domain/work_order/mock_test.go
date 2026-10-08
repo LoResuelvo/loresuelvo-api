@@ -229,3 +229,23 @@ func notificationBelongsTo(userID int) func(*notification.Notification) bool {
 		return created.UserID == userID
 	}
 }
+
+type reviewReportActorFinderMock struct{ mock.Mock }
+
+func (m *reviewReportActorFinderMock) FindByAuthID(ctx context.Context, authID string) (int, string, error) {
+	a := m.Called(ctx, authID)
+	return a.Int(0), a.String(1), a.Error(2)
+}
+
+type reviewReportRepositoryMock struct{ mock.Mock }
+
+func (m *reviewReportRepositoryMock) FindByWorkOrderID(ctx context.Context, id int) (*workorder.ReviewReport, error) {
+	a := m.Called(ctx, id)
+	if a.Get(0) == nil {
+		return nil, a.Error(1)
+	}
+	return a.Get(0).(*workorder.ReviewReport), a.Error(1)
+}
+func (m *reviewReportRepositoryMock) Save(ctx context.Context, r *workorder.ReviewReport) error {
+	return m.Called(ctx, r).Error(0)
+}

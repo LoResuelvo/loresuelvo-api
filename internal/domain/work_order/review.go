@@ -16,6 +16,7 @@ const (
 type Review struct {
 	rating      int
 	description string
+	visible     bool
 }
 
 func NewReview(rating int, description string) (*Review, error) {
@@ -31,6 +32,7 @@ func NewReview(rating int, description string) (*Review, error) {
 	return &Review{
 		rating:      rating,
 		description: description,
+		visible:     true,
 	}, nil
 }
 
@@ -47,3 +49,5 @@ func (review *Review) Description() string {
 	}
 	return review.description
 }
+
+func (review *Review) Visible() bool { return review != nil && review.visible }

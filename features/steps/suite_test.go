@@ -220,6 +220,7 @@ func (s *testSuite) registerAllSteps(sc *godog.ScenarioContext) {
 	registerGetWorkOrderDetailSteps(sc, s)
 	registerCompleteServicePaymentSteps(sc, s)
 	registerReviewPaidWorkOrderSteps(sc, s)
+	registerReportReviewSteps(sc, s)
 	registerConnectMercadoPagoAccountSteps(sc, s)
 	registerConnectGoogleCalendarSteps(sc, s)
 	registerAddWorkOrderToCalendarSteps(sc, s)

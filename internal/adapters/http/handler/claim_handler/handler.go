@@ -9,7 +9,6 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"slices"
 	"strconv"
 	"time"
 
@@ -56,39 +55,8 @@ type referenceRequest struct {
 	PaymentIntentID   *string `json:"payment_intent_id"`
 }
 
-// strictObject preserves the distinction between absent and null fields and rejects ambiguous duplicate members.
-func strictObject(data []byte, allowed ...string) (map[string]json.RawMessage, error) {
-	decoder := json.NewDecoder(bytes.NewReader(data))
-	token, err := decoder.Token()
-	if err != nil || token != json.Delim('{') {
-		return nil, claim.ErrInvalidSubmission
-	}
-	fields := map[string]json.RawMessage{}
-	for decoder.More() {
-		token, err := decoder.Token()
-		if err != nil {
-			return nil, claim.ErrInvalidSubmission
-		}
-		key, ok := token.(string)
-		if !ok || !slices.Contains(allowed, key) {
-			return nil, claim.ErrInvalidSubmission
-		}
-		if _, exists := fields[key]; exists {
-			return nil, claim.ErrInvalidSubmission
-		}
-		var value json.RawMessage
-		if err := decoder.Decode(&value); err != nil {
-			return nil, claim.ErrInvalidSubmission
-		}
-		fields[key] = value
-	}
-	if _, err := decoder.Token(); err != nil {
-		return nil, claim.ErrInvalidSubmission
-	}
-	return fields, nil
-}
 func (r *referenceRequest) UnmarshalJSON(data []byte) error {
-	fields, err := strictObject(data, "job_request_id", "service_proposal_id", "work_order_id", "payment_intent_id")
+	fields, err := httphandler.StrictObject(data, "job_request_id", "service_proposal_id", "work_order_id", "payment_intent_id")
 	if err != nil || len(fields) != 1 {
 		return claim.ErrInvalidSubmission
 	}
@@ -121,7 +89,7 @@ type submissionRequest struct {
 }
 
 func (r *submissionRequest) UnmarshalJSON(data []byte) error {
-	fields, err := strictObject(data, "reference", "reason", "description", "image_file_ids")
+	fields, err := httphandler.StrictObject(data, "reference", "reason", "description", "image_file_ids")
 	if err != nil {
 		return err
 	}

@@ -222,3 +222,20 @@ func (wo *WorkOrder) AddReview(reviewer *consumer.Consumer, review *Review) erro
 func (wo *WorkOrder) CreateFinalPaymentNotification(clock clock.Clock) *notification.Notification {
 	return notification.NewNotification(wo.ProviderID(), notification.TypeWorkOrderFinalPaymentApproved, notification.ResourceWorkOrder, wo.ID(), clock)
 }
+
+func (wo *WorkOrder) AuthorizeReviewReporter(providerID int) error {
+	if providerID <= 0 || wo.ServiceProposal().ProviderID() != providerID {
+		return ErrReviewReportForbidden
+	}
+	return nil
+}
+
+func (wo *WorkOrder) NewReviewReport(providerID int, category, explanation string, at time.Time) (*ReviewReport, error) {
+	if err := wo.AuthorizeReviewReporter(providerID); err != nil {
+		return nil, err
+	}
+	if wo.Review() == nil || !wo.Review().Visible() {
+		return nil, ErrReviewNotAvailable
+	}
+	return NewReviewReport(wo.ID(), providerID, category, explanation, at)
+}

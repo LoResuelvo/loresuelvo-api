@@ -12,6 +12,7 @@ import (
 )
 
 func registerProviderWithCoverageZonesSteps(sc *godog.ScenarioContext, suite *testSuite) {
+	sc.Step(`^que están habilitadas las zonas de cobertura "([^"]*)"$`, suite.thereIsEnabledCoverageZone)
 	sc.Step(`^que están habilitadas las zonas de cobertura "([^"]*)", "([^"]*)" y "([^"]*)"$`, suite.thereAreEnabledCoverageZones)
 	sc.Step(`^que están habilitadas las zonas de cobertura "([^"]*)" y "([^"]*)"$`, suite.thereAreEnabledCoverageZonesPair)
 	sc.Step(`^que no existe la zona de cobertura "([^"]*)"$`, suite.coverageZoneDoesNotExist)
@@ -364,5 +365,21 @@ func (suite *testSuite) providerIsNotRegistered(email string) error {
 		return fmt.Errorf("expected provider %q not to be registered", email)
 	}
 
+	return nil
+}
+
+func (suite *testSuite) thereIsEnabledCoverageZone(name string) error {
+	if name == defaultProviderCoverageZoneName {
+		if _, err := suite.ensureDefaultProviderCoverageZone(); err != nil {
+			return err
+		}
+	}
+	zone, err := suite.findDefaultProviderCoverageZone(context.Background(), name)
+	if err != nil {
+		return err
+	}
+	if !zone.Enabled {
+		return fmt.Errorf("coverage zone %q is disabled", name)
+	}
 	return nil
 }

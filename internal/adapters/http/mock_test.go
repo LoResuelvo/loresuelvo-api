@@ -13,6 +13,7 @@ import (
 	providerreadmodel "github.com/LoResuelvo/loresuelvo-api/internal/domain/provider/read_model"
 	serviceproposal "github.com/LoResuelvo/loresuelvo-api/internal/domain/service_proposal"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/user"
+	workorder "github.com/LoResuelvo/loresuelvo-api/internal/domain/work_order"
 	"github.com/lestrrat-go/jwx/v3/jwa"
 	"github.com/lestrrat-go/jwx/v3/jwt"
 	"github.com/stretchr/testify/mock"
@@ -188,4 +189,14 @@ func (m *adminClaimServiceMock) Resolve(ctx context.Context, auth string, id int
 	a := m.Called(ctx, auth, id, key, correlation, input)
 	v, _ := a.Get(0).(*claim.AdministrationResult)
 	return v, a.Error(1)
+}
+
+type reviewReporterMock struct{ mock.Mock }
+
+func (m *reviewReporterMock) Report(ctx context.Context, authID string, id int, category, explanation string) (*workorder.ReviewReport, error) {
+	a := m.Called(ctx, authID, id, category, explanation)
+	if a.Get(0) == nil {
+		return nil, a.Error(1)
+	}
+	return a.Get(0).(*workorder.ReviewReport), a.Error(1)
 }
