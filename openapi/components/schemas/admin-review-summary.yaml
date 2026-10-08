@@ -1,0 +1,54 @@
+type: object
+description: >-
+  One row per review, identified by its work-order ID. Does not include the
+  original review text, report explanation, or administrative reasons.
+required:
+  - work_order_id
+  - consumer_id
+  - provider_id
+  - operation_id
+  - rating
+  - visibility
+  - version
+  - pending_report_count
+  - reported_on
+properties:
+  work_order_id:
+    type: integer
+    format: int32
+    minimum: 1
+    description: Review identity; the review has no separate identifier.
+  consumer_id:
+    type: integer
+    format: int32
+    minimum: 1
+  provider_id:
+    type: integer
+    format: int32
+    minimum: 1
+  operation_id:
+    type: string
+    pattern: '^(jr|sp)-[1-9][0-9]*$'
+    description: Stable operation identifier associated with the work order.
+  rating:
+    type: integer
+    minimum: 1
+    maximum: 5
+  visibility:
+    type: string
+    enum: [visible, hidden]
+  version:
+    type: integer
+    minimum: 1
+    description: Current moderation version required for a decision.
+  pending_report_count:
+    type: integer
+    enum: [0, 1]
+    description: Number of pending reports; at most one report exists for this review.
+  reported_on:
+    type: [string, 'null']
+    format: date-time
+    description: >-
+      Creation time of the review's single report, when one exists, including
+      when that report has already been handled. Not a review-publication date.
+additionalProperties: false

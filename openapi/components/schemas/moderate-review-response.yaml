@@ -1,0 +1,23 @@
+type: object
+description: Minimal confirmation of a committed moderation decision.
+required: [work_order_id, visibility, version, decision_id]
+properties:
+  work_order_id:
+    type: integer
+    format: int32
+    minimum: 1
+    description: Identity of the moderated review and its work order.
+  visibility:
+    type: string
+    enum: [visible, hidden]
+  version:
+    type: integer
+    format: int32
+    minimum: 1
+    description: Updated moderation version.
+  decision_id:
+    type: integer
+    format: int32
+    minimum: 1
+    description: Server-generated identifier of the recorded decision.
+additionalProperties: false

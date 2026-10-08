@@ -94,6 +94,12 @@ paths:
     $ref: ./paths/admin-claim-resolution.yaml
   /admin/metrics/funnel:
     $ref: ./paths/admin-metrics-funnel.yaml
+  /admin/reviews:
+    $ref: ./paths/admin-reviews.yaml
+  /admin/reviews/{id}:
+    $ref: ./paths/admin-review-detail.yaml
+  /admin/reviews/{id}/moderate:
+    $ref: ./paths/admin-review-moderation.yaml
   /providers:
     $ref: ./paths/providers.yaml
   /providers/me/statistics/conversion:
@@ -299,6 +305,22 @@ components:
       $ref: ./components/schemas/admin-provider-directory-item.yaml
     AdminProviderDiagnostic:
       $ref: ./components/schemas/admin-provider-diagnostic.yaml
+    AdminReviewPage:
+      $ref: ./components/schemas/admin-review-page.yaml
+    AdminReviewSummary:
+      $ref: ./components/schemas/admin-review-summary.yaml
+    AdminReviewDetail:
+      $ref: ./components/schemas/admin-review-detail.yaml
+    AdminReviewReport:
+      $ref: ./components/schemas/admin-review-report.yaml
+    AdminReviewDecisionPage:
+      $ref: ./components/schemas/admin-review-decision-page.yaml
+    AdminReviewDecision:
+      $ref: ./components/schemas/admin-review-decision.yaml
+    ModerateReviewRequest:
+      $ref: ./components/schemas/moderate-review-request.yaml
+    ModerateReviewResponse:
+      $ref: ./components/schemas/moderate-review-response.yaml
     AdminProviderCoverageZone:
       $ref: ./components/schemas/admin-provider-coverage-zone.yaml
     AdminAuditLogEvent:

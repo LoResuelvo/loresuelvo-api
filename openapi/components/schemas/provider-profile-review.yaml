@@ -1,5 +1,5 @@
 type: object
-description: Public review attached to a paid work order.
+description: Publicly visible review attached to a paid work order; hidden reviews are omitted from public work history.
 required:
   - rating
   - description

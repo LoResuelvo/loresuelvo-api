@@ -2,13 +2,18 @@ type: object
 description: >-
   Global reputation for the authenticated provider's own paid work orders, together
   with one review page from the same coherent read-only snapshot. Each eligible
-  order contributes at most one review. review_count equals reviewed_paid_orders,
-  never exceeds eligible_paid_orders, and equals the sum of all five distribution
-  counts. Aggregates describe the entire eligible set, not the current page.
+  order contributes at most one review. review_count counts all registered
+  reviews, including hidden reviews; it equals reviewed_paid_orders, never
+  exceeds eligible_paid_orders, and equals the sum of all five rating-distribution
+  counts. visible_review_count counts only reviews whose visibility is `visible`,
+  including reviews with an empty description. The reviews page contains only
+  visible reviews. Aggregates describe the entire eligible set, not the current
+  page.
 required:
 - calculated_at
 - average_rating
 - review_count
+- visible_review_count
 - rating_distribution
 - eligible_paid_orders
 - reviewed_paid_orders
@@ -30,18 +35,24 @@ properties:
     description: >-
       Average of all registered ratings in the eligible set, rounded to two decimal
       places using exact HALF_UP arithmetic. Halfway values round up: 29 / 8 is
-      3.63. Orders without a review do not contribute zero ratings. Null when no
-      eligible order has a review; JSON numbers need not display trailing zeros.
+      3.63. Hidden reviews remain in this average. Orders without a review do not
+      contribute zero ratings. Null when no eligible order has a review; JSON
+      numbers need not display trailing zeros.
   review_count:
     type: integer
     format: int64
     minimum: 0
-    description: Global number of reviews of eligible paid orders; equals reviewed_paid_orders, independently of pagination.
+    description: Global number of all registered reviews of eligible paid orders, including hidden reviews; equals reviewed_paid_orders and is independent of pagination.
+  visible_review_count:
+    type: integer
+    format: int64
+    minimum: 0
+    description: Global number of reviews with visibility `visible`, including those with an empty description; never exceeds review_count.
   rating_distribution:
     type: array
     minItems: 5
     maxItems: 5
-    description: Five buckets in ascending rating order from 1 through 5, including zero counts. Their counts sum to review_count.
+    description: Five buckets in ascending rating order from 1 through 5, including zero counts. Their counts sum to review_count and include hidden ratings.
     items:
       $ref: ./provider-reputation-rating-count.yaml
   eligible_paid_orders:
@@ -53,7 +64,7 @@ properties:
     type: integer
     format: int64
     minimum: 0
-    description: Global count of eligible paid orders with a review; equals review_count and never exceeds eligible_paid_orders.
+    description: Global count of eligible paid orders with a review, including hidden reviews; equals review_count and never exceeds eligible_paid_orders.
   coverage_percentage:
     oneOf:
     - type: number
@@ -72,8 +83,10 @@ properties:
     maxItems: 100
     description: >-
       One page of reviews of eligible paid orders in strictly descending
-      work_order_id order. The identifier order is deterministic, not a promise
-      of recency. Empty pages are arrays, never null.
+      work_order_id order, restricted to reviews with visibility `visible`.
+      The identifier order is deterministic, not a promise of recency. Hidden
+      reviews remain in rating aggregates but are not included here. Empty pages
+      are arrays, never null.
     items:
       $ref: ./provider-reputation-review.yaml
   next_cursor:

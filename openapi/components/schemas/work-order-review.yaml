@@ -1,5 +1,9 @@
 type: object
-description: Consumer review attached to a paid work order.
+description: >-
+  Consumer review attached to a paid work order. In participant-facing work-order
+  detail, a hidden review retains its rating but its description is returned as
+  an empty string. The original text is available only through the restricted
+  administrative review detail endpoint after its access audit is prepared.
 required:
   - rating
   - description

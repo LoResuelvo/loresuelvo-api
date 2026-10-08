@@ -25,4 +25,5 @@ properties:
     $ref: '#/components/schemas/ProviderProfileCompletionReport'
   review:
     $ref: '#/components/schemas/ProviderProfileReview'
+    description: Present only when the review's text is publicly visible; a hidden review does not remove the work order from this history.
 additionalProperties: false

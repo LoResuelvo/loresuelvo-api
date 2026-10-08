@@ -270,7 +270,11 @@ $defs:
     additionalProperties: false
   Review:
     type: object
-    description: No review timestamp is recorded by this resource.
+    description: >-
+      No review timestamp is recorded by this resource. This ordinary operation
+      detail retains a hidden review's rating but returns an empty description;
+      it does not expose the hidden original available through the restricted
+      administrative review detail endpoint.
     required: [rating, description]
     properties:
       rating:

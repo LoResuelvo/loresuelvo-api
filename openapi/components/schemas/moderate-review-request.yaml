@@ -1,0 +1,73 @@
+type: object
+description: >-
+  `hide` requires a category and may include the pending report ID for this
+  review. `dismiss_reports` requires that pending report ID, accepts a category
+  only when omitted or empty, and does not change visibility. `unhide` accepts
+  a category only when omitted or empty and rejects a report ID. Every action
+  requires the current expected version and a nonblank UTF-8 reason, trimmed by
+  the server and limited to 500 bytes after trimming. No additional properties
+  are accepted.
+required: [action, reason, expected_version]
+properties:
+  action:
+    type: string
+    enum: [hide, unhide, dismiss_reports]
+  category:
+    oneOf:
+      - $ref: '#/components/schemas/WorkOrderReviewReportRequest/properties/category'
+      - type: string
+        const: ''
+  reason:
+    type: string
+    minLength: 1
+    description: >-
+      Human-authored reason. Surrounding whitespace is trimmed; the remaining
+      UTF-8 text must be nonempty, printable, and at most 500 bytes. The server
+      records the reason in the restricted decision history.
+  expected_version:
+    type: integer
+    format: int32
+    minimum: 1
+    description: Current moderation version of the review.
+  report_id:
+    type: integer
+    format: int32
+    minimum: 1
+    description: >-
+      Optional for `hide`; required to handle a pending report with
+      `dismiss_reports`; not used for `unhide`.
+additionalProperties: false
+allOf:
+  - if:
+      properties:
+        action:
+          const: hide
+      required: [action]
+    then:
+      required: [category]
+      properties:
+        category:
+          $ref: '#/components/schemas/WorkOrderReviewReportRequest/properties/category'
+  - if:
+      properties:
+        action:
+          const: unhide
+      required: [action]
+    then:
+      not:
+        required: [report_id]
+      properties:
+        category:
+          type: string
+          const: ''
+  - if:
+      properties:
+        action:
+          const: dismiss_reports
+      required: [action]
+    then:
+      required: [report_id]
+      properties:
+        category:
+          type: string
+          const: ''

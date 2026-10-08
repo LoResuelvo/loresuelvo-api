@@ -40,7 +40,7 @@ properties:
       $ref: '#/components/schemas/AdminProviderDiagnostic/$defs/Activity'
   reviews:
     type: array
-    description: At most six persisted reviews from associated work orders, ordered by work-order acceptance time and work-order ID descending; no review timestamp is available in this source.
+    description: At most six publicly visible reviews from associated work orders, ordered by work-order acceptance time and work-order ID descending; hidden review text is omitted and no review timestamp is available in this source.
     maxItems: 6
     items:
       $ref: '#/components/schemas/AdminProviderDiagnostic/$defs/Review'
@@ -193,13 +193,13 @@ $defs:
         type: integer
         format: int64
         minimum: 0
-        description: Count of all persisted provider reviews, including reviews beyond the bounded reviews sample.
+        description: Count of all persisted provider reviews, including hidden reviews and reviews beyond the bounded visible-review sample.
       average:
         type: number
         format: double
         minimum: 0
         maximum: 5
-        description: Average over all persisted provider reviews rounded to one decimal place; zero when there are no reviews.
+        description: Average over all persisted provider ratings, including hidden reviews, rounded to one decimal place; zero when there are no reviews.
   Navigation:
     type: object
     additionalProperties: false

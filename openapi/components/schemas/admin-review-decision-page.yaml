@@ -1,0 +1,22 @@
+type: object
+description: Paginated decision history, ordered by decision ID descending.
+required: [items, page, limit, total, has_more]
+properties:
+  items:
+    type: array
+    items:
+      $ref: '#/components/schemas/AdminReviewDecision'
+  page:
+    type: integer
+    minimum: 1
+  limit:
+    type: integer
+    minimum: 1
+    maximum: 100
+  total:
+    type: integer
+    format: int64
+    minimum: 0
+  has_more:
+    type: boolean
+additionalProperties: false

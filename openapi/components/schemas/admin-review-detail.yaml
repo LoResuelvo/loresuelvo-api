@@ -1,0 +1,17 @@
+type: object
+description: Restricted review detail returned only after its access audit is prepared.
+required: [review, description, report, decisions]
+properties:
+  review:
+    $ref: '#/components/schemas/AdminReviewSummary'
+  description:
+    type: string
+    description: Original review text, available only through this permission-protected detail endpoint.
+  report:
+    oneOf:
+      - $ref: '#/components/schemas/AdminReviewReport'
+      - type: 'null'
+    description: The review's single report, or null when no report exists.
+  decisions:
+    $ref: '#/components/schemas/AdminReviewDecisionPage'
+additionalProperties: false

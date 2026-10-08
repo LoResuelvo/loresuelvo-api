@@ -6,7 +6,10 @@ get:
   description: |
     Returns the contractual detail of a work order for its consumer or
     assigned provider. When completion evidence exists, each private image is
-    exposed through a temporary download URL.
+    exposed through a temporary download URL. If the review is hidden, its
+    rating remains in the response and its description is empty; the hidden
+    original is available only through the restricted administrative review
+    detail endpoint.
   security:
     - BearerAuth: []
   parameters:

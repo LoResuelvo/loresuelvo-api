@@ -10,8 +10,13 @@ get:
     orders are not eligible. Each eligible order contributes at most one review;
     images, payment attempts and other one-to-many relations do not duplicate it.
 
-    review_count equals reviewed_paid_orders and the sum of the five rating
-    distribution counts, and never exceeds eligible_paid_orders. The average
+    review_count counts all registered reviews, including hidden reviews, and
+    equals reviewed_paid_orders and the sum of the five rating distribution
+    counts. visible_review_count is distinct: it counts only reviews with a
+    publicly visible description, and the paginated reviews contain only these
+    visible reviews. Hiding a review therefore preserves its rating in the
+    average and distribution without returning its description. Both counts
+    never exceed eligible_paid_orders. The average
     uses all registered eligible ratings, without treating unreviewed orders as
     zero. Coverage is 100 times reviewed_paid_orders divided by
     eligible_paid_orders. Average and coverage use exact HALF_UP rounding to two
@@ -96,6 +101,7 @@ get:
                 calculated_at: '2026-10-03T12:00:00Z'
                 average_rating: null
                 review_count: 0
+                visible_review_count: 0
                 rating_distribution:
                 - {rating: 1, count: 0}
                 - {rating: 2, count: 0}
@@ -113,6 +119,7 @@ get:
                 calculated_at: '2026-10-03T12:00:00Z'
                 average_rating: null
                 review_count: 0
+                visible_review_count: 0
                 rating_distribution:
                 - {rating: 1, count: 0}
                 - {rating: 2, count: 0}
@@ -125,11 +132,12 @@ get:
                 reviews: []
                 next_cursor: null
             partialCoverage:
-              summary: Three reviews of four paid orders; average is 3.67 and coverage is 75 percent.
+              summary: Three registered reviews of four paid orders, one hidden; average includes all three while only two visible reviews are returned.
               value:
                 calculated_at: '2026-10-03T12:00:00Z'
                 average_rating: 3.67
                 review_count: 3
+                visible_review_count: 2
                 rating_distribution:
                 - {rating: 1, count: 0}
                 - {rating: 2, count: 1}
@@ -141,15 +149,15 @@ get:
                 coverage_percentage: 75
                 reviews:
                 - {work_order_id: 503, rating: 5, description: 'Excellent work.'}
-                - {work_order_id: 502, rating: 4, description: ''}
                 - {work_order_id: 501, rating: 2, description: 'Arrived late.'}
                 next_cursor: null
             firstPage:
-              summary: The same global totals with limit=2; the cursor string is illustrative, not usable.
+              summary: Three visible reviews with limit=2; the cursor string is illustrative, not usable.
               value:
                 calculated_at: '2026-10-03T12:00:00Z'
                 average_rating: 3.67
                 review_count: 3
+                visible_review_count: 3
                 rating_distribution:
                 - {rating: 1, count: 0}
                 - {rating: 2, count: 1}

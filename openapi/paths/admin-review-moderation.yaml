@@ -1,0 +1,129 @@
+post:
+  tags:
+    - Administration
+  operationId: moderateAdminReview
+  summary: Change review visibility or handle its pending report
+  description: >-
+    Records one moderation decision for the review identified by its work-order
+    ID. Requires `write:admin_reviews`. `hide` requires one supported category
+    and may optionally identify that review's pending report; without a report
+    ID it hides the review directly. `dismiss_reports` requires the pending
+    report ID for this review and leaves visibility unchanged. `unhide` restores
+    a hidden review, records the hiding decision it reverses, and does not
+    reopen a previously handled report. Changing visibility never alters the
+    rating or reputation aggregates; hiding only restricts review text in
+    ordinary projections. Every action requires a nonblank, trimmed UTF-8
+    reason of at most 500 bytes and the current expected moderation version. A
+    consumed/stale version or incompatible current state returns `409`; refresh
+    the detail before retrying. A report received after the review was loaded is
+    not handled automatically. Report intake remains the separate provider-only
+    work-order report endpoint. Request bodies and reasons are not copied into
+    technical logs. Responses use
+    `Cache-Control: private, no-store`.
+  security:
+    - BearerAuth: []
+  parameters:
+    - name: id
+      in: path
+      required: true
+      description: Review's work-order identifier; no separate review identifier is introduced.
+      schema:
+        type: integer
+        format: int32
+        minimum: 1
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/ModerateReviewRequest'
+        example:
+          action: hide
+          category: personal_data
+          reason: La reseña divulga datos personales.
+          expected_version: 1
+          report_id: 24
+  responses:
+    '200':
+      description: Moderation decision committed.
+      headers:
+        Cache-Control:
+          description: Prevents storage of private administrative review data.
+          schema:
+            type: string
+            const: private, no-store
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ModerateReviewResponse'
+          example:
+            work_order_id: 42
+            visibility: hidden
+            version: 2
+            decision_id: 61
+    '400':
+      description: The review identifier or moderation request is invalid, including malformed JSON, duplicate/unknown fields, invalid values, or a report reference that cannot be used for this review.
+      headers:
+        Cache-Control:
+          schema:
+            type: string
+            const: private, no-store
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    '401':
+      description: The Bearer token is missing or invalid.
+      headers:
+        Cache-Control:
+          schema:
+            type: string
+            const: private, no-store
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/AuthErrorResponse'
+    '403':
+      description: The Bearer token lacks the `write:admin_reviews` permission.
+      headers:
+        Cache-Control:
+          schema:
+            type: string
+            const: private, no-store
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    '404':
+      description: No review exists for the requested work-order identifier.
+      headers:
+        Cache-Control:
+          schema:
+            type: string
+            const: private, no-store
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    '409':
+      description: The expected moderation version is stale or the current visibility/report state does not allow the requested action.
+      headers:
+        Cache-Control:
+          schema:
+            type: string
+            const: private, no-store
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    '500':
+      description: The moderation decision or its audit event could not be committed; the prior review and report state is preserved.
+      headers:
+        Cache-Control:
+          schema:
+            type: string
+            const: private, no-store
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'

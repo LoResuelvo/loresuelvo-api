@@ -4282,6 +4282,508 @@
                 }
             }
         },
+        "/admin/reviews": {
+            "get": {
+                "tags": [
+                    "Administration"
+                ],
+                "operationId": "listAdminReviews",
+                "summary": "List review summaries for moderation",
+                "description": "Returns one bounded summary per review, ordered by work-order ID descending. The review identity is its `work_order_id`; a row is not duplicated by reports or decisions. The summary includes no original review text, report explanation, or administrative reason. `reported_on` is the creation time of the review's single report, when one exists; it is not a publication timestamp. The `reported` filter selects reviews with a pending report, not every review that has ever been reported. Hidden reviews retain their rating and can be queried using `status=hidden`. Unknown or repeated query parameters are rejected. Requires `read:admin_reviews` in the Bearer JWT. At most one report may exist for a review throughout its lifetime, including after handling or later visibility changes. Responses use `Cache-Control: private, no-store`.",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "name": "status",
+                        "in": "query",
+                        "required": false,
+                        "description": "Review view to list. Defaults to `reported`, which means a review with a pending report, independently of visibility. `visible`, `hidden`, and `all` filter by visibility or include every review, independently of whether a report exists.",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "reported",
+                                "visible",
+                                "hidden",
+                                "all"
+                            ],
+                            "default": "reported"
+                        }
+                    },
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "required": false,
+                        "description": "1-based page number; defaults to 1.",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "default": 1
+                        }
+                    },
+                    {
+                        "name": "limit",
+                        "in": "query",
+                        "required": false,
+                        "description": "Number of review summaries per page; defaults to 20 and is capped at 100.",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 100,
+                            "default": 20
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Bounded review summaries matching the selected view.",
+                        "headers": {
+                            "Cache-Control": {
+                                "description": "Prevents storage of private administrative review data.",
+                                "schema": {
+                                    "type": "string",
+                                    "const": "private, no-store"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AdminReviewPage"
+                                },
+                                "examples": {
+                                    "noPendingReports": {
+                                        "summary": "The default reported view is empty when no report is pending.",
+                                        "value": {
+                                            "items": [],
+                                            "page": 1,
+                                            "limit": 20,
+                                            "total": 0
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "A filter, pagination value, repeated query parameter, or unsupported query parameter is invalid.",
+                        "headers": {
+                            "Cache-Control": {
+                                "schema": {
+                                    "type": "string",
+                                    "const": "private, no-store"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "The Bearer token is missing or invalid.",
+                        "headers": {
+                            "Cache-Control": {
+                                "schema": {
+                                    "type": "string",
+                                    "const": "private, no-store"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AuthErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "The Bearer token lacks the `read:admin_reviews` permission.",
+                        "headers": {
+                            "Cache-Control": {
+                                "schema": {
+                                    "type": "string",
+                                    "const": "private, no-store"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "The administrative review summaries could not be read.",
+                        "headers": {
+                            "Cache-Control": {
+                                "schema": {
+                                    "type": "string",
+                                    "const": "private, no-store"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/reviews/{id}": {
+            "get": {
+                "tags": [
+                    "Administration"
+                ],
+                "operationId": "getAdminReviewDetail",
+                "summary": "Get a review's restricted moderation detail",
+                "description": "Returns the original review text, its single report when present, and a bounded page of earlier decisions. The review is identified by its `work_order_id`. Requires `read:admin_reviews`; general operation-reading permission does not grant this access. A prepared access-audit event is saved before the response is delivered. If that event cannot be saved, the original text, report details, and decision reasons are not returned. No manual access reason is required. Unknown or repeated query parameters are rejected. Technical logs do not include the original review text, report explanation, or decision reasons. Responses use `Cache-Control: private, no-store`.",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "description": "Review's work-order identifier; no separate review identifier is introduced.",
+                        "schema": {
+                            "type": "integer",
+                            "format": "int32",
+                            "minimum": 1
+                        }
+                    },
+                    {
+                        "name": "decisions_page",
+                        "in": "query",
+                        "required": false,
+                        "description": "1-based page of decisions ordered by decision ID descending; defaults to 1.",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "default": 1
+                        }
+                    },
+                    {
+                        "name": "decisions_limit",
+                        "in": "query",
+                        "required": false,
+                        "description": "Number of decisions per page; defaults to 20 and is capped at 100.",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 100,
+                            "default": 20
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Restricted review detail after its access event is prepared.",
+                        "headers": {
+                            "Cache-Control": {
+                                "description": "Prevents storage of private administrative review data.",
+                                "schema": {
+                                    "type": "string",
+                                    "const": "private, no-store"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AdminReviewDetail"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "The review identifier or decision pagination/query parameters are invalid, repeated, or unknown.",
+                        "headers": {
+                            "Cache-Control": {
+                                "schema": {
+                                    "type": "string",
+                                    "const": "private, no-store"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "The Bearer token is missing or invalid.",
+                        "headers": {
+                            "Cache-Control": {
+                                "schema": {
+                                    "type": "string",
+                                    "const": "private, no-store"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AuthErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "The Bearer token lacks the `read:admin_reviews` permission.",
+                        "headers": {
+                            "Cache-Control": {
+                                "schema": {
+                                    "type": "string",
+                                    "const": "private, no-store"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "No review exists for the requested work-order identifier.",
+                        "headers": {
+                            "Cache-Control": {
+                                "schema": {
+                                    "type": "string",
+                                    "const": "private, no-store"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "The review detail could not be read or its access-audit event could not be saved; restricted data is not returned.",
+                        "headers": {
+                            "Cache-Control": {
+                                "schema": {
+                                    "type": "string",
+                                    "const": "private, no-store"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/reviews/{id}/moderate": {
+            "post": {
+                "tags": [
+                    "Administration"
+                ],
+                "operationId": "moderateAdminReview",
+                "summary": "Change review visibility or handle its pending report",
+                "description": "Records one moderation decision for the review identified by its work-order ID. Requires `write:admin_reviews`. `hide` requires one supported category and may optionally identify that review's pending report; without a report ID it hides the review directly. `dismiss_reports` requires the pending report ID for this review and leaves visibility unchanged. `unhide` restores a hidden review, records the hiding decision it reverses, and does not reopen a previously handled report. Changing visibility never alters the rating or reputation aggregates; hiding only restricts review text in ordinary projections. Every action requires a nonblank, trimmed UTF-8 reason of at most 500 bytes and the current expected moderation version. A consumed/stale version or incompatible current state returns `409`; refresh the detail before retrying. A report received after the review was loaded is not handled automatically. Report intake remains the separate provider-only work-order report endpoint. Request bodies and reasons are not copied into technical logs. Responses use `Cache-Control: private, no-store`.",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "description": "Review's work-order identifier; no separate review identifier is introduced.",
+                        "schema": {
+                            "type": "integer",
+                            "format": "int32",
+                            "minimum": 1
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ModerateReviewRequest"
+                            },
+                            "example": {
+                                "action": "hide",
+                                "category": "personal_data",
+                                "reason": "La reseña divulga datos personales.",
+                                "expected_version": 1,
+                                "report_id": 24
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Moderation decision committed.",
+                        "headers": {
+                            "Cache-Control": {
+                                "description": "Prevents storage of private administrative review data.",
+                                "schema": {
+                                    "type": "string",
+                                    "const": "private, no-store"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ModerateReviewResponse"
+                                },
+                                "example": {
+                                    "work_order_id": 42,
+                                    "visibility": "hidden",
+                                    "version": 2,
+                                    "decision_id": 61
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "The review identifier or moderation request is invalid, including malformed JSON, duplicate/unknown fields, invalid values, or a report reference that cannot be used for this review.",
+                        "headers": {
+                            "Cache-Control": {
+                                "schema": {
+                                    "type": "string",
+                                    "const": "private, no-store"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "The Bearer token is missing or invalid.",
+                        "headers": {
+                            "Cache-Control": {
+                                "schema": {
+                                    "type": "string",
+                                    "const": "private, no-store"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AuthErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "The Bearer token lacks the `write:admin_reviews` permission.",
+                        "headers": {
+                            "Cache-Control": {
+                                "schema": {
+                                    "type": "string",
+                                    "const": "private, no-store"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "No review exists for the requested work-order identifier.",
+                        "headers": {
+                            "Cache-Control": {
+                                "schema": {
+                                    "type": "string",
+                                    "const": "private, no-store"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "The expected moderation version is stale or the current visibility/report state does not allow the requested action.",
+                        "headers": {
+                            "Cache-Control": {
+                                "schema": {
+                                    "type": "string",
+                                    "const": "private, no-store"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "The moderation decision or its audit event could not be committed; the prior review and report state is preserved.",
+                        "headers": {
+                            "Cache-Control": {
+                                "schema": {
+                                    "type": "string",
+                                    "const": "private, no-store"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/providers": {
             "get": {
                 "tags": [
@@ -4289,7 +4791,7 @@
                 ],
                 "operationId": "filterProvidersByCategory",
                 "summary": "Filter providers by category",
-                "description": "Returns providers whose registered category matches the category_id query parameter selected by the frontend from GET /categories.",
+                "description": "Returns providers whose registered category matches the `category_id` query parameter selected from GET /categories. Provider rating averages and counts include all registered ratings, including ratings whose review text is hidden.",
                 "security": [
                     {
                         "BearerAuth": []
@@ -5781,7 +6283,7 @@
                 ],
                 "operationId": "getMyProviderReputationStatistics",
                 "summary": "Get the authenticated provider's global reputation and review coverage",
-                "description": "Resolves the provider from the Bearer identity and returns only that provider's reputation. No administrative permission is required, and provider_id cannot select another owner. The eligible universe is the provider's own work orders in paid status, under the existing review rules. Requests and unpaid work orders are not eligible. Each eligible order contributes at most one review; images, payment attempts and other one-to-many relations do not duplicate it.\nreview_count equals reviewed_paid_orders and the sum of the five rating distribution counts, and never exceeds eligible_paid_orders. The average uses all registered eligible ratings, without treating unreviewed orders as zero. Coverage is 100 times reviewed_paid_orders divided by eligible_paid_orders. Average and coverage use exact HALF_UP rounding to two decimal places: 29 / 8 gives an average of 3.63, and one reviewed order out of 32 gives coverage of 3.13 percent. With eligible orders but no reviews, average is null and coverage is zero. Without eligible orders, all counts and buckets are zero and both average and coverage are null. Real absence of activity returns 200; persistence failures are controlled errors, not empty activity.\nReviews contain only work_order_id, rating and the stored description. An empty description remains empty and still contributes to the aggregates. Pages have limit 20 by default and at most 100 rows, ordered strictly by work_order_id descending. This identifier order is deterministic, not a guarantee of recency or review-registration order. Global aggregates include the entire eligible set independently of the page size or cursor.\nnext_cursor is null on the terminal page. Otherwise send the returned opaque token unchanged as cursor. It is signed and bound to the provider, reputation endpoint, effective limit and last position. A cursor may be sent alone; omitted limit inherits its signed value, whereas an explicit different limit returns 400. Altered, malformed or foreign-provider cursors also return 400. Only limit and cursor are accepted query parameters. Unknown, repeated, empty or malformed parameters, invalid limits and temporal or owner filters are rejected. No from, to, granularity, compare_previous or provider_id is accepted.\nAggregates, coverage and the page in one response share a coherent read-only database snapshot. Each subsequent request evaluates the current global set; the cursor does not freeze historical data across pages. calculated_at is the only query metadata, serialized in UTC; it is the evaluation instant, not an exact database-snapshot time or a review timestamp. There are no periods, series or comparisons in this global reputation contract.\nThis read does not alter reviews, work-order states, profile visibility or eligibility rules, generate administrative audit records or call external payment or calendar services. Existing technical and security logs are retained without logging the private query or response contents. Cache-Control: private, no-store applies to success and error responses.",
+                "description": "Resolves the provider from the Bearer identity and returns only that provider's reputation. No administrative permission is required, and provider_id cannot select another owner. The eligible universe is the provider's own work orders in paid status, under the existing review rules. Requests and unpaid work orders are not eligible. Each eligible order contributes at most one review; images, payment attempts and other one-to-many relations do not duplicate it.\nreview_count counts all registered reviews, including hidden reviews, and equals reviewed_paid_orders and the sum of the five rating distribution counts. visible_review_count is distinct: it counts only reviews with a publicly visible description, and the paginated reviews contain only these visible reviews. Hiding a review therefore preserves its rating in the average and distribution without returning its description. Both counts never exceed eligible_paid_orders. The average uses all registered eligible ratings, without treating unreviewed orders as zero. Coverage is 100 times reviewed_paid_orders divided by eligible_paid_orders. Average and coverage use exact HALF_UP rounding to two decimal places: 29 / 8 gives an average of 3.63, and one reviewed order out of 32 gives coverage of 3.13 percent. With eligible orders but no reviews, average is null and coverage is zero. Without eligible orders, all counts and buckets are zero and both average and coverage are null. Real absence of activity returns 200; persistence failures are controlled errors, not empty activity.\nReviews contain only work_order_id, rating and the stored description. An empty description remains empty and still contributes to the aggregates. Pages have limit 20 by default and at most 100 rows, ordered strictly by work_order_id descending. This identifier order is deterministic, not a guarantee of recency or review-registration order. Global aggregates include the entire eligible set independently of the page size or cursor.\nnext_cursor is null on the terminal page. Otherwise send the returned opaque token unchanged as cursor. It is signed and bound to the provider, reputation endpoint, effective limit and last position. A cursor may be sent alone; omitted limit inherits its signed value, whereas an explicit different limit returns 400. Altered, malformed or foreign-provider cursors also return 400. Only limit and cursor are accepted query parameters. Unknown, repeated, empty or malformed parameters, invalid limits and temporal or owner filters are rejected. No from, to, granularity, compare_previous or provider_id is accepted.\nAggregates, coverage and the page in one response share a coherent read-only database snapshot. Each subsequent request evaluates the current global set; the cursor does not freeze historical data across pages. calculated_at is the only query metadata, serialized in UTC; it is the evaluation instant, not an exact database-snapshot time or a review timestamp. There are no periods, series or comparisons in this global reputation contract.\nThis read does not alter reviews, work-order states, profile visibility or eligibility rules, generate administrative audit records or call external payment or calendar services. Existing technical and security logs are retained without logging the private query or response contents. Cache-Control: private, no-store applies to success and error responses.",
                 "security": [
                     {
                         "BearerAuth": []
@@ -5842,6 +6344,7 @@
                                             "calculated_at": "2026-10-03T12:00:00Z",
                                             "average_rating": null,
                                             "review_count": 0,
+                                            "visible_review_count": 0,
                                             "rating_distribution": [
                                                 {
                                                     "rating": 1,
@@ -5877,6 +6380,7 @@
                                             "calculated_at": "2026-10-03T12:00:00Z",
                                             "average_rating": null,
                                             "review_count": 0,
+                                            "visible_review_count": 0,
                                             "rating_distribution": [
                                                 {
                                                     "rating": 1,
@@ -5907,11 +6411,12 @@
                                         }
                                     },
                                     "partialCoverage": {
-                                        "summary": "Three reviews of four paid orders; average is 3.67 and coverage is 75 percent.",
+                                        "summary": "Three registered reviews of four paid orders, one hidden; average includes all three while only two visible reviews are returned.",
                                         "value": {
                                             "calculated_at": "2026-10-03T12:00:00Z",
                                             "average_rating": 3.67,
                                             "review_count": 3,
+                                            "visible_review_count": 2,
                                             "rating_distribution": [
                                                 {
                                                     "rating": 1,
@@ -5944,11 +6449,6 @@
                                                     "description": "Excellent work."
                                                 },
                                                 {
-                                                    "work_order_id": 502,
-                                                    "rating": 4,
-                                                    "description": ""
-                                                },
-                                                {
                                                     "work_order_id": 501,
                                                     "rating": 2,
                                                     "description": "Arrived late."
@@ -5958,11 +6458,12 @@
                                         }
                                     },
                                     "firstPage": {
-                                        "summary": "The same global totals with limit=2; the cursor string is illustrative, not usable.",
+                                        "summary": "Three visible reviews with limit=2; the cursor string is illustrative, not usable.",
                                         "value": {
                                             "calculated_at": "2026-10-03T12:00:00Z",
                                             "average_rating": 3.67,
                                             "review_count": 3,
+                                            "visible_review_count": 3,
                                             "rating_distribution": [
                                                 {
                                                     "rating": 1,
@@ -6158,7 +6659,7 @@
                 ],
                 "operationId": "getProviderProfile",
                 "summary": "Get a Provider public profile",
-                "description": "Returns the currently available public information for an existing Provider. Email, authentication identity, and private documents are not exposed.",
+                "description": "Returns the currently available public information for an existing Provider. Email, authentication identity, and private documents are not exposed. The rating average and count include all registered ratings, even when a review's text is hidden. A hidden review is omitted from the provider's public work history while the completed work order remains listed.",
                 "security": [
                     {
                         "BearerAuth": []
@@ -9359,7 +9860,7 @@
                 ],
                 "operationId": "getWorkOrder",
                 "summary": "Get a work order detail",
-                "description": "Returns the contractual detail of a work order for its consumer or\nassigned provider. When completion evidence exists, each private image is\nexposed through a temporary download URL.\n",
+                "description": "Returns the contractual detail of a work order for its consumer or\nassigned provider. When completion evidence exists, each private image is\nexposed through a temporary download URL. If the review is hidden, its\nrating remains in the response and its description is empty; the hidden\noriginal is available only through the restricted administrative review\ndetail endpoint.\n",
                 "security": [
                     {
                         "BearerAuth": []
@@ -11431,7 +11932,7 @@
                     },
                     "reviews": {
                         "type": "array",
-                        "description": "At most six persisted reviews from associated work orders, ordered by work-order acceptance time and work-order ID descending; no review timestamp is available in this source.",
+                        "description": "At most six publicly visible reviews from associated work orders, ordered by work-order acceptance time and work-order ID descending; hidden review text is omitted and no review timestamp is available in this source.",
                         "maxItems": 6,
                         "items": {
                             "$ref": "#/components/schemas/AdminProviderDiagnostic/$defs/Review"
@@ -11697,14 +12198,14 @@
                                 "type": "integer",
                                 "format": "int64",
                                 "minimum": 0,
-                                "description": "Count of all persisted provider reviews, including reviews beyond the bounded reviews sample."
+                                "description": "Count of all persisted provider reviews, including hidden reviews and reviews beyond the bounded visible-review sample."
                             },
                             "average": {
                                 "type": "number",
                                 "format": "double",
                                 "minimum": 0,
                                 "maximum": 5,
-                                "description": "Average over all persisted provider reviews rounded to one decimal place; zero when there are no reviews."
+                                "description": "Average over all persisted provider ratings, including hidden reviews, rounded to one decimal place; zero when there are no reviews."
                             }
                         }
                     },
@@ -11731,6 +12232,458 @@
                         }
                     }
                 }
+            },
+            "AdminReviewPage": {
+                "type": "object",
+                "description": "Paginated administrative review summaries.",
+                "required": [
+                    "items",
+                    "page",
+                    "limit",
+                    "total"
+                ],
+                "properties": {
+                    "items": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/AdminReviewSummary"
+                        }
+                    },
+                    "page": {
+                        "type": "integer",
+                        "minimum": 1
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 100
+                    },
+                    "total": {
+                        "type": "integer",
+                        "format": "int64",
+                        "minimum": 0
+                    }
+                },
+                "additionalProperties": false
+            },
+            "AdminReviewSummary": {
+                "type": "object",
+                "description": "One row per review, identified by its work-order ID. Does not include the original review text, report explanation, or administrative reasons.",
+                "required": [
+                    "work_order_id",
+                    "consumer_id",
+                    "provider_id",
+                    "operation_id",
+                    "rating",
+                    "visibility",
+                    "version",
+                    "pending_report_count",
+                    "reported_on"
+                ],
+                "properties": {
+                    "work_order_id": {
+                        "type": "integer",
+                        "format": "int32",
+                        "minimum": 1,
+                        "description": "Review identity; the review has no separate identifier."
+                    },
+                    "consumer_id": {
+                        "type": "integer",
+                        "format": "int32",
+                        "minimum": 1
+                    },
+                    "provider_id": {
+                        "type": "integer",
+                        "format": "int32",
+                        "minimum": 1
+                    },
+                    "operation_id": {
+                        "type": "string",
+                        "pattern": "^(jr|sp)-[1-9][0-9]*$",
+                        "description": "Stable operation identifier associated with the work order."
+                    },
+                    "rating": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 5
+                    },
+                    "visibility": {
+                        "type": "string",
+                        "enum": [
+                            "visible",
+                            "hidden"
+                        ]
+                    },
+                    "version": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "description": "Current moderation version required for a decision."
+                    },
+                    "pending_report_count": {
+                        "type": "integer",
+                        "enum": [
+                            0,
+                            1
+                        ],
+                        "description": "Number of pending reports; at most one report exists for this review."
+                    },
+                    "reported_on": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "format": "date-time",
+                        "description": "Creation time of the review's single report, when one exists, including when that report has already been handled. Not a review-publication date."
+                    }
+                },
+                "additionalProperties": false
+            },
+            "AdminReviewDetail": {
+                "type": "object",
+                "description": "Restricted review detail returned only after its access audit is prepared.",
+                "required": [
+                    "review",
+                    "description",
+                    "report",
+                    "decisions"
+                ],
+                "properties": {
+                    "review": {
+                        "$ref": "#/components/schemas/AdminReviewSummary"
+                    },
+                    "description": {
+                        "type": "string",
+                        "description": "Original review text, available only through this permission-protected detail endpoint."
+                    },
+                    "report": {
+                        "oneOf": [
+                            {
+                                "$ref": "#/components/schemas/AdminReviewReport"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "description": "The review's single report, or null when no report exists."
+                    },
+                    "decisions": {
+                        "$ref": "#/components/schemas/AdminReviewDecisionPage"
+                    }
+                },
+                "additionalProperties": false
+            },
+            "AdminReviewReport": {
+                "type": "object",
+                "description": "The single report associated with a review, when one exists.",
+                "required": [
+                    "id",
+                    "category",
+                    "explanation",
+                    "status",
+                    "created_on"
+                ],
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "format": "int32",
+                        "minimum": 1
+                    },
+                    "category": {
+                        "$ref": "#/components/schemas/WorkOrderReviewReportRequest/properties/category"
+                    },
+                    "explanation": {
+                        "$ref": "#/components/schemas/WorkOrderReviewReportRequest/properties/explanation"
+                    },
+                    "status": {
+                        "type": "string",
+                        "enum": [
+                            "pending",
+                            "upheld",
+                            "dismissed"
+                        ]
+                    },
+                    "created_on": {
+                        "type": "string",
+                        "format": "date-time",
+                        "description": "Server-recorded report creation time in UTC."
+                    }
+                },
+                "additionalProperties": false
+            },
+            "AdminReviewDecisionPage": {
+                "type": "object",
+                "description": "Paginated decision history, ordered by decision ID descending.",
+                "required": [
+                    "items",
+                    "page",
+                    "limit",
+                    "total",
+                    "has_more"
+                ],
+                "properties": {
+                    "items": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/AdminReviewDecision"
+                        }
+                    },
+                    "page": {
+                        "type": "integer",
+                        "minimum": 1
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 100
+                    },
+                    "total": {
+                        "type": "integer",
+                        "format": "int64",
+                        "minimum": 0
+                    },
+                    "has_more": {
+                        "type": "boolean"
+                    }
+                },
+                "additionalProperties": false
+            },
+            "AdminReviewDecision": {
+                "type": "object",
+                "description": "Immutable moderation decision for a review.",
+                "required": [
+                    "id",
+                    "work_order_id",
+                    "operator_id",
+                    "action",
+                    "category",
+                    "reason",
+                    "report_id",
+                    "previous_hide_id",
+                    "created_on"
+                ],
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "format": "int32",
+                        "minimum": 1
+                    },
+                    "work_order_id": {
+                        "type": "integer",
+                        "format": "int32",
+                        "minimum": 1
+                    },
+                    "operator_id": {
+                        "type": "integer",
+                        "format": "int32",
+                        "minimum": 1,
+                        "description": "Internal operator identity resolved from authentication."
+                    },
+                    "action": {
+                        "type": "string",
+                        "enum": [
+                            "hide",
+                            "unhide",
+                            "dismiss_reports"
+                        ]
+                    },
+                    "category": {
+                        "oneOf": [
+                            {
+                                "$ref": "#/components/schemas/WorkOrderReviewReportRequest/properties/category"
+                            },
+                            {
+                                "type": "null"
+                            }
+                        ],
+                        "description": "Present for a hide decision; null for other actions."
+                    },
+                    "reason": {
+                        "type": "string",
+                        "description": "Trimmed administrative reason."
+                    },
+                    "report_id": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ],
+                        "format": "int32",
+                        "minimum": 1,
+                        "description": "Report handled by this decision, or null when no report was selected."
+                    },
+                    "previous_hide_id": {
+                        "type": [
+                            "integer",
+                            "null"
+                        ],
+                        "format": "int32",
+                        "minimum": 1,
+                        "description": "Hiding decision restored by an unhide decision, or null otherwise."
+                    },
+                    "created_on": {
+                        "type": "string",
+                        "format": "date-time",
+                        "description": "Server-recorded decision instant in UTC."
+                    }
+                },
+                "additionalProperties": false
+            },
+            "ModerateReviewRequest": {
+                "type": "object",
+                "description": "`hide` requires a category and may include the pending report ID for this review. `dismiss_reports` requires that pending report ID, accepts a category only when omitted or empty, and does not change visibility. `unhide` accepts a category only when omitted or empty and rejects a report ID. Every action requires the current expected version and a nonblank UTF-8 reason, trimmed by the server and limited to 500 bytes after trimming. No additional properties are accepted.",
+                "required": [
+                    "action",
+                    "reason",
+                    "expected_version"
+                ],
+                "properties": {
+                    "action": {
+                        "type": "string",
+                        "enum": [
+                            "hide",
+                            "unhide",
+                            "dismiss_reports"
+                        ]
+                    },
+                    "category": {
+                        "oneOf": [
+                            {
+                                "$ref": "#/components/schemas/WorkOrderReviewReportRequest/properties/category"
+                            },
+                            {
+                                "type": "string",
+                                "const": ""
+                            }
+                        ]
+                    },
+                    "reason": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": "Human-authored reason. Surrounding whitespace is trimmed; the remaining UTF-8 text must be nonempty, printable, and at most 500 bytes. The server records the reason in the restricted decision history."
+                    },
+                    "expected_version": {
+                        "type": "integer",
+                        "format": "int32",
+                        "minimum": 1,
+                        "description": "Current moderation version of the review."
+                    },
+                    "report_id": {
+                        "type": "integer",
+                        "format": "int32",
+                        "minimum": 1,
+                        "description": "Optional for `hide`; required to handle a pending report with `dismiss_reports`; not used for `unhide`."
+                    }
+                },
+                "additionalProperties": false,
+                "allOf": [
+                    {
+                        "if": {
+                            "properties": {
+                                "action": {
+                                    "const": "hide"
+                                }
+                            },
+                            "required": [
+                                "action"
+                            ]
+                        },
+                        "then": {
+                            "required": [
+                                "category"
+                            ],
+                            "properties": {
+                                "category": {
+                                    "$ref": "#/components/schemas/WorkOrderReviewReportRequest/properties/category"
+                                }
+                            }
+                        }
+                    },
+                    {
+                        "if": {
+                            "properties": {
+                                "action": {
+                                    "const": "unhide"
+                                }
+                            },
+                            "required": [
+                                "action"
+                            ]
+                        },
+                        "then": {
+                            "not": {
+                                "required": [
+                                    "report_id"
+                                ]
+                            },
+                            "properties": {
+                                "category": {
+                                    "type": "string",
+                                    "const": ""
+                                }
+                            }
+                        }
+                    },
+                    {
+                        "if": {
+                            "properties": {
+                                "action": {
+                                    "const": "dismiss_reports"
+                                }
+                            },
+                            "required": [
+                                "action"
+                            ]
+                        },
+                        "then": {
+                            "required": [
+                                "report_id"
+                            ],
+                            "properties": {
+                                "category": {
+                                    "type": "string",
+                                    "const": ""
+                                }
+                            }
+                        }
+                    }
+                ]
+            },
+            "ModerateReviewResponse": {
+                "type": "object",
+                "description": "Minimal confirmation of a committed moderation decision.",
+                "required": [
+                    "work_order_id",
+                    "visibility",
+                    "version",
+                    "decision_id"
+                ],
+                "properties": {
+                    "work_order_id": {
+                        "type": "integer",
+                        "format": "int32",
+                        "minimum": 1,
+                        "description": "Identity of the moderated review and its work order."
+                    },
+                    "visibility": {
+                        "type": "string",
+                        "enum": [
+                            "visible",
+                            "hidden"
+                        ]
+                    },
+                    "version": {
+                        "type": "integer",
+                        "format": "int32",
+                        "minimum": 1,
+                        "description": "Updated moderation version."
+                    },
+                    "decision_id": {
+                        "type": "integer",
+                        "format": "int32",
+                        "minimum": 1,
+                        "description": "Server-generated identifier of the recorded decision."
+                    }
+                },
+                "additionalProperties": false
             },
             "AdminProviderCoverageZone": {
                 "type": "object",
@@ -12601,7 +13554,7 @@
                     },
                     "Review": {
                         "type": "object",
-                        "description": "No review timestamp is recorded by this resource.",
+                        "description": "No review timestamp is recorded by this resource. This ordinary operation detail retains a hidden review's rating but returns an empty description; it does not expose the hidden original available through the restricted administrative review detail endpoint.",
                         "required": [
                             "rating",
                             "description"
@@ -13920,14 +14873,14 @@
                         "format": "double",
                         "minimum": 0,
                         "maximum": 5,
-                        "description": "Average rating calculated from the provider reviews, rounded to one decimal place.",
+                        "description": "Average of all provider ratings, including ratings whose review text is hidden, rounded to one decimal place.",
                         "example": 4.5
                     },
                     "rating_count": {
                         "type": "integer",
                         "format": "int32",
                         "minimum": 0,
-                        "description": "Number of reviews associated with the provider.",
+                        "description": "Number of all registered provider reviews, including hidden reviews.",
                         "example": 2
                     },
                     "identity_verified": {
@@ -13977,12 +14930,14 @@
                         "format": "double",
                         "minimum": 0,
                         "maximum": 5,
+                        "description": "Average of all registered provider ratings, including ratings whose review text is hidden.",
                         "example": 4.5
                     },
                     "rating_count": {
                         "type": "integer",
                         "format": "int32",
                         "minimum": 0,
+                        "description": "Number of all registered provider reviews, including hidden reviews.",
                         "example": 2
                     },
                     "identity_verified": {
@@ -14032,7 +14987,8 @@
                         "$ref": "#/components/schemas/ProviderProfileCompletionReport"
                     },
                     "review": {
-                        "$ref": "#/components/schemas/ProviderProfileReview"
+                        "$ref": "#/components/schemas/ProviderProfileReview",
+                        "description": "Present only when the review's text is publicly visible; a hidden review does not remove the work order from this history."
                     }
                 },
                 "additionalProperties": false
@@ -14058,7 +15014,7 @@
             },
             "ProviderProfileReview": {
                 "type": "object",
-                "description": "Public review attached to a paid work order.",
+                "description": "Publicly visible review attached to a paid work order; hidden reviews are omitted from public work history.",
                 "required": [
                     "rating",
                     "description"
@@ -17817,11 +18773,12 @@
             },
             "ProviderReputationStatistics": {
                 "type": "object",
-                "description": "Global reputation for the authenticated provider's own paid work orders, together with one review page from the same coherent read-only snapshot. Each eligible order contributes at most one review. review_count equals reviewed_paid_orders, never exceeds eligible_paid_orders, and equals the sum of all five distribution counts. Aggregates describe the entire eligible set, not the current page.",
+                "description": "Global reputation for the authenticated provider's own paid work orders, together with one review page from the same coherent read-only snapshot. Each eligible order contributes at most one review. review_count counts all registered reviews, including hidden reviews; it equals reviewed_paid_orders, never exceeds eligible_paid_orders, and equals the sum of all five rating-distribution counts. visible_review_count counts only reviews whose visibility is `visible`, including reviews with an empty description. The reviews page contains only visible reviews. Aggregates describe the entire eligible set, not the current page.",
                 "required": [
                     "calculated_at",
                     "average_rating",
                     "review_count",
+                    "visible_review_count",
                     "rating_distribution",
                     "eligible_paid_orders",
                     "reviewed_paid_orders",
@@ -17847,19 +18804,25 @@
                                 "type": "null"
                             }
                         ],
-                        "description": "Average of all registered ratings in the eligible set, rounded to two decimal places using exact HALF_UP arithmetic. Halfway values round up: 29 / 8 is 3.63. Orders without a review do not contribute zero ratings. Null when no eligible order has a review; JSON numbers need not display trailing zeros."
+                        "description": "Average of all registered ratings in the eligible set, rounded to two decimal places using exact HALF_UP arithmetic. Halfway values round up: 29 / 8 is 3.63. Hidden reviews remain in this average. Orders without a review do not contribute zero ratings. Null when no eligible order has a review; JSON numbers need not display trailing zeros."
                     },
                     "review_count": {
                         "type": "integer",
                         "format": "int64",
                         "minimum": 0,
-                        "description": "Global number of reviews of eligible paid orders; equals reviewed_paid_orders, independently of pagination."
+                        "description": "Global number of all registered reviews of eligible paid orders, including hidden reviews; equals reviewed_paid_orders and is independent of pagination."
+                    },
+                    "visible_review_count": {
+                        "type": "integer",
+                        "format": "int64",
+                        "minimum": 0,
+                        "description": "Global number of reviews with visibility `visible`, including those with an empty description; never exceeds review_count."
                     },
                     "rating_distribution": {
                         "type": "array",
                         "minItems": 5,
                         "maxItems": 5,
-                        "description": "Five buckets in ascending rating order from 1 through 5, including zero counts. Their counts sum to review_count.",
+                        "description": "Five buckets in ascending rating order from 1 through 5, including zero counts. Their counts sum to review_count and include hidden ratings.",
                         "items": {
                             "type": "object",
                             "description": "Count of reviews with one rating in the provider's complete eligible paid-order set, not only the review page.",
@@ -17894,7 +18857,7 @@
                         "type": "integer",
                         "format": "int64",
                         "minimum": 0,
-                        "description": "Global count of eligible paid orders with a review; equals review_count and never exceeds eligible_paid_orders."
+                        "description": "Global count of eligible paid orders with a review, including hidden reviews; equals review_count and never exceeds eligible_paid_orders."
                     },
                     "coverage_percentage": {
                         "oneOf": [
@@ -17913,10 +18876,10 @@
                     "reviews": {
                         "type": "array",
                         "maxItems": 100,
-                        "description": "One page of reviews of eligible paid orders in strictly descending work_order_id order. The identifier order is deterministic, not a promise of recency. Empty pages are arrays, never null.",
+                        "description": "One page of reviews of eligible paid orders in strictly descending work_order_id order, restricted to reviews with visibility `visible`. The identifier order is deterministic, not a promise of recency. Hidden reviews remain in rating aggregates but are not included here. Empty pages are arrays, never null.",
                         "items": {
                             "type": "object",
-                            "description": "Registered review of an eligible paid work order. Only the order identifier, rating and stored description are returned; no additional customer data or fabricated comment is included.",
+                            "description": "Publicly visible review of an eligible paid work order. Hidden reviews remain in all rating aggregates but are not returned in review pages. Only the order identifier, rating and stored description are returned; no additional customer data or fabricated comment is included.",
                             "required": [
                                 "work_order_id",
                                 "rating",
@@ -17984,7 +18947,7 @@
             },
             "ProviderReputationReview": {
                 "type": "object",
-                "description": "Registered review of an eligible paid work order. Only the order identifier, rating and stored description are returned; no additional customer data or fabricated comment is included.",
+                "description": "Publicly visible review of an eligible paid work order. Hidden reviews remain in all rating aggregates but are not returned in review pages. Only the order identifier, rating and stored description are returned; no additional customer data or fabricated comment is included.",
                 "required": [
                     "work_order_id",
                     "rating",
@@ -20151,7 +21114,7 @@
             },
             "WorkOrderReview": {
                 "type": "object",
-                "description": "Consumer review attached to a paid work order.",
+                "description": "Consumer review attached to a paid work order. In participant-facing work-order detail, a hidden review retains its rating but its description is returned as an empty string. The original text is available only through the restricted administrative review detail endpoint after its access audit is prepared.",
                 "required": [
                     "rating",
                     "description"

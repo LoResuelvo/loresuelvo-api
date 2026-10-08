@@ -30,11 +30,13 @@ properties:
     format: double
     minimum: 0
     maximum: 5
+    description: Average of all registered provider ratings, including ratings whose review text is hidden.
     example: 4.5
   rating_count:
     type: integer
     format: int32
     minimum: 0
+    description: Number of all registered provider reviews, including hidden reviews.
     example: 2
   identity_verified:
     type: boolean

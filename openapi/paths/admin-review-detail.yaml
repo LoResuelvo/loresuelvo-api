@@ -1,0 +1,112 @@
+get:
+  tags:
+    - Administration
+  operationId: getAdminReviewDetail
+  summary: Get a review's restricted moderation detail
+  description: >-
+    Returns the original review text, its single report when present, and a
+    bounded page of earlier decisions. The review is identified by its
+    `work_order_id`. Requires `read:admin_reviews`; general operation-reading
+    permission does not grant this access. A prepared access-audit event is
+    saved before the response is delivered. If that event cannot be saved, the
+    original text, report details, and decision reasons are not returned. No
+    manual access reason is required. Unknown or repeated query parameters are
+    rejected. Technical logs do not include the original review text, report
+    explanation, or decision reasons. Responses use `Cache-Control: private,
+    no-store`.
+  security:
+    - BearerAuth: []
+  parameters:
+    - name: id
+      in: path
+      required: true
+      description: Review's work-order identifier; no separate review identifier is introduced.
+      schema:
+        type: integer
+        format: int32
+        minimum: 1
+    - name: decisions_page
+      in: query
+      required: false
+      description: 1-based page of decisions ordered by decision ID descending; defaults to 1.
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+    - name: decisions_limit
+      in: query
+      required: false
+      description: Number of decisions per page; defaults to 20 and is capped at 100.
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+  responses:
+    '200':
+      description: Restricted review detail after its access event is prepared.
+      headers:
+        Cache-Control:
+          description: Prevents storage of private administrative review data.
+          schema:
+            type: string
+            const: private, no-store
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/AdminReviewDetail'
+    '400':
+      description: The review identifier or decision pagination/query parameters are invalid, repeated, or unknown.
+      headers:
+        Cache-Control:
+          schema:
+            type: string
+            const: private, no-store
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    '401':
+      description: The Bearer token is missing or invalid.
+      headers:
+        Cache-Control:
+          schema:
+            type: string
+            const: private, no-store
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/AuthErrorResponse'
+    '403':
+      description: The Bearer token lacks the `read:admin_reviews` permission.
+      headers:
+        Cache-Control:
+          schema:
+            type: string
+            const: private, no-store
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    '404':
+      description: No review exists for the requested work-order identifier.
+      headers:
+        Cache-Control:
+          schema:
+            type: string
+            const: private, no-store
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    '500':
+      description: The review detail could not be read or its access-audit event could not be saved; restricted data is not returned.
+      headers:
+        Cache-Control:
+          schema:
+            type: string
+            const: private, no-store
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'

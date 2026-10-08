@@ -1,8 +1,9 @@
 type: object
 description: >-
-  Registered review of an eligible paid work order. Only the order identifier,
-  rating and stored description are returned; no additional customer data or
-  fabricated comment is included.
+  Publicly visible review of an eligible paid work order. Hidden reviews remain
+  in all rating aggregates but are not returned in review pages. Only the order
+  identifier, rating and stored description are returned; no additional
+  customer data or fabricated comment is included.
 required: [work_order_id, rating, description]
 properties:
   work_order_id:

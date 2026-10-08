@@ -3,8 +3,10 @@ get:
   - Providers
   operationId: filterProvidersByCategory
   summary: Filter providers by category
-  description: Returns providers whose registered category matches the category_id
-    query parameter selected by the frontend from GET /categories.
+  description: >-
+    Returns providers whose registered category matches the `category_id` query
+    parameter selected from GET /categories. Provider rating averages and counts
+    include all registered ratings, including ratings whose review text is hidden.
   security:
   - BearerAuth: []
   parameters:

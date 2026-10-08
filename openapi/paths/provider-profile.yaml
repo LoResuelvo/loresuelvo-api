@@ -3,8 +3,12 @@ get:
   - Providers
   operationId: getProviderProfile
   summary: Get a Provider public profile
-  description: Returns the currently available public information for an existing
-    Provider. Email, authentication identity, and private documents are not exposed.
+  description: >-
+    Returns the currently available public information for an existing Provider.
+    Email, authentication identity, and private documents are not exposed.
+    The rating average and count include all registered ratings, even when a
+    review's text is hidden. A hidden review is omitted from the provider's
+    public work history while the completed work order remains listed.
   security:
   - BearerAuth: []
   parameters:
