@@ -1,0 +1,128 @@
+post:
+  tags: [Administration]
+  operationId: startAdminClaimReview
+  summary: Start review of an administrative claim
+  description: >-
+    Transitions an open claim to `in_review` and records the authenticated
+    operator and server time. Requires a provisioned operator identity with
+    `write:admin_claims` in the Bearer JWT.
+    The request body may be omitted or be an empty JSON object; other fields,
+    duplicate JSON members and malformed JSON are rejected. A non-zero UUID
+    `Idempotency-Key` is required and is scoped to the authenticated operator.
+    Repeating the same key and action returns the original action with the
+    claim's current status and resolution. Reusing the key for another claim
+    or action returns 409. Responses use `Cache-Control: private, no-store`.
+  security:
+  - BearerAuth: []
+  parameters:
+  - name: id
+    in: path
+    required: true
+    description: Positive 32-bit claim identifier.
+    schema:
+      type: integer
+      format: int32
+      minimum: 1
+      maximum: 2147483647
+    example: 7
+  - name: Idempotency-Key
+    in: header
+    required: true
+    description: >-
+      Non-zero UUID identifying this operator's action. The key is normalized
+      before lookup; send one header value and reuse it only for an identical
+      retry.
+    schema:
+      type: string
+      format: uuid
+    example: 550e8400-e29b-41d4-a716-446655440017
+  requestBody:
+    required: false
+    description: Omit the body or send only an empty JSON object. The payload is bounded to 64 KiB.
+    content:
+      application/json:
+        schema:
+          type: object
+          properties: {}
+          additionalProperties: false
+        example: {}
+  responses:
+    '200':
+      description: Review started, or the original action returned for an idempotent retry.
+      headers:
+        Cache-Control:
+          schema:
+            type: string
+            const: private, no-store
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ClaimAdministrationResponse'
+    '400':
+      description: The idempotency key or request body is invalid, malformed, duplicated, oversized, or contains an unknown field.
+      headers:
+        Cache-Control:
+          schema:
+            type: string
+            const: private, no-store
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    '401':
+      description: The Bearer token is missing or invalid.
+      headers:
+        Cache-Control:
+          schema:
+            type: string
+            const: private, no-store
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/AuthErrorResponse'
+    '403':
+      description: The Bearer token lacks `write:admin_claims` or its subject is not a provisioned operator.
+      headers:
+        Cache-Control:
+          schema:
+            type: string
+            const: private, no-store
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: insufficient permissions
+    '404':
+      description: The ID is malformed or no claim has that ID.
+      headers:
+        Cache-Control:
+          schema:
+            type: string
+            const: private, no-store
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    '409':
+      description: The claim is not open, or this operator's idempotency key was used for a different claim or action.
+      headers:
+        Cache-Control:
+          schema:
+            type: string
+            const: private, no-store
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    '500':
+      description: The review action could not be committed atomically with its audit and idempotency record.
+      headers:
+        Cache-Control:
+          schema:
+            type: string
+            const: private, no-store
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'

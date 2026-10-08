@@ -7,12 +7,14 @@ properties:
   amount_minor:
     type: integer
     format: int64
+    minimum: 1
+    maximum: 9223372036854775807
     description: Suggested compensation amount in integer ARS cents; this is not an executed transfer.
     example: 1500
   currency:
     type: string
-    description: Currency code for the suggested compensation. The business operates in ARS.
-    example: ARS
+    const: ARS
+    description: Currency code derived by the server for the ARS-only business.
   unit:
     type: string
     description: Monetary unit used by the amount representation; currently minor.

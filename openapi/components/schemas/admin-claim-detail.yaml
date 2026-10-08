@@ -1,0 +1,43 @@
+description: >-
+  Administrative claim detail, including claimant contact metadata and lifecycle
+  actions. A prepared access audit event is persisted before resolving any
+  linked evidence URLs. If audit persistence or any linked image URL resolution
+  fails, the request returns no partial detail.
+allOf:
+- $ref: '#/components/schemas/ClaimDetailFields'
+- type: object
+  required:
+  - claimant
+  - category_id
+  - category_name
+  - actions
+  properties:
+    claimant:
+      type: object
+      required: [id, party, email]
+      properties:
+        id:
+          type: integer
+          format: int32
+          minimum: 1
+        party:
+          type: string
+          enum: [consumer, provider]
+        email:
+          type: string
+          format: email
+      additionalProperties: false
+    category_id:
+      type: [integer, 'null']
+      format: int32
+      minimum: 1
+      description: Current provider category ID, or null when unavailable.
+    category_name:
+      type: [string, 'null']
+      description: Current provider category name, or null when unavailable.
+    actions:
+      type: array
+      description: Persisted claim lifecycle actions in their recorded order; read-access audit events are not included.
+      items:
+        $ref: '#/components/schemas/ClaimAdministrationAction'
+unevaluatedProperties: false

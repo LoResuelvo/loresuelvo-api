@@ -1,0 +1,36 @@
+description: Administrative claim summary with claimant identity, category context and current age.
+allOf:
+- $ref: '#/components/schemas/ClaimSummaryFields'
+- type: object
+  required:
+  - claimant_id
+  - claimant_party
+  - claimant_email
+  - category_id
+  - category_name
+  - age_seconds
+  properties:
+    claimant_id:
+      type: integer
+      format: int32
+      minimum: 1
+    claimant_party:
+      type: string
+      enum: [consumer, provider]
+    claimant_email:
+      type: string
+      format: email
+    category_id:
+      type: [integer, 'null']
+      format: int32
+      minimum: 1
+      description: Current provider category ID, or null when unavailable.
+    category_name:
+      type: [string, 'null']
+      description: Current provider category name, or null when unavailable.
+    age_seconds:
+      type: integer
+      format: int64
+      minimum: 0
+      description: Non-negative age since the claim was created, measured when the page is read.
+unevaluatedProperties: false

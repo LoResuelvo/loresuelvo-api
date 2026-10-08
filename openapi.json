@@ -3199,6 +3199,672 @@
                 }
             }
         },
+        "/admin/claims": {
+            "get": {
+                "tags": [
+                    "Administration"
+                ],
+                "operationId": "listAdminClaims",
+                "summary": "Query the administrative claims inbox",
+                "description": "Lists bounded claim summaries for the support and mediation inbox. Requires the `read:admin_claims` permission in the Bearer JWT. The optional status and search filters are combined with AND. Search is a case-insensitive literal substring of the claimant email or an exact canonical operation ID (`jr-N` or `sp-N`); surrounding whitespace is trimmed. Results are ordered by claim creation time descending, then claim ID descending. `age_seconds` is measured at read time and is not an SLA or priority. An empty trimmed search does not narrow results; invalid UTF-8 and NUL in the search value are rejected. The provider's current category fields are null when unavailable. Items contain no testimony, evidence URLs, or action history. Inbox reads do not create audit events. Unknown or repeated query parameters are rejected. Responses use `Cache-Control: private, no-store`.",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "name": "status",
+                        "in": "query",
+                        "required": false,
+                        "description": "Filter by the persisted claim status.",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "open",
+                                "in_review",
+                                "resolved",
+                                "dismissed"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "q",
+                        "in": "query",
+                        "required": false,
+                        "description": "Case-insensitive literal substring of claimant email, or an exact canonical operation ID such as jr-12 or sp-34. Surrounding whitespace is trimmed; NUL and invalid UTF-8 are rejected.",
+                        "schema": {
+                            "type": "string"
+                        },
+                        "example": "ana@example.com"
+                    },
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "required": false,
+                        "description": "1-based page number; defaults to 1.",
+                        "schema": {
+                            "type": "integer",
+                            "format": "int32",
+                            "minimum": 1,
+                            "maximum": 2147483647,
+                            "default": 1
+                        }
+                    },
+                    {
+                        "name": "limit",
+                        "in": "query",
+                        "required": false,
+                        "description": "Number of claims per page; defaults to 20 and is capped at 100.",
+                        "schema": {
+                            "type": "integer",
+                            "format": "int32",
+                            "minimum": 1,
+                            "maximum": 100,
+                            "default": 20
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Administrative claim summaries matching the filters.",
+                        "headers": {
+                            "Cache-Control": {
+                                "description": "Prevents storage of private administrative data.",
+                                "schema": {
+                                    "type": "string",
+                                    "const": "private, no-store"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AdminClaimPage"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "A status, query parameter, or pagination value is invalid, repeated, or unknown.",
+                        "headers": {
+                            "Cache-Control": {
+                                "schema": {
+                                    "type": "string",
+                                    "const": "private, no-store"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "The Bearer token is missing or invalid.",
+                        "headers": {
+                            "Cache-Control": {
+                                "schema": {
+                                    "type": "string",
+                                    "const": "private, no-store"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AuthErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "The Bearer token lacks the `read:admin_claims` permission.",
+                        "headers": {
+                            "Cache-Control": {
+                                "schema": {
+                                    "type": "string",
+                                    "const": "private, no-store"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                },
+                                "example": {
+                                    "error": "insufficient permissions"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "The inbox could not be read.",
+                        "headers": {
+                            "Cache-Control": {
+                                "schema": {
+                                    "type": "string",
+                                    "const": "private, no-store"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/claims/{id}": {
+            "get": {
+                "tags": [
+                    "Administration"
+                ],
+                "operationId": "getAdminClaimDetail",
+                "summary": "Get an audited administrative claim detail",
+                "description": "Returns the recorded claim, its lifecycle actions and claimant contact metadata. Requires the `read:admin_claims` permission and a provisioned operator identity in the Bearer JWT context. A prepared access-audit event is persisted before any temporary URL is resolved for a linked private evidence image. If audit persistence or any linked image URL resolution fails, the request returns 500 without partial detail or URLs. Only confirmed private images linked to this claim are included; the response does not expose storage keys or credentials. The response includes persisted resolution data, not chat messages or payment transactions. Responses use `Cache-Control: private, no-store`.",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "description": "Positive 32-bit claim identifier.",
+                        "schema": {
+                            "type": "integer",
+                            "format": "int32",
+                            "minimum": 1,
+                            "maximum": 2147483647
+                        },
+                        "example": 7
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Administrative claim detail after its prepared access event is persisted.",
+                        "headers": {
+                            "Cache-Control": {
+                                "description": "Prevents storage of private administrative detail.",
+                                "schema": {
+                                    "type": "string",
+                                    "const": "private, no-store"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AdminClaimDetail"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "The Bearer token is missing or invalid.",
+                        "headers": {
+                            "Cache-Control": {
+                                "schema": {
+                                    "type": "string",
+                                    "const": "private, no-store"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AuthErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "The Bearer token lacks `read:admin_claims` or its subject is not a provisioned operator.",
+                        "headers": {
+                            "Cache-Control": {
+                                "schema": {
+                                    "type": "string",
+                                    "const": "private, no-store"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                },
+                                "example": {
+                                    "error": "insufficient permissions"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "The ID is malformed or no claim has that ID.",
+                        "headers": {
+                            "Cache-Control": {
+                                "schema": {
+                                    "type": "string",
+                                    "const": "private, no-store"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "The detail, its prepared access event, or a linked private image URL could not be resolved; no partial detail is returned.",
+                        "headers": {
+                            "Cache-Control": {
+                                "schema": {
+                                    "type": "string",
+                                    "const": "private, no-store"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/claims/{id}/review": {
+            "post": {
+                "tags": [
+                    "Administration"
+                ],
+                "operationId": "startAdminClaimReview",
+                "summary": "Start review of an administrative claim",
+                "description": "Transitions an open claim to `in_review` and records the authenticated operator and server time. Requires a provisioned operator identity with `write:admin_claims` in the Bearer JWT. The request body may be omitted or be an empty JSON object; other fields, duplicate JSON members and malformed JSON are rejected. A non-zero UUID `Idempotency-Key` is required and is scoped to the authenticated operator. Repeating the same key and action returns the original action with the claim's current status and resolution. Reusing the key for another claim or action returns 409. Responses use `Cache-Control: private, no-store`.",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "description": "Positive 32-bit claim identifier.",
+                        "schema": {
+                            "type": "integer",
+                            "format": "int32",
+                            "minimum": 1,
+                            "maximum": 2147483647
+                        },
+                        "example": 7
+                    },
+                    {
+                        "name": "Idempotency-Key",
+                        "in": "header",
+                        "required": true,
+                        "description": "Non-zero UUID identifying this operator's action. The key is normalized before lookup; send one header value and reuse it only for an identical retry.",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "example": "550e8400-e29b-41d4-a716-446655440017"
+                    }
+                ],
+                "requestBody": {
+                    "required": false,
+                    "description": "Omit the body or send only an empty JSON object. The payload is bounded to 64 KiB.",
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {},
+                                "additionalProperties": false
+                            },
+                            "example": {}
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Review started, or the original action returned for an idempotent retry.",
+                        "headers": {
+                            "Cache-Control": {
+                                "schema": {
+                                    "type": "string",
+                                    "const": "private, no-store"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ClaimAdministrationResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "The idempotency key or request body is invalid, malformed, duplicated, oversized, or contains an unknown field.",
+                        "headers": {
+                            "Cache-Control": {
+                                "schema": {
+                                    "type": "string",
+                                    "const": "private, no-store"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "The Bearer token is missing or invalid.",
+                        "headers": {
+                            "Cache-Control": {
+                                "schema": {
+                                    "type": "string",
+                                    "const": "private, no-store"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AuthErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "The Bearer token lacks `write:admin_claims` or its subject is not a provisioned operator.",
+                        "headers": {
+                            "Cache-Control": {
+                                "schema": {
+                                    "type": "string",
+                                    "const": "private, no-store"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                },
+                                "example": {
+                                    "error": "insufficient permissions"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "The ID is malformed or no claim has that ID.",
+                        "headers": {
+                            "Cache-Control": {
+                                "schema": {
+                                    "type": "string",
+                                    "const": "private, no-store"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "The claim is not open, or this operator's idempotency key was used for a different claim or action.",
+                        "headers": {
+                            "Cache-Control": {
+                                "schema": {
+                                    "type": "string",
+                                    "const": "private, no-store"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "The review action could not be committed atomically with its audit and idempotency record.",
+                        "headers": {
+                            "Cache-Control": {
+                                "schema": {
+                                    "type": "string",
+                                    "const": "private, no-store"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/admin/claims/{id}/resolution": {
+            "post": {
+                "tags": [
+                    "Administration"
+                ],
+                "operationId": "resolveAdminClaim",
+                "summary": "Record the final resolution of an administrative claim",
+                "description": "Resolves a claim in `in_review`. The `without_merit` type finalizes it as `dismissed`; the other resolution types finalize it as `resolved`. The reasoning is trimmed using Unicode whitespace and must contain 1 to 5000 Unicode code points after trimming; invalid UTF-8 and NUL are rejected. An optional suggested compensation accepts only a positive integer `amount_minor` in ARS cents. The server supplies `currency: ARS` and `unit: minor` in the response. A suggestion is not a payment or refund. Unknown or duplicate JSON members are rejected. The request body is bounded to 64 KiB.\n\nA non-zero UUID `Idempotency-Key` is required and scoped to the authenticated operator. Repeating the same key and normalized action returns the original action with the claim's current status and resolution. Reusing the key for a different claim, action, or normalized content returns 409. Responses use `Cache-Control: private, no-store`.",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "description": "Positive 32-bit claim identifier.",
+                        "schema": {
+                            "type": "integer",
+                            "format": "int32",
+                            "minimum": 1,
+                            "maximum": 2147483647
+                        },
+                        "example": 7
+                    },
+                    {
+                        "name": "Idempotency-Key",
+                        "in": "header",
+                        "required": true,
+                        "description": "Non-zero UUID identifying this operator's action. The key is normalized before lookup; send one header value and reuse it only for an identical retry.",
+                        "schema": {
+                            "type": "string",
+                            "format": "uuid"
+                        },
+                        "example": "550e8400-e29b-41d4-a716-446655440026"
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "description": "Strict JSON object; the payload is bounded to 64 KiB.",
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ClaimResolutionRequest"
+                            },
+                            "example": {
+                                "type": "agreement",
+                                "reasoning": "Las partes acordaron una compensación.",
+                                "suggested_compensation": {
+                                    "amount_minor": 1500
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Resolution recorded, or the original action returned for an idempotent retry.",
+                        "headers": {
+                            "Cache-Control": {
+                                "schema": {
+                                    "type": "string",
+                                    "const": "private, no-store"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ClaimAdministrationResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "The key, JSON body, resolution type, normalized reasoning, or optional amount is invalid.",
+                        "headers": {
+                            "Cache-Control": {
+                                "schema": {
+                                    "type": "string",
+                                    "const": "private, no-store"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "The Bearer token is missing or invalid.",
+                        "headers": {
+                            "Cache-Control": {
+                                "schema": {
+                                    "type": "string",
+                                    "const": "private, no-store"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AuthErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "The Bearer token lacks `write:admin_claims` or its subject is not a provisioned operator.",
+                        "headers": {
+                            "Cache-Control": {
+                                "schema": {
+                                    "type": "string",
+                                    "const": "private, no-store"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                },
+                                "example": {
+                                    "error": "insufficient permissions"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "The ID is malformed or no claim has that ID.",
+                        "headers": {
+                            "Cache-Control": {
+                                "schema": {
+                                    "type": "string",
+                                    "const": "private, no-store"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "The claim is not in review, or this operator's idempotency key was used for a different claim, action, or content.",
+                        "headers": {
+                            "Cache-Control": {
+                                "schema": {
+                                    "type": "string",
+                                    "const": "private, no-store"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "The resolution could not be committed atomically with its audit and idempotency record.",
+                        "headers": {
+                            "Cache-Control": {
+                                "schema": {
+                                    "type": "string",
+                                    "const": "private, no-store"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/admin/metrics/funnel": {
             "get": {
                 "tags": [
@@ -17659,6 +18325,15 @@
                 "additionalProperties": false
             },
             "ClaimSummary": {
+                "description": "Owned claim summary. Does not expose testimony, evidence, or administrative actions.",
+                "allOf": [
+                    {
+                        "$ref": "#/components/schemas/ClaimSummaryFields"
+                    }
+                ],
+                "unevaluatedProperties": false
+            },
+            "ClaimSummaryFields": {
                 "type": "object",
                 "required": [
                     "id",
@@ -17728,9 +18403,99 @@
                         "format": "date-time",
                         "description": "Actual server-recorded closure time, or null while the claim is not finalized."
                     }
-                },
-                "description": "Owned claim summary. Does not expose testimony, evidence, or administrative actions.",
-                "additionalProperties": false
+                }
+            },
+            "ClaimDetailFields": {
+                "allOf": [
+                    {
+                        "$ref": "#/components/schemas/ClaimSummaryFields"
+                    },
+                    {
+                        "type": "object",
+                        "required": [
+                            "description",
+                            "images",
+                            "resolution"
+                        ],
+                        "properties": {
+                            "description": {
+                                "type": "string",
+                                "description": "Original testimony submitted by the claimant.",
+                                "example": "El servicio acordado no fue completado."
+                            },
+                            "images": {
+                                "type": "array",
+                                "description": "Private evidence images linked to this claim, each with a temporary private URL. Only images linked to this claim are included.",
+                                "maxItems": 3,
+                                "items": {
+                                    "type": "object",
+                                    "required": [
+                                        "file_id",
+                                        "url"
+                                    ],
+                                    "properties": {
+                                        "file_id": {
+                                            "type": "string",
+                                            "format": "uuid",
+                                            "description": "Stable identifier of the linked private evidence image."
+                                        },
+                                        "url": {
+                                            "type": "string",
+                                            "format": "uri",
+                                            "minLength": 1,
+                                            "description": "Temporary private URL for the image. Its expiry does not remove the evidence."
+                                        }
+                                    },
+                                    "additionalProperties": false
+                                }
+                            },
+                            "resolution": {
+                                "oneOf": [
+                                    {
+                                        "$ref": "#/components/schemas/ClaimResolution"
+                                    },
+                                    {
+                                        "type": "null"
+                                    }
+                                ],
+                                "description": "Formal resolution once one exists; null before then."
+                            }
+                        }
+                    }
+                ]
+            },
+            "ClaimPageFields": {
+                "type": "object",
+                "required": [
+                    "items",
+                    "page",
+                    "limit",
+                    "total"
+                ],
+                "properties": {
+                    "items": {
+                        "type": "array"
+                    },
+                    "page": {
+                        "type": "integer",
+                        "format": "int32",
+                        "minimum": 1,
+                        "example": 1
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "format": "int32",
+                        "minimum": 1,
+                        "maximum": 100,
+                        "example": 20
+                    },
+                    "total": {
+                        "type": "integer",
+                        "format": "int32",
+                        "minimum": 0,
+                        "example": 1
+                    }
+                }
             },
             "ClaimSuggestedCompensation": {
                 "type": "object",
@@ -17743,13 +18508,15 @@
                     "amount_minor": {
                         "type": "integer",
                         "format": "int64",
+                        "minimum": 1,
+                        "maximum": 9223372036854775807,
                         "description": "Suggested compensation amount in integer ARS cents; this is not an executed transfer.",
                         "example": 1500
                     },
                     "currency": {
                         "type": "string",
-                        "description": "Currency code for the suggested compensation. The business operates in ARS.",
-                        "example": "ARS"
+                        "const": "ARS",
+                        "description": "Currency code derived by the server for the ARS-only business."
                     },
                     "unit": {
                         "type": "string",
@@ -17806,37 +18573,290 @@
                 },
                 "additionalProperties": false
             },
+            "ClaimResolutionRequest": {
+                "type": "object",
+                "required": [
+                    "type",
+                    "reasoning"
+                ],
+                "properties": {
+                    "type": {
+                        "type": "string",
+                        "enum": [
+                            "consumer_favor",
+                            "provider_favor",
+                            "agreement",
+                            "without_merit"
+                        ]
+                    },
+                    "reasoning": {
+                        "type": "string",
+                        "description": "Resolution reasoning. Unicode whitespace is trimmed before validation; the trimmed value must contain 1 to 5000 Unicode code points. NUL and invalid UTF-8 are rejected."
+                    },
+                    "suggested_compensation": {
+                        "type": "object",
+                        "required": [
+                            "amount_minor"
+                        ],
+                        "properties": {
+                            "amount_minor": {
+                                "type": "integer",
+                                "format": "int64",
+                                "minimum": 1,
+                                "maximum": 9223372036854775807,
+                                "description": "Positive suggested amount in integer ARS cents.",
+                                "example": 1500
+                            }
+                        },
+                        "additionalProperties": false,
+                        "description": "Optional recommendation only. Send only amount_minor; the server derives currency ARS and unit minor in the resolution response. It does not execute or imply a payment or refund."
+                    }
+                },
+                "additionalProperties": false
+            },
             "ClaimDetail": {
+                "description": "Owned claim detail. The other operation participant cannot access this resource unless they are its claimant.",
+                "allOf": [
+                    {
+                        "$ref": "#/components/schemas/ClaimDetailFields"
+                    }
+                ],
+                "unevaluatedProperties": false
+            },
+            "ClaimListPage": {
+                "description": "Page of claims owned by the authenticated claimant.",
+                "allOf": [
+                    {
+                        "$ref": "#/components/schemas/ClaimPageFields"
+                    },
+                    {
+                        "type": "object",
+                        "properties": {
+                            "items": {
+                                "description": "Owned claim summaries; empty when the page has no results.",
+                                "items": {
+                                    "$ref": "#/components/schemas/ClaimSummary"
+                                }
+                            },
+                            "total": {
+                                "description": "Number of claims matching the authenticated owner and optional status filter."
+                            }
+                        }
+                    }
+                ],
+                "unevaluatedProperties": false
+            },
+            "AdminClaimSummary": {
+                "description": "Administrative claim summary with claimant identity, category context and current age.",
+                "allOf": [
+                    {
+                        "$ref": "#/components/schemas/ClaimSummaryFields"
+                    },
+                    {
+                        "type": "object",
+                        "required": [
+                            "claimant_id",
+                            "claimant_party",
+                            "claimant_email",
+                            "category_id",
+                            "category_name",
+                            "age_seconds"
+                        ],
+                        "properties": {
+                            "claimant_id": {
+                                "type": "integer",
+                                "format": "int32",
+                                "minimum": 1
+                            },
+                            "claimant_party": {
+                                "type": "string",
+                                "enum": [
+                                    "consumer",
+                                    "provider"
+                                ]
+                            },
+                            "claimant_email": {
+                                "type": "string",
+                                "format": "email"
+                            },
+                            "category_id": {
+                                "type": [
+                                    "integer",
+                                    "null"
+                                ],
+                                "format": "int32",
+                                "minimum": 1,
+                                "description": "Current provider category ID, or null when unavailable."
+                            },
+                            "category_name": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ],
+                                "description": "Current provider category name, or null when unavailable."
+                            },
+                            "age_seconds": {
+                                "type": "integer",
+                                "format": "int64",
+                                "minimum": 0,
+                                "description": "Non-negative age since the claim was created, measured when the page is read."
+                            }
+                        }
+                    }
+                ],
+                "unevaluatedProperties": false
+            },
+            "AdminClaimPage": {
+                "description": "Administrative page of claims matching the optional filters.",
+                "allOf": [
+                    {
+                        "$ref": "#/components/schemas/ClaimPageFields"
+                    },
+                    {
+                        "type": "object",
+                        "properties": {
+                            "items": {
+                                "description": "Administrative claim summaries matching the request filters; empty when the page has no results.",
+                                "type": "array",
+                                "items": {
+                                    "$ref": "#/components/schemas/AdminClaimSummary"
+                                }
+                            },
+                            "total": {
+                                "description": "Number of claims matching the administrative filters."
+                            }
+                        }
+                    }
+                ],
+                "unevaluatedProperties": false
+            },
+            "AdminClaimDetail": {
+                "description": "Administrative claim detail, including claimant contact metadata and lifecycle actions. A prepared access audit event is persisted before resolving any linked evidence URLs. If audit persistence or any linked image URL resolution fails, the request returns no partial detail.",
+                "allOf": [
+                    {
+                        "$ref": "#/components/schemas/ClaimDetailFields"
+                    },
+                    {
+                        "type": "object",
+                        "required": [
+                            "claimant",
+                            "category_id",
+                            "category_name",
+                            "actions"
+                        ],
+                        "properties": {
+                            "claimant": {
+                                "type": "object",
+                                "required": [
+                                    "id",
+                                    "party",
+                                    "email"
+                                ],
+                                "properties": {
+                                    "id": {
+                                        "type": "integer",
+                                        "format": "int32",
+                                        "minimum": 1
+                                    },
+                                    "party": {
+                                        "type": "string",
+                                        "enum": [
+                                            "consumer",
+                                            "provider"
+                                        ]
+                                    },
+                                    "email": {
+                                        "type": "string",
+                                        "format": "email"
+                                    }
+                                },
+                                "additionalProperties": false
+                            },
+                            "category_id": {
+                                "type": [
+                                    "integer",
+                                    "null"
+                                ],
+                                "format": "int32",
+                                "minimum": 1,
+                                "description": "Current provider category ID, or null when unavailable."
+                            },
+                            "category_name": {
+                                "type": [
+                                    "string",
+                                    "null"
+                                ],
+                                "description": "Current provider category name, or null when unavailable."
+                            },
+                            "actions": {
+                                "type": "array",
+                                "description": "Persisted claim lifecycle actions in their recorded order; read-access audit events are not included.",
+                                "items": {
+                                    "$ref": "#/components/schemas/ClaimAdministrationAction"
+                                }
+                            }
+                        }
+                    }
+                ],
+                "unevaluatedProperties": false
+            },
+            "ClaimAdministrationAction": {
                 "type": "object",
                 "required": [
                     "id",
-                    "operation_id",
-                    "reference",
+                    "type",
+                    "actor_id",
+                    "actor_party",
+                    "created_on"
+                ],
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "format": "int32",
+                        "minimum": 1
+                    },
+                    "type": {
+                        "type": "string",
+                        "enum": [
+                            "submitted",
+                            "review_started",
+                            "resolved"
+                        ]
+                    },
+                    "actor_id": {
+                        "type": "integer",
+                        "format": "int32",
+                        "minimum": 1
+                    },
+                    "actor_party": {
+                        "type": "string",
+                        "enum": [
+                            "consumer",
+                            "provider",
+                            "operator"
+                        ]
+                    },
+                    "created_on": {
+                        "type": "string",
+                        "format": "date-time",
+                        "description": "Server-recorded action time in UTC."
+                    }
+                },
+                "additionalProperties": false
+            },
+            "ClaimAdministrationResponse": {
+                "type": "object",
+                "required": [
+                    "id",
                     "status",
-                    "created_on",
-                    "reason",
-                    "review_started_on",
-                    "closed_on",
-                    "description",
-                    "images",
+                    "action",
                     "resolution"
                 ],
                 "properties": {
                     "id": {
                         "type": "integer",
                         "format": "int32",
-                        "minimum": 1,
-                        "description": "Claim identifier.",
-                        "example": 7
-                    },
-                    "operation_id": {
-                        "type": "string",
-                        "pattern": "^(jr|sp)-[1-9][0-9]*$",
-                        "description": "Canonical operation identifier. A request and its first proposal use jr-N; a later proposal uses sp-N.",
-                        "example": "jr-12"
-                    },
-                    "reference": {
-                        "$ref": "#/components/schemas/ClaimReference"
+                        "minimum": 1
                     },
                     "status": {
                         "type": "string",
@@ -17846,69 +18866,10 @@
                             "resolved",
                             "dismissed"
                         ],
-                        "example": "open"
+                        "description": "Current claim status, including when returning an idempotent replay."
                     },
-                    "created_on": {
-                        "type": "string",
-                        "format": "date-time",
-                        "description": "Server-recorded creation time in UTC.",
-                        "example": "2026-10-07T12:30:00Z"
-                    },
-                    "reason": {
-                        "type": "string",
-                        "enum": [
-                            "non_compliance",
-                            "improper_charge",
-                            "damage",
-                            "poor_quality"
-                        ]
-                    },
-                    "review_started_on": {
-                        "type": [
-                            "string",
-                            "null"
-                        ],
-                        "format": "date-time",
-                        "description": "Actual server-recorded start time of review, or null if review has not started."
-                    },
-                    "closed_on": {
-                        "type": [
-                            "string",
-                            "null"
-                        ],
-                        "format": "date-time",
-                        "description": "Actual server-recorded closure time, or null while the claim is not finalized."
-                    },
-                    "description": {
-                        "type": "string",
-                        "description": "Original testimony submitted by the claimant.",
-                        "example": "El servicio acordado no fue completado."
-                    },
-                    "images": {
-                        "type": "array",
-                        "description": "Private evidence images linked to this claim, each with a temporary private URL. Only images linked to this claim are included.",
-                        "maxItems": 3,
-                        "items": {
-                            "type": "object",
-                            "required": [
-                                "file_id",
-                                "url"
-                            ],
-                            "properties": {
-                                "file_id": {
-                                    "type": "string",
-                                    "format": "uuid",
-                                    "description": "Stable identifier of the linked private evidence image."
-                                },
-                                "url": {
-                                    "type": "string",
-                                    "format": "uri",
-                                    "minLength": 1,
-                                    "description": "Temporary private URL for the image. Its expiry does not remove the evidence."
-                                }
-                            },
-                            "additionalProperties": false
-                        }
+                    "action": {
+                        "$ref": "#/components/schemas/ClaimAdministrationAction"
                     },
                     "resolution": {
                         "oneOf": [
@@ -17919,47 +18880,7 @@
                                 "type": "null"
                             }
                         ],
-                        "description": "Formal resolution once one exists; null before then."
-                    }
-                },
-                "description": "Owned claim detail. The other operation participant cannot access this resource unless they are its claimant.",
-                "additionalProperties": false
-            },
-            "ClaimListPage": {
-                "type": "object",
-                "required": [
-                    "items",
-                    "page",
-                    "limit",
-                    "total"
-                ],
-                "properties": {
-                    "items": {
-                        "type": "array",
-                        "description": "Owned claim summaries; empty when the page has no results.",
-                        "items": {
-                            "$ref": "#/components/schemas/ClaimSummary"
-                        }
-                    },
-                    "page": {
-                        "type": "integer",
-                        "format": "int32",
-                        "minimum": 1,
-                        "example": 1
-                    },
-                    "limit": {
-                        "type": "integer",
-                        "format": "int32",
-                        "minimum": 1,
-                        "maximum": 100,
-                        "example": 20
-                    },
-                    "total": {
-                        "type": "integer",
-                        "format": "int32",
-                        "minimum": 0,
-                        "description": "Number of claims matching the authenticated owner and optional status filter.",
-                        "example": 1
+                        "description": "Current persisted resolution, or null if none exists."
                     }
                 },
                 "additionalProperties": false

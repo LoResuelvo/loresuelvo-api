@@ -1,0 +1,13 @@
+description: Administrative page of claims matching the optional filters.
+allOf:
+- $ref: '#/components/schemas/ClaimPageFields'
+- type: object
+  properties:
+    items:
+      description: Administrative claim summaries matching the request filters; empty when the page has no results.
+      type: array
+      items:
+        $ref: '#/components/schemas/AdminClaimSummary'
+    total:
+      description: Number of claims matching the administrative filters.
+unevaluatedProperties: false

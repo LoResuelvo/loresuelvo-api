@@ -1,30 +1,12 @@
-type: object
-required:
-- items
-- page
-- limit
-- total
-properties:
-  items:
-    type: array
-    description: Owned claim summaries; empty when the page has no results.
+description: Page of claims owned by the authenticated claimant.
+allOf:
+- $ref: '#/components/schemas/ClaimPageFields'
+- type: object
+  properties:
     items:
-      $ref: '#/components/schemas/ClaimSummary'
-  page:
-    type: integer
-    format: int32
-    minimum: 1
-    example: 1
-  limit:
-    type: integer
-    format: int32
-    minimum: 1
-    maximum: 100
-    example: 20
-  total:
-    type: integer
-    format: int32
-    minimum: 0
-    description: Number of claims matching the authenticated owner and optional status filter.
-    example: 1
-additionalProperties: false
+      description: Owned claim summaries; empty when the page has no results.
+      items:
+        $ref: '#/components/schemas/ClaimSummary'
+    total:
+      description: Number of claims matching the authenticated owner and optional status filter.
+unevaluatedProperties: false

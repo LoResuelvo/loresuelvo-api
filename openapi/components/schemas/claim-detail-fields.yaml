@@ -1,0 +1,37 @@
+allOf:
+- $ref: '#/components/schemas/ClaimSummaryFields'
+- type: object
+  required:
+  - description
+  - images
+  - resolution
+  properties:
+    description:
+      type: string
+      description: Original testimony submitted by the claimant.
+      example: El servicio acordado no fue completado.
+    images:
+      type: array
+      description: Private evidence images linked to this claim, each with a temporary private URL. Only images linked to this claim are included.
+      maxItems: 3
+      items:
+        type: object
+        required:
+        - file_id
+        - url
+        properties:
+          file_id:
+            type: string
+            format: uuid
+            description: Stable identifier of the linked private evidence image.
+          url:
+            type: string
+            format: uri
+            minLength: 1
+            description: Temporary private URL for the image. Its expiry does not remove the evidence.
+        additionalProperties: false
+    resolution:
+      oneOf:
+      - $ref: '#/components/schemas/ClaimResolution'
+      - type: 'null'
+      description: Formal resolution once one exists; null before then.

@@ -1,0 +1,29 @@
+type: object
+required: [type, reasoning]
+properties:
+  type:
+    type: string
+    enum: [consumer_favor, provider_favor, agreement, without_merit]
+  reasoning:
+    type: string
+    description: >-
+      Resolution reasoning. Unicode whitespace is trimmed before validation;
+      the trimmed value must contain 1 to 5000 Unicode code points. NUL and
+      invalid UTF-8 are rejected.
+  suggested_compensation:
+    type: object
+    required: [amount_minor]
+    properties:
+      amount_minor:
+        type: integer
+        format: int64
+        minimum: 1
+        maximum: 9223372036854775807
+        description: Positive suggested amount in integer ARS cents.
+        example: 1500
+    additionalProperties: false
+    description: >-
+      Optional recommendation only. Send only amount_minor; the server derives
+      currency ARS and unit minor in the resolution response. It does not
+      execute or imply a payment or refund.
+additionalProperties: false

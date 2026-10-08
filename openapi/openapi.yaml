@@ -84,6 +84,14 @@ paths:
     $ref: ./paths/admin-operation-image.yaml
   /admin/payments:
     $ref: ./paths/admin-payments.yaml
+  /admin/claims:
+    $ref: ./paths/admin-claims.yaml
+  /admin/claims/{id}:
+    $ref: ./paths/admin-claim-detail.yaml
+  /admin/claims/{id}/review:
+    $ref: ./paths/admin-claim-review.yaml
+  /admin/claims/{id}/resolution:
+    $ref: ./paths/admin-claim-resolution.yaml
   /admin/metrics/funnel:
     $ref: ./paths/admin-metrics-funnel.yaml
   /providers:
@@ -429,14 +437,32 @@ components:
       $ref: ./components/schemas/claim-acknowledgment.yaml
     ClaimSummary:
       $ref: ./components/schemas/claim-summary.yaml
+    ClaimSummaryFields:
+      $ref: ./components/schemas/claim-summary-fields.yaml
+    ClaimDetailFields:
+      $ref: ./components/schemas/claim-detail-fields.yaml
+    ClaimPageFields:
+      $ref: ./components/schemas/claim-page-fields.yaml
     ClaimSuggestedCompensation:
       $ref: ./components/schemas/claim-suggested-compensation.yaml
     ClaimResolution:
       $ref: ./components/schemas/claim-resolution.yaml
+    ClaimResolutionRequest:
+      $ref: ./components/schemas/claim-resolution-request.yaml
     ClaimDetail:
       $ref: ./components/schemas/claim-detail.yaml
     ClaimListPage:
       $ref: ./components/schemas/claim-list-page.yaml
+    AdminClaimSummary:
+      $ref: ./components/schemas/admin-claim-summary.yaml
+    AdminClaimPage:
+      $ref: ./components/schemas/admin-claim-page.yaml
+    AdminClaimDetail:
+      $ref: ./components/schemas/admin-claim-detail.yaml
+    ClaimAdministrationAction:
+      $ref: ./components/schemas/claim-administration-action.yaml
+    ClaimAdministrationResponse:
+      $ref: ./components/schemas/claim-administration-response.yaml
     FileAudioMetadata:
       $ref: ./components/schemas/file-audio-metadata.yaml
     FileResponse:

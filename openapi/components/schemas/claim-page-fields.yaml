@@ -1,0 +1,25 @@
+type: object
+required:
+- items
+- page
+- limit
+- total
+properties:
+  items:
+    type: array
+  page:
+    type: integer
+    format: int32
+    minimum: 1
+    example: 1
+  limit:
+    type: integer
+    format: int32
+    minimum: 1
+    maximum: 100
+    example: 20
+  total:
+    type: integer
+    format: int32
+    minimum: 0
+    example: 1

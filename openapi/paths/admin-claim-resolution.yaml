@@ -1,0 +1,137 @@
+post:
+  tags: [Administration]
+  operationId: resolveAdminClaim
+  summary: Record the final resolution of an administrative claim
+  description: >-
+    Resolves a claim in `in_review`. The `without_merit` type finalizes it as
+    `dismissed`; the other resolution types finalize it as `resolved`. The
+    reasoning is trimmed using Unicode whitespace and must contain 1 to 5000
+    Unicode code points after trimming; invalid UTF-8 and NUL are rejected.
+    An optional suggested compensation accepts only a positive integer
+    `amount_minor` in ARS cents. The server supplies `currency: ARS` and
+    `unit: minor` in the response. A suggestion is not a payment or refund.
+    Unknown or duplicate JSON members are rejected. The request body is
+    bounded to 64 KiB.
+
+
+    A non-zero UUID `Idempotency-Key` is required and scoped to the
+    authenticated operator. Repeating the same key and normalized action
+    returns the original action with the claim's current status and resolution.
+    Reusing the key for a different claim, action, or normalized content returns
+    409. Responses use `Cache-Control: private, no-store`.
+  security:
+  - BearerAuth: []
+  parameters:
+  - name: id
+    in: path
+    required: true
+    description: Positive 32-bit claim identifier.
+    schema:
+      type: integer
+      format: int32
+      minimum: 1
+      maximum: 2147483647
+    example: 7
+  - name: Idempotency-Key
+    in: header
+    required: true
+    description: >-
+      Non-zero UUID identifying this operator's action. The key is normalized
+      before lookup; send one header value and reuse it only for an identical
+      retry.
+    schema:
+      type: string
+      format: uuid
+    example: 550e8400-e29b-41d4-a716-446655440026
+  requestBody:
+    required: true
+    description: Strict JSON object; the payload is bounded to 64 KiB.
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/ClaimResolutionRequest'
+        example:
+          type: agreement
+          reasoning: Las partes acordaron una compensación.
+          suggested_compensation:
+            amount_minor: 1500
+  responses:
+    '200':
+      description: Resolution recorded, or the original action returned for an idempotent retry.
+      headers:
+        Cache-Control:
+          schema:
+            type: string
+            const: private, no-store
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ClaimAdministrationResponse'
+    '400':
+      description: The key, JSON body, resolution type, normalized reasoning, or optional amount is invalid.
+      headers:
+        Cache-Control:
+          schema:
+            type: string
+            const: private, no-store
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    '401':
+      description: The Bearer token is missing or invalid.
+      headers:
+        Cache-Control:
+          schema:
+            type: string
+            const: private, no-store
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/AuthErrorResponse'
+    '403':
+      description: The Bearer token lacks `write:admin_claims` or its subject is not a provisioned operator.
+      headers:
+        Cache-Control:
+          schema:
+            type: string
+            const: private, no-store
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: insufficient permissions
+    '404':
+      description: The ID is malformed or no claim has that ID.
+      headers:
+        Cache-Control:
+          schema:
+            type: string
+            const: private, no-store
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    '409':
+      description: The claim is not in review, or this operator's idempotency key was used for a different claim, action, or content.
+      headers:
+        Cache-Control:
+          schema:
+            type: string
+            const: private, no-store
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    '500':
+      description: The resolution could not be committed atomically with its audit and idempotency record.
+      headers:
+        Cache-Control:
+          schema:
+            type: string
+            const: private, no-store
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'

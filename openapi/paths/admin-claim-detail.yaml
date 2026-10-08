@@ -1,0 +1,87 @@
+get:
+  tags: [Administration]
+  operationId: getAdminClaimDetail
+  summary: Get an audited administrative claim detail
+  description: >-
+    Returns the recorded claim, its lifecycle actions and claimant contact
+    metadata. Requires the `read:admin_claims` permission and a provisioned
+    operator identity in the Bearer JWT context.
+    A prepared access-audit event is persisted before any temporary URL is
+    resolved for a linked private evidence image. If audit persistence or any
+    linked image URL resolution fails, the request returns 500 without partial
+    detail or URLs. Only confirmed private images linked to this claim are
+    included; the response does not expose storage keys or credentials. The
+    response includes persisted resolution data, not chat messages or payment
+    transactions. Responses use `Cache-Control: private, no-store`.
+  security:
+  - BearerAuth: []
+  parameters:
+  - name: id
+    in: path
+    required: true
+    description: Positive 32-bit claim identifier.
+    schema:
+      type: integer
+      format: int32
+      minimum: 1
+      maximum: 2147483647
+    example: 7
+  responses:
+    '200':
+      description: Administrative claim detail after its prepared access event is persisted.
+      headers:
+        Cache-Control:
+          description: Prevents storage of private administrative detail.
+          schema:
+            type: string
+            const: private, no-store
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/AdminClaimDetail'
+    '401':
+      description: The Bearer token is missing or invalid.
+      headers:
+        Cache-Control:
+          schema:
+            type: string
+            const: private, no-store
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/AuthErrorResponse'
+    '403':
+      description: The Bearer token lacks `read:admin_claims` or its subject is not a provisioned operator.
+      headers:
+        Cache-Control:
+          schema:
+            type: string
+            const: private, no-store
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: insufficient permissions
+    '404':
+      description: The ID is malformed or no claim has that ID.
+      headers:
+        Cache-Control:
+          schema:
+            type: string
+            const: private, no-store
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    '500':
+      description: The detail, its prepared access event, or a linked private image URL could not be resolved; no partial detail is returned.
+      headers:
+        Cache-Control:
+          schema:
+            type: string
+            const: private, no-store
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'

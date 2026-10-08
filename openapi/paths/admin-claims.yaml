@@ -1,0 +1,116 @@
+get:
+  tags: [Administration]
+  operationId: listAdminClaims
+  summary: Query the administrative claims inbox
+  description: >-
+    Lists bounded claim summaries for the support and mediation inbox. Requires
+    the `read:admin_claims` permission in the Bearer JWT. The optional status
+    and search filters are combined with AND. Search is a case-insensitive
+    literal substring of the claimant email or an exact canonical operation
+    ID (`jr-N` or `sp-N`); surrounding whitespace is trimmed. Results are
+    ordered by claim creation time descending, then claim ID descending.
+    `age_seconds` is measured at read time and is not an SLA or priority. An
+    empty trimmed search does not narrow results; invalid UTF-8 and NUL in the
+    search value are rejected. The provider's current category fields are null when unavailable. Items
+    contain no testimony, evidence URLs, or action history. Inbox reads do not
+    create audit events. Unknown or repeated query parameters are rejected.
+    Responses use `Cache-Control: private, no-store`.
+  security:
+  - BearerAuth: []
+  parameters:
+  - name: status
+    in: query
+    required: false
+    description: Filter by the persisted claim status.
+    schema:
+      type: string
+      enum: [open, in_review, resolved, dismissed]
+  - name: q
+    in: query
+    required: false
+    description: >-
+      Case-insensitive literal substring of claimant email, or an exact
+      canonical operation ID such as jr-12 or sp-34. Surrounding whitespace
+      is trimmed; NUL and invalid UTF-8 are rejected.
+    schema:
+      type: string
+    example: ana@example.com
+  - name: page
+    in: query
+    required: false
+    description: 1-based page number; defaults to 1.
+    schema:
+      type: integer
+      format: int32
+      minimum: 1
+      maximum: 2147483647
+      default: 1
+  - name: limit
+    in: query
+    required: false
+    description: Number of claims per page; defaults to 20 and is capped at 100.
+    schema:
+      type: integer
+      format: int32
+      minimum: 1
+      maximum: 100
+      default: 20
+  responses:
+    '200':
+      description: Administrative claim summaries matching the filters.
+      headers:
+        Cache-Control:
+          description: Prevents storage of private administrative data.
+          schema:
+            type: string
+            const: private, no-store
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/AdminClaimPage'
+    '400':
+      description: A status, query parameter, or pagination value is invalid, repeated, or unknown.
+      headers:
+        Cache-Control:
+          schema:
+            type: string
+            const: private, no-store
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    '401':
+      description: The Bearer token is missing or invalid.
+      headers:
+        Cache-Control:
+          schema:
+            type: string
+            const: private, no-store
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/AuthErrorResponse'
+    '403':
+      description: The Bearer token lacks the `read:admin_claims` permission.
+      headers:
+        Cache-Control:
+          schema:
+            type: string
+            const: private, no-store
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: insufficient permissions
+    '500':
+      description: The inbox could not be read.
+      headers:
+        Cache-Control:
+          schema:
+            type: string
+            const: private, no-store
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
