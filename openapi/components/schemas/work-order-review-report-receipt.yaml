@@ -1,0 +1,16 @@
+type: object
+description: Minimal confirmation that a review report was received.
+required:
+  - id
+  - status
+properties:
+  id:
+    type: integer
+    minimum: 1
+    description: Server-generated report identifier.
+  status:
+    type: string
+    enum:
+      - pending
+    description: Initial handling status assigned by the server.
+additionalProperties: false

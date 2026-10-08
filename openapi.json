@@ -9774,6 +9774,186 @@
                 }
             }
         },
+        "/work-orders/{workOrderId}/reviews/reports": {
+            "post": {
+                "tags": [
+                    "WorkOrders"
+                ],
+                "operationId": "reportWorkOrderReview",
+                "summary": "Report a review for administrative review",
+                "description": "Creates one report for the visible review on a work order. Only the\nauthenticated provider assigned to that work order may submit it. The\nreport does not hide or change the review, its rating, or reputation.\nA review can have only one report for its entire lifetime. An existing\nreport returns `409` regardless of its handling status or the review's\ncurrent visibility; a first report requires the review to exist and be\nvisible. The response does not include the review's original text or the\noptional explanation.\n\nEvery response, including authentication failures, uses\n`Cache-Control: private, no-store`.\n",
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "parameters": [
+                    {
+                        "name": "workOrderId",
+                        "in": "path",
+                        "required": true,
+                        "description": "Work order identifier.",
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/WorkOrderReviewReportRequest"
+                            },
+                            "example": {
+                                "category": "personal_data",
+                                "explanation": "La reseña publica información personal."
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Review report received.",
+                        "headers": {
+                            "Cache-Control": {
+                                "description": "Prevents storage of this response.",
+                                "schema": {
+                                    "type": "string",
+                                    "example": "private, no-store"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/WorkOrderReviewReportReceipt"
+                                },
+                                "example": {
+                                    "id": 17,
+                                    "status": "pending"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "The work order identifier or request body is invalid, including malformed JSON, duplicate or unknown fields, invalid value types, or an unsupported category.",
+                        "headers": {
+                            "Cache-Control": {
+                                "description": "Prevents storage of this response.",
+                                "schema": {
+                                    "type": "string",
+                                    "example": "private, no-store"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication.",
+                        "headers": {
+                            "Cache-Control": {
+                                "description": "Prevents storage of this response.",
+                                "schema": {
+                                    "type": "string",
+                                    "example": "private, no-store"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AuthErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "The authenticated user is not the registered provider assigned to this work order.",
+                        "headers": {
+                            "Cache-Control": {
+                                "description": "Prevents storage of this response.",
+                                "schema": {
+                                    "type": "string",
+                                    "example": "private, no-store"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "The work order or its review does not exist, or the review is not visible for a first report.",
+                        "headers": {
+                            "Cache-Control": {
+                                "description": "Prevents storage of this response.",
+                                "schema": {
+                                    "type": "string",
+                                    "example": "private, no-store"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "A report already exists for this review, including after it has been handled or the review is hidden.",
+                        "headers": {
+                            "Cache-Control": {
+                                "description": "Prevents storage of this response.",
+                                "schema": {
+                                    "type": "string",
+                                    "example": "private, no-store"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "The report could not be persisted.",
+                        "headers": {
+                            "Cache-Control": {
+                                "description": "Prevents storage of this response.",
+                                "schema": {
+                                    "type": "string",
+                                    "example": "private, no-store"
+                                }
+                            }
+                        },
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ErrorResponse"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/work-orders/{workOrderId}/checkout-sessions": {
             "post": {
                 "tags": [
@@ -19987,6 +20167,54 @@
                         "type": "string",
                         "maxLength": 500,
                         "example": "Trabajo prolijo y excelente atención."
+                    }
+                },
+                "additionalProperties": false
+            },
+            "WorkOrderReviewReportRequest": {
+                "type": "object",
+                "description": "Request to report a review for administrative review.",
+                "required": [
+                    "category"
+                ],
+                "properties": {
+                    "category": {
+                        "type": "string",
+                        "enum": [
+                            "abusive_language",
+                            "personal_data",
+                            "spam_advertising",
+                            "unrelated_content"
+                        ],
+                        "description": "Reason for reporting the review."
+                    },
+                    "explanation": {
+                        "type": "string",
+                        "description": "Optional explanation. The server trims surrounding whitespace before validating the limit of 500 Unicode code points. Empty text is accepted. NUL characters are not accepted.",
+                        "pattern": "^[^\\u0000]*$"
+                    }
+                },
+                "additionalProperties": false
+            },
+            "WorkOrderReviewReportReceipt": {
+                "type": "object",
+                "description": "Minimal confirmation that a review report was received.",
+                "required": [
+                    "id",
+                    "status"
+                ],
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "description": "Server-generated report identifier."
+                    },
+                    "status": {
+                        "type": "string",
+                        "enum": [
+                            "pending"
+                        ],
+                        "description": "Initial handling status assigned by the server."
                     }
                 },
                 "additionalProperties": false

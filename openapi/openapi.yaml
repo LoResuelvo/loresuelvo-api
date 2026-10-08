@@ -160,6 +160,8 @@ paths:
     $ref: ./paths/work-order-completion-reports.yaml
   /work-orders/{workOrderId}/reviews:
     $ref: ./paths/work-order-reviews.yaml
+  /work-orders/{workOrderId}/reviews/reports:
+    $ref: ./paths/work-order-review-reports.yaml
   /work-orders/{workOrderId}/checkout-sessions:
     $ref: ./paths/work-order-checkout-sessions.yaml
   /conversations/{conversationId}:
@@ -507,6 +509,10 @@ components:
       $ref: ./components/schemas/work-order-review-request.yaml
     WorkOrderReview:
       $ref: ./components/schemas/work-order-review.yaml
+    WorkOrderReviewReportRequest:
+      $ref: ./components/schemas/work-order-review-report-request.yaml
+    WorkOrderReviewReportReceipt:
+      $ref: ./components/schemas/work-order-review-report-receipt.yaml
     CreateChatbotConversationRequest:
       $ref: ./components/schemas/create-chatbot-conversation-request.yaml
     ChatbotConversationResponse:

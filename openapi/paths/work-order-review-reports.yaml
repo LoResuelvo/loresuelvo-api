@@ -1,0 +1,124 @@
+post:
+  tags:
+    - WorkOrders
+  operationId: reportWorkOrderReview
+  summary: Report a review for administrative review
+  description: |
+    Creates one report for the visible review on a work order. Only the
+    authenticated provider assigned to that work order may submit it. The
+    report does not hide or change the review, its rating, or reputation.
+    A review can have only one report for its entire lifetime. An existing
+    report returns `409` regardless of its handling status or the review's
+    current visibility; a first report requires the review to exist and be
+    visible. The response does not include the review's original text or the
+    optional explanation.
+
+    Every response, including authentication failures, uses
+    `Cache-Control: private, no-store`.
+  security:
+    - BearerAuth: []
+  parameters:
+    - name: workOrderId
+      in: path
+      required: true
+      description: Work order identifier.
+      schema:
+        type: integer
+        minimum: 1
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: '#/components/schemas/WorkOrderReviewReportRequest'
+        example:
+          category: personal_data
+          explanation: La reseña publica información personal.
+  responses:
+    '201':
+      description: Review report received.
+      headers:
+        Cache-Control:
+          description: Prevents storage of this response.
+          schema:
+            type: string
+            example: private, no-store
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/WorkOrderReviewReportReceipt'
+          example:
+            id: 17
+            status: pending
+    '400':
+      description: The work order identifier or request body is invalid, including malformed JSON, duplicate or unknown fields, invalid value types, or an unsupported category.
+      headers:
+        Cache-Control:
+          description: Prevents storage of this response.
+          schema:
+            type: string
+            example: private, no-store
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    '401':
+      description: Missing or invalid authentication.
+      headers:
+        Cache-Control:
+          description: Prevents storage of this response.
+          schema:
+            type: string
+            example: private, no-store
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/AuthErrorResponse'
+    '403':
+      description: The authenticated user is not the registered provider assigned to this work order.
+      headers:
+        Cache-Control:
+          description: Prevents storage of this response.
+          schema:
+            type: string
+            example: private, no-store
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    '404':
+      description: The work order or its review does not exist, or the review is not visible for a first report.
+      headers:
+        Cache-Control:
+          description: Prevents storage of this response.
+          schema:
+            type: string
+            example: private, no-store
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    '409':
+      description: A report already exists for this review, including after it has been handled or the review is hidden.
+      headers:
+        Cache-Control:
+          description: Prevents storage of this response.
+          schema:
+            type: string
+            example: private, no-store
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    '500':
+      description: The report could not be persisted.
+      headers:
+        Cache-Control:
+          description: Prevents storage of this response.
+          schema:
+            type: string
+            example: private, no-store
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'

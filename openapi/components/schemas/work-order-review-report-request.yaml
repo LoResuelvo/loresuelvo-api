@@ -1,0 +1,21 @@
+type: object
+description: Request to report a review for administrative review.
+required:
+  - category
+properties:
+  category:
+    type: string
+    enum:
+      - abusive_language
+      - personal_data
+      - spam_advertising
+      - unrelated_content
+    description: Reason for reporting the review.
+  explanation:
+    type: string
+    description: >-
+      Optional explanation. The server trims surrounding whitespace before
+      validating the limit of 500 Unicode code points. Empty text is accepted.
+      NUL characters are not accepted.
+    pattern: '^[^\u0000]*$'
+additionalProperties: false
