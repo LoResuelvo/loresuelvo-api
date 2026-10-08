@@ -46,7 +46,7 @@ func TestRegistrationUsesJWTActorAndOmitsCredentialsFromResponse(t *testing.T) {
 				require.Equal(t, "/installations/"+id, response.Header().Get("Location"))
 			}
 			require.Equal(t, status, response.Code)
-			for _, secret := range []string{"secret-fcm-token", "installation-proof", "private-hash", "999", "secret_hash", "fcm_token", "installation_secret"} {
+			for _, secret := range []string{"secret-fcm-token", "installation-proof", "private-hash", "user_id", "secret_hash", "fcm_token", "installation_secret"} {
 				require.NotContains(t, response.Body.String(), secret)
 			}
 			require.JSONEq(t, `{"installation_id":"`+id+`","binding_id":"`+binding+`","app":"consumer","locale":"es","enabled":true}`, response.Body.String())
