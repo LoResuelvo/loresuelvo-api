@@ -5,7 +5,6 @@ Feature: Operar con rubros deshabilitados
 
     Rule: Un rubro deshabilitado no admite nuevas inscripciones
 
-        @wip
         Scenario: 38.2.25-RPA Rechazar el registro de un prestador en un rubro deshabilitado
             Given que existe el rubro deshabilitado "Plomería"
             And que no existe un usuario con correo "nuevo.prestador@example.com"
@@ -18,7 +17,6 @@ Feature: Operar con rubros deshabilitados
 
     Rule: Un rubro deshabilitado no interrumpe una negociación iniciada antes de su desactivación
 
-        @wip
         Scenario: 38.2.26-PSP Crear una propuesta para una solicitud aceptada antes de deshabilitar el rubro
             Given que la fecha y hora actual del sistema es "2026-07-04T10:00:00-03:00"
             And que existe el rubro "Plomería"

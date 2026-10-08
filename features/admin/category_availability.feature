@@ -5,7 +5,6 @@ Feature: Consultar la disponibilidad de los rubros
 
     Rule: El catálogo compartido sólo ofrece rubros habilitados para nuevas operaciones
 
-        @wip
         Scenario: 38.2.17-LR Listar rubros habilitados sin exponer datos administrativos
             Given que existe el rubro habilitado "Plomería"
             And que existe el rubro deshabilitado "Electricidad"
@@ -14,7 +13,6 @@ Feature: Consultar la disponibilidad de los rubros
             Then el listado incluye el rubro "Plomería" y no incluye el rubro "Electricidad"
             And cada rubro listado incluye solamente su identificador y nombre visible
 
-        @wip
         Scenario: 38.2.18-LR Consultar todos los rubros con el permiso de lectura
             Given que existe el rubro habilitado "Plomería"
             And que existe el rubro deshabilitado "Electricidad"
@@ -24,7 +22,6 @@ Feature: Consultar la disponibilidad de los rubros
             Then el listado incluye ambos rubros con su estado y versión
             And la consulta no registra un evento de auditoría
 
-        @wip
         Scenario: 38.2.19-LR Rechazar el catálogo administrativo sin el permiso requerido
             Given que existe el rubro habilitado "Plomería"
             And que existe el rubro deshabilitado "Electricidad"

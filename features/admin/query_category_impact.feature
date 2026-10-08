@@ -11,7 +11,6 @@ Feature: Consultar el impacto operativo de un rubro
         Background:
             Given que estoy autenticado como administrador "supervisor@example.com" con el permiso "read:categories"
 
-        @wip
         Scenario: 38.2.13-IR Consultar el impacto de un rubro con actividad
             Given que la fecha y hora actual del sistema es "2026-08-15T14:00:00Z"
             And que existe el rubro habilitado "Plomería"
@@ -31,7 +30,6 @@ Feature: Consultar el impacto operativo de un rubro
             And el impacto informa que las operaciones existentes, incluidas las negociaciones previas, pueden continuar aunque se deshabilite el rubro
             And la orden de trabajo conserva su estado programado y la consulta no modifica las operaciones
 
-        @wip
         Scenario: 38.2.14-IR Consultar un rubro deshabilitado sin actividad
             Given que existe el rubro deshabilitado "Electricidad"
             And que no hay prestadores ni operaciones asociadas al rubro "Electricidad"
@@ -42,14 +40,12 @@ Feature: Consultar el impacto operativo de un rubro
 
     Rule: El impacto requiere el permiso de lectura de rubros
 
-        @wip
         Scenario: 38.2.15-IR Rechazar la consulta de impacto sin el permiso requerido
             Given que existe el rubro "Plomería"
             And que estoy autenticado como administrador "supervisor@example.com" solamente con el permiso "read:admin_operations"
             When consulto el impacto del rubro "Plomería"
             Then el sistema responde con estado 403
 
-        @wip
         Scenario: 38.2.16-IR Rechazar la consulta de impacto sin autenticación
             Given que existe el rubro "Plomería"
             And que no tengo una sesión válida

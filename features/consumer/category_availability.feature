@@ -10,13 +10,11 @@ Feature: Descubrir prestadores y continuar solicitudes según la disponibilidad 
 
     Rule: Un rubro deshabilitado no ofrece prestadores para nuevas solicitudes
 
-        @wip
         Scenario: 38.2.20-BR No ofrecer prestadores al buscar por el identificador de un rubro deshabilitado
             Given que el rubro "Plomería" se deshabilitó después del registro de "juan.plomero@example.com"
             When filtro técnicos usando el identificador guardado del rubro "Plomería"
             Then el sistema muestra un listado de técnicos vacío
 
-        @wip
         Scenario: 38.2.21-EST Rechazar una solicitud manual a un prestador de un rubro deshabilitado
             Given que el rubro "Plomería" se deshabilitó después del registro de "juan.plomero@example.com"
             And que estoy autenticado como consumidor "ana@example.com"
@@ -27,7 +25,6 @@ Feature: Descubrir prestadores y continuar solicitudes según la disponibilidad 
             Then el sistema rechaza la solicitud porque el rubro del prestador no está habilitado para nuevas operaciones
             And el sistema no registra una solicitud de trabajo para "Juan Gómez"
 
-        @wip
         Scenario: 38.2.22-SAI Rechazar una solicitud desde una recomendación guardada antes de deshabilitar el rubro
             Given que estoy autenticado como consumidor "ana@example.com"
             And que el chatbot asistido por IA está disponible
@@ -43,7 +40,6 @@ Feature: Descubrir prestadores y continuar solicitudes según la disponibilidad 
 
     Rule: Deshabilitar un rubro no elimina las relaciones existentes
 
-        @wip
         Scenario: 38.2.23-VPP Mostrar el rubro del prestador en una orden existente aunque esté deshabilitado
             Given que la fecha y hora actual del sistema es "2026-07-04T10:00:00-03:00"
             And que existe una orden de trabajo programada para la propuesta aceptada de "juan.plomero@example.com" para "ana@example.com" por "15000.50" para la fecha y hora "2026-07-05T09:30:00-03:00" con la descripción:
@@ -58,7 +54,6 @@ Feature: Descubrir prestadores y continuar solicitudes según la disponibilidad 
 
     Rule: Reactivar un rubro restituye la oferta para nuevas operaciones
 
-        @wip
         Scenario: 38.2.24-BR Volver a ofrecer prestadores después de reactivar el mismo rubro
             Given que el rubro "Plomería" se deshabilitó y luego se reactivó con el mismo identificador
             When filtro técnicos usando el identificador guardado del rubro "Plomería"
