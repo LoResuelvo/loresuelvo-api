@@ -120,6 +120,7 @@ type testSuite struct {
 	invalidSession                          bool
 	lastConversationID                      int
 	lastJobRequestID                        int
+	lastJobRequestNotice                    *realtimeNotificationEvent
 	lastWorkRequestProviderID               int
 	lastProviderProfileID                   int
 	lastIdentityVerificationProviderID      int
@@ -195,6 +196,7 @@ func (s *testSuite) registerAllSteps(sc *godog.ScenarioContext) {
 	registerClaimSteps(sc, s)
 	registerAdminClaimSteps(sc, s)
 	registerServiceNoticeSteps(sc, s)
+	registerNotifyJobRequestSteps(sc, s)
 	registerPhoneSteps(sc, s)
 	registerNoticeDeliverySteps(sc, s)
 	registerConsumerAccountSteps(sc, s)
@@ -357,6 +359,7 @@ func (s *testSuite) cleanup() error {
 	s.lastProviderProfileID = 0
 	s.lastIdentityVerificationProviderID = 0
 	s.lastJobRequestID = 0
+	s.lastJobRequestNotice = nil
 	s.providerProfilePhotoFileID = ""
 	s.expectedCoverageZoneRegistrationError = ""
 	s.chatbot.Reset()

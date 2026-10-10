@@ -9,6 +9,8 @@ import (
 	"time"
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/consumer"
+	filedomain "github.com/LoResuelvo/loresuelvo-api/internal/domain/file"
+	jobrequest "github.com/LoResuelvo/loresuelvo-api/internal/domain/job_request"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/provider"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/user"
 	amqp "github.com/rabbitmq/amqp091-go"
@@ -93,4 +95,34 @@ func (finder notificationRecipientFinderStub) FindByID(_ context.Context, id int
 		return &provider.Provider{BaseUser: base}, nil
 	}
 	return &consumer.Consumer{BaseUser: base}, nil
+}
+
+type notificationJobRequestFinderMock struct{ mock.Mock }
+
+func (m *notificationJobRequestFinderMock) FindByID(id int) (*jobrequest.JobRequest, error) {
+	args := m.Called(id)
+	request, _ := args.Get(0).(*jobrequest.JobRequest)
+	return request, args.Error(1)
+}
+
+type notificationImageResolverMock struct{ mock.Mock }
+
+func (m *notificationImageResolverMock) ResolveJobRequestImages(ctx context.Context, images []filedomain.Image) ([]filedomain.Image, error) {
+	args := m.Called(ctx, images)
+	found, _ := args.Get(0).([]filedomain.Image)
+	return found, args.Error(1)
+}
+
+type notificationUserFinderMock struct{ mock.Mock }
+
+func (m *notificationUserFinderMock) FindByID(ctx context.Context, id int) (user.User, error) {
+	args := m.Called(ctx, id)
+	found, _ := args.Get(0).(user.User)
+	return found, args.Error(1)
+}
+
+type notificationDispatcherMock struct{ mock.Mock }
+
+func (m *notificationDispatcherMock) Publish(ctx context.Context, authID, role string, id int, event []byte) error {
+	return m.Called(ctx, authID, role, id, event).Error(0)
 }

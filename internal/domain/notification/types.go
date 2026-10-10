@@ -3,6 +3,7 @@ package notification
 type Type string
 
 const (
+	TypeJobRequestReceived              Type = "job_request_received"
 	TypeWorkOrderFinalPaymentApproved   Type = "work_order_final_payment_approved"
 	TypeServiceProposalReceived         Type = "service_proposal_received"
 	TypeServiceProposalAccepted         Type = "service_proposal_accepted"
@@ -15,6 +16,7 @@ const (
 type ResourceType string
 
 const (
+	ResourceJobRequest         ResourceType = "job_request"
 	ResourceServiceProposal    ResourceType = "service_proposal"
 	ResourceWorkOrder          ResourceType = "work_order"
 	ResourceCalendarConnection ResourceType = "calendar_connection"

@@ -2,9 +2,11 @@ package jobrequest_test
 
 import (
 	"context"
+
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/category"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/conversation"
 	jobrequest "github.com/LoResuelvo/loresuelvo-api/internal/domain/job_request"
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/notification"
 	"github.com/stretchr/testify/mock"
 )
 
@@ -42,4 +44,23 @@ func newCreationUnitForTest(repository *jobRequestRepositoryMock) *creationUnitM
 		return repository.SaveWithConversation(request, pending)
 	})
 	return unit
+}
+
+type notificationStoreMock struct{ mock.Mock }
+
+func (m *notificationStoreMock) Save(ctx context.Context, n *notification.Notification) (*notification.Notification, error) {
+	args := m.Called(ctx, n)
+	saved, _ := args.Get(0).(*notification.Notification)
+	return saved, args.Error(1)
+}
+
+type notificatorMock struct{ mock.Mock }
+
+func (m *notificatorMock) Notify(ctx context.Context, n *notification.Notification) error {
+	return m.Called(ctx, n).Error(0)
+}
+func notificationStoreForTest() *notificationStoreMock {
+	store := new(notificationStoreMock)
+	store.On("Save", mock.Anything, mock.Anything).Return(&notification.Notification{ID: 1}, nil)
+	return store
 }

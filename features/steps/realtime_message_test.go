@@ -430,56 +430,64 @@ func (connection *realtimeTestConnection) readMessageEvent(timeout time.Duration
 }
 
 func (connection *realtimeTestConnection) readTextFrame() ([]byte, error) {
-	header := make([]byte, 2)
-	if _, err := io.ReadFull(connection.reader, header); err != nil {
-		return nil, err
-	}
-
-	opcode := header[0] & 0x0f
-	if opcode == 0x8 {
-		return nil, fmt.Errorf("realtime connection was closed")
-	}
-	if opcode != 0x1 {
-		return nil, fmt.Errorf("expected realtime text frame, got opcode %d", opcode)
-	}
-
-	masked := header[1]&0x80 != 0
-	payloadLength := uint64(header[1] & 0x7f)
-	switch payloadLength {
-	case 126:
-		extended := make([]byte, 2)
-		if _, err := io.ReadFull(connection.reader, extended); err != nil {
+	var message []byte
+	firstFrame := true
+	for {
+		header := make([]byte, 2)
+		if _, err := io.ReadFull(connection.reader, header); err != nil {
 			return nil, err
 		}
-		payloadLength = uint64(binary.BigEndian.Uint16(extended))
-	case 127:
-		extended := make([]byte, 8)
-		if _, err := io.ReadFull(connection.reader, extended); err != nil {
+
+		opcode := header[0] & 0x0f
+		if opcode == 0x8 {
+			return nil, fmt.Errorf("realtime connection was closed")
+		}
+		if (firstFrame && opcode != 0x1) || (!firstFrame && opcode != 0x0) {
+			return nil, fmt.Errorf("expected realtime text frame, got opcode %d", opcode)
+		}
+
+		masked := header[1]&0x80 != 0
+		payloadLength := uint64(header[1] & 0x7f)
+		switch payloadLength {
+		case 126:
+			extended := make([]byte, 2)
+			if _, err := io.ReadFull(connection.reader, extended); err != nil {
+				return nil, err
+			}
+			payloadLength = uint64(binary.BigEndian.Uint16(extended))
+		case 127:
+			extended := make([]byte, 8)
+			if _, err := io.ReadFull(connection.reader, extended); err != nil {
+				return nil, err
+			}
+			payloadLength = binary.BigEndian.Uint64(extended)
+		}
+
+		var maskKey []byte
+		if masked {
+			maskKey = make([]byte, 4)
+			if _, err := io.ReadFull(connection.reader, maskKey); err != nil {
+				return nil, err
+			}
+		}
+
+		payload := make([]byte, payloadLength)
+		if _, err := io.ReadFull(connection.reader, payload); err != nil {
 			return nil, err
 		}
-		payloadLength = binary.BigEndian.Uint64(extended)
-	}
 
-	var maskKey []byte
-	if masked {
-		maskKey = make([]byte, 4)
-		if _, err := io.ReadFull(connection.reader, maskKey); err != nil {
-			return nil, err
+		if masked {
+			for index := range payload {
+				payload[index] ^= maskKey[index%4]
+			}
 		}
-	}
 
-	payload := make([]byte, payloadLength)
-	if _, err := io.ReadFull(connection.reader, payload); err != nil {
-		return nil, err
-	}
-
-	if masked {
-		for index := range payload {
-			payload[index] ^= maskKey[index%4]
+		message = append(message, payload...)
+		if header[0]&0x80 != 0 {
+			return message, nil
 		}
+		firstFrame = false
 	}
-
-	return payload, nil
 }
 
 func newWebSocketKey() (string, error) {

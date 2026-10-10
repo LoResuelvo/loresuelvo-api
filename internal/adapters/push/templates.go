@@ -1,6 +1,10 @@
 package push
 
 const (
+	requestTitleES    = "Nueva solicitud de trabajo"
+	requestBodyES     = "Recibiste una solicitud de trabajo."
+	requestTitleEN    = "New job request"
+	requestBodyEN     = "You received a job request."
 	messageTitleES    = "Nuevo mensaje"
 	messageBodyES     = "Tenés un nuevo mensaje en LoResuelvo."
 	messageTitleEN    = "New message"
@@ -28,6 +32,7 @@ const (
 )
 
 var templates = map[string][2][2]string{
+	"job_request_received":               {{requestTitleES, requestBodyES}, {requestTitleEN, requestBodyEN}},
 	"conversation.message.created":       {{messageTitleES, messageBodyES}, {messageTitleEN, messageBodyEN}},
 	"service_proposal_received":          {{proposalTitleES, proposalBodyES}, {proposalTitleEN, proposalBodyEN}},
 	"service_proposal_accepted":          {{acceptedTitleES, acceptedBodyES}, {acceptedTitleEN, acceptedBodyEN}},

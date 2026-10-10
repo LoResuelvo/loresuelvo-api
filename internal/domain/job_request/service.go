@@ -9,6 +9,7 @@ import (
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/conversation"
 	filedomain "github.com/LoResuelvo/loresuelvo-api/internal/domain/file"
 	readmodel "github.com/LoResuelvo/loresuelvo-api/internal/domain/job_request/read_model"
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/notification"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/provider"
 )
 
@@ -19,6 +20,8 @@ type Service struct {
 	conversationRepository ConversationRepository
 	fileService            FileService
 	clock                  clock.Clock
+	notificationRepository NotificationStore
+	notificator            notification.Notificator
 }
 
 func NewService(
@@ -28,6 +31,8 @@ func NewService(
 	conversationRepository ConversationRepository,
 	fileService FileService,
 	clock clock.Clock,
+	notificationRepository NotificationStore,
+	notificator notification.Notificator,
 ) *Service {
 	return &Service{
 		creationUnit:           creationUnit,
@@ -36,6 +41,8 @@ func NewService(
 		conversationRepository: conversationRepository,
 		fileService:            fileService,
 		clock:                  clock,
+		notificationRepository: notificationRepository,
+		notificator:            notificator,
 	}
 }
 
@@ -238,6 +245,16 @@ func (s *Service) saveNewRequest(ctx context.Context, request JobRequest, pendin
 	})
 	if err != nil {
 		return nil, err
+	}
+
+	savedNotification, err := s.notificationRepository.Save(ctx, saved.CreateReceivedNotification(s.clock))
+	if err != nil {
+		return nil, err
+	}
+	if s.notificator != nil {
+		if err := s.notificator.Notify(ctx, savedNotification); err != nil {
+			return nil, err
+		}
 	}
 	return saved, nil
 }

@@ -238,8 +238,6 @@ func newDependencies(database *sql.DB, adapters dependencyAdapters) (*Dependenci
 	realtimeMessagePublisher := realtime.NewPublisher(dispatcher, persistence.UserRepository)
 	pushPublisher := push.NewPublisher(adapters.pushSender, persistence.InstallationRepository, persistence.WorkOrderRepository, systemClock)
 	messagePublisher := notificationadapter.NewCompositeMessagePublisher(realtimeMessagePublisher, pushPublisher)
-	realtimeNotificationNotificator := realtime.NewNotificationNotificator(dispatcher, persistence.UserRepository)
-	notificator := notificationadapter.NewCompositeNotificator(realtimeNotificationNotificator, pushPublisher)
 	realtimeHandler := realtime.NewHandler(hub, persistence.UserRepository, ticketStore)
 
 	fileService := filedomain.NewService(
@@ -251,6 +249,8 @@ func newDependencies(database *sql.DB, adapters dependencyAdapters) (*Dependenci
 		mediaadapter.NewWebMAudioParser(),
 		mediaadapter.NewMP4VideoParser(),
 	)
+	realtimeNotificationNotificator := realtime.NewNotificationNotificator(dispatcher, persistence.UserRepository, persistence.JobRequestRepository, fileService)
+	notificator := notificationadapter.NewCompositeNotificator(realtimeNotificationNotificator, pushPublisher)
 	categoryUnitOfWork := category.UnitOfWork(persistence.CategoryUnitOfWork)
 	if adapters.categoryUnitOfWorkDecorator != nil {
 		categoryUnitOfWork = adapters.categoryUnitOfWorkDecorator(categoryUnitOfWork)
@@ -310,6 +310,8 @@ func newDependencies(database *sql.DB, adapters dependencyAdapters) (*Dependenci
 		persistence.ConversationRepository,
 		fileService,
 		systemClock,
+		persistence.NotificationRepository,
+		notificator,
 	)
 	userService := user.NewService(persistence.UserRepository, fileService)
 	adminService := admin.NewService(

@@ -11,6 +11,7 @@ import (
 	filedomain "github.com/LoResuelvo/loresuelvo-api/internal/domain/file"
 	jobrequest "github.com/LoResuelvo/loresuelvo-api/internal/domain/job_request"
 	readmodel "github.com/LoResuelvo/loresuelvo-api/internal/domain/job_request/read_model"
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/notification"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/provider"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/user"
 	"github.com/stretchr/testify/assert"
@@ -153,6 +154,7 @@ func TestCreateFromChatbotAssessmentCopiesCurrentAssessment(t *testing.T) {
 		}},
 		fileServiceForJobRequestTest(),
 		jobRequestTestClock{},
+		notificationStoreForTest(), nil,
 	)
 
 	created, err := service.CreateFromChatbotAssessment(context.Background(), "auth0|consumer", 7, 20)
@@ -183,6 +185,7 @@ func TestCreateFromChatbotAssessmentRejectsSelfServiceOutcome(t *testing.T) {
 		}},
 		fileServiceForJobRequestTest(),
 		jobRequestTestClock{},
+		notificationStoreForTest(), nil,
 	)
 
 	created, err := service.CreateFromChatbotAssessment(context.Background(), "auth0|consumer", 7, 20)
@@ -202,6 +205,7 @@ func TestCreateFromChatbotAssessmentRejectsDifferentOwner(t *testing.T) {
 		}},
 		fileServiceForJobRequestTest(),
 		jobRequestTestClock{},
+		notificationStoreForTest(), nil,
 	)
 
 	created, err := service.CreateFromChatbotAssessment(context.Background(), "auth0|other", 7, 20)
@@ -298,6 +302,7 @@ func TestCreateJobRequestSavesRequestWithPendingConversation(t *testing.T) {
 		&conversationRepo{},
 		fileServiceForJobRequestTest(),
 		jobRequestTestClock{},
+		notificationStoreForTest(), nil,
 	)
 
 	createdRequest, err := service.Create(context.Background(), "auth0|consumer", 20, "  Reparación de fuga  ", "  Necesito ayuda esta semana  ", []string{})
@@ -334,6 +339,7 @@ func TestCreateJobRequestValidatesImagesWithFileService(t *testing.T) {
 		&conversationRepo{},
 		imageValidator,
 		jobRequestTestClock{},
+		notificationStoreForTest(), nil,
 	)
 
 	createdRequest, err := service.Create(context.Background(), "auth0|consumer", 20, "Reparación de fuga", "Necesito ayuda", []string{"file-1"})
@@ -356,6 +362,7 @@ func TestCreateJobRequestAllowsEmptyDescription(t *testing.T) {
 		&conversationRepo{},
 		fileServiceForJobRequestTest(),
 		jobRequestTestClock{},
+		notificationStoreForTest(), nil,
 	)
 
 	createdRequest, err := service.Create(context.Background(), "auth0|consumer", 20, "Reparación de fuga", "   ", []string{})
@@ -374,6 +381,7 @@ func TestCreateJobRequestRejectsMissingTitle(t *testing.T) {
 		&conversationRepo{},
 		fileServiceForJobRequestTest(),
 		jobRequestTestClock{},
+		notificationStoreForTest(), nil,
 	)
 
 	createdRequest, err := service.Create(context.Background(), "auth0|consumer", 20, "   ", "Necesito ayuda", []string{})
@@ -392,6 +400,7 @@ func TestCreateJobRequestRejectsNonConsumer(t *testing.T) {
 		&conversationRepo{},
 		fileServiceForJobRequestTest(),
 		jobRequestTestClock{},
+		notificationStoreForTest(), nil,
 	)
 
 	createdRequest, err := service.Create(context.Background(), "auth0|provider", 20, "Reparación de fuga", "", []string{})
@@ -410,6 +419,7 @@ func TestCreateJobRequestRejectsNonExistingProvider(t *testing.T) {
 		&conversationRepo{},
 		fileServiceForJobRequestTest(),
 		jobRequestTestClock{},
+		notificationStoreForTest(), nil,
 	)
 
 	createdRequest, err := service.Create(context.Background(), "auth0|consumer", 20, "Reparación de fuga", "", []string{})
@@ -428,6 +438,7 @@ func TestCreateJobRequestRejectsExistingOpenRequestBetweenConsumerAndProvider(t 
 		&conversationRepo{},
 		fileServiceForJobRequestTest(),
 		jobRequestTestClock{},
+		notificationStoreForTest(), nil,
 	)
 
 	createdRequest, err := service.Create(context.Background(), "auth0|consumer", 20, "Reparación de fuga", "", []string{})
@@ -448,6 +459,7 @@ func TestCreateJobRequestPropagatesOpenRequestLookupError(t *testing.T) {
 		&conversationRepo{},
 		fileServiceForJobRequestTest(),
 		jobRequestTestClock{},
+		notificationStoreForTest(), nil,
 	)
 
 	createdRequest, err := service.Create(context.Background(), "auth0|consumer", 20, "Reparación de fuga", "", []string{})
@@ -467,6 +479,7 @@ func TestShouldGetNoJobRequests(t *testing.T) {
 		&conversationRepo{},
 		fileServiceForJobRequestTest(),
 		jobRequestTestClock{},
+		notificationStoreForTest(), nil,
 	)
 
 	jobRequests, err := service.GetJobRequests(context.Background(), "auth0|consumer")
@@ -484,6 +497,7 @@ func TestSHouldGetListOfJobRequests(t *testing.T) {
 		&conversationRepo{},
 		fileServiceForJobRequestTest(),
 		jobRequestTestClock{},
+		notificationStoreForTest(), nil,
 	)
 
 	repo.foundJobRequests = []readmodel.JobRequestSummary{
@@ -524,6 +538,7 @@ func TestAcceptJobRequestActivatesLinkedConversationForAssignedProvider(t *testi
 		conversationRepo,
 		fileServiceForJobRequestTest(),
 		jobRequestTestClock{},
+		notificationStoreForTest(), nil,
 	)
 
 	acceptedJobRequest, err := service.Accept(context.Background(), "auth0|provider", 1)
@@ -559,6 +574,7 @@ func TestAcceptJobRequestRejectsProviderThatIsNotAssigned(t *testing.T) {
 		conversationRepo,
 		fileServiceForJobRequestTest(),
 		jobRequestTestClock{},
+		notificationStoreForTest(), nil,
 	)
 
 	acceptedJobRequest, err := service.Accept(context.Background(), "auth0|other-provider", 1)
@@ -581,6 +597,7 @@ func TestAcceptJobRequestReturnsNotFoundWhenRequestDoesNotExist(t *testing.T) {
 		conversationRepo,
 		fileServiceForJobRequestTest(),
 		jobRequestTestClock{},
+		notificationStoreForTest(), nil,
 	)
 
 	acceptedJobRequest, err := service.Accept(context.Background(), "auth0|provider", 999)
@@ -612,6 +629,7 @@ func TestAcceptJobRequestRejectsAlreadyAcceptedRequest(t *testing.T) {
 		conversationRepo,
 		fileServiceForJobRequestTest(),
 		jobRequestTestClock{},
+		notificationStoreForTest(), nil,
 	)
 
 	acceptedJobRequest, err := service.Accept(context.Background(), "auth0|provider", 1)
@@ -636,7 +654,7 @@ func TestCreateJobRequestRejectsFreshDisabledCategoryWithoutSaving(t *testing.T)
 	store := new(creationStoreMock)
 	unit.On("Execute", mock.Anything, mock.Anything).Return(func(_ context.Context, operation func(jobrequest.CreationStore) error) error { return operation(store) }).Once()
 	store.On("FindProviderCategory", mock.Anything, 20).Return(&category.Category{ID: 3, Name: "Plomería", Enabled: false, Version: 2}, nil).Once()
-	service := jobrequest.NewService(unit, repository, newUserRepositoryMock(&consumerRepo{consumerID: 10}, &providerRepo{exists: true}), &conversationRepo{}, fileServiceForJobRequestTest(), jobRequestTestClock{})
+	service := jobrequest.NewService(unit, repository, newUserRepositoryMock(&consumerRepo{consumerID: 10}, &providerRepo{exists: true}), &conversationRepo{}, fileServiceForJobRequestTest(), jobRequestTestClock{}, notificationStoreForTest(), nil)
 	result, err := service.Create(t.Context(), "auth0|consumer", 20, "Repair", "Leak", nil)
 	require.ErrorIs(t, err, category.ErrDisabled)
 	require.Nil(t, result)
@@ -652,10 +670,93 @@ func TestCreateJobRequestPreservesCategoryLookupFailure(t *testing.T) {
 	unit.On("Execute", mock.Anything, mock.Anything).Return(func(_ context.Context, operation func(jobrequest.CreationStore) error) error { return operation(store) }).Once()
 	failure := errors.New("category database unavailable")
 	store.On("FindProviderCategory", mock.Anything, 20).Return((*category.Category)(nil), failure).Once()
-	service := jobrequest.NewService(unit, repository, newUserRepositoryMock(&consumerRepo{consumerID: 10}, &providerRepo{exists: true}), &conversationRepo{}, fileServiceForJobRequestTest(), jobRequestTestClock{})
+	service := jobrequest.NewService(unit, repository, newUserRepositoryMock(&consumerRepo{consumerID: 10}, &providerRepo{exists: true}), &conversationRepo{}, fileServiceForJobRequestTest(), jobRequestTestClock{}, notificationStoreForTest(), nil)
 	result, err := service.Create(t.Context(), "auth0|consumer", 20, "Repair", "Leak", nil)
 	require.ErrorIs(t, err, failure)
 	require.Nil(t, result)
 	store.AssertNotCalled(t, "SaveWithConversation", mock.Anything, mock.Anything, mock.Anything)
 	store.AssertExpectations(t)
+}
+
+func TestCreateJobRequestNotifiesAssignedProviderAfterCommit(t *testing.T) {
+	for _, fromAssessment := range []bool{false, true} {
+		t.Run(map[bool]string{false: "direct", true: "assessment"}[fromAssessment], func(t *testing.T) {
+			repo := &jobRequestRepositoryMock{}
+			committed := false
+			unit := new(creationUnitMock)
+			store := new(creationStoreMock)
+			enabledCategory, err := category.New("Plomería")
+			require.NoError(t, err)
+			enabledCategory.ID = 3
+			store.On("FindProviderCategory", mock.Anything, 20).Return(enabledCategory, nil).Once()
+			store.On("SaveWithConversation", mock.Anything, mock.Anything, mock.Anything).Return(func(request jobrequest.JobRequest, pending conversation.Conversation) (*jobrequest.JobRequest, error) {
+				return repo.SaveWithConversation(request, pending)
+			}).Once()
+			unit.On("Execute", mock.Anything, mock.Anything).Return(func(ctx context.Context, operation func(jobrequest.CreationStore) error) error {
+				err := operation(store)
+				committed = err == nil
+				return err
+			}).Once()
+			noticeStore := new(notificationStoreMock)
+			sender := new(notificatorMock)
+			noticeStore.On("Save", mock.Anything, mock.MatchedBy(func(n *notification.Notification) bool {
+				return n.UserID == 20 && n.ResourceID == 1 && n.Type == notification.TypeJobRequestReceived && n.ResourceType == notification.ResourceJobRequest && n.CreatedAt.Equal(jobRequestTestClock{}.Now())
+			})).Run(func(args mock.Arguments) { require.True(t, committed) }).Return(&notification.Notification{ID: 7, UserID: 20, ResourceID: 1}, nil).Once()
+			sender.On("Notify", mock.Anything, mock.MatchedBy(func(n *notification.Notification) bool { return n.ID == 7 })).Return(nil).Once()
+			categoryID := 3
+			chats := &conversationRepo{foundConversation: &conversation.ChatBotConversation{
+				BaseConversation: conversation.RehydrateBaseConversation(7, conversation.TypeChatbot, "", time.Time{}, nil), ConsumerID: 10,
+				CurrentAssessment: &conversation.ProblemAssessment{ID: 9, Outcome: conversation.AssessmentProfessionalRequired, ProblemCategoryID: &categoryID, ProblemTitle: "Leak", ProblemDescription: "Repair"},
+			}}
+			service := jobrequest.NewService(unit, repo, newUserRepositoryMock(&consumerRepo{consumerID: 10}, &providerRepo{exists: true, categoryID: categoryID}), chats, fileServiceForJobRequestTest(), jobRequestTestClock{}, noticeStore, sender)
+			if fromAssessment {
+				_, err = service.CreateFromChatbotAssessment(t.Context(), "auth0|consumer", 7, 20)
+			} else {
+				_, err = service.Create(t.Context(), "auth0|consumer", 20, "Leak", "Repair", nil)
+			}
+			require.NoError(t, err)
+			noticeStore.AssertExpectations(t)
+			sender.AssertExpectations(t)
+			store.AssertExpectations(t)
+			unit.AssertExpectations(t)
+		})
+	}
+}
+
+func TestCreateJobRequestPropagatesNotificationFailures(t *testing.T) {
+	for _, phase := range []string{"commit", "save notification", "notify"} {
+		t.Run(phase, func(t *testing.T) {
+			failure := errors.New("unavailable")
+			repo := &jobRequestRepositoryMock{}
+			unit := newCreationUnitForTest(repo)
+			noticeStore := new(notificationStoreMock)
+			sender := new(notificatorMock)
+			if phase == "commit" {
+				unit = new(creationUnitMock)
+				unit.On("Execute", mock.Anything, mock.Anything).Return(failure).Once()
+			} else {
+				saveErr := error(nil)
+				if phase == "save notification" {
+					saveErr = failure
+				}
+				noticeStore.On("Save", mock.Anything, mock.Anything).Return(&notification.Notification{ID: 7}, saveErr).Once()
+				if phase == "notify" {
+					sender.On("Notify", mock.Anything, mock.Anything).Return(failure).Once()
+				}
+			}
+			service := jobrequest.NewService(unit, repo, newUserRepositoryMock(&consumerRepo{consumerID: 10}, &providerRepo{exists: true}), &conversationRepo{}, fileServiceForJobRequestTest(), jobRequestTestClock{}, noticeStore, sender)
+			result, err := service.Create(t.Context(), "auth0|consumer", 20, "Leak", "Repair", nil)
+			require.ErrorIs(t, err, failure)
+			require.Nil(t, result)
+			if phase == "commit" {
+				noticeStore.AssertNotCalled(t, "Save", mock.Anything, mock.Anything)
+			}
+			if phase != "notify" {
+				sender.AssertNotCalled(t, "Notify", mock.Anything, mock.Anything)
+			}
+			noticeStore.AssertExpectations(t)
+			sender.AssertExpectations(t)
+			unit.AssertExpectations(t)
+		})
+	}
 }

@@ -53,6 +53,7 @@ type bookingTermsResponse struct {
 }
 
 type realtimeNotificationEvent struct {
+	JobRequest   *jobRequestNoticeData    `json:"job_request"`
 	Type         string                   `json:"type"`
 	Notification realtimeNotificationData `json:"notification"`
 }
