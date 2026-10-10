@@ -7,7 +7,6 @@ Feature: Notificar solicitudes de trabajo en tiempo real y en el teléfono
         Given que Ana es una consumidora y Juan es un prestador registrados
         And existe un prestador registrado con correo "pedro.plomero@example.com", nombre "Pedro", apellido "Dib" y rubro "Plomería"
 
-    @wip
     Scenario: 39.1.1 El prestador destinatario recibe la notificación con la información de la solicitud
         Given que estoy autenticado como consumidor "ana@example.com"
         And que cargué y confirmé las imágenes de solicitud de trabajo: "perdida-bajo-mesada.jpg", "detalle-sifon.webp", "humedad-pared.png"
@@ -25,7 +24,6 @@ Feature: Notificar solicitudes de trabajo en tiempo real y en el teléfono
         And el consumidor "ana@example.com" no recibe la notificación de su propia solicitud de trabajo
         And el prestador "pedro.plomero@example.com" no recibe la notificación de esa solicitud de trabajo
 
-    @wip
     Scenario: 39.1.2 El prestador recibe en su teléfono un aviso de nueva solicitud
         Given que estoy autenticado como consumidor "ana@example.com"
         And que cargué y confirmé la imagen de solicitud de trabajo "fuga-cocina.jpg"
