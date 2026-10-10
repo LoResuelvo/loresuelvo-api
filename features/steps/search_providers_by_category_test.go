@@ -11,8 +11,6 @@ import (
 	"github.com/cucumber/godog"
 )
 
-const providerFilterAuth0ID = "auth0|provider-search-test"
-
 type providerSummaryResponse struct {
 	ID                   int    `json:"id"`
 	Name                 string `json:"name"`
@@ -105,7 +103,9 @@ func (suite *testSuite) requestProviderFilter(query url.Values) error {
 	if err != nil {
 		return err
 	}
-	httpReq.Header.Set("Authorization", "Bearer "+suite.tokenBuilder.BuildToken(providerFilterAuth0ID, nil))
+	if suite.currentAuth0ID != "" {
+		httpReq.Header.Set("Authorization", "Bearer "+suite.tokenBuilder.BuildToken(suite.currentAuth0ID, nil))
+	}
 
 	resp, err := http.DefaultClient.Do(httpReq)
 	if err != nil {

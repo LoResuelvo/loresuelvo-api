@@ -769,7 +769,7 @@ func TestRegisterProviderRechecksFreshCategoryBeforeSaving(t *testing.T) {
 		return operation(store)
 	}).Once()
 	store.On("FindCategory", mock.Anything, 1).Return(&category.Category{ID: 1, Name: "Plomería", Enabled: false, Version: 2}, nil).Once()
-	service := provider.NewService(unit, nil, repository, finder, &profilePhotoValidatorMock{}, nil, coverageZoneFinderWithDefaultZone())
+	service := provider.NewService(unit, nil, repository, finder, &profilePhotoValidatorMock{}, nil, coverageZoneFinderWithDefaultZone(), nil)
 	result, err := service.RegisterProvider(t.Context(), "auth0|provider", "juan@example.com", "Juan", "Gomez", 1, "photo", []int{6})
 	require.ErrorIs(t, err, category.ErrDisabled)
 	require.Nil(t, result)
@@ -797,7 +797,7 @@ func TestRegisterProviderDoesNotExposeIDWhenCommitFails(t *testing.T) {
 		toSave.SetPersistenceID(17)
 		return toSave, nil
 	}).Once()
-	service := provider.NewService(unit, nil, repository, finder, &profilePhotoValidatorMock{}, nil, coverageZoneFinderWithDefaultZone())
+	service := provider.NewService(unit, nil, repository, finder, &profilePhotoValidatorMock{}, nil, coverageZoneFinderWithDefaultZone(), nil)
 	result, err := service.RegisterProvider(t.Context(), "auth0|provider", "juan@example.com", "Juan", "Gomez", 1, "photo", []int{6})
 	require.ErrorIs(t, err, failure)
 	require.Nil(t, result)

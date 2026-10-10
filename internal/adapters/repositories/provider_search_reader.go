@@ -19,7 +19,14 @@ func NewProviderSearchReader(database *sql.DB) *ProviderSearchReader {
 }
 
 const providerSearchSQL = `WITH selected_providers AS (
- SELECT user_id FROM providers WHERE category_id = $1
+ SELECT p.user_id FROM providers p WHERE p.category_id = $1
+ AND EXISTS (
+  SELECT 1 FROM provider_coverage_zones pc
+  JOIN coverage_zones z ON z.id = pc.coverage_zone_id
+  JOIN coverage_markets m ON m.id = z.market_id
+  WHERE pc.provider_id = p.user_id AND pc.coverage_zone_id = $2
+   AND z.enabled = TRUE AND m.enabled = TRUE
+ )
 ), zones AS (
  SELECT pc.provider_id, json_agg(z ORDER BY z."ID") AS coverage_zones
  FROM selected_providers p
@@ -57,8 +64,8 @@ LEFT JOIN ratings r ON r.provider_id = p.user_id
 LEFT JOIN identities i ON i.provider_id = p.user_id
 ORDER BY u.name ASC, u.surname ASC`
 
-func (reader *ProviderSearchReader) FindByCategoryID(ctx context.Context, categoryID int) ([]readmodel.ProviderSearchResult, error) {
-	rows, err := reader.db.QueryContext(ctx, providerSearchSQL, categoryID)
+func (reader *ProviderSearchReader) FindByCategoryAndCoverageZoneID(ctx context.Context, categoryID, coverageZoneID int) ([]readmodel.ProviderSearchResult, error) {
+	rows, err := reader.db.QueryContext(ctx, providerSearchSQL, categoryID, coverageZoneID)
 	if err != nil {
 		return nil, fmt.Errorf("finding providers for search: %w", err)
 	}

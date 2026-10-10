@@ -275,6 +275,7 @@ func newDependencies(database *sql.DB, adapters dependencyAdapters) (*Dependenci
 		fileService,
 		persistence.WorkOrderRepository,
 		persistence.CoverageZoneRepository,
+		persistence.UserRepository,
 		persistence.IdentityVerificationRepository,
 	)
 	activityService := provider.NewActivityService(persistence.ProviderActivityReader, persistence.ProviderActivityActorFinder, systemClock)

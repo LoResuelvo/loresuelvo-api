@@ -338,7 +338,7 @@ func (router *Router) registerConsumerRoutes(engine *gin.Engine, authMiddleware 
 }
 
 func (router *Router) registerProviderRoutes(engine *gin.Engine, authMiddleware gin.HandlerFunc) {
-	engine.GET("/providers", router.providerHandler.FilterProvidersByCategory)
+	engine.GET("/providers", authMiddleware, router.providerHandler.FilterProvidersByCategory)
 	engine.GET("/providers/me/statistics/reputation", privateNoStore, authMiddleware, router.reputationHandler.Get)
 	engine.GET("/providers/me/statistics/activity", privateNoStore, authMiddleware, router.activityHandler.Get)
 	engine.GET("/providers/me/statistics/conversion", privateNoStore, authMiddleware, router.conversionHandler.Get)

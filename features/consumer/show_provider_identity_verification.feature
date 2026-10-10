@@ -19,6 +19,8 @@ Feature: Mostrar la verificación de identidad de un prestador
 
         Scenario: 59.2 Mostrar la insignia en la búsqueda de prestadores aprobados
             Given que la identidad de "juan.plomero@example.com" está aprobada
+            And que existe un consumidor registrado con correo "ana@example.com", nombre "Ana" y apellido "Pérez"
+            And que estoy autenticado como consumidor "ana@example.com"
             When busco prestadores del rubro "Plomería"
             Then "juan.plomero@example.com" figura con identidad verificada
 
@@ -31,6 +33,8 @@ Feature: Mostrar la verificación de identidad de un prestador
 
         Scenario: 59.4 Mantener visible a un prestador no aprobado
             Given que la verificación de "juan.plomero@example.com" está en estado "declined"
+            And que existe un consumidor registrado con correo "ana@example.com", nombre "Ana" y apellido "Pérez"
+            And que estoy autenticado como consumidor "ana@example.com"
             When busco prestadores del rubro "Plomería"
             Then "juan.plomero@example.com" continúa apareciendo
             And figura sin identidad verificada

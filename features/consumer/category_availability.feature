@@ -12,6 +12,7 @@ Feature: Descubrir prestadores y continuar solicitudes según la disponibilidad 
 
         Scenario: 38.2.20-BR No ofrecer prestadores al buscar por el identificador de un rubro deshabilitado
             Given que el rubro "Plomería" se deshabilitó después del registro de "juan.plomero@example.com"
+            And que estoy autenticado como consumidor "ana@example.com"
             When filtro técnicos usando el identificador guardado del rubro "Plomería"
             Then el sistema muestra un listado de técnicos vacío
 
@@ -56,5 +57,6 @@ Feature: Descubrir prestadores y continuar solicitudes según la disponibilidad 
 
         Scenario: 38.2.24-BR Volver a ofrecer prestadores después de reactivar el mismo rubro
             Given que el rubro "Plomería" se deshabilitó y luego se reactivó con el mismo identificador
+            And que estoy autenticado como consumidor "ana@example.com"
             When filtro técnicos usando el identificador guardado del rubro "Plomería"
             Then el sistema muestra al técnico "Juan Gómez"

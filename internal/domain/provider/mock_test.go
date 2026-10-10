@@ -3,6 +3,8 @@ package provider_test
 import (
 	"context"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/category"
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/consumer"
+	coveragezone "github.com/LoResuelvo/loresuelvo-api/internal/domain/coverage_zone"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/user"
 	"time"
 
@@ -89,8 +91,8 @@ func (reader *providerProfileReaderMock) FindPaidWorkHistoryByProviderID(_ conte
 
 type providerSearchReaderMock struct{ mock.Mock }
 
-func (reader *providerSearchReaderMock) FindByCategoryID(ctx context.Context, categoryID int) ([]readmodel.ProviderSearchResult, error) {
-	args := reader.Called(ctx, categoryID)
+func (reader *providerSearchReaderMock) FindByCategoryAndCoverageZoneID(ctx context.Context, categoryID, coverageZoneID int) ([]readmodel.ProviderSearchResult, error) {
+	args := reader.Called(ctx, categoryID, coverageZoneID)
 	return args.Get(0).([]readmodel.ProviderSearchResult), args.Error(1)
 }
 
@@ -150,5 +152,19 @@ func newProviderServiceForTest(search provider.ProviderSearchReader, repository 
 	})
 	store.On("FindCategory", mock.Anything, mock.Anything).Return(func(ctx context.Context, id int) (*category.Category, error) { return finder.FindByID(ctx, id) })
 	store.On("SaveUser", mock.Anything, mock.Anything).Return(func(ctx context.Context, toSave user.User) (user.User, error) { return repository.Save(ctx, toSave) })
-	return provider.NewService(unit, search, repository, finder, files, profiles, zones, identities...)
+	return provider.NewService(unit, search, repository, finder, files, profiles, zones, nil, identities...)
+}
+
+type consumerFinderMock struct{ mock.Mock }
+
+func (finder *consumerFinderMock) FindConsumerByAuthID(ctx context.Context, authID string) (*consumer.Consumer, error) {
+	args := finder.Called(ctx, authID)
+	found, _ := args.Get(0).(*consumer.Consumer)
+	return found, args.Error(1)
+}
+func searchConsumerFinder(ctx context.Context, authID string, zoneID int) *consumerFinderMock {
+	finder := new(consumerFinderMock)
+	found := consumer.RehydrateConsumer(nil, consumer.Address{}, consumer.GeoPoint{}, coveragezone.CoverageZone{ID: zoneID})
+	finder.On("FindConsumerByAuthID", ctx, authID).Return(found, nil).Once()
+	return finder
 }

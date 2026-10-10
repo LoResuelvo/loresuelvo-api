@@ -46,13 +46,18 @@ func (h *ProviderHandler) RegisterProvider(c *gin.Context) {
 }
 
 func (h *ProviderHandler) FilterProvidersByCategory(c *gin.Context) {
+	authID, ok := httphandler.GetAuthenticatedUserID(c)
+	if !ok {
+		return
+	}
+
 	categoryID, err := categoryIDFromQuery(c)
 	if err != nil {
 		httphandler.RespondError(c, http.StatusBadRequest, err.Error())
 		return
 	}
 
-	providers, err := h.providerService.SearchProvidersByCategoryID(c.Request.Context(), categoryID)
+	providers, err := h.providerService.SearchProvidersByCategoryID(c.Request.Context(), authID, categoryID)
 	if err != nil {
 		handleFilterProvidersError(c, err)
 		return

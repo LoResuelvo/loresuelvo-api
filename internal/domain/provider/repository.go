@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/category"
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/consumer"
 	coveragezone "github.com/LoResuelvo/loresuelvo-api/internal/domain/coverage_zone"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/provider/read_model"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/user"
@@ -35,7 +36,7 @@ type IdentityApprovalReader interface {
 }
 
 type ProviderSearchReader interface {
-	FindByCategoryID(ctx context.Context, categoryID int) ([]readmodel.ProviderSearchResult, error)
+	FindByCategoryAndCoverageZoneID(ctx context.Context, categoryID, coverageZoneID int) ([]readmodel.ProviderSearchResult, error)
 }
 
 type RegistrationStore interface {
@@ -44,4 +45,8 @@ type RegistrationStore interface {
 }
 type RegistrationUnitOfWork interface {
 	Execute(ctx context.Context, operation func(RegistrationStore) error) error
+}
+
+type ConsumerFinder interface {
+	FindConsumerByAuthID(ctx context.Context, authID string) (*consumer.Consumer, error)
 }

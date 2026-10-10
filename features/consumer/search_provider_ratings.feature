@@ -15,6 +15,7 @@ Feature: US-30.1 - Ver reputación en la búsqueda de prestadores
     Rule: Cada resultado informa el resumen de reputación del prestador
 
         Scenario: 30.1.1-RSP Informar resumen cero para un prestador sin reviews
+            Given que estoy autenticado como consumidor "ana@example.com"
             When filtro técnicos por el rubro "Plomería"
             Then el resultado del prestador "Juan Pérez" informa un promedio de rating de 0 y una cantidad de ratings de 0
 
@@ -33,6 +34,7 @@ Feature: US-30.1 - Ver reputación en la búsqueda de prestadores
             And que el prestador "juan.plomero@example.com" informó la finalización con evidencia válida de la orden
             And que el pago aprobado del saldo dejó la orden de trabajo pagada por completo
             And que la orden ya tiene una reseña de 4 estrellas
+            Given que estoy autenticado como consumidor "ana@example.com"
             When filtro técnicos por el rubro "Plomería"
             Then el resultado del prestador "Juan Pérez" informa un promedio de rating de 4.5 y una cantidad de ratings de 2
 
@@ -53,6 +55,7 @@ Feature: US-30.1 - Ver reputación en la búsqueda de prestadores
             And que el prestador "pedro.plomero@example.com" informó la finalización con evidencia válida de la orden
             And que el pago aprobado del saldo dejó la orden de trabajo pagada por completo
             And que la orden ya tiene una reseña de 2 estrellas
+            Given que estoy autenticado como consumidor "ana@example.com"
             When filtro técnicos por el rubro "Plomería"
             Then el resultado del prestador "Juan Pérez" informa un promedio de rating de 5 y una cantidad de ratings de 1
             And el resultado del prestador "Pedro Dib" informa un promedio de rating de 2 y una cantidad de ratings de 1

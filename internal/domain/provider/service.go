@@ -15,6 +15,7 @@ import (
 type Service struct {
 	registrationUnit       RegistrationUnitOfWork
 	searchReader           ProviderSearchReader
+	consumerFinder         ConsumerFinder
 	userRepository         UserRepository
 	categoryFinder         CategoryFinder
 	coverageZoneFinder     CoverageZoneFinder
@@ -31,11 +32,13 @@ func NewService(
 	fileService FileService,
 	profileReader ProviderProfileReader,
 	coverageZoneFinder CoverageZoneFinder,
+	consumerFinder ConsumerFinder,
 	identityApprovalReaders ...IdentityApprovalReader,
 ) *Service {
 	service := &Service{
 		registrationUnit:   registrationUnit,
 		searchReader:       searchReader,
+		consumerFinder:     consumerFinder,
 		userRepository:     repository,
 		categoryFinder:     categoryFinder,
 		coverageZoneFinder: coverageZoneFinder,
@@ -176,7 +179,7 @@ func (s *Service) FilterProvidersByCategoryID(ctx context.Context, categoryID in
 	return WithProfilePhotoURLs(providers, profilePhotoURLs), nil
 }
 
-func (s *Service) SearchProvidersByCategoryID(ctx context.Context, categoryID int) ([]readmodel.ProviderSearchResult, error) {
+func (s *Service) SearchProvidersByCategoryID(ctx context.Context, authID string, categoryID int) ([]readmodel.ProviderSearchResult, error) {
 	current, err := s.validateCategory(ctx, categoryID)
 	if err != nil {
 		return nil, err
@@ -187,7 +190,11 @@ func (s *Service) SearchProvidersByCategoryID(ctx context.Context, categoryID in
 	if s.searchReader == nil {
 		return nil, ErrSearchReaderNotConfigured
 	}
-	results, err := s.searchReader.FindByCategoryID(ctx, categoryID)
+	foundConsumer, err := s.consumerFinder.FindConsumerByAuthID(ctx, authID)
+	if err != nil {
+		return nil, fmt.Errorf("finding consumer for provider search: %w", err)
+	}
+	results, err := s.searchReader.FindByCategoryAndCoverageZoneID(ctx, categoryID, foundConsumer.CoverageZone().ID)
 	if err != nil {
 		return nil, fmt.Errorf("finding providers for search: %w", err)
 	}
