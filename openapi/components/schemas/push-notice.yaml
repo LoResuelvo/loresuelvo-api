@@ -41,6 +41,7 @@ properties:
     type: string
     enum:
       - conversation.message.created
+      - job_request_received
       - service_proposal_received
       - service_proposal_accepted
       - work_order_close_to_scheduled_time
@@ -48,15 +49,15 @@ properties:
       - work_order_final_payment_approved
   resource_type:
     type: string
-    enum: [conversation, service_proposal, work_order]
-    description: Conversation for chat, proposal for a received proposal, and work order for the other four service notices.
+    enum: [conversation, job_request, service_proposal, work_order]
+    description: Conversation for chat, job request for a new request, proposal for a received proposal, and work order for the other service notices.
   resource_id:
     type: string
     pattern: '^[1-9][0-9]*$'
-    description: ID of the conversation, proposal, or work order to open. Proposal acceptance references the generated order here.
+    description: ID of the conversation, job request, proposal, or work order to open. Proposal acceptance references the generated order here.
   destination:
     type: string
-    enum: [conversation, service_proposal, work_order]
+    enum: [conversation, job_request, service_proposal, work_order]
     description: Destination screen, equal to resource_type in version 1.
   recipient_user_id:
     type: string
@@ -75,11 +76,11 @@ properties:
   title:
     type: string
     minLength: 1
-    description: API-owned constant template in the installation's es/en language, Spanish by default. Show this text without rebuilding it from chat data.
+    description: API-owned constant template in the installation's es/en language, Spanish by default. For job_request_received it is "Nueva solicitud de trabajo" (es) or "New job request" (en). Show this text without rebuilding it from request data.
   body:
     type: string
     minLength: 1
-    description: API-owned safe template. Contains no chat content, names, addresses, amounts, or private links. Final payment approval does not imply withdrawable funds.
+    description: API-owned safe template. For job_request_received it is "Recibiste una solicitud de trabajo." (es) or "You received a job request." (en); it contains no consumer or request details or private image links. Other templates contain no chat content, names, addresses, amounts, or private links. Final payment approval does not imply withdrawable funds.
   expires_at:
     type: string
     format: date-time
@@ -99,3 +100,17 @@ example:
   title: Pago final confirmado
   body: Se aprobó el pago del saldo de tu servicio.
   expires_at: '2026-10-07T12:00:00Z'
+examples:
+- version: '1'
+  event_id: notification:job_request_received:16
+  type: job_request_received
+  resource_type: job_request
+  resource_id: '31'
+  destination: job_request
+  recipient_user_id: '7'
+  recipient_app: provider
+  installation_id: 1d6c97bd-1d7d-4f17-8816-4d08e2b13d27
+  binding_id: aa2e943d-51ed-4a48-85a5-1d817ce26110
+  title: Nueva solicitud de trabajo
+  body: Recibiste una solicitud de trabajo.
+  expires_at: '2026-10-11T12:00:00Z'

@@ -237,6 +237,13 @@ paths:
         existing service_proposal resource here; its FCM notice opens the
         generated work_order instead.
 
+        When a consumer creates a job request, `job_request_received` is sent
+        only to the provider assigned to it. The `notification` identifies the
+        `job_request`; the event also includes a `job_request` object using the
+        pending JobRequestSummary shape (requester, title, description, status,
+        and images). This detail is available through the authenticated realtime
+        channel, not in the phone notice.
+
         **Conversation message event:**
         ```json
         {
@@ -264,6 +271,58 @@ paths:
             "read_at": null,
             "created_at": "2026-07-04T13:00:00Z"
           }
+        }
+        ```
+
+        **New job request notification event:**
+        ```json
+        {
+          "type": "notification.created",
+          "notification": {
+            "id": 16,
+            "user_id": 7,
+            "type": "job_request_received",
+            "resource_type": "job_request",
+            "resource_id": 31,
+            "read_at": null,
+            "created_at": "2026-10-10T12:00:00Z"
+          },
+          "job_request": {
+            "id": 31,
+            "conversation_id": 123,
+            "title": "Reparación de fuga en la cocina",
+            "description": "Hola Juan, necesito reparar una fuga de agua en la cocina.",
+            "status": "pending",
+            "requester": {"name": "Ana", "surname": "Gomez"},
+            "images": [{
+              "id": "4af47f1b-97b6-4b32-baa0-b95d6077f919",
+              "url": "https://cdn.example/private/job-request-image.jpg?signature=temporary",
+              "original_name": "fuga-cocina.jpg"
+            }]
+          }
+        }
+        ```
+
+        The provider also receives a data-only FCM `PushNotice` for registered
+        phones. It uses `type` `job_request_received` and
+        `resource_type`/`destination` `job_request`,
+        with the request ID as `resource_id`; its text is a fixed, localized
+        notice and does not include requester or request details:
+        ```json
+        {
+          "version": "1",
+          "event_id": "notification:job_request_received:16",
+          "type": "job_request_received",
+          "resource_type": "job_request",
+          "resource_id": "31",
+          "destination": "job_request",
+          "recipient_user_id": "7",
+          "recipient_app": "provider",
+          "installation_id": "1d6c97bd-1d7d-4f17-8816-4d08e2b13d27",
+          "binding_id": "aa2e943d-51ed-4a48-85a5-1d817ce26110",
+          "title": "Nueva solicitud de trabajo",
+          "body": "Recibiste una solicitud de trabajo.",
+          "expires_at": "2026-10-11T12:00:00Z"
         }
         ```
       tags:

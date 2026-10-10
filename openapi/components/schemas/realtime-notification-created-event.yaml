@@ -1,5 +1,5 @@
 type: object
-description: Event emitted when a notification is created for the connected user.
+description: Event emitted when a notification is created for the connected user. For job_request_received, only the provider assigned to the request receives the additional job_request details.
 required:
   - type
   - notification
@@ -10,4 +10,30 @@ properties:
     example: notification.created
   notification:
     $ref: '#/components/schemas/RealtimeNotification'
+  job_request:
+    description: Present for job_request_received; the pending request details sent to its assigned provider.
+    $ref: '#/components/schemas/JobRequestSummary'
 additionalProperties: false
+example:
+  type: notification.created
+  notification:
+    id: 16
+    user_id: 7
+    type: job_request_received
+    resource_type: job_request
+    resource_id: 31
+    read_at: null
+    created_at: '2026-10-10T12:00:00Z'
+  job_request:
+    id: 31
+    conversation_id: 123
+    title: Reparación de fuga en la cocina
+    description: Hola Juan, necesito reparar una fuga de agua en la cocina.
+    status: pending
+    requester:
+      name: Ana
+      surname: Gomez
+    images:
+    - id: 4af47f1b-97b6-4b32-baa0-b95d6077f919
+      url: https://cdn.example/private/job-request-image.jpg?signature=temporary
+      original_name: fuga-cocina.jpg

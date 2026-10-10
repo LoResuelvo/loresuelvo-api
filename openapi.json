@@ -9179,7 +9179,7 @@
                 ],
                 "operationId": "createJobRequestFromChatbotAssessment",
                 "summary": "Contact a provider from a chatbot assessment",
-                "description": "Creates a pending job request and work conversation using an immutable copy of the authenticated consumer's current professional assessment. A provider from a recommendation saved before its category was disabled cannot be contacted for a new request; the category is checked again when this operation is persisted. Existing negotiations remain unaffected.",
+                "description": "Creates a pending job request and work conversation using an immutable copy of the authenticated consumer's current professional assessment. A provider from a recommendation saved before its category was disabled cannot be contacted for a new request; the category is checked again when this operation is persisted. Existing negotiations remain unaffected. After the job request and conversation are committed, the API persists a `job_request_received` notification for the assigned provider and attempts delivery through the existing realtime and phone-notice channels.",
                 "security": [
                     {
                         "BearerAuth": []
@@ -9272,7 +9272,7 @@
                         }
                     },
                     "500": {
-                        "description": "Unexpected error.",
+                        "description": "Unexpected error. Notification persistence or realtime dispatch may fail after the job request and conversation have already committed, so this response does not imply they were rolled back. Phone-notice delivery is best-effort and does not roll back the request.",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -9366,7 +9366,7 @@
                 ],
                 "operationId": "createJobRequest",
                 "summary": "Create a job request",
-                "description": "Creates a job request from the authenticated consumer to a provider and links it to a pending conversation. The provider's current category must be enabled when the request is persisted; disabling a category does not cancel requests and negotiations that already exist.",
+                "description": "Creates a job request from the authenticated consumer to a provider and links it to a pending conversation. The provider's current category must be enabled when the request is persisted; disabling a category does not cancel requests and negotiations that already exist. After the job request and conversation are committed, the API persists a `job_request_received` notification for the assigned provider and attempts delivery through the existing realtime and phone-notice channels.",
                 "security": [
                     {
                         "BearerAuth": []
@@ -9524,7 +9524,7 @@
                         }
                     },
                     "500": {
-                        "description": "Unexpected error while creating the job request.",
+                        "description": "Unexpected error while creating the job request. Notification persistence or realtime dispatch may fail after the job request and conversation have already committed, so this response does not imply they were rolled back. Phone-notice delivery is best-effort and does not roll back the request.",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -11692,7 +11692,7 @@
         "/ws": {
             "get": {
                 "summary": "WebSocket for realtime events",
-                "description": "Establishes a WebSocket connection for realtime event delivery.\nThe client must first request a ticket with `POST /ws-tickets`, then open\n`/ws?ticket={ticket}&role={consumer|provider}`. The ticket is one-time use.\n\nOnce connected, the client receives realtime events for activity relevant\nto the authenticated user and selected role, preserving screen updates.\nSystem notices use the independent data-only FCM contract in PushNotice.\nAndroid decides whether to show a notice per installation and current\nlogin; a connected WebSocket does not suppress FCM delivery.\n\nThe new work_order_final_payment_approved notification is emitted only\nto the provider after verified balance approval and committed paid order\nstate. Its resource_type is work_order. Proposal acceptance keeps its\nexisting service_proposal resource here; its FCM notice opens the\ngenerated work_order instead.\n\n**Conversation message event:**\n```json\n{\n  \"type\": \"conversation.message.created\",\n  \"conversation_id\": 123,\n  \"message\": {\n    \"id\": 456,\n    \"sender_role\": \"consumer\",\n    \"content\": \"Hola, necesito un presupuesto\",\n    \"created_on\": \"2026-06-04T12:00:00Z\"\n  }\n}\n```\n\n**Notification created event:**\n```json\n{\n  \"type\": \"notification.created\",\n  \"notification\": {\n    \"id\": 15,\n    \"user_id\": 1,\n    \"type\": \"service_proposal_received\",\n    \"resource_type\": \"service_proposal\",\n    \"resource_id\": 10,\n    \"read_at\": null,\n    \"created_at\": \"2026-07-04T13:00:00Z\"\n  }\n}\n```\n",
+                "description": "Establishes a WebSocket connection for realtime event delivery.\nThe client must first request a ticket with `POST /ws-tickets`, then open\n`/ws?ticket={ticket}&role={consumer|provider}`. The ticket is one-time use.\n\nOnce connected, the client receives realtime events for activity relevant\nto the authenticated user and selected role, preserving screen updates.\nSystem notices use the independent data-only FCM contract in PushNotice.\nAndroid decides whether to show a notice per installation and current\nlogin; a connected WebSocket does not suppress FCM delivery.\n\nThe new work_order_final_payment_approved notification is emitted only\nto the provider after verified balance approval and committed paid order\nstate. Its resource_type is work_order. Proposal acceptance keeps its\nexisting service_proposal resource here; its FCM notice opens the\ngenerated work_order instead.\n\nWhen a consumer creates a job request, `job_request_received` is sent\nonly to the provider assigned to it. The `notification` identifies the\n`job_request`; the event also includes a `job_request` object using the\npending JobRequestSummary shape (requester, title, description, status,\nand images). This detail is available through the authenticated realtime\nchannel, not in the phone notice.\n\n**Conversation message event:**\n```json\n{\n  \"type\": \"conversation.message.created\",\n  \"conversation_id\": 123,\n  \"message\": {\n    \"id\": 456,\n    \"sender_role\": \"consumer\",\n    \"content\": \"Hola, necesito un presupuesto\",\n    \"created_on\": \"2026-06-04T12:00:00Z\"\n  }\n}\n```\n\n**Notification created event:**\n```json\n{\n  \"type\": \"notification.created\",\n  \"notification\": {\n    \"id\": 15,\n    \"user_id\": 1,\n    \"type\": \"service_proposal_received\",\n    \"resource_type\": \"service_proposal\",\n    \"resource_id\": 10,\n    \"read_at\": null,\n    \"created_at\": \"2026-07-04T13:00:00Z\"\n  }\n}\n```\n\n**New job request notification event:**\n```json\n{\n  \"type\": \"notification.created\",\n  \"notification\": {\n    \"id\": 16,\n    \"user_id\": 7,\n    \"type\": \"job_request_received\",\n    \"resource_type\": \"job_request\",\n    \"resource_id\": 31,\n    \"read_at\": null,\n    \"created_at\": \"2026-10-10T12:00:00Z\"\n  },\n  \"job_request\": {\n    \"id\": 31,\n    \"conversation_id\": 123,\n    \"title\": \"Reparación de fuga en la cocina\",\n    \"description\": \"Hola Juan, necesito reparar una fuga de agua en la cocina.\",\n    \"status\": \"pending\",\n    \"requester\": {\"name\": \"Ana\", \"surname\": \"Gomez\"},\n    \"images\": [{\n      \"id\": \"4af47f1b-97b6-4b32-baa0-b95d6077f919\",\n      \"url\": \"https://cdn.example/private/job-request-image.jpg?signature=temporary\",\n      \"original_name\": \"fuga-cocina.jpg\"\n    }]\n  }\n}\n```\n\nThe provider also receives a data-only FCM `PushNotice` for registered\nphones. It uses `type` `job_request_received` and\n`resource_type`/`destination` `job_request`,\nwith the request ID as `resource_id`; its text is a fixed, localized\nnotice and does not include requester or request details:\n```json\n{\n  \"version\": \"1\",\n  \"event_id\": \"notification:job_request_received:16\",\n  \"type\": \"job_request_received\",\n  \"resource_type\": \"job_request\",\n  \"resource_id\": \"31\",\n  \"destination\": \"job_request\",\n  \"recipient_user_id\": \"7\",\n  \"recipient_app\": \"provider\",\n  \"installation_id\": \"1d6c97bd-1d7d-4f17-8816-4d08e2b13d27\",\n  \"binding_id\": \"aa2e943d-51ed-4a48-85a5-1d817ce26110\",\n  \"title\": \"Nueva solicitud de trabajo\",\n  \"body\": \"Recibiste una solicitud de trabajo.\",\n  \"expires_at\": \"2026-10-11T12:00:00Z\"\n}\n```\n",
                 "tags": [
                     "Realtime"
                 ],
@@ -21041,7 +21041,7 @@
             },
             "JobRequestSummary": {
                 "type": "object",
-                "description": "Pending job request item returned for the authenticated user.",
+                "description": "Pending job request summary returned for an authenticated participant and included in the realtime notification sent to its assigned provider.",
                 "required": [
                     "id",
                     "conversation_id",
@@ -22983,6 +22983,7 @@
                             "service_proposal_received",
                             "service_proposal_accepted",
                             "service_proposal_rejected",
+                            "job_request_received",
                             "work_order_close_to_scheduled_time",
                             "work_order_completion_reported",
                             "work_order_final_payment_approved"
@@ -22993,6 +22994,7 @@
                         "type": "string",
                         "enum": [
                             "service_proposal",
+                            "job_request",
                             "work_order"
                         ],
                         "example": "service_proposal"
@@ -23031,7 +23033,7 @@
             },
             "RealtimeNotificationCreatedEvent": {
                 "type": "object",
-                "description": "Event emitted when a notification is created for the connected user.",
+                "description": "Event emitted when a notification is created for the connected user. For job_request_received, only the provider assigned to the request receives the additional job_request details.",
                 "required": [
                     "type",
                     "notification"
@@ -23044,9 +23046,43 @@
                     },
                     "notification": {
                         "$ref": "#/components/schemas/RealtimeNotification"
+                    },
+                    "job_request": {
+                        "description": "Present for job_request_received; the pending request details sent to its assigned provider.",
+                        "$ref": "#/components/schemas/JobRequestSummary"
                     }
                 },
-                "additionalProperties": false
+                "additionalProperties": false,
+                "example": {
+                    "type": "notification.created",
+                    "notification": {
+                        "id": 16,
+                        "user_id": 7,
+                        "type": "job_request_received",
+                        "resource_type": "job_request",
+                        "resource_id": 31,
+                        "read_at": null,
+                        "created_at": "2026-10-10T12:00:00Z"
+                    },
+                    "job_request": {
+                        "id": 31,
+                        "conversation_id": 123,
+                        "title": "Reparación de fuga en la cocina",
+                        "description": "Hola Juan, necesito reparar una fuga de agua en la cocina.",
+                        "status": "pending",
+                        "requester": {
+                            "name": "Ana",
+                            "surname": "Gomez"
+                        },
+                        "images": [
+                            {
+                                "id": "4af47f1b-97b6-4b32-baa0-b95d6077f919",
+                                "url": "https://cdn.example/private/job-request-image.jpg?signature=temporary",
+                                "original_name": "fuga-cocina.jpg"
+                            }
+                        ]
+                    }
+                }
             },
             "InstallationRegistrationRequest": {
                 "type": "object",
@@ -23210,6 +23246,7 @@
                         "type": "string",
                         "enum": [
                             "conversation.message.created",
+                            "job_request_received",
                             "service_proposal_received",
                             "service_proposal_accepted",
                             "work_order_close_to_scheduled_time",
@@ -23221,20 +23258,22 @@
                         "type": "string",
                         "enum": [
                             "conversation",
+                            "job_request",
                             "service_proposal",
                             "work_order"
                         ],
-                        "description": "Conversation for chat, proposal for a received proposal, and work order for the other four service notices."
+                        "description": "Conversation for chat, job request for a new request, proposal for a received proposal, and work order for the other service notices."
                     },
                     "resource_id": {
                         "type": "string",
                         "pattern": "^[1-9][0-9]*$",
-                        "description": "ID of the conversation, proposal, or work order to open. Proposal acceptance references the generated order here."
+                        "description": "ID of the conversation, job request, proposal, or work order to open. Proposal acceptance references the generated order here."
                     },
                     "destination": {
                         "type": "string",
                         "enum": [
                             "conversation",
+                            "job_request",
                             "service_proposal",
                             "work_order"
                         ],
@@ -23264,12 +23303,12 @@
                     "title": {
                         "type": "string",
                         "minLength": 1,
-                        "description": "API-owned constant template in the installation's es/en language, Spanish by default. Show this text without rebuilding it from chat data."
+                        "description": "API-owned constant template in the installation's es/en language, Spanish by default. For job_request_received it is \"Nueva solicitud de trabajo\" (es) or \"New job request\" (en). Show this text without rebuilding it from request data."
                     },
                     "body": {
                         "type": "string",
                         "minLength": 1,
-                        "description": "API-owned safe template. Contains no chat content, names, addresses, amounts, or private links. Final payment approval does not imply withdrawable funds."
+                        "description": "API-owned safe template. For job_request_received it is \"Recibiste una solicitud de trabajo.\" (es) or \"You received a job request.\" (en); it contains no consumer or request details or private image links. Other templates contain no chat content, names, addresses, amounts, or private links. Final payment approval does not imply withdrawable funds."
                     },
                     "expires_at": {
                         "type": "string",
@@ -23292,7 +23331,24 @@
                     "title": "Pago final confirmado",
                     "body": "Se aprobó el pago del saldo de tu servicio.",
                     "expires_at": "2026-10-07T12:00:00Z"
-                }
+                },
+                "examples": [
+                    {
+                        "version": "1",
+                        "event_id": "notification:job_request_received:16",
+                        "type": "job_request_received",
+                        "resource_type": "job_request",
+                        "resource_id": "31",
+                        "destination": "job_request",
+                        "recipient_user_id": "7",
+                        "recipient_app": "provider",
+                        "installation_id": "1d6c97bd-1d7d-4f17-8816-4d08e2b13d27",
+                        "binding_id": "aa2e943d-51ed-4a48-85a5-1d817ce26110",
+                        "title": "Nueva solicitud de trabajo",
+                        "body": "Recibiste una solicitud de trabajo.",
+                        "expires_at": "2026-10-11T12:00:00Z"
+                    }
+                ]
             }
         }
     }

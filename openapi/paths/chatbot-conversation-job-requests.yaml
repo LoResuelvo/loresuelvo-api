@@ -16,7 +16,10 @@ post:
     of the authenticated consumer's current professional assessment. A provider
     from a recommendation saved before its category was disabled cannot be
     contacted for a new request; the category is checked again when this
-    operation is persisted. Existing negotiations remain unaffected.
+    operation is persisted. Existing negotiations remain unaffected. After the
+    job request and conversation are committed, the API persists a
+    `job_request_received` notification for the assigned provider and attempts
+    delivery through the existing realtime and phone-notice channels.
   security:
   - BearerAuth: []
   requestBody:
@@ -75,7 +78,11 @@ post:
               value:
                 error: Category is disabled
     '500':
-      description: Unexpected error.
+      description: >-
+        Unexpected error. Notification persistence or realtime dispatch may fail
+        after the job request and conversation have already committed, so this
+        response does not imply they were rolled back. Phone-notice delivery is
+        best-effort and does not roll back the request.
       content:
         application/json:
           schema:

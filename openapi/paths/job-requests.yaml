@@ -53,7 +53,10 @@ post:
     Creates a job request from the authenticated consumer to a provider and
     links it to a pending conversation. The provider's current category must be
     enabled when the request is persisted; disabling a category does not cancel
-    requests and negotiations that already exist.
+    requests and negotiations that already exist. After the job request and
+    conversation are committed, the API persists a `job_request_received`
+    notification for the assigned provider and attempts delivery through the
+    existing realtime and phone-notice channels.
   security:
   - BearerAuth: []
   requestBody:
@@ -154,7 +157,11 @@ post:
               value:
                 error: Category is disabled
     '500':
-      description: Unexpected error while creating the job request.
+      description: >-
+        Unexpected error while creating the job request. Notification persistence
+        or realtime dispatch may fail after the job request and conversation have
+        already committed, so this response does not imply they were rolled back.
+        Phone-notice delivery is best-effort and does not roll back the request.
       content:
         application/json:
           schema:

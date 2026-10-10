@@ -70,6 +70,7 @@ active chat only on that installation. WebSocket continues updating screens.
 | Confirmed trigger / push type | Recipient | FCM destination |
 | --- | --- | --- |
 | New text/image/audio/video message / `conversation.message.created` | Counterpart, excluding author | Conversation |
+| New job request / `job_request_received` | Assigned provider only | Job request |
 | Proposal received / `service_proposal_received` | Consumer | Proposal |
 | Verified deposit and accepted proposal / `service_proposal_accepted` | Provider | Generated work order |
 | Existing appointment reminder rule / `work_order_close_to_scheduled_time` | Both participants | Work order |

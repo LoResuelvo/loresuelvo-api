@@ -1,5 +1,5 @@
 type: object
-description: Pending job request item returned for the authenticated user.
+description: Pending job request summary returned for an authenticated participant and included in the realtime notification sent to its assigned provider.
 required:
 - id
 - conversation_id

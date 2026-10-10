@@ -26,6 +26,7 @@ properties:
       - service_proposal_received
       - service_proposal_accepted
       - service_proposal_rejected
+      - job_request_received
       - work_order_close_to_scheduled_time
       - work_order_completion_reported
       - work_order_final_payment_approved
@@ -34,6 +35,7 @@ properties:
     type: string
     enum:
       - service_proposal
+      - job_request
       - work_order
     example: service_proposal
   resource_id:
