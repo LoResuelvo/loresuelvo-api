@@ -5323,8 +5323,8 @@
                     "Providers"
                 ],
                 "operationId": "filterProvidersByCategory",
-                "summary": "Filter providers by category",
-                "description": "Returns providers whose registered category matches the `category_id` query parameter selected from GET /categories. Provider rating averages and counts include all registered ratings, including ratings whose review text is hidden. A disabled category still exists, but is not available for discovery: using its previously saved identifier returns an empty array with `200`, not `404`. Only an unknown category identifier returns `404`.",
+                "summary": "Filter providers by category and consumer coverage zone",
+                "description": "Returns providers whose registered category matches the `category_id` query parameter and whose coverage includes the enabled zone saved for the authenticated consumer's address. A provider with multiple coverage zones is included when one matches; both the zone and its market must be enabled. A disabled category still exists, but returns an empty array with `200`; only an unknown category identifier returns `404`. Provider rating averages and counts include all registered ratings, including ratings whose review text is hidden.",
                 "security": [
                     {
                         "BearerAuth": []
@@ -5345,7 +5345,7 @@
                 ],
                 "responses": {
                     "200": {
-                        "description": "Providers matching the requested category. The array is empty when the category is disabled or has no registered providers.",
+                        "description": "Providers matching the requested category and the authenticated consumer's address coverage zone. The array is empty when the category is disabled or no eligible provider covers that zone.",
                         "content": {
                             "application/json": {
                                 "schema": {
