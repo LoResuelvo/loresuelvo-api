@@ -1,0 +1,199 @@
+{
+  "protocol_version": "1.0.0",
+  "campaign_id": "campaign-1",
+  "status": "defined",
+  "purpose": "Measure the approved development corpus against the shared Gemini adapter with fixed solution and operational settings.",
+  "dataset_version": "1.0.0",
+  "dataset_manifest_sha256": "e92470c993f28aed33e67a2eb37c2f09558e0fb9d0a30990dcdb2cfbd9fb3418",
+  "scope": "development",
+  "expected_trials": 3,
+  "allow_holdout": false,
+  "dataset": {
+    "path": "evals/datasets/LoResuelvo_US60_evals_v1.0.0",
+    "cases": 70,
+    "tasks": {
+      "PD": 47,
+      "RK": 19,
+      "SM": 4
+    },
+    "development_cases": 51,
+    "holdout_cases": 19,
+    "smoke_cases": 17,
+    "synthetic_images": 8
+  },
+  "solution": {
+    "baseline_source_commit": "af80a97e5eb50a64c7407686bbcff5b83dcf92e0",
+    "baseline_files": {
+      "cmd/evals/build_provenance.go": "183544567c0cf1715c5552b0d79ce19fe42351038a43d29b80ceb1b4cfd2334a",
+      "cmd/evals/campaign_export.go": "d68c302744980c05d997b579692b6ab6aa9b243d514d12beace95a8ecf326ebf",
+      "cmd/evals/campaign_live.go": "32a34493ebcbaecab9626873abe153353cb87f1e06a26e7655622e2c1341e55e",
+      "cmd/evals/campaign_output.go": "8ea81c885917eac697644b18225a30fd217cb4adcded5082d65bc531cf9f69ed",
+      "cmd/evals/campaign_recover.go": "2dc14855c458d813e18f21d0f83dfa20fa3a10815bc638995cb7f3b1d3bbcf48",
+      "cmd/evals/campaign_recovery_attempts.go": "b4cdee7445e2bd816923a1fdc6f4d5f4651ff8e03e616db69fb3fe562dab7c24",
+      "cmd/evals/campaign_report.go": "553c8ebdcd975074b5578da4802cb67602ed74999d95a18c41d73f8dcb90dea1",
+      "cmd/evals/main.go": "39e511d4ed9739b77a249c6c085dd6f29259972317cf3ceae590a710633e0c23",
+      "cmd/evals/summary.go": "7d4f956fa0c6f9a146c950c50c87b6a154d37627b2e5b1c8a10426159bd81d9e",
+      "go.mod": "12cfad4e9af502f1fcacb76b42608f3b0280150cf8adba2d6eb96853f9d1525c",
+      "go.sum": "1974d547a6d458965d8a12289c982a1b75e0ef4476e457f78c086af2b51e241c",
+      "internal/adapters/chatbot/config.go": "291645e2e37f04f7968f46288888caa6fc039686b6c99fffce305689fd0afef7",
+      "internal/adapters/chatbot/factory.go": "cc9e31ef59167cd0264945410df2d160ef1506ae02ffd893f2ec631222e39e10",
+      "internal/adapters/chatbot/fake_chatbot.go": "6a5cf07d0d57eec8367158e0cba26700680bfc38f081f455288ae03b5e497008",
+      "internal/adapters/chatbot/gemini_chatbot.go": "e2e9581ff32ece490fd8f47ce0d161864c6f15b1b4e41b7d0fdef5427d08e48d",
+      "internal/adapters/chatbot/gemini_generation.go": "a542d8078c0058e77ebc72ef2e1ab746610bf71549d67e321f32e02d8e246c0c",
+      "internal/adapters/chatbot/gemini_json.go": "2a59bae9a7997dc6899de99abffc712cf515f810d92bad2026c9e1790a6967c2",
+      "internal/adapters/chatbot/gemini_schema.go": "ce90399783e9d5f683dde4cf00d3cccb33e4bafc1fe49e66532f49a6ca1ce52f",
+      "internal/adapters/chatbot/gemini_token_count.go": "36afc522d6aa244511e259f367367bd6c030ebf6e4dbb1398b9bab9ca278d214",
+      "internal/domain/conversation/category_repository.go": "67560f0e68c909b522ecb40d82d5bf1868e46d397c589cd3e4240b5bcd6f03f1",
+      "internal/domain/conversation/chatbot.go": "ece9cc0f0d1fc163ec4f00d9929ccfce337a91842f7d7437c8cba7177150f6e8",
+      "internal/domain/conversation/chatbot_conversation.go": "719ae4ae9d51d38b2eff21eace49b3a5d7c104a2522ea4806de088027071eed0",
+      "internal/domain/conversation/chatbot_conversation_result.go": "1e984627dc9bd4d271cc2b0eaa9854a888018f289a67e0a460767824ba5cc0be",
+      "internal/domain/conversation/conversation.go": "1feaddf101c28921d3642add079a0a8f8ca7d8bf9744dfa1da302a2cdf05c09a",
+      "internal/domain/conversation/errors.go": "c5f90143237f26ad0bb62370748a4f163307d1097bc753de8292bb968b0945c4",
+      "internal/domain/conversation/file_service.go": "0ea81374f6fbd04045d233a603ab7ba118a34468844a1612c127581ff8a95b0a",
+      "internal/domain/conversation/message.go": "39b326fa1ed7340570a9cae30d304974c27816cbd84c453677507b5bd81e7105",
+      "internal/domain/conversation/message_attachment_reader.go": "aacde3fa89d69ae45c43a1c528f73c9e938516a9cb8fe108fa74a57d141a2fdd",
+      "internal/domain/conversation/message_page_reader.go": "c5a32f0c281f5eee248bf60f220b1d2854076bd24028f131d9e7e0dd90e83968",
+      "internal/domain/conversation/message_publisher.go": "c4f85565520c47923ab4d9cebc571a0cb03eb98f2009f8ca3468a0fd68ba1533",
+      "internal/domain/conversation/problem_assessment.go": "d11a3c2e0cab2e0c5113ac553db99544e6aa6f468d60d31b720b4f8ae16920d2",
+      "internal/domain/conversation/provider_recommendation.go": "6c83e042e60521f0c107d89050250edbc263cb1252dc81e12c85d465c8287ba8",
+      "internal/domain/conversation/provider_recommendation_errors.go": "3ca7878cb873074a81ed8ef15da8a090a26b1472e5d698f2755d218913942a29",
+      "internal/domain/conversation/read_model/detail.go": "145f8f106e050f8458b71bbd433c43579a6e75d5c9550c397a70d76033f2878f",
+      "internal/domain/conversation/read_model/summary.go": "34049b2bbe9219e1cf7698a52aad820ef3d0617bab85ebbd143b7429b88156fa",
+      "internal/domain/conversation/repository.go": "122281978de9904aaa5b42ad3a6ad08ac8e67252aeefe06411b50334c976f9b6",
+      "internal/domain/conversation/service.go": "f83bef77cb22a485c9793eb66eda67cbdc14117a55d931f795316fa8514e977a",
+      "internal/domain/conversation/work_conversation.go": "f0800183ff76c8e324021bfd2fa90391cf3dcea20b75fa1cc356ec52b8053809",
+      "internal/evals/api_keys.go": "5d2f838f6b52cdf45dfba263ca0713bb3abc2da022aac40ff3cb204952e92213",
+      "internal/evals/baselines.go": "eec82214e73f1ba1a3f1ac1e7460f082f96de21cd9fe39c4bfdb18d3dca2039c",
+      "internal/evals/campaign_budget.go": "350839aba0fb49203424dbdc06cd66a8a8e528b758159d6335263b546e4ea389",
+      "internal/evals/campaign_charts.go": "f98a850e842e98466042ececf1791dfa0a02cb12d4ba305225cf189a44b5ff54",
+      "internal/evals/campaign_cost.go": "c0e0975802f2c9fd7da68b6b38f5f8fc1e214f4017cff42c214e6f0dcc3e8c7a",
+      "internal/evals/campaign_export.go": "6538627820ab934d011538b9dd6372093a04dd1392e8db1fe786d3d4cfcb7666",
+      "internal/evals/campaign_recovery.go": "d141a6f823d99553be7f79af978e63b18317722ef9551c235d7ad10ce650615f",
+      "internal/evals/campaign_report.go": "1a0c093d8e96e0434cafd5e94bd200ef435fb9e605035e1f7e0cf905ea495f50",
+      "internal/evals/dataset.go": "6559390fd7b781e19e7a774b2321ce7908c3788f1f330e53049a317d2c76d6f6",
+      "internal/evals/evaluation.go": "bdd58880d2cd550e1bcd8f7c229f176e39e2fdc2568e79f6ae09ac8ed19f5166",
+      "internal/evals/evaluation_schema.go": "113970af2e7e22c71597fd428e2702d0d8fe11cd6b01db06d5d7df2e80159dcb",
+      "internal/evals/live.go": "3dcdb4a3016c6c33b5fde5152671e45fd4b1b629561753924f907f9d9f312471",
+      "internal/evals/mapping.go": "66181de027e64f53bb1bced4bf05b8ffe1b4029c2272f371e6333c1f447b910f",
+      "internal/evals/metamorphic.go": "3d4dd2c123a761bcb661c042b9f44da8bb232a2b2546a6eb1288c3a86532c506",
+      "internal/evals/metamorphic_comparison.go": "0bf56ffe4eb4ec34ea0861db3cd509ee7d258e4465931ec6d44427d37a174baa",
+      "internal/evals/metamorphic_report.go": "d9474694cf74b1987de93852989a1973093b053ff00d857f174ddb2bc3bcf5d9",
+      "internal/evals/plan.go": "eb4285aacf436330b0eb840228eb968871f2b407f6a5dc78524b566654f3694a",
+      "internal/evals/planned_evaluation.go": "33fca78cf1eef55ff24f0aab48b6f075a538f451095ebd03286867244ab26e71",
+      "internal/evals/project_lanes.go": "816a1e8804bfbcb147e419fa9e5a249e66b664e16e0ce59588c292b167b506e3",
+      "internal/evals/ranking.go": "c9b106a837c644d4f08c8424af0cb17afce28cab58f328958e49cc5fcef13e63",
+      "internal/evals/replay.go": "ec01316f863d5d9f7053fefb96fb2acfa0a2e1b5d11fc2f6d766734093941ed8",
+      "internal/evals/results.go": "b2e7dd891c2778de1f6a548a7f8262ef0ff2fa1624a372b7ed4362fcfa1c94eb",
+      "internal/evals/runner.go": "11d65a6ae6912dfe0976a8b16b412aa116daef3dfbb6627494146abb27a7346f",
+      "internal/evals/runner_concurrent.go": "78bf425799c77b9fbb4d8dd60e723b57a99571cbc0dd7dc982303e05e31a0c04",
+      "internal/evals/semantic.go": "0e1bab11142fbe1c535a898c90e62308ddab43c11afd5a9cb75dd5b67a7517a4",
+      "internal/evals/semantic_calibration.go": "4ac844e0bad14474cc4b4655963ad37eaa89bbb1146b7521bcc11e668c76fba7",
+      "internal/evals/semantic_io.go": "196cf9e1c9fa0b46805eb2fca70e454b9f894e7f1a0a86cbbe2145a678ad8c42",
+      "internal/evals/summary.go": "b615fe3dc050867a5e31a554abc7e69f1fa01543d0077e971d042e24cea17f87"
+    },
+    "require_clean_tree_before_live": true,
+    "prompt_change_allowed": false,
+    "generation_config_change_allowed": false,
+    "quality_fixes_allowed": false
+  },
+  "models": [
+    {
+      "requested_model": "gemini-3.1-flash-lite"
+    },
+    {
+      "requested_model": "gemini-3.5-flash-lite"
+    }
+  ],
+  "execution": {
+    "billing_tier": "free",
+    "concurrency": 3,
+    "max_retries": 0,
+    "retry_for_quality": false,
+    "attempt_timeout_seconds": 90,
+    "global_timeout_seconds": 16200,
+    "min_interval_seconds": 15,
+    "max_output_tokens": 4096,
+    "primary": {
+      "suite": "development",
+      "cases": 51,
+      "trials_per_case": 3,
+      "calls_total": 306,
+      "included_in_campaign_ceiling": true
+    },
+    "smoke": {
+      "suite": "smoke",
+      "cases": 17,
+      "trials_per_case": 1,
+      "calls_total": 34,
+      "included_in_campaign_ceiling": true
+    },
+    "maximum_provider_calls_total": 340,
+    "ranking_baselines": {
+      "suite": "development",
+      "policies": [
+        "seeded_random",
+        "rating_average",
+        "bayesian_rating_with_fixed_prior",
+        "paid_work_count",
+        "frozen_lexical_heuristic"
+      ],
+      "policy_version": "1",
+      "seed": 601,
+      "prior_count": 5,
+      "prior_mean": 3,
+      "tie_break": "reference_ascending"
+    },
+    "metamorphic": {
+      "enabled": false,
+      "reason": "Keep the first measurement on fixed base cases; transformations require a separately bounded execution."
+    }
+  },
+  "budget": {
+    "currency": "USD",
+    "hard_ceiling": 10,
+    "guard_required_before_live": true,
+    "guard_policy": "Reserve each request and conservative reference-price token bound before transport; stop new dispatch when exhausted.",
+    "max_input_tokens_per_request": 20000,
+    "max_output_tokens_per_request": 4096,
+    "preflight_upper_bound_usd": 5.5216,
+    "preflight_calculation": "340 * (20000 * 0.30 / 1000000 + 4096 * 2.50 / 1000000)",
+    "preflight_headroom_usd": 4.4784,
+    "pricing": {
+      "source": "https://ai.google.dev/gemini-api/docs/pricing",
+      "must_verify_on_execution_date": true,
+      "gemini-3.1-flash-lite": {
+        "input_usd_per_million_tokens": 0.25,
+        "output_usd_per_million_tokens": 1.5,
+        "cache_usd_per_million_tokens": 0.025,
+        "basis": "standard_paid_reference",
+        "currency": "USD",
+        "verified_on": "2026-10-13"
+      },
+      "gemini-3.5-flash-lite": {
+        "input_usd_per_million_tokens": 0.3,
+        "output_usd_per_million_tokens": 2.5,
+        "cache_usd_per_million_tokens": 0.03,
+        "basis": "standard_paid_reference",
+        "currency": "USD",
+        "verified_on": "2026-10-13"
+      }
+    },
+    "unknown_usage_policy": "Keep missing usage unknown and retain the conservative reservation; never infer zero or actual billing."
+  },
+  "measurement": {
+    "generation_calls": 340,
+    "auxiliary_count_tokens_requests": 136,
+    "count_tokens_in_generation_totals": false,
+    "cost_basis": "External calculation from native usage and the verified standard paid TEXT/IMAGE reference snapshot; output includes thinking. Free quota does not establish an invoice amount.",
+    "standalone_smoke_generations_outside_campaign": 34,
+    "standalone_smoke_has_campaign_usd_guard": false,
+    "api_configuration_difference": "Evaluations explicitly cap output at 4096 tokens; API does not explicitly set that cap.",
+    "semantic_policy": "Record criterion outcomes and output hashes; deterministic validity and corpus approval do not approve future responses or a release.",
+    "sample_unit": "Base case; repeated trials, smoke overlap and variants are not independent population observations."
+  },
+  "traceability": {
+    "source_policy": "The baseline commit identifies pinned source bytes. A later execution commit may add protocol/documentation without changing those bytes. The build must attest the actual clean execution revision and all pinned file hashes must still match the baseline.",
+    "unknown_provider_fields": "Leave optional native metadata unknown when absent.",
+    "public_projection": "Preserve attempts, raw responses, effective results and criterion coverage; exclude credentials and private review provenance."
+  }
+}

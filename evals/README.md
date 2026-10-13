@@ -45,6 +45,14 @@ La API no fija ese límite explícitamente; esta diferencia se registra, no se
 presenta como equivalencia de configuración. Los defaults del proveedor que no
 se observan permanecen desconocidos.
 
+## Primera campaña
+
+[`protocols/campaign-1.json`](protocols/campaign-1.json) fija la primera medición
+de desarrollo. Seguir el [procedimiento de preparación, smoke y campaña](protocols/README.md):
+primero previsualización offline, luego smoke independiente autorizado e inspección,
+y sólo después autorización separada de la campaña. Versionar el protocolo no
+inicia llamadas ni aprueba respuestas.
+
 ## Ejecución manual
 
 Desde la raíz del repositorio, sin credenciales ni llamadas al proveedor:
