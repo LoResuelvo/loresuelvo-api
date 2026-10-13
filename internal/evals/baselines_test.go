@@ -87,3 +87,21 @@ func TestEvaluateBaselinesDeduplicatesCasesAndPreservesEvidence(t *testing.T) {
 		require.Equal(t, 1, policy.Metrics["ndcg_at_3"].EvaluatedBaseCases)
 	}
 }
+
+func TestEvaluateBaselinesSkipsKnownNonRankingCases(t *testing.T) {
+	dataset := rankingEvaluationFixture(t)
+	dataset.PD = []PDCase{{CaseMetadata: CaseMetadata{ID: "PD-test"}}}
+	dataset.SM = []SMCase{{CaseMetadata: CaseMetadata{ID: "SM-test"}}}
+	want, err := EvaluateRankingBaselines(dataset, []string{"RK-test"})
+	require.NoError(t, err)
+
+	got, err := EvaluateRankingBaselines(dataset, []string{"PD-test", "SM-test", "RK-test"})
+	require.NoError(t, err)
+	require.Equal(t, want, got)
+}
+
+func TestEvaluateBaselinesRejectsUnknownCase(t *testing.T) {
+	_, err := EvaluateRankingBaselines(rankingEvaluationFixture(t), []string{"SM-unknown"})
+	require.ErrorIs(t, err, ErrInvalidBaseline)
+	require.ErrorContains(t, err, "unknown case SM-unknown")
+}

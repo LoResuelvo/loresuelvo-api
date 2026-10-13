@@ -164,7 +164,7 @@ type BaselineReport struct {
 }
 
 // EvaluateRankingBaselines evaluates each selected RK base case once per policy.
-// PD IDs may accompany a mixed suite and are skipped; unknown IDs fail closed.
+// PD and SM IDs may accompany a mixed suite and are skipped; unknown IDs fail closed.
 func EvaluateRankingBaselines(dataset *Dataset, caseIDs []string) (BaselineReport, error) {
 	report := BaselineReport{Policies: []BaselinePolicyReport{}, Warning: "Non-LLM baselines; five policies are paired on the same base cases, not independent observations. Semantic checks remain unassessed."}
 	if dataset == nil {
@@ -178,6 +178,9 @@ func EvaluateRankingBaselines(dataset *Dataset, caseIDs []string) (BaselineRepor
 		known[c.ID] = true
 	}
 	for _, c := range dataset.PD {
+		known[c.ID] = true
+	}
+	for _, c := range dataset.SM {
 		known[c.ID] = true
 	}
 	selected := []RKCase{}
