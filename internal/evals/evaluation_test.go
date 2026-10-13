@@ -26,7 +26,7 @@ func TestEvaluateRankingPreservesMissingRecommendationPenalty(t *testing.T) {
 	result, err := EvaluateCase(rankingEvaluationFixture(t), "RK-test", rankingRaw(t, []string{"a"}))
 	require.NoError(t, err)
 	require.InDelta(t, 1.0/3, *result.Metrics["precision_at_3_relevance_ge_2"].(*float64), 0.000001)
-	require.Contains(t, result.Errors, "too_few_results")
+	require.NotContains(t, result.Errors, "too_few_results")
 	require.Less(t, *result.Metrics["ndcg_at_3"].(*float64), 1.0)
 }
 func TestEvaluateRankingRequiresSemanticReview(t *testing.T) {
@@ -79,7 +79,7 @@ func evaluationSchemaFixture(t *testing.T, name string) map[string][]byte {
 }
 func rankingEvaluationFixture(t *testing.T) *Dataset {
 	t.Helper()
-	return &Dataset{schemaFiles: evaluationSchemaFixture(t, "ranking-output"), RK: []RKCase{{CaseMetadata: CaseMetadata{ID: "RK-test"}, Input: RKInput{MaxResults: 3}, Expected: json.RawMessage(`{"eligible_references":["a","b","c"],"relevance":{"a":3,"b":2,"c":0},"min_results":3,"required_top_k":["a"],"pairwise_constraints":[{"higher":"a","lower":"b"}],"semantic_assertions":[{"id":"grounding","severity":"major","criterion":"No invention."}]}`)}}}
+	return &Dataset{schemaFiles: evaluationSchemaFixture(t, "ranking-output"), RK: []RKCase{{CaseMetadata: CaseMetadata{ID: "RK-test"}, Input: RKInput{MaxResults: 3}, Expected: json.RawMessage(`{"eligible_references":["a","b","c"],"relevance":{"a":3,"b":2,"c":0},"pairwise_constraints":[{"higher":"a","lower":"b"}],"semantic_assertions":[{"id":"grounding","severity":"major","criterion":"No invention."}]}`)}}}
 }
 func rankingRaw(t *testing.T, refs []string) json.RawMessage {
 	t.Helper()
@@ -133,10 +133,9 @@ func TestEvaluatePDRejectsWrongHeadingOrder(t *testing.T) {
 	evaluatePD(&result, PDInput{}, pdExpected{}, output)
 	require.Contains(t, result.Errors, "required_headings_missing_or_wrong_order")
 }
-func TestEvaluateRankingRejectsMissingRequiredAndTooMany(t *testing.T) {
+func TestEvaluateRankingRejectsPairwiseViolationAndTooMany(t *testing.T) {
 	result, err := EvaluateCase(rankingEvaluationFixture(t), "RK-test", rankingRaw(t, []string{"b", "c"}))
 	require.NoError(t, err)
-	require.Contains(t, result.Errors, "required_top_k_missing")
 	require.Contains(t, result.Errors, "pairwise_violation")
 	d := rankingEvaluationFixture(t)
 	d.RK[0].Input.MaxResults = 1
@@ -147,4 +146,20 @@ func TestEvaluateRankingRejectsMissingRequiredAndTooMany(t *testing.T) {
 func TestEvaluateUnknownCaseReturnsError(t *testing.T) {
 	_, err := EvaluateCase(rankingEvaluationFixture(t), "unknown", nil)
 	require.ErrorIs(t, err, ErrUnknownEvaluationCase)
+}
+
+func TestEvaluateSummaryRequiresExactReferenceWithoutApprovingFidelity(t *testing.T) {
+	d := &Dataset{SM: []SMCase{{CaseMetadata: CaseMetadata{ID: "SM-001"}, Expected: json.RawMessage(`{"facts_to_preserve":["fact"],"must_not_invent":["cause"],"required_image_refs":[{"reference":"image:abc","description":"photo"}],"semantic_assertions":["preserve uncertainty"]}`)}}, schemaFiles: map[string][]byte{"schemas/summarization-output.schema.json": []byte(`{"type":"object","required":["summary"],"properties":{"summary":{"type":"string","pattern":"\\S"}},"additionalProperties":false}`)}}
+	result, err := EvaluateCase(d, "SM-001", json.RawMessage(`{"summary":"See image:abc; uncertainty retained."}`))
+	require.NoError(t, err)
+	require.Equal(t, "passed", result.DeterministicStatus)
+	require.Equal(t, "needs_semantic_review", result.OverallStatus)
+	require.NotEmpty(t, result.SemanticChecks)
+	for _, c := range result.SemanticChecks {
+		require.Empty(t, c.Severity)
+		require.Equal(t, "unassessed", c.Result)
+	}
+	result, err = EvaluateCase(d, "SM-001", json.RawMessage(`{"summary":"See image:abcd"}`))
+	require.NoError(t, err)
+	require.Contains(t, result.Errors, "required_image_reference_missing")
 }

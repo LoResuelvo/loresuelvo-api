@@ -128,3 +128,15 @@ func TestSummaryRejectsInvalidRetrySequence(t *testing.T) {
 		require.ErrorIs(t, err, ErrInvalidSummary)
 	}
 }
+
+func TestSummaryDoesNotCountSummarizationAsRankingObservations(t *testing.T) {
+	dataset := &Dataset{SM: []SMCase{{CaseMetadata: CaseMetadata{ID: "SM-one", FamilyID: "summary-family"}}}}
+	plan := &Plan{Trials: 1, Cases: []PlannedCase{{CaseID: "SM-one"}}}
+	attempts := []Attempt{{CaseID: "SM-one", Trial: 1, Status: "executed", RequestCount: 1}}
+	evaluations := []EvaluatedAttempt{{CaseID: "SM-one", Trial: 1, ExecutionStatus: "executed", Evaluation: Evaluation{CaseID: "SM-one", SemanticChecks: []SemanticCheck{{Result: "unassessed"}}}}}
+	result, err := Summarize(dataset, plan, attempts, evaluations)
+	require.NoError(t, err)
+	require.Equal(t, 1, result.BaseCases)
+	require.Zero(t, result.Metrics["ndcg_at_3"].ExpectedObservations)
+	require.Equal(t, 1, result.SemanticCounts["unassessed"])
+}

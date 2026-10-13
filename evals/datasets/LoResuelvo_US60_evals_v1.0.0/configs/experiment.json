@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "status": "finalized_design_not_model_validated",
+  "status": "defined",
   "questions": {
     "Q1": "Decisión preliminar y preguntas adecuadas bajo política acotada",
     "Q2": "Sin fallos críticos observados en la suite",
@@ -42,7 +42,7 @@
     "release": 3,
     "unit": "base_case; no contar variantes/repeticiones como nuevas observaciones independientes"
   },
-  "baseline_policy": "Medir commit/prompt actuales antes de modificarlos; candidato por cambio controlado. Comparación pareada por caso, split y ejecución.",
+  "baseline_policy": "Evaluar sobre desarrollo; no calibrar mirando reserva. No hay resultados ni umbrales empíricos calibrados en el corpus.",
   "ranking_baselines": [
     "seeded_random",
     "rating_average",

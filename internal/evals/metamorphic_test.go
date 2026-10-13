@@ -91,13 +91,13 @@ func TestMetamorphicBijectionRoundTripRetainsNonReferenceFields(t *testing.T) {
 func TestMetamorphicFrozenConfigSelectionRespectsParentSplitAndTrials(t *testing.T) {
 	dataset, err := LoadDataset("../../evals/datasets/LoResuelvo_US60_evals_v1.0.0")
 	require.NoError(t, err)
-	require.Len(t, dataset.Metamorphic.Ranking, 24)
-	require.Len(t, dataset.Metamorphic.PrediagnosisPairs, 2)
+	require.Len(t, dataset.Metamorphic.Ranking, 19)
+	require.Len(t, dataset.Metamorphic.PrediagnosisPairs, 1)
 	plan, err := BuildPlan(dataset, PlanOptions{Suite: "development", Model: "model", Trials: 3, MaxRequests: 1000})
 	require.NoError(t, err)
 	variants, err := BuildMetamorphicVariants(dataset, plan.Cases)
 	require.NoError(t, err)
-	require.Len(t, variants, 18*3*3)
+	require.Len(t, variants, 14*3*3)
 	for _, v := range variants {
 		require.Equal(t, "development", v.Split)
 		require.Equal(t, 3, v.RepeatTrials)

@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"regexp"
 	"slices"
 	"sort"
@@ -13,7 +14,7 @@ import (
 	"time"
 )
 
-const campaignExportVersion = "2"
+const campaignExportVersion = "3"
 
 var ErrInvalidCampaignExport = errors.New("invalid campaign export")
 
@@ -32,7 +33,7 @@ type CampaignExport struct {
 	Attempts  []CampaignExportAttempt
 	Responses []CampaignExportResponse
 	Results   []CampaignExportResult
-	Reviews   []CampaignExportReview
+	Reviews   []CampaignExportReview `json:"-"`
 	Summary   CampaignExportSummary
 }
 
@@ -60,6 +61,8 @@ type CampaignExportManifest struct {
 	EvidenceManifestSHA256 string                            `json:"evidence_manifest_sha256"`
 	ExporterSourceCommit   string                            `json:"exporter_source_commit"`
 	BaselineFilesSHA256    map[string]string                 `json:"baseline_files_sha256"`
+	Builds                 map[string]*BuildProvenance       `json:"builds_by_sha256"`
+	Plans                  map[string]*Plan                  `json:"plans_by_sha256"`
 	GenerationConfigs      map[string]json.RawMessage        `json:"generation_configs_by_sha256"`
 	SourceCommits          []CampaignExportSourceCommit      `json:"source_commits"`
 	Models                 []CampaignExportModelResolution   `json:"models"`
@@ -89,11 +92,11 @@ type CampaignExportCounts struct {
 	Responses          int `json:"responses"`
 	MalformedResponses int `json:"malformed_responses"`
 	Results            int `json:"results"`
-	ReviewRows         int `json:"review_rows"`
-	EffectiveReviews   int `json:"effective_review_rows"`
-	AgentAssessments   int `json:"agent_assessments"`
-	HumanAssessments   int `json:"human_assessments"`
-	UnassessedReviews  int `json:"unassessed_effective_reviews"`
+	ReviewRows         int `json:"-"`
+	EffectiveReviews   int `json:"effective_criteria"`
+	AgentAssessments   int `json:"-"`
+	HumanAssessments   int `json:"-"`
+	UnassessedReviews  int `json:"unassessed_effective_criteria"`
 }
 
 type CampaignExportSource struct {
@@ -120,6 +123,12 @@ type CampaignExportPrivacyScan struct {
 }
 
 type CampaignExportAttempt struct {
+	Provider               string                      `json:"provider"`
+	HTTPStatus             *int                        `json:"provider_http_status"`
+	ProviderResponseID     *string                     `json:"provider_response_id"`
+	FinishReasons          []string                    `json:"finish_reasons"`
+	BlockReason            *string                     `json:"block_reason"`
+	DurationScope          string                      `json:"duration_scope"`
 	AttemptID              string                      `json:"attempt_id"`
 	SlotID                 string                      `json:"slot_id"`
 	Phase                  string                      `json:"phase"`
@@ -150,6 +159,8 @@ type CampaignExportAttempt struct {
 }
 
 type CampaignExportProviderUsage struct {
+	Source            string                           `json:"source"`
+	CachedInputTokens *int64                           `json:"cached_input_tokens"`
 	InputTokens       *int64                           `json:"input_tokens"`
 	OutputTokens      *int64                           `json:"output_tokens"`
 	ThinkingTokens    *int64                           `json:"thinking_tokens"`
@@ -185,31 +196,43 @@ type CampaignExportResponse struct {
 }
 
 type CampaignExportResult struct {
-	SlotID              string          `json:"slot_id"`
-	ResponseID          string          `json:"response_id"`
-	Phase               string          `json:"phase"`
-	RequestedModel      string          `json:"requested_model"`
-	CaseID              string          `json:"case_id"`
-	BaseCaseID          string          `json:"base_case_id"`
-	FamilyID            string          `json:"family_id"`
-	Split               string          `json:"split"`
-	Task                string          `json:"task"`
-	Trial               int             `json:"trial"`
-	OriginalStatus      string          `json:"original_execution_status"`
-	Recovered           bool            `json:"recovered"`
-	RecoveryAttempts    int             `json:"recovery_attempts"`
-	RecoveryReason      string          `json:"recovery_reason,omitempty"`
-	Expected            json.RawMessage `json:"expected"`
-	Observed            json.RawMessage `json:"observed"`
-	ObservedMissing     *string         `json:"observed_missing_reason"`
-	DeterministicStatus string          `json:"deterministic_status"`
-	OverallStatus       string          `json:"overall_status"`
-	SemanticStatus      string          `json:"semantic_status"`
-	FailureCodes        []string        `json:"failure_codes"`
-	Metrics             map[string]any  `json:"metrics"`
-	SemanticCounts      map[string]int  `json:"semantic_criterion_counts"`
-	ReviewerKinds       []string        `json:"reviewer_kinds"`
-	ReleaseApproved     bool            `json:"release_approved"`
+	OutputSHA256        string                    `json:"output_sha256"`
+	SlotID              string                    `json:"slot_id"`
+	ResponseID          string                    `json:"response_id"`
+	Phase               string                    `json:"phase"`
+	RequestedModel      string                    `json:"requested_model"`
+	CaseID              string                    `json:"case_id"`
+	BaseCaseID          string                    `json:"base_case_id"`
+	FamilyID            string                    `json:"family_id"`
+	Split               string                    `json:"split"`
+	Task                string                    `json:"task"`
+	Trial               int                       `json:"trial"`
+	OriginalStatus      string                    `json:"original_execution_status"`
+	Recovered           bool                      `json:"recovered"`
+	RecoveryAttempts    int                       `json:"recovery_attempts"`
+	RecoveryReason      string                    `json:"recovery_reason,omitempty"`
+	Expected            json.RawMessage           `json:"expected"`
+	Observed            json.RawMessage           `json:"observed"`
+	ObservedMissing     *string                   `json:"observed_missing_reason"`
+	DeterministicStatus string                    `json:"deterministic_status"`
+	OverallStatus       string                    `json:"overall_status"`
+	SemanticStatus      string                    `json:"semantic_status"`
+	FailureCodes        []string                  `json:"failure_codes"`
+	Metrics             map[string]any            `json:"metrics"`
+	SemanticCounts      map[string]int            `json:"semantic_criterion_counts"`
+	ReviewerKinds       []string                  `json:"-"`
+	SemanticCriteria    []CampaignExportCriterion `json:"semantic_criteria"`
+	ReleaseApproved     bool                      `json:"release_approved"`
+}
+
+// CampaignExportCriterion is the public assessment projection. Private reviewer
+// identity, evidence prose and reasoning never enter this representation.
+type CampaignExportCriterion struct {
+	CriterionID     string `json:"criterion_id"`
+	CriterionSHA256 string `json:"criterion_sha256"`
+	OutputSHA256    string `json:"output_sha256"`
+	Severity        string `json:"severity,omitempty"`
+	Result          string `json:"result"`
 }
 
 type CampaignExportReview struct {
@@ -223,7 +246,7 @@ type CampaignExportReview struct {
 	Trial               int        `json:"trial"`
 	Retry               int        `json:"retry"`
 	Source              string     `json:"source"`
-	ReviewFormatVersion string     `json:"review_format_version"`
+	ReviewFormatVersion string     `json:"-"`
 	EffectiveForResult  bool       `json:"effective_for_result"`
 	OutputSHA256        string     `json:"output_sha256"`
 	CriterionID         string     `json:"criterion_id"`
@@ -231,13 +254,13 @@ type CampaignExportReview struct {
 	Criterion           string     `json:"criterion"`
 	Severity            string     `json:"severity"`
 	Result              string     `json:"result"`
-	Evidence            string     `json:"evidence,omitempty"`
-	EvidenceQuote       string     `json:"evidence_quote,omitempty"`
-	EvidenceLocation    string     `json:"evidence_location,omitempty"`
-	Reason              string     `json:"reason,omitempty"`
-	Reviewer            string     `json:"reviewer"`
-	ReviewerKind        string     `json:"reviewer_kind"`
-	ReviewedOn          *time.Time `json:"reviewed_on"`
+	Evidence            string     `json:"-"`
+	EvidenceQuote       string     `json:"-"`
+	EvidenceLocation    string     `json:"-"`
+	Reason              string     `json:"-"`
+	Reviewer            string     `json:"-"`
+	ReviewerKind        string     `json:"-"`
+	ReviewedOn          *time.Time `json:"-"`
 }
 
 // BuildCampaignExport validates all source evidence again and materializes a
@@ -272,14 +295,14 @@ func BuildCampaignExport(ctx context.Context, dataset *Dataset, spec CampaignExp
 		DatasetVersion: dataset.Version, DatasetManifestSHA256: dataset.ManifestSHA256,
 		ProtocolSHA256: spec.Report.ProtocolSHA256, EvidenceManifestSHA256: digest(evidence),
 		ExporterSourceCommit: spec.ExporterSourceCommit, BaselineFilesSHA256: cloneStringMap(spec.Report.BaselineFilesSHA256),
-		GenerationConfigs: map[string]json.RawMessage{}, Artifacts: map[string]CampaignExportArtifact{},
-		MissingData: []string{"actual_billed_cost", "human_review", "provider_http_status", "provider_request_id", "response_completion_time"},
+		Builds: map[string]*BuildProvenance{}, Plans: map[string]*Plan{}, GenerationConfigs: map[string]json.RawMessage{}, Artifacts: map[string]CampaignExportArtifact{},
+		MissingData: []string{"actual_billed_cost", "response_completion_time"},
 		PrivacyScan: CampaignExportPrivacyScan{Status: "pending", Method: "campaign-export-v1-deterministic-field-scan", Checks: []string{
 			"API-key, private-key, Bearer and authorization-token patterns",
 			"email addresses outside reserved .invalid fixtures",
 			"phone-like values outside structured image_ref, selected_image_refs and reference fields",
 			"prompt, inline image and private filesystem payload patterns",
-		}, Limitations: []string{"Passing these deterministic checks is not a universal guarantee that arbitrary personal data is absent."}, RecordsScanned: map[string]int{"responses": 0, "review_evidence": 0, "errors": 0}, Findings: map[string]int{}},
+		}, Limitations: []string{"Passing these deterministic checks is not a universal guarantee that arbitrary personal data is absent."}, RecordsScanned: map[string]int{"responses": 0, "semantic_criteria": 0, "errors": 0}, Findings: map[string]int{}},
 		ReleaseApproved: false,
 	}
 	result.Manifest.Sources = append(result.Manifest.Sources,
@@ -334,8 +357,8 @@ func BuildCampaignExport(ctx context.Context, dataset *Dataset, spec CampaignExp
 	result.Manifest.Counts.Responses = len(result.Responses)
 	result.Manifest.Counts.Results = len(result.Results)
 	result.Manifest.Counts.ReviewRows = len(result.Reviews)
-	if len(result.Responses) != result.Manifest.Counts.PlannedSlots || len(result.Results) != result.Manifest.Counts.PlannedSlots {
-		return result, fmt.Errorf("%w: every planned slot must retain one physical response and result", ErrInvalidCampaignExport)
+	if len(result.Results) != result.Manifest.Counts.PlannedSlots {
+		return result, fmt.Errorf("%w: every planned slot must retain one result", ErrInvalidCampaignExport)
 	}
 	for _, response := range result.Responses {
 		if response.FormatStatus == "malformed" {
@@ -394,6 +417,38 @@ func appendCampaignExportRun(dataset *Dataset, spec CampaignExportSpec, phase Ca
 		CampaignExportSource{ID: runSourceID, Kind: "run_record", Phase: phase.Name, Model: runSpec.RequestedModel, SHA256: digest(runData), Records: 1},
 		CampaignExportSource{ID: attemptSourceID, Kind: "attempt_journal", Phase: phase.Name, Model: runSpec.RequestedModel, SHA256: digest(attemptData), Records: len(attempts)},
 	)
+	if record.Build != nil {
+		raw, marshalErr := json.Marshal(record.Build)
+		if marshalErr != nil {
+			return marshalErr
+		}
+		export.Manifest.Builds[digest(raw)] = record.Build
+	}
+	planRaw, marshalErr := json.Marshal(record.Plan)
+	if marshalErr != nil {
+		return marshalErr
+	}
+	export.Manifest.Plans[digest(planRaw)] = record.Plan
+	runReferences := make(map[string]bool, len(allowedReferences))
+	for reference, known := range allowedReferences {
+		runReferences[reference] = known
+	}
+	for _, planned := range record.Plan.Cases {
+		if planned.Variant == nil {
+			continue
+		}
+		for _, base := range dataset.RK {
+			if base.ID == planned.Variant.BaseCaseID {
+				transformed, transformErr := TransformRanking(base.Input, planned.Variant.Transformation, planned.Variant.Seed)
+				if transformErr != nil {
+					return transformErr
+				}
+				for _, candidate := range transformed.Input.Candidates {
+					runReferences[candidate.Reference] = true
+				}
+			}
+		}
+	}
 	commits["original_execution"] = record.Commit
 	modelKey := phase.Name + "/" + runSpec.RequestedModel
 	resolution := &CampaignExportModelResolution{Phase: phase.Name, RequestedModel: runSpec.RequestedModel, ResolvedModelOccurrences: map[string]int{}}
@@ -418,6 +473,9 @@ func appendCampaignExportRun(dataset *Dataset, spec CampaignExportSpec, phase Ca
 			export.Manifest.PrivacyScan.RecordsScanned["errors"]++
 		}
 		export.Attempts = append(export.Attempts, row)
+		if err = appendCampaignPhysicalResponse(export, row, attempt, runReferences); err != nil {
+			return err
+		}
 		baseAttemptIDs[attemptKey(attempt.CaseID, attempt.Trial)] = id
 		allAttemptIDs[semanticAttemptKey(attempt.CaseID, attempt.Trial, attempt.Retry)] = id
 		campaignExportAddResolution(resolution, row.ResolvedModel)
@@ -455,6 +513,9 @@ func appendCampaignExportRun(dataset *Dataset, spec CampaignExportSpec, phase Ca
 				export.Manifest.PrivacyScan.RecordsScanned["errors"]++
 			}
 			export.Attempts = append(export.Attempts, row)
+			if err = appendCampaignPhysicalResponse(export, row, item.Attempt, runReferences); err != nil {
+				return err
+			}
 			recoveryAttemptIDs[semanticAttemptKey(item.Attempt.CaseID, item.Attempt.Trial, item.Attempt.Retry)] = id
 			allAttemptIDs[semanticAttemptKey(item.Attempt.CaseID, item.Attempt.Trial, item.Attempt.Retry)] = id
 			campaignExportAddResolution(resolution, row.ResolvedModel)
@@ -485,60 +546,39 @@ func appendCampaignExportRun(dataset *Dataset, spec CampaignExportSpec, phase Ca
 		if !ok {
 			return fmt.Errorf("%w: missing aggregate result for %s", ErrInvalidCampaignExport, slotID)
 		}
-		if strings.TrimSpace(effective.RawOutput) == "" {
-			return fmt.Errorf("%w: physical response is missing for %s", ErrInvalidCampaignExport, slotID)
-		}
-		if err = validateCampaignExportResponse(effective.RawOutput, allowedReferences); err != nil {
-			return fmt.Errorf("%w: unsafe response for %s", err, slotID)
-		}
-		export.Manifest.PrivacyScan.RecordsScanned["responses"]++
 		originalID := baseAttemptIDs[key]
 		effectiveID := originalID
 		if effective.Retry > original.Retry {
 			effectiveID = recoveryAttemptIDs[semanticAttemptKey(effective.CaseID, effective.Trial, effective.Retry)]
 		}
-		if effectiveID == "" {
-			return fmt.Errorf("%w: effective attempt identity missing for %s", ErrInvalidCampaignExport, slotID)
-		}
-		responseID := slotID + ":response"
-		raw := effective.RawOutput
-		parsed := append(json.RawMessage(nil), effective.ParsedOutput...)
-		// Older verified journals may omit the redundant parsed field even when
-		// the execution status proves the domain adapter decoded the JSON.
-		if len(parsed) == 0 && effective.Status == "executed" && json.Valid([]byte(raw)) {
-			parsed = append(json.RawMessage(nil), []byte(raw)...)
-		}
-		formatStatus := "parsed"
-		if len(parsed) == 0 || !json.Valid(parsed) {
-			formatStatus = "malformed"
-			parsed = nil
-		}
-		response := CampaignExportResponse{
-			ResponseID: responseID, SlotID: slotID, Phase: phase.Name, RequestedModel: runSpec.RequestedModel,
-			DatasetCaseID: effective.CaseID, Trial: effective.Trial, OriginalAttemptID: originalID,
-			EffectiveAttemptID: effectiveID, Recovered: effective.Retry > original.Retry,
-			ExecutionStatus: effective.Status, FormatStatus: formatStatus,
-			InputSHA256: effective.InputSHA256, PromptSHA256: effective.PromptSHA256,
-			OutputSHA256: digest([]byte(raw)), RawOutput: &raw, ParsedOutput: parsed,
-		}
-		if len(effective.GenerationConfig) > 0 {
-			response.GenerationConfigSHA = digest(effective.GenerationConfig)
-		}
-		export.Responses = append(export.Responses, response)
-		for i := range export.Attempts {
-			if export.Attempts[i].AttemptID == effectiveID {
-				export.Attempts[i].EffectiveResponseID = &responseID
+		responseID := ""
+		outputSHA256 := ""
+		var parsed json.RawMessage
+		if effective.RawOutput != "" {
+			if effectiveID == "" {
+				return fmt.Errorf("%w: effective attempt identity missing for %s", ErrInvalidCampaignExport, slotID)
+			}
+			responseID = effectiveID + ":response"
+			outputSHA256 = digest([]byte(effective.RawOutput))
+			if effective.Status == "executed" && json.Valid([]byte(effective.RawOutput)) {
+				parsed = json.RawMessage(effective.RawOutput)
 			}
 		}
-		expected, observed, observationErr := campaignExportExpectedObserved(dataset, effective.CaseID, parsed)
+		expected, observed, observationErr := campaignExportPlannedExpectedObserved(dataset, record.Plan, effective.CaseID, parsed)
 		var observedMissing *string
 		if observationErr != nil {
+			if errors.Is(observationErr, ErrInvalidCampaignExport) {
+				return observationErr
+			}
 			missing := "response_not_parseable"
+			if effective.RawOutput == "" {
+				missing = "response_not_available"
+			}
 			observedMissing = &missing
 			observed = nil
 		}
 		export.Results = append(export.Results, CampaignExportResult{
-			SlotID: slotID, ResponseID: responseID, Phase: phase.Name, RequestedModel: runSpec.RequestedModel,
+			OutputSHA256: outputSHA256, SlotID: slotID, ResponseID: responseID, Phase: phase.Name, RequestedModel: runSpec.RequestedModel,
 			CaseID: caseRow.CaseID, BaseCaseID: caseRow.BaseCaseID, FamilyID: caseRow.FamilyID, Split: caseRow.Split, Task: caseRow.Task, Trial: caseRow.Trial,
 			OriginalStatus: caseRow.OriginalExecutionStatus, Recovered: caseRow.Recovered,
 			RecoveryAttempts: caseRow.RecoveryAttempts, RecoveryReason: caseRow.RecoveryReason,
@@ -553,6 +593,44 @@ func appendCampaignExportRun(dataset *Dataset, spec CampaignExportSpec, phase Ca
 	if err = appendCampaignExportReviews(dataset, runSpec, phase.Name, spec.Report.CampaignID, effectiveBySlot, allAttemptIDs, export); err != nil {
 		return err
 	}
+	for _, attempt := range effectiveBySlot {
+		evaluation, evaluationErr := evaluatePlannedAttempt(dataset, record.Plan, attempt)
+		if evaluationErr != nil {
+			return evaluationErr
+		}
+		slotID := campaignExportSlotID(spec.Report.CampaignID, phase.Name, runSpec.RequestedModel, attempt.CaseID, attempt.Trial)
+		attemptID := allAttemptIDs[semanticAttemptKey(attempt.CaseID, attempt.Trial, attempt.Retry)]
+		for _, check := range evaluation.SemanticChecks {
+			exists := false
+			for _, review := range export.Reviews {
+				if review.SlotID == slotID && review.EffectiveForResult && review.CriterionID == check.ID {
+					exists = true
+					break
+				}
+			}
+			if exists {
+				continue
+			}
+			export.Reviews = append(export.Reviews, CampaignExportReview{ReviewID: slotID + ":criterion:" + check.ID, SlotID: slotID, AttemptID: attemptID, Phase: phase.Name, RequestedModel: runSpec.RequestedModel, CaseID: attempt.CaseID, Trial: attempt.Trial, Retry: attempt.Retry, EffectiveForResult: true, OutputSHA256: digest([]byte(attempt.RawOutput)), CriterionID: check.ID, CriterionSHA256: semanticCriterionHash(check), Criterion: check.Criterion, Severity: check.Severity, Result: "unassessed"})
+		}
+	}
+	for i := range export.Results {
+		row := &export.Results[i]
+		if row.Phase != phase.Name || row.RequestedModel != runSpec.RequestedModel {
+			continue
+		}
+		row.SemanticCriteria = []CampaignExportCriterion{}
+		for _, criterion := range export.Reviews {
+			if criterion.SlotID == row.SlotID && criterion.EffectiveForResult {
+				row.SemanticCriteria = append(row.SemanticCriteria, CampaignExportCriterion{CriterionID: criterion.CriterionID, CriterionSHA256: criterion.CriterionSHA256, OutputSHA256: criterion.OutputSHA256, Severity: criterion.Severity, Result: criterion.Result})
+			}
+		}
+	}
+	for _, row := range export.Results {
+		if row.Phase == phase.Name && row.RequestedModel == runSpec.RequestedModel {
+			export.Manifest.PrivacyScan.RecordsScanned["semantic_criteria"] += len(row.SemanticCriteria)
+		}
+	}
 	return nil
 }
 
@@ -564,8 +642,8 @@ func appendCampaignExportReviews(dataset *Dataset, runSpec CampaignRunSpec, phas
 			effectiveAttempt := effective[attemptKey(review.CaseID, review.Trial)]
 			effectiveReview := effectiveAttempt.Retry == review.Retry && digest([]byte(effectiveAttempt.RawOutput)) == review.OutputSHA256
 			var responseID *string
-			if effectiveReview && strings.TrimSpace(effectiveAttempt.RawOutput) != "" {
-				value := slotID + ":response"
+			if effectiveReview && effectiveAttempt.RawOutput != "" {
+				value := attemptID + ":response"
 				responseID = &value
 			}
 			export.Reviews = append(export.Reviews, CampaignExportReview{
@@ -581,11 +659,10 @@ func appendCampaignExportReviews(dataset *Dataset, runSpec CampaignRunSpec, phas
 				Reviewer: review.Reviewer, ReviewerKind: review.ReviewerKind,
 				ReviewedOn: review.ReviewedOn,
 			})
-			export.Manifest.PrivacyScan.RecordsScanned["review_evidence"]++
 		}
 	}
 	if runSpec.SemanticReviews != "" {
-		data, err := readBoundedFile(runSpec.SemanticReviews, maxSemanticReviewBytes)
+		_, err := readBoundedFile(runSpec.SemanticReviews, maxSemanticReviewBytes)
 		if err != nil {
 			return err
 		}
@@ -596,16 +673,7 @@ func appendCampaignExportReviews(dataset *Dataset, runSpec CampaignRunSpec, phas
 		if _, err = ApplySemanticReviews(dataset, runSpec.RunDirectory, document); err != nil {
 			return err
 		}
-		for _, review := range document.Reviews {
-			if err = validateCampaignExportReviewText(review); err != nil {
-				return fmt.Errorf("%w: unsafe semantic review evidence", err)
-			}
-			if err = validateCampaignExportSensitiveText(review.Reviewer, false); err != nil {
-				return fmt.Errorf("%w: unsafe semantic reviewer identity", err)
-			}
-		}
-		sourceID := campaignExportSourceID("reviews", phase, runSpec.RequestedModel)
-		export.Manifest.Sources = append(export.Manifest.Sources, CampaignExportSource{ID: sourceID, Kind: "semantic_reviews", Phase: phase, Model: runSpec.RequestedModel, SHA256: digest(data), Records: len(document.Reviews)})
+
 		appendReviews(document.Reviews, "original", document.FormatVersion)
 	}
 	if runSpec.RecoverySemanticReviews != "" {
@@ -624,26 +692,8 @@ func appendCampaignExportReviews(dataset *Dataset, runSpec CampaignRunSpec, phas
 		if _, err = ApplyRecoverySemanticReviews(dataset, runSpec.RunDirectory, evidence, document); err != nil {
 			return err
 		}
-		for _, review := range document.Reviews {
-			if err = validateCampaignExportReviewText(review); err != nil {
-				return fmt.Errorf("%w: unsafe recovery review evidence", err)
-			}
-			if err = validateCampaignExportSensitiveText(review.Reviewer, false); err != nil {
-				return fmt.Errorf("%w: unsafe recovery reviewer identity", err)
-			}
-		}
-		sourceID := campaignExportSourceID("recovery-reviews", phase, runSpec.RequestedModel)
-		export.Manifest.Sources = append(export.Manifest.Sources, CampaignExportSource{ID: sourceID, Kind: "recovery_semantic_reviews", Phase: phase, Model: runSpec.RequestedModel, SHA256: digest(data), Records: len(document.Reviews)})
-		appendReviews(document.Reviews, "recovery", document.FormatVersion)
-	}
-	return nil
-}
 
-func validateCampaignExportReviewText(review SemanticReview) error {
-	for _, value := range []string{review.Evidence, review.EvidenceQuote, review.Reason} {
-		if err := validateCampaignExportSensitiveText(value, false); err != nil {
-			return err
-		}
+		appendReviews(document.Reviews, "recovery", document.FormatVersion)
 	}
 	return nil
 }
@@ -656,14 +706,24 @@ func campaignExportAttemptRow(id, sourceID, campaignID, phase, model, source str
 		Source: source, SourceArtifactID: sourceID, JournalSequence: sequence, Retry: attempt.Retry,
 		RecoveryNumber: recoveryNumber, BaseAttemptSHA256: baseHash, Status: attempt.Status,
 		LatencyMillis: &latency, ProviderRequestCount: attempt.RequestCount,
-		ProviderHTTPRequestID: nil, InputSHA256: attempt.InputSHA256, PromptSHA256: attempt.PromptSHA256,
-		Usage: campaignExportUsage(attempt.ProviderResponse), MissingData: []string{"provider_http_request_id", "provider_http_status", "completion_time"},
+		Provider: attempt.Provider, HTTPStatus: attempt.HTTPStatus, ProviderHTTPRequestID: attempt.RequestID, DurationScope: "attempt_including_mapping_generation_parsing", InputSHA256: attempt.InputSHA256, PromptSHA256: attempt.PromptSHA256,
+		Usage: campaignExportAttemptUsage(attempt), MissingData: []string{"completion_time"},
+	}
+	if attempt.RequestID == nil {
+		row.MissingData = append(row.MissingData, "provider_http_request_id")
+	}
+	if attempt.HTTPStatus == nil {
+		row.MissingData = append(row.MissingData, "provider_http_status")
+	}
+	if row.Provider == "" {
+		row.MissingData = append(row.MissingData, "provider")
 	}
 	if !attempt.StartedOn.IsZero() {
 		started := attempt.StartedOn
 		row.StartedOn = &started
 	} else {
-		row.MissingData = append(row.MissingData, "started_on")
+		row.LatencyMillis = nil
+		row.MissingData = append(row.MissingData, "started_on", "latency_ms")
 	}
 	if len(attempt.GenerationConfig) > 0 {
 		row.GenerationConfigSHA256 = digest(attempt.GenerationConfig)
@@ -679,8 +739,30 @@ func campaignExportAttemptRow(id, sourceID, campaignID, phase, model, source str
 	}
 	var provider struct {
 		ModelVersion string `json:"modelVersion"`
+		ResponseID   string `json:"responseId"`
+		Candidates   []struct {
+			FinishReason string `json:"finishReason"`
+		} `json:"candidates"`
+		PromptFeedback struct {
+			BlockReason string `json:"blockReason"`
+		} `json:"promptFeedback"`
 	}
-	if json.Unmarshal(attempt.ProviderResponse, &provider) == nil && strings.TrimSpace(provider.ModelVersion) != "" {
+	providerErr := json.Unmarshal(attempt.ProviderResponse, &provider)
+	row.FinishReasons = []string{}
+	if providerErr == nil {
+		if provider.ResponseID != "" {
+			row.ProviderResponseID = &provider.ResponseID
+		}
+		if provider.PromptFeedback.BlockReason != "" {
+			row.BlockReason = &provider.PromptFeedback.BlockReason
+		}
+		for _, candidate := range provider.Candidates {
+			if candidate.FinishReason != "" {
+				row.FinishReasons = append(row.FinishReasons, candidate.FinishReason)
+			}
+		}
+	}
+	if providerErr == nil && strings.TrimSpace(provider.ModelVersion) != "" {
 		row.ResolvedModel = &provider.ModelVersion
 	} else {
 		row.MissingData = append(row.MissingData, "resolved_model")
@@ -696,6 +778,7 @@ func campaignExportUsage(raw json.RawMessage) CampaignExportProviderUsage {
 			Input    *int64 `json:"promptTokenCount"`
 			Output   *int64 `json:"candidatesTokenCount"`
 			Thinking *int64 `json:"thoughtsTokenCount"`
+			Cached   *int64 `json:"cachedContentTokenCount"`
 			Total    *int64 `json:"totalTokenCount"`
 			Details  []struct {
 				Modality string `json:"modality"`
@@ -708,11 +791,12 @@ func campaignExportUsage(raw json.RawMessage) CampaignExportProviderUsage {
 		result.OutputTokens = provider.Usage.Output
 		result.ThinkingTokens = provider.Usage.Thinking
 		result.TotalTokens = provider.Usage.Total
+		result.CachedInputTokens = provider.Usage.Cached
 		for _, detail := range provider.Usage.Details {
 			result.InputTokenDetails = append(result.InputTokenDetails, CampaignExportInputTokenDetail{Modality: detail.Modality, TokenCount: detail.Count})
 		}
 	}
-	for name, value := range map[string]*int64{"input_tokens": result.InputTokens, "output_tokens": result.OutputTokens, "thinking_tokens": result.ThinkingTokens, "total_tokens": result.TotalTokens} {
+	for name, value := range map[string]*int64{"input_tokens": result.InputTokens, "output_tokens": result.OutputTokens, "thinking_tokens": result.ThinkingTokens, "total_tokens": result.TotalTokens, "cached_input_tokens": result.CachedInputTokens} {
 		if value == nil {
 			result.Missing[name] = "not_reported_by_provider"
 		}
@@ -731,17 +815,30 @@ func campaignExportExpectedObserved(dataset *Dataset, caseID string, parsed json
 		if len(parsed) == 0 {
 			return append(json.RawMessage(nil), item.Expected...), nil, fmt.Errorf("parsed output unavailable")
 		}
-		var output pdOutput
+		var output map[string]json.RawMessage
 		if err := json.Unmarshal(parsed, &output); err != nil {
 			return append(json.RawMessage(nil), item.Expected...), nil, err
 		}
-		observed := struct {
-			Status            string   `json:"status"`
-			Action            string   `json:"action"`
-			Outcome           string   `json:"outcome"`
-			Category          string   `json:"category"`
-			SelectedImageRefs []string `json:"selected_image_refs"`
-		}{output.Status, output.Assessment.Action, output.Assessment.Outcome, output.Assessment.Category, append([]string(nil), output.Assessment.Selected...)}
+		var assessment map[string]json.RawMessage
+		if raw, exists := output["assessment"]; exists {
+			if err := json.Unmarshal(raw, &assessment); err != nil {
+				return append(json.RawMessage(nil), item.Expected...), nil, err
+			}
+		}
+		// Copy only reported fields so absent, null, empty and populated
+		// values remain distinct in the exported observation.
+		observed := map[string]json.RawMessage{}
+		if status, exists := output["status"]; exists {
+			observed["status"] = status
+		}
+		for source, target := range map[string]string{
+			"action": "action", "outcome": "outcome",
+			"problem_category_name": "category", "selected_image_refs": "selected_image_refs",
+		} {
+			if value, exists := assessment[source]; exists {
+				observed[target] = value
+			}
+		}
 		data, err := json.Marshal(observed)
 		return append(json.RawMessage(nil), item.Expected...), data, err
 	}
@@ -768,6 +865,20 @@ func campaignExportExpectedObserved(dataset *Dataset, caseID string, parsed json
 			OrderedReferences []string `json:"ordered_references"`
 		}{refs})
 		return append(json.RawMessage(nil), item.Expected...), data, err
+	}
+	for _, item := range dataset.SM {
+		if item.ID != caseID {
+			continue
+		}
+		if len(parsed) == 0 {
+			return append(json.RawMessage(nil), item.Expected...), nil, fmt.Errorf("parsed output unavailable")
+		}
+		var output map[string]json.RawMessage
+		if err := json.Unmarshal(parsed, &output); err != nil {
+			return item.Expected, nil, err
+		}
+		observed, err := json.Marshal(map[string]json.RawMessage{"summary": output["summary"]})
+		return append(json.RawMessage(nil), item.Expected...), observed, err
 	}
 	return nil, nil, fmt.Errorf("%w: unknown case %s", ErrInvalidCampaignExport, caseID)
 }
@@ -799,7 +910,7 @@ func campaignExportAddResolution(model *CampaignExportModelResolution, resolved 
 func campaignExportErrorClass(attempt Attempt) string {
 	message := strings.ToLower(attempt.Error)
 	switch {
-	case strings.TrimSpace(attempt.RawOutput) != "":
+	case attempt.RawOutput != "":
 		return "output_parse_error"
 	case strings.Contains(message, "503") || strings.Contains(message, "unavailable"):
 		return "provider_unavailable"
@@ -848,32 +959,64 @@ func campaignExportRecordConfig(export *CampaignExport, config json.RawMessage) 
 	return nil
 }
 
+// validateCampaignExportResponse scans every public wire token without map
+// decoding, which would discard duplicate keys in parser-rejected evidence.
 func validateCampaignExportResponse(raw string, allowedReferences map[string]bool) error {
-	var value any
-	if json.Unmarshal([]byte(raw), &value) != nil {
+	if !json.Valid([]byte(raw)) {
 		return validateCampaignExportSensitiveText(raw, false)
 	}
-	return walkCampaignExportResponse(value, "", allowedReferences)
+	decoder := json.NewDecoder(strings.NewReader(raw))
+	decoder.UseNumber()
+	if err := scanCampaignResponseToken(decoder, "", allowedReferences); err != nil {
+		return err
+	}
+	if _, err := decoder.Token(); !errors.Is(err, io.EOF) {
+		return fmt.Errorf("%w: trailing response tokens", ErrInvalidCampaignExport)
+	}
+	return nil
 }
 
-func walkCampaignExportResponse(value any, field string, allowedReferences map[string]bool) error {
-	switch typed := value.(type) {
-	case map[string]any:
-		for key, child := range typed {
-			if err := walkCampaignExportResponse(child, key, allowedReferences); err != nil {
-				return err
+func scanCampaignResponseToken(decoder *json.Decoder, field string, allowedReferences map[string]bool) error {
+	token, err := decoder.Token()
+	if err != nil {
+		return fmt.Errorf("%w: decode response token: %v", ErrInvalidCampaignExport, err)
+	}
+	switch value := token.(type) {
+	case json.Delim:
+		switch value {
+		case '{':
+			for decoder.More() {
+				keyToken, keyErr := decoder.Token()
+				if keyErr != nil {
+					return keyErr
+				}
+				key, ok := keyToken.(string)
+				if !ok {
+					return fmt.Errorf("%w: non-string response key", ErrInvalidCampaignExport)
+				}
+				if err := validateCampaignExportSensitiveText(key, false); err != nil {
+					return err
+				}
+				if err := scanCampaignResponseToken(decoder, key, allowedReferences); err != nil {
+					return err
+				}
 			}
-		}
-	case []any:
-		for _, child := range typed {
-			if err := walkCampaignExportResponse(child, field, allowedReferences); err != nil {
-				return err
+		case '[':
+			for decoder.More() {
+				if err := scanCampaignResponseToken(decoder, field, allowedReferences); err != nil {
+					return err
+				}
 			}
+		default:
+			return fmt.Errorf("%w: unexpected response delimiter", ErrInvalidCampaignExport)
 		}
+		_, err = decoder.Token()
+		return err
 	case string:
 		referenceField := field == "image_ref" || field == "selected_image_refs" || field == "reference"
-		skipPhone := referenceField && allowedReferences[typed]
-		return validateCampaignExportSensitiveText(typed, skipPhone)
+		return validateCampaignExportSensitiveText(value, referenceField && allowedReferences[value])
+	case json.Number:
+		return validateCampaignExportSensitiveText(value.String(), false)
 	}
 	return nil
 }
@@ -950,4 +1093,128 @@ func validateCampaignExportText(data []byte) error {
 // the offline writer. It does not mutate or redact evidence.
 func ValidateCampaignExportArtifact(data []byte) error {
 	return validateCampaignExportText(data)
+}
+
+// appendCampaignPhysicalResponse retains every received text unchanged, even
+// when the adapter rejects it or a later recovery replaces the logical result.
+func appendCampaignPhysicalResponse(export *CampaignExport, row CampaignExportAttempt, attempt Attempt, allowedReferences map[string]bool) error {
+	if attempt.RawOutput == "" {
+		return nil
+	}
+	if err := validateCampaignExportResponse(attempt.RawOutput, allowedReferences); err != nil {
+		return fmt.Errorf("%w: unsafe response for %s", err, row.AttemptID)
+	}
+	export.Manifest.PrivacyScan.RecordsScanned["responses"]++
+	raw := attempt.RawOutput
+	response := CampaignExportResponse{ResponseID: row.AttemptID + ":response", SlotID: row.SlotID, Phase: row.Phase, RequestedModel: row.RequestedModel, DatasetCaseID: row.CaseID, Trial: row.Trial, OriginalAttemptID: row.AttemptID, EffectiveAttemptID: row.AttemptID, Recovered: row.Source == "recovery", ExecutionStatus: attempt.Status, FormatStatus: "malformed", InputSHA256: row.InputSHA256, PromptSHA256: row.PromptSHA256, GenerationConfigSHA: row.GenerationConfigSHA256, OutputSHA256: digest([]byte(raw)), RawOutput: &raw}
+	if attempt.Status == "executed" && json.Valid([]byte(raw)) {
+		response.ParsedOutput = json.RawMessage(raw)
+		response.FormatStatus = "parsed"
+	}
+	export.Responses = append(export.Responses, response)
+	export.Attempts[len(export.Attempts)-1].EffectiveResponseID = &response.ResponseID
+	return nil
+}
+
+func campaignExportAttemptUsage(attempt Attempt) CampaignExportProviderUsage {
+	raw := attempt.ProviderResponse
+	source := attempt.UsageSource
+	if len(attempt.ProviderUsage) > 0 {
+		raw = append(append([]byte(`{"usageMetadata":`), attempt.ProviderUsage...), '}')
+		if source == "" {
+			source = "http_usage_metadata"
+		}
+	} else if source == "" {
+		source = "sdk_decoded_presence_unknown"
+	}
+	usage := campaignExportUsage(raw)
+	usage.Source = source
+	return usage
+}
+
+// campaignExportPlannedExpectedObserved keeps observations in the original wire
+// reference space. Only the oracle is renamed for a generated bijection.
+func campaignExportPlannedExpectedObserved(dataset *Dataset, plan *Plan, caseID string, parsed json.RawMessage) (json.RawMessage, json.RawMessage, error) {
+	for _, planned := range plan.Cases {
+		if planned.CaseID != caseID {
+			continue
+		}
+		if planned.Variant == nil {
+			return campaignExportExpectedObserved(dataset, caseID, parsed)
+		}
+		variant := planned.Variant
+		for _, base := range dataset.RK {
+			if base.ID != variant.BaseCaseID {
+				continue
+			}
+			transformed, err := TransformRanking(base.Input, variant.Transformation, variant.Seed)
+			if err != nil {
+				return nil, nil, fmt.Errorf("%w: transform oracle: %v", ErrInvalidCampaignExport, err)
+			}
+			expected, observed, observationErr := campaignExportExpectedObserved(dataset, base.ID, parsed)
+			if len(transformed.InverseReferences) == 0 {
+				return expected, observed, observationErr
+			}
+			forward := make(map[string]string, len(transformed.InverseReferences))
+			for renamed, original := range transformed.InverseReferences {
+				forward[original] = renamed
+			}
+			expected, err = campaignExportRenameExpectedReferences(expected, forward)
+			if err != nil {
+				return nil, nil, fmt.Errorf("%w: transform oracle references: %v", ErrInvalidCampaignExport, err)
+			}
+			return expected, observed, observationErr
+		}
+		return nil, nil, fmt.Errorf("%w: unknown variant parent %s", ErrInvalidCampaignExport, variant.BaseCaseID)
+	}
+	return nil, nil, fmt.Errorf("%w: unknown planned case %s", ErrInvalidCampaignExport, caseID)
+}
+
+func campaignExportRenameExpectedReferences(raw json.RawMessage, forward map[string]string) (json.RawMessage, error) {
+	var expected map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &expected); err != nil {
+		return nil, err
+	}
+	for _, field := range []string{"eligible_references", "relevance", "pairwise_constraints", "tie_groups"} {
+		value, exists := expected[field]
+		if !exists {
+			continue
+		}
+		var decoded any
+		if err := json.Unmarshal(value, &decoded); err != nil {
+			return nil, err
+		}
+		var rename func(any) any
+		rename = func(value any) any {
+			switch typed := value.(type) {
+			case string:
+				if replacement, exists := forward[typed]; exists {
+					return replacement
+				}
+				return typed
+			case []any:
+				for i := range typed {
+					typed[i] = rename(typed[i])
+				}
+				return typed
+			case map[string]any:
+				replaced := make(map[string]any, len(typed))
+				for key, child := range typed {
+					if replacement, exists := forward[key]; exists {
+						key = replacement
+					}
+					replaced[key] = rename(child)
+				}
+				return replaced
+			default:
+				return value
+			}
+		}
+		encoded, err := json.Marshal(rename(decoded))
+		if err != nil {
+			return nil, err
+		}
+		expected[field] = encoded
+	}
+	return json.Marshal(expected)
 }

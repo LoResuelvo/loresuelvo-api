@@ -54,7 +54,7 @@ func validateEvaluationOutput(dataset *Dataset, task string, raw json.RawMessage
 // ValidateDatasetSchemas validates frozen records with local Draft 2020-12 schemas.
 // The caller supplies the same bytes that passed manifest verification.
 func ValidateDatasetSchemas(files map[string][]byte) error {
-	for _, name := range []string{"prediagnosis", "ranking", "service_contracts"} {
+	for _, name := range []string{"prediagnosis", "ranking", "summarization"} {
 		schema, err := compileEvaluationSchema(files, name)
 		if err != nil {
 			return err

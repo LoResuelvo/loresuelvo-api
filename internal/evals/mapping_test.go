@@ -63,3 +63,12 @@ func TestRankingMappingRejectsNonpositiveMaximum(t *testing.T) {
 	_, err := (RKInput{}).DomainRequest()
 	require.ErrorContains(t, err, "max results must be positive")
 }
+
+func TestMapSMKeepsOrderedHistoryAndImageIdentity(t *testing.T) {
+	messages, err := (&Dataset{}).MapSM(SMInput{PreviousSummary: "old", Messages: []MessageInput{{SenderRole: "assistant", Content: "question"}, {SenderRole: "consumer", Content: "answer", Images: []HistoricalImage{{FileID: "abc", Description: "observed"}}}}})
+	require.NoError(t, err)
+	require.Equal(t, "chatbot", messages[0].SenderRole)
+	require.Equal(t, "answer", messages[1].Content)
+	require.Equal(t, "abc", messages[1].Images[0].FileID)
+	require.Equal(t, "observed", messages[1].Images[0].Description)
+}

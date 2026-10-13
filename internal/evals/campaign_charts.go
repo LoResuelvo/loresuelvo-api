@@ -109,7 +109,7 @@ func RenderQualitySVG(series []QualityChartSeries) ([]byte, error) {
 			b.WriteString(fmt.Sprintf(`<rect x="420" y="%d" width="%d" height="16" fill="#2b6cb0"/>`, y+2, width))
 			textSVG(&b, 790, y+15, formatFloat(value), 12, "value")
 		}
-		textSVG(&b, 24, y+34, fmt.Sprintf("n=%d/%d · base cases=%d/%d", item.Summary.Observations, item.Summary.ExpectedObservations, item.Summary.EvaluatedBaseCases, item.Summary.ExpectedObservations), 11, "value")
+		textSVG(&b, 24, y+34, fmt.Sprintf("n=%d/%d · base cases=%d/%d", item.Summary.Observations, item.Summary.ExpectedObservations, item.Summary.EvaluatedBaseCases, item.Summary.EvaluatedBaseCases+item.Summary.UnassessedBaseCases), 11, "value")
 	}
 	endSVG(&b)
 	return []byte(b.String()), nil
@@ -174,7 +174,7 @@ func RenderRankingSVG(series []RankingChartSeries) ([]byte, error) {
 			b.WriteString(fmt.Sprintf(`<rect x="420" y="%d" width="%d" height="16" fill="%s"/>`, y+2, width, color))
 			textSVG(&b, 790, y+15, formatFloat(value), 12, "value")
 		}
-		textSVG(&b, 24, y+34, fmt.Sprintf("n=%d/%d · base cases=%d/%d", item.Summary.Observations, item.Summary.ExpectedObservations, item.Summary.EvaluatedBaseCases, item.Summary.ExpectedObservations), 11, "value")
+		textSVG(&b, 24, y+34, fmt.Sprintf("n=%d/%d · base cases=%d/%d", item.Summary.Observations, item.Summary.ExpectedObservations, item.Summary.EvaluatedBaseCases, item.Summary.EvaluatedBaseCases+item.Summary.UnassessedBaseCases), 11, "value")
 	}
 	endSVG(&b)
 	return []byte(b.String()), nil

@@ -26,9 +26,9 @@ type metamorphicRankingExpected struct {
 
 // CompareRankingMetamorphic expects schema-validated outputs with reference
 // bijections already inverted. Order is assessed only by strict pairwise constraints. Explicit tie groups may substitute
-// a member at the cutoff without an instability penalty. Required membership
-// keeps multiplicity: two required tied candidates still require two slots.
-func CompareRankingMetamorphic(expected, left, right json.RawMessage) (MetamorphicComparison, error) {
+// a member at the cutoff without an instability penalty. MaxResults is the
+// model input limit, not the cutoff of the ranking quality metric.
+func CompareRankingMetamorphic(expected, left, right json.RawMessage, maxResults int) (MetamorphicComparison, error) {
 	result := MetamorphicComparison{Relation: "ranking_invariance", DeterministicStatus: "passed", SemanticStatus: "unassessed", AggregationUnit: "base_case_not_variant", Errors: []string{}}
 	var rubric metamorphicRankingExpected
 	if err := json.Unmarshal(expected, &rubric); err != nil {
@@ -50,13 +50,8 @@ func CompareRankingMetamorphic(expected, left, right json.RawMessage) (Metamorph
 			classes[ref] = fmt.Sprintf("tie:%d", i)
 		}
 	}
-	required := map[string]int{}
-	for _, ref := range rubric.Required {
-		class, ok := classes[ref]
-		if !ok {
-			return result, fmt.Errorf("unknown required reference %q", ref)
-		}
-		required[class]++
+	if maxResults <= 0 {
+		return result, fmt.Errorf("max results must be positive")
 	}
 	read := func(raw json.RawMessage, label string) ([]string, bool) {
 		var output struct {
@@ -69,30 +64,21 @@ func CompareRankingMetamorphic(expected, left, right json.RawMessage) (Metamorph
 			return nil, false
 		}
 		refs := make([]string, 0, len(output.Recommendations))
-		counts := map[string]int{}
 		seen := map[string]bool{}
 		valid := true
 		for _, item := range output.Recommendations {
-			class, ok := classes[item.Reference]
+			_, ok := classes[item.Reference]
 			if !ok || seen[item.Reference] {
 				result.Errors = append(result.Errors, label+":invalid_reference")
 				valid = false
 				continue
 			}
 			seen[item.Reference] = true
-			counts[class]++
 			refs = append(refs, item.Reference)
 		}
-		if len(output.Recommendations) < rubric.MinResults || len(output.Recommendations) > min(3, len(rubric.Eligible)) {
+		if len(output.Recommendations) > maxResults {
 			result.Errors = append(result.Errors, label+":result_count")
 			valid = false
-		}
-		for class, count := range required {
-			if counts[class] < count {
-				result.Errors = append(result.Errors, label+":required_top_k")
-				valid = false
-				break
-			}
 		}
 		return refs, valid
 	}
@@ -122,7 +108,7 @@ func CompareRankingMetamorphic(expected, left, right json.RawMessage) (Metamorph
 	stable := slices.Equal(leftSet, rightSet)
 	result.Stable = &stable
 	if !stable {
-		result.Errors = append(result.Errors, "top3_set_changed_outside_ties")
+		result.Errors = append(result.Errors, "recommendation_set_changed_outside_ties")
 	}
 	if len(result.Errors) > 0 {
 		result.DeterministicStatus = "failed"

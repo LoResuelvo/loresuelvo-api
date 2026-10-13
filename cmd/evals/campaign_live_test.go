@@ -46,21 +46,21 @@ func TestVerifyCampaignBaselineUsesExactFileHashes(t *testing.T) {
 }
 
 func TestCampaignLiveDryRunValidatesFrozenProtocolWithoutProviderCalls(t *testing.T) {
-	t.Setenv("CHATBOT_API_KEY", "")
-	root := filepath.Join("..", "..", "evals")
+	t.Setenv("CHATBOT_EVALS_API_KEYS", "")
+	root := cliDataset(t)
 	var stdout, stderr bytes.Buffer
-	code := run([]string{"campaign-live", "--dataset", filepath.Join(root, "datasets", "LoResuelvo_US60_evals_v1.0.0"), "--protocol", filepath.Join(root, "protocols", "campaign-1.json"), "--dry-run"}, &stdout, &stderr)
+	code := run([]string{"campaign-live", "--dataset", root, "--protocol", cliCampaignProtocol(t, root), "--dry-run"}, &stdout, &stderr)
 	require.Zero(t, code, stderr.String())
-	require.Contains(t, stdout.String(), `"maximum_generation_calls": 360`)
+	require.Contains(t, stdout.String(), `"maximum_generation_calls": 8`)
 	require.Contains(t, stdout.String(), `"live_model_calls": 0`)
 	require.Contains(t, stdout.String(), `"count_token_calls": 0`)
 }
 
-func TestFrozenCampaignBuildsFourPlansWithShared360GenerationCeiling(t *testing.T) {
-	root := filepath.Join("..", "..", "evals")
-	dataset, err := evals.LoadDataset(filepath.Join(root, "datasets", "LoResuelvo_US60_evals_v1.0.0"))
+func TestCampaignBuildsFourPlansWithSharedGenerationCeiling(t *testing.T) {
+	root := cliDataset(t)
+	dataset, err := evals.LoadDataset(root)
 	require.NoError(t, err)
-	config, err := evals.ReadCampaignExecutionConfig(dataset, filepath.Join(root, "protocols", "campaign-1.json"))
+	config, err := evals.ReadCampaignExecutionConfig(dataset, cliCampaignProtocol(t, root))
 	require.NoError(t, err)
 	items, err := buildCampaignExecutions(dataset, config, filepath.Join(t.TempDir(), "campaign"), "not-used", true)
 	require.NoError(t, err)
@@ -71,8 +71,8 @@ func TestFrozenCampaignBuildsFourPlansWithShared360GenerationCeiling(t *testing.
 		requests += item.Plan.MaximumRequests
 		countTokenRequests += len(item.Plan.Cases)
 	}
-	require.Equal(t, 360, requests)
-	require.Equal(t, 144, countTokenRequests)
+	require.Equal(t, 8, requests)
+	require.Equal(t, 4, countTokenRequests)
 }
 
 func TestCampaignLiveRejectsStalePricingBeforeRepositoryOrProviderWork(t *testing.T) {

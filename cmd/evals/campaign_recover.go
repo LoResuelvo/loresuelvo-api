@@ -110,21 +110,25 @@ type campaignRecoveryPreparation struct {
 }
 
 type campaignRecoveryResult struct {
-	CampaignID                    string              `json:"campaign_id"`
-	AddendumID                    string              `json:"addendum_id"`
-	ProtocolSHA256                string              `json:"protocol_sha256"`
-	DatasetManifestSHA256         string              `json:"dataset_manifest_sha256"`
-	ExecutionSourceCommit         string              `json:"execution_source_commit"`
-	OriginalExecutionSourceCommit string              `json:"original_execution_source_commit"`
-	Candidates                    []recoveryCandidate `json:"candidates"`
-	AdditionalAttempts            int                 `json:"additional_attempts"`
-	MaximumAdditionalAttempts     int                 `json:"maximum_additional_attempts"`
-	EffectiveMaxAttemptsPerSlot   int                 `json:"effective_max_attempts_per_original_slot"`
-	RecoveryUpperBoundUSD         float64             `json:"recovery_upper_bound_usd"`
-	ReleaseApproved               bool                `json:"release_approved"`
-	EvidencePath                  string              `json:"evidence_path,omitempty"`
-	RecoveryEvidencePaths         []string            `json:"recovery_evidence_paths,omitempty"`
-	EvidenceWithRecovery          string              `json:"evidence_with_recovery,omitempty"`
+	Status                        string                 `json:"status"`
+	StopReason                    string                 `json:"stop_reason,omitempty"`
+	BillingTier                   string                 `json:"billing_tier"`
+	Build                         *evals.BuildProvenance `json:"build,omitempty"`
+	CampaignID                    string                 `json:"campaign_id"`
+	AddendumID                    string                 `json:"addendum_id"`
+	ProtocolSHA256                string                 `json:"protocol_sha256"`
+	DatasetManifestSHA256         string                 `json:"dataset_manifest_sha256"`
+	ExecutionSourceCommit         string                 `json:"execution_source_commit"`
+	OriginalExecutionSourceCommit string                 `json:"original_execution_source_commit"`
+	Candidates                    []recoveryCandidate    `json:"candidates"`
+	AdditionalAttempts            int                    `json:"additional_attempts"`
+	MaximumAdditionalAttempts     int                    `json:"maximum_additional_attempts"`
+	EffectiveMaxAttemptsPerSlot   int                    `json:"effective_max_attempts_per_original_slot"`
+	RecoveryUpperBoundUSD         float64                `json:"recovery_upper_bound_usd"`
+	ReleaseApproved               bool                   `json:"release_approved"`
+	EvidencePath                  string                 `json:"evidence_path,omitempty"`
+	RecoveryEvidencePaths         []string               `json:"recovery_evidence_paths,omitempty"`
+	EvidenceWithRecovery          string                 `json:"evidence_with_recovery,omitempty"`
 }
 
 func readCampaignRecoveryAddendum(path string) (campaignRecoveryAddendum, error) {
@@ -362,12 +366,20 @@ func prepareCampaignRecovery(dataset *evals.Dataset, config evals.CampaignExecut
 }
 
 func executeCampaignRecovery(ctx context.Context, dataset *evals.Dataset, config evals.CampaignExecutionConfig, addendum campaignRecoveryAddendum, spec evals.CampaignReportSpec, originalEvidencePath, output, apiKey, runnerCommit string) (campaignRecoveryResult, error) {
-	result := campaignRecoveryResult{CampaignID: config.CampaignID, AddendumID: addendum.AddendumID, ProtocolSHA256: config.ProtocolSHA256, DatasetManifestSHA256: dataset.ManifestSHA256, ExecutionSourceCommit: runnerCommit, OriginalExecutionSourceCommit: addendum.Scope.ExecutionSourceCommit, Candidates: []recoveryCandidate{}}
+	result := campaignRecoveryResult{BillingTier: config.BillingTier, CampaignID: config.CampaignID, AddendumID: addendum.AddendumID, ProtocolSHA256: config.ProtocolSHA256, DatasetManifestSHA256: dataset.ManifestSHA256, ExecutionSourceCommit: runnerCommit, OriginalExecutionSourceCommit: addendum.Scope.ExecutionSourceCommit, Candidates: []recoveryCandidate{}}
+	if err := verifyCampaignOutput(output); err != nil {
+		return result, err
+	}
 	candidates, err := collectRecoveryCandidates(dataset, spec, addendum)
 	if err != nil {
 		return result, err
 	}
 	result.Candidates = candidates
+	build, err := executionBuildProvenance(runnerCommit)
+	if err != nil {
+		return result, err
+	}
+	result.Build = build
 	preparation, err := prepareCampaignRecovery(dataset, config, addendum, spec, candidates, runnerCommit)
 	if err != nil {
 		return result, err
@@ -379,11 +391,11 @@ func executeCampaignRecovery(ctx context.Context, dataset *evals.Dataset, config
 	if ctx == nil {
 		return result, errors.New("recovery context is required")
 	}
-	type recoveryWork struct {
-		candidate recoveryCandidate
-		executors []*evals.GeminiExecutor
-	}
 	workPlans, err := campaignRecoveryWorkPlans(candidates, preparation.EffectiveMaxAttemptsPerSlot)
+	if err != nil {
+		return result, err
+	}
+	keys, err := evals.ParseEvaluationAPIKeys(apiKey)
 	if err != nil {
 		return result, err
 	}
@@ -391,6 +403,12 @@ func executeCampaignRecovery(ctx context.Context, dataset *evals.Dataset, config
 	allExecutors := make([]*evals.GeminiExecutor, 0, preparation.MaximumAdditionalAttempts)
 	prices := append([]evals.CampaignPrice(nil), config.Prices...)
 	for i := range prices {
+		today := time.Now().UTC().Format(time.DateOnly)
+		if prices[i].VerifiedOn != "" && prices[i].VerifiedOn != today {
+			return result, fmt.Errorf("protocol pricing snapshot date differs from recovery verification date")
+		}
+		prices[i].VerifiedOn = today
+		prices[i].Source = config.PricingSource
 		prices[i].Verified = true
 	}
 	for _, workPlan := range workPlans {
@@ -399,13 +417,13 @@ func executeCampaignRecovery(ctx context.Context, dataset *evals.Dataset, config
 		if candidate.Phase == "smoke" {
 			suite = "smoke"
 		}
-		work := recoveryWork{candidate: candidate, executors: make([]*evals.GeminiExecutor, 0, workPlan.AdditionalAttempts)}
+		work := recoveryWork{candidate: candidate, executors: make([]evals.CaseExecutor, 0, workPlan.AdditionalAttempts)}
 		for n := 0; n < workPlan.AdditionalAttempts; n++ {
 			plan, planErr := evals.BuildPlan(dataset, evals.PlanOptions{Suite: suite, Model: candidate.RequestedModel, Trials: 1, MaxRetries: 0, MaxRequests: 1, CaseIDs: []string{candidate.CaseID}})
 			if planErr != nil {
 				return result, planErr
 			}
-			executor, exErr := evals.NewGeminiExecutor(dataset, plan, config.Execution.Limits, true, apiKey)
+			executor, exErr := evals.NewGeminiExecutorWithKeys(dataset, plan, config.Execution.Limits, true, keys)
 			if exErr != nil {
 				return result, exErr
 			}
@@ -414,6 +432,7 @@ func executeCampaignRecovery(ctx context.Context, dataset *evals.Dataset, config
 		}
 		works = append(works, work)
 	}
+	evals.ShareGeminiProjectLanes(allExecutors)
 	// CountTokens and the shared guard are installed before any GenerateContent call.
 	if _, err := evals.PreflightGeminiCampaignBudget(ctx, allExecutors, prices, config.HardCeilingUSD-preparation.PriorUpperBoundUSD, config.PricingSource); err != nil {
 		return result, err
@@ -433,100 +452,17 @@ func executeCampaignRecovery(ctx context.Context, dataset *evals.Dataset, config
 	if err := os.MkdirAll(filepath.Join(output, "recovery"), 0700); err != nil {
 		return result, err
 	}
-	byRun := map[string][]evals.RecoveryAttempt{}
-	actualAttempts := 0
-	var lastGeneration time.Time
-	for i, work := range works {
-		candidate := work.candidate
-		for n, executor := range work.executors {
-			interval := config.Execution.Limits.MinInterval
-			addendumInterval := time.Duration(addendum.Execution.MinIntervalSeconds) * time.Second
-			if addendumInterval > interval {
-				interval = addendumInterval
-			}
-			if !lastGeneration.IsZero() {
-				if wait := interval - time.Since(lastGeneration); wait > 0 {
-					timer := time.NewTimer(wait)
-					select {
-					case <-ctx.Done():
-						timer.Stop()
-						return result, ctx.Err()
-					case <-timer.C:
-					}
-				}
-			}
-			started := time.Now().UTC()
-			lastGeneration = started
-			attemptCtx, cancel := context.WithTimeout(ctx, config.Execution.Limits.AttemptTimeout)
-			out, callErr := executor.Execute(attemptCtx, candidate.CaseID)
-			cancel()
-			a := evals.Attempt{RequestID: out.RequestID, CaseID: candidate.CaseID, Trial: candidate.Trial, Retry: candidate.Retry + n + 1, StartedOn: started, LatencyMillis: time.Since(started).Milliseconds(), Status: "executed", Input: out.Input, PromptSHA256: out.PromptSHA256, GenerationConfig: out.GenerationConfig, RawOutput: out.RawOutput, ParsedOutput: out.ParsedOutput, ProviderResponse: out.ProviderResponse, RequestCount: out.RequestCount}
-			if len(a.Input) > 0 {
-				sum := sha256.Sum256(a.Input)
-				a.InputSHA256 = fmt.Sprintf("%x", sum)
-			}
-			if callErr != nil {
-				a.Status = "execution_error"
-				a.Error = strings.ReplaceAll(callErr.Error(), apiKey, "[REDACTED]")
-			}
-			item := evals.RecoveryAttempt{Attempt: a, BaseAttemptSHA256: candidate.OriginalAttemptSHA256, RecoveryNumber: n + 1}
-			actualAttempts++
-			byRun[candidate.RunDirectory] = append(byRun[candidate.RunDirectory], item)
-			path := filepath.Join(output, "attempts", fmt.Sprintf("%03d-%s-%s-%d.json", i+1, safeCampaignPathComponent(candidate.RequestedModel), safeCampaignPathComponent(candidate.CaseID), n+1))
-			if err := writeExclusiveJSON(path, item); err != nil {
-				return result, err
-			}
-			if callErr == nil || strings.TrimSpace(a.RawOutput) != "" || !evals.RecoverableNoResponse(a) {
-				break
-			}
-			if n+1 < len(work.executors) {
-				delay := time.Duration(addendum.Execution.Backoff.InitialSeconds) * time.Second
-				for j := 1; j < n+1; j++ {
-					delay *= time.Duration(addendum.Execution.Backoff.Multiplier)
-				}
-				maxDelay := time.Duration(addendum.Execution.Backoff.MaxSeconds) * time.Second
-				if delay > maxDelay {
-					delay = maxDelay
-				}
-				timer := time.NewTimer(delay)
-				select {
-				case <-ctx.Done():
-					timer.Stop()
-					return result, ctx.Err()
-				case <-timer.C:
-				}
-			}
-		}
+	byRun, actualAttempts, stopReason, err := executeRecoveryAttempts(ctx, works, config.Execution.Limits, addendum, output, keys)
+	if err != nil {
+		return result, err
+	}
+	result.StopReason = stopReason
+	result.Status = "completed"
+	if stopReason != "" {
+		result.Status = "partial"
 	}
 	result.AdditionalAttempts = actualAttempts
-	pathByRun := map[string]string{}
-	for runDir, attempts := range byRun {
-		record, baseAttempts := preparation.BaseRecordsByRun[runDir], preparation.BaseAttemptsByRun[runDir]
-		manifest, manifestOK := preparation.ManifestByRun[runDir]
-		if !manifestOK {
-			return result, fmt.Errorf("missing recovery manifest for %s", runDir)
-		}
-		bundle := evals.RecoveryBundle{Manifest: manifest, Attempts: attempts}
-		if validateErr := evals.ValidateRecovery(bundle, record, baseAttempts); validateErr != nil {
-			return result, validateErr
-		}
-		path := filepath.Join(output, "recovery", safeCampaignPathComponent(record.Plan.Model), safeCampaignPathComponent(record.RunID)+".json")
-		if writeErr := evals.WriteCampaignRecovery(path, evals.CampaignRecoveryEvidence{Manifest: manifest, Attempts: attempts}); writeErr != nil {
-			return result, writeErr
-		}
-		result.RecoveryEvidencePaths = append(result.RecoveryEvidencePaths, path)
-		pathByRun[runDir] = path
-	}
-	sort.Strings(result.RecoveryEvidencePaths)
-	result.EvidencePath = filepath.Join(output, "recovery.json")
-	result.EvidenceWithRecovery = filepath.Join(output, "evidence-with-recovery.json")
-	if err := writeExclusiveJSON(result.EvidencePath, result); err != nil {
-		return result, err
-	}
-	if err := writeRecoveryEvidenceOverlay(originalEvidencePath, result.EvidenceWithRecovery, pathByRun); err != nil {
-		return result, err
-	}
-	return result, nil
+	return finalizeRecoveryEvidence(result, preparation, byRun, originalEvidencePath, output)
 }
 
 func writeRecoveryEvidenceOverlay(originalPath, output string, recoveryByRun map[string]string) error {

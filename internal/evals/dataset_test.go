@@ -20,15 +20,15 @@ func writeDatasetFixture(t *testing.T) string {
 `,
 		"datasets/ranking.jsonl": `{"id":"RK-001","task":"ranking","family_id":"sink","split":"holdout","input":{"max_results":3},"expected":{}}
 `,
-		"datasets/service_contracts.jsonl": `{"id":"CT-01","input":{},"expected":{}}
+		"datasets/summarization.jsonl": `{"id":"SM-001","task":"summarization","family_id":"summary","split":"development","input":{"previous_summary":"","messages":[]},"expected":{}}
 `,
-		"configs/suites.json": `{"smoke":["PD-001"],"development":["PD-001"],"holdout":["RK-001"],"critical_all":[],"rules":{"live_calls_disabled_by_default":true}}
+		"configs/suites.json": `{"smoke":["PD-001"],"development":["PD-001","SM-001"],"holdout":["RK-001"],"critical_all":[],"rules":{"live_calls_disabled_by_default":true}}
 `,
 		"configs/metamorphic.json": `{ "ranking": [], "prediagnosis_pairs": [] }`,
 		"configs/experiment.json": `{"trials":{"smoke":1,"baseline_development":3,"release":3}}
 `,
 	}
-	for _, name := range []string{"prediagnosis", "ranking", "service_contracts", "prediagnosis-output", "ranking-output"} {
+	for _, name := range []string{"prediagnosis", "ranking", "summarization", "prediagnosis-output", "ranking-output", "summarization-output"} {
 		files["schemas/"+name+".schema.json"] = `{"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object"}`
 	}
 	manifest := datasetManifest{Version: "1.0.0", HashAlgorithm: "SHA-256", Files: make(map[string]string)}

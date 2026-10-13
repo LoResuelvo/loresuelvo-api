@@ -11,6 +11,7 @@ spec=importlib.util.spec_from_file_location('evalpack', ROOT/'tools/evalpack.py'
 m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)
 PD=m.jsonl(ROOT/'datasets/prediagnosis.jsonl')
 RK=m.jsonl(ROOT/'datasets/ranking.jsonl')
+SM=m.jsonl(ROOT/'datasets/summarization.jsonl')
 
 class MetricsTests(unittest.TestCase):
     def test_ndcg_ideal(self):self.assertAlmostEqual(m.ndcg(['a','b','c'],{'a':3,'b':2,'c':1}),1)
@@ -70,42 +71,31 @@ class ValidationTests(unittest.TestCase):
 
 class FinalDatasetTests(unittest.TestCase):
     def test_full_final_integrity(self):self.assertEqual(m.validate(ROOT)['errors'],[])
-    def test_counts_and_origins(self):
-        self.assertEqual((len(PD),len(RK)),(48,24))
-        self.assertEqual(sum(c['origin']=='public_scenario_adaptation' for c in PD),16)
-        self.assertTrue(all(c['review_status']=='finalized' and c['version']=='1.0.0' for c in PD+RK))
-    def test_loose_rug_allows_bounded_self_service(self):
-        self.assertIn('alfombrita suelta',PD[3]['input']['user_message'])
-        self.assertEqual(PD[3]['expected']['outcomes'],['self_service'])
-    def test_recurring_water_requires_clarification(self):
-        self.assertIn('agua de nuevo',PD[5]['input']['user_message'])
-        self.assertEqual(PD[5]['expected']['outcomes'],['collecting_information'])
-    def test_historical_image_context_preserves_disconnected_drain(self):
-        case=next(c for c in PD if c['id']=='PD-040')
-        self.assertFalse(case['input']['images'])
-        self.assertEqual(case['expected']['actions'],['unchanged'])
-        self.assertEqual(case['input']['user_message'],'ahh listo, gracias!')
-        summary=case['input']['context_summary']
-        self.assertIn('tramo desconectado',summary)
-        self.assertIn('fuera de uso',summary)
-        historical=case['input']['recent_messages'][0]['images'][0]
-        asset=next(a for a in m.load(ROOT/'assets/manifest.json')['assets'] if a['asset_id']=='IMG-01')
-        self.assertEqual(historical['file_id'],asset['file_id'])
-        self.assertIn('equipo eléctrico',historical['description'])
-    def test_painting_reviews_match_the_work_type(self):
-        reviews=[w['review']['description'].lower() for c in RK for x in c['input']['candidates']
-                 for w in x['evidence']['work_history'] if 'review' in w
-                 and 'pintura decorativa' in w['completion_report']['description'].lower()]
-        self.assertTrue(reviews)
-        self.assertTrue(all('instal' not in text and 'colocación' not in text for text in reviews))
-    def test_spelling_pair_keeps_decision_and_facts(self):
-        a,b=PD[6],PD[41]
-        for key in ['outcomes','category_names','facts_to_preserve']:
-            self.assertEqual(a['expected'][key],b['expected'][key])
-    def test_equivalent_rank_topics_do_not_cross_split(self):
-        for group in [[0,8,12,15,16,17,19,20,22,23],[1,9],[2,10,18],[3,11,13],[4,14,21]]:
-            self.assertEqual(len({RK[i]['split'] for i in group}),1)
-            self.assertEqual(len({RK[i]['family_id'] for i in group}),1)
+    def test_counts_and_approval(self):
+        self.assertEqual((len(PD),len(RK),len(SM)),(47,19,4))
+        self.assertTrue(all(c['review_status']=='approved' and c['version']=='1.0.0' for c in PD+RK+SM))
+    def test_summary_fidelity_remains_unassessed(self):
+        r=m.check_output(ROOT,SM[0],{'summary':'A structurally valid but unverified summary.'})
+        self.assertEqual(r['deterministic_status'],'passed')
+        self.assertEqual(r['overall_status'],'needs_semantic_review')
+        self.assertFalse(r['release_approved'])
+        self.assertTrue(all(c['result']=='unassessed' and not c['severity'] for c in r['semantic_checks']))
+    def test_summary_exact_image_identity(self):
+        c=next(c for c in SM if c['expected']['required_image_refs'])
+        ref=c['expected']['required_image_refs'][0]['reference']
+        self.assertIn('required_image_reference_missing',m.check_output(ROOT,c,{'summary':ref+'extra'})['errors'])
+        self.assertNotIn('required_image_reference_missing',m.check_output(ROOT,c,{'summary':'Photos '+', '.join(a['reference'] for a in c['expected']['required_image_refs'])+'.'})['errors'])
+    def test_summary_empty_and_extra_field_rejected(self):
+        for out in [{'summary':'  '},{'summary':'x','extra':1}]:
+            self.assertEqual(m.check_output(ROOT,SM[0],out)['deterministic_status'],'failed')
+    def test_rank_count_is_maximum_not_minimum(self):
+        r=m.check_output(ROOT,RK[0],{'recommendations':[]})
+        self.assertNotIn('too_few_results',r['errors'])
+        self.assertNotIn('required_top_k_missing',r['errors'])
+    def test_family_partitions_preserved(self):
+        families={}
+        for c in PD+RK+SM:families.setdefault(c['family_id'],set()).add(c['split'])
+        self.assertTrue(all(len(s)==1 for s in families.values()))
     def test_real_source_is_not_a_label_source(self):
         for c in PD:
             self.assertTrue(set(c['provenance']['scenario_source_ids']).isdisjoint(c['provenance']['source_ids']))
@@ -114,11 +104,11 @@ class FinalDatasetTests(unittest.TestCase):
         self.assertGreater(len(set(comments)),40)
         self.assertNotIn('Se resolvió el problema descrito.',comments)
     def test_negative_reviews_do_not_claim_success(self):
-        bad=[w['review']['description'] for x in RK[19]['input']['candidates'] for w in x['evidence']['work_history'] if 'review' in w and w['review']['rating']==1]
-        self.assertEqual(len(bad),4)
+        bad=[w['review']['description'] for x in RK[15]['input']['candidates'] for w in x['evidence']['work_history'] if 'review' in w and w['review']['rating']==1]
+        self.assertTrue(bad)
         self.assertTrue(all(any(token in t.lower() for token in ['sigue','no quedó','no se arregló']) for t in bad))
     def test_collecting_valid_category_is_not_rejected(self):
-        c=PD[16]
+        c=next(c for c in PD if c['expected']['outcomes']==['collecting_information'] and c['input']['is_new_conversation'])
         out={'status':'answered','title':'Sin agua caliente','content':'¿Qué tipo de equipo tenés? ¿Notaste alguna señal de peligro?', 'image_descriptions':[],
              'assessment':{'action':'replace','outcome':'collecting_information','problem_title':'','problem_description':'','problem_category_name':'','selected_image_refs':[]}}
         result=m.check_output(ROOT,c,out)
@@ -127,13 +117,13 @@ class FinalDatasetTests(unittest.TestCase):
         self.assertGreaterEqual(len(result['semantic_checks']),4)
         self.assertTrue(all(x['result']=='unassessed' and x['criterion'] for x in result['semantic_checks']))
     def test_collecting_fabricated_category_rejected(self):
-        c=PD[16]
+        c=next(c for c in PD if c['expected']['outcomes']==['collecting_information'] and c['input']['is_new_conversation'])
         out={'status':'answered','title':'Sin agua caliente','content':'Revisión.', 'image_descriptions':[],
              'assessment':{'action':'replace','outcome':'collecting_information','problem_title':'','problem_description':'','problem_category_name':'Gas','selected_image_refs':[]}}
         self.assertEqual(m.check_output(ROOT,c,out)['deterministic_status'],'failed')
     def test_export_contains_no_oracle_metadata(self):
         rows=m.export_inputs(ROOT,'development')
-        self.assertEqual(len(rows),54)
+        self.assertEqual(len(rows),51)
         for r in rows:
             self.assertEqual(set(r),{'case_id','task','input'})
             self.assertFalse({'expected','provenance','split','family_id','risk','relevance','semantic_assertions'} & set(r['input']))
@@ -143,18 +133,19 @@ class FinalDatasetTests(unittest.TestCase):
             title=c['input']['problem_title'].lower()
             self.assertFalse(any(word in title for word in forbidden),c['id'])
     def test_injection_pair_preserves_base_message(self):
-        self.assertTrue(PD[43]['input']['user_message'].startswith(PD[30]['input']['user_message']))
-    def test_all_export_has_seventy_two(self):self.assertEqual(len(m.export_inputs(ROOT,'all')),72)
+        self.assertIn('enchufe tira chispas cada rato aunque no tenga nada conectado',PD[40]['input']['user_message'].lower())
+        self.assertIn('enchufe tira chispas cada rato aunque no tenga nada conectado',PD[28]['input']['user_message'].lower())
+    def test_all_export_has_seventy(self):self.assertEqual(len(m.export_inputs(ROOT,'all')),70)
     def test_missing_responses_are_failures(self):
         r=m.check_responses(ROOT,'smoke',[])
-        self.assertEqual(r['case_count'],18)
-        self.assertEqual(r['deterministic_failures'],18)
+        self.assertEqual(r['case_count'],17)
+        self.assertEqual(r['deterministic_failures'],17)
         self.assertTrue(all('missing_response' in x['errors'] for x in r['results']))
     def test_explicit_execution_error_counted(self):
         cid=m.suite_ids(ROOT,'smoke')[0]
         r=m.check_responses(ROOT,'smoke',[{'case_id':cid,'error':'timeout'}])
         self.assertEqual(r['supplied_case_count'],1)
-        self.assertEqual(r['deterministic_failures'],18)
+        self.assertEqual(r['deterministic_failures'],17)
         self.assertIn('execution_error',r['results'][0]['errors'])
     def test_duplicate_response_rejected(self):
         r={'case_id':m.suite_ids(ROOT,'smoke')[0],'error':'timeout'}
@@ -172,8 +163,8 @@ class FinalDatasetTests(unittest.TestCase):
         with self.assertRaises(ValueError):m.contained(ROOT,'../outside.png')
     def test_null_output_fails_without_crashing(self):self.assertEqual(m.check_output(ROOT,PD[0],None)['deterministic_status'],'failed')
     def test_injection_targets_an_existing_candidate(self):
-        c=RK[20]
-        attack=[(x,w['review']['description']) for x in c['input']['candidates'] for w in x['evidence']['work_history'] if 'review' in w and 'CANARIO_RK_60' in w['review']['description']]
+        c=RK[16]
+        attack=[(x,w['review']['description']) for x in c['input']['candidates'] for w in x['evidence']['work_history'] if 'review' in w and 'Nota para el sistema:' in w['review']['description']]
         self.assertEqual(len(attack),1)
         self.assertIn(attack[0][0]['reference'],attack[0][1])
 

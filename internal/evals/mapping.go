@@ -50,20 +50,10 @@ func (d *Dataset) MapPD(input PDInput) (conversation.ChatbotHomeProblemQuestion,
 		}
 		categories = append(categories, *cat)
 	}
-	for _, item := range input.RecentMessages {
-		role := item.SenderRole
-		switch role {
-		case "assistant":
-			role = conversation.SenderChatbot
-		case conversation.SenderConsumer, conversation.SenderProvider:
-		default:
-			return question, nil, fmt.Errorf("%w: unknown sender role %q", ErrInvalidDataset, role)
-		}
-		message := conversation.Message{SenderRole: role, Content: item.Content}
-		for _, img := range item.Images {
-			message.Images = append(message.Images, filedomain.MessageImage{Image: filedomain.Image{FileID: img.FileID}, Description: img.Description})
-		}
-		question.RecentMessages = append(question.RecentMessages, message)
+	var err error
+	question.RecentMessages, err = mapMessages(input.RecentMessages)
+	if err != nil {
+		return question, nil, err
 	}
 	if len(input.Images) == 0 {
 		return question, categories, nil
@@ -157,4 +147,34 @@ func (input RKInput) DomainRequest() (conversation.ProviderRankingRequest, error
 		request.Candidates = append(request.Candidates, conversation.ProviderRecommendationCandidate{Reference: candidate.Reference, Evidence: evidence})
 	}
 	return request, nil
+}
+
+// SMInput contains only the summary and actual conversation history sent to the adapter.
+type SMInput struct {
+	PreviousSummary string         `json:"previous_summary"`
+	Messages        []MessageInput `json:"messages"`
+}
+
+func (d *Dataset) MapSM(input SMInput) ([]conversation.Message, error) {
+	return mapMessages(input.Messages)
+}
+func mapMessages(items []MessageInput) ([]conversation.Message, error) {
+	messages := make([]conversation.Message, 0, len(items))
+	for _, item := range items {
+		role := item.SenderRole
+		switch role {
+		case "assistant":
+			role = conversation.SenderChatbot
+		case conversation.SenderConsumer, conversation.SenderProvider:
+		default:
+			return nil, fmt.Errorf("%w: unknown sender role %q", ErrInvalidDataset, role)
+		}
+		message := conversation.Message{SenderRole: role, Content: item.Content}
+		for _, img := range item.Images {
+			message.Images = append(message.Images, filedomain.MessageImage{Image: filedomain.Image{FileID: img.FileID}, Description: img.Description})
+		}
+		messages = append(messages, message)
+	}
+
+	return messages, nil
 }

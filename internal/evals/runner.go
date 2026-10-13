@@ -18,8 +18,8 @@ type ExecutionLimits struct {
 }
 
 func (l ExecutionLimits) Validate() error {
-	if l.Concurrency != 1 {
-		return fmt.Errorf("this runner supports concurrency=1 only")
+	if l.Concurrency <= 0 {
+		return fmt.Errorf("concurrency must be positive")
 	}
 	if l.AttemptTimeout <= 0 || l.GlobalTimeout <= 0 || l.MinInterval <= 0 || l.MaxOutputTokens <= 0 {
 		return fmt.Errorf("timeouts, request interval and output token limit must be positive")
@@ -31,6 +31,10 @@ func (l ExecutionLimits) Validate() error {
 }
 
 type ExecutionOutput struct {
+	Provider         string
+	ProviderUsage    json.RawMessage
+	UsageSource      string
+	HTTPStatus       *int
 	RequestID        *string
 	Input            json.RawMessage
 	PromptSHA256     string
@@ -47,10 +51,12 @@ type CaseExecutor interface {
 
 // ExecutionError separates technical failures from model quality failures.
 type ExecutionError struct {
-	Kind      string
-	Stop      bool
-	Retryable bool
-	Cause     error
+	Kind        string
+	Stop        bool
+	Retryable   bool
+	LaneStop    bool
+	NotExecuted bool
+	Cause       error
 }
 
 func (e *ExecutionError) Error() string {
@@ -67,9 +73,16 @@ func Run(ctx context.Context, dataset *Dataset, plan *Plan, limits ExecutionLimi
 	if err := limits.Validate(); err != nil {
 		return record, err
 	}
+	if limits.Concurrency > 1 {
+		return runConcurrent(ctx, dataset, plan, limits, executor, journal, record, redact)
+	}
 	ctx, cancel := context.WithTimeout(ctx, limits.GlobalTimeout)
 	defer cancel()
 	var stopReason string
+	lane := firstAvailableLane(executor)
+	if lane < 0 {
+		stopReason = "all project lanes stopped"
+	}
 	notExecuted := 0
 	usedRequests := 0
 	nextStart := time.Time{}
@@ -101,48 +114,35 @@ func Run(ctx context.Context, dataset *Dataset, plan *Plan, limits ExecutionLimi
 				started := time.Now().UTC()
 				nextStart = started.Add(limits.MinInterval)
 				attemptCtx, cancelAttempt := context.WithTimeout(ctx, limits.AttemptTimeout)
-				output, err := executor.Execute(attemptCtx, c.CaseID)
+				output, err := executeLane(executor, attemptCtx, c.CaseID, lane)
 				cancelAttempt()
 				usedRequests += output.RequestCount
-				a := Attempt{RequestID: output.RequestID, CaseID: c.CaseID, Trial: trial, Retry: retry, StartedOn: started, LatencyMillis: time.Since(started).Milliseconds(), Status: "executed", Input: output.Input, PromptSHA256: output.PromptSHA256, GenerationConfig: output.GenerationConfig, RawOutput: output.RawOutput, ParsedOutput: output.ParsedOutput, ProviderResponse: output.ProviderResponse, RequestCount: output.RequestCount}
-				if len(a.Input) > 0 {
-					a.InputSHA256 = digest(a.Input)
+				a := attemptFromOutput(output, c.CaseID, trial, retry, started, err)
+				if a.Status == "not_executed" {
+					notExecuted++
 				}
-				if err != nil {
-					a.Status = "execution_error"
-					var classified *ExecutionError
-					if errors.As(err, &classified) && classified.Kind == "asset_error" {
-						a.Status = "asset_error"
-					}
-					a.Error = redact(err.Error())
-				}
-				// Scrub the configured credential from all strings before persistence.
-				encoded, encodeErr := json.Marshal(a)
-				if encodeErr != nil {
-					return record, encodeErr
-				}
-				if decodeErr := json.Unmarshal([]byte(redact(string(encoded))), &a); decodeErr != nil {
-					return record, decodeErr
-				}
-				if len(a.Input) > 0 {
-					a.InputSHA256 = digest(a.Input)
-					hash, hashErr := promptHash(a.Input)
-					if hashErr != nil {
-						return record, hashErr
-					}
-					a.PromptSHA256 = hash
+				if sanitizeErr := sanitizeAttempt(&a, redact); sanitizeErr != nil {
+					return record, sanitizeErr
 				}
 				if appendErr := journal.Append(a); appendErr != nil {
 					return record, appendErr
 				}
 				var executionErr *ExecutionError
-				if errors.As(err, &executionErr) && executionErr.Stop {
-					stopReason = executionErr.Kind
+				if errors.As(err, &executionErr) {
+					if executionErr.Stop {
+						stopReason = executionErr.Kind
+					}
+					if executionErr.LaneStop {
+						lane = firstAvailableLane(executor)
+						if lane < 0 {
+							stopReason = "all project lanes stopped"
+						}
+					}
 				}
 				if usedRequests >= plan.RequestLimit {
 					stopReason = "request budget exhausted"
 				}
-				if err == nil || stopReason != "" || !errors.As(err, &executionErr) || !executionErr.Retryable {
+				if err == nil || stopReason != "" || !errors.As(err, &executionErr) || executionErr.LaneStop || !executionErr.Retryable {
 					break
 				}
 			}
@@ -179,10 +179,15 @@ func waitUntil(ctx context.Context, when time.Time) error {
 }
 func CredentialRedactor(secret string) func(string) string {
 	secret = strings.TrimSpace(secret)
+	escaped := secret
+	if encoded, err := json.Marshal(secret); err == nil {
+		escaped = string(encoded[1 : len(encoded)-1])
+	}
 	return func(text string) string {
 		if secret == "" {
 			return text
 		}
+		text = strings.ReplaceAll(text, escaped, "[REDACTED]")
 		return strings.ReplaceAll(text, secret, "[REDACTED]")
 	}
 }

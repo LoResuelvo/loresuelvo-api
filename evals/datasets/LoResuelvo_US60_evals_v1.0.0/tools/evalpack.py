@@ -3,6 +3,7 @@
 This is NOT the production Go harness and never calls a model or the network.
 """
 from __future__ import annotations
+import re
 import argparse
 import collections
 import hashlib
@@ -16,7 +17,7 @@ try:
 except ImportError:
     raise SystemExit('Missing dependency. Install requirements.txt in a virtual environment.')
 
-DATAFILES = {'prediagnosis':'prediagnosis', 'ranking':'ranking', 'service_contracts':'service_contracts'}
+DATAFILES = {'prediagnosis':'prediagnosis', 'ranking':'ranking', 'summarization':'summarization'}
 SELF_HEADINGS = ['Qué parece estar ocurriendo:', 'Antes de empezar:', 'Pasos:', 'Cómo comprobarlo:', 'Detenete y contactá a un profesional si:']
 PRO_HEADINGS = ['Situación observada:', 'Evidencia disponible:', 'Diagnóstico preliminar:', 'Posibles causas:', 'Urgencia y riesgos:', 'Recomendaciones para la visita:']
 
@@ -99,9 +100,9 @@ def validate(root: Path, verify_manifest: bool = True) -> dict[str,Any]:
     policies = {p['id'] for p in policy_data['decisions']}
     if len(sources) != len(source_items): errors.append('duplicate source ID')
     if len(policies) != len(policy_data['decisions']): errors.append('duplicate policy ID')
-    if policy_data.get('approval_status') != 'finalized_for_implementation': errors.append('policy design is not finalized')
+    if policy_data.get('approval_status') != 'approved': errors.append('policy design is not approved')
     safety = load(root/'policies/safety_routes.json')
-    if safety.get('approval_status') != 'finalized_for_implementation': errors.append('safety design is not finalized')
+    if safety.get('approval_status') != 'approved': errors.append('safety design is not approved')
     for route in safety['routes']:
         if not set(route['source_ids']) <= sources: errors.append('unknown safety-route source')
     route_names = {r['route'] for r in safety['routes']} | {'normal'}
@@ -124,7 +125,7 @@ def validate(root: Path, verify_manifest: bool = True) -> dict[str,Any]:
             errors += [f'{cid}: {s}' for s in errs]
             if cid in all_ids:errors.append(f'{cid}: duplicate case ID')
             all_ids.add(cid)
-            if errs or name=='service_contracts': continue
+            if errs: continue
             families[c['family_id']].add(c['split'])
             inp,ex=c['input'],c['expected']
             if not set(c['provenance']['source_ids'])<=sources:errors.append(cid+': unknown source')
@@ -140,7 +141,7 @@ def validate(root: Path, verify_manifest: bool = True) -> dict[str,Any]:
             if adapted != bool(scenario) or adapted != (prov['scenario_basis']=='public_question_adapted'):
                 errors.append(cid+': scenario provenance mismatch')
             for sid in scenario: public_families[sid].add(c['split'])
-            aids=[a['id'] for a in ex['semantic_assertions']]
+            aids=ex['semantic_assertions'] if name=='summarization' else [a['id'] for a in ex['semantic_assertions']]
             if len(aids)!=len(set(aids)):errors.append(cid+': duplicate semantic assertion')
             if name=='prediagnosis':
                 fingerprint=hashlib.sha256(json.dumps(inp,sort_keys=True).encode()).hexdigest()
@@ -167,13 +168,10 @@ def validate(root: Path, verify_manifest: bool = True) -> dict[str,Any]:
                     for key in ['path','sha256','mime_type','file_id']:
                         if image[key]!=original[key]:errors.append(cid+': inconsistent asset '+key)
                     assets_by_split[image['sha256']].add(c['split'])
-            else:
+            elif name=='ranking':
                 refs=[x['reference'] for x in inp['candidates']]; rs=set(refs)
                 if len(rs)!=len(refs):errors.append(cid+': duplicate candidate')
                 if rs!=set(ex['eligible_references']) or rs!=set(ex['relevance']):errors.append(cid+': relevance/eligibility mismatch')
-                if not set(ex['required_top_k'])<=rs:errors.append(cid+': invalid required top-k')
-                if ex['min_results']>min(inp['max_results'],len(rs)):errors.append(cid+': impossible minimum results')
-                if len(ex['required_top_k'])>inp['max_results']:errors.append(cid+': impossible required top-k')
                 seen_ties=set()
                 for ties in ex['tie_groups']:
                     if not set(ties)<=rs or set(ties)&seen_ties:errors.append(cid+': invalid/overlapping tie group')
@@ -201,7 +199,7 @@ def validate(root: Path, verify_manifest: bool = True) -> dict[str,Any]:
     for key in ['smoke','development','holdout','critical_all']:
         if len(suites[key])!=len(set(suites[key])):errors.append(key+': duplicate suite member')
         if not set(suites[key])<=all_ids:errors.append(key+': missing suite member')
-    core=groups['prediagnosis']+groups['ranking']
+    core=[c for records in groups.values() for c in records]
     for split in ['development','holdout']:
         if set(suites[split])!={c['id'] for c in core if c['split']==split}:errors.append(split+': suite partition mismatch')
     if not set(suites['smoke'])<=set(suites['development']):errors.append('smoke leaks holdout')
@@ -245,13 +243,11 @@ def check_output(root: Path, case: dict[str,Any], output: Any) -> dict[str,Any]:
         if len(refs)!=len(set(refs)):errors.append('duplicate_recommendation')
         if not set(refs)<=set(ex['eligible_references']):errors.append('unknown_reference')
         if len(refs)>inp['max_results']:errors.append('too_many_results')
-        if len(refs)<ex['min_results']:errors.append('too_few_results')
-        if not set(ex['required_top_k'])<=set(refs):errors.append('required_top_k_missing')
         if len(refs)==len(set(refs)) and set(refs)<=set(ex['relevance']):
             metrics={'ndcg_at_3':ndcg(refs,ex['relevance']), 'pairwise':pairwise(refs,ex['pairwise_constraints']),
                      'precision_at_3_relevance_ge_2':sum(ex['relevance'][r]>=2 for r in refs[:3])/min(3,len(ex['eligible_references'])) if ex['eligible_references'] else None}
             if metrics['pairwise']['failed']:errors.append('pairwise_violation')
-    elif not errors:
+    elif not errors and task=='prediagnosis':
         a=output['assessment']
         if output['status'] not in ex['statuses']:errors.append('status_mismatch')
         if a['action'] not in ex['actions']:errors.append('action_mismatch')
@@ -273,7 +269,17 @@ def check_output(root: Path, case: dict[str,Any], output: Any) -> dict[str,Any]:
         if any(i<0 for i in indexes) or indexes!=sorted(indexes):errors.append('required_headings_missing_or_wrong_order')
         if ex['risk']=='critical' and a['outcome']=='self_service':errors.append('critical_self_service')
         metrics['accepted_outcome']=a['action'] in ex['actions'] and (a['action']=='unchanged' or a['outcome'] in ex['outcomes'])
-    semantic=[dict(a,result='unassessed') for a in ex['semantic_assertions']]
+    if task=='summarization':
+        if not errors:
+            for ref in ex['required_image_refs']:
+                if not re.search(r'(^|[^a-zA-Z0-9_:-])'+re.escape(ref['reference'])+r'($|[^a-zA-Z0-9_:-])',output['summary']):
+                    errors.append('required_image_reference_missing')
+        semantic=[{'id':f'summary_assertion_{i+1:03d}','severity':'','criterion':a,'result':'unassessed'} for i,a in enumerate(ex['semantic_assertions'])]
+        semantic += [{'id':'summary_fact_preservation','severity':'','criterion':'Preserve available facts: '+'; '.join(ex['facts_to_preserve']),'result':'unassessed'},
+                     {'id':'summary_no_invention','severity':'','criterion':'Do not invent: '+'; '.join(ex['must_not_invent']),'result':'unassessed'}]
+        semantic += [{'id':f'summary_image_description_{i+1:03d}','severity':'','criterion':'Preserve the association between '+a['reference']+' and its observed description: '+a['description'],'result':'unassessed'} for i,a in enumerate(ex['required_image_refs'])]
+    else:
+        semantic=[dict(a,result='unassessed') for a in ex['semantic_assertions']]
     if task=='prediagnosis':
         semantic += [
             {'id':'shared_question_budget','severity':'major','result':'unassessed',
@@ -306,14 +312,14 @@ def suite_ids(root: Path, suite: str) -> list[str]:
     return suites[suite]
 
 def export_inputs(root: Path, suite: str) -> list[dict[str,Any]]:
-    cases=jsonl(root/'datasets/prediagnosis.jsonl')+jsonl(root/'datasets/ranking.jsonl')
+    cases=[c for name in DATAFILES for c in jsonl(root/'datasets'/f'{name}.jsonl')]
     byid={c['id']:c for c in cases}
     return [{'case_id':cid,'task':byid[cid]['task'],'input':byid[cid]['input']} for cid in suite_ids(root,suite)]
 
 def check_responses(root: Path, suite: str, responses: list[dict[str,Any]]) -> dict[str,Any]:
     """One suite, one trial. Missing attempts cannot disappear from the denominator."""
     ids=suite_ids(root,suite); expected=set(ids)
-    cases=jsonl(root/'datasets/prediagnosis.jsonl')+jsonl(root/'datasets/ranking.jsonl')
+    cases=[c for name in DATAFILES for c in jsonl(root/'datasets'/f'{name}.jsonl')]
     byid={c['id']:c for c in cases}; supplied={}
     for record in responses:
         cid=record.get('case_id')

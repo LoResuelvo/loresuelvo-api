@@ -159,6 +159,7 @@ func (b RecoveryBudget) Reserve(additionalCalls int) (RecoveryBudgetReservation,
 
 // RecoveryManifest binds a recovery overlay to one immutable, completed run.
 type RecoveryManifest struct {
+	StopReason           string                    `json:"stop_reason,omitempty"`
 	FormatVersion        string                    `json:"format_version"`
 	RecoveryID           string                    `json:"recovery_id"`
 	BaseRunID            string                    `json:"base_run_id"`
@@ -293,6 +294,9 @@ func terminalAttempts(attempts []Attempt) (map[string]Attempt, error) {
 // evidence and manifest. Recovery attempts never alter the original journal.
 func ValidateRecovery(bundle RecoveryBundle, base RunRecord, baseAttempts []Attempt) error {
 	m := bundle.Manifest
+	if !ValidRecoveryStopReason(m.StopReason) {
+		return fmt.Errorf("%w: invalid recovery stop reason code", ErrInvalidCampaignRecovery)
+	}
 	if base.FinishedOn == nil || strings.TrimSpace(base.AttemptsSHA256) == "" {
 		return fmt.Errorf("%w: base run must be completed and checksummed", ErrInvalidCampaignRecovery)
 	}
@@ -835,4 +839,15 @@ func readBaseRecoveryRecord(dataset *Dataset, originalRunDirectory string, evide
 		return RunRecord{}, fmt.Errorf("%w: base recovery identity mismatch", ErrInvalidCampaignRecovery)
 	}
 	return record, nil
+}
+
+// ValidRecoveryStopReason restricts public stop metadata to technical codes,
+// never provider free-form errors, causes, credentials or reviewer text.
+func ValidRecoveryStopReason(reason string) bool {
+	switch reason {
+	case "", "rate_limited", "budget_exhausted", "provider_configuration_error", "execution_error", "asset_error", "unauthorized_case", "canceled", "deadline_exceeded", "request_not_dispatched", "dispatch_stopped":
+		return true
+	default:
+		return false
+	}
 }

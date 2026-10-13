@@ -221,3 +221,25 @@ func TestWriteCampaignRecoveryCanonicalizesRawMessageHashes(t *testing.T) {
 	require.Equal(t, digest(stored.GenerationConfig), loaded.Manifest.Binding.GenerationConfigSHA256BySlot["PD-001/1"])
 	require.NoError(t, ValidateRecovery(RecoveryBundle(loaded), record, attempts))
 }
+
+func TestRecoveryPartialStopPreservesStrictPhysicalAttemptContract(t *testing.T) {
+	base, originals, binding, budget := recoveryFixture(t)
+	manifest, err := BuildRecoveryManifest(base, originals, binding, DefaultRecoveryPolicy(), budget, "stopped")
+	require.NoError(t, err)
+	manifest.StopReason = "rate_limited"
+	physical := RecoveryAttempt{BaseAttemptSHA256: manifest.Targets[0].OriginalAttemptSHA256, RecoveryNumber: 1, Attempt: Attempt{CaseID: "PD-001", Trial: 1, Retry: 1, Status: "execution_error", Error: "rate_limited", RequestCount: 1}}
+	require.NoError(t, ValidateRecovery(RecoveryBundle{Manifest: manifest, Attempts: []RecoveryAttempt{physical}}, base, originals))
+	physical.Attempt.RequestCount = 0
+	require.ErrorContains(t, ValidateRecovery(RecoveryBundle{Manifest: manifest, Attempts: []RecoveryAttempt{physical}}, base, originals), "invalid recovery attempt status/evidence")
+	require.NoError(t, ValidateRecovery(RecoveryBundle{Manifest: manifest}, base, originals))
+}
+
+func TestRecoveryManifestRejectsFreeFormPublicStopReason(t *testing.T) {
+	base, originals, binding, budget := recoveryFixture(t)
+	manifest, err := BuildRecoveryManifest(base, originals, binding, DefaultRecoveryPolicy(), budget, "stopped")
+	require.NoError(t, err)
+	manifest.StopReason = "provider echoed private-key"
+	err = ValidateRecovery(RecoveryBundle{Manifest: manifest}, base, originals)
+	require.ErrorContains(t, err, "stop reason code")
+	require.NotContains(t, err.Error(), "private-key")
+}

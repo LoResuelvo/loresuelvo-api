@@ -75,7 +75,7 @@ func ReplayMetamorphic(dataset *Dataset, directory string) (MetamorphicReport, e
 					err = nil
 				}
 				if err == nil && validateEvaluationOutput(dataset, "ranking", raw) == nil && validateEvaluationOutput(dataset, "ranking", json.RawMessage(left.RawOutput)) == nil {
-					observation.Comparison, err = CompareRankingMetamorphic(base.Expected, json.RawMessage(left.RawOutput), raw)
+					observation.Comparison, err = CompareRankingMetamorphic(base.Expected, json.RawMessage(left.RawOutput), raw, base.Input.MaxResults)
 					if err != nil {
 						return result, err
 					}

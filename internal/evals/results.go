@@ -15,6 +15,10 @@ const resultVersion = "1"
 
 // Attempt preserves execution evidence independently from subsequent scoring.
 type Attempt struct {
+	Provider         string          `json:"provider,omitempty"`
+	ProviderUsage    json.RawMessage `json:"provider_usage,omitempty"`
+	UsageSource      string          `json:"usage_source,omitempty"`
+	HTTPStatus       *int            `json:"http_status"`
 	RequestID        *string         `json:"provider_http_request_id"`
 	CaseID           string          `json:"case_id"`
 	Trial            int             `json:"trial"`
@@ -33,19 +37,28 @@ type Attempt struct {
 	RequestCount     int             `json:"request_count"`
 }
 
+type BuildProvenance struct {
+	SourceCommit      string            `json:"source_commit"`
+	GoVersion         string            `json:"go_version"`
+	ExecutableSHA256  string            `json:"executable_sha256"`
+	SourceFilesSHA256 map[string]string `json:"source_files_sha256"`
+}
+
 type RunRecord struct {
-	UnknownDefaults string          `json:"unknown_defaults"`
-	FormatVersion   string          `json:"format_version"`
-	RunID           string          `json:"run_id"`
-	Mode            string          `json:"mode"`
-	Commit          string          `json:"commit"`
-	StartedOn       time.Time       `json:"started_on"`
-	FinishedOn      *time.Time      `json:"finished_on"`
-	Plan            *Plan           `json:"plan"`
-	Limits          ExecutionLimits `json:"limits"`
-	Status          string          `json:"status"`
-	AttemptsSHA256  string          `json:"attempts_sha256"`
-	ReleaseApproved bool            `json:"release_approved"`
+	BillingTier     string           `json:"billing_tier,omitempty"`
+	Build           *BuildProvenance `json:"build,omitempty"`
+	UnknownDefaults string           `json:"unknown_defaults"`
+	FormatVersion   string           `json:"format_version"`
+	RunID           string           `json:"run_id"`
+	Mode            string           `json:"mode"`
+	Commit          string           `json:"commit"`
+	StartedOn       time.Time        `json:"started_on"`
+	FinishedOn      *time.Time       `json:"finished_on"`
+	Plan            *Plan            `json:"plan"`
+	Limits          ExecutionLimits  `json:"limits"`
+	Status          string           `json:"status"`
+	AttemptsSHA256  string           `json:"attempts_sha256"`
+	ReleaseApproved bool             `json:"release_approved"`
 }
 
 type Journal struct {

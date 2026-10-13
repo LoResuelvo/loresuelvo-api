@@ -45,8 +45,8 @@ type Plan struct {
 	LiveCalls         int           `json:"live_model_calls"`
 }
 
-// BuildPlan counts only the explicitly selected base PD/RK cases. It never
-// adds contracts, transformations, holdout, or retries implicitly.
+// BuildPlan counts only the explicitly selected base PD/RK/SM cases. It never
+// adds transformations, holdout, or retries implicitly.
 func BuildPlan(dataset *Dataset, options PlanOptions) (*Plan, error) {
 	if dataset == nil {
 		return nil, fmt.Errorf("dataset is required")
@@ -84,11 +84,14 @@ func BuildPlan(dataset *Dataset, options PlanOptions) (*Plan, error) {
 		}
 		ids = filtered
 	}
-	splits := make(map[string]string, len(dataset.PD)+len(dataset.RK))
+	splits := make(map[string]string, len(dataset.PD)+len(dataset.RK)+len(dataset.SM))
 	for _, c := range dataset.PD {
 		splits[c.ID] = c.Split
 	}
 	for _, c := range dataset.RK {
+		splits[c.ID] = c.Split
+	}
+	for _, c := range dataset.SM {
 		splits[c.ID] = c.Split
 	}
 	plan := &Plan{DatasetVersion: dataset.Version, DatasetSHA256: dataset.ManifestSHA256, Suite: options.Suite, Model: strings.TrimSpace(options.Model), Trials: options.Trials, MaxRetries: options.MaxRetries, RequestLimit: options.MaxRequests, HoldoutAuthorized: options.AllowHoldout, CostReason: "verified pricing is not configured", Cases: make([]PlannedCase, 0, len(ids))}

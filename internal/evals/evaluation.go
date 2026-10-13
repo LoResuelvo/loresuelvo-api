@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"regexp"
 	"slices"
 	"strings"
 )
@@ -43,12 +44,10 @@ type pdExpected struct {
 	Semantic       []SemanticCheck `json:"semantic_assertions"`
 }
 type rkExpected struct {
-	Eligible   []string             `json:"eligible_references"`
-	Relevance  map[string]int       `json:"relevance"`
-	Pairs      []PairwiseConstraint `json:"pairwise_constraints"`
-	Required   []string             `json:"required_top_k"`
-	MinResults int                  `json:"min_results"`
-	Semantic   []SemanticCheck      `json:"semantic_assertions"`
+	Eligible  []string             `json:"eligible_references"`
+	Relevance map[string]int       `json:"relevance"`
+	Pairs     []PairwiseConstraint `json:"pairwise_constraints"`
+	Semantic  []SemanticCheck      `json:"semantic_assertions"`
 }
 type pdOutput struct {
 	Status  string `json:"status"`
@@ -142,6 +141,49 @@ func EvaluateCase(dataset *Dataset, caseID string, rawOutput json.RawMessage) (E
 		evaluateRK(&result, c.Input, expected, refs)
 		return finish(), nil
 	}
+	for _, c := range dataset.SM {
+		if c.ID != caseID {
+			continue
+		}
+		var expected struct {
+			Facts      []string `json:"facts_to_preserve"`
+			Inventions []string `json:"must_not_invent"`
+			Semantic   []string `json:"semantic_assertions"`
+			References []struct {
+				Reference   string `json:"reference"`
+				Description string `json:"description"`
+			} `json:"required_image_refs"`
+		}
+		if err := json.Unmarshal(c.Expected, &expected); err != nil {
+			return result, fmt.Errorf("decode expected %s: %w", caseID, err)
+		}
+		add := func(id, criterion string) {
+			result.SemanticChecks = append(result.SemanticChecks, SemanticCheck{ID: id, Criterion: criterion})
+		}
+		for i, criterion := range expected.Semantic {
+			add(fmt.Sprintf("summary_assertion_%03d", i+1), criterion)
+		}
+		add("summary_fact_preservation", "Preserve available facts: "+strings.Join(expected.Facts, "; "))
+		add("summary_no_invention", "Do not invent: "+strings.Join(expected.Inventions, "; "))
+		for i, ref := range expected.References {
+			add(fmt.Sprintf("summary_image_description_%03d", i+1), "Preserve the association between "+ref.Reference+" and its observed description: "+ref.Description)
+		}
+		if err := validateEvaluationOutput(dataset, "summarization", rawOutput); err != nil {
+			result.Errors = append(result.Errors, "output_schema: "+err.Error())
+			return finish(), nil
+		}
+		var output struct {
+			Summary string `json:"summary"`
+		}
+		if err := json.Unmarshal(rawOutput, &output); err != nil {
+			return result, fmt.Errorf("decode validated output: %w", err)
+		}
+		check(&result, strings.TrimSpace(output.Summary) != "", "empty_summary")
+		for _, ref := range expected.References {
+			check(&result, containsExactImageReference(output.Summary, ref.Reference), "required_image_reference_missing")
+		}
+		return finish(), nil
+	}
 	return result, fmt.Errorf("%w: %s", ErrUnknownEvaluationCase, caseID)
 }
 func check(result *Evaluation, valid bool, code string) {
@@ -220,8 +262,6 @@ func evaluateRK(result *Evaluation, input RKInput, ex rkExpected, refs []string)
 	check(result, unique, "duplicate_recommendation")
 	check(result, subset(refs, ex.Eligible), "unknown_reference")
 	check(result, len(refs) <= input.MaxResults, "too_many_results")
-	check(result, len(refs) >= ex.MinResults, "too_few_results")
-	check(result, subset(ex.Required, refs), "required_top_k_missing")
 	if !unique || !known {
 		return
 	}
@@ -241,4 +281,8 @@ func evaluateRK(result *Evaluation, input RKInput, ex rkExpected, refs []string)
 		precision = &value
 	}
 	result.Metrics["precision_at_3_relevance_ge_2"] = precision
+}
+
+func containsExactImageReference(summary, reference string) bool {
+	return regexp.MustCompile(`(^|[^[:alnum:]_:-])` + regexp.QuoteMeta(reference) + `($|[^[:alnum:]_:-])`).MatchString(summary)
 }

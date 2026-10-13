@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "approval_status": "finalized_for_implementation",
+  "approval_status": "approved",
   "decisions": [
     {
       "id": "POL-01",
@@ -14,7 +14,7 @@
     {
       "id": "POL-02",
       "title": "Autoservicio acotado",
-      "rule": "Sólo acciones externas, reversibles, de bajo riesgo, sin gas, cableado, tableros, altura, estructuras, presión peligrosa ni químicos. Sin herramientas especiales. Parar al encontrar resistencia, daño o incertidumbre.",
+      "rule": "Sólo acciones externas, reversibles, de bajo riesgo, sin gas, cableado, tableros, altura, estructuras, presión peligrosa ni químicos. Sin herramientas especiales. Parar al encontrar resistencia, daño o incertidumbre. Si el consumidor pide explícitamente un profesional porque no quiere o no puede hacerlo, respetar la contratación voluntaria sin inventar una necesidad técnica ni forzar autoservicio.",
       "basis": "conservative_product_decision",
       "source_ids": [
         "SRC-REPO",
@@ -75,7 +75,7 @@
     {
       "id": "POL-08",
       "title": "Ranking normativo",
-      "rule": "Preferir evidencia pertinente corroborada; permitir empates. Rating aislado y cantidad no sustituyen similitud. Nuevo significa evidencia insuficiente, no baja calidad. Informes del prestador no prueban satisfacción independiente.",
+      "rule": "Preferir evidencia pertinente corroborada; permitir empates. Rating aislado y cantidad no sustituyen similitud. Nuevo significa evidencia insuficiente, no baja calidad. Informes del prestador no prueban satisfacción independiente. El límite es un máximo, sin mínimo ni inclusión obligatoria. Mayor respaldo pertinente o ausencia de evidencia frente a experiencias negativas admiten preferencias prudenciales explícitas, no garantías de calidad futura ni inelegibilidad. La estructura válida de una lista corta o vacía no aprueba su utilidad semántica; cronologías relativas no acreditan disponibilidad actual.",
       "basis": "product_decision",
       "source_ids": [
         "SRC-REPO"
@@ -102,12 +102,13 @@
     {
       "id": "POL-11",
       "title": "Catálogo ausente en riesgo",
-      "rule": "No inventar una categoría ni convertir una urgencia en recolección rutinaria. La capa de seguridad externa debe orientar inmediatamente aun sin categoría contratable. Prueba de servicio, no output imposible impuesto al adaptador actual.",
+      "rule": "No inventar una categoría ni convertir una urgencia en recolección rutinaria. La capa de seguridad externa debe orientar inmediatamente aun sin categoría contratable. Prueba de servicio, no output imposible impuesto al adaptador actual. Fuera del golden activo: este paquete no implementa ni evalúa esa capacidad de servicio.",
       "basis": "proposed_service_change",
       "source_ids": [
         "SRC-REPO",
         "SRC-GAS-AR"
-      ]
+      ],
+      "scope": "outside_active_golden"
     },
     {
       "id": "POL-13",

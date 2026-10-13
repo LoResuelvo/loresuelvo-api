@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "status": "finalized_for_implementation",
+  "status": "approved",
   "hash_algorithm": "SHA-256",
   "excluded": [
     "manifest.json",
@@ -9,44 +9,49 @@
     ".venv/**"
   ],
   "files_sha256": {
-    "README.md": "2cb7b11291528f13b0475538d2c6969d2e830549262dae1acb21d3f754c2807f",
+    "README.md": "14ff3e5b5ca63e58732ddac851251455d16a1013b70bb014ac56fa107af1f4f8",
     "assets/fixture_01.png": "16841a62c892798d9c95c46a4a9100eb5909357a1dc39541b98541eb76ebaf2c",
     "assets/fixture_02.png": "54f85d05d656364781ab0e356c13681b835a88c2d41a96a3b343b002eaf17639",
     "assets/fixture_03.png": "50df1b00ebf83f7cf22f409ee02ddb4fd78025bf1a9063c398ef92e55d639a60",
     "assets/fixture_04.png": "ce52fee396b051a6e21fdf50d2061523cfdd0c4e228274d078ed289e81d90315",
     "assets/fixture_05.png": "d8c32d1e86d5f32fa4d905f42cb5ee0bad45230aaea8546e9b1792f37be81ab7",
     "assets/fixture_06.png": "8cb2c9ff1cc08fc13b3c7222d39142b7d153ac8c7cf10bf689643f76e6b87cdb",
-    "assets/fixture_07.png": "92a92869ceeac0c82acc400115afca8d64ae7c05dda02938b8085016235798c1",
+    "assets/fixture_07.png": "59e8b70042a11bef3628223d0cd19089107a8c016a235105986e1a3c7330c4c1",
     "assets/fixture_08.png": "9d8036e0f0ff668be3b188ec236b5b29f9bf0a7ea2b3861bf1cb803ba014c8de",
-    "assets/manifest.json": "bae8f7fb53cd449bacb129e06e2f4ee644b7d221e7eb8779a0da7f7da8c54188",
-    "configs/experiment.json": "9ff2fbf29543a3db58958eb7a1adc88f140ee10e3446a16ecbce57c5f0572c26",
-    "configs/metamorphic.json": "e5c44d60ccd78fe1eecac684602728ee9751119093e316fddcaa2793136ddd8b",
-    "configs/suites.json": "aa0e3ac38e3b9388a7c2b95fd7ebd7bab93ee2e463a9ba9f1d298ab5687b6d3e",
-    "datasets/prediagnosis.jsonl": "e23234468b8ae162eeda76008413e54fffce2fcc2d85ec85127b8ed7d6259fcd",
-    "datasets/ranking.jsonl": "51401ad06e1eef6095f34824bf20d945a4665a0fd7830ff1fc08a1392b8a47af",
-    "datasets/service_contracts.jsonl": "dbd53b102e517e00568c17ce15db216e2c8265af38621f7f7a305dfb6d450d29",
-    "policies/decisions.json": "bbd8f72fa7d99e20a63fcde74e7395b660450cfb093267672fd819ac199e9861",
-    "policies/safety_routes.json": "109e7332c30c6b517cba5a82b0a8d37c6b3d09758ea7659b6ffae73620bba5e2",
-    "policies/sources.json": "d8bc94d57610272f7979f227bbc5df4dbfe3e174049b36dd58573ec3d4a35547",
+    "assets/manifest.json": "dba57e82f249417fc2753193d90c3655edb1f7fce56e0bfdd15db5b725597a2e",
+    "configs/experiment.json": "2cebc286df41716ddec84ff7779ae5a1ba01da20751c4dfe0ababd766fdeb63b",
+    "configs/metamorphic.json": "02943920112c512b86038fde1932bdb850d442683fbcecf06d611e3ce21945cb",
+    "configs/suites.json": "254b0519f7677dad3d7eeebe5f714dcfa4fcfdcc7ba12a9d8e12e94382596fe0",
+    "datasets/prediagnosis.jsonl": "5a875df6281bc77e0c022233ed99b69fe66e5fae72db1d4ce240cf823696c188",
+    "datasets/ranking.jsonl": "b7a6127db59f8e4aaa45a7c28f0aff72feeeea04b5958700ff98db35b5f78067",
+    "datasets/summarization.jsonl": "97f6c2ec6f4387086c78410a8cfbe1dd225a94efc2ab3bba4afc6b8d2429aa1a",
+    "policies/decisions.json": "34ea768b4e8921e26828928bb8087a72b9b76914a88dfe95b08b293023730ed5",
+    "policies/safety_routes.json": "3139f72d0362e204f1a27f9b790d26b32f7e5de8bfa36e04e5265bfdf9724360",
+    "policies/sources.json": "dbbedcf00ffa2f98f51efe9408178f51803f7f02def320d18bf011ef4b109c14",
     "requirements.txt": "756cc9e506ae4ee1a6f6c0507088b5cfc0dc8ba350fb2d2d46f1ffa72033adb6",
     "schemas/prediagnosis-output.schema.json": "0778cedc6f1c929d9b4cc88c7d23b6b35509f5e73452dfee5f9b0c91e116392a",
-    "schemas/prediagnosis.schema.json": "23964a06a2d702c1d87eb1a6814179461159c055a491377e0566f2d93ef78358",
+    "schemas/prediagnosis.schema.json": "1adcf5fee8e6051820d5690f5edd162f989d31c66bc84e7fff0c028ba4ddde9b",
     "schemas/ranking-output.schema.json": "5ef3296aed3676ef5fc1d87d347b90bb7f57f5450c773b8ad243643e00daa81f",
-    "schemas/ranking.schema.json": "4311d9d81e8cd443f4e2de8c098d28087f7357a00d81166b2d8e48ed3ae794b3",
-    "schemas/service_contracts.schema.json": "1f806f1967e5aa9d9346006c39db29b72f963ec3080d746ab49cde78d8a15939",
-    "tests/test_evalpack.py": "956e642734065a172a833684127ad65120ae5156516865c7482571065d79c325",
-    "tools/evalpack.py": "0a2cf61c6f809b25f70af48b0833abeb01836e8d685471c2b83572780dc940bf"
+    "schemas/ranking.schema.json": "251162d9f4c78656d39c28fa91f16e4352971249d24dfcc909abe19319823a81",
+    "schemas/summarization-output.schema.json": "e3ad8ff7a6cb0ee5d6a11aadef02e7581d115d98d214f4ff768ad9a1672e23e7",
+    "schemas/summarization.schema.json": "e4d3556aaeb1d9666eac41ae7d52ba61cc4276dc080c13d3c17db861e2a9a9f7",
+    "tests/test_evalpack.py": "6efe1f13872acec2c621c9c969cac532ff0c2f901ad22dae4b58810702deca26",
+    "tools/evalpack.py": "9365683df7e674ec361ca5c2e55daef917d7bec051e809c533d7605fe95c9be8"
   },
-  "finalized_on": "2026-09-14",
-  "human_casewise_signoff_claimed": false,
-  "expert_validation_claimed": false,
   "live_model_evaluation_performed": false,
   "provenance_counts": {
-    "public_question_sources": 10,
-    "adapted_prediagnosis": 16,
-    "authored_prediagnosis": 32,
-    "synthetic_ranking": 24,
-    "synthetic_service_contracts": 12
+    "public_question_sources": 9,
+    "adapted_prediagnosis": 14,
+    "authored_prediagnosis": 33,
+    "synthetic_ranking": 19,
+    "synthetic_summarization": 4
   },
-  "immutable_scope": "All listed files; local reports and virtual environments are excluded. Hashes are integrity checks, not a trusted signature."
+  "immutable_scope": "Files listed by SHA-256 identify content, not approval or a trusted signature. Local reports, bytecode caches and virtual environments are excluded.",
+  "case_counts": {
+    "prediagnosis": 47,
+    "ranking": 19,
+    "summarization": 4,
+    "total": 70,
+    "campaigns": 0
+  }
 }

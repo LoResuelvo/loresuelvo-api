@@ -30,10 +30,9 @@ type RKCase struct {
 	Input    RKInput         `json:"input"`
 	Expected json.RawMessage `json:"expected"`
 }
-type CTCase struct {
+type SMCase struct {
 	CaseMetadata
-	Target   string          `json:"target"`
-	Input    json.RawMessage `json:"input"`
+	Input    SMInput         `json:"input"`
 	Expected json.RawMessage `json:"expected"`
 }
 type Dataset struct {
@@ -42,7 +41,7 @@ type Dataset struct {
 	ManifestSHA256   string
 	PD               []PDCase
 	RK               []RKCase
-	CT               []CTCase
+	SM               []SMCase
 	Suites           map[string][]string
 	ExperimentTrials map[string]int
 	Metamorphic      MetamorphicConfig
@@ -89,7 +88,7 @@ func LoadDataset(root string) (*Dataset, error) {
 		}
 		verifiedFiles[name] = data
 	}
-	for _, required := range []string{"datasets/prediagnosis.jsonl", "datasets/ranking.jsonl", "datasets/service_contracts.jsonl", "configs/suites.json", "configs/experiment.json", "configs/metamorphic.json", "assets/manifest.json", "schemas/prediagnosis.schema.json", "schemas/ranking.schema.json", "schemas/service_contracts.schema.json", "schemas/prediagnosis-output.schema.json", "schemas/ranking-output.schema.json"} {
+	for _, required := range []string{"datasets/prediagnosis.jsonl", "datasets/ranking.jsonl", "datasets/summarization.jsonl", "configs/suites.json", "configs/experiment.json", "configs/metamorphic.json", "assets/manifest.json", "schemas/prediagnosis.schema.json", "schemas/ranking.schema.json", "schemas/summarization.schema.json", "schemas/prediagnosis-output.schema.json", "schemas/ranking-output.schema.json", "schemas/summarization-output.schema.json"} {
 		if _, ok := manifest.Files[required]; !ok {
 			return nil, fmt.Errorf("%w: untracked required file %q", ErrInvalidDataset, required)
 		}
@@ -108,7 +107,7 @@ func LoadDataset(root string) (*Dataset, error) {
 	if d.RK, err = readCases[RKCase](verifiedFiles["datasets/ranking.jsonl"], "datasets/ranking.jsonl"); err != nil {
 		return nil, err
 	}
-	if d.CT, err = readCases[CTCase](verifiedFiles["datasets/service_contracts.jsonl"], "datasets/service_contracts.jsonl"); err != nil {
+	if d.SM, err = readCases[SMCase](verifiedFiles["datasets/summarization.jsonl"], "datasets/summarization.jsonl"); err != nil {
 		return nil, err
 	}
 	var suites map[string]json.RawMessage
@@ -178,6 +177,11 @@ func LoadDataset(root string) (*Dataset, error) {
 			return nil, fmt.Errorf("map case %s: %w", c.ID, err)
 		}
 	}
+	for _, c := range d.SM {
+		if _, err = d.MapSM(c.Input); err != nil {
+			return nil, fmt.Errorf("map case %s: %w", c.ID, err)
+		}
+	}
 	return d, nil
 }
 func digest(data []byte) string { sum := sha256.Sum256(data); return hex.EncodeToString(sum[:]) }
@@ -236,8 +240,8 @@ func (d *Dataset) validateReferences() error {
 			return err
 		}
 	}
-	for _, c := range d.CT {
-		if err := add(c.CaseMetadata, ""); err != nil {
+	for _, c := range d.SM {
+		if err := add(c.CaseMetadata, "summarization"); err != nil {
 			return err
 		}
 	}

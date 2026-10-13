@@ -94,6 +94,7 @@ func Summarize(dataset *Dataset, plan *Plan, attempts []Attempt, evaluations []E
 	}
 	meta := map[string]CaseMetadata{}
 	pd := map[string]pdExpected{}
+	rankingIDs := map[string]bool{}
 	pdCount, rkCount := 0, 0
 	for _, c := range dataset.PD {
 		meta[c.ID] = c.CaseMetadata
@@ -104,6 +105,10 @@ func Summarize(dataset *Dataset, plan *Plan, attempts []Attempt, evaluations []E
 		pd[c.ID] = expected
 	}
 	for _, c := range dataset.RK {
+		rankingIDs[c.ID] = true
+		meta[c.ID] = c.CaseMetadata
+	}
+	for _, c := range dataset.SM {
 		meta[c.ID] = c.CaseMetadata
 	}
 	evaluated := map[string]EvaluatedAttempt{}
@@ -175,7 +180,7 @@ func Summarize(dataset *Dataset, plan *Plan, attempts []Attempt, evaluations []E
 	for id := range baseIDs {
 		if _, ok := pd[id]; ok {
 			pdCount++
-		} else {
+		} else if rankingIDs[id] {
 			rkCount++
 		}
 	}
@@ -195,7 +200,7 @@ func Summarize(dataset *Dataset, plan *Plan, attempts []Attempt, evaluations []E
 		evaluation := evaluated[summaryAttemptKey(a.CaseID, a.Trial, a.Retry)].Evaluation
 		baseID := baseFor[a.CaseID]
 		if variants[a.CaseID] {
-			if _, isPD := pd[baseID]; isPD {
+			if !rankingIDs[baseID] {
 				return summary, fmt.Errorf("%w: ranking variants require ranking base cases", ErrInvalidSummary)
 			}
 			summary.VariantTrials++
@@ -207,6 +212,9 @@ func Summarize(dataset *Dataset, plan *Plan, attempts []Attempt, evaluations []E
 		}
 		expected, isPD := pd[baseID]
 		if !isPD {
+			if !rankingIDs[baseID] {
+				continue
+			}
 			rkTrials++
 			if a.Status == "executed" {
 				collectRankingMetrics(observations, baseID, evaluation)

@@ -147,19 +147,6 @@
       "limitations": "Relato público auto-reportado, no verificado independientemente. Se redactan escenarios nuevos, no citas ni transcripciones. Sin nombres, imágenes o datos personales del autor. Las modificaciones se declaran por caso; no se adoptan respuestas del foro."
     },
     {
-      "id": "Q-DOOR-RUG",
-      "publisher": "Home Improvement Stack Exchange",
-      "title": "Will a door rubbing on the carpet cause excessive wear?",
-      "url": "https://diy.stackexchange.com/questions/186076/will-a-door-rubbing-on-the-carpet-cause-excessive-wear",
-      "published_on": "2020-03-06",
-      "accessed_on": "2026-09-07",
-      "kind": "public_user_question",
-      "applicability": "Patrón de consulta y síntomas relatados; no respalda soluciones, etiquetas ni representatividad de Argentina.",
-      "supported_summary": "Puerta que roza una alfombra instalada recientemente; preocupación por roce y desgaste.",
-      "verification": "question_text_read",
-      "limitations": "Relato público auto-reportado, no verificado independientemente. Se redactan escenarios nuevos, no citas ni transcripciones. Sin nombres, imágenes o datos personales del autor. Las modificaciones se declaran por caso; no se adoptan respuestas del foro."
-    },
-    {
       "id": "Q-SINK",
       "publisher": "Home Improvement Stack Exchange",
       "title": "Should I attempt to fix a sink leak myself?",

@@ -22,10 +22,15 @@ const (
 // CampaignPrice is a provider price verified for this campaign execution date.
 // Prices are USD per million tokens. Unverified or missing prices fail closed.
 type CampaignPrice struct {
-	Model               string
-	InputUSDPerMillion  float64
-	OutputUSDPerMillion float64
-	Verified            bool
+	Model               string   `json:"model"`
+	InputUSDPerMillion  float64  `json:"input_usd_per_million"`
+	OutputUSDPerMillion float64  `json:"output_usd_per_million"`
+	CacheUSDPerMillion  *float64 `json:"cache_usd_per_million"`
+	Source              string   `json:"source"`
+	VerifiedOn          string   `json:"verified_on"`
+	Basis               string   `json:"basis"`
+	Currency            string   `json:"currency"`
+	Verified            bool     `json:"verified"`
 }
 
 // InputTokenEvidence is the input-token count for one effective provider
@@ -147,12 +152,13 @@ func PreflightCampaignBudget(spec CampaignBudgetSpec) (CampaignBudgetEstimate, e
 // CampaignBudgetGuard enforces the same ceiling while requests execute. It is
 // safe for a runner that records requests from multiple workers.
 type CampaignBudgetGuard struct {
-	mu       sync.Mutex
-	estimate CampaignBudgetEstimate
-	used     int
-	spentUSD float64
-	unknown  int
-	planUsed map[*Plan]int
+	mu        sync.Mutex
+	estimate  CampaignBudgetEstimate
+	used      int
+	spentUSD  float64
+	unknown   int
+	exhausted bool
+	planUsed  map[*Plan]int
 }
 
 func NewCampaignBudgetGuard(estimate CampaignBudgetEstimate) (*CampaignBudgetGuard, error) {
@@ -165,93 +171,61 @@ func NewCampaignBudgetGuard(estimate CampaignBudgetEstimate) (*CampaignBudgetGua
 	return &CampaignBudgetGuard{estimate: estimate, planUsed: make(map[*Plan]int)}, nil
 }
 
-// BeforeRequest must be called immediately before each provider request. It
-// reserves the worst-case input/output cost of the remaining scheduled slot.
-func (g *CampaignBudgetGuard) BeforeRequest(plan *Plan) error {
-	g.mu.Lock()
-	defer g.mu.Unlock()
-	if plan == nil || g.used >= g.estimate.RequestCount {
-		return ErrCampaignBudgetExceeded
-	}
-	usedForPlan := g.planUsed[plan]
-	bounds, ok := g.estimate.planBounds[plan]
-	if !ok || usedForPlan >= len(bounds) {
-		return fmt.Errorf("%w: plan request sequence exhausted", ErrCampaignBudgetExceeded)
-	}
-	var remainingInput int64
-	for eachPlan, eachBounds := range g.estimate.planBounds {
-		start := g.planUsed[eachPlan]
-		if start > len(eachBounds) {
-			return fmt.Errorf("%w: plan request sequence invalid", ErrCampaignBudgetExceeded)
-		}
-		for _, bound := range eachBounds[start:] {
-			if remainingInput > math.MaxInt64-bound {
-				return fmt.Errorf("%w: remaining input bound overflows", ErrCampaignBudgetExceeded)
-			}
-			remainingInput += bound
-		}
-	}
-	remaining := g.estimate.RequestCount - g.used
-	upper := g.spentUSD + float64(remainingInput)*g.estimate.InputUSDPerMillion/1_000_000 + float64(remaining)*float64(CampaignBudgetMaxOutputTokens)*g.estimate.OutputUSDPerMillion/1_000_000
-	if !finite(upper) || upper > g.estimate.HardCeilingUSD {
-		return fmt.Errorf("%w: remaining upper bound %.6f exceeds ceiling %.6f", ErrCampaignBudgetExceeded, upper, g.estimate.HardCeilingUSD)
-	}
-	return nil
+// CampaignBudgetReservation is one attempt's atomic worst-case claim. Settlement
+// is idempotent; unknown usage consumes the bound, never a fabricated zero.
+type CampaignBudgetReservation struct {
+	guard           *CampaignBudgetGuard
+	reservedUSD     float64
+	settled         bool
+	settlementError error
 }
 
-// RecordObserved records provider usage after a request. Unknown usage is
-// rejected: the guard cannot certify a hard ceiling without observed or
-// preflight-bounded usage.
-func (g *CampaignBudgetGuard) RecordObserved(plan *Plan, inputTokens, outputTokens int64) error {
-	if inputTokens < 0 || outputTokens < 0 {
-		return fmt.Errorf("%w: invalid observed usage", ErrInvalidCampaignBudget)
-	}
-	if inputTokens > CampaignBudgetMaxInputTokens || outputTokens > CampaignBudgetMaxOutputTokens {
-		return ErrCampaignBudgetExceeded
-	}
+// Reserve must run immediately before RoundTrip, not before input mapping.
+func (g *CampaignBudgetGuard) Reserve(plan *Plan) (*CampaignBudgetReservation, error) {
 	g.mu.Lock()
 	defer g.mu.Unlock()
-	if plan == nil || g.used >= g.estimate.RequestCount || g.planUsed[plan] >= len(g.estimate.planBounds[plan]) {
-		return ErrCampaignBudgetExceeded
-	}
-	cost := float64(inputTokens)*g.estimate.InputUSDPerMillion/1_000_000 + float64(outputTokens)*g.estimate.OutputUSDPerMillion/1_000_000
-	if !finite(cost) || !finite(g.spentUSD+cost) || g.spentUSD+cost > g.estimate.HardCeilingUSD {
-		return ErrCampaignBudgetExceeded
-	}
-	g.spentUSD += cost
-	g.used++
-	g.planUsed[plan]++
-	return nil
-}
-
-// AbortUnknownUsage permanently exhausts the guard when a provider response
-// omits usage metadata. Further generation is unsafe to certify.
-func (g *CampaignBudgetGuard) AbortUnknownUsage() error {
-	g.mu.Lock()
-	defer g.mu.Unlock()
-	g.used = g.estimate.RequestCount
-	return ErrCampaignBudgetExceeded
-}
-
-// RecordUnknown consumes the complete per-request reservation when the
-// provider omits usage metadata. The preflight proof guarantees that this
-// reservation remains within the campaign ceiling, so a valid response is not
-// converted into an execution failure merely because usage is unavailable.
-func (g *CampaignBudgetGuard) RecordUnknown(plan *Plan) error {
-	g.mu.Lock()
-	defer g.mu.Unlock()
-	if plan == nil || g.used >= g.estimate.RequestCount || g.planUsed[plan] >= len(g.estimate.planBounds[plan]) {
-		return ErrCampaignBudgetExceeded
+	if g.exhausted || plan == nil || g.used >= g.estimate.RequestCount || g.planUsed[plan] >= len(g.estimate.planBounds[plan]) {
+		return nil, ErrCampaignBudgetExceeded
 	}
 	reserve := float64(CampaignBudgetMaxInputTokens)*g.estimate.InputUSDPerMillion/1_000_000 + float64(CampaignBudgetMaxOutputTokens)*g.estimate.OutputUSDPerMillion/1_000_000
-	if !finite(reserve) || g.spentUSD+reserve > g.estimate.HardCeilingUSD {
-		return ErrCampaignBudgetExceeded
+	if !finite(reserve) || !finite(g.spentUSD+reserve) || g.spentUSD+reserve > g.estimate.HardCeilingUSD {
+		return nil, ErrCampaignBudgetExceeded
 	}
 	g.spentUSD += reserve
 	g.used++
-	g.unknown++
 	g.planUsed[plan]++
+	return &CampaignBudgetReservation{guard: g, reservedUSD: reserve}, nil
+}
+
+func (r *CampaignBudgetReservation) RecordObserved(inputTokens, outputTokens int64) error {
+	g := r.guard
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	if r.settled {
+		return r.settlementError
+	}
+	r.settled = true
+	if inputTokens < 0 || outputTokens < 0 || inputTokens > CampaignBudgetMaxInputTokens || outputTokens > CampaignBudgetMaxOutputTokens {
+		// Retain the reservation and close the entire guard on bound violation.
+		g.unknown++
+		g.exhausted = true
+		r.settlementError = ErrCampaignBudgetExceeded
+		return r.settlementError
+	}
+	cost := float64(inputTokens)*g.estimate.InputUSDPerMillion/1_000_000 + float64(outputTokens)*g.estimate.OutputUSDPerMillion/1_000_000
+	g.spentUSD = g.spentUSD - r.reservedUSD + cost
 	return nil
+}
+
+func (r *CampaignBudgetReservation) RecordUnknown() error {
+	g := r.guard
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	if !r.settled {
+		r.settled = true
+		g.unknown++
+	}
+	return r.settlementError
 }
 
 func (g *CampaignBudgetGuard) Snapshot() (used int, spentUSD float64) {
@@ -260,8 +234,8 @@ func (g *CampaignBudgetGuard) Snapshot() (used int, spentUSD float64) {
 	return g.used, g.spentUSD
 }
 
-// PreflightGeminiCampaignBudget counts the exact prompts (including image
-// parts) for every trial through each executor's CountTokens endpoint. The
+// PreflightGeminiCampaignBudget counts shared contents (including image
+// parts), not the full schema-bearing generation context. The
 // endpoint is used only for token counting; no generation request is made.
 // A single shared guard is attached to all phase/model executors so the
 // campaign-wide request ceiling cannot be bypassed by splitting plans.

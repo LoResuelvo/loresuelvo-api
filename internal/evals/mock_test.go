@@ -34,7 +34,7 @@ func executionTestLimits() ExecutionLimits {
 func executionTestJournal(t *testing.T, plan *Plan) (*Journal, RunRecord, string) {
 	t.Helper()
 	directory := filepath.Join(t.TempDir(), "run")
-	record := RunRecord{FormatVersion: resultVersion, RunID: "test", Mode: "contract", Plan: plan}
+	record := RunRecord{FormatVersion: resultVersion, RunID: "test", Mode: "offline", Plan: plan}
 	journal, err := NewJournal(directory, record)
 	require.NoError(t, err)
 	t.Cleanup(func() { require.NoError(t, journal.Close()) })
@@ -47,3 +47,18 @@ func executionTestPlan(ids ...string) *Plan {
 	}
 	return plan
 }
+
+type laneExecutorMock struct{ mock.Mock }
+
+func (m *laneExecutorMock) LaneCount() int { return m.Called().Int(0) }
+func (m *laneExecutorMock) Execute(ctx context.Context, id string) (ExecutionOutput, error) {
+	return m.ExecuteLane(ctx, id, 0)
+}
+func (m *laneExecutorMock) ExecuteLane(ctx context.Context, id string, lane int) (ExecutionOutput, error) {
+	args := m.Called(ctx, id, lane)
+	return args.Get(0).(ExecutionOutput), args.Error(1)
+}
+
+type availableLaneExecutorMock struct{ laneExecutorMock }
+
+func (m *availableLaneExecutorMock) LaneAvailable(lane int) bool { return m.Called(lane).Bool(0) }

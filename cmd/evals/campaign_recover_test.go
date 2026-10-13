@@ -12,23 +12,23 @@ import (
 
 func TestReadCampaignRecoveryAddendumRejectsUnknownFieldsAndUnsafeScope(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "addendum.json")
-	canonical, err := os.ReadFile(filepath.Join("..", "..", "evals", "protocols", "campaign-1-recovery-addendum.json"))
-	require.NoError(t, err)
+	canonical := cliRecoveryAddendum(t)
 	require.NoError(t, os.WriteFile(path, canonical, 0600))
-	_, err = readCampaignRecoveryAddendum(path)
+	_, err := readCampaignRecoveryAddendum(path)
 	require.NoError(t, err)
-	require.NoError(t, os.WriteFile(path, []byte(`{"protocol_version":"1.0.0","addendum_id":"r","campaign_id":"campaign-1","parent_protocol":"campaign-1.json","unexpected":true}`), 0600))
+	require.NoError(t, os.WriteFile(path, []byte(`{"protocol_version":"1.0.0","addendum_id":"r","campaign_id":"synthetic","parent_protocol":"protocol.json","unexpected":true}`), 0600))
 	_, err = readCampaignRecoveryAddendum(path)
 	require.Error(t, err)
 }
 
-func TestCampaignTwoRecoveryAddendumMatchesReusableLoader(t *testing.T) {
-	path := filepath.Join("..", "..", "evals", "protocols", "campaign-2-recovery-addendum.json")
+func TestRecoveryAddendumMatchesReusableLoader(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "addendum.json")
+	require.NoError(t, os.WriteFile(path, cliRecoveryAddendum(t), 0600))
 	addendum, err := readCampaignRecoveryAddendum(path)
 	require.NoError(t, err)
-	require.Equal(t, "campaign-2-recovery-1", addendum.AddendumID)
-	require.Equal(t, "campaign-2", addendum.CampaignID)
-	require.Equal(t, filepath.Join("evals", "protocols", "campaign-2.json"), addendum.ParentProtocol)
+	require.Equal(t, "synthetic-recovery", addendum.AddendumID)
+	require.Equal(t, "synthetic", addendum.CampaignID)
+	require.Equal(t, "protocol.json", addendum.ParentProtocol)
 	require.False(t, addendum.Scope.QualityOrMalformedRetries)
 	require.True(t, addendum.Selection.NeverRetryExecutedResponse)
 }
@@ -103,8 +103,7 @@ func TestCampaignRecoveryWorkPlansUseEffectiveManifestPolicy(t *testing.T) {
 }
 
 func TestReadCampaignRecoveryAddendumRejectsOriginalCountedAsAdditionalAttempt(t *testing.T) {
-	canonical, err := os.ReadFile(filepath.Join("..", "..", "evals", "protocols", "campaign-1-recovery-addendum.json"))
-	require.NoError(t, err)
+	canonical := cliRecoveryAddendum(t)
 	var document map[string]any
 	require.NoError(t, json.Unmarshal(canonical, &document))
 	execution, ok := document["execution"].(map[string]any)

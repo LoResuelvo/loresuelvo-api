@@ -1,8 +1,8 @@
 {
   "version": "1.0.0",
-  "approval_status": "finalized_for_implementation",
-  "kind": "proposed_product_safety_messages_not_existing_api_contract",
-  "use": "Textos finales de diseño para implementar una salida de seguridad acotada. Debe evaluarse también la detección de riesgo. No contiene teléfonos: resolver por jurisdicción fuera del LLM.",
+  "approval_status": "approved",
+  "kind": "product_safety_messages_not_existing_api_contract",
+  "use": "Especificaciones editoriales de precaución. No demuestran implementación ni detección de riesgo; no contienen teléfonos, que requieren configuración verificada por jurisdicción.",
   "routes": [
     {
       "route": "gas_emergency_now",

@@ -69,10 +69,6 @@ func renderCampaignExportArtifacts(bundle evals.CampaignExport) (map[string][]by
 	if err != nil {
 		return nil, fmt.Errorf("encode campaign results: %w", err)
 	}
-	reviews, err := encodeJSONLines(bundle.Reviews)
-	if err != nil {
-		return nil, fmt.Errorf("encode campaign reviews: %w", err)
-	}
 	summary, err := json.MarshalIndent(bundle.Summary, "", "  ")
 	if err != nil {
 		return nil, fmt.Errorf("encode campaign summary: %w", err)
@@ -84,7 +80,6 @@ func renderCampaignExportArtifacts(bundle evals.CampaignExport) (map[string][]by
 		"attempts.jsonl":  attempts,
 		"responses.jsonl": responses,
 		"results.jsonl":   results,
-		"reviews.jsonl":   reviews,
 		"summary.json":    summary,
 	}
 	records := map[string]*int{
@@ -92,7 +87,6 @@ func renderCampaignExportArtifacts(bundle evals.CampaignExport) (map[string][]by
 		"attempts.jsonl":  intPointer(len(bundle.Attempts)),
 		"responses.jsonl": intPointer(len(bundle.Responses)),
 		"results.jsonl":   intPointer(len(bundle.Results)),
-		"reviews.jsonl":   intPointer(len(bundle.Reviews)),
 		"summary.json":    nil,
 	}
 	bundle.Manifest.Artifacts = make(map[string]evals.CampaignExportArtifact, len(artifacts))
@@ -137,27 +131,7 @@ func encodeJSONLines[T any](rows []T) ([]byte, error) {
 }
 
 func renderCampaignExportREADME(manifest evals.CampaignExportManifest, summary evals.CampaignExportSummary) []byte {
-	const template = "# Campaña %s — evidencia longitudinal\n\n" +
-		"Este directorio conserva los datos detallados necesarios para comparar la solución entre campañas. No contiene gráficas: las visualizaciones y métricas futuras deben derivarse de estos archivos.\n\n" +
-		"## Alcance de la ejecución\n\n" +
-		"%s\n" +
-		"Los smoke reutilizan casos del conjunto development: comprueban el circuito operativo antes de la fase primaria, pero no son casos nuevos ni observaciones independientes. Los trials también repiten los mismos casos para observar variabilidad; no aumentan la diversidad del dataset.\n\n" +
-		"## Archivos\n\n" +
-		"- **responses.jsonl:** una respuesta efectiva por slot, con texto original en `raw_output` y salida interpretada en `parsed_output` cuando fue posible. Las respuestas malformadas se conservan sin corregir. Para inspeccionar un caso, buscá su `dataset_case_id`, `requested_model` y `trial`; cada línea es una respuesta completa.\n" +
-		"- **attempts.jsonl:** cada solicitud real al proveedor, incluidos los errores transitorios y la recuperación append-only; no contiene prompts, imágenes, headers ni identificadores HTTP.\n" +
-		"- **results.jsonl:** resultado por caso, modelo y trial, con esperado, observado, métricas y códigos de fallo.\n" +
-		"- **reviews.jsonl:** juicios por criterio, su evidencia y procedencia; effective_for_result distingue los juicios usados en el resultado de los reemplazados por recuperación.\n" +
-		"- **summary.json:** agregados derivados y limitaciones de la campaña.\n" +
-		"- **manifest.json:** identidad del golden, protocolo, commits, hashes de fuentes, cobertura y datos ausentes.\n" +
-		"- **SHA256SUMS:** integridad de todos los artefactos anteriores.\n\n" +
-		"## Cobertura\n\n" +
-		"- Slots planificados: **%d**.\n" +
-		"- Solicitudes reales al proveedor: **%d**.\n" +
-		"- Respuestas físicas conservadas: **%d**.\n" +
-		"- Respuestas malformadas conservadas: **%d**.\n" +
-		"- Revisiones efectivas: **%d**; evaluadas por agente: **%d**; evaluadas por humanos: **%d**; no evaluadas: **%d**.\n\n" +
-		"Las revisiones de esta campaña fueron realizadas por agentes salvo que `reviewer_kind` indique explícitamente `human`; la identidad de revisores es declarada, no autenticada. Una revisión de agente no certifica seguridad. Esta campaña no aprueba un release.\n"
-	return []byte(fmt.Sprintf(template, manifest.CampaignID, renderCampaignExportScope(summary), manifest.Counts.PlannedSlots, manifest.Counts.ProviderAttempts, manifest.Counts.Responses, manifest.Counts.MalformedResponses, manifest.Counts.EffectiveReviews, manifest.Counts.AgentAssessments, manifest.Counts.HumanAssessments, manifest.Counts.UnassessedReviews))
+	return []byte(fmt.Sprintf("# Campaña %s — evidencia longitudinal\n\n%s\n\nLos smoke reutilizan casos development: no son casos nuevos ni observaciones independientes. Los trials miden variabilidad, no diversidad.\n\n## Archivos\n\n- **responses.jsonl:** todas las respuestas físicas recibidas, incluidas fallidas y reemplazadas; `raw_output` conserva el texto original y `parsed_output` el formato wire aceptado. Buscá `dataset_case_id`, `requested_model` y `trial`.\n- **attempts.jsonl:** cada solicitud al proveedor, con uso reportado, duración del intento, errores e identificadores disponibles. No contiene prompts, imágenes ni headers.\n- **results.jsonl:** un resultado por slot, referencia a la respuesta efectiva o ausencia explícita, métricas y resultados por criterio semántico sin identidades ni razonamientos privados.\n- **summary.json:** agregados derivados; operaciones incluyen todas las solicitudes originales y de recuperación, calidad usa el resultado efectivo. Reserva presupuestaria no equivale a costo facturado.\n- **manifest.json:** identidad, configuración deduplicada, fuentes e integridad.\n- **SHA256SUMS:** integridad de los artefactos.\n\n## Cobertura\n\n- Slots planificados: **%d**.\n- Solicitudes al proveedor: **%d**.\n- Respuestas recibidas conservadas: **%d**.\n- Respuestas malformadas: **%d**.\n- Criterios efectivos: **%d**; sin evaluar: **%d**.\n\nLa cobertura semántica no implica aprobación de un release.\n", manifest.CampaignID, renderCampaignExportScope(summary), manifest.Counts.PlannedSlots, manifest.Counts.ProviderAttempts, manifest.Counts.Responses, manifest.Counts.MalformedResponses, manifest.Counts.EffectiveReviews, manifest.Counts.UnassessedReviews))
 }
 
 func renderCampaignExportScope(summary evals.CampaignExportSummary) string {
@@ -168,14 +142,18 @@ func renderCampaignExportScope(summary evals.CampaignExportSummary) string {
 		if phase.Trials > 0 && models > 0 {
 			cases = phase.Coverage.ExpectedSlots / (phase.Trials * models)
 		}
+		unitLabel := "casos"
+		if phase.Metamorphic {
+			unitLabel = "entradas planificadas (incluidas variantes)"
+		}
 		label := phase.Name
 		if phase.Name == "primary" {
 			label = "Fase primaria"
 		} else if phase.Name == "smoke" {
-			lines = append(lines, fmt.Sprintf("- **Comprobaciones smoke:** %d casos × %d modelos = %d slots (%d ejecución por caso y modelo).", cases, models, phase.Coverage.ExpectedSlots, phase.Trials))
+			lines = append(lines, fmt.Sprintf("- **Comprobaciones smoke:** %d %s × %d modelos = %d slots (%d ejecución por caso y modelo).", cases, unitLabel, models, phase.Coverage.ExpectedSlots, phase.Trials))
 			continue
 		}
-		lines = append(lines, fmt.Sprintf("- **%s:** %d casos × %d trials × %d modelos = %d slots.", label, cases, phase.Trials, models, phase.Coverage.ExpectedSlots))
+		lines = append(lines, fmt.Sprintf("- **%s:** %d %s × %d trials × %d modelos = %d slots.", label, cases, unitLabel, phase.Trials, models, phase.Coverage.ExpectedSlots))
 	}
 	return strings.Join(lines, "\n")
 }

@@ -7,6 +7,7 @@ import (
 	"maps"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -194,6 +195,7 @@ func TestBuildCampaignReportOverlaysFirstEffectiveRecoveryWithoutErasingOriginal
 
 	spec := campaignReportSpec(t, dataset, runDirectory)
 	spec.Budget.AccountedSpendUSD = priorSpent
+	spec.Prices = []CampaignPrice{{Model: "model-a", Source: "pricing", VerifiedOn: "2026-10-13", Basis: "standard_paid_reference", Currency: "USD", InputUSDPerMillion: .3, OutputUSDPerMillion: 2.5, Verified: true}}
 	spec.BaselineFilesSHA256 = maps.Clone(binding.BaselineFilesSHA256)
 	spec.Phases[0].Runs[0].RecoveryEvidence = recoveryPath
 	report, err := BuildCampaignReport(context.Background(), dataset, spec)
@@ -202,6 +204,13 @@ func TestBuildCampaignReportOverlaysFirstEffectiveRecoveryWithoutErasingOriginal
 	require.True(t, model.Coverage.ResponsesComplete)
 	require.Equal(t, 1, model.Coverage.RecoveredSlots)
 	require.NotNil(t, model.Recovery)
+	require.Equal(t, 2, model.Operations.Requests)
+	require.Equal(t, 1, model.OriginalOperations.Requests)
+	require.Equal(t, 1, model.RecoveryOperations.Requests)
+	require.Nil(t, model.OriginalOperations.Cost)
+	require.Nil(t, model.RecoveryOperations.Cost)
+	require.Equal(t, "pricing_or_usage_incomplete", model.OriginalOperations.CostReason)
+	require.Equal(t, "pricing_or_usage_incomplete", model.RecoveryOperations.CostReason)
 	require.Equal(t, 1, model.Recovery.TargetSlots)
 	require.Equal(t, 1, model.Recovery.RecoveredSlots)
 	require.Equal(t, "executed", report.Cases[0].ExecutionStatus)
@@ -213,6 +222,21 @@ func TestBuildCampaignReportOverlaysFirstEffectiveRecoveryWithoutErasingOriginal
 	require.NotNil(t, report.Recovery)
 	require.Equal(t, 1, report.Recovery.EvidenceDocuments)
 	require.True(t, report.Recovery.WithinHardCeiling)
+
+	partial := loadedRecovery
+	partial.Attempts = nil
+	partial.Manifest.StopReason = "rate_limited"
+	partialPath := filepath.Join(t.TempDir(), "partial-recovery.json")
+	require.NoError(t, WriteCampaignRecovery(partialPath, partial))
+	partialSpec := spec
+	partialSpec.Phases = slices.Clone(spec.Phases)
+	partialSpec.Phases[0].Runs = slices.Clone(spec.Phases[0].Runs)
+	partialSpec.Phases[0].Runs[0].RecoveryEvidence = partialPath
+	partialReport, err := BuildCampaignReport(context.Background(), dataset, partialSpec)
+	require.NoError(t, err)
+	require.Equal(t, "rate_limited", partialReport.Phases[0].Models[0].Recovery.StopReason)
+	require.Equal(t, 1, partialReport.Phases[0].Models[0].Operations.Requests)
+	require.Equal(t, 1, partialReport.Recovery.MissingSlots)
 	// Recovery does not inherit a semantic judgment bound to the empty output.
 	require.Equal(t, "unassessed", report.Cases[0].SemanticStatus)
 	require.False(t, model.Coverage.HumanReviewComplete)
@@ -296,7 +320,7 @@ func TestBuildCampaignReportRejectsUndeclaredOrUnsafeEvidence(t *testing.T) {
 func TestReadCampaignReportSpecIsStrictAndHashesExactProtocol(t *testing.T) {
 	dataset, _ := campaignReportFixture(t, "executed")
 	dataset.Suites["development"] = append([]string(nil), dataset.Suites["smoke"]...)
-	protocol := fmt.Sprintf(`{"protocol_version":"1.0.0","campaign_id":"campaign-1","status":"frozen","purpose":"test","dataset_version":%q,"dataset_manifest_sha256":%q,"scope":"development","expected_trials":1,"allow_holdout":false,"dataset":{},"solution":{"baseline_source_commit":"base","baseline_files":{"file":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},"require_clean_tree_before_live":true,"prompt_change_allowed":false,"generation_config_change_allowed":false,"quality_fixes_allowed":false},"models":[{"requested_model":"model-a"}],"execution":{"concurrency":1,"max_retries":0,"retry_for_quality":false,"attempt_timeout_seconds":1,"global_timeout_seconds":2,"min_interval_seconds":1,"max_output_tokens":4096,"primary":{"suite":"development","cases":1,"trials_per_case":1,"calls_total":1},"smoke":{"suite":"smoke","cases":1,"trials_per_case":1,"calls_total":1},"maximum_provider_calls_total":2,"contracts":{},"ranking_baselines":{},"metamorphic":{"enabled":false}},"budget":{"currency":"USD","hard_ceiling":10,"guard_required_before_live":true,"guard_policy":"test","max_input_tokens_per_request":1,"max_output_tokens_per_request":4096,"preflight_upper_bound_usd":1,"preflight_calculation":"test","preflight_headroom_usd":9,"pricing":{"source":"pricing-source","must_verify_on_execution_date":true,"model-a":{"input_usd_per_million_tokens":0.3,"output_usd_per_million_tokens":2.5}},"unknown_usage_policy":"fail"},"measurement":{},"traceability":{}}`, dataset.Version, dataset.ManifestSHA256)
+	protocol := fmt.Sprintf(`{"protocol_version":"1.0.0","campaign_id":"campaign-1","status":"frozen","purpose":"test","dataset_version":%q,"dataset_manifest_sha256":%q,"scope":"development","expected_trials":1,"allow_holdout":false,"dataset":{},"solution":{"baseline_source_commit":"base","baseline_files":{"file":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},"require_clean_tree_before_live":true,"prompt_change_allowed":false,"generation_config_change_allowed":false,"quality_fixes_allowed":false},"models":[{"requested_model":"model-a"}],"execution":{"concurrency":1,"max_retries":0,"retry_for_quality":false,"attempt_timeout_seconds":1,"global_timeout_seconds":2,"min_interval_seconds":1,"max_output_tokens":4096,"primary":{"suite":"development","cases":1,"trials_per_case":1,"calls_total":1},"smoke":{"suite":"smoke","cases":1,"trials_per_case":1,"calls_total":1},"maximum_provider_calls_total":2,"ranking_baselines":{},"metamorphic":{"enabled":false}},"budget":{"currency":"USD","hard_ceiling":10,"guard_required_before_live":true,"guard_policy":"test","max_input_tokens_per_request":1,"max_output_tokens_per_request":4096,"preflight_upper_bound_usd":1,"preflight_calculation":"test","preflight_headroom_usd":9,"pricing":{"source":"pricing-source","must_verify_on_execution_date":true,"model-a":{"input_usd_per_million_tokens":0.3,"output_usd_per_million_tokens":2.5}},"unknown_usage_policy":"fail"},"measurement":{},"traceability":{}}`, dataset.Version, dataset.ManifestSHA256)
 	root := t.TempDir()
 	protocolPath := filepath.Join(root, "protocol.json")
 	require.NoError(t, os.WriteFile(protocolPath, []byte(protocol), 0600))
@@ -315,71 +339,51 @@ func TestReadCampaignReportSpecIsStrictAndHashesExactProtocol(t *testing.T) {
 }
 
 func TestReadCampaignReportSpecAcceptsFrozenCampaignProtocol(t *testing.T) {
-	protocolPath := filepath.Join("..", "..", "evals", "protocols", "campaign-1.json")
-	dataset, err := LoadDataset(filepath.Join("..", "..", "evals", "datasets", "LoResuelvo_US60_evals_v1.0.0"))
-	require.NoError(t, err)
-	protocol, err := os.ReadFile(protocolPath)
-	require.NoError(t, err)
-	models := []string{"gemini-3.1-flash-lite", "gemini-3.5-flash-lite"}
-	phase := func(name string) CampaignEvidencePhase {
-		result := CampaignEvidencePhase{Name: name}
-		for _, model := range models {
-			result.Runs = append(result.Runs, CampaignRunSpec{RequestedModel: model, RunDirectory: name + "-" + model})
-		}
-		return result
-	}
-	evidence := CampaignEvidence{FormatVersion: "1", CampaignID: "campaign-1", ProtocolSHA256: digest(protocol), DatasetManifestSHA256: dataset.ManifestSHA256, ExecutionSourceCommit: "future-clean-commit", PricingVerifiedOn: "2026-09-14", BaselineFilesSHA256: map[string]string{
-		"internal/adapters/chatbot/gemini_chatbot.go":         "865d4bac8787cb774e0d6575671710427115154a355585f0989277aebc4301c0",
-		"internal/adapters/chatbot/gemini_generation.go":      "7ed4dc97f4dc1ab3b3471190212cd752dc90ebac7323d38794c64461d061ce73",
-		"internal/adapters/chatbot/gemini_chatbot_test.go":    "400b70ab7d7db43c94dcf4cdd91cc310478452b85e316ccb240d33a38f1119f6",
-		"internal/adapters/chatbot/gemini_generation_test.go": "fded926bf129f5ac3a9c3454d8388f8c48b4aca716eb28b9c0fd4c6659bed83d",
-	}, Budget: CampaignBudgetEvidence{PricingSource: "https://ai.google.dev/gemini-api/docs/pricing", HardCeilingUSD: 10, CountTokenRequests: 144, ExpectedGenerationCalls: 360, ReservedInputTokens: 360 * 20000, ReservedOutputTokens: 360 * 4096, ReservedInputUSD: 2.16, ReservedOutputUSD: 3.6864, ReservedTotalUSD: 5.8464, PreflightHeadroomUSD: 4.1536, ProviderUsageComplete: true}, Phases: []CampaignEvidencePhase{phase("smoke"), phase("primary")}}
+	dataset, _ := campaignReportFixture(t, "executed")
+	dataset.Suites["development"] = append([]string(nil), dataset.Suites["smoke"]...)
+	protocol := campaignProtocolFixture(t, dataset)
+	protocolPath := filepath.Join(t.TempDir(), "protocol.json")
+	require.NoError(t, os.WriteFile(protocolPath, []byte(protocol), 0600))
+	evidence := CampaignEvidence{FormatVersion: "1", CampaignID: "campaign-1", ProtocolSHA256: digest([]byte(protocol)), DatasetManifestSHA256: dataset.ManifestSHA256, ExecutionSourceCommit: "future-clean-commit", PricingVerifiedOn: "2026-09-14", BaselineFilesSHA256: map[string]string{"file": strings.Repeat("a", 64)}, Budget: CampaignBudgetEvidence{PricingSource: "pricing-source", HardCeilingUSD: 10, CountTokenRequests: 2, ExpectedGenerationCalls: 2, ReservedInputTokens: 40000, ReservedOutputTokens: 8192, ReservedInputUSD: .012, ReservedOutputUSD: .02048, ReservedTotalUSD: .03248, PreflightHeadroomUSD: 9.96752, ProviderUsageComplete: true}, Phases: []CampaignEvidencePhase{{Name: "smoke", Runs: []CampaignRunSpec{{RequestedModel: "model-a", RunDirectory: "smoke-run"}}}, {Name: "primary", Runs: []CampaignRunSpec{{RequestedModel: "model-a", RunDirectory: "primary-run"}}}}}
 	data, err := json.Marshal(evidence)
 	require.NoError(t, err)
 	evidencePath := filepath.Join(t.TempDir(), "evidence.json")
 	require.NoError(t, os.WriteFile(evidencePath, data, 0600))
-
 	spec, err := ReadCampaignReportSpec(dataset, protocolPath, evidencePath)
 	require.NoError(t, err)
 	require.Len(t, spec.Phases, 2)
 	require.Equal(t, 1, spec.Phases[0].Trials)
-	require.Equal(t, 3, spec.Phases[1].Trials)
-	require.Len(t, spec.Phases[1].Runs, 2)
+	require.Equal(t, 1, spec.Phases[1].Trials)
+	require.Len(t, spec.Phases[1].Runs, 1)
 	require.False(t, spec.Phases[1].Metamorphic)
 	require.Equal(t, "future-clean-commit", spec.SourceCommit)
 	execution, err := ReadCampaignExecutionConfig(dataset, protocolPath)
 	require.NoError(t, err)
-	require.Equal(t, 360, execution.MaximumGenerationCalls)
+	require.Equal(t, 2, execution.MaximumGenerationCalls)
 	require.Equal(t, 10.0, execution.HardCeilingUSD)
-	require.Len(t, execution.Models, 2)
-	require.Len(t, execution.Prices, 2)
+	require.Len(t, execution.Models, 1)
+	require.Len(t, execution.Prices, 1)
 	for _, price := range execution.Prices {
 		require.False(t, price.Verified)
 	}
 }
 
 func TestReadCampaignExecutionConfigAcceptsVersionedChangedSolution(t *testing.T) {
-	protocolPath := filepath.Join("..", "..", "evals", "protocols", "campaign-1.json")
-	dataset, err := LoadDataset(filepath.Join("..", "..", "evals", "datasets", "LoResuelvo_US60_evals_v1.0.0"))
-	require.NoError(t, err)
-	data, err := os.ReadFile(protocolPath)
-	require.NoError(t, err)
-	changed := strings.Replace(string(data), `"campaign_id": "campaign-1"`, `"campaign_id": "campaign-2"`, 1)
-	changed = strings.Replace(changed, `"baseline_source_commit": "ca5e2ae",`, `"baseline_source_commit": "candidate-commit",
-    "parent_campaign_id": "campaign-1",
-    "change_description": "Bounded safety, grounding and response-contract fixes.",`, 1)
-	changed = strings.Replace(changed, `"prompt_change_allowed": false`, `"prompt_change_allowed": true`, 1)
-	changed = strings.Replace(changed, `"generation_config_change_allowed": false`, `"generation_config_change_allowed": true`, 1)
-	changed = strings.Replace(changed, `"quality_fixes_allowed": false`, `"quality_fixes_allowed": true`, 1)
-	path := filepath.Join(t.TempDir(), "campaign-2.json")
+	dataset, _ := campaignReportFixture(t, "executed")
+	dataset.Suites["development"] = append([]string(nil), dataset.Suites["smoke"]...)
+	changed := strings.Replace(campaignProtocolFixture(t, dataset), `"campaign_id":"campaign-1"`, `"campaign_id":"candidate"`, 1)
+	changed = strings.Replace(changed, `"baseline_source_commit":"base"`, `"baseline_source_commit":"candidate-commit","parent_campaign_id":"campaign-1","change_description":"Bounded safety fixes."`, 1)
+	for _, field := range []string{"prompt_change_allowed", "generation_config_change_allowed", "quality_fixes_allowed"} {
+		changed = strings.Replace(changed, `"`+field+`":false`, `"`+field+`":true`, 1)
+	}
+	path := filepath.Join(t.TempDir(), "candidate.json")
 	require.NoError(t, os.WriteFile(path, []byte(changed), 0600))
-
 	config, err := ReadCampaignExecutionConfig(dataset, path)
 	require.NoError(t, err)
-	require.Equal(t, "campaign-2", config.CampaignID)
+	require.Equal(t, "candidate", config.CampaignID)
 	require.Equal(t, "campaign-1", config.ParentCampaignID)
 	require.Contains(t, config.ChangeDescription, "safety")
-	require.Equal(t, 360, config.MaximumGenerationCalls)
+	require.Equal(t, 2, config.MaximumGenerationCalls)
 }
 
 func TestCampaignTrialVariabilityUsesWithinCaseRanges(t *testing.T) {
@@ -396,4 +400,86 @@ func TestCampaignTrialVariabilityUsesWithinCaseRanges(t *testing.T) {
 	require.Equal(t, 1, result.VariableBaseCases)
 	require.Equal(t, 0.5, *result.MeanWithinCaseRange)
 	require.Equal(t, 0.5, *result.MaxWithinCaseRange)
+}
+
+func campaignProtocolFixture(t *testing.T, dataset *Dataset) string {
+	t.Helper()
+	return fmt.Sprintf(`{"protocol_version":"1.0.0","campaign_id":"campaign-1","status":"frozen","purpose":"test","dataset_version":%q,"dataset_manifest_sha256":%q,"scope":"development","expected_trials":1,"allow_holdout":false,"dataset":{},"solution":{"baseline_source_commit":"base","baseline_files":{"file":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},"require_clean_tree_before_live":true,"prompt_change_allowed":false,"generation_config_change_allowed":false,"quality_fixes_allowed":false},"models":[{"requested_model":"model-a"}],"execution":{"concurrency":1,"max_retries":0,"retry_for_quality":false,"attempt_timeout_seconds":1,"global_timeout_seconds":2,"min_interval_seconds":1,"max_output_tokens":4096,"primary":{"suite":"development","cases":1,"trials_per_case":1,"calls_total":1},"smoke":{"suite":"smoke","cases":1,"trials_per_case":1,"calls_total":1},"maximum_provider_calls_total":2,"ranking_baselines":{},"metamorphic":{"enabled":false}},"budget":{"currency":"USD","hard_ceiling":10,"guard_required_before_live":true,"guard_policy":"test","max_input_tokens_per_request":1,"max_output_tokens_per_request":4096,"preflight_upper_bound_usd":1,"preflight_calculation":"test","preflight_headroom_usd":9,"pricing":{"source":"pricing-source","must_verify_on_execution_date":true,"model-a":{"input_usd_per_million_tokens":0.3,"output_usd_per_million_tokens":2.5}},"unknown_usage_policy":"fail"},"measurement":{},"traceability":{}}`, dataset.Version, dataset.ManifestSHA256)
+}
+
+func TestCampaignProtocolBillingTierRequiresExplicitDeclaration(t *testing.T) {
+	dataset, _ := campaignReportFixture(t, "executed")
+	dataset.Suites["development"] = dataset.Suites["smoke"]
+	for _, test := range []struct {
+		tier  string
+		valid bool
+	}{{"", true}, {"free", true}, {"paid", true}, {"unknown", true}, {"guess", false}} {
+		t.Run(test.tier, func(t *testing.T) {
+			protocol := campaignProtocolFixture(t, dataset)
+			if test.tier != "" {
+				protocol = strings.Replace(protocol, `"execution":{`, `"execution":{"billing_tier":"`+test.tier+`",`, 1)
+			}
+			path := filepath.Join(t.TempDir(), "protocol.json")
+			require.NoError(t, os.WriteFile(path, []byte(protocol), 0600))
+			config, err := ReadCampaignExecutionConfig(dataset, path)
+			if !test.valid {
+				require.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			expected := test.tier
+			if expected == "" {
+				expected = "unknown"
+			}
+			require.Equal(t, expected, config.BillingTier)
+		})
+	}
+}
+
+func TestCampaignPublicStatusIsActorNeutralAndPreservesPrivateHumanCoverage(t *testing.T) {
+	dataset, directory := campaignReportFixture(t, "executed")
+	var expected rkExpected
+	require.NoError(t, json.Unmarshal(dataset.RK[0].Expected, &expected))
+	expected.Semantic = append(expected.Semantic, SemanticCheck{ID: "completeness", Severity: "major", Criterion: "Required evidence remains faithful."})
+	var err error
+	dataset.RK[0].Expected, err = json.Marshal(expected)
+	require.NoError(t, err)
+	var public []byte
+	for _, test := range []struct {
+		name  string
+		kinds []string
+		human bool
+	}{{"agent", []string{"agent", "agent"}, false}, {"mixed", []string{"human", "agent"}, false}, {"human", []string{"human", "human"}, true}} {
+		t.Run(test.name, func(t *testing.T) {
+			document, err := NewSemanticReviewTemplate(dataset, directory)
+			require.NoError(t, err)
+			require.Len(t, document.Reviews, 2)
+			now := time.Date(2026, 10, 13, 0, 0, 0, 0, time.UTC)
+			for i := range document.Reviews {
+				document.Reviews[i].Result = "pass"
+				document.Reviews[i].EvidenceLocation = "absent"
+				document.Reviews[i].Reason = "The synthetic response satisfies this bound criterion."
+				document.Reviews[i].Reviewer = "private-reviewer"
+				document.Reviews[i].ReviewerKind = test.kinds[i]
+				document.Reviews[i].ReviewedOn = &now
+			}
+			path := filepath.Join(t.TempDir(), "reviews.json")
+			require.NoError(t, WriteSemanticReviews(path, document))
+			spec := campaignReportSpec(t, dataset, directory)
+			spec.Phases[0].Runs[0].SemanticReviews = path
+			report, err := BuildCampaignReport(context.Background(), dataset, spec)
+			require.NoError(t, err)
+			require.Equal(t, "semantic_reviewed", report.Cases[0].OverallStatus)
+			require.Equal(t, test.human, report.Phases[0].Models[0].Coverage.HumanReviewComplete)
+			require.Equal(t, boolInt(test.human), report.Phases[0].Models[0].Coverage.HumanReviewedSlots)
+			require.False(t, report.ReleaseApproved)
+			encoded, err := json.Marshal(report)
+			require.NoError(t, err)
+			if public == nil {
+				public = encoded
+			} else {
+				require.JSONEq(t, string(public), string(encoded))
+			}
+		})
+	}
 }

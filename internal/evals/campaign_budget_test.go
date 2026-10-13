@@ -88,14 +88,16 @@ func TestCampaignBudgetGuardStopsBeforeNextRequestWhenObservedSpendExceedsCeilin
 	require.NoError(t, err)
 	guard, err := NewCampaignBudgetGuard(estimate)
 	require.NoError(t, err)
-	require.NoError(t, guard.BeforeRequest(spec.Plans[0].Plan))
+	reservation, err := guard.Reserve(spec.Plans[0].Plan)
+	require.NoError(t, err)
 	// The observed input is deliberately much larger than the CountTokens bound;
 	// the guard refuses to certify the next request rather than hiding the drift.
-	require.NoError(t, guard.RecordObserved(spec.Plans[0].Plan, 100, 100))
-	require.NoError(t, guard.BeforeRequest(spec.Plans[0].Plan))
-	require.ErrorIs(t, guard.RecordObserved(spec.Plans[0].Plan, 1_000_000, 4096), ErrCampaignBudgetExceeded)
+	require.NoError(t, reservation.RecordObserved(100, 100))
+	reservation, err = guard.Reserve(spec.Plans[0].Plan)
+	require.NoError(t, err)
+	require.ErrorIs(t, reservation.RecordObserved(1_000_000, 4096), ErrCampaignBudgetExceeded)
 	used, spent := guard.Snapshot()
-	require.Equal(t, 1, used)
+	require.Equal(t, 2, used)
 	require.Greater(t, spent, 0.0)
 }
 
@@ -113,13 +115,14 @@ func TestCampaignBudgetGuardIsConcurrencySafe(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			if err := guard.BeforeRequest(spec.Plans[0].Plan); err != nil {
+			reservation, err := guard.Reserve(spec.Plans[0].Plan)
+			if err != nil {
 				mu.Lock()
 				errs = append(errs, err)
 				mu.Unlock()
 				return
 			}
-			if err := guard.RecordObserved(spec.Plans[0].Plan, 1, 1); err != nil {
+			if err := reservation.RecordObserved(1, 1); err != nil {
 				mu.Lock()
 				errs = append(errs, err)
 				mu.Unlock()
@@ -130,7 +133,8 @@ func TestCampaignBudgetGuardIsConcurrencySafe(t *testing.T) {
 	require.Empty(t, errs)
 	used, _ := guard.Snapshot()
 	require.Equal(t, 4, used)
-	require.True(t, errors.Is(guard.BeforeRequest(spec.Plans[0].Plan), ErrCampaignBudgetExceeded))
+	_, err = guard.Reserve(spec.Plans[0].Plan)
+	require.True(t, errors.Is(err, ErrCampaignBudgetExceeded))
 }
 
 type budgetCountTransport struct{}
@@ -224,12 +228,14 @@ func TestCampaignBudgetGuardConsumesMaximumForUnknownUsageAndContinues(t *testin
 	guard, err := NewCampaignBudgetGuard(estimate)
 	require.NoError(t, err)
 	plan := spec.Plans[0].Plan
-	require.NoError(t, guard.BeforeRequest(plan))
-	require.NoError(t, guard.RecordUnknown(plan))
+	reservation, err := guard.Reserve(plan)
+	require.NoError(t, err)
+	require.NoError(t, reservation.RecordUnknown())
 	used, spent := guard.Snapshot()
 	require.Equal(t, 1, used)
 	require.InDelta(t, 0.01624, spent, 0.0000001)
-	require.NoError(t, guard.BeforeRequest(plan))
+	_, err = guard.Reserve(plan)
+	require.NoError(t, err)
 }
 
 type unknownUsageTransport struct {
@@ -285,4 +291,36 @@ func TestGeminiExecutorPreservesQualityErrorWhenUsageIsUnknown(t *testing.T) {
 	used, _, ok := executor.CampaignBudgetSnapshot()
 	require.True(t, ok)
 	require.Equal(t, 1, used)
+}
+
+func TestCampaignBudgetReservationClaimsLastSlotAtomicallyAndSettlesOnce(t *testing.T) {
+	spec := validBudgetSpec()
+	spec.Plans = []CampaignBudgetPlan{budgetPlan("gemini-3.5-flash-lite", 1, 1, 0)}
+	estimate, err := PreflightCampaignBudget(spec)
+	require.NoError(t, err)
+	guard, err := NewCampaignBudgetGuard(estimate)
+	require.NoError(t, err)
+	var winners atomic.Int32
+	var wg sync.WaitGroup
+	var reservation *CampaignBudgetReservation
+	for range 20 {
+		wg.Go(func() {
+			r, err := guard.Reserve(spec.Plans[0].Plan)
+			if err == nil {
+				winners.Add(1)
+				reservation = r
+			}
+		})
+	}
+	wg.Wait()
+	require.EqualValues(t, 1, winners.Load())
+	used, reserved := guard.Snapshot()
+	require.Equal(t, 1, used)
+	require.Greater(t, reserved, 0.0)
+	require.NoError(t, reservation.RecordObserved(1, 1))
+	_, spent := guard.Snapshot()
+	require.Less(t, spent, reserved)
+	require.NoError(t, reservation.RecordObserved(100, 100))
+	_, repeated := guard.Snapshot()
+	require.Equal(t, spent, repeated)
 }

@@ -59,3 +59,11 @@ func TestBuildPlanRejectsUnknownAndDuplicateCases(t *testing.T) {
 		require.Error(t, err)
 	}
 }
+
+func TestBuildPlanIncludesExplicitSummaryCasesWithoutOracleInput(t *testing.T) {
+	d := &Dataset{SM: []SMCase{{CaseMetadata: CaseMetadata{ID: "SM-001", Split: "development"}}}, Suites: map[string][]string{"development": {"SM-001"}}}
+	plan, err := BuildPlan(d, PlanOptions{Suite: "development", Model: "model", Trials: 1, MaxRequests: 1})
+	require.NoError(t, err)
+	require.Equal(t, 1, plan.BaseExecutions)
+	require.Equal(t, "SM-001", plan.Cases[0].CaseID)
+}

@@ -17,13 +17,14 @@ import (
 )
 
 type campaignExecutionItem struct {
-	Phase     evals.CampaignExecutionPhase
-	Model     string
-	Plan      *evals.Plan
-	Executor  *evals.GeminiExecutor
-	Limits    evals.ExecutionLimits
-	Directory string
-	Reviews   string
+	BillingTier string
+	Phase       evals.CampaignExecutionPhase
+	Model       string
+	Plan        *evals.Plan
+	Executor    *evals.GeminiExecutor
+	Limits      evals.ExecutionLimits
+	Directory   string
+	Reviews     string
 }
 
 type campaignLiveRunResult struct {
@@ -52,6 +53,10 @@ func buildCampaignExecutions(dataset *evals.Dataset, config evals.CampaignExecut
 	if dataset == nil || output == "" {
 		return nil, fmt.Errorf("campaign dataset and output directory are required")
 	}
+	keys, err := evals.ParseEvaluationAPIKeys(apiKey)
+	if err != nil {
+		return nil, err
+	}
 	seenPaths := map[string]bool{}
 	items := make([]campaignExecutionItem, 0, len(config.Phases)*len(config.Models))
 	requests := 0
@@ -73,11 +78,11 @@ func buildCampaignExecutions(dataset *evals.Dataset, config evals.CampaignExecut
 				return nil, fmt.Errorf("campaign model paths collide")
 			}
 			seenPaths[directory] = true
-			executor, err := evals.NewGeminiExecutor(dataset, plan, config.Execution.Limits, allowLive, apiKey)
+			executor, err := evals.NewGeminiExecutorWithKeys(dataset, plan, config.Execution.Limits, allowLive, keys)
 			if err != nil {
 				return nil, err
 			}
-			items = append(items, campaignExecutionItem{Phase: phase, Model: model, Plan: plan, Executor: executor, Limits: config.Execution.Limits, Directory: directory, Reviews: reviews})
+			items = append(items, campaignExecutionItem{BillingTier: config.BillingTier, Phase: phase, Model: model, Plan: plan, Executor: executor, Limits: config.Execution.Limits, Directory: directory, Reviews: reviews})
 		}
 	}
 	if requests != config.MaximumGenerationCalls || requests > evals.CampaignBudgetMaxRequests {
@@ -91,6 +96,9 @@ func executeCampaignLive(ctx context.Context, dataset *evals.Dataset, config eva
 	if pricingVerifiedOn != time.Now().UTC().Format(time.DateOnly) {
 		return result, fmt.Errorf("pricing must be independently verified on the current UTC execution date")
 	}
+	if err := verifyCampaignOutput(output); err != nil {
+		return result, err
+	}
 	if err := verifyCampaignBaseline(config); err != nil {
 		return result, err
 	}
@@ -99,18 +107,27 @@ func executeCampaignLive(ctx context.Context, dataset *evals.Dataset, config eva
 		return result, err
 	}
 	result.ExecutionSourceCommit = commit
+	if _, err = executionBuildProvenance(commit); err != nil {
+		return result, err
+	}
 	items, err := buildCampaignExecutions(dataset, config, output, apiKey, true)
 	if err != nil {
 		return result, err
 	}
 	prices := append([]evals.CampaignPrice(nil), config.Prices...)
 	for i := range prices {
+		if prices[i].VerifiedOn != "" && prices[i].VerifiedOn != pricingVerifiedOn {
+			return result, fmt.Errorf("protocol pricing snapshot date differs from execution verification date")
+		}
+		prices[i].VerifiedOn = pricingVerifiedOn
+		prices[i].Source = config.PricingSource
 		prices[i].Verified = true
 	}
 	executors := make([]*evals.GeminiExecutor, len(items))
 	for i := range items {
 		executors[i] = items[i].Executor
 	}
+	evals.ShareGeminiProjectLanes(executors)
 	estimate, err := evals.PreflightGeminiCampaignBudget(ctx, executors, prices, config.HardCeilingUSD, config.PricingSource)
 	if err != nil {
 		return result, err
@@ -223,7 +240,11 @@ func campaignProviderUsageComplete(directory string) (bool, error) {
 				Thoughts *int64 `json:"thoughtsTokenCount"`
 			} `json:"usageMetadata"`
 		}
-		if json.Unmarshal(attempt.ProviderResponse, &response) != nil || response.Usage == nil || response.Usage.Input == nil || response.Usage.Output == nil || response.Usage.Thoughts == nil {
+		usage := attempt.ProviderResponse
+		if len(attempt.ProviderUsage) > 0 {
+			usage = append(append(json.RawMessage(`{"usageMetadata":`), attempt.ProviderUsage...), '}')
+		}
+		if json.Unmarshal(usage, &response) != nil || response.Usage == nil || response.Usage.Input == nil || response.Usage.Output == nil || response.Usage.Thoughts == nil {
 			return false, nil
 		}
 	}
@@ -231,13 +252,17 @@ func campaignProviderUsageComplete(directory string) (bool, error) {
 }
 
 func executeCampaignItem(ctx context.Context, dataset *evals.Dataset, item campaignExecutionItem, commit, apiKey string) (evals.RunRecord, evals.Report, error) {
+	build, err := executionBuildProvenance(commit)
+	if err != nil {
+		return evals.RunRecord{}, evals.Report{}, err
+	}
 	now := time.Now().UTC()
-	record := evals.RunRecord{UnknownDefaults: "Provider defaults not present in captured requested configuration remain unknown; SDK response metadata is recorded only when supplied.", FormatVersion: "1", RunID: uuid.NewString(), Mode: "live", Commit: commit, StartedOn: now, Plan: item.Plan, Limits: item.Limits, Status: "running"}
+	record := evals.RunRecord{BillingTier: item.BillingTier, Build: build, UnknownDefaults: "Provider defaults not present in captured requested configuration remain unknown; SDK response metadata is recorded only when supplied.", FormatVersion: "1", RunID: uuid.NewString(), Mode: "live", Commit: commit, StartedOn: now, Plan: item.Plan, Limits: item.Limits, Status: "running"}
 	journal, err := evals.NewJournal(item.Directory, record)
 	if err != nil {
 		return record, evals.Report{}, err
 	}
-	_, runErr := evals.Run(ctx, dataset, item.Plan, record.Limits, item.Executor, journal, record, evals.CredentialRedactor(apiKey))
+	_, runErr := evals.Run(ctx, dataset, item.Plan, record.Limits, item.Executor, journal, record, evals.CredentialsRedactor(strings.Split(apiKey, ",")))
 	if err = errors.Join(runErr, journal.Close()); err != nil {
 		return record, evals.Report{}, err
 	}

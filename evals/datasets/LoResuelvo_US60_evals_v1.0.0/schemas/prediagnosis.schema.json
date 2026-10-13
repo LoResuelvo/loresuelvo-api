@@ -38,7 +38,7 @@
       ]
     },
     "review_status": {
-      "const": "finalized"
+      "const": "approved"
     },
     "execution_scope": {
       "enum": [

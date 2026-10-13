@@ -108,24 +108,24 @@ func liveArguments(root string) []string {
 }
 
 func TestLiveDryRunNeedsNoCredential(t *testing.T) {
-	t.Setenv("CHATBOT_API_KEY", "")
+	t.Setenv("CHATBOT_EVALS_API_KEYS", "")
 	var out, stderr bytes.Buffer
 	args := append(liveArguments(cliDataset(t)), "--dry-run")
 	require.Zero(t, run(args, &out, &stderr), stderr.String())
 	require.Contains(t, out.String(), `"live_model_calls": 0`)
 }
 func TestLiveRequiresOptInAndCredentials(t *testing.T) {
-	t.Setenv("CHATBOT_API_KEY", "")
+	t.Setenv("CHATBOT_EVALS_API_KEYS", "")
 	args := liveArguments(cliDataset(t))
 	var out, stderr bytes.Buffer
 	require.Equal(t, 2, run(args, &out, &stderr))
 	require.Contains(t, stderr.String(), "--allow-live")
 	stderr.Reset()
 	require.Equal(t, 2, run(append(args, "--allow-live", "--out", t.TempDir()+"/run"), &out, &stderr))
-	require.Contains(t, stderr.String(), "CHATBOT_API_KEY")
+	require.Contains(t, stderr.String(), "CHATBOT_EVALS_API_KEYS")
 }
 func TestOfflineCommandsRejectLiveFlag(t *testing.T) {
-	for _, command := range []string{"validate", "contract", "replay", "compare", "baselines", "summary", "review", "review-template", "review-calibrate", "metamorphic-report", "campaign-report", "campaign-export"} {
+	for _, command := range []string{"validate", "replay", "compare", "baselines", "summary", "review", "review-template", "review-calibrate", "metamorphic-report", "campaign-report", "campaign-export"} {
 		var out, stderr bytes.Buffer
 		require.Equal(t, 2, run([]string{command, "--allow-live"}, &out, &stderr))
 		require.Contains(t, stderr.String(), "flag provided but not defined")
@@ -146,7 +146,7 @@ func TestPlanSelectionCannotEscapeSuite(t *testing.T) {
 }
 
 func TestNewOfflineCommandsRequireExplicitEvidence(t *testing.T) {
-	t.Setenv("CHATBOT_API_KEY", "")
+	t.Setenv("CHATBOT_EVALS_API_KEYS", "")
 	root := cliDataset(t)
 	for _, command := range []string{"summary", "review-template", "review", "review-calibrate", "metamorphic-report", "baselines", "campaign-report", "campaign-export"} {
 		t.Run(command, func(t *testing.T) {

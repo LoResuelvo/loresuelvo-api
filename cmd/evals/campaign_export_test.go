@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -28,7 +27,7 @@ func TestWriteCampaignExportCreatesLongitudinalDataPackageWithoutCharts(t *testi
 	}
 	directory := filepath.Join(t.TempDir(), "campaign-1")
 	require.NoError(t, writeCampaignExport(directory, bundle))
-	for _, name := range []string{"README.md", "manifest.json", "attempts.jsonl", "responses.jsonl", "results.jsonl", "reviews.jsonl", "summary.json", "SHA256SUMS"} {
+	for _, name := range []string{"README.md", "manifest.json", "attempts.jsonl", "responses.jsonl", "results.jsonl", "summary.json", "SHA256SUMS"} {
 		data, err := os.ReadFile(filepath.Join(directory, name))
 		require.NoError(t, err, name)
 		require.NotNil(t, data)
@@ -37,6 +36,7 @@ func TestWriteCampaignExportCreatesLongitudinalDataPackageWithoutCharts(t *testi
 	require.NoError(t, err)
 	for _, entry := range entries {
 		require.NotEqual(t, ".svg", filepath.Ext(entry.Name()))
+		require.NotEqual(t, "reviews.jsonl", entry.Name())
 	}
 	responseData, err := os.ReadFile(filepath.Join(directory, "responses.jsonl"))
 	require.NoError(t, err)
@@ -83,36 +83,29 @@ func TestRenderCampaignExportREADMEExplainsPrimaryAndSmokeDenominators(t *testin
 	require.Contains(t, readme, "no son casos nuevos ni observaciones independientes")
 	require.Contains(t, readme, "`raw_output`")
 	require.Contains(t, readme, "`dataset_case_id`, `requested_model` y `trial`")
-	require.Contains(t, readme, "Una revisión de agente no certifica seguridad")
+	require.NotContains(t, readme, "agente")
+	require.NotContains(t, readme, "reviewer_kind")
+	require.Contains(t, readme, "no implica aprobación")
 }
 
-func TestRenderCampaignOneExternalEvidencePassesPublicationSafety(t *testing.T) {
-	evidencePath := os.Getenv("CAMPAIGN_ONE_EVIDENCE")
-	if evidencePath == "" {
-		t.Skip("CAMPAIGN_ONE_EVIDENCE is only available in the local evidence archive")
-	}
-	root := filepath.Join("..", "..", "evals")
-	dataset, err := evals.LoadDataset(filepath.Join(root, "datasets", "LoResuelvo_US60_evals_v1.0.0"))
-	require.NoError(t, err)
-	protocolPath := filepath.Join(root, "protocols", "campaign-1.json")
-	reportSpec, err := evals.ReadCampaignReportSpec(dataset, protocolPath, evidencePath)
-	require.NoError(t, err)
-	bundle, err := evals.BuildCampaignExport(context.Background(), dataset, evals.CampaignExportSpec{
-		Report: reportSpec, ProtocolPath: protocolPath, EvidencePath: evidencePath,
-		RecoveryAddendumPath: filepath.Join(root, "protocols", "campaign-1-recovery-addendum.json"),
-		ExporterSourceCommit: "local-verification",
-	})
-	require.NoError(t, err)
+func TestRenderCampaignPublicationExcludesPrivateAssessmentFields(t *testing.T) {
+	bundle := evals.CampaignExport{Manifest: evals.CampaignExportManifest{CampaignID: "fixture"}, Results: []evals.CampaignExportResult{{SemanticCriteria: []evals.CampaignExportCriterion{{CriterionID: "criterion", CriterionSHA256: "hash", Result: "pass"}}}}, Summary: evals.CampaignExportSummary{}}
 	artifacts, err := renderCampaignExportArtifacts(bundle)
 	require.NoError(t, err)
-	require.Len(t, artifacts, 8)
-	require.Equal(t, 392, strings.Count(string(artifacts["attempts.jsonl"]), "\n"))
-	require.Equal(t, 360, strings.Count(string(artifacts["responses.jsonl"]), "\n"))
-	require.Equal(t, 360, strings.Count(string(artifacts["results.jsonl"]), "\n"))
-	require.Equal(t, 2190, strings.Count(string(artifacts["reviews.jsonl"]), "\n"))
+	require.Len(t, artifacts, 7)
+	require.NotContains(t, artifacts, "reviews.jsonl")
 	require.NotContains(t, string(artifacts["summary.json"]), "case_trials")
 	for name, data := range artifacts {
-		require.NotContains(t, string(data), "/home/joseph/", name)
-		require.NotContains(t, string(data), "iVBORw0KGgo", name)
+		for _, private := range []string{"private-name", "private-reasoning", "reviewer_kind", "agent_assessments", "human_review", "/home/joseph/", "iVBORw0KGgo"} {
+			require.NotContains(t, string(data), private, name)
+		}
 	}
+	require.Contains(t, string(artifacts["results.jsonl"]), `"criterion_sha256":"hash"`)
+}
+
+func TestRenderCampaignExportScopeLabelsMetamorphicEntriesWithoutClaimingBaseCases(t *testing.T) {
+	summary := evals.CampaignExportSummary{Phases: []evals.CampaignPhaseReport{{Name: "primary", Trials: 3, Metamorphic: true, Coverage: evals.CampaignCoverage{ExpectedSlots: 12}, Models: make([]evals.CampaignModelReport, 2)}}}
+	scope := renderCampaignExportScope(summary)
+	require.Contains(t, scope, "2 entradas planificadas (incluidas variantes) × 3 trials × 2 modelos = 12 slots")
+	require.NotContains(t, scope, "2 casos")
 }

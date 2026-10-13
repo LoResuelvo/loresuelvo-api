@@ -38,7 +38,7 @@
       ]
     },
     "review_status": {
-      "const": "finalized"
+      "const": "approved"
     },
     "execution_scope": {
       "enum": [
@@ -326,18 +326,6 @@
           },
           "minItems": 0
         },
-        "required_top_k": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "minItems": 0,
-          "uniqueItems": true
-        },
-        "min_results": {
-          "type": "integer",
-          "minimum": 0
-        },
         "semantic_assertions": {
           "type": "array",
           "items": {
@@ -374,8 +362,6 @@
         "relevance",
         "pairwise_constraints",
         "tie_groups",
-        "required_top_k",
-        "min_results",
         "semantic_assertions"
       ],
       "additionalProperties": false

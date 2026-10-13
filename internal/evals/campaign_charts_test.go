@@ -28,13 +28,13 @@ func TestRenderCoverageSVGIsDeterministicAndShowsUnknowns(t *testing.T) {
 func TestRenderQualitySVGDoesNotTurnUnknownIntoZero(t *testing.T) {
 	value := 0.75
 	body, err := RenderQualitySVG([]QualityChartSeries{
-		{Name: "m", Metric: "accuracy", Summary: MetricSummary{Mean: &value, Observations: 3, ExpectedObservations: 6, EvaluatedBaseCases: 2}},
+		{Name: "m", Metric: "accuracy", Summary: MetricSummary{Mean: &value, Observations: 3, ExpectedObservations: 6, EvaluatedBaseCases: 2, UnassessedBaseCases: 1}},
 		{Name: "m", Metric: "ndcg", Summary: MetricSummary{ExpectedObservations: 6}},
 	})
 	require.NoError(t, err)
 	text := string(body)
 	require.Contains(t, text, "0.7500")
-	require.Contains(t, text, "n=3/6 · base cases=2/6")
+	require.Contains(t, text, "n=3/6 · base cases=2/3")
 	require.Contains(t, text, "ndcg")
 	// Unknown metrics must be explicit and cannot be represented by a zero bar.
 	require.Contains(t, text, "unknown")
@@ -100,4 +100,14 @@ func TestRenderVariabilitySVGRejectsImpossibleRanges(t *testing.T) {
 	mean, maxRange := 0.5, 0.2
 	_, err := RenderVariabilitySVG([]TrialVariabilitySeries{{Name: "m", ExpectedBaseCases: 1, EvaluatedBaseCases: 2, MeanWithinCaseRange: &mean, MaxWithinCaseRange: &maxRange}})
 	require.ErrorIs(t, err, ErrInvalidCampaignChartData)
+}
+
+func TestQualityChartsSeparateTrialAndBaseCaseDenominators(t *testing.T) {
+	summary := MetricSummary{Observations: 6, ExpectedObservations: 9, EvaluatedBaseCases: 2, UnassessedBaseCases: 1}
+	quality, err := RenderQualitySVG([]QualityChartSeries{{Name: "model", Summary: summary}})
+	require.NoError(t, err)
+	require.Contains(t, string(quality), "base cases=2/3")
+	ranking, err := RenderRankingSVG([]RankingChartSeries{{Name: "model", Summary: summary}})
+	require.NoError(t, err)
+	require.Contains(t, string(ranking), "base cases=2/3")
 }
