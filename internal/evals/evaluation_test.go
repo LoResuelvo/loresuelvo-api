@@ -163,3 +163,25 @@ func TestEvaluateSummaryRequiresExactReferenceWithoutApprovingFidelity(t *testin
 	require.NoError(t, err)
 	require.Contains(t, result.Errors, "required_image_reference_missing")
 }
+
+func TestPDSharedCriteriaDefineDistinctReviewContracts(t *testing.T) {
+	expected := json.RawMessage(`{"facts_to_preserve":["User removed the filter"],"must_not_invent":["A confirmed obstruction"],"semantic_assertions":[{"id":"fidelity","severity":"major","criterion":"Legacy explicit criterion"}]}`)
+	d := &Dataset{schemaFiles: evaluationSchemaFixture(t, "prediagnosis-output"), PD: []PDCase{{CaseMetadata: CaseMetadata{ID: "PD-test"}, Expected: expected}}}
+	result, err := EvaluateCase(d, "PD-test", nil)
+	require.NoError(t, err)
+	checks := map[string]SemanticCheck{}
+	for _, check := range result.SemanticChecks {
+		checks[check.ID] = check
+		require.Equal(t, "unassessed", check.Result)
+	}
+	require.Contains(t, checks, "fidelity", "Explicit legacy criteria remain available")
+	require.Contains(t, checks["shared_fact_preservation"].Criterion, "provenance")
+	require.Contains(t, checks["shared_fact_preservation"].Criterion, "recommended")
+	require.Contains(t, checks["shared_fact_preservation"].Criterion, "contradictions")
+	require.Contains(t, checks["shared_no_invention"].Criterion, "full response context")
+	require.Contains(t, checks["shared_no_invention"].Criterion, "plausible hypotheses")
+	require.Contains(t, checks["shared_no_invention"].Criterion, "global safety guarantees")
+	require.Contains(t, checks["shared_no_invention"].Criterion, "confirmed")
+	require.False(t, result.ReleaseApproved)
+	require.Equal(t, "failed", result.DeterministicStatus)
+}

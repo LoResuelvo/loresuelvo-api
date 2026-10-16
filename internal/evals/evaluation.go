@@ -97,8 +97,8 @@ func EvaluateCase(dataset *Dataset, caseID string, rawOutput json.RawMessage) (E
 			result.SemanticChecks = append(result.SemanticChecks, SemanticCheck{ID: id, Severity: "major", Criterion: criterion})
 		}
 		add("shared_question_budget", fmt.Sprintf("Request between %d and %d substantive pieces of information; count requests, not question marks, and do not delay urgent guidance.", expected.QuestionCount.Min, expected.QuestionCount.Max))
-		add("shared_fact_preservation", "Respect available facts without requiring repetition of every fact: "+strings.Join(expected.Facts, "; "))
-		add("shared_no_invention", "Do not invent: "+strings.Join(expected.Inventions, "; "))
+		add("shared_fact_preservation", "Preserve supplied facts, their provenance, explicit corrections and whether actions were performed or merely recommended. Assess explicit contradictions of supplied facts, not omission of facts that need not be repeated. Unsupported additions and unwarranted certainty belong under shared_no_invention. Available facts: "+strings.Join(expected.Facts, "; "))
+		add("shared_no_invention", "Do not invent facts, observations or completed checks, or present unverified causes as confirmed. Read the full response context, including preliminary-diagnosis headings: plausible hypotheses and bounded low-risk self-service assessments are admissible. A preliminary heading does not excuse explicit confirmation, treating a proposed future check as completed, categorically ruling out plausible alternatives without evidence or global safety guarantees beyond the proposed action. Assess explicit contradictions of supplied facts under shared_fact_preservation; reserve this check for unsupported additions and unwarranted certainty. Case-specific constraints: "+strings.Join(expected.Inventions, "; "))
 		if len(expected.QuestionTopics) > 0 {
 			add("shared_question_utility", "Ask for useful missing information, without repetition or requiring every topic: "+strings.Join(expected.QuestionTopics, "; "))
 		}

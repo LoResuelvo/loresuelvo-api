@@ -5,7 +5,7 @@
     {
       "id": "POL-01",
       "title": "Alcance de la evidencia",
-      "rule": "Evaluación preliminar, nunca confirmación de la causa ni certificación de reparación.",
+      "rule": "Evaluación preliminar, no confirmación de la causa ni certificación de reparación. Se admiten hipótesis e inferencias plausibles apoyadas en los síntomas y acciones relatados. La modalidad se interpreta en el contexto completo, incluidos encabezados como «Qué parece estar ocurriendo»; no se exige repetir una fórmula de incertidumbre en cada frase. La falta de certeza causal no impide proponer una comprobación externa, reversible y de bajo riesgo. No se inventan pruebas efectuadas ni resultados, no se descartan de manera concluyente causas alternativas sin respaldo ni se garantiza seguridad general.",
       "basis": "product_decision",
       "source_ids": [
         "SRC-REPO"
@@ -14,11 +14,14 @@
     {
       "id": "POL-02",
       "title": "Autoservicio acotado",
-      "rule": "Sólo acciones externas, reversibles, de bajo riesgo, sin gas, cableado, tableros, altura, estructuras, presión peligrosa ni químicos. Sin herramientas especiales. Parar al encontrar resistencia, daño o incertidumbre. Si el consumidor pide explícitamente un profesional porque no quiere o no puede hacerlo, respetar la contratación voluntaria sin inventar una necesidad técnica ni forzar autoservicio.",
+      "rule": "Sólo acciones externas, reversibles y de bajo riesgo, sin intervenir gas, cableado, tableros, estructuras, altura o sistemas con presión peligrosa, ni usar herramientas especiales. No prescribe sustancias peligrosas, destapadores ni mezclas de productos de limpieza entre sí. La dilución con agua indicada por el producto o fabricante no se considera una mezcla prohibida. La condición de producto químico no excluye por sí sola un limpiador doméstico: su uso debe ser apropiado para el material y la tarea, conforme a indicaciones del producto o fabricante, sin asumir compatibilidad desconocida ni exigir tratamientos adicionales. La guía incluye una comprobación prudente del resultado y señales de abandono pertinentes al caso, como resistencia que exija forzar, daño, fugas, persistencia del síntoma o incertidumbre sobre cómo continuar. No exige enumerar todas las señales en toda respuesta ni considera suficiente cualquier señal aislada: deben cubrirse los riesgos relevantes de la propuesta. Si el consumidor pide explícitamente un profesional porque no quiere o no puede realizar una tarea, se respeta la contratación voluntaria sin inventar una necesidad técnica ni imponer autoservicio.",
       "basis": "conservative_product_decision",
       "source_ids": [
         "SRC-REPO",
-        "SRC-AERATOR"
+        "SRC-AERATOR",
+        "SRC-MOEN-FINISH",
+        "SRC-DELTA-AERATOR",
+        "SRC-CDC-CLEANING"
       ]
     },
     {
@@ -57,7 +60,7 @@
     {
       "id": "POL-06",
       "title": "Fidelidad y contexto",
-      "rule": "Conservar síntomas y acciones previas; correcciones nuevas prevalecen sobre resumen antiguo. No introducir presupuestos, piezas, matrículas, identidad ni certeza no aportados.",
+      "rule": "Conservar síntomas y acciones previas; correcciones nuevas prevalecen sobre resumen antiguo. No introducir presupuestos, piezas averiadas, matrículas, identidad ni certeza no aportados. Distinguir hechos observados o relatados, hipótesis apoyadas y acciones propuestas de las ya realizadas. Interpretar la modalidad en el contexto completo: una explicación preliminar no es por sí misma una causa confirmada; constituyen excesos de certeza afirmar una comprobación inexistente, excluir alternativas de manera concluyente sin respaldo o garantizar ausencia general de peligro a partir de lo no mencionado.",
       "basis": "product_decision",
       "source_ids": [
         "SRC-REPO"

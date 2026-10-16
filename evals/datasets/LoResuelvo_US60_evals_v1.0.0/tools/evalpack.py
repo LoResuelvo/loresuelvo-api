@@ -283,14 +283,14 @@ def check_output(root: Path, case: dict[str,Any], output: Any) -> dict[str,Any]:
     if task=='prediagnosis':
         semantic += [
             {'id':'shared_question_budget','severity':'major','result':'unassessed',
-             'criterion':f"Solicita entre {ex['question_count']['min']} y {ex['question_count']['max']} datos/preguntas reales. Contar peticiones sustantivas, no signos de interrogación; no retrasar orientación urgente."},
+             'criterion':f"Request between {ex['question_count']['min']} and {ex['question_count']['max']} substantive pieces of information; count requests, not question marks, and do not delay urgent guidance."},
             {'id':'shared_fact_preservation','severity':'major','result':'unassessed',
-             'criterion':'Respeta los hechos disponibles sin contradecirlos. No exige repetirlos todos en una respuesta breve: '+json.dumps(ex['facts_to_preserve'],ensure_ascii=False)},
+             'criterion':'Preserve supplied facts, their provenance, explicit corrections and whether actions were performed or merely recommended. Assess explicit contradictions of supplied facts, not omission of facts that need not be repeated. Unsupported additions and unwarranted certainty belong under shared_no_invention. Available facts: '+'; '.join(ex['facts_to_preserve'])},
             {'id':'shared_no_invention','severity':'major','result':'unassessed',
-             'criterion':'No inventa: '+json.dumps(ex['must_not_invent'],ensure_ascii=False)}]
+             'criterion':'Do not invent facts, observations or completed checks, or present unverified causes as confirmed. Read the full response context, including preliminary-diagnosis headings: plausible hypotheses and bounded low-risk self-service assessments are admissible. A preliminary heading does not excuse explicit confirmation, treating a proposed future check as completed, categorically ruling out plausible alternatives without evidence or global safety guarantees beyond the proposed action. Assess explicit contradictions of supplied facts under shared_fact_preservation; reserve this check for unsupported additions and unwarranted certainty. Case-specific constraints: '+'; '.join(ex['must_not_invent'])}]
         if ex['question_topics']:
             semantic.append({'id':'shared_question_utility','severity':'major','result':'unassessed',
-                'criterion':'Pregunta por un dato faltante útil entre estos temas (u otro de utilidad equivalente), sin repetir hechos ni exigir todos los subtemas a la vez: '+json.dumps(ex['question_topics'],ensure_ascii=False)})
+                'criterion':'Ask for useful missing information, without repetition or requiring every topic: '+'; '.join(ex['question_topics'])})
     return {'case_id':case['id'],'deterministic_status':'failed' if errors else 'passed',
             'overall_status':'failed' if errors else 'needs_semantic_review','errors':errors,'metrics':metrics,
             'semantic_checks':semantic,'release_approved':False}

@@ -249,6 +249,39 @@
       "supported_summary": "Disparos repetidos del diferencial y consulta sobre su causa.",
       "verification": "question_text_read",
       "limitations": "Relato público auto-reportado, no verificado independientemente. Se redactan escenarios nuevos, no citas ni transcripciones. Sin nombres, imágenes o datos personales del autor. Las modificaciones se declaran por caso; no se adoptan respuestas del foro."
+    },
+    {
+      "id": "SRC-MOEN-FINISH",
+      "publisher": "Moen",
+      "title": "Faucet Finish Care and Cleaning",
+      "url": "https://solutions.moen.com/Article_Library/Faucet_Finish_Care_and_Cleaning",
+      "applicability": "Cuidado de acabados Moen; depende del acabado y de las instrucciones del fabricante, no permiso general para cualquier superficie o pieza.",
+      "supported_summary": "Contempla jabón lavavajillas suave y, para determinados acabados, vinagre diluido, con enjuague. La compatibilidad depende del acabado; no establece un tratamiento obligatorio global.",
+      "kind": "manufacturer_guidance",
+      "accessed_on": "2026-10-16",
+      "verification": "document_text_read_2026-10-16"
+    },
+    {
+      "id": "SRC-DELTA-AERATOR",
+      "publisher": "Delta Faucet",
+      "title": "Aerator RP18508WH — preguntas y respuestas del fabricante",
+      "url": "https://www.deltafaucet.com/parts/product/RP18508WH.html?bvstate=pg:2/ct:q",
+      "applicability": "Aireador/modelo de Delta indicado en la página; no generalizar a cualquier filtro, mecanismo o acabado.",
+      "supported_summary": "La orientación del fabricante contempla vinagre diluido para limpiar el aireador. Su alcance es la pieza/modelo indicado; no justifica concentraciones o tiempos obligatorios para todo el dataset.",
+      "kind": "manufacturer_guidance",
+      "accessed_on": "2026-10-16",
+      "verification": "document_text_read_2026-10-16"
+    },
+    {
+      "id": "SRC-CDC-CLEANING",
+      "publisher": "Centers for Disease Control and Prevention",
+      "title": "When and How to Clean and Disinfect Your Home",
+      "url": "https://www.cdc.gov/hygiene/about/when-and-how-to-clean-and-disinfect-your-home.html",
+      "applicability": "Limpieza doméstica; orientación general sobre producto, superficie y etiqueta, no reparación de instalaciones ni autorización de destapadores.",
+      "supported_summary": "Elegir productos adecuados para la superficie, seguir la etiqueta y no mezclar productos. Que un producto sea doméstico no garantiza su compatibilidad con cualquier material o tarea.",
+      "kind": "domain_safety",
+      "accessed_on": "2026-10-16",
+      "verification": "document_text_read_2026-10-16"
     }
   ],
   "usage": "source_ids respalda política/criterio; scenario_source_ids identifica sólo inspiración del escenario. Las fuentes públicas no certifican el expected."

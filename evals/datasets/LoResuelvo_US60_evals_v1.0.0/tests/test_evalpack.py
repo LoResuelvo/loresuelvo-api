@@ -13,6 +13,20 @@ PD=m.jsonl(ROOT/'datasets/prediagnosis.jsonl')
 RK=m.jsonl(ROOT/'datasets/ranking.jsonl')
 SM=m.jsonl(ROOT/'datasets/summarization.jsonl')
 
+class PDSharedContractTests(unittest.TestCase):
+    def test_shared_rubric_matches_go_contract(self):
+        case=copy.deepcopy(PD[0])
+        case['expected']['facts_to_preserve']=['Reported action']
+        case['expected']['must_not_invent']=['Confirmed cause']
+        checks={c['id']:c for c in m.check_output(ROOT,case,None)['semantic_checks']}
+        go=(ROOT.parents[2]/'internal/evals/evaluation.go').read_text()
+        for key,field in [('shared_fact_preservation','facts_to_preserve'),('shared_no_invention','must_not_invent')]:
+            import re
+            prefix=re.search(r'add\("'+key+r'", "([^"]*)"',go).group(1)
+            self.assertEqual(checks[key]['criterion'],prefix+'; '.join(case['expected'][field]))
+            self.assertEqual(checks[key]['result'],'unassessed')
+            self.assertEqual(checks[key]['severity'],'major')
+
 class MetricsTests(unittest.TestCase):
     def test_ndcg_ideal(self):self.assertAlmostEqual(m.ndcg(['a','b','c'],{'a':3,'b':2,'c':1}),1)
     def test_ndcg_wrong_order(self):self.assertLess(m.ndcg(['c','b','a'],{'a':3,'b':2,'c':1}),1)
