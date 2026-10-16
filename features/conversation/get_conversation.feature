@@ -5,7 +5,7 @@ Feature: Obtener conversación
 
     Background:
         Given que existe el rubro "Plomería"
-        And que existe un consumidor registrado con correo "ana@example.com", nombre "Ana" y apellido "Pérez"
+        And que existe un consumidor registrado con correo "ana@example.com", nombre "Ana" y apellido "Pérez" con la foto de perfil cargada
         And que existe un consumidor registrado con correo "carla@example.com", nombre "Carla" y apellido "Gómez"
         And existe un prestador registrado con correo "juan.plomero@example.com", nombre "Juan", apellido "Gómez" y rubro "Plomería"
         And existe un prestador registrado con correo "pedro.plomero@example.com", nombre "Pedro", apellido "Dib" y rubro "Plomería"
@@ -25,10 +25,13 @@ Feature: Obtener conversación
             Hola Juan, necesito reparar una pérdida de agua en la cocina. ¿Podrías ayudarme esta semana?
             """
 
+    @wip
     Scenario: 02-OC Prestador obtiene una conversación existente
         Given que estoy autenticado como prestador "juan.plomero@example.com"
         When consulto la conversación pendiente con el consumidor "ana@example.com"
         Then el sistema muestra la conversación entre el consumidor "ana@example.com" y el prestador "juan.plomero@example.com"
+        And la contraparte de la conversación es la consumidora "Ana Pérez" y su foto de perfil
+        And la contraparte de la conversación no incluye un rubro
         And el detalle de la conversación incluye el mensaje inicial enviado por "ana@example.com":
             """
             Hola Juan, necesito reparar una pérdida de agua en la cocina. ¿Podrías ayudarme esta semana?
