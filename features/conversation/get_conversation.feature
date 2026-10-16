@@ -25,7 +25,6 @@ Feature: Obtener conversación
             Hola Juan, necesito reparar una pérdida de agua en la cocina. ¿Podrías ayudarme esta semana?
             """
 
-    @wip
     Scenario: 02-OC Prestador obtiene una conversación existente
         Given que estoy autenticado como prestador "juan.plomero@example.com"
         When consulto la conversación pendiente con el consumidor "ana@example.com"
