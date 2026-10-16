@@ -22120,7 +22120,7 @@
                     "profile_photo_url": {
                         "type": "string",
                         "format": "uri",
-                        "description": "Public provider profile photo URL. Present only when the counterpart is a provider.",
+                        "description": "Public profile photo URL of the consumer or provider counterpart. Present when the counterpart has a profile photo.",
                         "example": "https://cdn.example/files/2026/06/profile_photo/juan.jpg"
                     }
                 },
