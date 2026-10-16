@@ -424,7 +424,7 @@ func (router *Router) registerTestRoutes(engine *gin.Engine) {
 
 func testRoutesEnabled(environment Environment) bool {
 	switch environment {
-	case DevelopmentEnvironment, TestEnvironment:
+	case DevelopmentEnvironment, TestEnvironment, StagingEnvironment:
 		return true
 	default:
 		return false
