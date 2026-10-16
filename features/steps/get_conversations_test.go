@@ -29,6 +29,8 @@ type conversationLastMessageSummaryResponse struct {
 }
 
 func registerGetConversationsSteps(sc *godog.ScenarioContext, suite *testSuite) {
+	sc.Step(`^la contraparte de la conversación es la consumidora "([^"]*)" y su foto de perfil$`, suite.conversationCounterpartIsConsumerWithPhoto)
+	sc.Step(`^la contraparte de la conversación no incluye un rubro$`, suite.conversationCounterpartDoesNotIncludeCategory)
 	sc.Step(`^consulto mis conversaciones$`, suite.requestMyConversations)
 	sc.Step(`^intento consultar mis conversaciones$`, suite.tryRequestMyConversations)
 	sc.Step(`^el sistema muestra un listado de conversaciones vacío$`, suite.systemShowsEmptyConversationList)
