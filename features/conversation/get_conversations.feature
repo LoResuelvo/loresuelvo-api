@@ -29,7 +29,6 @@ Feature: Obtener conversaciones
             Hola Juan, necesito reparar una pérdida de agua en la cocina. ¿Podrías ayudarme esta semana?
             """
 
-    @wip
     Scenario: 03-OCS Prestador obtiene sus conversaciones
         Given que estoy autenticado como prestador "juan.plomero@example.com"
         When consulto mis conversaciones
