@@ -27,6 +27,21 @@ class PDSharedContractTests(unittest.TestCase):
             self.assertEqual(checks[key]['result'],'unassessed')
             self.assertEqual(checks[key]['severity'],'major')
 
+class SharedReadabilityTests(unittest.TestCase):
+    def test_same_minor_semantic_criterion_in_all_tasks_and_go(self):
+        import re
+        go=(ROOT.parents[2]/'internal/evals/evaluation.go').read_text()
+        criterion=re.search(r'const sharedReadabilityCriterion = "([^\"]*)"',go)
+        self.assertIsNotNone(criterion)
+        for case in PD+RK+SM:
+            for output in (None, {}, {'summary':'A brief paragraph.'} if case['task']=='summarization' else {'recommendations':[]} if case['task']=='ranking' else {'content':'Section: 1. Step. 2. Step.'}):
+                with self.subTest(case=case['id'],output=output):
+                    result=m.check_output(ROOT,case,output)
+                    checks=[c for c in result['semantic_checks'] if c['id']=='shared_readability']
+                    self.assertEqual(len(checks),1)
+                    self.assertEqual(checks[0],{'id':'shared_readability','severity':'minor','criterion':criterion.group(1),'result':'unassessed'})
+                    self.assertFalse(result['release_approved'])
+
 class MetricsTests(unittest.TestCase):
     def test_ndcg_ideal(self):self.assertAlmostEqual(m.ndcg(['a','b','c'],{'a':3,'b':2,'c':1}),1)
     def test_ndcg_wrong_order(self):self.assertLess(m.ndcg(['c','b','a'],{'a':3,'b':2,'c':1}),1)
@@ -93,7 +108,7 @@ class FinalDatasetTests(unittest.TestCase):
         self.assertEqual(r['deterministic_status'],'passed')
         self.assertEqual(r['overall_status'],'needs_semantic_review')
         self.assertFalse(r['release_approved'])
-        self.assertTrue(all(c['result']=='unassessed' and not c['severity'] for c in r['semantic_checks']))
+        self.assertTrue(all(c['result']=='unassessed' and (c['severity']=='minor' if c['id']=='shared_readability' else not c['severity']) for c in r['semantic_checks']))
     def test_summary_exact_image_identity(self):
         c=next(c for c in SM if c['expected']['required_image_refs'])
         ref=c['expected']['required_image_refs'][0]['reference']

@@ -70,7 +70,7 @@ func TestSummaryReplayKeepsSemanticCriterionBindings(t *testing.T) {
 	require.Equal(t, "passed", report.Attempts[0].Evaluation.DeterministicStatus)
 	template, err := NewSemanticReviewTemplate(dataset, directory)
 	require.NoError(t, err)
-	require.Len(t, template.Reviews, 3)
+	require.Len(t, template.Reviews, 4)
 	require.Equal(t, "summary_assertion_001", template.Reviews[0].CriterionID)
 	require.Empty(t, template.Reviews[0].Severity)
 	require.NotEmpty(t, template.Reviews[0].CriterionSHA256)

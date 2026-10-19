@@ -290,8 +290,8 @@ func TestBuildCampaignExportRetainsNonterminalRejectedResponse(t *testing.T) {
 	require.Equal(t, 2, bundle.Summary.Phases[0].Models[0].Operations.Requests)
 	require.Equal(t, int64(24), *bundle.Summary.Phases[0].Models[0].Operations.InputTokens.ObservedTotal)
 	require.NotContains(t, bundle.Manifest.PrivacyScan.RecordsScanned, "review_evidence")
-	require.Equal(t, 1, bundle.Manifest.PrivacyScan.RecordsScanned["semantic_criteria"])
-	require.Len(t, bundle.Results[0].SemanticCriteria, 1)
+	require.Equal(t, 2, bundle.Manifest.PrivacyScan.RecordsScanned["semantic_criteria"])
+	require.Len(t, bundle.Results[0].SemanticCriteria, 2)
 	require.Equal(t, "unassessed", bundle.Results[0].SemanticCriteria[0].Result)
 }
 
@@ -341,14 +341,18 @@ func TestBuildCampaignReportAndExportSummaryIsSemanticallyUnassessed(t *testing.
 	require.NoError(t, err)
 	require.Equal(t, "summarization", bundle.Results[0].Task)
 	require.Equal(t, "unassessed", bundle.Results[0].SemanticStatus)
-	require.Len(t, bundle.Results[0].SemanticCriteria, 3)
+	require.Len(t, bundle.Results[0].SemanticCriteria, 4)
 	require.JSONEq(t, attempt.RawOutput, string(bundle.Responses[0].ParsedOutput))
 	require.JSONEq(t, attempt.RawOutput, string(bundle.Results[0].Observed))
 	task := bundle.Summary.Phases[0].Models[0].Tasks["summarization"]
 	require.Equal(t, 1, task.Coverage.ExpectedSlots)
 	require.Empty(t, task.TrialVariability)
 	for _, criterion := range bundle.Results[0].SemanticCriteria {
-		require.Empty(t, criterion.Severity)
+		if criterion.CriterionID == "shared_readability" {
+			require.Equal(t, "minor", criterion.Severity)
+		} else {
+			require.Empty(t, criterion.Severity)
+		}
 		require.NotEmpty(t, criterion.CriterionSHA256)
 	}
 }

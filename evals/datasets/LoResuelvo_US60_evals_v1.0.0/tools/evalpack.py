@@ -233,6 +233,8 @@ def validate(root: Path, verify_manifest: bool = True) -> dict[str,Any]:
             'critical_prediagnosis':len(suites['critical_all']),'smoke_cases':len(suites['smoke']),
             'errors':errors,'live_model_calls':0,'meaning':'Dataset integrity only; not a model or safety performance evaluation.'}
 
+SHARED_READABILITY_CRITERION = "Keep user-facing prose readable: separate sections with line breaks, place each step or list item on its own line, and use short paragraphs when the content contains several ideas. Judge each prose field independently and proportionally to its length and structure; a brief single paragraph is acceptable. Assess PD content and assessment.problem_description, RK recommendation reasons and SM summary; ignore JSON serialization whitespace and non-prose identifiers. If there is no assessable prose, the semantic reviewer should mark not_applicable. Safety correctness is assessed by existing safety criteria."
+
 def check_output(root: Path, case: dict[str,Any], output: Any) -> dict[str,Any]:
     """Only deterministic aspects. Semantic checks always remain unassessed here."""
     task=case['task']; ex=case['expected'];inp=case['input']
@@ -291,6 +293,7 @@ def check_output(root: Path, case: dict[str,Any], output: Any) -> dict[str,Any]:
         if ex['question_topics']:
             semantic.append({'id':'shared_question_utility','severity':'major','result':'unassessed',
                 'criterion':'Ask for useful missing information, without repetition or requiring every topic: '+'; '.join(ex['question_topics'])})
+    semantic.append({'id':'shared_readability','severity':'minor','criterion':SHARED_READABILITY_CRITERION,'result':'unassessed'})
     return {'case_id':case['id'],'deterministic_status':'failed' if errors else 'passed',
             'overall_status':'failed' if errors else 'needs_semantic_review','errors':errors,'metrics':metrics,
             'semantic_checks':semantic,'release_approved':False}

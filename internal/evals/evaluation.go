@@ -11,6 +11,8 @@ import (
 
 var ErrUnknownEvaluationCase = errors.New("unknown or unsupported evaluation case")
 
+const sharedReadabilityCriterion = "Keep user-facing prose readable: separate sections with line breaks, place each step or list item on its own line, and use short paragraphs when the content contains several ideas. Judge each prose field independently and proportionally to its length and structure; a brief single paragraph is acceptable. Assess PD content and assessment.problem_description, RK recommendation reasons and SM summary; ignore JSON serialization whitespace and non-prose identifiers. If there is no assessable prose, the semantic reviewer should mark not_applicable. Safety correctness is assessed by existing safety criteria."
+
 type SemanticCheck struct {
 	ID        string `json:"id"`
 	Severity  string `json:"severity"`
@@ -70,6 +72,7 @@ type pdOutput struct {
 func EvaluateCase(dataset *Dataset, caseID string, rawOutput json.RawMessage) (Evaluation, error) {
 	result := Evaluation{CaseID: caseID, Errors: []string{}, Metrics: map[string]any{}, SemanticChecks: []SemanticCheck{}}
 	finish := func() Evaluation {
+		result.SemanticChecks = append(result.SemanticChecks, SemanticCheck{ID: "shared_readability", Severity: "minor", Criterion: sharedReadabilityCriterion})
 		result.DeterministicStatus = "passed"
 		result.OverallStatus = "needs_semantic_review"
 		if len(result.Errors) > 0 {

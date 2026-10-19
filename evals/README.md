@@ -136,6 +136,18 @@ calibrados y cero fallos observados no demuestra riesgo cero. Un criterio críti
 fallido o sin evaluar impide declarar aprobado un release; el smoke no acredita
 los críticos de reserva que no ejecutó.
 
+El criterio compartido `shared_readability` (`minor`) evalúa semánticamente la
+legibilidad en PD, RK y SM: saltos entre secciones, cada paso o elemento de lista
+en su propia línea y párrafos breves cuando el contenido contiene varias ideas.
+Se juzga cada campo de prosa por separado y proporcionalmente: un párrafo breve
+es válido. No considera espacios del JSON ni identificadores. Sin prosa evaluable,
+el revisor puede marcar `not_applicable`; Go y Python lo dejan `unassessed` hasta
+ese juicio, también ante salidas ausentes. No sustituye los criterios de seguridad.
+Ver [alcance y política](datasets/LoResuelvo_US60_evals_v1.0.0/README.md#legibilidad-compartida--2026-10-19).
+Su integración reevalúa trials guardados sin modificar el prompt, la solución,
+las entradas o expectativas de los casos ni generar nuevas respuestas. Los
+juicios anteriores se conservan para trazabilidad; no publica la primera campaña.
+
 ## Artefactos de campaña
 
 Cada campaña conserva su protocolo y configuración, además del export:

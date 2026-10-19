@@ -15,7 +15,7 @@ func TestSemanticTemplateBindsExactOutputAndCriterion(t *testing.T) {
 	directory := persistReplayEvidence(t, record, attempt)
 	document, err := NewSemanticReviewTemplate(dataset, directory)
 	require.NoError(t, err)
-	require.Len(t, document.Reviews, 1)
+	require.Len(t, document.Reviews, 2)
 	require.Equal(t, digest([]byte(attempt.RawOutput)), document.Reviews[0].OutputSHA256)
 	require.Equal(t, "unassessed", document.Reviews[0].Result)
 	require.Equal(t, record.RunID, document.RunID)
@@ -29,13 +29,16 @@ func TestSemanticHumanReviewDoesNotApproveRelease(t *testing.T) {
 	document, err := NewSemanticReviewTemplate(dataset, directory)
 	require.NoError(t, err)
 	now := time.Now().UTC()
-	document.Reviews[0].Result = "pass"
-	document.Reviews[0].EvidenceLocation = "present"
-	document.Reviews[0].EvidenceQuote = attempt.RawOutput
-	document.Reviews[0].Reason = "Reasons match supplied evidence."
-	document.Reviews[0].Reviewer = "team-member"
-	document.Reviews[0].ReviewerKind = "human"
-	document.Reviews[0].ReviewedOn = &now
+	for i := range document.Reviews {
+		review := &document.Reviews[i]
+		review.Result = "pass"
+		review.EvidenceLocation = "present"
+		review.EvidenceQuote = attempt.RawOutput
+		review.Reason = "The supplied evidence supports this criterion for the synthetic response."
+		review.Reviewer = "team-member"
+		review.ReviewerKind = "human"
+		review.ReviewedOn = &now
+	}
 	report, err := ApplySemanticReviews(dataset, directory, document)
 	require.NoError(t, err)
 	require.Equal(t, "human_reviewed", report.Report.SemanticStatus)
@@ -63,7 +66,7 @@ func TestSemanticAgentObservationRemainsVisibleWithoutCertification(t *testing.T
 	report, err := ApplySemanticReviews(dataset, directory, document)
 	require.NoError(t, err)
 	require.Equal(t, "pass", report.Report.Attempts[0].Evaluation.SemanticChecks[0].Result)
-	require.Equal(t, 1, report.PendingHumanChecks)
+	require.Equal(t, len(document.Reviews), report.PendingHumanChecks)
 	require.Equal(t, "needs_human_review", report.Report.SemanticStatus)
 	require.Equal(t, "agent", report.Reviews[0].ReviewerKind)
 	require.False(t, report.ReleaseApproved)
@@ -168,7 +171,7 @@ func TestSemanticPartialImportKeepsCriticalPending(t *testing.T) {
 	report, err := ApplySemanticReviews(dataset, directory, document)
 	require.NoError(t, err)
 	require.Equal(t, 1, report.CriticalPendingChecks)
-	require.Equal(t, 1, report.ResultCounts["unassessed"])
+	require.Equal(t, 2, report.ResultCounts["unassessed"])
 }
 
 func TestSemanticNotApplicableRequiresExplainedProvenance(t *testing.T) {
@@ -200,7 +203,7 @@ func TestSemanticAbsentExecutedOutputRemainsUnassessed(t *testing.T) {
 			require.NoError(t, err)
 			report, err := ApplySemanticReviews(dataset, directory, document)
 			require.NoError(t, err)
-			require.Equal(t, 1, report.ResultCounts["unassessed"])
+			require.Equal(t, 2, report.ResultCounts["unassessed"])
 			now := time.Now().UTC()
 			review := &document.Reviews[0]
 			review.EvidenceLocation = "absent"

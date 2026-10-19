@@ -65,7 +65,7 @@ func TestEvaluatePDChecksExpectedFieldsAndDefersSemanticJudgment(t *testing.T) {
 	result, err := EvaluateCase(d, "PD-test", raw)
 	require.NoError(t, err)
 	require.Equal(t, "passed", result.DeterministicStatus)
-	require.Len(t, result.SemanticChecks, 5)
+	require.Len(t, result.SemanticChecks, 6)
 	for _, criterion := range result.SemanticChecks {
 		require.Equal(t, "unassessed", criterion.Result)
 	}
@@ -156,7 +156,11 @@ func TestEvaluateSummaryRequiresExactReferenceWithoutApprovingFidelity(t *testin
 	require.Equal(t, "needs_semantic_review", result.OverallStatus)
 	require.NotEmpty(t, result.SemanticChecks)
 	for _, c := range result.SemanticChecks {
-		require.Empty(t, c.Severity)
+		if c.ID == "shared_readability" {
+			require.Equal(t, "minor", c.Severity)
+		} else {
+			require.Empty(t, c.Severity)
+		}
 		require.Equal(t, "unassessed", c.Result)
 	}
 	result, err = EvaluateCase(d, "SM-001", json.RawMessage(`{"summary":"See image:abcd"}`))
@@ -184,4 +188,36 @@ func TestPDSharedCriteriaDefineDistinctReviewContracts(t *testing.T) {
 	require.Contains(t, checks["shared_no_invention"].Criterion, "confirmed")
 	require.False(t, result.ReleaseApproved)
 	require.Equal(t, "failed", result.DeterministicStatus)
+}
+
+func TestSharedReadabilityRemainsSemanticAcrossTasks(t *testing.T) {
+	d := &Dataset{
+		PD: []PDCase{{CaseMetadata: CaseMetadata{ID: "PD-test"}, Expected: json.RawMessage(`{}`)}},
+		RK: []RKCase{{CaseMetadata: CaseMetadata{ID: "RK-test"}, Expected: json.RawMessage(`{}`)}},
+		SM: []SMCase{{CaseMetadata: CaseMetadata{ID: "SM-test"}, Expected: json.RawMessage(`{}`)}},
+	}
+	var criterion string
+	for _, caseID := range []string{"PD-test", "RK-test", "SM-test"} {
+		t.Run(caseID, func(t *testing.T) {
+			result, err := EvaluateCase(d, caseID, nil)
+			require.NoError(t, err)
+			var checks []SemanticCheck
+			for _, check := range result.SemanticChecks {
+				if check.ID == "shared_readability" {
+					checks = append(checks, check)
+				}
+			}
+			require.Len(t, checks, 1)
+			require.Equal(t, "minor", checks[0].Severity)
+			require.Equal(t, "unassessed", checks[0].Result)
+			if criterion == "" {
+				criterion = checks[0].Criterion
+			}
+			require.Equal(t, criterion, checks[0].Criterion)
+			require.Contains(t, criterion, "brief single paragraph is acceptable")
+			require.Contains(t, criterion, "ignore JSON serialization whitespace")
+			require.Contains(t, criterion, "not_applicable")
+			require.False(t, result.ReleaseApproved)
+		})
+	}
 }

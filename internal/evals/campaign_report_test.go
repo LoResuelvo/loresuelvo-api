@@ -106,12 +106,15 @@ func TestBuildCampaignReportLabelsAgentReviewWithoutHumanCertification(t *testin
 	document, err := NewSemanticReviewTemplate(dataset, runDirectory)
 	require.NoError(t, err)
 	now := time.Date(2026, 9, 14, 11, 0, 0, 0, time.UTC)
-	document.Reviews[0].Result = "pass"
-	document.Reviews[0].EvidenceLocation = "absent"
-	document.Reviews[0].Reason = "The response contains no unsupported provider facts relevant to this criterion."
-	document.Reviews[0].Reviewer = "campaign-review-agent"
-	document.Reviews[0].ReviewerKind = "agent"
-	document.Reviews[0].ReviewedOn = &now
+	for i := range document.Reviews {
+		review := &document.Reviews[i]
+		review.Result = "pass"
+		review.EvidenceLocation = "absent"
+		review.Reason = "The synthetic response satisfies this bound criterion."
+		review.Reviewer = "campaign-review-agent"
+		review.ReviewerKind = "agent"
+		review.ReviewedOn = &now
+	}
 	reviewsPath := filepath.Join(t.TempDir(), "reviews.json")
 	require.NoError(t, WriteSemanticReviews(reviewsPath, document))
 	spec := campaignReportSpec(t, dataset, runDirectory)
@@ -125,7 +128,7 @@ func TestBuildCampaignReportLabelsAgentReviewWithoutHumanCertification(t *testin
 	require.False(t, model.Coverage.HumanReviewComplete)
 	require.Equal(t, 1, model.Coverage.AgentReviewedSlots)
 	require.Equal(t, []string{"agent"}, model.Semantic.ReviewerKinds)
-	require.Equal(t, 1, model.Semantic.PendingHumanChecks)
+	require.Equal(t, len(document.Reviews), model.Semantic.PendingHumanChecks)
 	require.NotEmpty(t, model.Semantic.ReviewDocumentSHA256)
 	require.False(t, report.ReleaseApproved)
 }
@@ -449,11 +452,11 @@ func TestCampaignPublicStatusIsActorNeutralAndPreservesPrivateHumanCoverage(t *t
 		name  string
 		kinds []string
 		human bool
-	}{{"agent", []string{"agent", "agent"}, false}, {"mixed", []string{"human", "agent"}, false}, {"human", []string{"human", "human"}, true}} {
+	}{{"agent", []string{"agent", "agent", "agent"}, false}, {"mixed", []string{"human", "agent", "human"}, false}, {"human", []string{"human", "human", "human"}, true}} {
 		t.Run(test.name, func(t *testing.T) {
 			document, err := NewSemanticReviewTemplate(dataset, directory)
 			require.NoError(t, err)
-			require.Len(t, document.Reviews, 2)
+			require.Len(t, document.Reviews, len(test.kinds))
 			now := time.Date(2026, 10, 13, 0, 0, 0, 0, time.UTC)
 			for i := range document.Reviews {
 				document.Reviews[i].Result = "pass"
