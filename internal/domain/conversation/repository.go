@@ -23,6 +23,7 @@ type UserRepository interface {
 }
 
 type Reader interface {
+	FindAccessByID(ctx context.Context, conversationID int) (*readmodel.ConversationAccess, error)
 	FindSummariesByUserAndType(ctx context.Context, user user.User, conversationType string) ([]readmodel.ConversationSummary, error)
 	FindDetailByIDRoleAndType(ctx context.Context, conversationID int, participantRole string, conversationType string) (*readmodel.ConversationDetail, error)
 }

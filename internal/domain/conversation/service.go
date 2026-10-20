@@ -57,32 +57,39 @@ func NewService(
 }
 
 func (s *Service) GetByID(ctx context.Context, authID string, conversationID int) (*readmodel.ConversationDetail, error) {
-	foundConversation, err := s.conversationRepository.FindByID(ctx, conversationID)
+	access, err := s.conversationReader.FindAccessByID(ctx, conversationID)
 	if err != nil {
 		return nil, err
 	}
-
-	switch typedConversation := foundConversation.(type) {
-	case *WorkConversation:
-		return s.getWorkConversationDetail(ctx, authID, typedConversation)
-	case *ChatBotConversation:
-		return s.getChatbotConversationDetail(ctx, authID, typedConversation)
+	switch access.Type {
+	case TypeWork:
+		return s.getWorkConversationDetail(ctx, authID, access)
+	case TypeChatbot:
+		foundConversation, err := s.conversationRepository.FindByID(ctx, conversationID)
+		if err != nil {
+			return nil, err
+		}
+		chatbotConversation, ok := foundConversation.(*ChatBotConversation)
+		if !ok {
+			return nil, ErrConversationAccessDenied
+		}
+		return s.getChatbotConversationDetail(ctx, authID, chatbotConversation)
 	default:
-		return nil, ErrConversationAccessDenied
+		return nil, fmt.Errorf("finding conversation by id: unsupported conversation type %q", access.Type)
 	}
 }
 
-func (s *Service) getWorkConversationDetail(ctx context.Context, authID string, workConversation *WorkConversation) (*readmodel.ConversationDetail, error) {
-	authenticatedUser, err := s.authenticatedUserForConversation(authID, workConversation)
+func (s *Service) getWorkConversationDetail(ctx context.Context, authID string, access *readmodel.ConversationAccess) (*readmodel.ConversationDetail, error) {
+	authenticatedUser, err := s.authenticatedUserForParticipantIDs(authID, access.ConsumerID, access.ProviderID)
 	if err != nil {
 		return nil, err
 	}
 
 	detail, err := s.conversationReader.FindDetailByIDRoleAndType(
 		ctx,
-		workConversation.ID(),
+		access.ID,
 		authenticatedUser.Role(),
-		workConversation.ConversationType(),
+		access.Type,
 	)
 	if err != nil {
 		return nil, err
@@ -635,14 +642,18 @@ func (s *Service) authenticatedConsumerForChatbot(ctx context.Context, authID st
 }
 
 func (s *Service) authenticatedUserForConversation(authID string, conversation *WorkConversation) (user.User, error) {
+	return s.authenticatedUserForParticipantIDs(authID, conversation.ConsumerID, conversation.ProviderID)
+}
+
+func (s *Service) authenticatedUserForParticipantIDs(authID string, consumerID, providerID int) (user.User, error) {
 	authenticatedUser, err := s.userRepository.FindByAuthID(authID)
 	if err != nil {
 		return nil, ErrConversationAccessDenied
 	}
 	role := authenticatedUser.Role()
 	userID := authenticatedUser.ID()
-	if (role == SenderConsumer && userID != conversation.ConsumerID) ||
-		(role == SenderProvider && userID != conversation.ProviderID) ||
+	if (role == SenderConsumer && userID != consumerID) ||
+		(role == SenderProvider && userID != providerID) ||
 		(role != SenderConsumer && role != SenderProvider) {
 		return nil, ErrConversationAccessDenied
 	}

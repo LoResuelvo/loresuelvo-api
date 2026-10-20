@@ -3,6 +3,7 @@ package repositories
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/conversation"
@@ -16,6 +17,26 @@ type ConversationReader struct {
 	messageImageRepository *MessageImageRepository
 	messageAudioRepository *MessageAudioRepository
 	messageVideoRepository *MessageVideoRepository
+}
+
+func (reader *ConversationReader) FindAccessByID(ctx context.Context, conversationID int) (*readmodel.ConversationAccess, error) {
+	var access readmodel.ConversationAccess
+	err := reader.db.QueryRowContext(ctx, `SELECT
+		c.id,
+		c.type,
+		COALESCE(wc.consumer_id, cc.consumer_id),
+		COALESCE(wc.provider_id, 0)
+	FROM conversations c
+	LEFT JOIN work_conversations wc ON wc.conversation_id = c.id
+	LEFT JOIN chatbot_conversations cc ON cc.conversation_id = c.id
+	WHERE c.id = $1`, conversationID).Scan(&access.ID, &access.Type, &access.ConsumerID, &access.ProviderID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, conversation.ErrConversationDoesNotExist
+	}
+	if err != nil {
+		return nil, fmt.Errorf("finding conversation access by id: %w", err)
+	}
+	return &access, nil
 }
 
 func (reader *ConversationReader) FindSummariesByUserAndType(ctx context.Context, foundUser user.User, conversationType string) ([]readmodel.ConversationSummary, error) {
