@@ -24,3 +24,6 @@ docker-compose.override.yml
 .atl/
 odd/
 /.claude/
+
+# Generated application coverage
+/coverage/

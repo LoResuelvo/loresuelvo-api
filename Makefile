@@ -2,6 +2,7 @@
 
 # Nombre del servicio del compose
 SERVICE = api-dev
+GO_TEST_TIMEOUT ?= 30m
 
 up:
 	docker compose up -d $(SERVICE)
@@ -138,3 +139,27 @@ evals-review:
 	go run ./cmd/evals review $(ARGS)
 evals-metamorphic-report:
 	go run ./cmd/evals metamorphic-report $(ARGS)
+
+# Native Go coverage for application packages; all test packages still execute.
+.PHONY: test-coverage
+test-coverage:
+	@docker compose run --rm minio-clean-tests >/dev/null 2>&1
+	docker compose run --rm --no-deps -T \
+		-e GOFLAGS="-buildvcs=false" \
+		-e GO_TEST_TIMEOUT="$(GO_TEST_TIMEOUT)" \
+		$(SERVICE) sh -ec '\
+			export STORAGE_PUBLIC_BUCKET="$$TEST_STORAGE_PUBLIC_BUCKET"; \
+			export STORAGE_PRIVATE_BUCKET="$$TEST_STORAGE_PRIVATE_BUCKET"; \
+			export STORAGE_PUBLIC_BASE_URL="$$TEST_STORAGE_PUBLIC_BASE_URL"; \
+			mkdir -p coverage; \
+			rm -f coverage/coverage.out coverage/index.html coverage/summary.txt; \
+			migrate -path db/migrations -database "$$TEST_DATABASE_URL" up; \
+			packages=$$(go list ./internal/... ./cmd/api); \
+			coverpkg=$$(printf "%s\n" "$$packages" | grep -Ev "/internal/(evals|testsupport)(/|$$)" | paste -sd, -); \
+			test -n "$$coverpkg"; \
+			go test -v -timeout="$$GO_TEST_TIMEOUT" -count=1 -p 1 \
+				-covermode=atomic -coverpkg="$$coverpkg" -coverprofile=coverage/coverage.out ./...; \
+			go tool cover -func=coverage/coverage.out > coverage/summary.txt; \
+			cat coverage/summary.txt; \
+			go tool cover -html=coverage/coverage.out -o coverage/index.html'; \
+		status=$$?; docker compose run --rm minio-clean-tests >/dev/null 2>&1; exit $$status
