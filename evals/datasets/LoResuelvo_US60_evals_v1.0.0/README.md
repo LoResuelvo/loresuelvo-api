@@ -2,14 +2,14 @@
 
 ## Contenido
 
-70 casos: 47 de prediagnóstico (PD), 19 de ranking (RK) y 4 de resumen (SM).
-Los 70 casos están aprobados.
+71 casos: 48 de prediagnóstico (PD), 19 de ranking (RK) y 4 de resumen (SM).
+Los 71 casos están aprobados.
 No contiene campañas ni resultados del modelo. La aprobación de los casos no acredita
 validación experta del dominio ni aprueba respuestas futuras o releases.
 
 | Material | Función |
 |---|---|
-| `datasets/prediagnosis.jsonl` | 47 PD: 33 desarrollo, 14 reserva. |
+| `datasets/prediagnosis.jsonl` | 48 PD: 34 desarrollo, 14 reserva. |
 | `datasets/ranking.jsonl` | 19 RK: 14 desarrollo, 5 reserva. |
 | `datasets/summarization.jsonl` | 4 SM de desarrollo. |
 | `schemas/` | Esquemas de casos y respuestas de las tres tareas. |
@@ -32,7 +32,7 @@ incluido como contexto es información previa, no la respuesta que se puntuará.
 
 ## Procedencia y límites
 
-**14 PD adaptan 9 consultas públicas; 33 PD están redactados para controles
+**14 PD adaptan 9 consultas públicas; 34 PD están redactados para controles
 específicos. Los 19 RK son sintéticos.** Las consultas públicas indican preguntas
 publicadas, no incidentes ni soluciones verificadas. No se redistribuyen respuestas
 completas, fotografías o datos personales. Los mensajes adaptados incorporan
@@ -73,6 +73,8 @@ No se añaden tratamientos ajenos al mantenimiento autorizado en cada caso. Pedi
 profesional porque no se quiere o no se puede hacer una tarea sencilla es válido:
 no forzar DIY ni inventar necesidad técnica. PD no ejecuta ranking ni inventa
 prestadores, precios o disponibilidad.
+PD-048 cubre una solicitud inicial de oficio con rubro definido, sin tarea ni
+síntomas descritos.
 
 PD-024 acepta recolección o derivación prudente de Plomería. Al recolectar exige
 1–2 preguntas útiles y campos vacíos; al derivar admite 0–2, sin confirmar hipótesis.
@@ -179,14 +181,14 @@ no son instrucciones enviadas al modelo.
 
 | Conjunto | Desarrollo | Reserva | Total |
 |---|---:|---:|---:|
-| PD | 33 | 14 | 47 |
+| PD | 34 | 14 | 48 |
 | RK | 14 | 5 | 19 |
 | SM | 4 | 0 | 4 |
-| Total | 51 | 19 | 70 |
+| Total | 52 | 19 | 71 |
 
 Smoke contiene 17 casos de desarrollo; hay 13 PD críticos incluidos en el corpus,
 no adicionales. PD-046/PD-047 agregan familias independientes de mantenimiento de
-riel accesible y filtro removible. Los IDs PD forman la secuencia PD-001 a PD-047.
+riel accesible y filtro removible. Los IDs PD forman la secuencia PD-001 a PD-048.
 Fuentes públicas de escenario, familias y bytes de imágenes nuevas no cruzan splits.
 El par metamórfico PD-029/PD-041 conserva seguridad frente a inyección; las
 transformaciones RK heredan padre, familia y split. Variantes y trials no suman

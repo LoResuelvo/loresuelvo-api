@@ -9,7 +9,7 @@
     ".venv/**"
   ],
   "files_sha256": {
-    "README.md": "7c53e118cb06bc2ea1df1594cbf422cc5f6a4952bc2b1428a946680908741ee5",
+    "README.md": "f2df695931f2f4adccb48383a3dc0dd26230e6d12f12089c18b30e7ee8d86ade",
     "assets/fixture_01.png": "16841a62c892798d9c95c46a4a9100eb5909357a1dc39541b98541eb76ebaf2c",
     "assets/fixture_02.png": "54f85d05d656364781ab0e356c13681b835a88c2d41a96a3b343b002eaf17639",
     "assets/fixture_03.png": "50df1b00ebf83f7cf22f409ee02ddb4fd78025bf1a9063c398ef92e55d639a60",
@@ -21,8 +21,8 @@
     "assets/manifest.json": "dba57e82f249417fc2753193d90c3655edb1f7fce56e0bfdd15db5b725597a2e",
     "configs/experiment.json": "2cebc286df41716ddec84ff7779ae5a1ba01da20751c4dfe0ababd766fdeb63b",
     "configs/metamorphic.json": "02943920112c512b86038fde1932bdb850d442683fbcecf06d611e3ce21945cb",
-    "configs/suites.json": "254b0519f7677dad3d7eeebe5f714dcfa4fcfdcc7ba12a9d8e12e94382596fe0",
-    "datasets/prediagnosis.jsonl": "b04ffb65c39957c00339c97122717eba743964cf230f496eca07fb886dcf9d4c",
+    "configs/suites.json": "fd5205e7127f997f2d102f79fd84d1c15012753b0dd19f64f1829262d64c9b25",
+    "datasets/prediagnosis.jsonl": "edb96e66e79dca5be40591c51ed5686f39de0838420079dcfe0bb6fa67721ee1",
     "datasets/ranking.jsonl": "237e0ab74f64ce5b089fc13dbc2c71b26749f49412ebf3d446e736b41c212ed7",
     "datasets/summarization.jsonl": "97f6c2ec6f4387086c78410a8cfbe1dd225a94efc2ab3bba4afc6b8d2429aa1a",
     "policies/decisions.json": "ca4298eb5d9ec65169479d25d747bf44874e5978bcf181ba7d26c054194bf77d",
@@ -35,23 +35,23 @@
     "schemas/ranking.schema.json": "251162d9f4c78656d39c28fa91f16e4352971249d24dfcc909abe19319823a81",
     "schemas/summarization-output.schema.json": "e3ad8ff7a6cb0ee5d6a11aadef02e7581d115d98d214f4ff768ad9a1672e23e7",
     "schemas/summarization.schema.json": "e4d3556aaeb1d9666eac41ae7d52ba61cc4276dc080c13d3c17db861e2a9a9f7",
-    "tests/test_evalpack.py": "152eae7c47ed30470d8eb430232d14ac1f6cc97a9478d56e58a2021cdccfda4b",
+    "tests/test_evalpack.py": "c02a7df92ce752e513ba3a253c68ef0267a7e6df9d107cf1f8a9d872e3a4baab",
     "tools/evalpack.py": "55aff467dfe3f68f36f3be848b6581e61797d5eecb11d0a9c8c45df7c661e0db"
   },
   "live_model_evaluation_performed": false,
   "provenance_counts": {
     "public_question_sources": 9,
     "adapted_prediagnosis": 14,
-    "authored_prediagnosis": 33,
+    "authored_prediagnosis": 34,
     "synthetic_ranking": 19,
     "synthetic_summarization": 4
   },
   "immutable_scope": "Files listed by SHA-256 identify content, not approval or a trusted signature. Local reports, bytecode caches and virtual environments are excluded.",
   "case_counts": {
-    "prediagnosis": 47,
+    "prediagnosis": 48,
     "ranking": 19,
     "summarization": 4,
-    "total": 70,
+    "total": 71,
     "campaigns": 0
   }
 }

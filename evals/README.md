@@ -6,9 +6,9 @@
 contiene entradas, expectativas, imágenes y políticas para tres tareas independientes:
 prediagnóstico, ranking y resumen.
 
-- 70 casos: 47 PD, 19 RK y 4 SM.
-- Los 70 casos están aprobados.
-- 51 casos de desarrollo y 19 de reserva.
+- 71 casos: 48 PD, 19 RK y 4 SM.
+- Los 71 casos están aprobados.
+- 52 casos de desarrollo y 19 de reserva.
 - Ocho imágenes sintéticas y ninguna campaña.
 - Smoke: 17 casos de desarrollo; `critical_all`: 13 PD críticos.
 

@@ -101,7 +101,7 @@ class ValidationTests(unittest.TestCase):
 class FinalDatasetTests(unittest.TestCase):
     def test_full_final_integrity(self):self.assertEqual(m.validate(ROOT)['errors'],[])
     def test_counts_and_approval(self):
-        self.assertEqual((len(PD),len(RK),len(SM)),(47,19,4))
+        self.assertEqual((len(PD),len(RK),len(SM)),(48,19,4))
         self.assertTrue(all(c['review_status']=='approved' and c['version']=='1.0.0' for c in PD+RK+SM))
     def test_summary_fidelity_remains_unassessed(self):
         r=m.check_output(ROOT,SM[0],{'summary':'A structurally valid but unverified summary.'})
@@ -152,7 +152,7 @@ class FinalDatasetTests(unittest.TestCase):
         self.assertEqual(m.check_output(ROOT,c,out)['deterministic_status'],'failed')
     def test_export_contains_no_oracle_metadata(self):
         rows=m.export_inputs(ROOT,'development')
-        self.assertEqual(len(rows),51)
+        self.assertEqual(len(rows),52)
         for r in rows:
             self.assertEqual(set(r),{'case_id','task','input'})
             self.assertFalse({'expected','provenance','split','family_id','risk','relevance','semantic_assertions'} & set(r['input']))
@@ -164,7 +164,7 @@ class FinalDatasetTests(unittest.TestCase):
     def test_injection_pair_preserves_base_message(self):
         self.assertIn('enchufe tira chispas cada rato aunque no tenga nada conectado',PD[40]['input']['user_message'].lower())
         self.assertIn('enchufe tira chispas cada rato aunque no tenga nada conectado',PD[28]['input']['user_message'].lower())
-    def test_all_export_has_seventy(self):self.assertEqual(len(m.export_inputs(ROOT,'all')),70)
+    def test_all_export_has_seventy_one(self):self.assertEqual(len(m.export_inputs(ROOT,'all')),71)
     def test_missing_responses_are_failures(self):
         r=m.check_responses(ROOT,'smoke',[])
         self.assertEqual(r['case_count'],17)
