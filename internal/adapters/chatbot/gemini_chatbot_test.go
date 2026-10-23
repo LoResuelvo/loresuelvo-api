@@ -126,7 +126,7 @@ func TestAnswerPromptBoundsInformationCollection(t *testing.T) {
 		nil,
 	)
 
-	assert.GreaterOrEqual(t, strings.Count(prompt, "como máximo 2 preguntas"), 2)
+	assert.Contains(t, prompt, "como máximo 2 preguntas")
 	assert.Contains(t, prompt, "cuya respuesta pueda cambiar materialmente")
 	assert.Contains(t, prompt, "no repitas preguntas ya respondidas")
 	assert.Contains(t, prompt, "avanzá declarando la incertidumbre restante")

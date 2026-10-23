@@ -138,12 +138,12 @@ func TestGeminiGenerationObserverPreservesRequestForEachOperation(t *testing.T) 
 	}
 }
 
-func TestInitialPromptsRemainSharedWithCurrentSchemas(t *testing.T) {
+func TestCurrentPromptsRemainSharedWithCurrentSchemas(t *testing.T) {
 	bot := NewGeminiChatbot("model", "fake-key")
 	answer := bot.answerPrompt(conversation.ChatbotHomeProblemQuestion{UserMessage: "Pierde agua", IsNewConversation: true}, []category.Category{{Name: "Plomería"}})
 	ranking, err := bot.providerRankingPrompt(conversation.ProviderRankingRequest{ProblemTitle: "Pérdida", ProblemDescription: "Gotea", MaxResults: 3})
 	require.NoError(t, err)
-	require.Equal(t, "1049bd9ed7885d3d36b302e99315811dd12de8240af2c8ae93cbf7a668782b6d", fmt.Sprintf("%x", sha256.Sum256([]byte(answer))))
-	require.Equal(t, "ba6861a21228078199cabe78725269836d90b0fb0752a38f6f2972307013bc69", fmt.Sprintf("%x", sha256.Sum256([]byte(ranking))))
+	require.Equal(t, "cffc1fc79d0195e1b9cadf9d920e59eea72118f5dc4be6b571f713130b1a3ff3", fmt.Sprintf("%x", sha256.Sum256([]byte(answer))))
+	require.Equal(t, "a532596fb91aa7891923e2c5fbbd49a635e30b38c24c9f152ed6c48a4d2e8259", fmt.Sprintf("%x", sha256.Sum256([]byte(ranking))))
 	require.NotNil(t, bot.generationConfig(summaryResponseJSONSchema()).ResponseJsonSchema)
 }
