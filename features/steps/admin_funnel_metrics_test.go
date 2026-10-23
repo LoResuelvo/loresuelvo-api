@@ -95,6 +95,10 @@ type adminFunnelResponse struct {
 		AI     adminFunnelCohort `json:"ai"`
 		Manual adminFunnelCohort `json:"manual"`
 	} `json:"cohorts"`
+	RequestComparison struct {
+		AI     adminFunnelCohort `json:"ai"`
+		Manual adminFunnelCohort `json:"manual"`
+	} `json:"request_comparison"`
 }
 
 type adminFunnelCohort struct {
@@ -149,6 +153,10 @@ func registerAdminFunnelSteps(sc *godog.ScenarioContext, suite *testSuite) {
 	sc.Step(`^la conversión IA de evaluación profesional a solicitud es (\d+\.\d+) por ciento con denominador tres$`, suite.adminFunnelConversion)
 	sc.Step(`^las conversiones posteriores con denominador cero son nulas y conservan sus conteos cero$`, suite.adminFunnelLaterConversionsNull)
 	sc.Step(`^las conversiones manuales son nulas porque su cohorte inicial no tiene unidades$`, suite.adminFunnelManualConversionsNull)
+	sc.Step(`^la comparación por solicitudes informa estas etapas por origen:$`, suite.adminFunnelRequestComparisonStages)
+	sc.Step(`^la comparación usa la solicitud como base y el rubro actual del prestador para ambos orígenes$`, suite.adminFunnelRequestComparisonSemantics)
+	sc.Step(`^la finalización global desde solicitudes es (\d+\.\d+) por ciento para IA y (\d+\.\d+) por ciento para manual$`, suite.adminFunnelRequestComparisonGlobalCompletion)
+	sc.Step(`^las demoras cuentan solicitudes y órdenes una sola vez aunque haya propuestas múltiples$`, suite.adminFunnelRequestComparisonDelays)
 	sc.Step(`^el recorrido IA cuenta una unidad con finalización informada por el reporte de "([^"]*)"$`, suite.adminFunnelReportedBranch)
 	sc.Step(`^el recorrido IA no cuenta una unidad con pago completo porque ningún mismo recorrido de orden tiene ambos hitos de finalización y pago$`, suite.adminFunnelNoPaidBranch)
 	sc.Step(`^el reporte de "([^"]*)" no se combina con el pago de "([^"]*)" para fabricar una cadena completa$`, suite.adminFunnelNoCrossBranch)
@@ -238,6 +246,7 @@ func registerAdminFunnelSteps(sc *godog.ScenarioContext, suite *testSuite) {
 	sc.Step(`^las órdenes aceptadas, reportes y pagos están vinculados a sus propias propuestas:$`, suite.adminFunnelOrdersTable)
 	sc.Step(`^"([^"]*)" no tiene propuesta y "([^"]*)" no tiene reporte$`, suite.adminFunnelMissingProposalAndReport)
 	sc.Step(`^las dos propuestas de "([^"]*)" no multiplican el conteo de solicitudes ni de etapas$`, suite.adminFunnelManualRequestNotMultiplied)
+	sc.Step(`^que una evaluación profesional origina dos solicitudes IA y existen tres solicitudes manuales con propuestas múltiples y avances posteriores$`, suite.adminFunnelRequestComparisonFixture)
 
 }
 
@@ -331,7 +340,7 @@ func (suite *testSuite) adminFunnelStatus(expected string) error {
 	}
 	if code != http.StatusOK && len(suite.lastBody) > 0 && json.Valid(suite.lastBody) {
 		var payload map[string]json.RawMessage
-		if json.Unmarshal(suite.lastBody, &payload) == nil && payload["cohorts"] != nil {
+		if json.Unmarshal(suite.lastBody, &payload) == nil && (payload["cohorts"] != nil || payload["request_comparison"] != nil) {
 			return fmt.Errorf("error response unexpectedly contains metrics")
 		}
 	}
@@ -394,7 +403,10 @@ func (suite *testSuite) adminFunnelMaxPeriod() error {
 	return suite.adminFunnelEmptyCohorts()
 }
 func (suite *testSuite) adminFunnelEmptyCohorts() error {
-	for name, cohort := range map[string]adminFunnelCohort{"ai": suite.adminFunnel.response.Cohorts.AI, "manual": suite.adminFunnel.response.Cohorts.Manual} {
+	for name, cohort := range map[string]adminFunnelCohort{
+		"ai": suite.adminFunnel.response.Cohorts.AI, "manual": suite.adminFunnel.response.Cohorts.Manual,
+		"request_comparison.ai": suite.adminFunnel.response.RequestComparison.AI, "request_comparison.manual": suite.adminFunnel.response.RequestComparison.Manual,
+	} {
 		for _, stage := range cohort.Stages {
 			if stage.Count != 0 {
 				return fmt.Errorf("%s stage %s unexpectedly counts %d", name, stage.Stage, stage.Count)
@@ -425,6 +437,83 @@ func (suite *testSuite) adminFunnelOriginCounts(ai, manual string) error {
 		return err
 	}
 	return suite.requireFunnelCount(suite.adminFunnel.response.Cohorts.Manual, "request", manual)
+}
+func (suite *testSuite) adminFunnelRequestComparisonStages(table *godog.Table) error {
+	if !suite.adminFunnel.responseValid {
+		return fmt.Errorf("request comparison is unavailable or malformed")
+	}
+	if err := requireTableHeaders(table, "recorrido", "etapa", "unidades"); err != nil {
+		return err
+	}
+	if len(table.Rows) != 13 {
+		return fmt.Errorf("expected twelve request-comparison stage assertions, got %d", len(table.Rows)-1)
+	}
+	cohorts := map[string]adminFunnelCohort{
+		"IA":     suite.adminFunnel.response.RequestComparison.AI,
+		"manual": suite.adminFunnel.response.RequestComparison.Manual,
+	}
+	for _, row := range table.Rows[1:] {
+		if len(row.Cells) != 3 {
+			return fmt.Errorf("request-comparison stage row expects three cells")
+		}
+		cohort, ok := cohorts[row.Cells[0].Value]
+		if !ok {
+			return fmt.Errorf("unknown request-comparison origin %q", row.Cells[0].Value)
+		}
+		if err := suite.adminFunnelCountNumber(cohort, row.Cells[1].Value, row.Cells[2].Value); err != nil {
+			return fmt.Errorf("%s request comparison: %w", row.Cells[0].Value, err)
+		}
+	}
+	return nil
+}
+func (suite *testSuite) adminFunnelRequestComparisonSemantics() error {
+	if !suite.adminFunnel.responseValid {
+		return fmt.Errorf("request comparison is unavailable or malformed")
+	}
+	for name, cohort := range map[string]adminFunnelCohort{
+		"ai": suite.adminFunnel.response.RequestComparison.AI, "manual": suite.adminFunnel.response.RequestComparison.Manual,
+	} {
+		if cohort.CategorySource != "provider.current_category_id" {
+			return fmt.Errorf("%s request comparison category source=%q", name, cohort.CategorySource)
+		}
+		if len(cohort.Stages) != 6 || cohort.Stages[0].Stage != "request" {
+			return fmt.Errorf("%s request comparison does not start with six request-based stages", name)
+		}
+	}
+	if err := suite.adminFunnelCountNumber(suite.adminFunnel.response.Cohorts.AI, "professional_assessment", "1"); err != nil {
+		return fmt.Errorf("legacy AI cohort changed: %w", err)
+	}
+	return suite.adminFunnelCountNumber(suite.adminFunnel.response.Cohorts.Manual, "request", "3")
+}
+func (suite *testSuite) adminFunnelRequestComparisonGlobalCompletion(ai, manual string) error {
+	if err := suite.adminFunnelComparePercent(suite.adminFunnel.response.RequestComparison.AI.GlobalConversion, ai); err != nil {
+		return fmt.Errorf("AI request-comparison global completion: %w", err)
+	}
+	return suite.adminFunnelComparePercent(suite.adminFunnel.response.RequestComparison.Manual.GlobalConversion, manual)
+}
+func (suite *testSuite) adminFunnelRequestComparisonDelays() error {
+	for name, cohort := range map[string]adminFunnelCohort{
+		"ai": suite.adminFunnel.response.RequestComparison.AI, "manual": suite.adminFunnel.response.RequestComparison.Manual,
+	} {
+		if len(cohort.Stages) == 0 {
+			return fmt.Errorf("%s request comparison has no stages", name)
+		}
+		firstProposal, ok := cohort.Delays["request_to_first_proposal"]
+		if !ok {
+			return fmt.Errorf("%s request comparison omits request-to-proposal delay", name)
+		}
+		orders, ok := cohort.Delays["proposal_to_confirmed_hiring"]
+		if !ok {
+			return fmt.Errorf("%s request comparison omits proposal-to-hiring delay", name)
+		}
+		if firstProposal.Observations != cohort.Stages[0].Count || orders.Observations != 3 {
+			return fmt.Errorf("%s request comparison delay observations are %d and %d", name, firstProposal.Observations, orders.Observations)
+		}
+		if isJSONNull(firstProposal.MeanSeconds) || isJSONNull(orders.MeanSeconds) {
+			return fmt.Errorf("%s request comparison delay means should include persisted observations", name)
+		}
+	}
+	return nil
 }
 func (suite *testSuite) adminFunnelCountNumber(cohort adminFunnelCohort, stage, expected string) error {
 	if !suite.adminFunnel.responseValid {
@@ -615,7 +704,10 @@ func (suite *testSuite) adminFunnelComparePercent(value json.RawMessage, expecte
 	return nil
 }
 func (suite *testSuite) adminFunnelLaterConversionsNull() error {
-	for _, cohort := range []adminFunnelCohort{suite.adminFunnel.response.Cohorts.AI, suite.adminFunnel.response.Cohorts.Manual} {
+	for _, cohort := range []adminFunnelCohort{
+		suite.adminFunnel.response.Cohorts.AI, suite.adminFunnel.response.Cohorts.Manual,
+		suite.adminFunnel.response.RequestComparison.AI, suite.adminFunnel.response.RequestComparison.Manual,
+	} {
 		for i, stage := range cohort.Stages {
 			if i == 0 {
 				continue
@@ -632,12 +724,17 @@ func (suite *testSuite) adminFunnelLaterConversionsNull() error {
 	return nil
 }
 func (suite *testSuite) adminFunnelManualConversionsNull() error {
-	for _, stage := range suite.adminFunnel.response.Cohorts.Manual.Stages {
-		if stage.Count != 0 {
-			return fmt.Errorf("manual stage %s unexpectedly has count %d", stage.Stage, stage.Count)
-		}
-		if !isJSONNull(stage.Conversion) {
-			return fmt.Errorf("manual stage %s conversion should be null", stage.Stage)
+	for name, cohort := range map[string]adminFunnelCohort{
+		"manual":                    suite.adminFunnel.response.Cohorts.Manual,
+		"request_comparison.manual": suite.adminFunnel.response.RequestComparison.Manual,
+	} {
+		for _, stage := range cohort.Stages {
+			if stage.Count != 0 {
+				return fmt.Errorf("%s stage %s unexpectedly has count %d", name, stage.Stage, stage.Count)
+			}
+			if !isJSONNull(stage.Conversion) {
+				return fmt.Errorf("%s stage %s conversion should be null", name, stage.Stage)
+			}
 		}
 	}
 	return nil
@@ -667,7 +764,10 @@ func (suite *testSuite) adminFunnelDownstreamNotPeriodFiltered() error {
 	if !suite.adminFunnel.responseValid {
 		return fmt.Errorf("funnel metrics are unavailable")
 	}
-	for _, cohort := range []adminFunnelCohort{suite.adminFunnel.response.Cohorts.AI, suite.adminFunnel.response.Cohorts.Manual} {
+	for _, cohort := range []adminFunnelCohort{
+		suite.adminFunnel.response.Cohorts.AI, suite.adminFunnel.response.Cohorts.Manual,
+		suite.adminFunnel.response.RequestComparison.AI, suite.adminFunnel.response.RequestComparison.Manual,
+	} {
 		if len(cohort.Stages) > 1 && cohort.Stages[0].Count > 0 && cohort.Stages[1].Count == 0 {
 			return fmt.Errorf("downstream activity for an origin was filtered out")
 		}
@@ -678,7 +778,10 @@ func (suite *testSuite) adminFunnelStagesMonotonic() error {
 	if !suite.adminFunnel.responseValid {
 		return fmt.Errorf("funnel metrics are unavailable")
 	}
-	for _, cohort := range []adminFunnelCohort{suite.adminFunnel.response.Cohorts.AI, suite.adminFunnel.response.Cohorts.Manual} {
+	for _, cohort := range []adminFunnelCohort{
+		suite.adminFunnel.response.Cohorts.AI, suite.adminFunnel.response.Cohorts.Manual,
+		suite.adminFunnel.response.RequestComparison.AI, suite.adminFunnel.response.RequestComparison.Manual,
+	} {
 		for i := 1; i < len(cohort.Stages); i++ {
 			if cohort.Stages[i].Count > cohort.Stages[i-1].Count {
 				return fmt.Errorf("funnel stages are not monotonic: %s=%d after %s=%d", cohort.Stages[i].Stage, cohort.Stages[i].Count, cohort.Stages[i-1].Stage, cohort.Stages[i-1].Count)
@@ -753,7 +856,10 @@ func (suite *testSuite) adminFunnelNoSubstitution() error {
 	})
 }
 func (suite *testSuite) adminFunnelDelaySamplesValid() error {
-	for _, cohort := range []adminFunnelCohort{suite.adminFunnel.response.Cohorts.AI, suite.adminFunnel.response.Cohorts.Manual} {
+	for _, cohort := range []adminFunnelCohort{
+		suite.adminFunnel.response.Cohorts.AI, suite.adminFunnel.response.Cohorts.Manual,
+		suite.adminFunnel.response.RequestComparison.AI, suite.adminFunnel.response.RequestComparison.Manual,
+	} {
 		for name, delay := range cohort.Delays {
 			if delay.Observations < 0 {
 				return fmt.Errorf("delay %s has negative observations", name)
@@ -833,64 +939,76 @@ func (suite *testSuite) adminFunnelAggregateOnly() error {
 	if err := json.Unmarshal(suite.lastBody, &payload); err != nil {
 		return err
 	}
-	if err := requireJSONKeys(payload, "period", "timezone", "observed_at", "category_id", "rounding", "decimal_places", "cohorts"); err != nil {
+	if err := requireJSONKeys(payload, "period", "timezone", "observed_at", "category_id", "rounding", "decimal_places", "cohorts", "request_comparison"); err != nil {
 		return err
 	}
-	var period, cohorts map[string]json.RawMessage
+	var period map[string]json.RawMessage
 	if err := json.Unmarshal(payload["period"], &period); err != nil {
 		return err
 	}
 	if err := requireJSONKeys(period, "from", "to"); err != nil {
 		return err
 	}
-	if err := json.Unmarshal(payload["cohorts"], &cohorts); err != nil {
+	for groupName, rawGroup := range map[string]json.RawMessage{
+		"cohorts": payload["cohorts"], "request_comparison": payload["request_comparison"],
+	} {
+		var cohorts map[string]json.RawMessage
+		if err := json.Unmarshal(rawGroup, &cohorts); err != nil {
+			return err
+		}
+		if err := requireJSONKeys(cohorts, "ai", "manual"); err != nil {
+			return err
+		}
+		for name, raw := range cohorts {
+			if err := validateFunnelCohortAggregate(groupName+"."+name, raw); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func validateFunnelCohortAggregate(name string, raw json.RawMessage) error {
+	var cohort map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &cohort); err != nil {
+		return fmt.Errorf("%s cohort: %w", name, err)
+	}
+	if err := requireJSONKeys(cohort, "category_source", "stages", "global_completion_conversion_percentage", "delays"); err != nil {
 		return err
 	}
-	if err := requireJSONKeys(cohorts, "ai", "manual"); err != nil {
+	var stages []map[string]json.RawMessage
+	if err := json.Unmarshal(cohort["stages"], &stages); err != nil {
 		return err
 	}
-	for name, raw := range cohorts {
-		var cohort map[string]json.RawMessage
-		if err := json.Unmarshal(raw, &cohort); err != nil {
-			return fmt.Errorf("%s cohort: %w", name, err)
-		}
-		if err := requireJSONKeys(cohort, "category_source", "stages", "global_completion_conversion_percentage", "delays"); err != nil {
+	for _, stage := range stages {
+		if err := requireJSONKeys(stage, "stage", "count", "conversion_percentage"); err != nil {
 			return err
 		}
-		var stages []map[string]json.RawMessage
-		if err := json.Unmarshal(cohort["stages"], &stages); err != nil {
+	}
+	if !isJSONNumberOrNull(cohort["global_completion_conversion_percentage"]) {
+		return fmt.Errorf("%s global completion conversion must be a JSON number or null", name)
+	}
+	var delays map[string]json.RawMessage
+	if err := json.Unmarshal(cohort["delays"], &delays); err != nil {
+		return err
+	}
+	if err := requireJSONKeys(delays, "request_to_first_proposal", "proposal_to_confirmed_hiring", "confirmed_hiring_to_reported_completion", "reported_completion_to_full_payment"); err != nil {
+		return err
+	}
+	for _, delayRaw := range delays {
+		var delay map[string]json.RawMessage
+		if err := json.Unmarshal(delayRaw, &delay); err != nil {
 			return err
 		}
-		for _, stage := range stages {
-			if err := requireJSONKeys(stage, "stage", "count", "conversion_percentage"); err != nil {
-				return err
-			}
-		}
-		if !isJSONNumberOrNull(cohort["global_completion_conversion_percentage"]) {
-			return fmt.Errorf("%s global completion conversion must be a JSON number or null", name)
-		}
-		var delays map[string]json.RawMessage
-		if err := json.Unmarshal(cohort["delays"], &delays); err != nil {
+		if err := requireJSONKeys(delay, "observations", "mean_seconds"); err != nil {
 			return err
 		}
-		if err := requireJSONKeys(delays, "request_to_first_proposal", "proposal_to_confirmed_hiring", "confirmed_hiring_to_reported_completion", "reported_completion_to_full_payment"); err != nil {
-			return err
+		var observations int64
+		if err := json.Unmarshal(delay["observations"], &observations); err != nil || observations < 0 {
+			return fmt.Errorf("%s delay observations must be a nonnegative integer", name)
 		}
-		for _, delayRaw := range delays {
-			var delay map[string]json.RawMessage
-			if err := json.Unmarshal(delayRaw, &delay); err != nil {
-				return err
-			}
-			if err := requireJSONKeys(delay, "observations", "mean_seconds"); err != nil {
-				return err
-			}
-			var observations int64
-			if err := json.Unmarshal(delay["observations"], &observations); err != nil || observations < 0 {
-				return fmt.Errorf("%s delay observations must be a nonnegative integer", name)
-			}
-			if !isJSONNumberOrNull(delay["mean_seconds"]) {
-				return fmt.Errorf("%s delay mean_seconds must be a JSON number or null", name)
-			}
+		if !isJSONNumberOrNull(delay["mean_seconds"]) {
+			return fmt.Errorf("%s delay mean_seconds must be a JSON number or null", name)
 		}
 	}
 	return nil
@@ -913,85 +1031,124 @@ func validateFunnelResponseShape(body []byte) error {
 	if err := json.Unmarshal(body, &payload); err != nil {
 		return err
 	}
-	if err := requireJSONKeys(payload, "period", "timezone", "observed_at", "category_id", "rounding", "decimal_places", "cohorts"); err != nil {
+	if err := requireJSONKeys(payload, "period", "timezone", "observed_at", "category_id", "rounding", "decimal_places", "cohorts", "request_comparison"); err != nil {
 		return err
 	}
-	var period, cohorts map[string]json.RawMessage
+	var period map[string]json.RawMessage
 	if err := json.Unmarshal(payload["period"], &period); err != nil {
 		return err
 	}
 	if err := requireJSONKeys(period, "from", "to"); err != nil {
 		return err
 	}
-	if err := json.Unmarshal(payload["cohorts"], &cohorts); err != nil {
-		return err
-	}
-	if err := requireJSONKeys(cohorts, "ai", "manual"); err != nil {
-		return err
-	}
-	expectedStages := map[string][]string{
+	legacyStages := map[string][]string{
 		"ai":     {"professional_assessment", "request", "proposal", "confirmed_hiring", "reported_completion", "full_payment", "review"},
 		"manual": {"request", "proposal", "confirmed_hiring", "reported_completion", "full_payment", "review"},
 	}
-	for _, name := range []string{"ai", "manual"} {
-		var cohort map[string]json.RawMessage
-		if err := json.Unmarshal(cohorts[name], &cohort); err != nil {
+	requestStages := []string{"request", "proposal", "confirmed_hiring", "reported_completion", "full_payment", "review"}
+	for _, group := range []struct {
+		name          string
+		expectedStage map[string][]string
+		category      map[string]string
+	}{
+		{
+			name:          "cohorts",
+			expectedStage: legacyStages,
+			category: map[string]string{
+				"ai": "assessment.problem_category_id", "manual": "provider.current_category_id",
+			},
+		},
+		{
+			name: "request_comparison",
+			expectedStage: map[string][]string{
+				"ai": requestStages, "manual": requestStages,
+			},
+			category: map[string]string{
+				"ai": "provider.current_category_id", "manual": "provider.current_category_id",
+			},
+		},
+	} {
+		var cohorts map[string]json.RawMessage
+		if err := json.Unmarshal(payload[group.name], &cohorts); err != nil {
 			return err
 		}
-		if err := requireJSONKeys(cohort, "category_source", "stages", "global_completion_conversion_percentage", "delays"); err != nil {
+		if err := requireJSONKeys(cohorts, "ai", "manual"); err != nil {
 			return err
 		}
-		var stages []map[string]json.RawMessage
-		if err := json.Unmarshal(cohort["stages"], &stages); err != nil {
+		for _, name := range []string{"ai", "manual"} {
+			if err := validateFunnelResponseCohort(group.name+"."+name, cohorts[name], group.expectedStage[name], group.category[name]); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func validateFunnelResponseCohort(name string, raw json.RawMessage, expectedStages []string, expectedCategory string) error {
+	var cohort map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &cohort); err != nil {
+		return err
+	}
+	if err := requireJSONKeys(cohort, "category_source", "stages", "global_completion_conversion_percentage", "delays"); err != nil {
+		return err
+	}
+	var categorySource string
+	if err := json.Unmarshal(cohort["category_source"], &categorySource); err != nil {
+		return err
+	}
+	if categorySource != expectedCategory {
+		return fmt.Errorf("%s category_source is %q, expected %q", name, categorySource, expectedCategory)
+	}
+	var stages []map[string]json.RawMessage
+	if err := json.Unmarshal(cohort["stages"], &stages); err != nil {
+		return err
+	}
+	if len(stages) != len(expectedStages) {
+		return fmt.Errorf("%s has %d stages, expected %d", name, len(stages), len(expectedStages))
+	}
+	for i, stage := range stages {
+		if err := requireJSONKeys(stage, "stage", "count", "conversion_percentage"); err != nil {
 			return err
 		}
-		if len(stages) != len(expectedStages[name]) {
-			return fmt.Errorf("%s cohort has %d stages, expected %d", name, len(stages), len(expectedStages[name]))
-		}
-		for i, stage := range stages {
-			if err := requireJSONKeys(stage, "stage", "count", "conversion_percentage"); err != nil {
-				return err
-			}
-			var stageName string
-			if err := json.Unmarshal(stage["stage"], &stageName); err != nil {
-				return err
-			}
-			if stageName != expectedStages[name][i] {
-				return fmt.Errorf("%s stage %d is %q, expected %q", name, i, stageName, expectedStages[name][i])
-			}
-			var count int64
-			if err := json.Unmarshal(stage["count"], &count); err != nil {
-				return err
-			}
-			if !isJSONNumberOrNull(stage["conversion_percentage"]) {
-				return fmt.Errorf("%s stage %s conversion_percentage must be a JSON number or null", name, stageName)
-			}
-		}
-		if !isJSONNumberOrNull(cohort["global_completion_conversion_percentage"]) {
-			return fmt.Errorf("%s global completion conversion must be a JSON number or null", name)
-		}
-		var delays map[string]json.RawMessage
-		if err := json.Unmarshal(cohort["delays"], &delays); err != nil {
+		var stageName string
+		if err := json.Unmarshal(stage["stage"], &stageName); err != nil {
 			return err
 		}
-		if err := requireJSONKeys(delays, "request_to_first_proposal", "proposal_to_confirmed_hiring", "confirmed_hiring_to_reported_completion", "reported_completion_to_full_payment"); err != nil {
+		if stageName != expectedStages[i] {
+			return fmt.Errorf("%s stage %d is %q, expected %q", name, i, stageName, expectedStages[i])
+		}
+		var count int64
+		if err := json.Unmarshal(stage["count"], &count); err != nil || count < 0 {
+			return fmt.Errorf("%s stage %s count must be a nonnegative integer", name, stageName)
+		}
+		if !isJSONNumberOrNull(stage["conversion_percentage"]) {
+			return fmt.Errorf("%s stage %s conversion_percentage must be a JSON number or null", name, stageName)
+		}
+	}
+	if !isJSONNumberOrNull(cohort["global_completion_conversion_percentage"]) {
+		return fmt.Errorf("%s global completion conversion must be a JSON number or null", name)
+	}
+	var delays map[string]json.RawMessage
+	if err := json.Unmarshal(cohort["delays"], &delays); err != nil {
+		return err
+	}
+	if err := requireJSONKeys(delays, "request_to_first_proposal", "proposal_to_confirmed_hiring", "confirmed_hiring_to_reported_completion", "reported_completion_to_full_payment"); err != nil {
+		return err
+	}
+	for _, rawDelay := range delays {
+		var delay map[string]json.RawMessage
+		if err := json.Unmarshal(rawDelay, &delay); err != nil {
 			return err
 		}
-		for _, raw := range delays {
-			var delay map[string]json.RawMessage
-			if err := json.Unmarshal(raw, &delay); err != nil {
-				return err
-			}
-			if err := requireJSONKeys(delay, "observations", "mean_seconds"); err != nil {
-				return err
-			}
-			var observations int64
-			if err := json.Unmarshal(delay["observations"], &observations); err != nil || observations < 0 {
-				return fmt.Errorf("%s delay observations must be a nonnegative integer", name)
-			}
-			if !isJSONNumberOrNull(delay["mean_seconds"]) {
-				return fmt.Errorf("%s delay mean_seconds must be a JSON number or null", name)
-			}
+		if err := requireJSONKeys(delay, "observations", "mean_seconds"); err != nil {
+			return err
+		}
+		var observations int64
+		if err := json.Unmarshal(delay["observations"], &observations); err != nil || observations < 0 {
+			return fmt.Errorf("%s delay observations must be a nonnegative integer", name)
+		}
+		if !isJSONNumberOrNull(delay["mean_seconds"]) {
+			return fmt.Errorf("%s delay mean_seconds must be a JSON number or null", name)
 		}
 	}
 	return nil

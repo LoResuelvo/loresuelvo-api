@@ -28,6 +28,13 @@ func TestFunnelResponseUsesExactDecimalJSONNumbersAndPreservesNulls(t *testing.T
 			GlobalCompletionConversionHundredths: &zero,
 			Delays:                               readmodel.FunnelDelays{RequestToFirstProposal: readmodel.FunnelDelayMetric{Observations: 1, MeanSecondsHundredths: &mean}},
 		},
+		RequestComparison: readmodel.FunnelRequestComparison{
+			AI: readmodel.FunnelCohort{Stages: []readmodel.FunnelStageMetric{
+				{Stage: readmodel.FunnelStageRequest, Count: 3},
+				{Stage: readmodel.FunnelStageProposal, Count: 2, ConversionHundredths: &percent},
+			}},
+			Manual: readmodel.FunnelCohort{Stages: []readmodel.FunnelStageMetric{{Stage: readmodel.FunnelStageRequest, Count: 4}}},
+		},
 	}
 	encoded, err := json.Marshal(responseFromMetrics(metrics))
 	require.NoError(t, err)
@@ -53,6 +60,14 @@ func TestFunnelResponseUsesExactDecimalJSONNumbersAndPreservesNulls(t *testing.T
 	require.Equal(t, json.Number("0"), manual["delays"].(map[string]any)["request_to_first_proposal"].(map[string]any)["observations"])
 	require.Equal(t, "assessment.problem_category_id", ai["category_source"])
 	require.Equal(t, "provider.current_category_id", manual["category_source"])
+	comparison := body["request_comparison"].(map[string]any)
+	comparisonAI := comparison["ai"].(map[string]any)
+	comparisonManual := comparison["manual"].(map[string]any)
+	require.Equal(t, "provider.current_category_id", comparisonAI["category_source"])
+	require.Equal(t, "provider.current_category_id", comparisonManual["category_source"])
+	require.Equal(t, "request", comparisonAI["stages"].([]any)[0].(map[string]any)["stage"])
+	require.Equal(t, json.Number("3"), comparisonAI["stages"].([]any)[0].(map[string]any)["count"])
+	require.Equal(t, "request", comparisonManual["stages"].([]any)[0].(map[string]any)["stage"])
 }
 
 func TestFunnelDecimalFormattingPreservesTinyNegativeMagnitude(t *testing.T) {

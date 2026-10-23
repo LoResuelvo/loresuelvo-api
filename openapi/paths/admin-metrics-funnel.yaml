@@ -5,7 +5,8 @@ get:
   summary: Get administrative hiring funnel metrics
   description: >-
     Returns aggregate conversion counts and mean delays for separate
-    AI-originated and manual hiring cohorts. Requires a Bearer JWT with the
+    AI-originated and manual hiring cohorts, plus a comparable view based on
+    requests from each source. Requires a Bearer JWT with the
     exact `read:admin_metrics` permission; a local administrator role or other
     administrative permissions do not substitute for it. This is a read-only
     query over one coherent read snapshot. It does not persist an audit event,
@@ -20,7 +21,8 @@ get:
     the exact preceding 30 × 24 hours ending at the observation instant.
     `from` must precede `to`, the interval cannot exceed 365 × 24 hours, and
     `to` cannot be later than `observed_at`. An optional positive `category_id`
-    filters origin units; an unknown positive ID returns empty aggregates.
+    filters each cohort using its documented category source; an unknown
+    positive ID returns empty aggregates.
     The response reports the effective bounds, `America/Argentina/Buenos_Aires`
     time zone, observation instant, and decimal-rounding metadata.
 
@@ -43,6 +45,20 @@ get:
     still count. Once an origin unit reaches a stage, it remains counted at
     that stage; consequently a later aggregate stage cannot contain more
     units than its preceding stage.
+
+    **Request comparison.** The `request_comparison` cohorts start with
+    distinct requests created in the same period. A request is AI-originated
+    when `source_assessment_id` is present and manual when it is absent. Both
+    comparison cohorts use the destination provider's current category for
+    filtering and report `provider.current_category_id`; this mutable value
+    describes the provider at query time. Their six stages start at `request`
+    and continue through proposal, confirmed hiring, reported completion,
+    full payment, and review. A request contributes at most once to each stage
+    despite multiple proposals or orders. The selected period filters request
+    origins only, so later linked milestones may occur after `to`. Global
+    completion conversion uses reported-completion requests over the request
+    count. The comparison uses the same snapshot, rounding, chronology, branch,
+    delay, and null-denominator rules as the original cohorts.
 
     **Conversions and delays.** Each stage after the first reports
     `100 × current stage count / preceding stage count`; global completion
@@ -86,10 +102,10 @@ get:
       in: query
       required: false
       description: >-
-        Positive category ID used to filter origin units. AI uses the source
-        assessment's problem category; manual requests use the destination
-        provider's current category. Unknown positive IDs produce empty
-        aggregates.
+        Positive category ID used to filter origin units. Original AI cohorts
+        use the source assessment's problem category; original manual cohorts
+        and both request-comparison cohorts use the destination provider's
+        current category. Unknown positive IDs produce empty aggregates.
       schema:
         type: integer
         format: int32
@@ -97,7 +113,7 @@ get:
       example: 7
   responses:
     '200':
-      description: Aggregate hiring funnel and delay metrics for both cohorts.
+      description: Aggregate hiring funnel and delay metrics for original and request-comparison cohorts.
       headers:
         Cache-Control:
           description: Prevents storage of private administrative metrics.
@@ -152,6 +168,37 @@ get:
                       proposal_to_confirmed_hiring: {observations: 0, mean_seconds: null}
                       confirmed_hiring_to_reported_completion: {observations: 0, mean_seconds: null}
                       reported_completion_to_full_payment: {observations: 0, mean_seconds: null}
+                request_comparison:
+                  ai:
+                    category_source: provider.current_category_id
+                    stages:
+                      - {stage: request, count: 2, conversion_percentage: null}
+                      - {stage: proposal, count: 2, conversion_percentage: 100.00}
+                      - {stage: confirmed_hiring, count: 2, conversion_percentage: 100.00}
+                      - {stage: reported_completion, count: 2, conversion_percentage: 100.00}
+                      - {stage: full_payment, count: 1, conversion_percentage: 50.00}
+                      - {stage: review, count: 1, conversion_percentage: 100.00}
+                    global_completion_conversion_percentage: 100.00
+                    delays:
+                      request_to_first_proposal: {observations: 2, mean_seconds: 33.34}
+                      proposal_to_confirmed_hiring: {observations: 3, mean_seconds: 14.17}
+                      confirmed_hiring_to_reported_completion: {observations: 2, mean_seconds: 172820.00}
+                      reported_completion_to_full_payment: {observations: 1, mean_seconds: 40.00}
+                  manual:
+                    category_source: provider.current_category_id
+                    stages:
+                      - {stage: request, count: 0, conversion_percentage: null}
+                      - {stage: proposal, count: 0, conversion_percentage: null}
+                      - {stage: confirmed_hiring, count: 0, conversion_percentage: null}
+                      - {stage: reported_completion, count: 0, conversion_percentage: null}
+                      - {stage: full_payment, count: 0, conversion_percentage: null}
+                      - {stage: review, count: 0, conversion_percentage: null}
+                    global_completion_conversion_percentage: null
+                    delays:
+                      request_to_first_proposal: {observations: 0, mean_seconds: null}
+                      proposal_to_confirmed_hiring: {observations: 0, mean_seconds: null}
+                      confirmed_hiring_to_reported_completion: {observations: 0, mean_seconds: null}
+                      reported_completion_to_full_payment: {observations: 0, mean_seconds: null}
             empty:
               summary: Empty cohorts retain zero counts and null denominatorless metrics
               value:
@@ -168,6 +215,37 @@ get:
                     category_source: assessment.problem_category_id
                     stages:
                       - {stage: professional_assessment, count: 0, conversion_percentage: null}
+                      - {stage: request, count: 0, conversion_percentage: null}
+                      - {stage: proposal, count: 0, conversion_percentage: null}
+                      - {stage: confirmed_hiring, count: 0, conversion_percentage: null}
+                      - {stage: reported_completion, count: 0, conversion_percentage: null}
+                      - {stage: full_payment, count: 0, conversion_percentage: null}
+                      - {stage: review, count: 0, conversion_percentage: null}
+                    global_completion_conversion_percentage: null
+                    delays:
+                      request_to_first_proposal: {observations: 0, mean_seconds: null}
+                      proposal_to_confirmed_hiring: {observations: 0, mean_seconds: null}
+                      confirmed_hiring_to_reported_completion: {observations: 0, mean_seconds: null}
+                      reported_completion_to_full_payment: {observations: 0, mean_seconds: null}
+                  manual:
+                    category_source: provider.current_category_id
+                    stages:
+                      - {stage: request, count: 0, conversion_percentage: null}
+                      - {stage: proposal, count: 0, conversion_percentage: null}
+                      - {stage: confirmed_hiring, count: 0, conversion_percentage: null}
+                      - {stage: reported_completion, count: 0, conversion_percentage: null}
+                      - {stage: full_payment, count: 0, conversion_percentage: null}
+                      - {stage: review, count: 0, conversion_percentage: null}
+                    global_completion_conversion_percentage: null
+                    delays:
+                      request_to_first_proposal: {observations: 0, mean_seconds: null}
+                      proposal_to_confirmed_hiring: {observations: 0, mean_seconds: null}
+                      confirmed_hiring_to_reported_completion: {observations: 0, mean_seconds: null}
+                      reported_completion_to_full_payment: {observations: 0, mean_seconds: null}
+                request_comparison:
+                  ai:
+                    category_source: provider.current_category_id
+                    stages:
                       - {stage: request, count: 0, conversion_percentage: null}
                       - {stage: proposal, count: 0, conversion_percentage: null}
                       - {stage: confirmed_hiring, count: 0, conversion_percentage: null}

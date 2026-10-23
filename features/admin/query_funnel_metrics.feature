@@ -180,6 +180,32 @@ Feature: Consultar métricas administrativas del embudo de contrataciones
             And la conversión global IA hasta finalización informada es 0.00 por ciento con denominador tres
             And las conversiones manuales son nulas porque su cohorte inicial no tiene unidades
 
+    Rule: La comparación equivalente parte de solicitudes IA y manuales
+        Background:
+            Given que el reloj del sistema indica "2026-09-30T12:00:00-03:00"
+            And que estoy autenticado como administrador "operador@example.com" con el permiso "read:admin_metrics"
+
+        Scenario: 67.22-AM Comparar solicitudes de ambos orígenes sin multiplicar propuestas ni filtrar avances posteriores
+            Given que una evaluación profesional origina dos solicitudes IA y existen tres solicitudes manuales con propuestas múltiples y avances posteriores
+            When consulto el embudo desde "2026-09-10T00:00:00Z" hasta "2026-09-11T00:00:00Z"
+            Then la comparación por solicitudes informa estas etapas por origen:
+                | recorrido | etapa               | unidades |
+                | IA        | request             | 2        |
+                | IA        | proposal            | 2        |
+                | IA        | confirmed_hiring    | 2        |
+                | IA        | reported_completion | 1        |
+                | IA        | full_payment        | 1        |
+                | IA        | review              | 1        |
+                | manual    | request             | 3        |
+                | manual    | proposal            | 3        |
+                | manual    | confirmed_hiring    | 2        |
+                | manual    | reported_completion | 2        |
+                | manual    | full_payment        | 1        |
+                | manual    | review              | 1        |
+            And la comparación usa la solicitud como base y el rubro actual del prestador para ambos orígenes
+            And la finalización global desde solicitudes es 50.00 por ciento para IA y 66.67 por ciento para manual
+            And las demoras cuentan solicitudes y órdenes una sola vez aunque haya propuestas múltiples
+
     Rule: Las demoras representan intervalos válidos entre recursos del mismo recorrido
         Background:
             Given que el reloj del sistema indica "2026-09-30T12:00:00-03:00"

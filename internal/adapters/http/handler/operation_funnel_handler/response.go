@@ -15,13 +15,14 @@ const (
 )
 
 type funnelResponse struct {
-	Period        periodResponse  `json:"period"`
-	TimeZone      string          `json:"timezone"`
-	ObservedAt    time.Time       `json:"observed_at"`
-	CategoryID    *int            `json:"category_id"`
-	Rounding      string          `json:"rounding"`
-	DecimalPlaces int             `json:"decimal_places"`
-	Cohorts       cohortsResponse `json:"cohorts"`
+	Period            periodResponse            `json:"period"`
+	TimeZone          string                    `json:"timezone"`
+	ObservedAt        time.Time                 `json:"observed_at"`
+	CategoryID        *int                      `json:"category_id"`
+	Rounding          string                    `json:"rounding"`
+	DecimalPlaces     int                       `json:"decimal_places"`
+	Cohorts           cohortsResponse           `json:"cohorts"`
+	RequestComparison requestComparisonResponse `json:"request_comparison"`
 }
 
 type periodResponse struct {
@@ -30,6 +31,11 @@ type periodResponse struct {
 }
 
 type cohortsResponse struct {
+	AI     cohortResponse `json:"ai"`
+	Manual cohortResponse `json:"manual"`
+}
+
+type requestComparisonResponse struct {
 	AI     cohortResponse `json:"ai"`
 	Manual cohortResponse `json:"manual"`
 }
@@ -67,6 +73,10 @@ func responseFromMetrics(metrics readmodel.FunnelMetrics) funnelResponse {
 		Cohorts: cohortsResponse{
 			AI:     cohortResponseFromModel(metrics.AI, aiCategorySource),
 			Manual: cohortResponseFromModel(metrics.Manual, manualCategorySource),
+		},
+		RequestComparison: requestComparisonResponse{
+			AI:     cohortResponseFromModel(metrics.RequestComparison.AI, manualCategorySource),
+			Manual: cohortResponseFromModel(metrics.RequestComparison.Manual, manualCategorySource),
 		},
 	}
 }

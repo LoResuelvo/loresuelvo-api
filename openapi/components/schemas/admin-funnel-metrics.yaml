@@ -14,6 +14,7 @@ required:
   - rounding
   - decimal_places
   - cohorts
+  - request_comparison
 properties:
   period:
     $ref: '#/components/schemas/AdminFunnelMetrics/$defs/Period'
@@ -96,6 +97,25 @@ properties:
           - description: >-
               Manual cohort, ordered as request, proposal, confirmed hiring,
               reported completion, full payment, and review.
+  request_comparison:
+    type: object
+    additionalProperties: false
+    required: [ai, manual]
+    description: >-
+      Alternative cohorts whose origins are requests created in the selected
+      period. Both use the destination provider's current category for filtering
+      and category_source; this mutable value describes the provider at query
+      time. Each request contributes at most once to each stage regardless of
+      how many proposals or orders are linked to its conversation.
+    properties:
+      ai:
+        allOf:
+          - $ref: '#/components/schemas/AdminFunnelMetrics/$defs/RequestComparisonCohort'
+          - description: AI-originated requests with a present source_assessment_id.
+      manual:
+        allOf:
+          - $ref: '#/components/schemas/AdminFunnelMetrics/$defs/RequestComparisonCohort'
+          - description: Manual requests with an absent source_assessment_id.
 $defs:
   Period:
     type: object
@@ -200,3 +220,27 @@ $defs:
           decimal places; null when observations is zero. A valid zero-length
           interval has one observation and a mean of 0.00.
         example: 33.34
+  RequestComparisonCohort:
+    allOf:
+      - $ref: '#/components/schemas/AdminFunnelMetrics/$defs/Cohort'
+      - properties:
+          category_source:
+            const: provider.current_category_id
+          stages:
+            minItems: 6
+            maxItems: 6
+            items:
+              allOf:
+                - $ref: '#/components/schemas/AdminFunnelMetrics/$defs/Stage'
+                - properties:
+                    stage:
+                      enum:
+                        - request
+                        - proposal
+                        - confirmed_hiring
+                        - reported_completion
+                        - full_payment
+                        - review
+      - description: >-
+          Request-based cohort ordered as request, proposal, confirmed hiring,
+          reported completion, full payment, and review.

@@ -4405,7 +4405,7 @@
                 ],
                 "operationId": "getAdminFunnelMetrics",
                 "summary": "Get administrative hiring funnel metrics",
-                "description": "Returns aggregate conversion counts and mean delays for separate AI-originated and manual hiring cohorts. Requires a Bearer JWT with the exact `read:admin_metrics` permission; a local administrator role or other administrative permissions do not substitute for it. This is a read-only query over one coherent read snapshot. It does not persist an audit event, change business state, call external services, or return individual rows, personal data, conversations, or financial payloads. Every response, including authentication and validation errors, uses `Cache-Control: private, no-store`.\n**Period and filters.** Supply both `from` and `to`, or omit both. Each is an RFC 3339 timestamp with a time-zone offset; the interval is inclusive at `from` and exclusive at `to`. When omitted, the effective interval is the exact preceding 30 × 24 hours ending at the observation instant. `from` must precede `to`, the interval cannot exceed 365 × 24 hours, and `to` cannot be later than `observed_at`. An optional positive `category_id` filters origin units; an unknown positive ID returns empty aggregates. The response reports the effective bounds, `America/Argentina/Buenos_Aires` time zone, observation instant, and decimal-rounding metadata.\n**Cohorts and stages.** The AI cohort starts with distinct persisted `professional_required` assessment versions created in the selected period. Its category source is the assessment's `problem_category_id`; a later current assessment does not replace the assessment that sourced a request. The manual cohort starts with distinct requests created in the period whose `source_assessment_id` is absent; its category source is the destination provider's current category, not historical request data. Cohorts and denominators remain separate. AI stages are `professional_assessment`, `request`, `proposal`, `confirmed_hiring`, `reported_completion`, `full_payment`, and `review`; manual stages omit only `professional_assessment`. Each unit contributes at most once to a stage through its own persisted request/proposal/order branch. Hiring requires the linked order's `accepted_on`, completion its persisted report, full payment `paid_on` on that same completed order, and review a review associated with that paid order. The selected period filters origins only: later linked milestones may occur after `to` and still count. Once an origin unit reaches a stage, it remains counted at that stage; consequently a later aggregate stage cannot contain more units than its preceding stage.\n**Conversions and delays.** Each stage after the first reports `100 × current stage count / preceding stage count`; global completion conversion uses the origin count as denominator and the reported completion count as numerator. A zero denominator is `null`; a positive denominator with no progress yields `0.00`. Percentages and delay means are rounded half up to two decimal places. Delay means are seconds and include an observation count. The four intervals are request to earliest proposal (one sample per request), proposal to confirmed hiring, hiring to reported completion, and completion to full payment (each latter interval one sample per linked order). Only persisted endpoint pairs in valid chronological order contribute; missing or negative intervals are excluded, and pending wait is not measured. No valid observations yields a null mean. Read/projection failure returns an error, never synthetic zero metrics or a partial aggregate.",
+                "description": "Returns aggregate conversion counts and mean delays for separate AI-originated and manual hiring cohorts, plus a comparable view based on requests from each source. Requires a Bearer JWT with the exact `read:admin_metrics` permission; a local administrator role or other administrative permissions do not substitute for it. This is a read-only query over one coherent read snapshot. It does not persist an audit event, change business state, call external services, or return individual rows, personal data, conversations, or financial payloads. Every response, including authentication and validation errors, uses `Cache-Control: private, no-store`.\n**Period and filters.** Supply both `from` and `to`, or omit both. Each is an RFC 3339 timestamp with a time-zone offset; the interval is inclusive at `from` and exclusive at `to`. When omitted, the effective interval is the exact preceding 30 × 24 hours ending at the observation instant. `from` must precede `to`, the interval cannot exceed 365 × 24 hours, and `to` cannot be later than `observed_at`. An optional positive `category_id` filters each cohort using its documented category source; an unknown positive ID returns empty aggregates. The response reports the effective bounds, `America/Argentina/Buenos_Aires` time zone, observation instant, and decimal-rounding metadata.\n**Cohorts and stages.** The AI cohort starts with distinct persisted `professional_required` assessment versions created in the selected period. Its category source is the assessment's `problem_category_id`; a later current assessment does not replace the assessment that sourced a request. The manual cohort starts with distinct requests created in the period whose `source_assessment_id` is absent; its category source is the destination provider's current category, not historical request data. Cohorts and denominators remain separate. AI stages are `professional_assessment`, `request`, `proposal`, `confirmed_hiring`, `reported_completion`, `full_payment`, and `review`; manual stages omit only `professional_assessment`. Each unit contributes at most once to a stage through its own persisted request/proposal/order branch. Hiring requires the linked order's `accepted_on`, completion its persisted report, full payment `paid_on` on that same completed order, and review a review associated with that paid order. The selected period filters origins only: later linked milestones may occur after `to` and still count. Once an origin unit reaches a stage, it remains counted at that stage; consequently a later aggregate stage cannot contain more units than its preceding stage.\n**Request comparison.** The `request_comparison` cohorts start with distinct requests created in the same period. A request is AI-originated when `source_assessment_id` is present and manual when it is absent. Both comparison cohorts use the destination provider's current category for filtering and report `provider.current_category_id`; this mutable value describes the provider at query time. Their six stages start at `request` and continue through proposal, confirmed hiring, reported completion, full payment, and review. A request contributes at most once to each stage despite multiple proposals or orders. The selected period filters request origins only, so later linked milestones may occur after `to`. Global completion conversion uses reported-completion requests over the request count. The comparison uses the same snapshot, rounding, chronology, branch, delay, and null-denominator rules as the original cohorts.\n**Conversions and delays.** Each stage after the first reports `100 × current stage count / preceding stage count`; global completion conversion uses the origin count as denominator and the reported completion count as numerator. A zero denominator is `null`; a positive denominator with no progress yields `0.00`. Percentages and delay means are rounded half up to two decimal places. Delay means are seconds and include an observation count. The four intervals are request to earliest proposal (one sample per request), proposal to confirmed hiring, hiring to reported completion, and completion to full payment (each latter interval one sample per linked order). Only persisted endpoint pairs in valid chronological order contribute; missing or negative intervals are excluded, and pending wait is not measured. No valid observations yields a null mean. Read/projection failure returns an error, never synthetic zero metrics or a partial aggregate.",
                 "security": [
                     {
                         "BearerAuth": []
@@ -4438,7 +4438,7 @@
                         "name": "category_id",
                         "in": "query",
                         "required": false,
-                        "description": "Positive category ID used to filter origin units. AI uses the source assessment's problem category; manual requests use the destination provider's current category. Unknown positive IDs produce empty aggregates.",
+                        "description": "Positive category ID used to filter origin units. Original AI cohorts use the source assessment's problem category; original manual cohorts and both request-comparison cohorts use the destination provider's current category. Unknown positive IDs produce empty aggregates.",
                         "schema": {
                             "type": "integer",
                             "format": "int32",
@@ -4449,7 +4449,7 @@
                 ],
                 "responses": {
                     "200": {
-                        "description": "Aggregate hiring funnel and delay metrics for both cohorts.",
+                        "description": "Aggregate hiring funnel and delay metrics for original and request-comparison cohorts.",
                         "headers": {
                             "Cache-Control": {
                                 "description": "Prevents storage of private administrative metrics.",
@@ -4591,6 +4591,116 @@
                                                         }
                                                     }
                                                 }
+                                            },
+                                            "request_comparison": {
+                                                "ai": {
+                                                    "category_source": "provider.current_category_id",
+                                                    "stages": [
+                                                        {
+                                                            "stage": "request",
+                                                            "count": 2,
+                                                            "conversion_percentage": null
+                                                        },
+                                                        {
+                                                            "stage": "proposal",
+                                                            "count": 2,
+                                                            "conversion_percentage": 100.0
+                                                        },
+                                                        {
+                                                            "stage": "confirmed_hiring",
+                                                            "count": 2,
+                                                            "conversion_percentage": 100.0
+                                                        },
+                                                        {
+                                                            "stage": "reported_completion",
+                                                            "count": 2,
+                                                            "conversion_percentage": 100.0
+                                                        },
+                                                        {
+                                                            "stage": "full_payment",
+                                                            "count": 1,
+                                                            "conversion_percentage": 50.0
+                                                        },
+                                                        {
+                                                            "stage": "review",
+                                                            "count": 1,
+                                                            "conversion_percentage": 100.0
+                                                        }
+                                                    ],
+                                                    "global_completion_conversion_percentage": 100.0,
+                                                    "delays": {
+                                                        "request_to_first_proposal": {
+                                                            "observations": 2,
+                                                            "mean_seconds": 33.34
+                                                        },
+                                                        "proposal_to_confirmed_hiring": {
+                                                            "observations": 3,
+                                                            "mean_seconds": 14.17
+                                                        },
+                                                        "confirmed_hiring_to_reported_completion": {
+                                                            "observations": 2,
+                                                            "mean_seconds": 172820.0
+                                                        },
+                                                        "reported_completion_to_full_payment": {
+                                                            "observations": 1,
+                                                            "mean_seconds": 40.0
+                                                        }
+                                                    }
+                                                },
+                                                "manual": {
+                                                    "category_source": "provider.current_category_id",
+                                                    "stages": [
+                                                        {
+                                                            "stage": "request",
+                                                            "count": 0,
+                                                            "conversion_percentage": null
+                                                        },
+                                                        {
+                                                            "stage": "proposal",
+                                                            "count": 0,
+                                                            "conversion_percentage": null
+                                                        },
+                                                        {
+                                                            "stage": "confirmed_hiring",
+                                                            "count": 0,
+                                                            "conversion_percentage": null
+                                                        },
+                                                        {
+                                                            "stage": "reported_completion",
+                                                            "count": 0,
+                                                            "conversion_percentage": null
+                                                        },
+                                                        {
+                                                            "stage": "full_payment",
+                                                            "count": 0,
+                                                            "conversion_percentage": null
+                                                        },
+                                                        {
+                                                            "stage": "review",
+                                                            "count": 0,
+                                                            "conversion_percentage": null
+                                                        }
+                                                    ],
+                                                    "global_completion_conversion_percentage": null,
+                                                    "delays": {
+                                                        "request_to_first_proposal": {
+                                                            "observations": 0,
+                                                            "mean_seconds": null
+                                                        },
+                                                        "proposal_to_confirmed_hiring": {
+                                                            "observations": 0,
+                                                            "mean_seconds": null
+                                                        },
+                                                        "confirmed_hiring_to_reported_completion": {
+                                                            "observations": 0,
+                                                            "mean_seconds": null
+                                                        },
+                                                        "reported_completion_to_full_payment": {
+                                                            "observations": 0,
+                                                            "mean_seconds": null
+                                                        }
+                                                    }
+                                                }
                                             }
                                         }
                                     },
@@ -4615,6 +4725,116 @@
                                                             "count": 0,
                                                             "conversion_percentage": null
                                                         },
+                                                        {
+                                                            "stage": "request",
+                                                            "count": 0,
+                                                            "conversion_percentage": null
+                                                        },
+                                                        {
+                                                            "stage": "proposal",
+                                                            "count": 0,
+                                                            "conversion_percentage": null
+                                                        },
+                                                        {
+                                                            "stage": "confirmed_hiring",
+                                                            "count": 0,
+                                                            "conversion_percentage": null
+                                                        },
+                                                        {
+                                                            "stage": "reported_completion",
+                                                            "count": 0,
+                                                            "conversion_percentage": null
+                                                        },
+                                                        {
+                                                            "stage": "full_payment",
+                                                            "count": 0,
+                                                            "conversion_percentage": null
+                                                        },
+                                                        {
+                                                            "stage": "review",
+                                                            "count": 0,
+                                                            "conversion_percentage": null
+                                                        }
+                                                    ],
+                                                    "global_completion_conversion_percentage": null,
+                                                    "delays": {
+                                                        "request_to_first_proposal": {
+                                                            "observations": 0,
+                                                            "mean_seconds": null
+                                                        },
+                                                        "proposal_to_confirmed_hiring": {
+                                                            "observations": 0,
+                                                            "mean_seconds": null
+                                                        },
+                                                        "confirmed_hiring_to_reported_completion": {
+                                                            "observations": 0,
+                                                            "mean_seconds": null
+                                                        },
+                                                        "reported_completion_to_full_payment": {
+                                                            "observations": 0,
+                                                            "mean_seconds": null
+                                                        }
+                                                    }
+                                                },
+                                                "manual": {
+                                                    "category_source": "provider.current_category_id",
+                                                    "stages": [
+                                                        {
+                                                            "stage": "request",
+                                                            "count": 0,
+                                                            "conversion_percentage": null
+                                                        },
+                                                        {
+                                                            "stage": "proposal",
+                                                            "count": 0,
+                                                            "conversion_percentage": null
+                                                        },
+                                                        {
+                                                            "stage": "confirmed_hiring",
+                                                            "count": 0,
+                                                            "conversion_percentage": null
+                                                        },
+                                                        {
+                                                            "stage": "reported_completion",
+                                                            "count": 0,
+                                                            "conversion_percentage": null
+                                                        },
+                                                        {
+                                                            "stage": "full_payment",
+                                                            "count": 0,
+                                                            "conversion_percentage": null
+                                                        },
+                                                        {
+                                                            "stage": "review",
+                                                            "count": 0,
+                                                            "conversion_percentage": null
+                                                        }
+                                                    ],
+                                                    "global_completion_conversion_percentage": null,
+                                                    "delays": {
+                                                        "request_to_first_proposal": {
+                                                            "observations": 0,
+                                                            "mean_seconds": null
+                                                        },
+                                                        "proposal_to_confirmed_hiring": {
+                                                            "observations": 0,
+                                                            "mean_seconds": null
+                                                        },
+                                                        "confirmed_hiring_to_reported_completion": {
+                                                            "observations": 0,
+                                                            "mean_seconds": null
+                                                        },
+                                                        "reported_completion_to_full_payment": {
+                                                            "observations": 0,
+                                                            "mean_seconds": null
+                                                        }
+                                                    }
+                                                }
+                                            },
+                                            "request_comparison": {
+                                                "ai": {
+                                                    "category_source": "provider.current_category_id",
+                                                    "stages": [
                                                         {
                                                             "stage": "request",
                                                             "count": 0,
@@ -15018,7 +15238,8 @@
                     "category_id",
                     "rounding",
                     "decimal_places",
-                    "cohorts"
+                    "cohorts",
+                    "request_comparison"
                 ],
                 "properties": {
                     "period": {
@@ -15143,6 +15364,37 @@
                                     },
                                     {
                                         "description": "Manual cohort, ordered as request, proposal, confirmed hiring, reported completion, full payment, and review."
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "request_comparison": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                            "ai",
+                            "manual"
+                        ],
+                        "description": "Alternative cohorts whose origins are requests created in the selected period. Both use the destination provider's current category for filtering and category_source; this mutable value describes the provider at query time. Each request contributes at most once to each stage regardless of how many proposals or orders are linked to its conversation.",
+                        "properties": {
+                            "ai": {
+                                "allOf": [
+                                    {
+                                        "$ref": "#/components/schemas/AdminFunnelMetrics/$defs/RequestComparisonCohort"
+                                    },
+                                    {
+                                        "description": "AI-originated requests with a present source_assessment_id."
+                                    }
+                                ]
+                            },
+                            "manual": {
+                                "allOf": [
+                                    {
+                                        "$ref": "#/components/schemas/AdminFunnelMetrics/$defs/RequestComparisonCohort"
+                                    },
+                                    {
+                                        "description": "Manual requests with an absent source_assessment_id."
                                     }
                                 ]
                             }
@@ -15290,6 +15542,48 @@
                                 "example": 33.34
                             }
                         }
+                    },
+                    "RequestComparisonCohort": {
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/AdminFunnelMetrics/$defs/Cohort"
+                            },
+                            {
+                                "properties": {
+                                    "category_source": {
+                                        "const": "provider.current_category_id"
+                                    },
+                                    "stages": {
+                                        "minItems": 6,
+                                        "maxItems": 6,
+                                        "items": {
+                                            "allOf": [
+                                                {
+                                                    "$ref": "#/components/schemas/AdminFunnelMetrics/$defs/Stage"
+                                                },
+                                                {
+                                                    "properties": {
+                                                        "stage": {
+                                                            "enum": [
+                                                                "request",
+                                                                "proposal",
+                                                                "confirmed_hiring",
+                                                                "reported_completion",
+                                                                "full_payment",
+                                                                "review"
+                                                            ]
+                                                        }
+                                                    }
+                                                }
+                                            ]
+                                        }
+                                    }
+                                }
+                            },
+                            {
+                                "description": "Request-based cohort ordered as request, proposal, confirmed hiring, reported completion, full payment, and review."
+                            }
+                        ]
                     }
                 }
             },

@@ -88,7 +88,9 @@ func TestOperationFunnelReaderReturnsBothEmptyCohorts(t *testing.T) {
 	got := funnelRead(t, f, funnelPeriod(time.Date(2026, 9, 10, 0, 0, 0, 0, time.UTC)))
 	require.Equal(t, readmodel.FunnelCounts{}, got.AI.Counts)
 	require.Equal(t, readmodel.FunnelCounts{}, got.Manual.Counts)
-	for _, c := range []readmodel.FunnelCohortSnapshot{got.AI, got.Manual} {
+	require.Equal(t, readmodel.FunnelCounts{}, got.RequestComparison.AI.Counts)
+	require.Equal(t, readmodel.FunnelCounts{}, got.RequestComparison.Manual.Counts)
+	for _, c := range []readmodel.FunnelCohortSnapshot{got.AI, got.Manual, got.RequestComparison.AI, got.RequestComparison.Manual} {
 		for _, d := range []readmodel.FunnelDelayAggregate{c.Delays.RequestToFirstProposal, c.Delays.ProposalToConfirmedHiring, c.Delays.ConfirmedHiringToReportedCompletion, c.Delays.ReportedCompletionToFullPayment} {
 			funnelSum(t, d, 0, "0")
 		}
@@ -140,6 +142,48 @@ func TestOperationFunnelReaderUsesCurrentProviderCategoryForManualOrigin(t *test
 		require.Equal(t, tc.count, got.Manual.Counts.Origins)
 		require.Equal(t, tc.count, got.Manual.Counts.Requested)
 	}
+}
+func TestOperationFunnelReaderComparesRequestsByCurrentProviderCategory(t *testing.T) {
+	f := newOperationInboxFixture(t)
+	base := time.Date(2026, 9, 10, 0, 0, 0, 0, time.UTC)
+	consumerID := savedConsumerIDForJobRequest(t, f.testContext)
+	p1, p2 := funnelProvider(t, f, 1, "Plumbing"), funnelProvider(t, f, 2, "Electricity")
+	c1, c2 := funnelCategory(t, f, p1), funnelCategory(t, f, p2)
+	conversationID, messageID := funnelAssessmentConversation(t, f, consumerID, base)
+	assessmentID := funnelAssessment(t, f, conversationID, messageID, 1, &c2, "professional_required", base)
+	aiPlumbing := f.jobRequest(t, consumerID, p1, base, jobrequest.StatusPending)
+	aiElectricity := f.jobRequest(t, consumerID, p2, base.Add(time.Hour), jobrequest.StatusPending)
+	funnelSource(t, f, aiPlumbing.ID, assessmentID)
+	funnelSource(t, f, aiElectricity.ID, assessmentID)
+	manualConsumers := make([]int, 3)
+	for i := range manualConsumers {
+		manualConsumers[i] = savedConsumerIDWithData(t, f.testContext, fmt.Sprintf("auth0|funnel-comparison-%d", i), fmt.Sprintf("funnel-comparison-%d@example.com", i), "Manual", "Funnel")
+	}
+	f.jobRequest(t, manualConsumers[0], p1, base.Add(2*time.Hour), jobrequest.StatusPending)
+	f.jobRequest(t, manualConsumers[1], p2, base.Add(3*time.Hour), jobrequest.StatusPending)
+	f.jobRequest(t, manualConsumers[2], p1, base.Add(4*time.Hour), jobrequest.StatusPending)
+
+	all := funnelRead(t, f, funnelPeriod(base))
+	require.Equal(t, int64(2), all.RequestComparison.AI.Counts.Origins)
+	require.Equal(t, int64(2), all.RequestComparison.AI.Counts.Requested)
+	require.Equal(t, int64(3), all.RequestComparison.Manual.Counts.Origins)
+	require.Equal(t, int64(3), all.RequestComparison.Manual.Counts.Requested)
+
+	plumbing := funnelPeriod(base)
+	plumbing.CategoryID = &c1
+	plumbingResult := funnelRead(t, f, plumbing)
+	// The historical AI cohort still selects by assessment category, while the
+	// comparison selects the destination provider's current category.
+	require.Zero(t, plumbingResult.AI.Counts.Origins)
+	require.Equal(t, int64(1), plumbingResult.RequestComparison.AI.Counts.Origins)
+	require.Equal(t, int64(2), plumbingResult.RequestComparison.Manual.Counts.Origins)
+
+	electricity := funnelPeriod(base)
+	electricity.CategoryID = &c2
+	electricityResult := funnelRead(t, f, electricity)
+	require.Equal(t, int64(1), electricityResult.AI.Counts.Origins)
+	require.Equal(t, int64(1), electricityResult.RequestComparison.AI.Counts.Origins)
+	require.Equal(t, int64(1), electricityResult.RequestComparison.Manual.Counts.Origins)
 }
 func TestOperationFunnelReaderCountsDistinctOriginsAndCompleteOwnBranches(t *testing.T) {
 	f := newOperationInboxFixture(t)

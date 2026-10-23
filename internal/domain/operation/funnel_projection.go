@@ -36,7 +36,7 @@ func projectFunnelDelay(total readmodel.FunnelDelayAggregate) (readmodel.FunnelD
 	}
 	return readmodel.FunnelDelayMetric{Observations: total.Observations, MeanSecondsHundredths: mean}, nil
 }
-func projectFunnelCohort(snapshot readmodel.FunnelCohortSnapshot, manual bool) (readmodel.FunnelCohort, error) {
+func projectFunnelCohort(snapshot readmodel.FunnelCohortSnapshot, startsWithRequest bool) (readmodel.FunnelCohort, error) {
 	counts := snapshot.Counts
 	values := []int64{counts.Origins, counts.Requested, counts.Proposed, counts.Hired, counts.Completed, counts.Paid, counts.Reviewed}
 	stages := []readmodel.FunnelStage{readmodel.FunnelStageProfessionalAssessment, readmodel.FunnelStageRequest, readmodel.FunnelStageProposal, readmodel.FunnelStageConfirmedHiring, readmodel.FunnelStageReportedCompletion, readmodel.FunnelStageFullPayment, readmodel.FunnelStageReview}
@@ -45,7 +45,7 @@ func projectFunnelCohort(snapshot readmodel.FunnelCohortSnapshot, manual bool) (
 			return readmodel.FunnelCohort{}, ErrInvalidFunnelSnapshot
 		}
 	}
-	if manual {
+	if startsWithRequest {
 		if counts.Requested != counts.Origins {
 			return readmodel.FunnelCohort{}, ErrInvalidFunnelSnapshot
 		}

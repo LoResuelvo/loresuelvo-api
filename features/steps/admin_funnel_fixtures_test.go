@@ -575,6 +575,76 @@ func (suite *testSuite) adminFunnelManualMilestones(first, second, paid, noRepor
 	return nil
 }
 
+func (suite *testSuite) adminFunnelRequestComparisonFixture() error {
+	base := time.Date(2026, 9, 10, 10, 0, 0, 0, time.UTC)
+	if _, err := suite.adminFunnelCreateAssessment("A1", "ana@example.com", "Plomería", "professional_required", 1, base); err != nil {
+		return err
+	}
+	for _, request := range []struct {
+		alias, consumer, provider string
+		at                        time.Time
+	}{
+		{"S1", "ana@example.com", "juan@example.com", base.Add(time.Hour)},
+		{"S2", "beatriz@example.com", "pedro@example.com", base.Add(2 * time.Hour)},
+	} {
+		if _, err := suite.adminFunnelCreateAIRequest(request.alias, request.consumer, request.provider, "A1", request.at); err != nil {
+			return err
+		}
+	}
+	for _, request := range []struct {
+		alias, consumer, provider string
+		at                        time.Time
+	}{
+		{"S3", "carla@example.com", "juan@example.com", base.Add(3 * time.Hour)},
+		{"S4", "ana@example.com", "pedro@example.com", base.Add(4 * time.Hour)},
+		{"S5", "beatriz@example.com", "luis@example.com", base.Add(5 * time.Hour)},
+	} {
+		if _, err := suite.adminFunnelCreateManualRequest(request.alias, request.consumer, request.provider, request.at); err != nil {
+			return err
+		}
+	}
+	for _, proposal := range []struct {
+		alias, request string
+		offset         time.Duration
+	}{
+		{"P1", "S1", 48 * time.Hour}, {"P2", "S1", 49 * time.Hour}, {"P3", "S2", 50 * time.Hour},
+		{"P4", "S3", 51 * time.Hour}, {"P5", "S3", 52 * time.Hour}, {"P6", "S4", 53 * time.Hour}, {"P7", "S5", 54 * time.Hour},
+	} {
+		created := base.Add(proposal.offset)
+		if _, err := suite.adminFunnelCreateProposal(proposal.alias, proposal.request, created, created.Add(72*time.Hour), true); err != nil {
+			return err
+		}
+	}
+	for _, order := range []struct {
+		alias, proposal string
+		proposalOffset  time.Duration
+	}{
+		{"O1", "P1", 48 * time.Hour}, {"O2", "P2", 49 * time.Hour}, {"O3", "P3", 50 * time.Hour},
+		{"O4", "P4", 51 * time.Hour}, {"O5", "P5", 52 * time.Hour}, {"O6", "P6", 53 * time.Hour},
+	} {
+		// Proposals are scheduled 72 hours after creation; accept each order only
+		// after its proposal's scheduled service time to keep the work order valid.
+		if _, err := suite.adminFunnelCreateOrder(order.alias, order.proposal, base.Add(order.proposalOffset+73*time.Hour)); err != nil {
+			return err
+		}
+	}
+	for _, item := range []struct {
+		order    string
+		reported time.Time
+		paid     time.Time
+		reviewed bool
+	}{
+		{"O1", base.Add(124 * time.Hour), base.Add(126 * time.Hour), true},
+		{"O4", base.Add(129 * time.Hour), base.Add(131 * time.Hour), true},
+		{"O6", base.Add(130 * time.Hour), time.Time{}, false},
+	} {
+		if err := suite.adminFunnelAddMilestones(item.order, item.reported, item.paid, item.reviewed); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (suite *testSuite) adminFunnelNoOrderForCheckout(requestAlias string) error {
 	proposalID := suite.adminFunnel.proposalAliases["P4"]
 	if suite.adminFunnel.proposalRequests["P4"] != requestAlias {

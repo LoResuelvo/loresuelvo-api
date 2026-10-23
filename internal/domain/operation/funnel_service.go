@@ -61,5 +61,18 @@ func (s *FunnelService) Query(ctx context.Context, query FunnelQuery) (readmodel
 	if err != nil {
 		return readmodel.FunnelMetrics{}, err
 	}
-	return readmodel.FunnelMetrics{From: period.From, To: period.To, ObservedAt: now, CategoryID: categoryID, TimeZone: "America/Argentina/Buenos_Aires", Rounding: "half_up", DecimalPlaces: 2, AI: ai, Manual: manual}, nil
+	requestComparisonAI, err := projectFunnelCohort(snapshot.RequestComparison.AI, true)
+	if err != nil {
+		return readmodel.FunnelMetrics{}, err
+	}
+	requestComparisonManual, err := projectFunnelCohort(snapshot.RequestComparison.Manual, true)
+	if err != nil {
+		return readmodel.FunnelMetrics{}, err
+	}
+	return readmodel.FunnelMetrics{
+		From: period.From, To: period.To, ObservedAt: now, CategoryID: categoryID,
+		TimeZone: "America/Argentina/Buenos_Aires", Rounding: "half_up", DecimalPlaces: 2,
+		AI: ai, Manual: manual,
+		RequestComparison: readmodel.FunnelRequestComparison{AI: requestComparisonAI, Manual: requestComparisonManual},
+	}, nil
 }

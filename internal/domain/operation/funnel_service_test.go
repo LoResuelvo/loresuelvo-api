@@ -16,7 +16,7 @@ import (
 func funnelEmptySnapshot() readmodel.FunnelSnapshot {
 	z := readmodel.FunnelDelayAggregate{TotalMicroseconds: "0"}
 	c := readmodel.FunnelCohortSnapshot{Delays: readmodel.FunnelDelayTotals{RequestToFirstProposal: z, ProposalToConfirmedHiring: z, ConfirmedHiringToReportedCompletion: z, ReportedCompletionToFullPayment: z}}
-	return readmodel.FunnelSnapshot{AI: c, Manual: c}
+	return readmodel.FunnelSnapshot{AI: c, Manual: c, RequestComparison: readmodel.FunnelRequestComparisonSnapshot{AI: c, Manual: c}}
 }
 func TestFunnelDefaultPeriodAndEmptyCohorts(t *testing.T) {
 	now := time.Date(2026, 9, 30, 15, 0, 0, 123, time.UTC)
@@ -31,8 +31,12 @@ func TestFunnelDefaultPeriodAndEmptyCohorts(t *testing.T) {
 	require.Equal(t, 2, got.DecimalPlaces)
 	require.Len(t, got.AI.Stages, 7)
 	require.Len(t, got.Manual.Stages, 6)
+	require.Len(t, got.RequestComparison.AI.Stages, 6)
+	require.Len(t, got.RequestComparison.Manual.Stages, 6)
 	require.Nil(t, got.AI.GlobalCompletionConversionHundredths)
 	require.Nil(t, got.Manual.Delays.RequestToFirstProposal.MeanSecondsHundredths)
+	require.Nil(t, got.RequestComparison.AI.GlobalCompletionConversionHundredths)
+	require.Nil(t, got.RequestComparison.Manual.GlobalCompletionConversionHundredths)
 	r.AssertExpectations(t)
 }
 func TestFunnelRejectsInvalidQueryBeforeRead(t *testing.T) {
@@ -55,6 +59,7 @@ func TestFunnelExactConversionsAndDelayRounding(t *testing.T) {
 	snap := funnelEmptySnapshot()
 	snap.AI.Counts = readmodel.FunnelCounts{Origins: 3, Requested: 2, Proposed: 2, Hired: 2, Completed: 2, Paid: 1, Reviewed: 1}
 	snap.AI.Delays.RequestToFirstProposal = readmodel.FunnelDelayAggregate{Observations: 2, TotalMicroseconds: "66670000.000000"}
+	snap.RequestComparison.AI.Counts = readmodel.FunnelCounts{Origins: 4, Requested: 4, Proposed: 2, Hired: 2, Completed: 1, Paid: 1, Reviewed: 1}
 	r := &funnelReaderMock{}
 	r.On("Read", mock.Anything, mock.Anything).Return(snap, nil).Once()
 	got, err := operation.NewFunnelService(r, inboxFixedClock{time.Now()}).Query(context.Background(), operation.FunnelQuery{})
@@ -64,6 +69,9 @@ func TestFunnelExactConversionsAndDelayRounding(t *testing.T) {
 	require.EqualValues(t, 5000, *got.AI.Stages[5].ConversionHundredths)
 	require.EqualValues(t, 6667, *got.AI.GlobalCompletionConversionHundredths)
 	require.EqualValues(t, 3334, *got.AI.Delays.RequestToFirstProposal.MeanSecondsHundredths)
+	require.Nil(t, got.RequestComparison.AI.Stages[0].ConversionHundredths)
+	require.EqualValues(t, 5000, *got.RequestComparison.AI.Stages[1].ConversionHundredths)
+	require.EqualValues(t, 2500, *got.RequestComparison.AI.GlobalCompletionConversionHundredths)
 	r.AssertExpectations(t)
 }
 func TestFunnelLargeExactAggregate(t *testing.T) {
@@ -79,14 +87,15 @@ func TestFunnelLargeExactAggregate(t *testing.T) {
 }
 func TestFunnelFailsClosedForInvalidSnapshots(t *testing.T) {
 	for name, change := range map[string]func(*readmodel.FunnelSnapshot){
-		"negative count":         func(s *readmodel.FunnelSnapshot) { s.AI.Counts.Origins = -1 },
-		"non nested":             func(s *readmodel.FunnelSnapshot) { s.AI.Counts.Proposed = 1 },
-		"manual origin":          func(s *readmodel.FunnelSnapshot) { s.Manual.Counts.Origins = 1 },
-		"missing sum":            func(s *readmodel.FunnelSnapshot) { s.AI.Delays.RequestToFirstProposal.TotalMicroseconds = "" },
-		"negative sum":           func(s *readmodel.FunnelSnapshot) { s.AI.Delays.RequestToFirstProposal.TotalMicroseconds = "-1" },
-		"fractional microsecond": func(s *readmodel.FunnelSnapshot) { s.AI.Delays.RequestToFirstProposal.TotalMicroseconds = "0.5" },
-		"negative sample":        func(s *readmodel.FunnelSnapshot) { s.AI.Delays.RequestToFirstProposal.Observations = -1 },
-		"no sample nonzero":      func(s *readmodel.FunnelSnapshot) { s.AI.Delays.RequestToFirstProposal.TotalMicroseconds = "1" },
+		"negative count":                func(s *readmodel.FunnelSnapshot) { s.AI.Counts.Origins = -1 },
+		"non nested":                    func(s *readmodel.FunnelSnapshot) { s.AI.Counts.Proposed = 1 },
+		"manual origin":                 func(s *readmodel.FunnelSnapshot) { s.Manual.Counts.Origins = 1 },
+		"request comparison non nested": func(s *readmodel.FunnelSnapshot) { s.RequestComparison.AI.Counts.Proposed = 1 },
+		"missing sum":                   func(s *readmodel.FunnelSnapshot) { s.AI.Delays.RequestToFirstProposal.TotalMicroseconds = "" },
+		"negative sum":                  func(s *readmodel.FunnelSnapshot) { s.AI.Delays.RequestToFirstProposal.TotalMicroseconds = "-1" },
+		"fractional microsecond":        func(s *readmodel.FunnelSnapshot) { s.AI.Delays.RequestToFirstProposal.TotalMicroseconds = "0.5" },
+		"negative sample":               func(s *readmodel.FunnelSnapshot) { s.AI.Delays.RequestToFirstProposal.Observations = -1 },
+		"no sample nonzero":             func(s *readmodel.FunnelSnapshot) { s.AI.Delays.RequestToFirstProposal.TotalMicroseconds = "1" },
 		"overflow mean": func(s *readmodel.FunnelSnapshot) {
 			s.AI.Delays.RequestToFirstProposal = readmodel.FunnelDelayAggregate{Observations: 1, TotalMicroseconds: "999999999999999999999999999999"}
 		},
@@ -132,6 +141,7 @@ func TestFunnelCapturesClockOnceAndPreservesContext(t *testing.T) {
 func TestFunnelDistinguishesNoDenominatorFromZeroAdvance(t *testing.T) {
 	snap := funnelEmptySnapshot()
 	snap.AI.Counts.Origins = 3
+	snap.RequestComparison.AI.Counts = readmodel.FunnelCounts{Origins: 3, Requested: 3}
 	r := &funnelReaderMock{}
 	r.On("Read", mock.Anything, mock.Anything).Return(snap, nil).Once()
 	got, err := operation.NewFunnelService(r, inboxFixedClock{time.Now()}).Query(context.Background(), operation.FunnelQuery{})
@@ -140,4 +150,7 @@ func TestFunnelDistinguishesNoDenominatorFromZeroAdvance(t *testing.T) {
 	require.Nil(t, got.AI.Stages[2].ConversionHundredths)
 	require.EqualValues(t, 0, *got.AI.GlobalCompletionConversionHundredths)
 	require.Nil(t, got.Manual.GlobalCompletionConversionHundredths)
+	require.EqualValues(t, 0, *got.RequestComparison.AI.Stages[1].ConversionHundredths)
+	require.EqualValues(t, 0, *got.RequestComparison.AI.GlobalCompletionConversionHundredths)
+	require.Nil(t, got.RequestComparison.Manual.GlobalCompletionConversionHundredths)
 }

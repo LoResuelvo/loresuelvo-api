@@ -2,7 +2,13 @@ package readmodel
 
 import "time"
 
-type FunnelSnapshot struct{ AI, Manual FunnelCohortSnapshot }
+type FunnelSnapshot struct {
+	AI, Manual        FunnelCohortSnapshot
+	RequestComparison FunnelRequestComparisonSnapshot
+}
+type FunnelRequestComparisonSnapshot struct {
+	AI, Manual FunnelCohortSnapshot
+}
 type FunnelCohortSnapshot struct {
 	Counts FunnelCounts
 	Delays FunnelDelayTotals
@@ -21,7 +27,9 @@ type FunnelMetrics struct {
 	TimeZone, Rounding   string
 	DecimalPlaces        int
 	AI, Manual           FunnelCohort
+	RequestComparison    FunnelRequestComparison
 }
+type FunnelRequestComparison struct{ AI, Manual FunnelCohort }
 type FunnelCohort struct {
 	Stages                               []FunnelStageMetric
 	GlobalCompletionConversionHundredths *int64
