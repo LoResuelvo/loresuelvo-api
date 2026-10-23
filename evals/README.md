@@ -53,6 +53,10 @@ primero previsualización offline, luego smoke independiente autorizado e inspec
 y sólo después autorización separada de la campaña. Versionar el protocolo no
 inicia llamadas ni aprueba respuestas.
 
+Los [resultados publicados de Campaña 1](campaigns/campaign-1/README.md) y su
+[diagnóstico técnico](analysis/campaign-1-diagnosis.md) registran la medición y
+fundamentan los cambios propuestos para PD, RK y SM.
+
 ## Ejecución manual
 
 Desde la raíz del repositorio, sin credenciales ni llamadas al proveedor:
