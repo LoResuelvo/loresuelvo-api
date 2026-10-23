@@ -27,17 +27,17 @@
       },
       "metrics": {
         "accepted_outcome_accuracy": {
-          "observations": 99,
-          "evaluated_base_cases": 33,
-          "base_case_mean": 0.98989898989899,
+          "observations": 102,
+          "evaluated_base_cases": 34,
+          "base_case_mean": 0.9607843137254902,
           "minimum_observation": 0,
           "maximum_observation": 1
         },
         "category_accuracy_when_required": {
-          "observations": 60,
-          "evaluated_base_cases": 20,
-          "base_case_mean": 1,
-          "minimum_observation": 1,
+          "observations": 63,
+          "evaluated_base_cases": 21,
+          "base_case_mean": 0.9523809523809523,
+          "minimum_observation": 0,
           "maximum_observation": 1
         },
         "ndcg_at_3": {
@@ -138,17 +138,17 @@
           },
           "metrics": {
             "accepted_outcome_accuracy": {
-              "observations": 99,
-              "evaluated_base_cases": 33,
-              "base_case_mean": 0.98989898989899,
+              "observations": 102,
+              "evaluated_base_cases": 34,
+              "base_case_mean": 0.9607843137254902,
               "minimum_observation": 0,
               "maximum_observation": 1
             },
             "category_accuracy_when_required": {
-              "observations": 60,
-              "evaluated_base_cases": 20,
-              "base_case_mean": 1,
-              "minimum_observation": 1,
+              "observations": 63,
+              "evaluated_base_cases": 21,
+              "base_case_mean": 0.9523809523809523,
+              "minimum_observation": 0,
               "maximum_observation": 1
             }
           },
@@ -384,16 +384,16 @@
       },
       "metrics": {
         "accepted_outcome_accuracy": {
-          "observations": 99,
-          "evaluated_base_cases": 33,
-          "base_case_mean": 0.9494949494949495,
+          "observations": 102,
+          "evaluated_base_cases": 34,
+          "base_case_mean": 0.9215686274509803,
           "minimum_observation": 0,
           "maximum_observation": 1
         },
         "category_accuracy_when_required": {
-          "observations": 60,
-          "evaluated_base_cases": 20,
-          "base_case_mean": 0.9666666666666667,
+          "observations": 63,
+          "evaluated_base_cases": 21,
+          "base_case_mean": 0.9206349206349206,
           "minimum_observation": 0,
           "maximum_observation": 1
         },
@@ -495,16 +495,16 @@
           },
           "metrics": {
             "accepted_outcome_accuracy": {
-              "observations": 99,
-              "evaluated_base_cases": 33,
-              "base_case_mean": 0.9494949494949495,
+              "observations": 102,
+              "evaluated_base_cases": 34,
+              "base_case_mean": 0.9215686274509803,
               "minimum_observation": 0,
               "maximum_observation": 1
             },
             "category_accuracy_when_required": {
-              "observations": 60,
-              "evaluated_base_cases": 20,
-              "base_case_mean": 0.9666666666666667,
+              "observations": 63,
+              "evaluated_base_cases": 21,
+              "base_case_mean": 0.9206349206349206,
               "minimum_observation": 0,
               "maximum_observation": 1
             }
@@ -745,16 +745,16 @@
       },
       "metrics": {
         "accepted_outcome_accuracy": {
-          "observations": 198,
-          "evaluated_base_cases": 33,
-          "base_case_mean": 0.9696969696969697,
+          "observations": 204,
+          "evaluated_base_cases": 34,
+          "base_case_mean": 0.9411764705882353,
           "minimum_observation": 0,
           "maximum_observation": 1
         },
         "category_accuracy_when_required": {
-          "observations": 120,
-          "evaluated_base_cases": 20,
-          "base_case_mean": 0.9833333333333334,
+          "observations": 126,
+          "evaluated_base_cases": 21,
+          "base_case_mean": 0.9365079365079365,
           "minimum_observation": 0,
           "maximum_observation": 1
         }
@@ -995,16 +995,16 @@
     },
     "metrics": {
       "accepted_outcome_accuracy": {
-        "observations": 198,
-        "evaluated_base_cases": 33,
-        "base_case_mean": 0.9696969696969697,
+        "observations": 204,
+        "evaluated_base_cases": 34,
+        "base_case_mean": 0.9411764705882353,
         "minimum_observation": 0,
         "maximum_observation": 1
       },
       "category_accuracy_when_required": {
-        "observations": 120,
-        "evaluated_base_cases": 20,
-        "base_case_mean": 0.9833333333333334,
+        "observations": 126,
+        "evaluated_base_cases": 21,
+        "base_case_mean": 0.9365079365079365,
         "minimum_observation": 0,
         "maximum_observation": 1
       },
