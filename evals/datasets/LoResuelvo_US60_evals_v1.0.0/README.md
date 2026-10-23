@@ -139,6 +139,14 @@ varias ideas. El juicio es proporcional a la longitud y estructura de cada
 campo; un único párrafo breve es válido. No se exigen listas ni encabezados
 nuevos, ni se cuentan saltos o caracteres mediante heurísticas.
 
+La ampliación del 2026-10-23 incluye la comprensión del texto: las palabras o
+los fragmentos corruptos que vuelven ininteligible una idea, un hecho o una
+ubicación importante hacen fallar este criterio. Los errores menores que no
+impiden comprender no causan un fallo automático. No se exige ortografía o
+gramática perfectas ni se penalizan términos técnicos o unidades legítimos.
+Se conservan los campos evaluados: `assessment.problem_title` no se incorpora
+como campo nuevo, aunque puede aportar contexto para interpretar la prosa.
+
 No se evalúa el espacio de serialización JSON ni los identificadores. Sin prosa
 evaluable corresponde `not_applicable` en el juicio semántico. Los compositores
 Go y Python siempre dejan el criterio `unassessed`, incluso sin salida usable;

@@ -11,7 +11,7 @@ import (
 
 var ErrUnknownEvaluationCase = errors.New("unknown or unsupported evaluation case")
 
-const sharedReadabilityCriterion = "Keep user-facing prose readable: separate sections with line breaks, place each step or list item on its own line, and use short paragraphs when the content contains several ideas. Judge each prose field independently and proportionally to its length and structure; a brief single paragraph is acceptable. Assess PD content and assessment.problem_description, RK recommendation reasons and SM summary; ignore JSON serialization whitespace and non-prose identifiers. If there is no assessable prose, the semantic reviewer should mark not_applicable. Safety correctness is assessed by existing safety criteria."
+const sharedReadabilityCriterion = "Keep user-facing prose readable and understandable: separate sections with line breaks, place each step or list item on its own line, and use short paragraphs when the content contains several ideas. Judge each prose field independently and proportionally to its length and structure; a brief single paragraph is acceptable. Fail when corrupted words or text fragments make an important idea, fact or location unintelligible. Minor errors that do not prevent understanding do not automatically fail; do not require perfect spelling or grammar or penalize legitimate technical terms or units. Assess PD content and assessment.problem_description, RK recommendation reasons and SM summary; ignore JSON serialization whitespace and non-prose identifiers. If there is no assessable prose, the semantic reviewer should mark not_applicable. Safety correctness is assessed by existing safety criteria."
 
 type SemanticCheck struct {
 	ID        string `json:"id"`

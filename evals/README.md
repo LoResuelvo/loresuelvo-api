@@ -140,7 +140,13 @@ El criterio compartido `shared_readability` (`minor`) evalúa semánticamente la
 legibilidad en PD, RK y SM: saltos entre secciones, cada paso o elemento de lista
 en su propia línea y párrafos breves cuando el contenido contiene varias ideas.
 Se juzga cada campo de prosa por separado y proporcionalmente: un párrafo breve
-es válido. No considera espacios del JSON ni identificadores. Sin prosa evaluable,
+es válido. La ampliación del 2026-10-23 incluye la comprensión: las palabras o
+los fragmentos corruptos que vuelven ininteligible una idea, un hecho o una
+ubicación importante hacen fallar el criterio. Los errores menores que permiten
+comprender no fallan automáticamente; no se exige ortografía o gramática
+perfectas ni se penalizan términos técnicos o unidades legítimos. Se mantienen
+los campos evaluados, sin añadir `assessment.problem_title`. No considera espacios
+del JSON ni identificadores. Sin prosa evaluable,
 el revisor puede marcar `not_applicable`; Go y Python lo dejan `unassessed` hasta
 ese juicio, también ante salidas ausentes. No sustituye los criterios de seguridad.
 Ver [alcance y política](datasets/LoResuelvo_US60_evals_v1.0.0/README.md#legibilidad-compartida--2026-10-19).
