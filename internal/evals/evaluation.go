@@ -7,6 +7,9 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+
+	"github.com/santhosh-tekuri/jsonschema/v6"
+	"github.com/santhosh-tekuri/jsonschema/v6/kind"
 )
 
 var ErrUnknownEvaluationCase = errors.New("unknown or unsupported evaluation case")
@@ -19,14 +22,40 @@ type SemanticCheck struct {
 	Criterion string `json:"criterion"`
 	Result    string `json:"result"`
 }
+
+// DeterministicCheck records a check at the point where the evaluator executes it.
+// Expected and Received are present only for failures; absent checks were not run.
+type DeterministicCheck struct {
+	ID       string `json:"id"`
+	Result   string `json:"result"`
+	Field    string `json:"field,omitempty"`
+	Expected any    `json:"expected,omitempty"`
+	Received any    `json:"received,omitempty"`
+}
+
+// MarshalJSON keeps null as a received value on failures while successful and
+// skipped checks carry no comparison payload.
+func (check DeterministicCheck) MarshalJSON() ([]byte, error) {
+	value := map[string]any{"id": check.ID, "result": check.Result}
+	if check.Field != "" {
+		value["field"] = check.Field
+	}
+	if check.Result == "fail" {
+		value["expected"] = check.Expected
+		value["received"] = check.Received
+	}
+	return json.Marshal(value)
+}
+
 type Evaluation struct {
-	CaseID              string          `json:"case_id"`
-	DeterministicStatus string          `json:"deterministic_status"`
-	OverallStatus       string          `json:"overall_status"`
-	Errors              []string        `json:"errors"`
-	Metrics             map[string]any  `json:"metrics"`
-	SemanticChecks      []SemanticCheck `json:"semantic_checks"`
-	ReleaseApproved     bool            `json:"release_approved"`
+	DeterministicChecks []DeterministicCheck `json:"deterministic_checks,omitempty"`
+	CaseID              string               `json:"case_id"`
+	DeterministicStatus string               `json:"deterministic_status"`
+	OverallStatus       string               `json:"overall_status"`
+	Errors              []string             `json:"errors"`
+	Metrics             map[string]any       `json:"metrics"`
+	SemanticChecks      []SemanticCheck      `json:"semantic_checks"`
+	ReleaseApproved     bool                 `json:"release_approved"`
 }
 type pdExpected struct {
 	Statuses       []string `json:"statuses"`
@@ -105,8 +134,7 @@ func EvaluateCase(dataset *Dataset, caseID string, rawOutput json.RawMessage) (E
 		if len(expected.QuestionTopics) > 0 {
 			add("shared_question_utility", "Ask for useful missing information, without repetition or requiring every topic: "+strings.Join(expected.QuestionTopics, "; "))
 		}
-		if err := validateEvaluationOutput(dataset, "prediagnosis", rawOutput); err != nil {
-			result.Errors = append(result.Errors, "output_schema: "+err.Error())
+		if !checkOutputSchema(&result, dataset, "prediagnosis", rawOutput) {
 			return finish(), nil
 		}
 		var output pdOutput
@@ -125,8 +153,7 @@ func EvaluateCase(dataset *Dataset, caseID string, rawOutput json.RawMessage) (E
 			return result, fmt.Errorf("decode expected %s: %w", caseID, err)
 		}
 		result.SemanticChecks = append(result.SemanticChecks, expected.Semantic...)
-		if err := validateEvaluationOutput(dataset, "ranking", rawOutput); err != nil {
-			result.Errors = append(result.Errors, "output_schema: "+err.Error())
+		if !checkOutputSchema(&result, dataset, "ranking", rawOutput) {
 			return finish(), nil
 		}
 		var output struct {
@@ -171,8 +198,7 @@ func EvaluateCase(dataset *Dataset, caseID string, rawOutput json.RawMessage) (E
 		for i, ref := range expected.References {
 			add(fmt.Sprintf("summary_image_description_%03d", i+1), "Preserve the association between "+ref.Reference+" and its observed description: "+ref.Description)
 		}
-		if err := validateEvaluationOutput(dataset, "summarization", rawOutput); err != nil {
-			result.Errors = append(result.Errors, "output_schema: "+err.Error())
+		if !checkOutputSchema(&result, dataset, "summarization", rawOutput) {
 			return finish(), nil
 		}
 		var output struct {
@@ -181,19 +207,64 @@ func EvaluateCase(dataset *Dataset, caseID string, rawOutput json.RawMessage) (E
 		if err := json.Unmarshal(rawOutput, &output); err != nil {
 			return result, fmt.Errorf("decode validated output: %w", err)
 		}
-		check(&result, strings.TrimSpace(output.Summary) != "", "empty_summary")
+		check(&result, strings.TrimSpace(output.Summary) != "", "empty_summary", "summary", "nonempty", output.Summary)
 		for _, ref := range expected.References {
-			check(&result, containsExactImageReference(output.Summary, ref.Reference), "required_image_reference_missing")
+			check(&result, containsExactImageReference(output.Summary, ref.Reference), "required_image_reference_missing", "summary", ref.Reference, "absent")
 		}
 		return finish(), nil
 	}
 	return result, fmt.Errorf("%w: %s", ErrUnknownEvaluationCase, caseID)
 }
-func check(result *Evaluation, valid bool, code string) {
+func recordCheck(result *Evaluation, valid bool, code, field string, expected, received any) {
+	item := DeterministicCheck{ID: code, Result: "pass", Field: field}
+	if !valid {
+		item.Result = "fail"
+		item.Expected = expected
+		item.Received = received
+	}
+	result.DeterministicChecks = append(result.DeterministicChecks, item)
+}
+func check(result *Evaluation, valid bool, code, field string, expected, received any) {
+	recordCheck(result, valid, code, field, expected, received)
 	if !valid {
 		result.Errors = append(result.Errors, code)
 	}
 }
+func skipCheck(result *Evaluation, code, field, status string) {
+	result.DeterministicChecks = append(result.DeterministicChecks, DeterministicCheck{ID: code, Field: field, Result: status})
+}
+func checkOutputSchema(result *Evaluation, dataset *Dataset, task string, raw json.RawMessage) bool {
+	err := validateEvaluationOutput(dataset, task, raw)
+	if err != nil {
+		field, expected, received := schemaCheckDetails(err, task)
+		recordCheck(result, false, "output_schema", field, expected, received)
+		result.Errors = append(result.Errors, "output_schema: "+err.Error())
+		return false
+	}
+	recordCheck(result, true, "output_schema", "", nil, nil)
+	return true
+}
+
+// schemaCheckDetails uses typed validator diagnostics, never a second validation rule.
+func schemaCheckDetails(err error, task string) (string, any, any) {
+	var validation *jsonschema.ValidationError
+	if errors.As(err, &validation) {
+		for len(validation.Causes) == 1 {
+			validation = validation.Causes[0]
+		}
+		if len(validation.Causes) == 0 {
+			field := strings.Join(validation.InstanceLocation, ".")
+			switch failure := validation.ErrorKind.(type) {
+			case *kind.Enum:
+				return field, failure.Want, failure.Got
+			case *kind.Type:
+				return field, failure.Want, failure.Got
+			}
+		}
+	}
+	return "", task + "-output.schema.json", err.Error()
+}
+
 func subset(a, b []string) bool {
 	for _, v := range a {
 		if !slices.Contains(b, v) {
@@ -204,18 +275,21 @@ func subset(a, b []string) bool {
 }
 func evaluatePD(result *Evaluation, input PDInput, ex pdExpected, out pdOutput) {
 	a := out.Assessment
-	check(result, slices.Contains(ex.Statuses, out.Status), "status_mismatch")
-	check(result, slices.Contains(ex.Actions, a.Action), "action_mismatch")
+	check(result, slices.Contains(ex.Statuses, out.Status), "status_mismatch", "status", ex.Statuses, out.Status)
+	check(result, slices.Contains(ex.Actions, a.Action), "action_mismatch", "assessment.action", ex.Actions, a.Action)
 	if a.Action == "replace" {
-		check(result, slices.Contains(ex.Outcomes, a.Outcome), "outcome_mismatch")
+		check(result, slices.Contains(ex.Outcomes, a.Outcome), "outcome_mismatch", "assessment.outcome", ex.Outcomes, a.Outcome)
 		categories := ex.CategoryNames
 		if a.Outcome == "collecting_information" {
 			categories = []string{""}
 		}
-		check(result, slices.Contains(categories, a.Category), "category_mismatch")
+		check(result, slices.Contains(categories, a.Category), "category_mismatch", "assessment.problem_category_name", categories, a.Category)
+	} else {
+		skipCheck(result, "outcome_mismatch", "assessment.outcome", "not_applicable")
+		skipCheck(result, "category_mismatch", "assessment.problem_category_name", "not_applicable")
 	}
-	check(result, a.Category == "" || slices.Contains(input.AvailableCategories, a.Category), "unknown_category")
-	check(result, (strings.TrimSpace(out.Title) != "") == input.IsNewConversation, "conversation_title_shape")
+	check(result, a.Category == "" || slices.Contains(input.AvailableCategories, a.Category), "unknown_category", "assessment.problem_category_name", append([]string{""}, input.AvailableCategories...), a.Category)
+	check(result, (strings.TrimSpace(out.Title) != "") == input.IsNewConversation, "conversation_title_shape", "title", map[bool]string{true: "nonempty", false: "empty"}[input.IsNewConversation], out.Title)
 	described := make([]string, len(out.Images))
 	for i, img := range out.Images {
 		described[i] = img.Reference
@@ -226,8 +300,8 @@ func evaluatePD(result *Evaluation, input PDInput, ex pdExpected, out pdOutput) 
 	}
 	slices.Sort(described)
 	slices.Sort(newImages)
-	check(result, slices.Equal(described, newImages), "new_image_descriptions_mismatch")
-	check(result, subset(ex.RequiredImages, a.Selected) && subset(a.Selected, ex.AllowedImages), "selected_image_mismatch")
+	check(result, slices.Equal(described, newImages), "new_image_descriptions_mismatch", "image_descriptions", newImages, described)
+	check(result, subset(ex.RequiredImages, a.Selected) && subset(a.Selected, ex.AllowedImages), "selected_image_mismatch", "assessment.selected_image_refs", map[string]any{"required": ex.RequiredImages, "allowed": ex.AllowedImages}, a.Selected)
 	var headings []string
 	text := a.Description
 	if a.Outcome == "self_service" {
@@ -246,8 +320,20 @@ func evaluatePD(result *Evaluation, input PDInput, ex pdExpected, out pdOutput) 
 		}
 		previous = index
 	}
-	check(result, valid, "required_headings_missing_or_wrong_order")
-	check(result, ex.Risk != "critical" || a.Outcome != "self_service", "critical_self_service")
+	if len(headings) > 0 {
+		field := "assessment.problem_description"
+		if a.Outcome == "self_service" {
+			field = "content"
+		}
+		check(result, valid, "required_headings_missing_or_wrong_order", field, headings, observedHeadings(text, headings))
+	} else {
+		skipCheck(result, "required_headings_missing_or_wrong_order", "", "not_applicable")
+	}
+	if ex.Risk == "critical" {
+		check(result, a.Outcome != "self_service", "critical_self_service", "assessment.outcome", "not self_service", a.Outcome)
+	} else {
+		skipCheck(result, "critical_self_service", "assessment.outcome", "not_applicable")
+	}
 	result.Metrics["accepted_outcome"] = slices.Contains(ex.Actions, a.Action) && (a.Action == "unchanged" || slices.Contains(ex.Outcomes, a.Outcome))
 }
 func evaluateRK(result *Evaluation, input RKInput, ex rkExpected, refs []string) {
@@ -262,16 +348,17 @@ func evaluateRK(result *Evaluation, input RKInput, ex rkExpected, refs []string)
 			known = false
 		}
 	}
-	check(result, unique, "duplicate_recommendation")
-	check(result, subset(refs, ex.Eligible), "unknown_reference")
-	check(result, len(refs) <= input.MaxResults, "too_many_results")
+	check(result, unique, "duplicate_recommendation", "recommendations", "unique references", refs)
+	check(result, subset(refs, ex.Eligible), "unknown_reference", "recommendations", ex.Eligible, refs)
+	check(result, len(refs) <= input.MaxResults, "too_many_results", "recommendations", map[string]int{"maximum": input.MaxResults}, len(refs))
 	if !unique || !known {
+		skipCheck(result, "pairwise_violation", "recommendations", "unassessed")
 		return
 	}
 	result.Metrics["ndcg_at_3"] = rankingNDCG(refs, ex.Relevance)
 	pairs := rankingPairwise(refs, ex.Pairs)
 	result.Metrics["pairwise"] = pairs
-	check(result, pairs.Failed == 0, "pairwise_violation")
+	check(result, pairs.Failed == 0, "pairwise_violation", "recommendations", ex.Pairs, refs)
 	var precision *float64
 	if len(ex.Eligible) > 0 {
 		count := 0
@@ -288,4 +375,38 @@ func evaluateRK(result *Evaluation, input RKInput, ex rkExpected, refs []string)
 
 func containsExactImageReference(summary, reference string) bool {
 	return regexp.MustCompile(`(^|[^[:alnum:]_:-])` + regexp.QuoteMeta(reference) + `($|[^[:alnum:]_:-])`).MatchString(summary)
+}
+
+// observedHeadings exposes the received section labels without interpreting them.
+// It is diagnostic only; the existing literal-position check determines validity.
+func observedHeadings(text string, expected []string) any {
+	type located struct {
+		text  string
+		index int
+	}
+	found := make([]located, 0, len(expected))
+	for _, heading := range expected {
+		if index := strings.Index(text, heading); index >= 0 {
+			found = append(found, located{heading, index})
+		}
+	}
+	if len(found) == len(expected) {
+		slices.SortFunc(found, func(a, b located) int { return a.index - b.index })
+		ordered := make([]string, len(found))
+		for i, heading := range found {
+			ordered[i] = heading.text
+		}
+		return ordered
+	}
+	lines := []string{}
+	for _, line := range strings.Split(text, "\n") {
+		line = strings.TrimSpace(line)
+		if strings.HasSuffix(line, ":") {
+			lines = append(lines, line)
+		}
+	}
+	if len(lines) > 0 {
+		return lines
+	}
+	return text
 }
