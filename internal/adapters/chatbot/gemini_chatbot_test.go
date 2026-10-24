@@ -132,6 +132,28 @@ func TestAnswerPromptBoundsInformationCollection(t *testing.T) {
 	assert.Contains(t, prompt, "avanzá declarando la incertidumbre restante")
 }
 
+func TestAnswerPromptUsesOnlyDomainOutcomesInItsOutcomeInstructions(t *testing.T) {
+	prompt := (&GeminiChatbot{}).answerPrompt(conversation.ChatbotHomeProblemQuestion{}, nil)
+	_, section, found := strings.Cut(prompt, "Resultados de evaluación:\n")
+	require.True(t, found)
+	section, _, found = strings.Cut(section, "\n\nPuerta de suficiencia:")
+	require.True(t, found)
+	var outcomes []string
+	for line := range strings.SplitSeq(section, "\n") {
+		if !strings.HasPrefix(line, "- ") {
+			continue
+		}
+		outcome, _, found := strings.Cut(strings.TrimPrefix(line, "- "), ":")
+		require.True(t, found)
+		outcomes = append(outcomes, outcome)
+	}
+	assert.ElementsMatch(t, []string{
+		string(conversation.AssessmentCollectingInformation),
+		string(conversation.AssessmentSelfService),
+		string(conversation.AssessmentProfessionalRequired),
+	}, outcomes)
+}
+
 func TestAnswerPromptRequiresActionableSelfServiceGuide(t *testing.T) {
 	prompt := (&GeminiChatbot{}).answerPrompt(
 		conversation.ChatbotHomeProblemQuestion{UserMessage: "La canilla tiene el aireador tapado."},

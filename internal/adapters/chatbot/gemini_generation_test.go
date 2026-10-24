@@ -99,6 +99,37 @@ func TestOperationSchemasConstrainTheirOwnResponseShape(t *testing.T) {
 	assert.NotContains(t, rankingProperties, "assessment")
 }
 
+func TestAnswerRequestMapsConversationStateBeforeConsumerText(t *testing.T) {
+	for _, isNew := range []bool{false, true} {
+		t.Run(fmt.Sprintf("new_%t", isNew), func(t *testing.T) {
+			transport := &generationTransportMock{}
+			transport.On("RoundTrip", mock.Anything).Run(func(args mock.Arguments) {
+				request := args.Get(0).(*http.Request)
+				var body struct {
+					Contents []struct {
+						Parts []struct {
+							Text string `json:"text"`
+						} `json:"parts"`
+					} `json:"contents"`
+				}
+				require.NoError(t, json.NewDecoder(request.Body).Decode(&body))
+				require.NotEmpty(t, body.Contents)
+				require.NotEmpty(t, body.Contents[0].Parts)
+				_, input, found := strings.Cut(body.Contents[0].Parts[0].Text, "\nEntrada:\n")
+				require.True(t, found)
+				assert.True(t, strings.HasPrefix(input, fmt.Sprintf("Conversación nueva: %t\n\nMensaje actual del consumidor:\nmensaje de prueba", isNew)))
+			}).Return(&http.Response{StatusCode: 200, Header: make(http.Header), Body: io.NopCloser(strings.NewReader(`{"candidates":[{"content":{"parts":[{"text":"invalid JSON"}]}}]}`))}, nil).Once()
+			bot := NewGeminiChatbot("model", "key")
+			bot.client = &http.Client{Transport: transport}
+
+			_, err := bot.AnswerHomeProblemQuestion(context.Background(), conversation.ChatbotHomeProblemQuestion{UserMessage: "mensaje de prueba", IsNewConversation: isNew}, nil)
+
+			require.Error(t, err)
+			transport.AssertExpectations(t)
+		})
+	}
+}
+
 func TestGeminiGenerationObserverPreservesRequestForEachOperation(t *testing.T) {
 	operations := map[string]func(*GeminiChatbot) error{
 		"answer": func(bot *GeminiChatbot) error {
@@ -143,7 +174,8 @@ func TestCurrentPromptsRemainSharedWithCurrentSchemas(t *testing.T) {
 	answer := bot.answerPrompt(conversation.ChatbotHomeProblemQuestion{UserMessage: "Pierde agua", IsNewConversation: true}, []category.Category{{Name: "Plomería"}})
 	ranking, err := bot.providerRankingPrompt(conversation.ProviderRankingRequest{ProblemTitle: "Pérdida", ProblemDescription: "Gotea", MaxResults: 3})
 	require.NoError(t, err)
-	require.Equal(t, "cffc1fc79d0195e1b9cadf9d920e59eea72118f5dc4be6b571f713130b1a3ff3", fmt.Sprintf("%x", sha256.Sum256([]byte(answer))))
+	require.Equal(t, "9efc66c0a15865b67aa82a8847c964535996aa1791c59098783b8e9804432920", fmt.Sprintf("%x", sha256.Sum256([]byte(answer))))
 	require.Equal(t, "a532596fb91aa7891923e2c5fbbd49a635e30b38c24c9f152ed6c48a4d2e8259", fmt.Sprintf("%x", sha256.Sum256([]byte(ranking))))
+	require.Equal(t, "2251f7f31b089245573918eaa153ccbedfb8287fd7574a279a61285988c9a632", fmt.Sprintf("%x", sha256.Sum256([]byte(bot.summaryPrompt("", nil)))))
 	require.NotNil(t, bot.generationConfig(summaryResponseJSONSchema()).ResponseJsonSchema)
 }
