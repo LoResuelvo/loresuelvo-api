@@ -82,13 +82,8 @@ func (category *Category) Edit(edit Edit, hasOngoingOrders bool) (bool, error) {
 	if edit.Enabled != nil {
 		next.Enabled = *edit.Enabled
 	}
-	if next.Enabled != category.Enabled {
-		if _, err := audit.NewReason(edit.Reason); err != nil {
-			return false, ErrInvalidReason
-		}
-		if !next.Enabled && hasOngoingOrders && !edit.ConfirmOngoingOrders {
-			return false, ErrConfirmationRequired
-		}
+	if category.Enabled && !next.Enabled && hasOngoingOrders && !edit.ConfirmOngoingOrders {
+		return false, ErrConfirmationRequired
 	}
 	if next.Name == category.Name && next.Enabled == category.Enabled {
 		return false, nil

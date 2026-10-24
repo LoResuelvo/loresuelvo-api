@@ -55,7 +55,7 @@ func newReviewTransactionFixture(t *testing.T, reviewed bool) reviewTransactionF
 }
 
 func hideReviewInput(version int) workorder.ModerationInput {
-	return workorder.ModerationInput{Action: "hide", Category: "abusive_language", Reason: "Verified content", ExpectedVersion: version}
+	return workorder.ModerationInput{Action: "hide", Category: "abusive_language", ExpectedVersion: version}
 }
 
 // waitForReviewLock verifies real PostgreSQL blocking instead of assuming a scheduler delay.

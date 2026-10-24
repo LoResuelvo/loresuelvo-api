@@ -188,9 +188,9 @@ func TestEditCategoryAuditsCombinedEditOnceWithoutNameHistory(t *testing.T) {
 	expected := &category.Category{ID: 17, Name: "Instalaciones", NormalizedName: "instalaciones", Enabled: false, Version: 2}
 	store.On("SaveCategory", mock.Anything, *expected).Return(expected, nil).Once()
 	store.On("SaveAuditEvent", mock.Anything, mock.MatchedBy(func(event *audit.Event) bool {
-		return event.Action() == audit.ActionExecute && event.ResourceID() == "17" && event.OperatorID() == 31 && event.Reason().Text() == "Retirar oferta" && event.StateChange().Field() == "enabled" && event.StateChange().From() == "enabled" && event.StateChange().To() == "disabled"
+		return event.Action() == audit.ActionExecute && event.ResourceID() == "17" && event.OperatorID() == 31 && event.Reason() == nil && event.StateChange().Field() == "enabled" && event.StateChange().From() == "enabled" && event.StateChange().To() == "disabled"
 	})).Return(nil).Once()
-	result, err := service.EditCategory(context.Background(), 17, category.Edit{ExpectedVersion: 1, Name: new("Instalaciones"), Enabled: new(false), Reason: "Retirar oferta"}, "auth0|supervisor", "request-123")
+	result, err := service.EditCategory(context.Background(), 17, category.Edit{ExpectedVersion: 1, Name: new("Instalaciones"), Enabled: new(false)}, "auth0|supervisor", "request-123")
 	require.NoError(t, err)
 	assert.Equal(t, expected, result)
 	store.AssertExpectations(t)

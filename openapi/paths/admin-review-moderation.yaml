@@ -12,8 +12,9 @@ post:
     a hidden review, records the hiding decision it reverses, and does not
     reopen a previously handled report. Changing visibility never alters the
     rating or reputation aggregates; hiding only restricts review text in
-    ordinary projections. Every action requires a nonblank, trimmed UTF-8
-    reason of at most 500 bytes and the current expected moderation version. A
+    ordinary projections. Every action requires the current expected moderation
+    version. A reason is optional; nonempty values must be printable trimmed
+    UTF-8 text of at most 500 bytes. A
     consumed/stale version or incompatible current state returns `409`; refresh
     the detail before retrying. A report received after the review was loaded is
     not handled automatically. Report intake remains the separate provider-only

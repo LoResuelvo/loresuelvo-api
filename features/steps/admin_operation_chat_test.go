@@ -226,7 +226,7 @@ func (suite *testSuite) operationChatAccessPersisted(email, requestLabel, conver
 		if err != nil {
 			return err
 		}
-		if persisted == nil || persisted.ConversationID() == nil || *persisted.ConversationID() != suite.operationChat.conversations[conversationLabel] || persisted.Reason() == nil || persisted.Reason().Text() != reason || persisted.OccurredOn().IsZero() || persisted.Action() != audit.ActionAccess {
+		if persisted == nil || persisted.ConversationID() == nil || *persisted.ConversationID() != suite.operationChat.conversations[conversationLabel] || persisted.Reason().Text() != reason || persisted.OccurredOn().IsZero() || persisted.Action() != audit.ActionAccess {
 			return fmt.Errorf("incorrect persisted chat access evidence")
 		}
 		suite.operationChat.event = persisted

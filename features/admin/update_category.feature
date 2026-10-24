@@ -46,17 +46,16 @@ Feature: Editar, desactivar y reactivar rubros
             Then el sistema rechaza la edición con estado 409 porque la versión del rubro cambió
             And el rubro conserva el nombre "Instalaciones sanitarias" y sólo registra el cambio efectivo
 
-    Rule: Deshabilitar y reactivar requiere motivo y conserva las operaciones existentes
+    Rule: Deshabilitar y reactivar conserva las operaciones existentes
 
         Background:
             Given que estoy autenticado como administrador "supervisor@example.com" con el permiso "write:categories"
 
-        Scenario: 38.2.6-CR Rechazar un cambio de estado sin motivo
+        Scenario: 38.2.6-CR Cambiar el estado sin motivo
             Given que existe el rubro habilitado "Plomería"
             When intento deshabilitar el rubro "Plomería" con la versión actual y sin motivo
-            Then el sistema rechaza el cambio con estado 400
-            And el rubro permanece habilitado con la misma versión
-            And no queda registrado un evento exitoso de edición de esta solicitud
+            Then el sistema devuelve el mismo rubro deshabilitado con su nueva versión
+            And queda registrado un único evento para esta solicitud, correspondiente a la desactivación de este rubro por "supervisor@example.com" con el motivo "" y los estados anterior habilitado y posterior deshabilitado
 
         Scenario: 38.2.7-CR Deshabilitar un rubro sin órdenes en curso
             Given que existe el rubro habilitado "Plomería" sin órdenes en curso

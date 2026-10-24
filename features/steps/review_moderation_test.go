@@ -300,7 +300,10 @@ func (s *testSuite) fixtureModeration(label, action, category, reason string, ve
 	return nil
 }
 func (s *testSuite) requestModeration(label, action, category, reason string, version int, report string) error {
-	body := map[string]any{"action": action, "reason": reason, "expected_version": version}
+	body := map[string]any{"action": action, "expected_version": version}
+	if reason != "" {
+		body["reason"] = reason
+	}
 	if category != "" {
 		body["category"] = category
 	}
@@ -323,8 +326,8 @@ func (s *testSuite) requestInvalidModeration(label, entry string) error {
 	switch {
 	case strings.Contains(entry, "repetitive_reporting"):
 		category = "repetitive_reporting"
-	case strings.Contains(entry, "motivo vacío"):
-		reason = ""
+	case strings.Contains(entry, "motivo en blanco"):
+		reason = "  "
 	case strings.Contains(entry, "500 bytes"):
 		reason = strings.Repeat("ñ", 251)
 	case strings.Contains(entry, "desestimar"):

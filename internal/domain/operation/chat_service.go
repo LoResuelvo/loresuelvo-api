@@ -43,9 +43,12 @@ func (service *ChatService) Query(ctx context.Context, rawID, authSubject, corre
 	if err := query.Validate(); err != nil {
 		return nil, err
 	}
-	reason, err := audit.NewReason(reasonText)
-	if err != nil {
-		return nil, fmt.Errorf("%w: %w", ErrInvalidChatReason, err)
+	var reason *audit.Reason
+	if reasonText != "" {
+		reason, err = audit.NewReason(reasonText)
+		if err != nil {
+			return nil, fmt.Errorf("%w: %w", ErrInvalidChatReason, err)
+		}
 	}
 	association, err := service.association.FindConversationAssociation(ctx, id)
 	if err != nil {

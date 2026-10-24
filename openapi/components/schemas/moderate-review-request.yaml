@@ -4,10 +4,10 @@ description: >-
   review. `dismiss_reports` requires that pending report ID, accepts a category
   only when omitted or empty, and does not change visibility. `unhide` accepts
   a category only when omitted or empty and rejects a report ID. Every action
-  requires the current expected version and a nonblank UTF-8 reason, trimmed by
-  the server and limited to 500 bytes after trimming. No additional properties
+  requires the current expected version. A supplied nonempty reason is trimmed
+  by the server and limited to 500 printable UTF-8 bytes. No additional properties
   are accepted.
-required: [action, reason, expected_version]
+required: [action, expected_version]
 properties:
   action:
     type: string
@@ -19,9 +19,8 @@ properties:
         const: ''
   reason:
     type: string
-    minLength: 1
     description: >-
-      Human-authored reason. Surrounding whitespace is trimmed; the remaining
+      Optional human-authored reason. When nonempty, Surrounding whitespace is trimmed; the remaining
       UTF-8 text must be nonempty, printable, and at most 500 bytes. The server
       records the reason in the restricted decision history.
   expected_version:

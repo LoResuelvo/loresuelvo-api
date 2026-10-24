@@ -34,7 +34,7 @@ properties:
     description: Present for a hide decision; null for other actions.
   reason:
     type: string
-    description: Trimmed administrative reason.
+    description: Trimmed administrative reason; empty when no reason was supplied.
   report_id:
     type: [integer, 'null']
     format: int32

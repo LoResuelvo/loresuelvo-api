@@ -22,13 +22,13 @@ properties:
     example: Instalaciones sanitarias
   enabled:
     type: boolean
-    description: Optional availability state. Effective changes require a reason.
+    description: Optional availability state. No reason is required.
     example: false
   reason:
     type: string
     description: >-
-      Optional human-authored reason. It is required for an effective enabled
-      state change and, when nonempty, is trimmed and must contain 1–500 bytes
+      Optional human-authored reason. When nonempty, it is trimmed and must
+      contain 1–500 bytes
       of printable UTF-8. The byte bound applies after trimming; this schema's
       string length is not an equivalent byte-count constraint.
     example: Retiro del rubro

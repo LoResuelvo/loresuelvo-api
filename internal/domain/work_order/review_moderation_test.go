@@ -89,11 +89,26 @@ func TestReviewModerationDismissDoesNotRestoreHiddenVisibility(t *testing.T) {
 	require.Equal(t, 9, review.HidingDecisionID())
 }
 func TestModerationInputNormalizesBoundedPrintableReason(t *testing.T) {
-	for _, reason := range []string{"", "  ", strings.Repeat("ñ", 251), "a\x00b", "line\nbreak", string([]byte{255})} {
+	for _, reason := range []string{"  ", strings.Repeat("ñ", 251), "a\x00b", "line\nbreak", string([]byte{255})} {
 		_, err := (workorder.ModerationInput{Action: "hide", Category: "personal_data", Reason: reason, ExpectedVersion: 1}).Normalize()
 		require.ErrorIs(t, err, workorder.ErrInvalidReviewModeration)
 	}
 	input, err := (workorder.ModerationInput{Action: "hide", Category: "personal_data", Reason: "  " + strings.Repeat("ñ", 250) + "  ", ExpectedVersion: 1}).Normalize()
 	require.NoError(t, err)
 	require.Len(t, input.Reason, 500)
+}
+
+func TestModerationAcceptsAllActionsWithoutReason(t *testing.T) {
+	for _, input := range []workorder.ModerationInput{
+		{Action: "hide", Category: "personal_data", ExpectedVersion: 1},
+		{Action: "unhide", ExpectedVersion: 1},
+		{Action: "dismiss_reports", ExpectedVersion: 1, ReportID: 4},
+	} {
+		normalized, err := input.Normalize()
+		require.NoError(t, err)
+		require.Empty(t, normalized.Reason)
+	}
+	decision, err := workorder.RestoreReviewDecision(1, 2, 3, 0, 0, "hide", "personal_data", "", time.Now())
+	require.NoError(t, err)
+	require.Empty(t, decision.Reason())
 }

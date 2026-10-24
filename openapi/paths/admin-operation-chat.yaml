@@ -9,9 +9,9 @@ get:
     proposal associated with a request remains in its jr operation; later
     proposals use sp identities and may share the same complete conversation.
     Messages are not attributed exclusively to the selected proposal.
-    Every page requires authorization and the X-Audit-Reason header. The UI
-    may ask for the reason once on entry and resend it automatically on each
-    page. One access/prepared event is saved before delivery or generation of
+    Every page requires authorization. The optional X-Audit-Reason header
+    supports callers that supply a reason. One access/prepared event is saved
+    automatically before delivery or generation of
     private attachment access URLs. Prepared does not prove client receipt.
     Audit failure returns 500 without messages or signed attachment access.
     Only attachments owned by delivered messages and their persisted sender
@@ -33,9 +33,9 @@ get:
     example: sp-42
   - name: X-Audit-Reason
     in: header
-    required: true
+    required: false
     description: >-
-      Human-authored reason required for each page. Unicode surrounding
+      Optional human-authored reason. When nonempty, Unicode surrounding
       whitespace is trimmed; the result must be nonempty valid UTF-8, contain
       no Unicode control characters, and occupy 1–500 UTF-8 bytes. Do not
       include messages, credentials or signed URLs. OpenAPI maxLength counts
@@ -43,7 +43,6 @@ get:
       here rather than represented as an inaccurate raw-header maxLength.
     schema:
       type: string
-      minLength: 1
     example: Investigate support incident 123
   - name: X-Request-ID
     in: header
@@ -117,7 +116,7 @@ get:
                 messages: []
                 next_cursor: null
     '400':
-      description: Invalid operation ID, missing/invalid reason, or invalid/duplicated/unknown query parameter or cursor binding.
+      description: Invalid operation ID, invalid supplied reason, or invalid/duplicated/unknown query parameter or cursor binding.
       headers:
         Cache-Control:
           schema: {type: string, const: 'private, no-store'}

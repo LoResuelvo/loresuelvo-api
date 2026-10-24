@@ -3014,7 +3014,7 @@
                 ],
                 "operationId": "getAdminOperationChat",
                 "summary": "Get an audited page of an operation's private conversation",
-                "description": "Requires `read:admin_chat_audit`, independently of `read:admin_operations`. Resolves the persisted work conversation and participants from a stable operation ID, never from a caller-selected conversation ID. The first proposal associated with a request remains in its jr operation; later proposals use sp identities and may share the same complete conversation. Messages are not attributed exclusively to the selected proposal. Every page requires authorization and the X-Audit-Reason header. The UI may ask for the reason once on entry and resend it automatically on each page. One access/prepared event is saved before delivery or generation of private attachment access URLs. Prepared does not prove client receipt. Audit failure returns 500 without messages or signed attachment access. Only attachments owned by delivered messages and their persisted sender are considered; confirmed/private/purpose media policy is enforced. No participant membership, conversation state or realtime subscription is changed. This is chronological keyset pagination, not a frozen snapshot. Unknown or duplicated query parameters are rejected. A GET body cannot supply the reason. All route responses use Cache-Control: private, no-store.",
+                "description": "Requires `read:admin_chat_audit`, independently of `read:admin_operations`. Resolves the persisted work conversation and participants from a stable operation ID, never from a caller-selected conversation ID. The first proposal associated with a request remains in its jr operation; later proposals use sp identities and may share the same complete conversation. Messages are not attributed exclusively to the selected proposal. Every page requires authorization. The optional X-Audit-Reason header supports callers that supply a reason. One access/prepared event is saved automatically before delivery or generation of private attachment access URLs. Prepared does not prove client receipt. Audit failure returns 500 without messages or signed attachment access. Only attachments owned by delivered messages and their persisted sender are considered; confirmed/private/purpose media policy is enforced. No participant membership, conversation state or realtime subscription is changed. This is chronological keyset pagination, not a frozen snapshot. Unknown or duplicated query parameters are rejected. A GET body cannot supply the reason. All route responses use Cache-Control: private, no-store.",
                 "security": [
                     {
                         "BearerAuth": []
@@ -3035,11 +3035,10 @@
                     {
                         "name": "X-Audit-Reason",
                         "in": "header",
-                        "required": true,
-                        "description": "Human-authored reason required for each page. Unicode surrounding whitespace is trimmed; the result must be nonempty valid UTF-8, contain no Unicode control characters, and occupy 1–500 UTF-8 bytes. Do not include messages, credentials or signed URLs. OpenAPI maxLength counts characters, not trimmed UTF-8 bytes, so that runtime limit is documented here rather than represented as an inaccurate raw-header maxLength.",
+                        "required": false,
+                        "description": "Optional human-authored reason. When nonempty, Unicode surrounding whitespace is trimmed; the result must be nonempty valid UTF-8, contain no Unicode control characters, and occupy 1–500 UTF-8 bytes. Do not include messages, credentials or signed URLs. OpenAPI maxLength counts characters, not trimmed UTF-8 bytes, so that runtime limit is documented here rather than represented as an inaccurate raw-header maxLength.",
                         "schema": {
-                            "type": "string",
-                            "minLength": 1
+                            "type": "string"
                         },
                         "example": "Investigate support incident 123"
                     },
@@ -3146,7 +3145,7 @@
                         }
                     },
                     "400": {
-                        "description": "Invalid operation ID, missing/invalid reason, or invalid/duplicated/unknown query parameter or cursor binding.",
+                        "description": "Invalid operation ID, invalid supplied reason, or invalid/duplicated/unknown query parameter or cursor binding.",
                         "headers": {
                             "Cache-Control": {
                                 "schema": {
@@ -5364,7 +5363,7 @@
                 ],
                 "operationId": "moderateAdminReview",
                 "summary": "Change review visibility or handle its pending report",
-                "description": "Records one moderation decision for the review identified by its work-order ID. Requires `write:admin_reviews`. `hide` requires one supported category and may optionally identify that review's pending report; without a report ID it hides the review directly. `dismiss_reports` requires the pending report ID for this review and leaves visibility unchanged. `unhide` restores a hidden review, records the hiding decision it reverses, and does not reopen a previously handled report. Changing visibility never alters the rating or reputation aggregates; hiding only restricts review text in ordinary projections. Every action requires a nonblank, trimmed UTF-8 reason of at most 500 bytes and the current expected moderation version. A consumed/stale version or incompatible current state returns `409`; refresh the detail before retrying. A report received after the review was loaded is not handled automatically. Report intake remains the separate provider-only work-order report endpoint. Request bodies and reasons are not copied into technical logs. Responses use `Cache-Control: private, no-store`.",
+                "description": "Records one moderation decision for the review identified by its work-order ID. Requires `write:admin_reviews`. `hide` requires one supported category and may optionally identify that review's pending report; without a report ID it hides the review directly. `dismiss_reports` requires the pending report ID for this review and leaves visibility unchanged. `unhide` restores a hidden review, records the hiding decision it reverses, and does not reopen a previously handled report. Changing visibility never alters the rating or reputation aggregates; hiding only restricts review text in ordinary projections. Every action requires the current expected moderation version. A reason is optional; nonempty values must be printable trimmed UTF-8 text of at most 500 bytes. A consumed/stale version or incompatible current state returns `409`; refresh the detail before retrying. A report received after the review was loaded is not handled automatically. Report intake remains the separate provider-only work-order report endpoint. Request bodies and reasons are not copied into technical logs. Responses use `Cache-Control: private, no-store`.",
                 "security": [
                     {
                         "BearerAuth": []
@@ -13295,7 +13294,7 @@
                     },
                     "reason": {
                         "type": "string",
-                        "description": "Trimmed administrative reason."
+                        "description": "Trimmed administrative reason; empty when no reason was supplied."
                     },
                     "report_id": {
                         "type": [
@@ -13325,10 +13324,9 @@
             },
             "ModerateReviewRequest": {
                 "type": "object",
-                "description": "`hide` requires a category and may include the pending report ID for this review. `dismiss_reports` requires that pending report ID, accepts a category only when omitted or empty, and does not change visibility. `unhide` accepts a category only when omitted or empty and rejects a report ID. Every action requires the current expected version and a nonblank UTF-8 reason, trimmed by the server and limited to 500 bytes after trimming. No additional properties are accepted.",
+                "description": "`hide` requires a category and may include the pending report ID for this review. `dismiss_reports` requires that pending report ID, accepts a category only when omitted or empty, and does not change visibility. `unhide` accepts a category only when omitted or empty and rejects a report ID. Every action requires the current expected version. A supplied nonempty reason is trimmed by the server and limited to 500 printable UTF-8 bytes. No additional properties are accepted.",
                 "required": [
                     "action",
-                    "reason",
                     "expected_version"
                 ],
                 "properties": {
@@ -13353,8 +13351,7 @@
                     },
                     "reason": {
                         "type": "string",
-                        "minLength": 1,
-                        "description": "Human-authored reason. Surrounding whitespace is trimmed; the remaining UTF-8 text must be nonempty, printable, and at most 500 bytes. The server records the reason in the restricted decision history."
+                        "description": "Optional human-authored reason. When nonempty, Surrounding whitespace is trimmed; the remaining UTF-8 text must be nonempty, printable, and at most 500 bytes. The server records the reason in the restricted decision history."
                     },
                     "expected_version": {
                         "type": "integer",
@@ -23049,12 +23046,12 @@
                     },
                     "enabled": {
                         "type": "boolean",
-                        "description": "Optional availability state. Effective changes require a reason.",
+                        "description": "Optional availability state. No reason is required.",
                         "example": false
                     },
                     "reason": {
                         "type": "string",
-                        "description": "Optional human-authored reason. It is required for an effective enabled state change and, when nonempty, is trimmed and must contain 1–500 bytes of printable UTF-8. The byte bound applies after trimming; this schema's string length is not an equivalent byte-count constraint.",
+                        "description": "Optional human-authored reason. When nonempty, it is trimmed and must contain 1–500 bytes of printable UTF-8. The byte bound applies after trimming; this schema's string length is not an equivalent byte-count constraint.",
                         "example": "Retiro del rubro"
                     },
                     "confirm_ongoing_orders": {

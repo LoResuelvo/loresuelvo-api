@@ -146,7 +146,10 @@ func (s *testSuite) categorySetEnabled(name string, enabled bool, reason string,
 	if err != nil {
 		return err
 	}
-	payload := map[string]any{"enabled": enabled, "reason": reason, "expected_version": found.Version, "confirm_ongoing_orders": confirmed}
+	payload := map[string]any{"enabled": enabled, "expected_version": found.Version, "confirm_ongoing_orders": confirmed}
+	if reason != "" {
+		payload["reason"] = reason
+	}
 	if next != "" {
 		payload["name"] = next
 	}
@@ -286,7 +289,7 @@ func (s *testSuite) categoryEditAudit(kind, email, reason string) error {
 	if err != nil {
 		return err
 	}
-	if event.OperatorID() != operator || event.ResourceType() != "category" || event.ResourceID() != strconv.Itoa(s.categoryAdministration.selected) || event.Action() != audit.ActionExecute || event.Result() != audit.ResultSucceeded || event.Reason() == nil || event.Reason().Text() != reason || event.CorrelationID() != s.adminRequest.headers.Get("X-Request-ID") {
+	if event.OperatorID() != operator || event.ResourceType() != "category" || event.ResourceID() != strconv.Itoa(s.categoryAdministration.selected) || event.Action() != audit.ActionExecute || event.Result() != audit.ResultSucceeded || event.Reason().Text() != reason || event.CorrelationID() != s.adminRequest.headers.Get("X-Request-ID") {
 		return fmt.Errorf("category edit audit mismatch")
 	}
 	total, err := testsupport.OperationDetailAuditCorrelationCount(s.scenarioContext, s.database, event.CorrelationID())

@@ -1,6 +1,6 @@
-Feature: Consultar el chat de una contratación con justificación auditada
+Feature: Consultar el chat de una contratación con registro automático
     Como operador de soporte autorizado
-    quiero consultar la conversación vinculada a una contratación después de justificar el acceso
+    quiero consultar la conversación vinculada a una contratación con acceso autorizado
     para investigar un incidente sin habilitar la lectura indiscriminada de mensajes privados
 
     Background:
@@ -55,7 +55,7 @@ Feature: Consultar el chat de una contratación con justificación auditada
             Then el sistema responde con estado 400
             And la respuesta no contiene mensajes ni URLs de adjuntos de "C2"
 
-    Rule: Cada página exige autorización y auditoría independientes y una justificación válida
+    Rule: Cada página exige autorización y auditoría independientes
 
         Scenario: 64.2.5-CO Limitar la primera página sin descargar el historial completo
             Given que "C1" contiene los siguientes mensajes persistidos en el orden indicado, con IDs crecientes:
@@ -79,15 +79,23 @@ Feature: Consultar el chat de una contratación con justificación auditada
             And la página contiene sólo "M3" y no tiene cursor siguiente
             And quedan persistidos dos eventos de acceso distintos, ambos con el motivo "Revisar página inicial" reutilizado y con las correlaciones "request-chat-page-1" y "request-chat-page-2" respectivamente
 
-        Scenario Outline: 64.2.6-CO Rechazar un motivo ausente, blanco o excesivo
+        Scenario Outline: Consultar el chat sin proporcionar una justificación
+            When intento consultar el chat administrativo de "S1" con <motivo>
+            Then el sistema responde con estado 200
+            And antes de entregar los mensajes queda persistido un evento de acceso con operador "soporte@example.com", operación "S1", conversación "C1", motivo "", fecha, resultado y correlación "request-chat-without-reason"
+
+            Examples:
+                | motivo |
+                | la cabecera X-Audit-Reason ausente |
+                | la cabecera X-Audit-Reason en blanco |
+
+        Scenario Outline: 64.2.6-CO Rechazar un motivo excesivo
             When intento consultar el chat administrativo de "S1" con <motivo>
             Then el sistema responde con estado 400
             And la respuesta no contiene mensajes ni URLs de adjuntos
 
             Examples:
                 | motivo                              |
-                | la cabecera X-Audit-Reason ausente |
-                | la cabecera X-Audit-Reason en blanco |
                 | una cabecera X-Audit-Reason que supera la longitud máxima documentada |
 
         Scenario Outline: 64.2.7-CO Rechazar límites y cursores inválidos para una operación existente

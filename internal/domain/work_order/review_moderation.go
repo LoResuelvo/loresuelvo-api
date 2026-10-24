@@ -15,11 +15,16 @@ type ModerationInput struct {
 }
 
 func (input ModerationInput) Normalize() (ModerationInput, error) {
-	reason, err := audit.NewReason(input.Reason)
-	if err != nil || input.ExpectedVersion <= 0 || input.ReportID < 0 {
+	if input.ExpectedVersion <= 0 || input.ReportID < 0 {
 		return ModerationInput{}, ErrInvalidReviewModeration
 	}
-	input.Reason = reason.Text()
+	if input.Reason != "" {
+		reason, err := audit.NewReason(input.Reason)
+		if err != nil {
+			return ModerationInput{}, ErrInvalidReviewModeration
+		}
+		input.Reason = reason.Text()
+	}
 	switch input.Action {
 	case "hide":
 		if !validReviewReportCategory(input.Category) {

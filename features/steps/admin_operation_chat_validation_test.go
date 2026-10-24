@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/operation"
+	"github.com/LoResuelvo/loresuelvo-api/internal/testsupport"
 	"github.com/cucumber/godog"
 )
 
@@ -38,7 +39,11 @@ func (suite *testSuite) queryOperationChatWithReasonHeader(label string, reason 
 	if err != nil {
 		return err
 	}
-	return suite.sendOperationChatGetWithAuditReason(operationID, "", nil, reason)
+	const correlation = "request-chat-without-reason"
+	if err := testsupport.ResetOperationDetailAuditCorrelation(suite.scenarioContext, suite.database, correlation); err != nil {
+		return err
+	}
+	return suite.sendOperationChatGetWithAuditReason(operationID, correlation, nil, reason)
 }
 func (suite *testSuite) persistedOperationChatRequestID(label string) (string, error) {
 	request, ok := suite.operationInbox.requests[label]

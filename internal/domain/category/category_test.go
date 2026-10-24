@@ -97,3 +97,14 @@ func TestCategoryEditValidatesReasonAndBusinessFields(t *testing.T) {
 		assert.Equal(t, 1, current.Version)
 	}
 }
+
+func TestCategoryAvailabilityChangesWithoutReason(t *testing.T) {
+	current, err := category.New("Plomería")
+	assert.NoError(t, err)
+	for _, enabled := range []bool{false, true} {
+		changed, err := current.Edit(category.Edit{ExpectedVersion: current.Version, Enabled: &enabled}, false)
+		assert.NoError(t, err)
+		assert.True(t, changed)
+		assert.Equal(t, enabled, current.Enabled)
+	}
+}

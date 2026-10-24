@@ -8,7 +8,7 @@ Feature: Moderar la visibilidad de una reseña
         And existe un prestador registrado con correo "juan@example.com"
         And que existe un administrador provisionado con correo "operador@example.com", nombre "Sofía" y apellido "López"
 
-    Rule: Cada decisión identifica su motivo y los reportes que atiende
+    Rule: Cada decisión identifica los reportes que atiende
 
         Scenario: 69.6-MR Ocultar una reseña atendiendo su reporte pendiente
             Given que la fecha y hora actual del sistema es "2026-09-25T12:00:00Z"
@@ -32,7 +32,7 @@ Feature: Moderar la visibilidad de una reseña
 
             Examples:
                 | categoria          | motivo                                    |
-                | abusive_language   | El comentario contiene lenguaje abusivo  |
+                | abusive_language   |                                           |
                 | personal_data      | El comentario publica un dato personal    |
                 | spam_advertising   | El comentario incluye publicidad ajena    |
                 | unrelated_content  | El comentario no trata sobre el servicio  |
@@ -74,7 +74,7 @@ Feature: Moderar la visibilidad de una reseña
             Examples:
                 | entrada                                                                   |
                 | la categoría de ocultación "repetitive_reporting"                         |
-                | el motivo vacío al ocultar con categoría "personal_data" y versión 1       |
+                | el motivo en blanco al ocultar con categoría "personal_data" y versión 1 |
                 | el motivo que excede 500 bytes UTF-8 al ocultar con categoría "personal_data" y versión 1 |
                 | desestimar sin identificar reportes, con versión 1                           |
 
