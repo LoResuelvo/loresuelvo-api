@@ -33,7 +33,9 @@ type AdminPage struct {
 }
 type AdminDetail struct {
 	GetResult
+	ClaimantName  string
 	ClaimantEmail string
+	Respondent    readmodel.AdminIdentity
 	CategoryID    *int
 	CategoryName  *string
 }

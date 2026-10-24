@@ -24,6 +24,9 @@ type paymentResponse struct {
 	WorkOrderID       *int                  `json:"work_order_id"`
 	ConsumerID        int                   `json:"consumer_id"`
 	ProviderID        int                   `json:"provider_id"`
+	ConsumerName      string                `json:"consumer_name"`
+	ProviderName      string                `json:"provider_name"`
+	OperationID       string                `json:"operation_id"`
 	Purpose           string                `json:"purpose"`
 	IntentStatus      string                `json:"intent_status"`
 	Currency          string                `json:"currency"`
@@ -119,6 +122,7 @@ func paymentResponseFromModel(item readmodel.AdminPayment) paymentResponse {
 	return paymentResponse{
 		ID: item.ID, ServiceProposalID: item.ServiceProposalID, WorkOrderID: item.WorkOrderID,
 		ConsumerID: item.ConsumerID, ProviderID: item.ProviderID,
+		ConsumerName: item.ConsumerName, ProviderName: item.ProviderName, OperationID: item.OperationID,
 		Purpose: item.Purpose, IntentStatus: item.IntentStatus, Currency: item.Currency,
 		SellerAmountCents: item.SellerAmountCents, PlatformFeeCents: item.PlatformFeeCents,
 		TotalAmountCents: item.TotalAmountCents, CreatedOn: item.CreatedOn.UTC(), UpdatedOn: item.UpdatedOn.UTC(),

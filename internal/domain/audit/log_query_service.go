@@ -12,14 +12,15 @@ const defaultLogQueryLimit = 20
 
 // LogQueryService coordinates a read and its append-only access evidence.
 type LogQueryService struct {
-	reader      LogReader
-	writer      Writer
-	operatorIDs OperatorIDFinder
-	clock       clock.Clock
+	reader        LogReader
+	writer        Writer
+	operatorNames OperatorNameFinder
+	operatorIDs   OperatorIDFinder
+	clock         clock.Clock
 }
 
-func NewLogQueryService(reader LogReader, writer Writer, operatorIDs OperatorIDFinder, clock clock.Clock) *LogQueryService {
-	return &LogQueryService{reader: reader, writer: writer, operatorIDs: operatorIDs, clock: clock}
+func NewLogQueryService(reader LogReader, writer Writer, operatorIDs OperatorIDFinder, operatorNames OperatorNameFinder, clock clock.Clock) *LogQueryService {
+	return &LogQueryService{reader: reader, writer: writer, operatorIDs: operatorIDs, operatorNames: operatorNames, clock: clock}
 }
 
 // Query reads before appending access evidence, so this request never observes
@@ -55,6 +56,21 @@ func (service *LogQueryService) Query(ctx context.Context, authSubject, correlat
 		page.Events = page.Events[:limit]
 		last := page.Events[limit-1]
 		page.Next = &LogPosition{OccurredOn: last.OccurredOn(), ID: last.ID()}
+	}
+
+	if len(page.Events) > 0 {
+		ids := make([]int, 0, len(page.Events))
+		seen := make(map[int]bool)
+		for _, event := range page.Events {
+			if id := event.OperatorID(); !seen[id] {
+				ids = append(ids, id)
+				seen[id] = true
+			}
+		}
+		page.OperatorNames, err = service.operatorNames.FindNamesByIDs(ctx, ids)
+		if err != nil {
+			return LogPage{}, fmt.Errorf("reading audit operator names: %w", err)
+		}
 	}
 
 	access, err := NewEvent(EventParams{

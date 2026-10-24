@@ -1,6 +1,7 @@
 package claim_handler
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"log/slog"
@@ -10,6 +11,7 @@ import (
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/http/middleware"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/claim"
+	claimmodel "github.com/LoResuelvo/loresuelvo-api/internal/domain/claim/read_model"
 	filedomain "github.com/LoResuelvo/loresuelvo-api/internal/domain/file"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -81,5 +83,56 @@ func TestAdministrativeDetailUnavailableLinkedEvidenceRemainsServerError(t *test
 	router.ServeHTTP(response, req)
 	require.Equal(t, 500, response.Code)
 	require.JSONEq(t, `{"error":"internal server error"}`, response.Body.String())
+	service.AssertExpectations(t)
+}
+
+func TestAdministrativeClaimListIncludesClaimantName(t *testing.T) {
+	service := new(adminServiceMock)
+	service.On("List", mock.Anything, mock.Anything).Return(&claim.AdminPage{Claims: []claimmodel.AdminClaimSummary{{
+		ClaimSummary:  claimmodel.ClaimSummary{ID: 1},
+		ClaimantID:    12,
+		ClaimantParty: "consumer",
+		ClaimantName:  "Ana Perez",
+		ClaimantEmail: "ana@example.com",
+	}}}, nil).Once()
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	router.Use(func(c *gin.Context) { c.Set(middleware.ContextKeyUserID, "admin") })
+	router.GET("/admin/claims", NewAdminHandler(service).List)
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, httptest.NewRequest("GET", "/admin/claims", nil))
+
+	require.Equal(t, 200, response.Code, response.Body.String())
+	var body struct {
+		Items []map[string]json.RawMessage `json:"items"`
+	}
+	require.NoError(t, json.Unmarshal(response.Body.Bytes(), &body))
+	require.Len(t, body.Items, 1)
+	require.JSONEq(t, `"Ana Perez"`, string(body.Items[0]["claimant_name"]))
+	service.AssertExpectations(t)
+}
+
+func TestAdministrativeClaimDetailIncludesClaimantAndRespondentIdentity(t *testing.T) {
+	service := new(adminServiceMock)
+	service.On("Get", mock.Anything, "admin", 1, "claim-identity-correlation").Return(&claim.AdminDetail{
+		GetResult:     claim.GetResult{Claim: &claim.Claim{ID: 1, ClaimantID: 12, ClaimantParty: claim.PartyConsumer}},
+		ClaimantName:  "Ana Perez",
+		ClaimantEmail: "ana@example.com",
+		Respondent:    claimmodel.AdminIdentity{ID: 34, Party: "provider", Name: "Juan Gomez", Email: "juan@example.com"},
+	}, nil).Once()
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	router.Use(middleware.RequestLogger(slog.New(slog.NewTextHandler(io.Discard, nil))), func(c *gin.Context) { c.Set(middleware.ContextKeyUserID, "admin") })
+	router.GET("/admin/claims/:id", NewAdminHandler(service).Get)
+	request := httptest.NewRequest("GET", "/admin/claims/1", nil)
+	request.Header.Set("X-Request-ID", "claim-identity-correlation")
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, request)
+
+	require.Equal(t, 200, response.Code, response.Body.String())
+	var body map[string]json.RawMessage
+	require.NoError(t, json.Unmarshal(response.Body.Bytes(), &body))
+	require.JSONEq(t, `{"id":12,"party":"consumer","name":"Ana Perez","email":"ana@example.com"}`, string(body["claimant"]))
+	require.JSONEq(t, `{"id":34,"party":"provider","name":"Juan Gomez","email":"juan@example.com"}`, string(body["respondent"]))
 	service.AssertExpectations(t)
 }

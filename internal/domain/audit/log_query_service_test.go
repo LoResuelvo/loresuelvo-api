@@ -22,8 +22,12 @@ func queryEvent(t *testing.T, at time.Time) *audit.Event {
 func TestLogQueryServiceCapturesCutReadsAndAuditsBeforeReturning(t *testing.T) {
 	ctx := context.Background()
 	now := time.Date(2026, 9, 23, 12, 0, 0, 0, time.UTC)
-	first, second, third := queryEvent(t, now), queryEvent(t, now.Add(-time.Hour)), queryEvent(t, now.Add(-2*time.Hour))
+	first, second := queryEvent(t, now), queryEvent(t, now.Add(-time.Hour))
+	third, err := audit.NewEvent(audit.EventParams{ID: uuid.New(), OperatorID: 99, Action: audit.ActionCreate, ResourceType: "category", ResourceID: "17", OccurredOn: now.Add(-2 * time.Hour), Result: audit.ResultSucceeded, CorrelationID: "lookahead-request"})
+	require.NoError(t, err)
 	reader, writer, finder := &logReaderMock{}, &auditWriterMock{}, &auditOperatorIDFinderMock{}
+	names := &operatorNameFinderMock{}
+	names.On("FindNamesByIDs", ctx, []int{7}).Return(map[int]string{7: "Sofía López"}, nil).Once()
 	sequence := []string{}
 	finder.On("FindOperatorIDByAuthID", ctx, "actor").Return(23, nil).Once()
 	reader.On("CaptureWatermark", ctx).Run(func(mock.Arguments) { sequence = append(sequence, "cut") }).Return(int64(50), nil).Once()
@@ -32,10 +36,12 @@ func TestLogQueryServiceCapturesCutReadsAndAuditsBeforeReturning(t *testing.T) {
 		return event != nil && event.OperatorID() == 23 && event.Action() == audit.ActionAccess && event.ResourceType() == "audit_log" && event.ResourceID() == "" && event.Result() == audit.ResultPrepared && event.CorrelationID() == "request-audit" && event.OccurredOn().Equal(now) && event.Reason() == nil
 	})).Run(func(mock.Arguments) { sequence = append(sequence, "save") }).Return(nil).Once()
 
-	page, err := audit.NewLogQueryService(reader, writer, finder, auditFixedClock{now}).Query(ctx, "actor", "request-audit", audit.LogQuery{Limit: 2})
+	page, err := audit.NewLogQueryService(reader, writer, finder, names, auditFixedClock{now}).Query(ctx, "actor", "request-audit", audit.LogQuery{Limit: 2})
 	require.NoError(t, err)
 	require.Equal(t, []string{"cut", "read", "save"}, sequence)
 	require.Equal(t, []*audit.Event{first, second}, page.Events)
+	require.Equal(t, "Sofía López", page.OperatorNames[7])
+	names.AssertExpectations(t)
 	require.Equal(t, int64(50), page.Watermark)
 	require.Equal(t, &audit.LogPosition{OccurredOn: second.OccurredOn(), ID: second.ID()}, page.Next)
 	reader.AssertExpectations(t)
@@ -51,7 +57,7 @@ func TestLogQueryServiceContinuesWithoutCapturingAnotherCut(t *testing.T) {
 	finder.On("FindOperatorIDByAuthID", ctx, "actor").Return(23, nil).Once()
 	reader.On("FindPage", ctx, audit.LogFilter{}, watermark, before, 21).Return(nil, nil).Once()
 	writer.On("Save", ctx, mock.Anything).Return(nil).Once()
-	page, err := audit.NewLogQueryService(reader, writer, finder, auditFixedClock{time.Now()}).Query(ctx, "actor", "request-audit", audit.LogQuery{Watermark: &watermark, Before: before})
+	page, err := audit.NewLogQueryService(reader, writer, finder, &operatorNameFinderMock{}, auditFixedClock{time.Now()}).Query(ctx, "actor", "request-audit", audit.LogQuery{Watermark: &watermark, Before: before})
 	require.NoError(t, err)
 	require.NotNil(t, page.Events)
 	require.Empty(t, page.Events)
@@ -61,7 +67,7 @@ func TestLogQueryServiceContinuesWithoutCapturingAnotherCut(t *testing.T) {
 
 func TestLogQueryServiceRejectsInvalidQueryBeforeIO(t *testing.T) {
 	reader, writer, finder := &logReaderMock{}, &auditWriterMock{}, &auditOperatorIDFinderMock{}
-	service := audit.NewLogQueryService(reader, writer, finder, auditFixedClock{time.Now()})
+	service := audit.NewLogQueryService(reader, writer, finder, &operatorNameFinderMock{}, auditFixedClock{time.Now()})
 	invalidOperator, negativeWatermark := 0, int64(-1)
 	for _, query := range []audit.LogQuery{
 		{Filter: audit.LogFilter{OperatorID: &invalidOperator}}, {Limit: 101}, {Limit: -1},
@@ -92,10 +98,12 @@ func TestLogQueryServiceFailsClosedOnReadAndWriteErrors(t *testing.T) {
 			finder.On("FindOperatorIDByAuthID", ctx, "actor").Return(23, nil).Once()
 			reader.On("CaptureWatermark", ctx).Return(int64(3), nil).Once()
 			reader.On("FindPage", ctx, audit.LogFilter{}, int64(3), (*audit.LogPosition)(nil), 21).Return([]*audit.Event{queryEvent(t, time.Now())}, tc.readErr).Once()
+			names := &operatorNameFinderMock{}
 			if tc.readErr == nil {
+				names.On("FindNamesByIDs", ctx, []int{7}).Return(map[int]string{}, nil).Once()
 				writer.On("Save", ctx, mock.Anything).Return(tc.writeErr).Once()
 			}
-			page, err := audit.NewLogQueryService(reader, writer, finder, auditFixedClock{time.Now()}).Query(ctx, "actor", "request-audit", audit.LogQuery{})
+			page, err := audit.NewLogQueryService(reader, writer, finder, names, auditFixedClock{time.Now()}).Query(ctx, "actor", "request-audit", audit.LogQuery{})
 			require.Nil(t, page.Events)
 			if tc.readErr != nil {
 				require.ErrorIs(t, err, tc.readErr)
@@ -113,7 +121,7 @@ func TestLogQueryServiceDoesNotReadWhenCutFails(t *testing.T) {
 	failure := errors.New("cut unavailable")
 	finder.On("FindOperatorIDByAuthID", ctx, "actor").Return(23, nil).Once()
 	reader.On("CaptureWatermark", ctx).Return(int64(0), failure).Once()
-	page, err := audit.NewLogQueryService(reader, writer, finder, auditFixedClock{time.Now()}).Query(ctx, "actor", "request-audit", audit.LogQuery{})
+	page, err := audit.NewLogQueryService(reader, writer, finder, &operatorNameFinderMock{}, auditFixedClock{time.Now()}).Query(ctx, "actor", "request-audit", audit.LogQuery{})
 	require.Nil(t, page.Events)
 	require.ErrorIs(t, err, failure)
 	reader.AssertNotCalled(t, "FindPage", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
@@ -125,7 +133,7 @@ func TestLogQueryServiceDoesNotReadWhenOperatorResolutionFails(t *testing.T) {
 	reader, writer, finder := &logReaderMock{}, &auditWriterMock{}, &auditOperatorIDFinderMock{}
 	failure := errors.New("operator lookup failed")
 	finder.On("FindOperatorIDByAuthID", ctx, "actor").Return(0, failure).Once()
-	page, err := audit.NewLogQueryService(reader, writer, finder, auditFixedClock{time.Now()}).Query(ctx, "actor", "request-audit", audit.LogQuery{})
+	page, err := audit.NewLogQueryService(reader, writer, finder, &operatorNameFinderMock{}, auditFixedClock{time.Now()}).Query(ctx, "actor", "request-audit", audit.LogQuery{})
 	require.Nil(t, page.Events)
 	require.ErrorIs(t, err, failure)
 	reader.AssertNotCalled(t, "CaptureWatermark", mock.Anything)
@@ -138,8 +146,23 @@ func TestLogQueryServiceDoesNotPersistInvalidAccessEvidence(t *testing.T) {
 	finder.On("FindOperatorIDByAuthID", ctx, "actor").Return(23, nil).Once()
 	reader.On("CaptureWatermark", ctx).Return(int64(3), nil).Once()
 	reader.On("FindPage", ctx, audit.LogFilter{}, int64(3), (*audit.LogPosition)(nil), 21).Return(nil, nil).Once()
-	page, err := audit.NewLogQueryService(reader, writer, finder, auditFixedClock{time.Now()}).Query(ctx, "actor", "invalid correlation with spaces", audit.LogQuery{})
+	page, err := audit.NewLogQueryService(reader, writer, finder, &operatorNameFinderMock{}, auditFixedClock{time.Now()}).Query(ctx, "actor", "invalid correlation with spaces", audit.LogQuery{})
 	require.Nil(t, page.Events)
 	require.ErrorIs(t, err, audit.ErrInvalidEvent)
 	writer.AssertNotCalled(t, "Save", mock.Anything, mock.Anything)
+}
+
+func TestLogQueryServiceFailsClosedWhenOperatorNamesCannotBeRead(t *testing.T) {
+	ctx := context.Background()
+	reader, writer, finder, names := &logReaderMock{}, &auditWriterMock{}, &auditOperatorIDFinderMock{}, &operatorNameFinderMock{}
+	failure := errors.New("directory unavailable")
+	finder.On("FindOperatorIDByAuthID", ctx, "actor").Return(23, nil).Once()
+	reader.On("CaptureWatermark", ctx).Return(int64(3), nil).Once()
+	reader.On("FindPage", ctx, audit.LogFilter{}, int64(3), (*audit.LogPosition)(nil), 21).Return([]*audit.Event{queryEvent(t, time.Now())}, nil).Once()
+	names.On("FindNamesByIDs", ctx, []int{7}).Return(nil, failure).Once()
+	page, err := audit.NewLogQueryService(reader, writer, finder, names, auditFixedClock{time.Now()}).Query(ctx, "actor", "request-audit", audit.LogQuery{})
+	require.ErrorIs(t, err, failure)
+	require.Nil(t, page.Events)
+	writer.AssertNotCalled(t, "Save", mock.Anything, mock.Anything)
+	names.AssertExpectations(t)
 }

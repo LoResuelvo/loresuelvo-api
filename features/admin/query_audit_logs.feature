@@ -19,7 +19,7 @@ Feature: Consultar el registro de auditoría administrativa
             When consulto el registro de auditoría administrativa para el operador "supervisor@example.com"
             Then el sistema responde con estado 200
             And la página contiene los eventos "B" y "A" en ese orden
-            And cada evento expone exactamente su identificador, referencia interna del operador, acción, tipo e ID de recurso, fecha UTC, resultado, correlación y motivo sólo cuando existe
+            And cada evento expone exactamente su identificador, referencia interna y nombre actual del operador, acción, tipo e ID de recurso, fecha UTC, resultado, correlación y motivo sólo cuando existe
             And el evento "B" informa el motivo "Revisión aprobada" y el evento "A" no informa motivo
             And la respuesta no expone credenciales, identificadores externos de autenticación, cuerpos HTTP, mensajes de chat, biometría ni URLs firmadas
             And la respuesta incluye la cabecera "Cache-Control" con valor "private, no-store"

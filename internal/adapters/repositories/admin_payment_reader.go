@@ -19,11 +19,23 @@ var _ payment.AdminPaymentReader = (*AdminPaymentReader)(nil)
 
 const adminPaymentIntentColumns = `pi.id::text,pi.service_proposal_id,pi.purpose,pi.status,pi.currency,
  pi.seller_amount_cents,pi.platform_fee_cents,pi.total_amount_cents,pi.created_on,pi.updated_on,
- sp.consumer_id,sp.provider_id,wo.id`
-const adminPaymentPageSQL = `SELECT ` + adminPaymentIntentColumns + `
+ sp.consumer_id,sp.provider_id,wo.id,
+ concat_ws(' ',NULLIF(BTRIM(consumer.name),''),NULLIF(BTRIM(consumer.surname),'')),
+ concat_ws(' ',NULLIF(BTRIM(provider.name),''),NULLIF(BTRIM(provider.surname),'')),
+ CASE WHEN jr.id IS NOT NULL AND first_proposal.id=sp.id THEN 'jr-' || jr.id::text ELSE 'sp-' || sp.id::text END`
+
+// This matches operationRootsSQL: the first proposal of a request keeps its job-request identity.
+const adminPaymentFirstProposalsSQL = `WITH first_proposals AS (
+ SELECT DISTINCT ON (conversation_id) conversation_id,id
+ FROM service_proposals ORDER BY conversation_id,id
+)
+`
+const adminPaymentPageSQL = adminPaymentFirstProposalsSQL + `SELECT ` + adminPaymentIntentColumns + `
  FROM payment_intents pi JOIN service_proposals sp ON sp.id=pi.service_proposal_id
  JOIN users consumer ON consumer.id=sp.consumer_id JOIN users provider ON provider.id=sp.provider_id
  LEFT JOIN work_orders wo ON wo.service_proposal_id=sp.id
+ LEFT JOIN job_requests jr ON jr.conversation_id=sp.conversation_id
+ LEFT JOIN first_proposals first_proposal ON first_proposal.conversation_id=sp.conversation_id
  WHERE ($1::uuid IS NULL OR pi.id=$1) AND ($2::uuid IS NULL OR pi.id=$2)
  AND ($3::text='' OR EXISTS(SELECT 1 FROM payment_transactions pt WHERE pt.payment_intent_id=pi.id AND pt.external_payment_id=$3))
  AND ($4::integer=0 OR sp.id=$4)
@@ -33,10 +45,13 @@ const adminPaymentPageSQL = `SELECT ` + adminPaymentIntentColumns + `
  AND ($9::timestamptz IS NULL OR pi.created_on >= $9) AND ($10::timestamptz IS NULL OR pi.created_on < $10)
  AND ($11::timestamptz IS NULL OR (pi.created_on,pi.id)<($11,$12::uuid))
  ORDER BY pi.created_on DESC,pi.id DESC LIMIT $13`
-const adminPaymentProposalsSQL = `SELECT ` + adminPaymentIntentColumns + `,sp.status,COALESCE(wo.status,''),sp.currency,sp.amount_cents,sp.deposit_cents,
+const adminPaymentProposalsSQL = adminPaymentFirstProposalsSQL + `SELECT ` + adminPaymentIntentColumns + `,sp.status,COALESCE(wo.status,''),sp.currency,sp.amount_cents,sp.deposit_cents,
  sp.platform_fee_total_cents,sp.platform_fee_due_now_cents,sp.booking_payment_deadline
  FROM payment_intents pi JOIN service_proposals sp ON sp.id=pi.service_proposal_id
  LEFT JOIN work_orders wo ON wo.service_proposal_id=sp.id
+ JOIN users consumer ON consumer.id=sp.consumer_id JOIN users provider ON provider.id=sp.provider_id
+ LEFT JOIN job_requests jr ON jr.conversation_id=sp.conversation_id
+ LEFT JOIN first_proposals first_proposal ON first_proposal.conversation_id=sp.conversation_id
  WHERE sp.id=ANY($1::integer[]) ORDER BY sp.id,pi.created_on DESC,pi.id DESC`
 const adminPaymentTransactionsSQL = `SELECT pt.id,pt.payment_intent_id::text,pt.processor,pt.external_payment_id,pt.status,pt.currency,
  pt.amount_cents,pt.verified_on,pt.created_on,pt.updated_on
@@ -165,7 +180,7 @@ func adminPaymentReadProposals(ctx context.Context, tx *sql.Tx, s *rm.AdminPayme
 	return nil
 }
 func adminPaymentScanArgs(p *rm.AdminPayment, order *sql.NullInt64) []any {
-	return []any{&p.ID, &p.ServiceProposalID, &p.Purpose, &p.IntentStatus, &p.Currency, &p.SellerAmountCents, &p.PlatformFeeCents, &p.TotalAmountCents, &p.CreatedOn, &p.UpdatedOn, &p.ConsumerID, &p.ProviderID, order}
+	return []any{&p.ID, &p.ServiceProposalID, &p.Purpose, &p.IntentStatus, &p.Currency, &p.SellerAmountCents, &p.PlatformFeeCents, &p.TotalAmountCents, &p.CreatedOn, &p.UpdatedOn, &p.ConsumerID, &p.ProviderID, order, &p.ConsumerName, &p.ProviderName, &p.OperationID}
 }
 func adminPaymentNormalize(p *rm.AdminPayment, order sql.NullInt64) {
 	p.CreatedOn = p.CreatedOn.UTC()

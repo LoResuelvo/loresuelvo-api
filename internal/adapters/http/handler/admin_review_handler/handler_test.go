@@ -82,11 +82,13 @@ func TestModerationReturnsOnlyDecisionConfirmation(t *testing.T) {
 
 func TestReviewListPassesBoundedPaginationAndOmitsOriginals(t *testing.T) {
 	service := new(serviceMock)
-	service.On("List", mock.Anything, workorder.ReviewListInput{ReviewPageInput: workorder.ReviewPageInput{Page: 2, Limit: 10}, Status: "hidden"}).Return(&workorder.AdminReviewPage{Page: 2, Limit: 10, Total: 11, Items: []readmodel.AdminReviewSummary{{WorkOrderID: 1, Rating: 5, Version: 2}}}, nil).Once()
+	service.On("List", mock.Anything, workorder.ReviewListInput{ReviewPageInput: workorder.ReviewPageInput{Page: 2, Limit: 10}, Status: "hidden"}).Return(&workorder.AdminReviewPage{Page: 2, Limit: 10, Total: 11, Items: []readmodel.AdminReviewSummary{{WorkOrderID: 1, ConsumerID: 2, ProviderID: 3, ConsumerName: "Ana Perez", ProviderName: "Juan Gomez", Rating: 5, Version: 2}}}, nil).Once()
 	response := httptest.NewRecorder()
 	newHandlerTestRouter(service).ServeHTTP(response, httptest.NewRequest("GET", "/admin/reviews?status=hidden&page=2&limit=10", nil))
 	require.Equal(t, 200, response.Code)
 	require.Contains(t, response.Body.String(), `"visibility":"hidden"`)
+	require.Contains(t, response.Body.String(), `"consumer_name":"Ana Perez"`)
+	require.Contains(t, response.Body.String(), `"provider_name":"Juan Gomez"`)
 	for _, restricted := range []string{"description", "reason", "explanation", "decisions"} {
 		require.NotContains(t, response.Body.String(), restricted)
 	}
@@ -97,13 +99,15 @@ func TestReviewDetailPassesDecisionPaginationAndServerIdentity(t *testing.T) {
 	service := new(serviceMock)
 	review, err := workorder.NewReview(5, "Restricted original")
 	require.NoError(t, err)
-	service.On("Get", mock.Anything, "admin", 1, workorder.ReviewPageInput{Page: 2, Limit: 10}, "http-test-correlation").Return(&workorder.AdminReviewDetail{Review: review, Page: 2, Limit: 10, Total: 21}, nil).Once()
+	service.On("Get", mock.Anything, "admin", 1, workorder.ReviewPageInput{Page: 2, Limit: 10}, "http-test-correlation").Return(&workorder.AdminReviewDetail{Summary: readmodel.AdminReviewSummary{WorkOrderID: 1, ConsumerID: 2, ProviderID: 3, ConsumerName: "Ana Perez", ProviderName: "Juan Gomez"}, Review: review, Page: 2, Limit: 10, Total: 21}, nil).Once()
 	request := httptest.NewRequest("GET", "/admin/reviews/1?decisions_page=2&decisions_limit=10", nil)
 	request.Header.Set("X-Request-ID", "http-test-correlation")
 	response := httptest.NewRecorder()
 	newHandlerTestRouter(service).ServeHTTP(response, request)
 	require.Equal(t, 200, response.Code)
 	require.Contains(t, response.Body.String(), `"description":"Restricted original"`)
+	require.Contains(t, response.Body.String(), `"consumer_name":"Ana Perez"`)
+	require.Contains(t, response.Body.String(), `"provider_name":"Juan Gomez"`)
 	require.Contains(t, response.Body.String(), `"has_more":true`)
 	service.AssertExpectations(t)
 }

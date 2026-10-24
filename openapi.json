@@ -13059,6 +13059,8 @@
                     "work_order_id",
                     "consumer_id",
                     "provider_id",
+                    "consumer_name",
+                    "provider_name",
                     "operation_id",
                     "rating",
                     "visibility",
@@ -13082,6 +13084,14 @@
                         "type": "integer",
                         "format": "int32",
                         "minimum": 1
+                    },
+                    "consumer_name": {
+                        "type": "string",
+                        "description": "Consumer display name, combining the name and surname."
+                    },
+                    "provider_name": {
+                        "type": "string",
+                        "description": "Provider display name, combining the name and surname."
                     },
                     "operation_id": {
                         "type": "string",
@@ -13538,6 +13548,7 @@
                 "required": [
                     "id",
                     "operator_id",
+                    "operator_name",
                     "action",
                     "resource_type",
                     "occurred_on",
@@ -13554,6 +13565,13 @@
                         "type": "integer",
                         "minimum": 1,
                         "description": "Internal user ID of the authenticated operator."
+                    },
+                    "operator_name": {
+                        "type": [
+                            "string",
+                            "null"
+                        ],
+                        "description": "Current operator display name, or null if unavailable. Informational enrichment; not a historical identity snapshot."
                     },
                     "action": {
                         "type": "string",
@@ -14856,6 +14874,9 @@
                     "work_order_id",
                     "consumer_id",
                     "provider_id",
+                    "consumer_name",
+                    "provider_name",
+                    "operation_id",
                     "purpose",
                     "intent_status",
                     "currency",
@@ -14897,6 +14918,19 @@
                         "type": "integer",
                         "minimum": 1,
                         "description": "Internal provider ID; email values are not exposed in result objects."
+                    },
+                    "consumer_name": {
+                        "type": "string",
+                        "description": "Consumer display name from the associated user record."
+                    },
+                    "provider_name": {
+                        "type": "string",
+                        "description": "Provider display name from the associated user record."
+                    },
+                    "operation_id": {
+                        "type": "string",
+                        "pattern": "^(jr|sp)-[1-9][0-9]*$",
+                        "description": "Canonical operation ID; the first proposal in a job-request conversation uses jr-{job_request_id}, and later proposals use sp-{service_proposal_id}."
                     },
                     "purpose": {
                         "type": "string",
@@ -20660,6 +20694,7 @@
                         "required": [
                             "claimant_id",
                             "claimant_party",
+                            "claimant_name",
                             "claimant_email",
                             "category_id",
                             "category_name",
@@ -20677,6 +20712,10 @@
                                     "consumer",
                                     "provider"
                                 ]
+                            },
+                            "claimant_name": {
+                                "type": "string",
+                                "description": "Claimant name and surname joined for display."
                             },
                             "claimant_email": {
                                 "type": "string",
@@ -20743,6 +20782,7 @@
                         "type": "object",
                         "required": [
                             "claimant",
+                            "respondent",
                             "category_id",
                             "category_name",
                             "actions"
@@ -20753,6 +20793,7 @@
                                 "required": [
                                     "id",
                                     "party",
+                                    "name",
                                     "email"
                                 ],
                                 "properties": {
@@ -20767,6 +20808,40 @@
                                             "consumer",
                                             "provider"
                                         ]
+                                    },
+                                    "name": {
+                                        "type": "string"
+                                    },
+                                    "email": {
+                                        "type": "string",
+                                        "format": "email"
+                                    }
+                                },
+                                "additionalProperties": false
+                            },
+                            "respondent": {
+                                "type": "object",
+                                "required": [
+                                    "id",
+                                    "party",
+                                    "name",
+                                    "email"
+                                ],
+                                "properties": {
+                                    "id": {
+                                        "type": "integer",
+                                        "format": "int32",
+                                        "minimum": 1
+                                    },
+                                    "party": {
+                                        "type": "string",
+                                        "enum": [
+                                            "consumer",
+                                            "provider"
+                                        ]
+                                    },
+                                    "name": {
+                                        "type": "string"
                                     },
                                     "email": {
                                         "type": "string",

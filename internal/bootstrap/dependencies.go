@@ -260,6 +260,7 @@ func newDependencies(database *sql.DB, adapters dependencyAdapters) (*Dependenci
 		persistence.AuditEventRepository,
 		persistence.AuditEventRepository,
 		persistence.UserRepository,
+		persistence.UserRepository,
 		systemClock,
 	)
 	auditLogHandler, err := audit_log_handler.NewHandler(auditLogQueryService, adapters.auditCursorSigningKey)

@@ -22,6 +22,16 @@ func (m *logReaderMock) FindPage(ctx context.Context, filter audit.LogFilter, wa
 	return nil, args.Error(1)
 }
 
+type operatorNameFinderMock struct{ mock.Mock }
+
+func (m *operatorNameFinderMock) FindNamesByIDs(ctx context.Context, ids []int) (map[int]string, error) {
+	args := m.Called(ctx, ids)
+	if names := args.Get(0); names != nil {
+		return names.(map[int]string), args.Error(1)
+	}
+	return nil, args.Error(1)
+}
+
 type auditWriterMock struct{ mock.Mock }
 
 func (m *auditWriterMock) Save(ctx context.Context, event *audit.Event) error {

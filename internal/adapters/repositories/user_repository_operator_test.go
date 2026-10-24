@@ -38,3 +38,23 @@ func TestFindOperatorIDByAuthIDPreservesMissingUserError(t *testing.T) {
 	assert.Zero(t, id)
 	assert.True(t, errors.Is(err, sql.ErrNoRows))
 }
+
+func TestFindNamesByIDsReturnsCurrentNamesAndOmitsMissingUsers(t *testing.T) {
+	_, _, _, database := newCategoryUnitOfWorkTest(t)
+	ctx := context.Background()
+	users := repositories.NewUserRepository(database)
+	operator, err := admin.NewAdmin("auth0|display-"+uuid.NewString(), "display-"+uuid.NewString()+"@example.com", "Sofía", "López", nil)
+	require.NoError(t, err)
+	saved, err := users.Save(ctx, operator)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		_, cleanupErr := database.ExecContext(context.Background(), `DELETE FROM users WHERE id=$1`, saved.ID())
+		require.NoError(t, cleanupErr)
+	})
+	names, err := users.FindNamesByIDs(ctx, []int{saved.ID(), saved.ID(), -1})
+	require.NoError(t, err)
+	require.Equal(t, map[int]string{saved.ID(): "Sofía López"}, names)
+	empty, err := users.FindNamesByIDs(ctx, nil)
+	require.NoError(t, err)
+	require.Empty(t, empty)
+}

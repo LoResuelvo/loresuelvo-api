@@ -24,8 +24,16 @@ func TestAdminReviewReaderUsesCanonicalFirstAndLaterProposalIdentities(t *testin
 	require.Len(t, page.Items, 2)
 	require.Equal(t, later.ID(), page.Items[0].WorkOrderID)
 	require.Equal(t, fmt.Sprintf("sp-%d", later.ServiceProposalID()), page.Items[0].OperationID)
+	require.Equal(t, "Ana Perez", page.Items[0].ConsumerName)
+	require.Equal(t, "Juan Gomez", page.Items[0].ProviderName)
 	require.Equal(t, f.order.ID(), page.Items[1].WorkOrderID)
 	require.Equal(t, fmt.Sprintf("jr-%d", requestID), page.Items[1].OperationID)
+	require.Equal(t, "Ana Perez", page.Items[1].ConsumerName)
+	require.Equal(t, "Juan Gomez", page.Items[1].ProviderName)
+	detail, err := reader.FindByID(t.Context(), later.ID(), workorder.ReviewPageInput{})
+	require.NoError(t, err)
+	require.Equal(t, "Ana Perez", detail.Summary.ConsumerName)
+	require.Equal(t, "Juan Gomez", detail.Summary.ProviderName)
 }
 func TestAdminReviewReaderBoundsHistoryWithoutMultiplyingListRows(t *testing.T) {
 	f := newReviewTransactionFixture(t, true)

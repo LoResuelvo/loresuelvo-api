@@ -52,7 +52,7 @@ func (handler *Handler) List(c *gin.Context) {
 		httphandler.RespondError(c, http.StatusInternalServerError, "internal server error")
 		return
 	}
-	response := pageResponse{Events: eventResponsesFromDomain(page.Events)}
+	response := pageResponse{Events: eventResponsesFromDomain(page.Events, page.OperatorNames)}
 	if page.Next != nil {
 		cursor, err := handler.cursors.encode(cursorPayload{
 			Watermark: page.Watermark, Before: *page.Next, Filter: query.Filter, Limit: query.Limit,

@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"reflect"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/audit"
@@ -35,6 +36,7 @@ type auditPageResponse struct {
 type auditEventResponse struct {
 	ID            uuid.UUID `json:"id"`
 	OperatorID    int       `json:"operator_id"`
+	OperatorName  *string   `json:"operator_name"`
 	Action        string    `json:"action"`
 	ResourceType  string    `json:"resource_type"`
 	ResourceID    string    `json:"resource_id"`
@@ -52,7 +54,7 @@ func registerAdminQueryAuditLogsSteps(sc *godog.ScenarioContext, suite *testSuit
 	sc.Step(`^consulto el registro de auditoría administrativa para el operador "([^"]*)" con la correlación "([^"]*)"$`, suite.queryAuditForOperatorWithCorrelation)
 	sc.Step(`^intento consultar el registro de auditoría administrativa$`, suite.attemptAuditQuery)
 	sc.Step(`^la página contiene los eventos "([^"]*)" y "([^"]*)" en ese orden$`, suite.auditPageContainsTwoEventsInOrder)
-	sc.Step(`^cada evento expone exactamente su identificador, referencia interna del operador, acción, tipo e ID de recurso, fecha UTC, resultado, correlación y motivo sólo cuando existe$`, suite.auditEventsExposeAllowedFields)
+	sc.Step(`^cada evento expone exactamente su identificador, referencia interna y nombre actual del operador, acción, tipo e ID de recurso, fecha UTC, resultado, correlación y motivo sólo cuando existe$`, suite.auditEventsExposeAllowedFields)
 	sc.Step(`^el evento "([^"]*)" informa el motivo "([^"]*)" y el evento "([^"]*)" no informa motivo$`, suite.auditEventReasonsMatch)
 	sc.Step(`^la respuesta no expone credenciales, identificadores externos de autenticación, cuerpos HTTP, mensajes de chat, biometría ni URLs firmadas$`, suite.auditResponseHasNoPrivateData)
 	sc.Step(`^los eventos "([^"]*)" y "([^"]*)" permanecen sin modificaciones$`, suite.auditEventsRemainUnchanged)
@@ -309,12 +311,20 @@ func (suite *testSuite) auditEventsExposeAllowedFields() error {
 		if expected == nil {
 			return fmt.Errorf("unknown audit event %s", found.ID)
 		}
-		fields := []string{"id", "operator_id", "action", "resource_type", "resource_id", "occurred_on", "result", "correlation_id"}
+		fields := []string{"id", "operator_id", "operator_name", "action", "resource_type", "resource_id", "occurred_on", "result", "correlation_id"}
 		if expected.Reason() != nil {
 			fields = append(fields, "reason")
 		}
 		if err := requireExactJSONFields(rawEvents[index], "audit event", fields...); err != nil {
 			return err
+		}
+		operator, err := suite.dependencies.Persistence.UserRepository.FindByID(suite.scenarioContext, expected.OperatorID())
+		if err != nil {
+			return fmt.Errorf("finding expected audit operator: %w", err)
+		}
+		expectedName := strings.TrimSpace(strings.TrimSpace(operator.Name()) + " " + strings.TrimSpace(operator.Surname()))
+		if found.OperatorName == nil || *found.OperatorName != expectedName {
+			return fmt.Errorf("audit operator display name does not match current user")
 		}
 		if found.OperatorID != expected.OperatorID() || found.Action != string(expected.Action()) ||
 			found.ResourceType != expected.ResourceType() || found.ResourceID != expected.ResourceID() ||

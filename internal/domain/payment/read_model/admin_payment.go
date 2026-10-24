@@ -32,6 +32,7 @@ type AdminPayment struct {
 	ServiceProposalID                                     int
 	WorkOrderID                                           *int
 	ConsumerID, ProviderID                                int
+	ConsumerName, ProviderName, OperationID               string
 	Purpose, IntentStatus, Currency                       string
 	SellerAmountCents, PlatformFeeCents, TotalAmountCents int64
 	CreatedOn, UpdatedOn                                  time.Time

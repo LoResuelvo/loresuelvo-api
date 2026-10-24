@@ -21,19 +21,24 @@ func NewAdminReviewReader(db *sql.DB, reviews *ReviewModerationRepository, repor
 }
 
 const adminReviewSelection = operationRootsSQL + ` selected_reviews AS (
- SELECT rv.work_order_id,sp.consumer_id,sp.provider_id,o.kind || '-' || o.resource_id AS operation_id,rv.rating,rv.visible,rv.moderation_version,
+ SELECT rv.work_order_id,sp.consumer_id,sp.provider_id,
+ concat_ws(' ',NULLIF(BTRIM(consumer_user.name),''),NULLIF(BTRIM(consumer_user.surname),'')) AS consumer_name,
+ concat_ws(' ',NULLIF(BTRIM(provider_user.name),''),NULLIF(BTRIM(provider_user.surname),'')) AS provider_name,
+ o.kind || '-' || o.resource_id AS operation_id,rv.rating,rv.visible,rv.moderation_version,
  CASE WHEN rr.status='pending' THEN 1 ELSE 0 END AS pending_reports,rr.created_on AS reported_on
  FROM work_order_reviews rv JOIN work_orders wo ON wo.id=rv.work_order_id
  JOIN service_proposals sp ON sp.id=wo.service_proposal_id
  JOIN operations o ON o.service_proposal_id=sp.id
+ JOIN users consumer_user ON consumer_user.id=sp.consumer_id
+ JOIN users provider_user ON provider_user.id=sp.provider_id
  LEFT JOIN review_reports rr ON rr.work_order_id=rv.work_order_id
 )`
-const adminReviewColumns = `work_order_id,consumer_id,provider_id,operation_id,rating,visible,moderation_version,pending_reports,reported_on`
+const adminReviewColumns = `work_order_id,consumer_id,provider_id,consumer_name,provider_name,operation_id,rating,visible,moderation_version,pending_reports,reported_on`
 
 func scanAdminReviewSummary(row interface{ Scan(...any) error }) (readmodel.AdminReviewSummary, error) {
 	var item readmodel.AdminReviewSummary
 	var date sql.NullTime
-	err := row.Scan(&item.WorkOrderID, &item.ConsumerID, &item.ProviderID, &item.OperationID, &item.Rating, &item.Visible, &item.Version, &item.PendingReports, &date)
+	err := row.Scan(&item.WorkOrderID, &item.ConsumerID, &item.ProviderID, &item.ConsumerName, &item.ProviderName, &item.OperationID, &item.Rating, &item.Visible, &item.Version, &item.PendingReports, &date)
 	if date.Valid {
 		at := date.Time.UTC()
 		item.ReportedOn = &at

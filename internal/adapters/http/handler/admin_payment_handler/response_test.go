@@ -14,6 +14,7 @@ func TestPaymentResponseKeepsEvidenceAndUnavailableSettlementNull(t *testing.T) 
 	verified := time.Date(2026, 9, 20, 12, 0, 0, 0, time.FixedZone("offset", 3*60*60))
 	model := readmodel.AdminPayment{
 		ID: "123e4567-e89b-12d3-a456-426614174000", Purpose: "booking_deposit", IntentStatus: "paid",
+		ConsumerID: 17, ProviderID: 29, ConsumerName: "Ana Perez", ProviderName: "Juan Gomez", OperationID: "jr-42",
 		CreatedOn: verified, UpdatedOn: verified,
 		Transactions: []readmodel.AdminPaymentTransaction{{
 			ID: 9, Processor: "mercado_pago", ExternalPaymentID: "mp-9", Status: "approved",
@@ -29,6 +30,11 @@ func TestPaymentResponseKeepsEvidenceAndUnavailableSettlementNull(t *testing.T) 
 	var body map[string]any
 	require.NoError(t, json.Unmarshal(encoded, &body))
 	require.Equal(t, "2026-09-20T09:00:00Z", body["created_on"])
+	require.Equal(t, float64(17), body["consumer_id"])
+	require.Equal(t, float64(29), body["provider_id"])
+	require.Equal(t, "Ana Perez", body["consumer_name"])
+	require.Equal(t, "Juan Gomez", body["provider_name"])
+	require.Equal(t, "jr-42", body["operation_id"])
 	require.Equal(t, []any{}, body["anomalies"])
 	require.Equal(t, []any{}, body["summary"].(map[string]any)["anomalies"])
 	require.Nil(t, body["summary"].(map[string]any)["pending_amount"])

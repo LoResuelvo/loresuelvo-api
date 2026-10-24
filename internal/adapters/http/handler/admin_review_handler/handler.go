@@ -203,6 +203,8 @@ type summaryResponse struct {
 	WorkOrderID    int        `json:"work_order_id"`
 	ConsumerID     int        `json:"consumer_id"`
 	ProviderID     int        `json:"provider_id"`
+	ConsumerName   string     `json:"consumer_name"`
+	ProviderName   string     `json:"provider_name"`
 	OperationID    string     `json:"operation_id"`
 	Rating         int        `json:"rating"`
 	Visibility     string     `json:"visibility"`
@@ -212,7 +214,19 @@ type summaryResponse struct {
 }
 
 func summary(s readmodel.AdminReviewSummary) summaryResponse {
-	return summaryResponse{s.WorkOrderID, s.ConsumerID, s.ProviderID, s.OperationID, s.Rating, visibility(s.Visible), s.Version, s.PendingReports, s.ReportedOn}
+	return summaryResponse{
+		WorkOrderID:    s.WorkOrderID,
+		ConsumerID:     s.ConsumerID,
+		ProviderID:     s.ProviderID,
+		ConsumerName:   s.ConsumerName,
+		ProviderName:   s.ProviderName,
+		OperationID:    s.OperationID,
+		Rating:         s.Rating,
+		Visibility:     visibility(s.Visible),
+		Version:        s.Version,
+		PendingReports: s.PendingReports,
+		ReportedOn:     s.ReportedOn,
+	}
 }
 
 type decisionResponse struct {

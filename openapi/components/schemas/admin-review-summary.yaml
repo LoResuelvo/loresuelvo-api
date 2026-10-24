@@ -6,6 +6,8 @@ required:
   - work_order_id
   - consumer_id
   - provider_id
+  - consumer_name
+  - provider_name
   - operation_id
   - rating
   - visibility
@@ -26,6 +28,12 @@ properties:
     type: integer
     format: int32
     minimum: 1
+  consumer_name:
+    type: string
+    description: Consumer display name, combining the name and surname.
+  provider_name:
+    type: string
+    description: Provider display name, combining the name and surname.
   operation_id:
     type: string
     pattern: '^(jr|sp)-[1-9][0-9]*$'

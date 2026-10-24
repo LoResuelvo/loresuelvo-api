@@ -23,6 +23,12 @@ type LogReader interface {
 	FindPage(ctx context.Context, filter LogFilter, watermark int64, before *LogPosition, limit int) ([]*Event, error)
 }
 
+// OperatorNameFinder resolves current display names in one bounded lookup.
+// Missing users are omitted; historical event identity remains the operator ID.
+type OperatorNameFinder interface {
+	FindNamesByIDs(ctx context.Context, ids []int) (map[int]string, error)
+}
+
 // OperatorIDFinder resolves the local operator from an authenticated subject.
 type OperatorIDFinder interface {
 	FindOperatorIDByAuthID(ctx context.Context, authID string) (int, error)

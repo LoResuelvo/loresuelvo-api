@@ -14,11 +14,13 @@ import (
 )
 
 type adminPaymentReaderFixture struct {
+	testContext        jobRequestRepositoryTestContext
 	reader             *repositories.AdminPaymentReader
 	ids                []string
 	proposals          []int
 	states             []string
 	consumer, provider int
+	jobRequestID       int
 }
 
 func newAdminPaymentReaderFixture(t *testing.T) adminPaymentReaderFixture {
@@ -29,7 +31,7 @@ func newAdminPaymentReaderFixture(t *testing.T) adminPaymentReaderFixture {
 	request := f.jobRequest(t, consumer, provider, now, jobrequest.StatusAccepted)
 	proposal := f.proposal(t, request, now, serviceproposal.StatusAccepted)
 	states := []string{"requires_checkout", "checkout_ready", "processing", "paid", "rejected", "expired", "cancelled", "refunded", "disputed", "payment_mismatch"}
-	fixture := adminPaymentReaderFixture{reader: repositories.NewAdminPaymentReader(f.testContext.database), ids: make([]string, len(states)), proposals: make([]int, len(states)), states: states, consumer: consumer, provider: provider}
+	fixture := adminPaymentReaderFixture{testContext: f.testContext, reader: repositories.NewAdminPaymentReader(f.testContext.database), ids: make([]string, len(states)), proposals: make([]int, len(states)), states: states, consumer: consumer, provider: provider, jobRequestID: request.ID}
 	// Active states cannot coexist for one proposal/purpose, so historical fixtures isolate proposals.
 	for n, state := range states {
 		p := proposal
@@ -90,6 +92,59 @@ func TestAdminPaymentReaderKeepsWholeProposalEvidenceBeyondExternalFilter(t *tes
 	require.Equal(t, f.consumer, s.Payments[0].ConsumerID)
 	require.Equal(t, f.provider, s.Payments[0].ProviderID)
 }
+
+func TestAdminPaymentReaderEnrichesParticipantNamesAndCanonicalOperationIDs(t *testing.T) {
+	f := newAdminPaymentReaderFixture(t)
+
+	firstProposal, err := f.reader.FindPage(t.Context(), payment.AdminPaymentQuery{Limit: 20, ServiceProposalID: f.proposals[0]})
+	require.NoError(t, err)
+	require.NotEmpty(t, firstProposal.Payments)
+	first := firstProposal.Payments[0]
+	require.Equal(t, "Ana Perez", first.ConsumerName)
+	require.Equal(t, "Juan Gomez", first.ProviderName)
+	require.Equal(t, fmt.Sprintf("jr-%d", f.jobRequestID), first.OperationID)
+	require.NotEmpty(t, firstProposal.Proposals)
+	require.Equal(t, first.OperationID, firstProposal.Proposals[0].Intents[0].OperationID)
+
+	laterProposal, err := f.reader.FindPage(t.Context(), payment.AdminPaymentQuery{Limit: 20, ServiceProposalID: f.proposals[1]})
+	require.NoError(t, err)
+	require.Len(t, laterProposal.Payments, 1)
+	require.Equal(t, fmt.Sprintf("sp-%d", f.proposals[1]), laterProposal.Payments[0].OperationID)
+	require.Equal(t, "Ana Perez", laterProposal.Payments[0].ConsumerName)
+	require.Equal(t, "Juan Gomez", laterProposal.Payments[0].ProviderName)
+}
+
+func TestAdminPaymentReaderUsesProposalOperationIDWithoutJobRequest(t *testing.T) {
+	f := newAdminPaymentReaderFixture(t)
+	consumerID := savedConsumerIDWithData(t, f.testContext, "auth0|admin-payment-unrequested-consumer", "admin-payment-unrequested.consumer@example.com", "Marta", "Rios")
+	providerID := savedProviderIDWithData(t, f.testContext, "auth0|admin-payment-unrequested-provider", "admin-payment-unrequested.provider@example.com", "Luis", "Vega", "Electricidad")
+	conversation, err := f.testContext.conversationRepository.SaveConversation(t.Context(), conversationForJobRequest(t, consumerID, providerID))
+	require.NoError(t, err)
+
+	createdOn := time.Date(2026, 9, 20, 12, 0, 0, 0, time.UTC)
+	scheduledOn := createdOn.Add(72 * time.Hour)
+	var proposalID int
+	err = f.testContext.database.QueryRowContext(t.Context(), `INSERT INTO service_proposals (
+		consumer_id,provider_id,conversation_id,amount_cents,scheduled_on,description,status,created_on,updated_on,
+		currency,deposit_cents,platform_fee_total_cents,platform_fee_due_now_cents,booking_payment_deadline,estimated_duration_minutes
+	) VALUES ($1,$2,$3,100000,$4,'Reparación','accepted',$5,$5,'ARS',20000,5000,1000,$6,60) RETURNING id`,
+		consumerID, providerID, conversation.ID(), scheduledOn, createdOn, scheduledOn.Add(-24*time.Hour),
+	).Scan(&proposalID)
+	require.NoError(t, err)
+	intentID := fmt.Sprintf("00000000-0000-4000-8000-%012d", len(f.ids)+1)
+	_, err = f.testContext.database.ExecContext(t.Context(), `INSERT INTO payment_intents (
+		id,service_proposal_id,purpose,currency,seller_amount_cents,platform_fee_cents,total_amount_cents,status,created_on,updated_on
+	) VALUES ($1,$2,'booking_deposit','ARS',20000,1000,21000,'requires_checkout',$3,$3)`, intentID, proposalID, createdOn)
+	require.NoError(t, err)
+
+	snapshot, err := f.reader.FindPage(t.Context(), payment.AdminPaymentQuery{Limit: 20, ServiceProposalID: proposalID})
+	require.NoError(t, err)
+	require.Len(t, snapshot.Payments, 1)
+	require.Equal(t, fmt.Sprintf("sp-%d", proposalID), snapshot.Payments[0].OperationID)
+	require.Equal(t, "Marta Rios", snapshot.Payments[0].ConsumerName)
+	require.Equal(t, "Luis Vega", snapshot.Payments[0].ProviderName)
+}
+
 func TestAdminPaymentReaderDoesNotTreatExactExternalIDAsPrefix(t *testing.T) {
 	f := newAdminPaymentReaderFixture(t)
 	empty, err := f.reader.FindPage(t.Context(), payment.AdminPaymentQuery{Limit: 20, ExternalPaymentID: "payment-"})

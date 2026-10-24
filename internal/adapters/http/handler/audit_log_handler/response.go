@@ -14,6 +14,7 @@ type pageResponse struct {
 
 type eventResponse struct {
 	ID            uuid.UUID    `json:"id"`
+	OperatorName  *string      `json:"operator_name"`
 	OperatorID    int          `json:"operator_id"`
 	Action        audit.Action `json:"action"`
 	ResourceType  string       `json:"resource_type"`
@@ -24,7 +25,7 @@ type eventResponse struct {
 	Reason        string       `json:"reason,omitempty"`
 }
 
-func eventResponsesFromDomain(events []*audit.Event) []eventResponse {
+func eventResponsesFromDomain(events []*audit.Event, operatorNames map[int]string) []eventResponse {
 	responses := make([]eventResponse, 0, len(events))
 	for _, event := range events {
 		response := eventResponse{
@@ -32,6 +33,9 @@ func eventResponsesFromDomain(events []*audit.Event) []eventResponse {
 			ResourceType: event.ResourceType(), ResourceID: event.ResourceID(),
 			OccurredOn: event.OccurredOn().UTC(), Result: event.Result(),
 			CorrelationID: event.CorrelationID(),
+		}
+		if name, ok := operatorNames[event.OperatorID()]; ok && name != "" {
+			response.OperatorName = &name
 		}
 		if reason := event.Reason(); reason != nil {
 			response.Reason = reason.Text()

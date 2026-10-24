@@ -8,6 +8,7 @@ import (
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/repositories"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/claim"
+	claimmodel "github.com/LoResuelvo/loresuelvo-api/internal/domain/claim/read_model"
 	operationmodel "github.com/LoResuelvo/loresuelvo-api/internal/domain/operation/read_model"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
@@ -65,6 +66,7 @@ func TestAdministrativeClaimPageOrdersAndCountsWithoutEvidenceInflation(t *testi
 	require.NotNil(t, page.Claims[0].CategoryID)
 	for _, item := range page.Claims {
 		require.Equal(t, "consumer", item.ClaimantParty)
+		require.Equal(t, "Ana Perez", item.ClaimantName)
 		require.Equal(t, "job.request.consumer@example.com", item.ClaimantEmail)
 	}
 	second, err := repo.FindAdministrativePage(ctx, claim.AdminCriteria{ListCriteria: claim.ListCriteria{Page: 2, Limit: 2}})
@@ -106,7 +108,59 @@ func TestAdministrativeClaimDetailHydratesOwnedDataAndContext(t *testing.T) {
 	require.Equal(t, "sensitive original", detail.Claim.Description)
 	require.Len(t, detail.Claim.ImageFileIDs, 2)
 	require.Len(t, detail.Claim.Actions, 1)
+	require.Equal(t, "Ana Perez", detail.ClaimantName)
 	require.Equal(t, "job.request.consumer@example.com", detail.ClaimantEmail)
+	require.Equal(t, "provider", detail.Respondent.Party)
+	require.Equal(t, "Juan Gomez", detail.Respondent.Name)
+	require.Equal(t, "job.request.provider@example.com", detail.Respondent.Email)
+}
+
+func TestAdministrativeClaimDetailResolvesCounterpartForBothPartiesAndOperationRoots(t *testing.T) {
+	fixture := newOperationInboxFixture(t)
+	consumerID := savedConsumerIDWithData(t, fixture.testContext, "auth0|admin-claim-counterpart-consumer", "admin.claim.consumer@example.com", "Ana", "Perez")
+	providerID := savedProviderIDWithData(t, fixture.testContext, "auth0|admin-claim-counterpart-provider", "admin.claim.provider@example.com", "Juan", "Gomez", "Plomeria")
+	base := time.Date(2026, 9, 24, 13, 0, 0, 0, time.UTC)
+	request := fixture.jobRequest(t, consumerID, providerID, base, "pending")
+	fixture.proposal(t, request, base.Add(time.Hour), "pending")
+	laterProposalID := fixture.proposal(t, request, base.Add(2*time.Hour), "pending")
+	repo := repositories.NewClaimRepository(fixture.testContext.database)
+
+	claimFor := func(claimantID int, party claim.Party, operationKind string, operationID int, referenceKind claim.ReferenceKind, referenceID int) int {
+		t.Helper()
+		reference, err := claim.NewReference(referenceKind, fmt.Sprint(referenceID))
+		require.NoError(t, err)
+		found, err := claim.New(claim.Claimant{ID: claimantID, Party: party}, operationmodel.ID{Kind: operationmodel.Kind(operationKind), ResourceID: operationID}, uuid.NewString(), claim.Submission{Reference: reference, Reason: claim.ReasonDamage, Description: "counterpart identity"}, base.Add(3*time.Hour))
+		require.NoError(t, err)
+		require.NoError(t, repo.Save(context.Background(), found))
+		return found.ID
+	}
+
+	cases := []struct {
+		claimantID  int
+		party       claim.Party
+		operation   operationmodel.ID
+		reference   claim.ReferenceKind
+		referenceID int
+		respondent  string
+	}{
+		{consumerID, claim.PartyConsumer, operationmodel.ID{Kind: operationmodel.KindJobRequest, ResourceID: request.ID}, claim.ReferenceKindJobRequest, request.ID, "provider"},
+		{providerID, claim.PartyProvider, operationmodel.ID{Kind: operationmodel.KindJobRequest, ResourceID: request.ID}, claim.ReferenceKindJobRequest, request.ID, "consumer"},
+		{consumerID, claim.PartyConsumer, operationmodel.ID{Kind: operationmodel.KindServiceProposal, ResourceID: laterProposalID}, claim.ReferenceKindServiceProposal, laterProposalID, "provider"},
+		{providerID, claim.PartyProvider, operationmodel.ID{Kind: operationmodel.KindServiceProposal, ResourceID: laterProposalID}, claim.ReferenceKindServiceProposal, laterProposalID, "consumer"},
+	}
+
+	for _, tc := range cases {
+		id := claimFor(tc.claimantID, tc.party, string(tc.operation.Kind), tc.operation.ResourceID, tc.reference, tc.referenceID)
+		detail, err := repo.FindAdministrativeByID(context.Background(), id)
+		require.NoError(t, err)
+		require.NotNil(t, detail)
+		require.Equal(t, tc.respondent, detail.Respondent.Party)
+		if tc.respondent == "provider" {
+			require.Equal(t, claimmodel.AdminIdentity{ID: providerID, Party: "provider", Name: "Juan Gomez", Email: "admin.claim.provider@example.com"}, detail.Respondent)
+		} else {
+			require.Equal(t, claimmodel.AdminIdentity{ID: consumerID, Party: "consumer", Name: "Ana Perez", Email: "admin.claim.consumer@example.com"}, detail.Respondent)
+		}
+	}
 }
 
 func TestAdministrativeClaimDetailReturnsAbsentResource(t *testing.T) {

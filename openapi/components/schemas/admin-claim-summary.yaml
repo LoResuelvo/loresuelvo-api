@@ -5,6 +5,7 @@ allOf:
   required:
   - claimant_id
   - claimant_party
+  - claimant_name
   - claimant_email
   - category_id
   - category_name
@@ -17,6 +18,9 @@ allOf:
     claimant_party:
       type: string
       enum: [consumer, provider]
+    claimant_name:
+      type: string
+      description: Claimant name and surname joined for display.
     claimant_email:
       type: string
       format: email

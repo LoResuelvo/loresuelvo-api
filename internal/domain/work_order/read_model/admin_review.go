@@ -8,6 +8,8 @@ type AdminReviewSummary struct {
 	WorkOrderID    int
 	ConsumerID     int
 	ProviderID     int
+	ConsumerName   string
+	ProviderName   string
 	OperationID    string
 	Rating         int
 	Visible        bool

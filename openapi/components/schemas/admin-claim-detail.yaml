@@ -8,13 +8,14 @@ allOf:
 - type: object
   required:
   - claimant
+  - respondent
   - category_id
   - category_name
   - actions
   properties:
     claimant:
       type: object
-      required: [id, party, email]
+      required: [id, party, name, email]
       properties:
         id:
           type: integer
@@ -23,6 +24,25 @@ allOf:
         party:
           type: string
           enum: [consumer, provider]
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+      additionalProperties: false
+    respondent:
+      type: object
+      required: [id, party, name, email]
+      properties:
+        id:
+          type: integer
+          format: int32
+          minimum: 1
+        party:
+          type: string
+          enum: [consumer, provider]
+        name:
+          type: string
         email:
           type: string
           format: email

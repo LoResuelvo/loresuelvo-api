@@ -48,7 +48,7 @@ func (h *AdminHandler) List(c *gin.Context) {
 	}
 	items := make([]adminSummaryResponse, 0, len(page.Claims))
 	for _, item := range page.Claims {
-		items = append(items, adminSummaryResponse{summaryResponse: summary(item.ClaimSummary), ClaimantID: item.ClaimantID, ClaimantParty: item.ClaimantParty, ClaimantEmail: item.ClaimantEmail, CategoryID: item.CategoryID, CategoryName: item.CategoryName, AgeSeconds: item.AgeSeconds})
+		items = append(items, adminSummaryResponse{summaryResponse: summary(item.ClaimSummary), ClaimantID: item.ClaimantID, ClaimantParty: item.ClaimantParty, ClaimantName: item.ClaimantName, ClaimantEmail: item.ClaimantEmail, CategoryID: item.CategoryID, CategoryName: item.CategoryName, AgeSeconds: item.AgeSeconds})
 	}
 	c.JSON(http.StatusOK, gin.H{"items": items, "page": page.Page, "limit": page.Limit, "total": page.Total})
 }
@@ -57,14 +57,16 @@ type adminSummaryResponse struct {
 	summaryResponse
 	ClaimantID    int     `json:"claimant_id"`
 	ClaimantParty string  `json:"claimant_party"`
+	ClaimantName  string  `json:"claimant_name"`
 	ClaimantEmail string  `json:"claimant_email"`
 	CategoryID    *int    `json:"category_id"`
 	CategoryName  *string `json:"category_name"`
 	AgeSeconds    int64   `json:"age_seconds"`
 }
-type claimantResponse struct {
+type adminIdentityResponse struct {
 	ID    int         `json:"id"`
 	Party claim.Party `json:"party"`
+	Name  string      `json:"name"`
 	Email string      `json:"email"`
 }
 
@@ -114,11 +116,12 @@ func (h *AdminHandler) Get(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, struct {
 		detailResponse
-		Claimant     claimantResponse `json:"claimant"`
-		CategoryID   *int             `json:"category_id"`
-		CategoryName *string          `json:"category_name"`
-		Actions      []actionResponse `json:"actions"`
-	}{detail(&found.GetResult), claimantResponse{ID: found.Claim.ClaimantID, Party: found.Claim.ClaimantParty, Email: found.ClaimantEmail}, found.CategoryID, found.CategoryName, actions})
+		Claimant     adminIdentityResponse `json:"claimant"`
+		Respondent   adminIdentityResponse `json:"respondent"`
+		CategoryID   *int                  `json:"category_id"`
+		CategoryName *string               `json:"category_name"`
+		Actions      []actionResponse      `json:"actions"`
+	}{detail(&found.GetResult), adminIdentityResponse{ID: found.Claim.ClaimantID, Party: found.Claim.ClaimantParty, Name: found.ClaimantName, Email: found.ClaimantEmail}, adminIdentityResponse{ID: found.Respondent.ID, Party: claim.Party(found.Respondent.Party), Name: found.Respondent.Name, Email: found.Respondent.Email}, found.CategoryID, found.CategoryName, actions})
 }
 
 func administrationKey(c *gin.Context) (string, error) {

@@ -17,6 +17,9 @@ const claimAdminContextSQL = ` FROM claims c JOIN users u ON u.id=c.claimant_id
  LEFT JOIN service_proposals sp ON sp.id=c.operation_service_proposal_id
  LEFT JOIN providers p ON p.user_id=COALESCE(jr.provider_id,sp.provider_id)
  LEFT JOIN categories cat ON cat.id=p.category_id`
+const claimAdminIdentityContextSQL = claimAdminContextSQL + ` JOIN users respondent ON respondent.id=CASE
+ WHEN c.claimant_party='consumer' THEN COALESCE(jr.provider_id,sp.provider_id)
+ ELSE COALESCE(jr.consumer_id,sp.consumer_id) END`
 const claimAdminFilterSQL = ` WHERE ($1::text IS NULL OR c.status=$1) AND ($2::text='' OR STRPOS(LOWER(u.email),LOWER($2))>0
  OR (CASE WHEN c.operation_job_request_id IS NOT NULL THEN 'jr-' ELSE 'sp-' END || COALESCE(c.operation_job_request_id,c.operation_service_proposal_id)::text)=$2)`
 
@@ -38,7 +41,7 @@ func (r *ClaimRepository) FindAdministrativePage(ctx context.Context, criteria c
 	if err := tx.QueryRowContext(ctx, `SELECT COUNT(*)`+claimAdminContextSQL+claimAdminFilterSQL, status, criteria.Query).Scan(&page.Total); err != nil {
 		return nil, rollbackClaimTx(tx, err)
 	}
-	rows, err := tx.QueryContext(ctx, `SELECT c.id,c.claimant_id,c.claimant_party,u.email,
+	rows, err := tx.QueryContext(ctx, `SELECT c.id,c.claimant_id,c.claimant_party,concat_ws(' ',NULLIF(BTRIM(u.name),''),NULLIF(BTRIM(u.surname),'')),u.email,
  CASE WHEN c.operation_job_request_id IS NOT NULL THEN 'jr' ELSE 'sp' END, COALESCE(c.operation_job_request_id,c.operation_service_proposal_id),
  CASE WHEN c.reference_job_request_id IS NOT NULL THEN 'job_request' WHEN c.reference_service_proposal_id IS NOT NULL THEN 'service_proposal' WHEN c.reference_work_order_id IS NOT NULL THEN 'work_order' ELSE 'payment_intent' END,
  COALESCE(c.reference_job_request_id::text,c.reference_service_proposal_id::text,c.reference_work_order_id::text,c.reference_payment_intent_id::text),c.reason,c.status,c.created_on,c.review_started_on,c.closed_on,cat.id,cat.name`+claimAdminContextSQL+claimAdminFilterSQL+` ORDER BY c.created_on DESC,c.id DESC LIMIT $3 OFFSET $4`, status, criteria.Query, criteria.Limit, int64(criteria.Page-1)*int64(criteria.Limit))
@@ -51,7 +54,7 @@ func (r *ClaimRepository) FindAdministrativePage(ctx context.Context, criteria c
 		var review, closed sql.NullTime
 		var category sql.NullInt64
 		var name sql.NullString
-		err := rows.Scan(&item.ID, &item.ClaimantID, &item.ClaimantParty, &item.ClaimantEmail, &item.OperationID.Kind, &item.OperationID.ResourceID, &item.ReferenceKind, &item.ReferenceID, &item.Reason, &item.Status, &item.CreatedOn, &review, &closed, &category, &name)
+		err := rows.Scan(&item.ID, &item.ClaimantID, &item.ClaimantParty, &item.ClaimantName, &item.ClaimantEmail, &item.OperationID.Kind, &item.OperationID.ResourceID, &item.ReferenceKind, &item.ReferenceID, &item.Reason, &item.Status, &item.CreatedOn, &review, &closed, &category, &name)
 		if err != nil {
 			return nil, rollbackClaimTx(tx, err)
 		}
@@ -98,7 +101,10 @@ func (r *ClaimRepository) FindAdministrativeByID(ctx context.Context, id int) (*
 	result := &claim.AdminDetail{GetResult: claim.GetResult{Claim: found}}
 	var category sql.NullInt64
 	var name sql.NullString
-	err = tx.QueryRowContext(ctx, `SELECT u.email,cat.id,cat.name`+claimAdminContextSQL+` WHERE c.id=$1`, id).Scan(&result.ClaimantEmail, &category, &name)
+	err = tx.QueryRowContext(ctx, `SELECT concat_ws(' ',NULLIF(BTRIM(u.name),''),NULLIF(BTRIM(u.surname),'')),u.email,
+ CASE WHEN c.claimant_party='consumer' THEN COALESCE(jr.provider_id,sp.provider_id) ELSE COALESCE(jr.consumer_id,sp.consumer_id) END,
+ CASE WHEN c.claimant_party='consumer' THEN 'provider' ELSE 'consumer' END,
+ concat_ws(' ',NULLIF(BTRIM(respondent.name),''),NULLIF(BTRIM(respondent.surname),'')),respondent.email,cat.id,cat.name`+claimAdminIdentityContextSQL+` WHERE c.id=$1`, id).Scan(&result.ClaimantName, &result.ClaimantEmail, &result.Respondent.ID, &result.Respondent.Party, &result.Respondent.Name, &result.Respondent.Email, &category, &name)
 	if err != nil {
 		return nil, rollbackClaimTx(tx, fmt.Errorf("reading claim context: %w", err))
 	}

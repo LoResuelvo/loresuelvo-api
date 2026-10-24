@@ -24,9 +24,10 @@ type LogQuery struct {
 
 // LogPage contains domain events, not an HTTP representation.
 type LogPage struct {
-	Events    []*Event
-	Watermark int64
-	Next      *LogPosition
+	OperatorNames map[int]string
+	Events        []*Event
+	Watermark     int64
+	Next          *LogPosition
 }
 
 func (query LogQuery) Validate() error {

@@ -2,6 +2,7 @@ type: object
 required:
 - id
 - operator_id
+- operator_name
 - action
 - resource_type
 - occurred_on
@@ -16,6 +17,9 @@ properties:
     type: integer
     minimum: 1
     description: Internal user ID of the authenticated operator.
+  operator_name:
+    type: [string, 'null']
+    description: Current operator display name, or null if unavailable. Informational enrichment; not a historical identity snapshot.
   action:
     type: string
     enum:

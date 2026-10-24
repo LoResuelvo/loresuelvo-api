@@ -5,6 +5,9 @@ required:
   - work_order_id
   - consumer_id
   - provider_id
+  - consumer_name
+  - provider_name
+  - operation_id
   - purpose
   - intent_status
   - currency
@@ -40,6 +43,16 @@ properties:
     type: integer
     minimum: 1
     description: Internal provider ID; email values are not exposed in result objects.
+  consumer_name:
+    type: string
+    description: Consumer display name from the associated user record.
+  provider_name:
+    type: string
+    description: Provider display name from the associated user record.
+  operation_id:
+    type: string
+    pattern: '^(jr|sp)-[1-9][0-9]*$'
+    description: Canonical operation ID; the first proposal in a job-request conversation uses jr-{job_request_id}, and later proposals use sp-{service_proposal_id}.
   purpose:
     type: string
     enum:
