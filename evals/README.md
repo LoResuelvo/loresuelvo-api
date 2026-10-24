@@ -9,7 +9,7 @@ prediagnóstico, ranking y resumen.
 - 71 casos: 48 PD, 19 RK y 4 SM.
 - Los 71 casos están aprobados.
 - 52 casos de desarrollo y 19 de reserva.
-- Ocho imágenes sintéticas y ninguna campaña.
+- Ocho imágenes sintéticas.
 - Smoke: 17 casos de desarrollo; `critical_all`: 13 PD críticos.
 
 El manifiesto registra el inventario exacto con hashes SHA-256. Los esquemas
@@ -45,7 +45,7 @@ La API no fija ese límite explícitamente; esta diferencia se registra, no se
 presenta como equivalencia de configuración. Los defaults del proveedor que no
 se observan permanecen desconocidos.
 
-## Primera campaña
+## Campañas
 
 [`protocols/campaign-1.json`](protocols/campaign-1.json) fija la primera medición
 de desarrollo. Seguir el [procedimiento de preparación, smoke y campaña](protocols/README.md):
@@ -56,6 +56,10 @@ inicia llamadas ni aprueba respuestas.
 Los [resultados publicados de Campaña 1](campaigns/campaign-1/README.md) y su
 [diagnóstico técnico](analysis/campaign-1-diagnosis.md) registran la medición y
 fundamentan los cambios propuestos para PD, RK y SM.
+
+Los [resultados de Campaña 2](campaigns/campaign-2/README.md) y su
+[diagnóstico comparativo](analysis/campaign-2-diagnosis.md) comparan los resultados
+tras esos cambios y las intervenciones propuestas para la siguiente medición.
 
 ## Ejecución manual
 
@@ -150,13 +154,10 @@ ubicación importante hacen fallar el criterio. Los errores menores que permiten
 comprender no fallan automáticamente; no se exige ortografía o gramática
 perfectas ni se penalizan términos técnicos o unidades legítimos. Se mantienen
 los campos evaluados, sin añadir `assessment.problem_title`. No considera espacios
-del JSON ni identificadores. Sin prosa evaluable,
-el revisor puede marcar `not_applicable`; Go y Python lo dejan `unassessed` hasta
-ese juicio, también ante salidas ausentes. No sustituye los criterios de seguridad.
+del JSON ni identificadores. Sin prosa evaluable, el criterio puede quedar
+`not_applicable`; `unassessed` indica una evaluación sin resolver. No sustituye
+los criterios de seguridad.
 Ver [alcance y política](datasets/LoResuelvo_US60_evals_v1.0.0/README.md#legibilidad-compartida--2026-10-19).
-Su integración reevalúa trials guardados sin modificar el prompt, la solución,
-las entradas o expectativas de los casos ni generar nuevas respuestas. Los
-juicios anteriores se conservan para trazabilidad; no publica la primera campaña.
 
 ## Artefactos de campaña
 
@@ -172,9 +173,8 @@ Cada campaña conserva su protocolo y configuración, además del export:
 | `SHA256SUMS` | Integridad de los artefactos. |
 | `README.md` | Instrucciones de lectura y reproducción de esa campaña. |
 
-Las respuestas faltantes tienen motivo explícito. El export público no contiene
-identidades ni razonamientos privados de revisión, credenciales, cabeceras
-completas ni volcados HTTP. Configuraciones y referencias se deduplican por hash;
+Las respuestas faltantes tienen motivo explícito.
+Configuraciones y referencias se deduplican por hash;
 las estadísticas y gráficas se derivan de los registros, no los sustituyen.
 Los resultados se escriben fuera del paquete del dataset y no modifican sus
 expectativas para hacer aprobar una salida.

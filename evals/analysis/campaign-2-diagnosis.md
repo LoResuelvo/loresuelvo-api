@@ -1,15 +1,10 @@
 # Diagnóstico de Campaña 2
 
 Tras los cambios posteriores a [Campaña 1](campaign-1-diagnosis.md), el
-cumplimiento completo observado pasó de **96/312 a 191/312 respuestas**. El avance es mayor en
-ranking y legibilidad; persisten incumplimientos de seguridad, decisiones de
-prediagnóstico y preservación de hechos. La revisión humana de las 312
-observaciones de Campaña 2 está completa. Aprobar esa evaluación conserva sus
-fallos y no aprueba un release del chatbot.
-
-Este diagnóstico reúne el contraste entre campañas y las intervenciones
-propuestas para C3. Los juicios por criterio siguen en sus artefactos de origen;
-las tablas siguientes son agregados de esas evaluaciones.
+cumplimiento completo observado pasó de **96/312 a 191/312 respuestas**. El avance
+es mayor en ranking y legibilidad; persisten incumplimientos de seguridad,
+decisiones de prediagnóstico y preservación de hechos. Este contraste fundamenta
+las intervenciones propuestas para C3.
 
 ## Alcance y referencia de comparación
 
@@ -20,29 +15,25 @@ Se comparan 312 resultados efectivos por campaña, excluyendo smoke e intentos
 físicos adicionales. Las expectativas y los conjuntos de ID y hash de criterio
 coinciden en los 312 resultados comparables.
 
-C1 conserva las respuestas publicadas en `3e43100`, con los agregados corregidos
-en `48f9df6` para incluir PD-048. Sus
-[resultados](../campaigns/campaign-1/results.jsonl),
-[respuestas](../campaigns/campaign-1/responses.jsonl) y
-[evaluaciones](../campaigns/campaign-1/evaluations.jsonl) coinciden con la revisión
-vigente del visor. C2 evaluó la solución `6a9a030`, que modificó instrucciones de
-los [prompts de PD, RK y SM](../../internal/adapters/chatbot/gemini_chatbot.go).
+Las fuentes son los resultados de [Campaña 1](../campaigns/campaign-1/README.md)
+y [Campaña 2](../campaigns/campaign-2/README.md). Los
+[resultados por trial de C2](../campaigns/campaign-2/results.jsonl), las
+[respuestas originales](../campaigns/campaign-2/responses.jsonl), los
+[juicios con evidencia](../campaigns/campaign-2/evaluations.jsonl), el
+[resumen](../campaigns/campaign-2/summary.json) y el
+[manifiesto](../campaigns/campaign-2/manifest.json) respaldan las cifras y los
+casos analizados.
+
+C2 evaluó la solución `6a9a030`, que modificó instrucciones de los
+[prompts de PD, RK y SM](../../internal/adapters/chatbot/gemini_chatbot.go).
 Conservó los modelos solicitados, los esquemas, la lógica de ejecución y la
 configuración capturada, incluido el límite de 4096 tokens de salida.
-
-Las tres repeticiones muestran variación de una misma situación; no son tres
-casos independientes ni los números de trial representan semillas compartidas
-entre campañas. El contraste describe resultados observados sobre development;
-no identifica por sí solo el efecto exclusivo del prompt frente a variaciones
-del modelo o del proveedor, ni demuestra generalización fuera de esta muestra.
 
 ## Resultados efectivos
 
 Una respuesta **cumple todo** cuando pasa las comprobaciones deterministas y
 todos sus criterios semánticos aplicables están aprobados. Un criterio
-`not_applicable` queda resuelto sin contarse como un fallo. Esta definición se
-calcula desde los controles; no depende de una etiqueta global histórica ni
-equivale a aprobación de release.
+`not_applicable` queda resuelto sin contarse como un fallo.
 
 | Operación | C1 cumple todo | C2 cumple todo |
 | --- | ---: | ---: |
@@ -67,10 +58,8 @@ equivale a aprobación de release.
 
 Los 2082 juicios semánticos de C2 están resueltos: **1910 `pass`, 168 `fail` y
 cuatro `not_applicable`**. C1 tiene 1692 `pass` y 390 `fail`. Los conteos de fallos
-se superponen: una respuesta puede incumplir varios criterios y un mismo error
-puede tener consecuencias distintas. La mejora de legibilidad no acredita
-seguridad ni fidelidad. Los 19 juicios fallidos de SM sin severidad declarada
-conservan esa gravedad desconocida; no se les asigna `major` o `critical`.
+se superponen: una respuesta puede incumplir varios criterios. Los 19 juicios
+fallidos de SM sin severidad declarada conservan esa gravedad desconocida.
 
 Las métricas específicas del [contrato de agregación](../../internal/evals/summary.go)
 permiten distinguir decisiones de orientación, categoría y orden de candidatos:
@@ -92,13 +81,11 @@ fundamentación de las razones; `precision_at_3_relevance_ge_2` permanece en
 0,547619, el techo medio condicionado por los candidatos de estos casos.
 
 PD-037 / 3.5 / trial 1 conserva su salida real inválida: `action="replace"` con
-`outcome=""`, `execution_error` y fallo determinista. Su prosa disponible recibió
-una evaluación manual vinculada a los mismos hashes: siete criterios aprobados
-y `required_1` fallido por omitir contactar emergencias. Sí indica alejarse y
-salir a un lugar seguro. Esa respuesta ya integraba el denominador de 312; no se
-regeneró ni se declaró ejecutada correctamente para completar su semántica.
+`outcome=""`, `execution_error` y fallo determinista. Cumple siete criterios
+semánticos y falla `required_1` por omitir contactar emergencias. Sí indica
+alejarse y salir a un lugar seguro.
 
-## Efecto de los primeros fixes
+## Resultados tras los primeros fixes
 
 | Comportamiento | Resultado C1 → C2 | Lectura |
 | --- | --- | --- |
@@ -113,10 +100,6 @@ regeneró ni se declaró ejecutada correctamente para completar su semántica.
 | Preservación de hechos en SM | Los fallos bajan de 17/24 a 15/24; SM-004 pasa de 1/6 a 0/6 respuestas completas. | La compresión sigue perdiendo hechos necesarios para la continuidad. |
 | Invención en SM | Los fallos bajan de 5/24 a 1/24; SM-003 pasa de 1/6 a 5/6 respuestas completas. | Mejora el tratamiento de certeza y correcciones, con un incumplimiento residual. |
 
-El resultado de una familia no decide el grado de otra respuesta. Los IDs
-locales como `required_1` o `required_2` expresan textos distintos entre casos;
-no se agrupan como si fueran una única obligación universal.
-
 En PD-045 desaparecen los fallos de status, pero sólo una de seis respuestas
 cumple todo: atender la parte doméstica no resuelve por sí solo la continuidad,
 el presupuesto de preguntas o el rechazo de la consulta ajena. Los cambios de
@@ -125,10 +108,7 @@ decisión y de contenido deben comprobarse por separado.
 Los fixes de `6a9a030` expresan reglas generales: procedencia de hechos,
 prioridad de seguridad, intención explícita, relevancia de preguntas,
 fundamentación por candidato y conservación de certeza. No introducen ramas por
-ID de caso, nombres de fixtures ni respuestas del oráculo. Es adecuado usar los
-casos development para descubrir esas causas; optimizar y medir sólo sobre ellos
-no prueba que la solución generalice. Los tests de texto y hashes de los prompts
-verifican su contenido y captura, no que el modelo obedezca esas instrucciones.
+ID de caso, nombres de fixtures ni respuestas del oráculo.
 
 ## Causas pendientes y frontera de intervención
 
@@ -181,30 +161,24 @@ una decisión de orientación por sustitución silenciosa de campos.
 
 PD-002 / 3.5 / trial 1 incumple únicamente el encabezado literal requerido:
 «Qué parece estar informando:» sustituye a «Qué parece estar ocurriendo:», con
-los seis criterios semánticos aprobados. Esa diferencia formal debe seguir
-siendo distinguible de los fallos de seguridad. La nueva visualización de
-comprobaciones explica el resultado guardado; no mejora la conducta del modelo
-ni cambia el contrato para obtener un pase.
+los seis criterios semánticos aprobados. Es un incumplimiento formal del
+contrato de salida.
 
 ## Intervenciones propuestas para C3
 
-Las propuestas siguientes aún no están implementadas. Cada bloque debe tener
-una necesidad comprobada, un mecanismo general y una comprobación de los
-aciertos que debe conservar. No se propone añadir excepciones por caso ni
-debilitar las evaluaciones.
+Las propuestas siguientes priorizan seguridad, decisión y fidelidad, con los
+aciertos que cada intervención debe conservar.
 
 | Intervención | Mecanismo y frontera | Comprobación y aciertos que proteger |
 | --- | --- | --- |
 | Candidato PD: triaje y decisión coherentes | Desambiguar en `answerPrompt` la asistencia de emergencia frente a una visita profesional urgente, según peligro informado y evolución. Consolidar la precedencia entre seguridad, contratación explícita, suficiencia y continuidad; después elegir action/outcome y completar sólo sus campos compatibles. Las restricciones y contingencias deben corresponder al peligro, sin declarar urgente cualquier problema eléctrico. | Comprobar los fallos críticos anteriores, decisiones prematuras, preguntas y solicitudes mixtas. Mantener `no_diy` sin fallos, la contratación de PD-048 y el seguimiento que no necesita reabrir una entrevista. No ocultar un fallo de outcome rellenando campos en el parser. |
 | Candidato PD: fidelidad de toda la respuesta | Consolidar la separación entre observación, relato, hipótesis y desconocido en `content`, descripción y descripciones visuales. Mantener una prohibición común de convertir indicios en hechos; no añadir una regla por cada afirmación inventada. | Medir invenciones y contradicciones por campo, con la misma entrada y criterio. Proteger hipótesis preliminares justificadas y selección de referencias pertinentes. Para imágenes cuya instrucción ya es explícita, contrastar capacidad del modelo antes de añadir más texto. |
-| Candidato SM: conservación de relaciones | Revisar la compresión para que retenga, por problema o entidad, el hecho relevante, su fuente, momento y grado de certeza. Eliminar redundancia antes que relaciones necesarias para la continuidad. Mantener el esquema de salida actual como primera alternativa. | Comprobar preservación, correcciones y hechos aún vigentes sin mezclar ambientes ni observación visual con relato. Conservar la mejora de SM-003, referencias exactas y brevedad. Los cuatro casos actuales no justifican afirmar eficacia general ni introducir una nueva arquitectura de memoria. |
+| Candidato SM: conservación de relaciones | Revisar la compresión para que retenga, por problema o entidad, el hecho relevante, su fuente, momento y grado de certeza. Eliminar redundancia antes que relaciones necesarias para la continuidad. Mantener el esquema de salida actual como primera alternativa. | Comprobar preservación, correcciones y hechos aún vigentes sin mezclar ambientes ni observación visual con relato. Conservar la mejora de SM-003, referencias exactas y brevedad. Comprobar los cuatro casos actuales antes de introducir una nueva arquitectura de memoria. |
 | RK: conservar y acotar los residuales | Mantener la ordenación y las instrucciones que ya mejoraron las razones. Investigar únicamente las causas residuales demostradas: límite probatorio de reseñas en RK-013 / 3.1 / trial 1 y traslado de antecedentes en RK-011 / 3.5 / trial 1. | Conservar el 82/84 completo, los casos sin historial y las métricas de orden. No alargar el prompt ni cambiar el ranking automáticamente por dos incumplimientos de las razones. |
 | Invariantes y formato | Reutilizar parser y dominio para rechazar relaciones inválidas. Como alternativa posterior, comprobar si el esquema soportado por el proveedor permite expresar esas mismas relaciones antes de generar. Encabezados y presentación quedan después de seguridad y fidelidad. | Mantener el rechazo de `replace` con outcome vacío y los grados de la salida realmente recibida. No reparar silenciosamente valores, repetir una generación por calidad ni relajar encabezados para obtener un pase. |
 
-Las dos primeras intervenciones forman un candidato cohesivo de PD; SM puede
-prepararse como candidato de su tarea independiente. El contenido exacto del
-cambio debe justificarse por esas clases de fallo y revisarse antes de medirlo.
-No se requiere fragmentar la implementación en una modificación por fixture.
+Las dos primeras intervenciones forman un candidato de PD; SM puede prepararse
+como candidato de su tarea independiente.
 
 La elección de modelo también pertenece a la solución. La tasa conjunta favorece
 a 3.5, pero los 46 fallos de legibilidad de C2 corresponden a PD de 3.1, mientras
@@ -215,33 +189,5 @@ Una comparación adicional debe mantener fijos input, contrato y prompt cuando
 busque aislar el modelo; cambiar modelo e instrucciones a la vez no identifica
 cuál explica la diferencia.
 
-Se conserva el ciclo acordado: publicar el corte final de C2, acordar los
-candidatos y sus cambios deliberados, verificarlos localmente y, con las
-autorizaciones de ejecución correspondientes, realizar smoke y C3 sobre la
-misma suite de desarrollo. La comparación debe mostrar mejoras y regresiones
-con los mismos denominadores, incluidos los outputs inválidos. La reserva no se
-usa para elegir ni ajustar los cambios; la generalización sigue pendiente de
-una comprobación independiente del desarrollo usado para corregir la solución.
-
-## Procedencia y cierre de la medición
-
-El corte aprobado de C2 sigue conservado en el bundle editorial local; todavía
-no existe un export público equivalente al de C1 en `evals/campaigns/campaign-2`.
-La fuente congelada para este diagnóstico es
-`tmp/c2-diagnosis-20261024/data.json`, SHA-256
-`1f75007c7bd8b2c8a3ff88fbb8ae37b67ebb0b1fd5db11c91a4b90437786017c`.
-El manifiesto efectivo de C2 tiene hash
-`d7a248d469f1b7805494829c1d61eef41204401d4742bc2660e478eb7700424f`.
-
-Ese corte incorpora la calibración semántica aplicada, la auditoría de razones y
-citas, la evaluación manual de PD-037 y la corrección contextual de RK-007 / 3.5 /
-trial 2. Esta última aprueba `grounding` y `uncertainty` sin generar otra
-respuesta; por eso el total vigente es 191/312, no el 190/312 anterior. Las
-correcciones de evaluación no deben atribuirse como cambios del modelo.
-
-Antes de usar C2 como baseline durable de C3, corresponde publicar una proyección
-de los resultados efectivos, respuestas, evaluaciones, resumen y manifiesto con
-sus hashes, siguiendo el patrón final de C1. Debe conservar la salida inválida
-de PD-037 y la procedencia de su evaluación manual, y excluir identidades,
-conversaciones de revisión y notas privadas. La aprobación humana de la
-evaluación no elimina los 25 trials con fallo crítico ni autoriza un release.
+El siguiente paso es preparar los candidatos PD y SM, verificar los aciertos
+que deben conservar y medirlos sobre la misma suite de desarrollo.
