@@ -7,6 +7,8 @@ required:
 - description
 - status
 - images
+- service_address
+- created_on
 properties:
   id:
     type: integer
@@ -39,4 +41,10 @@ properties:
     maxItems: 3
     items:
       $ref: '#/components/schemas/MessageImage'
+  service_address:
+    $ref: '#/components/schemas/JobRequestServiceAddress'
+  created_on:
+    type: string
+    format: date-time
+    description: Timestamp when the request was created.
 additionalProperties: false

@@ -13,4 +13,10 @@ type Profile struct {
 	RatingCount      int
 	IdentityVerified bool
 	WorkOrders       []WorkOrder
+	CoverageZones    []CoverageZone
+}
+
+type CoverageZone struct {
+	ID   int
+	Name string
 }

@@ -265,6 +265,11 @@ func (s *Service) GetProviderProfileDetail(ctx context.Context, providerID int) 
 	}
 
 	ratingSummary := ratingStats.Summary()
+	coverageZones := make([]readmodel.CoverageZone, 0, len(foundProvider.CoverageZones))
+	for _, zone := range foundProvider.CoverageZones {
+		coverageZones = append(coverageZones, readmodel.CoverageZone{ID: zone.ID, Name: zone.Name})
+	}
+
 	return &readmodel.Profile{
 		ID:               foundProvider.ID(),
 		Name:             foundProvider.Name(),
@@ -276,6 +281,7 @@ func (s *Service) GetProviderProfileDetail(ctx context.Context, providerID int) 
 		RatingCount:      ratingSummary.Count,
 		IdentityVerified: identityApprovedByProviderID[foundProvider.ID()],
 		WorkOrders:       workOrders,
+		CoverageZones:    coverageZones,
 	}, nil
 }
 

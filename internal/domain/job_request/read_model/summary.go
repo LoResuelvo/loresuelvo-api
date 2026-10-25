@@ -1,5 +1,11 @@
 package readmodel
 
+import (
+	"time"
+
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/consumer"
+)
+
 type JobRequestSummary struct {
 	ID             int
 	ConversationID int
@@ -8,6 +14,8 @@ type JobRequestSummary struct {
 	Status         string
 	Requester      JobRequestRequester
 	Images         []JobRequestImage
+	ServiceAddress *consumer.Address
+	CreatedOn      time.Time
 }
 
 type JobRequestRequester struct {

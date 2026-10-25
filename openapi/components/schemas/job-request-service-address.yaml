@@ -1,0 +1,21 @@
+type:
+- object
+- 'null'
+description: Address snapshot captured from the consumer profile when the job request was created. Null for legacy requests without a saved address.
+required:
+- street
+- street_number
+properties:
+  street:
+    type: string
+    example: Av. Corrientes
+  street_number:
+    type: string
+    example: '1234'
+  floor:
+    type: string
+    example: '3'
+  unit:
+    type: string
+    example: B
+additionalProperties: false

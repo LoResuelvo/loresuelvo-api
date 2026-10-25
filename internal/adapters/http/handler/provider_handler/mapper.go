@@ -53,6 +53,11 @@ func providerSearchResponsesFromReadModel(results []readmodel.ProviderSearchResu
 }
 
 func providerProfileResponseFromReadModel(profile readmodel.Profile) providerProfileResponse {
+	coverageZones := make([]providerProfileCoverageZoneResponse, 0, len(profile.CoverageZones))
+	for _, zone := range profile.CoverageZones {
+		coverageZones = append(coverageZones, providerProfileCoverageZoneResponse{ID: zone.ID, Name: zone.Name})
+	}
+
 	workOrders := make([]providerProfileWorkOrderResponse, 0, len(profile.WorkOrders))
 	for _, workOrder := range profile.WorkOrders {
 		workOrderResponse := providerProfileWorkOrderResponse{
@@ -94,5 +99,6 @@ func providerProfileResponseFromReadModel(profile readmodel.Profile) providerPro
 		RatingCount:      profile.RatingCount,
 		IdentityVerified: profile.IdentityVerified,
 		WorkOrders:       workOrders,
+		CoverageZones:    coverageZones,
 	}
 }

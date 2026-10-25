@@ -10,6 +10,7 @@ required:
 - rating_count
 - identity_verified
 - work_orders
+- coverage_zones
 properties:
   id:
     type: integer
@@ -45,4 +46,9 @@ properties:
     type: array
     items:
       $ref: '#/components/schemas/ProviderProfileWorkOrder'
+  coverage_zones:
+    type: array
+    description: Coverage zones saved for this provider.
+    items:
+      $ref: '#/components/schemas/ProviderProfileCoverageZone'
 additionalProperties: false

@@ -42,6 +42,9 @@ get:
             rating_average: 4.5
             rating_count: 2
             identity_verified: true
+            coverage_zones:
+            - id: 6
+              name: Comuna 6
             work_orders:
             - id: 84
               scheduled_on: '2026-08-15T15:00:00Z'

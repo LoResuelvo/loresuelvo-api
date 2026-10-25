@@ -23,6 +23,12 @@ get:
                 title: Reparación de fuga en la cocina
                 description: Hola Ana, necesito reparar una fuga de agua en la cocina. ¿Podrías ayudarme esta semana?
                 status: pending
+                service_address:
+                  street: Av. Corrientes
+                  street_number: '1234'
+                  floor: '3'
+                  unit: B
+                created_on: '2026-10-10T12:00:00Z'
                 requester:
                   name: Ana
                   surname: Pérez
@@ -53,7 +59,9 @@ post:
     Creates a job request from the authenticated consumer to a provider and
     links it to a pending conversation. The provider's current category must be
     enabled when the request is persisted; disabling a category does not cancel
-    requests and negotiations that already exist. After the job request and
+    requests and negotiations that already exist. The request captures the
+    consumer's service address at creation time and keeps that snapshot with
+    the request. After the job request and
     conversation are committed, the API persists a `job_request_received`
     notification for the assigned provider and attempts delivery through the
     existing realtime and phone-notice channels.
@@ -95,6 +103,12 @@ post:
                 title: Reparación de fuga en la cocina
                 description: Hola Ana, necesito reparar una fuga de agua en la cocina. ¿Podrías ayudarme esta semana?
                 status: pending
+                service_address:
+                  street: Av. Corrientes
+                  street_number: '1234'
+                  floor: '3'
+                  unit: B
+                created_on: '2026-10-10T12:00:00Z'
                 images:
                 - id: 4af47f1b-97b6-4b32-baa0-b95d6077f919
                   url: https://cdn.example/private/job-request-image.jpg?signature=temporary

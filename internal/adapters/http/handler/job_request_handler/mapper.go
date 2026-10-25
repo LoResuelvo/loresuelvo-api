@@ -1,6 +1,7 @@
 package job_request_handler
 
 import (
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/consumer"
 	filedomain "github.com/LoResuelvo/loresuelvo-api/internal/domain/file"
 	jobrequest "github.com/LoResuelvo/loresuelvo-api/internal/domain/job_request"
 	readmodel "github.com/LoResuelvo/loresuelvo-api/internal/domain/job_request/read_model"
@@ -14,6 +15,8 @@ func jobRequestResponseFromDomain(createdJobRequest jobrequest.JobRequest) jobRe
 		Description:    createdJobRequest.Description,
 		Status:         string(createdJobRequest.Status),
 		Images:         jobRequestImageResponsesFromDomain(createdJobRequest.Images),
+		ServiceAddress: serviceAddressResponseFromDomain(createdJobRequest.ServiceAddress),
+		CreatedOn:      createdJobRequest.CreatedOn.UTC(),
 	}
 }
 
@@ -30,11 +33,26 @@ func jobRequestSummaryResponsesFromReadModel(jobRequests []readmodel.JobRequestS
 				Name:    jobRequest.Requester.Name,
 				Surname: jobRequest.Requester.Surname,
 			},
-			Images: jobRequestImageResponsesFromReadModel(jobRequest.Images),
+			Images:         jobRequestImageResponsesFromReadModel(jobRequest.Images),
+			ServiceAddress: serviceAddressResponseFromDomain(jobRequest.ServiceAddress),
+			CreatedOn:      jobRequest.CreatedOn.UTC(),
 		}
 	}
 
 	return formattedJobRequests
+}
+
+func serviceAddressResponseFromDomain(address *consumer.Address) *serviceAddressResponse {
+	if address == nil {
+		return nil
+	}
+
+	return &serviceAddressResponse{
+		Street:       address.Street,
+		StreetNumber: address.StreetNumber,
+		Floor:        address.Floor,
+		Unit:         address.Unit,
+	}
 }
 
 func jobRequestImageResponsesFromDomain(images []filedomain.Image) []messageImageResponse {

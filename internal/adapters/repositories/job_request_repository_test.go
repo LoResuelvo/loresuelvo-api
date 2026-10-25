@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/adapters/repositories"
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/consumer"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/conversation"
 	filedomain "github.com/LoResuelvo/loresuelvo-api/internal/domain/file"
 	jobrequest "github.com/LoResuelvo/loresuelvo-api/internal/domain/job_request"
@@ -160,6 +161,8 @@ func TestJobRequestRepositoryCanSaveRequestWithConversation(t *testing.T) {
 	testContext := newJobRequestRepositoryTest(t)
 	consumerID, providerID := savedJobRequestParticipants(t, testContext)
 	requestToSave := validJobRequest(t, consumerID, providerID)
+	serviceAddress := consumer.Address{Street: "Av. Corrientes", StreetNumber: "1234", Floor: "3", Unit: "B"}
+	requestToSave.CaptureServiceAddress(serviceAddress)
 	requestToSave.Images = []filedomain.Image{
 		savedJobRequestImage(t, testContext, "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", "perdida-bajo-mesada.jpg", "auth0|job-request-consumer"),
 	}
@@ -178,6 +181,15 @@ func TestJobRequestRepositoryCanSaveRequestWithConversation(t *testing.T) {
 	assert.Equal(t, jobrequest.StatusPending, savedJobRequest.Status)
 	assert.Equal(t, requestToSave.Images, savedJobRequest.Images)
 	assert.True(t, requestToSave.CreatedOn.Equal(savedJobRequest.CreatedOn))
+	require.NotNil(t, savedJobRequest.ServiceAddress)
+	assert.Equal(t, serviceAddress, *savedJobRequest.ServiceAddress)
+	_, err = testContext.database.Exec(
+		`UPDATE consumer_addresses SET street = $2, street_number = $3 WHERE consumer_id = $1`,
+		consumerID,
+		"Calle Nueva",
+		"987",
+	)
+	require.NoError(t, err)
 
 	foundConversation, err := testContext.conversationRepository.FindByID(context.Background(), savedJobRequest.ConversationID)
 	require.NoError(t, err)
@@ -190,6 +202,8 @@ func TestJobRequestRepositoryCanSaveRequestWithConversation(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, requestToSave.Images, foundJobRequest.Images)
 	assert.True(t, requestToSave.CreatedOn.Equal(foundJobRequest.CreatedOn))
+	require.NotNil(t, foundJobRequest.ServiceAddress)
+	assert.Equal(t, serviceAddress, *foundJobRequest.ServiceAddress)
 }
 
 func TestJobRequestRepositoryRejectsDuplicateRequestBetweenSameConsumerAndProvider(t *testing.T) {
@@ -248,12 +262,16 @@ func TestJobRequestRepositoryCanFindByConversationID(t *testing.T) {
 	assert.Equal(t, requestToSave.Title, foundJobRequest.Title)
 	assert.Equal(t, requestToSave.Description, foundJobRequest.Description)
 	assert.Equal(t, jobrequest.StatusPending, foundJobRequest.Status)
+	assert.Nil(t, foundJobRequest.ServiceAddress)
+	assert.True(t, requestToSave.CreatedOn.Equal(foundJobRequest.CreatedOn))
 }
 
 func TestJobRequestRepositoryCanFindByID(t *testing.T) {
 	testContext := newJobRequestRepositoryTest(t)
 	consumerID, providerID := savedJobRequestParticipants(t, testContext)
 	requestToSave := validJobRequest(t, consumerID, providerID)
+	serviceAddress := consumer.Address{Street: "Calle San Martín", StreetNumber: "101", Floor: "1", Unit: "C"}
+	requestToSave.CaptureServiceAddress(serviceAddress)
 	pendingConversation := conversationForJobRequest(t, consumerID, providerID)
 	savedJobRequest, err := testContext.jobRequestRepository.SaveWithConversation(requestToSave, pendingConversation)
 	require.NoError(t, err)
@@ -269,6 +287,8 @@ func TestJobRequestRepositoryCanFindByID(t *testing.T) {
 	assert.Equal(t, requestToSave.Title, foundJobRequest.Title)
 	assert.Equal(t, requestToSave.Description, foundJobRequest.Description)
 	assert.Equal(t, jobrequest.StatusPending, foundJobRequest.Status)
+	require.NotNil(t, foundJobRequest.ServiceAddress)
+	assert.Equal(t, serviceAddress, *foundJobRequest.ServiceAddress)
 }
 
 func TestJobRequestRepositoryFindByIDReturnsNotFoundIfRequestDoesNotExist(t *testing.T) {
@@ -288,6 +308,8 @@ func TestJobRequestRepositoryCanFindPendingRequestsByConsumerAuthID(t *testing.T
 	unrelatedProviderID := savedProviderIDWithData(t, testContext, "auth0|job-request-other-provider", "job.request.other.provider@example.com", "Pedro", "Diaz", "Electricidad")
 
 	requestToFind := validJobRequest(t, consumerID, providerID)
+	serviceAddress := consumer.Address{Street: "Av. Belgrano", StreetNumber: "456"}
+	requestToFind.CaptureServiceAddress(serviceAddress)
 	savedJobRequest, err := testContext.jobRequestRepository.SaveWithConversation(requestToFind, conversationForJobRequest(t, consumerID, providerID))
 	require.NoError(t, err)
 	_, err = testContext.jobRequestRepository.SaveWithConversation(validJobRequest(t, unrelatedConsumerID, unrelatedProviderID), conversationForJobRequest(t, unrelatedConsumerID, unrelatedProviderID))
@@ -302,6 +324,9 @@ func TestJobRequestRepositoryCanFindPendingRequestsByConsumerAuthID(t *testing.T
 	assert.Equal(t, "Ana", foundJobRequests[0].Requester.Name)
 	assert.Equal(t, "Perez", foundJobRequests[0].Requester.Surname)
 	assert.Equal(t, string(jobrequest.StatusPending), foundJobRequests[0].Status)
+	require.NotNil(t, foundJobRequests[0].ServiceAddress)
+	assert.Equal(t, serviceAddress, *foundJobRequests[0].ServiceAddress)
+	assert.True(t, requestToFind.CreatedOn.Equal(foundJobRequests[0].CreatedOn))
 }
 
 func TestJobRequestRepositoryCanFindPendingRequestsByProviderAuthID(t *testing.T) {
@@ -312,6 +337,8 @@ func TestJobRequestRepositoryCanFindPendingRequestsByProviderAuthID(t *testing.T
 	unrelatedProviderID := savedProviderIDWithData(t, testContext, "auth0|job-request-provider-view-other-provider", "job.request.provider.view.other.provider@example.com", "Pedro", "Diaz", "Electricidad")
 
 	requestToFind := validJobRequest(t, consumerID, providerID)
+	serviceAddress := consumer.Address{Street: "Av. Libertador", StreetNumber: "2000"}
+	requestToFind.CaptureServiceAddress(serviceAddress)
 	savedJobRequest, err := testContext.jobRequestRepository.SaveWithConversation(requestToFind, conversationForJobRequest(t, consumerID, providerID))
 	require.NoError(t, err)
 	_, err = testContext.jobRequestRepository.SaveWithConversation(validJobRequest(t, unrelatedConsumerID, unrelatedProviderID), conversationForJobRequest(t, unrelatedConsumerID, unrelatedProviderID))
@@ -326,6 +353,8 @@ func TestJobRequestRepositoryCanFindPendingRequestsByProviderAuthID(t *testing.T
 	assert.Equal(t, "Ana", foundJobRequests[0].Requester.Name)
 	assert.Equal(t, "Perez", foundJobRequests[0].Requester.Surname)
 	assert.Equal(t, string(jobrequest.StatusPending), foundJobRequests[0].Status)
+	require.NotNil(t, foundJobRequests[0].ServiceAddress)
+	assert.Equal(t, serviceAddress, *foundJobRequests[0].ServiceAddress)
 }
 
 func TestJobRequestRepositoryFindByUserAuthIDReturnsOnlyPendingRequests(t *testing.T) {

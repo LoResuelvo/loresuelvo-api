@@ -146,7 +146,12 @@ func TestJobRequestNotificationIncludesResolvedRequest(t *testing.T) {
 			users := new(notificationUserFinderMock)
 			images := new(notificationImageResolverMock)
 			dispatcher := new(notificationDispatcherMock)
-			request := &jobrequest.JobRequest{ID: 99, ConsumerID: 10, ProviderID: 20, ConversationID: 30, Title: "Leak", Description: "Repair", Status: jobrequest.StatusPending}
+			createdOn := time.Date(2026, 10, 10, 12, 0, 0, 0, time.UTC)
+			serviceAddress := &consumer.Address{Street: "Av. Corrientes", StreetNumber: "1234", Floor: "3", Unit: "B"}
+			request := &jobrequest.JobRequest{
+				ID: 99, ConsumerID: 10, ProviderID: 20, ConversationID: 30, Title: "Leak", Description: "Repair", Status: jobrequest.StatusPending,
+				ServiceAddress: serviceAddress, CreatedOn: createdOn,
+			}
 			resolved := []filedomain.Image{}
 			if attached {
 				request.Images = []filedomain.Image{{FileID: "image", OriginalName: "leak.jpg"}}
@@ -166,6 +171,8 @@ func TestJobRequestNotificationIncludesResolvedRequest(t *testing.T) {
 				assert.Equal(t, "Leak", event.JobRequest.Title)
 				assert.Equal(t, "Repair", event.JobRequest.Description)
 				assert.Equal(t, "pending", event.JobRequest.Status)
+				assert.Equal(t, &realtimeServiceAddress{Street: "Av. Corrientes", StreetNumber: "1234", Floor: "3", Unit: "B"}, event.JobRequest.ServiceAddress)
+				assert.Equal(t, createdOn, event.JobRequest.CreatedOn)
 				assert.Equal(t, realtimeJobRequester{Name: "Ana", Surname: "Gomez"}, event.JobRequest.Requester)
 				require.NotNil(t, event.JobRequest.Images)
 				if attached {

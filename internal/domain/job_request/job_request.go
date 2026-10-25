@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/clock"
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/consumer"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/conversation"
 	filedomain "github.com/LoResuelvo/loresuelvo-api/internal/domain/file"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/notification"
@@ -33,6 +34,7 @@ type JobRequest struct {
 	Status             Status
 	SourceAssessmentID *int
 	Images             []filedomain.Image
+	ServiceAddress     *consumer.Address
 	CreatedOn          time.Time
 }
 
@@ -104,6 +106,11 @@ func (jobRequest *JobRequest) Accept(providerID int) error {
 
 	jobRequest.Status = StatusAccepted
 	return nil
+}
+
+func (jobRequest *JobRequest) CaptureServiceAddress(address consumer.Address) {
+	snapshot := address
+	jobRequest.ServiceAddress = &snapshot
 }
 
 func (jobRequest *JobRequest) CreateReceivedNotification(clock clock.Clock) *notification.Notification {

@@ -1,5 +1,5 @@
 type: object
-description: Pending job request summary returned for an authenticated participant and included in the realtime notification sent to its assigned provider.
+description: Pending job request summary returned for an authenticated participant and included in the realtime notification sent to its assigned provider. The service address is a snapshot from creation time and is null for legacy requests without one.
 required:
 - id
 - conversation_id
@@ -8,6 +8,8 @@ required:
 - status
 - requester
 - images
+- service_address
+- created_on
 properties:
   id:
     type: integer
@@ -42,4 +44,10 @@ properties:
     maxItems: 3
     items:
       $ref: '#/components/schemas/MessageImage'
+  service_address:
+    $ref: '#/components/schemas/JobRequestServiceAddress'
+  created_on:
+    type: string
+    format: date-time
+    description: Timestamp when the request was created.
 additionalProperties: false

@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/consumer"
 	filedomain "github.com/LoResuelvo/loresuelvo-api/internal/domain/file"
 	jobrequest "github.com/LoResuelvo/loresuelvo-api/internal/domain/job_request"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/notification"
@@ -107,14 +108,24 @@ type realtimeEventNotification struct {
 }
 
 type realtimeJobRequest struct {
-	ID             int                    `json:"id"`
-	ConversationID int                    `json:"conversation_id"`
-	Title          string                 `json:"title"`
-	Description    string                 `json:"description"`
-	Status         string                 `json:"status"`
-	Requester      realtimeJobRequester   `json:"requester"`
-	Images         []realtimeMessageImage `json:"images"`
+	ID             int                     `json:"id"`
+	ConversationID int                     `json:"conversation_id"`
+	Title          string                  `json:"title"`
+	Description    string                  `json:"description"`
+	Status         string                  `json:"status"`
+	Requester      realtimeJobRequester    `json:"requester"`
+	Images         []realtimeMessageImage  `json:"images"`
+	ServiceAddress *realtimeServiceAddress `json:"service_address"`
+	CreatedOn      time.Time               `json:"created_on"`
 }
+
+type realtimeServiceAddress struct {
+	Street       string `json:"street"`
+	StreetNumber string `json:"street_number"`
+	Floor        string `json:"floor,omitempty"`
+	Unit         string `json:"unit,omitempty"`
+}
+
 type realtimeJobRequester struct {
 	Name    string `json:"name"`
 	Surname string `json:"surname"`
@@ -138,11 +149,25 @@ func (n *NotificationNotificator) jobRequestPayload(ctx context.Context, notice 
 	}
 	result := &realtimeJobRequest{
 		ID: request.ID, ConversationID: request.ConversationID, Title: request.Title, Description: request.Description, Status: string(request.Status),
-		Requester: realtimeJobRequester{Name: requester.Name(), Surname: requester.Surname()},
-		Images:    make([]realtimeMessageImage, 0, len(images)),
+		Requester:      realtimeJobRequester{Name: requester.Name(), Surname: requester.Surname()},
+		Images:         make([]realtimeMessageImage, 0, len(images)),
+		ServiceAddress: realtimeServiceAddressFromDomain(request.ServiceAddress),
+		CreatedOn:      request.CreatedOn.UTC(),
 	}
 	for _, image := range images {
 		result.Images = append(result.Images, realtimeMessageImage{ID: image.FileID, OriginalName: image.OriginalName, URL: image.URL})
 	}
 	return result, nil
+}
+
+func realtimeServiceAddressFromDomain(address *consumer.Address) *realtimeServiceAddress {
+	if address == nil {
+		return nil
+	}
+	return &realtimeServiceAddress{
+		Street:       address.Street,
+		StreetNumber: address.StreetNumber,
+		Floor:        address.Floor,
+		Unit:         address.Unit,
+	}
 }

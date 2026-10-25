@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/clock"
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/consumer"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/conversation"
 	filedomain "github.com/LoResuelvo/loresuelvo-api/internal/domain/file"
 	readmodel "github.com/LoResuelvo/loresuelvo-api/internal/domain/job_request/read_model"
@@ -47,10 +48,11 @@ func NewService(
 }
 
 func (s *Service) Create(ctx context.Context, consumerAuthID string, providerID int, title, description string, imageFileIDs []string) (*JobRequest, error) {
-	consumerID, err := s.consumerIDForJobRequest(consumerAuthID)
+	foundConsumer, err := s.consumerForJobRequest(ctx, consumerAuthID)
 	if err != nil {
 		return nil, err
 	}
+	consumerID := foundConsumer.ID()
 
 	if err := s.ensureProviderExists(providerID); err != nil {
 		return nil, err
@@ -73,7 +75,8 @@ func (s *Service) Create(ctx context.Context, consumerAuthID string, providerID 
 	if err != nil {
 		return nil, err
 	}
-	jobRequest.CreatedOn = s.clock.Now()
+	captureCurrentConsumerAddress(jobRequest, foundConsumer)
+	jobRequest.CreatedOn = s.clock.Now().UTC()
 
 	return s.saveNewRequest(ctx, *jobRequest, pendingConversation)
 }
@@ -93,10 +96,11 @@ func (s *Service) jobRequestImages(ctx context.Context, consumerAuthID string, i
 }
 
 func (s *Service) CreateFromChatbotAssessment(ctx context.Context, consumerAuthID string, chatbotConversationID, providerID int) (*JobRequest, error) {
-	consumerID, err := s.consumerIDForJobRequest(consumerAuthID)
+	foundConsumer, err := s.consumerForJobRequest(ctx, consumerAuthID)
 	if err != nil {
 		return nil, err
 	}
+	consumerID := foundConsumer.ID()
 	foundConversation, err := s.conversationRepository.FindByID(ctx, chatbotConversationID)
 	if err != nil {
 		return nil, err
@@ -129,7 +133,8 @@ func (s *Service) CreateFromChatbotAssessment(ctx context.Context, consumerAuthI
 	if err != nil {
 		return nil, err
 	}
-	jobRequest.CreatedOn = s.clock.Now()
+	captureCurrentConsumerAddress(jobRequest, foundConsumer)
+	jobRequest.CreatedOn = s.clock.Now().UTC()
 	pendingConversation, err := conversation.NewPendingConversation(consumerID, providerID)
 	if err != nil {
 		return nil, err
@@ -190,13 +195,20 @@ func (s *Service) Accept(ctx context.Context, providerAuthID string, jobRequestI
 	return jobRequest, nil
 }
 
-func (s *Service) consumerIDForJobRequest(consumerAuthID string) (int, error) {
-	consumerID, err := s.userRepository.FindIDByAuthID(consumerAuthID)
-	if err != nil {
-		return 0, ErrOnlyConsumerCanCreateJobRequest
+func (s *Service) consumerForJobRequest(ctx context.Context, consumerAuthID string) (*consumer.Consumer, error) {
+	foundConsumer, err := s.userRepository.FindConsumerByAuthID(ctx, consumerAuthID)
+	if err != nil || foundConsumer == nil {
+		return nil, ErrOnlyConsumerCanCreateJobRequest
 	}
 
-	return consumerID, nil
+	return foundConsumer, nil
+}
+
+func captureCurrentConsumerAddress(jobRequest *JobRequest, foundConsumer *consumer.Consumer) {
+	address := foundConsumer.Address()
+	if address.Validate() == nil {
+		jobRequest.CaptureServiceAddress(address)
+	}
 }
 
 func (s *Service) ensureProviderExists(providerID int) error {

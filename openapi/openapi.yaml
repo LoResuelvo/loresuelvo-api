@@ -241,8 +241,9 @@ paths:
         only to the provider assigned to it. The `notification` identifies the
         `job_request`; the event also includes a `job_request` object using the
         pending JobRequestSummary shape (requester, title, description, status,
-        and images). This detail is available through the authenticated realtime
-        channel, not in the phone notice.
+        service address, creation timestamp, and images). The address is the
+        snapshot captured when the request was created. This detail is available
+        through the authenticated realtime channel, not in the phone notice.
 
         **Conversation message event:**
         ```json
@@ -293,6 +294,13 @@ paths:
             "title": "Reparación de fuga en la cocina",
             "description": "Hola Juan, necesito reparar una fuga de agua en la cocina.",
             "status": "pending",
+            "service_address": {
+              "street": "Av. Corrientes",
+              "street_number": "1234",
+              "floor": "3",
+              "unit": "B"
+            },
+            "created_on": "2026-10-10T12:00:00Z",
             "requester": {"name": "Ana", "surname": "Gomez"},
             "images": [{
               "id": "4af47f1b-97b6-4b32-baa0-b95d6077f919",
@@ -426,6 +434,8 @@ components:
       $ref: ./components/schemas/provider-search-result.yaml
     ProviderProfile:
       $ref: ./components/schemas/provider-profile.yaml
+    ProviderProfileCoverageZone:
+      $ref: ./components/schemas/provider-profile-coverage-zone.yaml
     ProviderProfileWorkOrder:
       $ref: ./components/schemas/provider-profile-work-order.yaml
     ProviderProfileCompletionReport:
@@ -568,6 +578,8 @@ components:
       $ref: ./components/schemas/job-request.yaml
     JobRequestSummary:
       $ref: ./components/schemas/job-request-summary.yaml
+    JobRequestServiceAddress:
+      $ref: ./components/schemas/job-request-service-address.yaml
     JobRequestRequester:
       $ref: ./components/schemas/job-request-requester.yaml
     SendMessageRequest:

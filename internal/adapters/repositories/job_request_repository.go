@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/consumer"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/conversation"
 	filedomain "github.com/LoResuelvo/loresuelvo-api/internal/domain/file"
 	jobrequest "github.com/LoResuelvo/loresuelvo-api/internal/domain/job_request"
@@ -76,12 +77,20 @@ func (repository *JobRequestRepository) saveWithConversationWithTx(ctx context.C
 		return nil, mapJobRequestInsertError(err)
 	}
 
+	serviceStreet, serviceStreetNumber, serviceFloor, serviceUnit := serviceAddressInsertValues(jobRequest.ServiceAddress)
 	var savedJobRequest jobrequest.JobRequest
+	var savedServiceStreet, savedServiceStreetNumber, savedServiceFloor, savedServiceUnit sql.NullString
 	err = tx.QueryRowContext(
 		ctx,
-		`INSERT INTO job_requests (consumer_id, provider_id, conversation_id, title, description, status, source_assessment_id, created_on, updated_on)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $8)
-		RETURNING id, consumer_id, provider_id, conversation_id, title, description, status, source_assessment_id, created_on`,
+		`INSERT INTO job_requests (
+			consumer_id, provider_id, conversation_id, title, description, status,
+			source_assessment_id, created_on, updated_on, service_address_street,
+			service_address_street_number, service_address_floor, service_address_unit
+		)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $8, $9, $10, $11, $12)
+		RETURNING id, consumer_id, provider_id, conversation_id, title, description,
+			status, source_assessment_id, created_on, service_address_street,
+			service_address_street_number, service_address_floor, service_address_unit`,
 		jobRequest.ConsumerID,
 		jobRequest.ProviderID,
 		conversationID,
@@ -90,6 +99,10 @@ func (repository *JobRequestRepository) saveWithConversationWithTx(ctx context.C
 		jobRequest.Status,
 		jobRequest.SourceAssessmentID,
 		jobRequest.CreatedOn.UTC(),
+		serviceStreet,
+		serviceStreetNumber,
+		serviceFloor,
+		serviceUnit,
 	).Scan(
 		&savedJobRequest.ID,
 		&savedJobRequest.ConsumerID,
@@ -100,9 +113,18 @@ func (repository *JobRequestRepository) saveWithConversationWithTx(ctx context.C
 		&savedJobRequest.Status,
 		&savedJobRequest.SourceAssessmentID,
 		&savedJobRequest.CreatedOn,
+		&savedServiceStreet,
+		&savedServiceStreetNumber,
+		&savedServiceFloor,
+		&savedServiceUnit,
 	)
 	if err != nil {
 		return nil, mapJobRequestInsertError(err)
+	}
+	savedJobRequest.CreatedOn = savedJobRequest.CreatedOn.UTC()
+	savedJobRequest.ServiceAddress, err = serviceAddressFromNullStrings(savedServiceStreet, savedServiceStreetNumber, savedServiceFloor, savedServiceUnit)
+	if err != nil {
+		return nil, fmt.Errorf("reading saved job request service address: %w", err)
 	}
 	savedJobRequest.Images = append([]filedomain.Image(nil), jobRequest.Images...)
 
@@ -145,8 +167,11 @@ func (repository *JobRequestRepository) ExistsBetweenWithAnyStatus(consumerID, p
 
 func (repository *JobRequestRepository) FindByConversationID(conversationID int) (*jobrequest.JobRequest, error) {
 	var foundJobRequest jobrequest.JobRequest
+	var serviceStreet, serviceStreetNumber, serviceFloor, serviceUnit sql.NullString
 	err := repository.db.QueryRow(
-		`SELECT id, consumer_id, provider_id, conversation_id, title, description, status, source_assessment_id, created_on
+		`SELECT id, consumer_id, provider_id, conversation_id, title, description, status,
+			source_assessment_id, created_on, service_address_street,
+			service_address_street_number, service_address_floor, service_address_unit
 		FROM job_requests
 		WHERE conversation_id = $1`,
 		conversationID,
@@ -160,9 +185,18 @@ func (repository *JobRequestRepository) FindByConversationID(conversationID int)
 		&foundJobRequest.Status,
 		&foundJobRequest.SourceAssessmentID,
 		&foundJobRequest.CreatedOn,
+		&serviceStreet,
+		&serviceStreetNumber,
+		&serviceFloor,
+		&serviceUnit,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("finding job request by conversation id: %w", err)
+	}
+	foundJobRequest.CreatedOn = foundJobRequest.CreatedOn.UTC()
+	foundJobRequest.ServiceAddress, err = serviceAddressFromNullStrings(serviceStreet, serviceStreetNumber, serviceFloor, serviceUnit)
+	if err != nil {
+		return nil, fmt.Errorf("reading job request service address by conversation id: %w", err)
 	}
 	imagesByJobRequestID, err := repository.findImagesByJobRequestIDs([]int{foundJobRequest.ID})
 	if err != nil {
@@ -175,8 +209,11 @@ func (repository *JobRequestRepository) FindByConversationID(conversationID int)
 
 func (repository *JobRequestRepository) FindByID(id int) (*jobrequest.JobRequest, error) {
 	var foundJobRequest jobrequest.JobRequest
+	var serviceStreet, serviceStreetNumber, serviceFloor, serviceUnit sql.NullString
 	err := repository.db.QueryRow(
-		`SELECT id, consumer_id, provider_id, conversation_id, title, description, status, source_assessment_id, created_on
+		`SELECT id, consumer_id, provider_id, conversation_id, title, description, status,
+			source_assessment_id, created_on, service_address_street,
+			service_address_street_number, service_address_floor, service_address_unit
 		FROM job_requests
 		WHERE id = $1`,
 		id,
@@ -190,6 +227,10 @@ func (repository *JobRequestRepository) FindByID(id int) (*jobrequest.JobRequest
 		&foundJobRequest.Status,
 		&foundJobRequest.SourceAssessmentID,
 		&foundJobRequest.CreatedOn,
+		&serviceStreet,
+		&serviceStreetNumber,
+		&serviceFloor,
+		&serviceUnit,
 	)
 
 	if err != nil {
@@ -197,6 +238,11 @@ func (repository *JobRequestRepository) FindByID(id int) (*jobrequest.JobRequest
 			return nil, jobrequest.ErrJobRequestNotFound
 		}
 		return nil, fmt.Errorf("finding job request by id: %w", err)
+	}
+	foundJobRequest.CreatedOn = foundJobRequest.CreatedOn.UTC()
+	foundJobRequest.ServiceAddress, err = serviceAddressFromNullStrings(serviceStreet, serviceStreetNumber, serviceFloor, serviceUnit)
+	if err != nil {
+		return nil, fmt.Errorf("reading job request service address by id: %w", err)
 	}
 	imagesByJobRequestID, err := repository.findImagesByJobRequestIDs([]int{foundJobRequest.ID})
 	if err != nil {
@@ -239,7 +285,12 @@ func (repository *JobRequestRepository) FindByUserAuthID(userAuthID string) ([]r
 			job_requests.description,
 			job_requests.status,
 			consumer_users.name,
-			consumer_users.surname
+			consumer_users.surname,
+			job_requests.service_address_street,
+			job_requests.service_address_street_number,
+			job_requests.service_address_floor,
+			job_requests.service_address_unit,
+			job_requests.created_on
 		FROM job_requests
 		INNER JOIN conversations ON conversations.id = job_requests.conversation_id
 		INNER JOIN consumers ON consumers.user_id = job_requests.consumer_id
@@ -262,6 +313,7 @@ func (repository *JobRequestRepository) FindByUserAuthID(userAuthID string) ([]r
 	jobRequests := []readmodel.JobRequestSummary{}
 	for rows.Next() {
 		var foundJobRequest readmodel.JobRequestSummary
+		var serviceStreet, serviceStreetNumber, serviceFloor, serviceUnit sql.NullString
 		if err := rows.Scan(
 			&foundJobRequest.ID,
 			&foundJobRequest.ConversationID,
@@ -270,8 +322,18 @@ func (repository *JobRequestRepository) FindByUserAuthID(userAuthID string) ([]r
 			&foundJobRequest.Status,
 			&foundJobRequest.Requester.Name,
 			&foundJobRequest.Requester.Surname,
+			&serviceStreet,
+			&serviceStreetNumber,
+			&serviceFloor,
+			&serviceUnit,
+			&foundJobRequest.CreatedOn,
 		); err != nil {
 			return nil, fmt.Errorf("scanning job request by user auth id: %w", err)
+		}
+		foundJobRequest.CreatedOn = foundJobRequest.CreatedOn.UTC()
+		foundJobRequest.ServiceAddress, err = serviceAddressFromNullStrings(serviceStreet, serviceStreetNumber, serviceFloor, serviceUnit)
+		if err != nil {
+			return nil, fmt.Errorf("reading job request service address by user auth id: %w", err)
 		}
 
 		jobRequests = append(jobRequests, foundJobRequest)
@@ -294,6 +356,40 @@ func (repository *JobRequestRepository) FindByUserAuthID(userAuthID string) ([]r
 	}
 
 	return jobRequests, nil
+}
+
+func serviceAddressInsertValues(address *consumer.Address) (any, any, any, any) {
+	if address == nil {
+		return nil, nil, nil, nil
+	}
+
+	return address.Street, address.StreetNumber, nullableServiceAddressField(address.Floor), nullableServiceAddressField(address.Unit)
+}
+
+func nullableServiceAddressField(value string) any {
+	if value == "" {
+		return nil
+	}
+	return value
+}
+
+func serviceAddressFromNullStrings(street, streetNumber, floor, unit sql.NullString) (*consumer.Address, error) {
+	if street.Valid != streetNumber.Valid {
+		return nil, fmt.Errorf("street and street number must both be present")
+	}
+	if !street.Valid {
+		if floor.Valid || unit.Valid {
+			return nil, fmt.Errorf("optional service address fields require a street address")
+		}
+		return nil, nil
+	}
+
+	return &consumer.Address{
+		Street:       street.String,
+		StreetNumber: streetNumber.String,
+		Floor:        floor.String,
+		Unit:         unit.String,
+	}, nil
 }
 
 func saveJobRequestImagesWithTx(ctx context.Context, tx *sql.Tx, jobRequestID int, images []filedomain.Image) error {

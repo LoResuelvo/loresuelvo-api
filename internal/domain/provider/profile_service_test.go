@@ -74,6 +74,7 @@ func TestServiceIncludesIdentityApprovalInPublicProfile(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, profile.IdentityVerified)
 	assert.Equal(t, []int{12}, identityReader.providerIDs)
+	assert.Equal(t, []readmodel.CoverageZone{{ID: 6, Name: "Comuna 6"}}, profile.CoverageZones)
 }
 
 func TestServicePropagatesRatingStatsError(t *testing.T) {

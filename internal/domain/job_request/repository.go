@@ -2,7 +2,9 @@ package jobrequest
 
 import (
 	"context"
+
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/category"
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/consumer"
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/conversation"
 	readmodel "github.com/LoResuelvo/loresuelvo-api/internal/domain/job_request/read_model"
@@ -19,6 +21,7 @@ type Repository interface {
 
 type UserRepository interface {
 	FindIDByAuthID(authID string) (int, error)
+	FindConsumerByAuthID(ctx context.Context, authID string) (*consumer.Consumer, error)
 	ExistsProviderByID(id int) (bool, error)
 	FindProviderByID(ctx context.Context, id int) (*provider.Provider, error)
 }

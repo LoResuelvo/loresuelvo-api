@@ -7,7 +7,9 @@ import (
 	"time"
 
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/category"
+	"github.com/LoResuelvo/loresuelvo-api/internal/domain/consumer"
 	"github.com/LoResuelvo/loresuelvo-api/internal/domain/conversation"
+	coveragezone "github.com/LoResuelvo/loresuelvo-api/internal/domain/coverage_zone"
 	filedomain "github.com/LoResuelvo/loresuelvo-api/internal/domain/file"
 	jobrequest "github.com/LoResuelvo/loresuelvo-api/internal/domain/job_request"
 	readmodel "github.com/LoResuelvo/loresuelvo-api/internal/domain/job_request/read_model"
@@ -85,6 +87,7 @@ func (r *jobRequestRepositoryMock) SaveStatus(ctx context.Context, jobRequest jo
 
 type consumerRepo struct {
 	consumerID int
+	address    consumer.Address
 	err        error
 }
 
@@ -107,8 +110,11 @@ type userRepositoryMock struct {
 	provider *providerRepo
 }
 
-func newUserRepositoryMock(consumer *consumerRepo, provider *providerRepo) *userRepositoryMock {
-	return &userRepositoryMock{consumer: consumer, provider: provider}
+func newUserRepositoryMock(consumerRepository *consumerRepo, provider *providerRepo) *userRepositoryMock {
+	if consumerRepository != nil && consumerRepository.address.Street == "" {
+		consumerRepository.address = consumer.Address{Street: "Av. Siempre Viva", StreetNumber: "742"}
+	}
+	return &userRepositoryMock{consumer: consumerRepository, provider: provider}
 }
 
 func (m *userRepositoryMock) FindIDByAuthID(authID string) (int, error) {
@@ -116,6 +122,14 @@ func (m *userRepositoryMock) FindIDByAuthID(authID string) (int, error) {
 		return m.provider.FindIDByAuthID(authID)
 	}
 	return m.consumer.FindIDByAuthID(authID)
+}
+
+func (m *userRepositoryMock) FindConsumerByAuthID(_ context.Context, authID string) (*consumer.Consumer, error) {
+	if m.consumer.err != nil {
+		return nil, m.consumer.err
+	}
+	baseUser := user.RehydrateBaseUser(m.consumer.consumerID, authID, "", "Ana", "Perez", consumer.Role, nil)
+	return consumer.RehydrateConsumer(baseUser, m.consumer.address, consumer.GeoPoint{}, coveragezone.CoverageZone{}), nil
 }
 
 func (m *userRepositoryMock) ExistsProviderByID(id int) (bool, error) {
@@ -164,6 +178,8 @@ func TestCreateFromChatbotAssessmentCopiesCurrentAssessment(t *testing.T) {
 	require.Len(t, repo.savedJobRequest, 1)
 	assert.Equal(t, assessment.ProblemTitle, repo.savedJobRequest[0].Title)
 	assert.Equal(t, assessment.ProblemDescription, repo.savedJobRequest[0].Description)
+	require.NotNil(t, repo.savedJobRequest[0].ServiceAddress)
+	assert.Equal(t, consumer.Address{Street: "Av. Siempre Viva", StreetNumber: "742"}, *repo.savedJobRequest[0].ServiceAddress)
 	require.NotNil(t, repo.savedJobRequest[0].SourceAssessmentID)
 	assert.Equal(t, assessment.ID, *repo.savedJobRequest[0].SourceAssessmentID)
 }
@@ -318,7 +334,9 @@ func TestCreateJobRequestSavesRequestWithPendingConversation(t *testing.T) {
 	assert.Equal(t, "Reparación de fuga", firstSavedRequest.Title)
 	assert.Equal(t, "Necesito ayuda esta semana", firstSavedRequest.Description)
 	assert.Equal(t, jobrequest.StatusPending, firstSavedRequest.Status)
-	assert.Equal(t, jobRequestTestClock{}.Now(), firstSavedRequest.CreatedOn)
+	assert.Equal(t, jobRequestTestClock{}.Now().UTC(), firstSavedRequest.CreatedOn)
+	require.NotNil(t, firstSavedRequest.ServiceAddress)
+	assert.Equal(t, consumer.Address{Street: "Av. Siempre Viva", StreetNumber: "742"}, *firstSavedRequest.ServiceAddress)
 	savedConversation := repo.savedConversation.(*conversation.WorkConversation)
 	assert.Equal(t, conversation.StatusPending, savedConversation.Status())
 	assert.Equal(t, 10, savedConversation.ConsumerID)

@@ -16,8 +16,9 @@ post:
     of the authenticated consumer's current professional assessment. A provider
     from a recommendation saved before its category was disabled cannot be
     contacted for a new request; the category is checked again when this
-    operation is persisted. Existing negotiations remain unaffected. After the
-    job request and conversation are committed, the API persists a
+    operation is persisted. Existing negotiations remain unaffected. The
+    request captures the consumer's service address at creation time and keeps
+    that snapshot with the request. After the job request and conversation are committed, the API persists a
     `job_request_received` notification for the assigned provider and attempts
     delivery through the existing realtime and phone-notice channels.
   security:
