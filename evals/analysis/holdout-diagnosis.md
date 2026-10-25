@@ -1,0 +1,50 @@
+# Diagnóstico de holdout
+
+El candidato `gemini-3.5-flash-lite`, con la solución `41dfefa`, **no aprueba
+holdout**: cumplen todas las comprobaciones **38 de 57 respuestas (66,7 %)**.
+Se aplicó la condición fijada de que todos los criterios aplicables deben
+aprobar. La solución, el modelo y los criterios permanecieron sin cambios.
+
+Los [resultados de holdout](../holdout/holdout-1/README.md) contienen las
+respuestas, los criterios y sus evidencias; el [plan](holdout-plan.md) conserva
+el alcance, la configuración y las condiciones de aprobación.
+
+## Resultado y contraste
+
+| Tarea | C3, modelo 3.5 | Holdout, modelo 3.5 |
+| --- | --- | --- |
+| Prediagnóstico | 72/102 (70,6 %) | 24/42 (57,1 %) |
+| Ranking | 40/42 (95,2 %) | 14/15 (93,3 %) |
+| PD + RK | 112/144 (77,8 %) | 38/57 (66,7 %) |
+
+La diferencia observada en PD + RK es de **−11,1 puntos porcentuales** entre
+conjuntos de casos distintos. SM queda fuera del contraste porque no tiene
+casos de reserva. El [diagnóstico de C3](campaign-3-diagnosis.md) desarrolla
+los cambios respecto de la campaña anterior.
+
+Los 366 criterios semánticos están completos: **347 `pass` y 19 `fail`**,
+sin pendientes. Las comprobaciones deterministas aprueban en **52 de 57**
+respuestas. Hay **seis fallos críticos**, en seis respuestas de dos casos.
+
+## Comportamientos que fallan
+
+| Comportamiento | Casos y trials | Resultado observado |
+| --- | --- | --- |
+| Protección ante riesgos | PD-027, t1–t3; PD-031, t1–t3 | Se omite impedir el reingreso sin autorización o mantener alejadas a otras personas, respectivamente. Son los seis fallos críticos. |
+| Fidelidad a los datos | PD-010 t3; PD-013 t3; PD-016 t2 | Se agregan circunstancias no suministradas sobre uso habitual, continuidad de una pérdida o extensión de un corte. |
+| Preguntas | PD-019 t1–t2; PD-023 t1 y t3 | Se excede el presupuesto de información solicitada; en PD-023 también se presupone un síntoma que el usuario no informó. |
+| Límites de mantenimiento | PD-046 t2; PD-047 t1 | Se amplía la limpieza a suciedad adherida, o se fija un secado de 24 horas sin sustento y falta una condición de detención ante la persistencia del problema. |
+| Fundamentación del ranking | RK-006 t2 | Se atribuye experiencia en grifería que el historial del candidato no respalda. |
+| Clasificación prematura | PD-016 t1–t2 | Ante «se me cortó la luz», se deriva a Electricidad sin recabar la información que exige el caso. Falla el outcome y la categoría. |
+| Categoría de autoservicio | PD-046 t1–t3 | Se recibe una categoría profesional donde la expectativa determinista exige el valor vacío. |
+
+Las dos últimas filas corresponden al contrato determinista vigente. Sus
+resultados se conservan y se distinguen de los criterios semánticos: son
+comprobaciones diferentes sobre la misma respuesta.
+
+## Decisión
+
+**`release_approved=false`.** Holdout detectó omisiones críticas y no alcanzó
+la condición de aprobación. Tampoco elimina los tres trials críticos conocidos
+del modelo 3.5 en desarrollo. Estos resultados cierran la medición de reserva;
+no se modificó la solución ni se repitieron respuestas para mejorar su calidad.
