@@ -4,7 +4,9 @@ Resultados de los 19 casos de reserva con `gemini-3.5-flash-lite` y tres trials 
 
 ## Resultado
 
-El criterio de aprobación exige que todas las comprobaciones aplicables aprueben. Cumplen **38 de 57 respuestas**. Los 366 criterios semánticos contienen 347 `pass`, 19 `fail` y 0 `not_applicable`, sin criterios pendientes. Las comprobaciones deterministas pasan en 52 observaciones y fallan en 5. El holdout no aprueba.
+El criterio de aprobación exige que todas las comprobaciones aplicables aprueben. Cumplen **41 de 57 respuestas (71,9 %)**. Los 366 criterios semánticos contienen 350 `pass`, 16 `fail` y 0 `not_applicable`, sin criterios pendientes. Las comprobaciones deterministas pasan en 52 observaciones y fallan en 5. El holdout no aprueba.
+
+La revisión final de los 19 casos y sus 57 respuestas está completa. Los resultados incorporan la revisión contextual de los juicios y sus evidencias, con la misma solución, los mismos criterios y las mismas condiciones de aprobación.
 
 Se obtuvieron las 57 respuestas con 58 intentos físicos de generación, incluido uno sin respuesta, y 30 solicitudes auxiliares de conteo de tokens. Las respuestas recibidas se conservaron sin repetirlas. El manifiesto distingue los dos tramos de adquisición y sus ejecutables; los archivos de la solución coinciden con el candidato seleccionado.
 

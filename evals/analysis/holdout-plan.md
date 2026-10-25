@@ -71,10 +71,13 @@ repitió ninguna salida por su calidad. Se realizaron **30 conteos de tokens**:
 concurrencia. Las respuestas y sus evaluaciones están vinculadas por los hashes
 de output y criterio.
 
-El resultado se contrastó con los criterios fijados. La solución y la
-evaluación no se ajustaron mirando la reserva. Holdout no elimina los tres
-trials críticos conocidos de 3.5 en desarrollo.
+El resultado final incorpora la revisión de los 19 casos y sus
+57 respuestas, incluidos los juicios y sus evidencias en el contexto completo
+de cada respuesta. La solución, los criterios y las condiciones de aprobación
+se conservaron sin cambios. Holdout no elimina los tres trials críticos
+conocidos de 3.5 en desarrollo.
 
-**Estado:** ejecución y evaluación completas; **holdout no aprobado** y
+**Estado:** ejecución, evaluación y revisión final completas;
+**holdout no aprobado** y
 `release_approved=false`. Véanse el [resultado publicado](../holdout/holdout-1/README.md)
 y el [diagnóstico](holdout-diagnosis.md).

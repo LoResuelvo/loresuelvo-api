@@ -14,16 +14,16 @@
         "passed": 52
       },
       "overall_status_counts": {
-        "failed": 19,
-        "semantic_reviewed": 38
+        "failed": 16,
+        "semantic_reviewed": 41
       },
       "semantic_status_counts": {
-        "assessed": 41,
-        "failed": 16
+        "assessed": 44,
+        "failed": 13
       },
       "criterion_result_counts": {
-        "fail": 19,
-        "pass": 347
+        "fail": 16,
+        "pass": 350
       },
       "metrics": {
         "accepted_outcome_accuracy": {
@@ -125,16 +125,16 @@
             "passed": 37
           },
           "overall_status_counts": {
-            "failed": 18,
-            "semantic_reviewed": 24
+            "failed": 16,
+            "semantic_reviewed": 26
           },
           "semantic_status_counts": {
-            "assessed": 27,
-            "failed": 15
+            "assessed": 29,
+            "failed": 13
           },
           "criterion_result_counts": {
-            "fail": 18,
-            "pass": 267
+            "fail": 16,
+            "pass": 269
           },
           "metrics": {
             "accepted_outcome_accuracy": {
@@ -207,16 +207,13 @@
             "passed": 15
           },
           "overall_status_counts": {
-            "failed": 1,
-            "semantic_reviewed": 14
+            "semantic_reviewed": 15
           },
           "semantic_status_counts": {
-            "assessed": 14,
-            "failed": 1
+            "assessed": 15
           },
           "criterion_result_counts": {
-            "fail": 1,
-            "pass": 80
+            "pass": 81
           },
           "metrics": {
             "ndcg_at_3": {
@@ -308,16 +305,16 @@
         "passed": 37
       },
       "overall_status_counts": {
-        "failed": 18,
-        "semantic_reviewed": 24
+        "failed": 16,
+        "semantic_reviewed": 26
       },
       "semantic_status_counts": {
-        "assessed": 27,
-        "failed": 15
+        "assessed": 29,
+        "failed": 13
       },
       "criterion_result_counts": {
-        "fail": 18,
-        "pass": 267
+        "fail": 16,
+        "pass": 269
       },
       "metrics": {
         "accepted_outcome_accuracy": {
@@ -390,16 +387,13 @@
         "passed": 15
       },
       "overall_status_counts": {
-        "failed": 1,
-        "semantic_reviewed": 14
+        "semantic_reviewed": 15
       },
       "semantic_status_counts": {
-        "assessed": 14,
-        "failed": 1
+        "assessed": 15
       },
       "criterion_result_counts": {
-        "fail": 1,
-        "pass": 80
+        "pass": 81
       },
       "metrics": {
         "ndcg_at_3": {
@@ -488,16 +482,16 @@
       "passed": 52
     },
     "overall_status_counts": {
-      "failed": 19,
-      "semantic_reviewed": 38
+      "failed": 16,
+      "semantic_reviewed": 41
     },
     "semantic_status_counts": {
-      "assessed": 41,
-      "failed": 16
+      "assessed": 44,
+      "failed": 13
     },
     "criterion_result_counts": {
-      "fail": 19,
-      "pass": 347
+      "fail": 16,
+      "pass": 350
     },
     "metrics": {
       "accepted_outcome_accuracy": {
