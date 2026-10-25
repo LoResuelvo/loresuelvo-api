@@ -1,0 +1,1370 @@
+{
+  "format_version": "campaign-results/1",
+  "campaign_id": "campaign-3",
+  "scope": "development",
+  "models": {
+    "gemini-3.1-flash-lite": {
+      "observations": 156,
+      "base_cases": 52,
+      "execution_status_counts": {
+        "executed": 156
+      },
+      "deterministic_status_counts": {
+        "failed": 2,
+        "passed": 154
+      },
+      "overall_status_counts": {
+        "failed": 66,
+        "semantic_reviewed": 90
+      },
+      "semantic_status_counts": {
+        "assessed": 90,
+        "failed": 66
+      },
+      "criterion_result_counts": {
+        "fail": 100,
+        "not_applicable": 2,
+        "pass": 939
+      },
+      "metrics": {
+        "accepted_outcome_accuracy": {
+          "observations": 102,
+          "evaluated_base_cases": 34,
+          "base_case_mean": 0.9901960784313726,
+          "minimum_observation": 0,
+          "maximum_observation": 1
+        },
+        "category_accuracy_when_required": {
+          "observations": 63,
+          "evaluated_base_cases": 21,
+          "base_case_mean": 1,
+          "minimum_observation": 1,
+          "maximum_observation": 1
+        },
+        "ndcg_at_3": {
+          "observations": 42,
+          "evaluated_base_cases": 14,
+          "base_case_mean": 1,
+          "minimum_observation": 1,
+          "maximum_observation": 1
+        },
+        "pairwise_coverage": {
+          "observations": 36,
+          "evaluated_base_cases": 12,
+          "base_case_mean": 1,
+          "minimum_observation": 1,
+          "maximum_observation": 1
+        },
+        "pairwise_satisfaction": {
+          "observations": 36,
+          "evaluated_base_cases": 12,
+          "base_case_mean": 1,
+          "minimum_observation": 1,
+          "maximum_observation": 1
+        },
+        "precision_at_3_relevance_ge_2": {
+          "observations": 42,
+          "evaluated_base_cases": 14,
+          "base_case_mean": 0.5476190476190476,
+          "minimum_observation": 0,
+          "maximum_observation": 1
+        }
+      },
+      "selected_generation": {
+        "responses": 156,
+        "generation_started_between": {
+          "first": "2026-10-24T22:39:22.06685182Z",
+          "last": "2026-10-24T22:52:20.034237841Z"
+        },
+        "resolved_model_counts": {
+          "gemini-3.1-flash-lite": 156
+        },
+        "latency_ms": {
+          "reported_responses": 156,
+          "unknown_responses": 0,
+          "minimum": 898,
+          "maximum": 21777,
+          "mean": 4320.371794871795
+        },
+        "tokens": {
+          "input_tokens": {
+            "reported_responses": 156,
+            "unknown_responses": 0,
+            "sum_reported": 383247
+          },
+          "output_tokens": {
+            "reported_responses": 156,
+            "unknown_responses": 0,
+            "sum_reported": 45548
+          },
+          "thinking_tokens": {
+            "reported_responses": 0,
+            "unknown_responses": 156,
+            "sum_reported": null
+          },
+          "total_tokens": {
+            "reported_responses": 156,
+            "unknown_responses": 0,
+            "sum_reported": 428795
+          },
+          "cached_input_tokens": {
+            "reported_responses": 1,
+            "unknown_responses": 155,
+            "sum_reported": 1723
+          }
+        }
+      },
+      "tasks": {
+        "prediagnosis": {
+          "observations": 102,
+          "base_cases": 34,
+          "execution_status_counts": {
+            "executed": 102
+          },
+          "deterministic_status_counts": {
+            "failed": 1,
+            "passed": 101
+          },
+          "overall_status_counts": {
+            "failed": 53,
+            "semantic_reviewed": 49
+          },
+          "semantic_status_counts": {
+            "assessed": 49,
+            "failed": 53
+          },
+          "criterion_result_counts": {
+            "fail": 80,
+            "not_applicable": 2,
+            "pass": 647
+          },
+          "metrics": {
+            "accepted_outcome_accuracy": {
+              "observations": 102,
+              "evaluated_base_cases": 34,
+              "base_case_mean": 0.9901960784313726,
+              "minimum_observation": 0,
+              "maximum_observation": 1
+            },
+            "category_accuracy_when_required": {
+              "observations": 63,
+              "evaluated_base_cases": 21,
+              "base_case_mean": 1,
+              "minimum_observation": 1,
+              "maximum_observation": 1
+            }
+          },
+          "selected_generation": {
+            "responses": 102,
+            "generation_started_between": {
+              "first": "2026-10-24T22:39:22.06685182Z",
+              "last": "2026-10-24T22:47:46.51775322Z"
+            },
+            "resolved_model_counts": {
+              "gemini-3.1-flash-lite": 102
+            },
+            "latency_ms": {
+              "reported_responses": 102,
+              "unknown_responses": 0,
+              "minimum": 1100,
+              "maximum": 21777,
+              "mean": 4923.450980392156
+            },
+            "tokens": {
+              "input_tokens": {
+                "reported_responses": 102,
+                "unknown_responses": 0,
+                "sum_reported": 288030
+              },
+              "output_tokens": {
+                "reported_responses": 102,
+                "unknown_responses": 0,
+                "sum_reported": 36458
+              },
+              "thinking_tokens": {
+                "reported_responses": 0,
+                "unknown_responses": 102,
+                "sum_reported": null
+              },
+              "total_tokens": {
+                "reported_responses": 102,
+                "unknown_responses": 0,
+                "sum_reported": 324488
+              },
+              "cached_input_tokens": {
+                "reported_responses": 1,
+                "unknown_responses": 101,
+                "sum_reported": 1723
+              }
+            }
+          }
+        },
+        "ranking": {
+          "observations": 42,
+          "base_cases": 14,
+          "execution_status_counts": {
+            "executed": 42
+          },
+          "deterministic_status_counts": {
+            "passed": 42
+          },
+          "overall_status_counts": {
+            "failed": 3,
+            "semantic_reviewed": 39
+          },
+          "semantic_status_counts": {
+            "assessed": 39,
+            "failed": 3
+          },
+          "criterion_result_counts": {
+            "fail": 5,
+            "pass": 241
+          },
+          "metrics": {
+            "ndcg_at_3": {
+              "observations": 42,
+              "evaluated_base_cases": 14,
+              "base_case_mean": 1,
+              "minimum_observation": 1,
+              "maximum_observation": 1
+            },
+            "pairwise_coverage": {
+              "observations": 36,
+              "evaluated_base_cases": 12,
+              "base_case_mean": 1,
+              "minimum_observation": 1,
+              "maximum_observation": 1
+            },
+            "pairwise_satisfaction": {
+              "observations": 36,
+              "evaluated_base_cases": 12,
+              "base_case_mean": 1,
+              "minimum_observation": 1,
+              "maximum_observation": 1
+            },
+            "precision_at_3_relevance_ge_2": {
+              "observations": 42,
+              "evaluated_base_cases": 14,
+              "base_case_mean": 0.5476190476190476,
+              "minimum_observation": 0,
+              "maximum_observation": 1
+            }
+          },
+          "selected_generation": {
+            "responses": 42,
+            "generation_started_between": {
+              "first": "2026-10-24T22:47:52.494920789Z",
+              "last": "2026-10-24T22:51:20.016868992Z"
+            },
+            "resolved_model_counts": {
+              "gemini-3.1-flash-lite": 42
+            },
+            "latency_ms": {
+              "reported_responses": 42,
+              "unknown_responses": 0,
+              "minimum": 1056,
+              "maximum": 18438,
+              "mean": 3202.7619047619046
+            },
+            "tokens": {
+              "input_tokens": {
+                "reported_responses": 42,
+                "unknown_responses": 0,
+                "sum_reported": 88233
+              },
+              "output_tokens": {
+                "reported_responses": 42,
+                "unknown_responses": 0,
+                "sum_reported": 8080
+              },
+              "thinking_tokens": {
+                "reported_responses": 0,
+                "unknown_responses": 42,
+                "sum_reported": null
+              },
+              "total_tokens": {
+                "reported_responses": 42,
+                "unknown_responses": 0,
+                "sum_reported": 96313
+              },
+              "cached_input_tokens": {
+                "reported_responses": 0,
+                "unknown_responses": 42,
+                "sum_reported": null
+              }
+            }
+          }
+        },
+        "summarization": {
+          "observations": 12,
+          "base_cases": 4,
+          "execution_status_counts": {
+            "executed": 12
+          },
+          "deterministic_status_counts": {
+            "failed": 1,
+            "passed": 11
+          },
+          "overall_status_counts": {
+            "failed": 10,
+            "semantic_reviewed": 2
+          },
+          "semantic_status_counts": {
+            "assessed": 2,
+            "failed": 10
+          },
+          "criterion_result_counts": {
+            "fail": 15,
+            "pass": 51
+          },
+          "metrics": {},
+          "selected_generation": {
+            "responses": 12,
+            "generation_started_between": {
+              "first": "2026-10-24T22:51:22.520246566Z",
+              "last": "2026-10-24T22:52:20.034237841Z"
+            },
+            "resolved_model_counts": {
+              "gemini-3.1-flash-lite": 12
+            },
+            "latency_ms": {
+              "reported_responses": 12,
+              "unknown_responses": 0,
+              "minimum": 898,
+              "maximum": 12155,
+              "mean": 3105.8333333333335
+            },
+            "tokens": {
+              "input_tokens": {
+                "reported_responses": 12,
+                "unknown_responses": 0,
+                "sum_reported": 6984
+              },
+              "output_tokens": {
+                "reported_responses": 12,
+                "unknown_responses": 0,
+                "sum_reported": 1010
+              },
+              "thinking_tokens": {
+                "reported_responses": 0,
+                "unknown_responses": 12,
+                "sum_reported": null
+              },
+              "total_tokens": {
+                "reported_responses": 12,
+                "unknown_responses": 0,
+                "sum_reported": 7994
+              },
+              "cached_input_tokens": {
+                "reported_responses": 0,
+                "unknown_responses": 12,
+                "sum_reported": null
+              }
+            }
+          }
+        }
+      }
+    },
+    "gemini-3.5-flash-lite": {
+      "observations": 156,
+      "base_cases": 52,
+      "execution_status_counts": {
+        "executed": 156
+      },
+      "deterministic_status_counts": {
+        "failed": 5,
+        "passed": 151
+      },
+      "overall_status_counts": {
+        "failed": 38,
+        "semantic_reviewed": 118
+      },
+      "semantic_status_counts": {
+        "assessed": 118,
+        "failed": 38
+      },
+      "criterion_result_counts": {
+        "fail": 54,
+        "not_applicable": 3,
+        "pass": 984
+      },
+      "metrics": {
+        "accepted_outcome_accuracy": {
+          "observations": 102,
+          "evaluated_base_cases": 34,
+          "base_case_mean": 0.9509803921568627,
+          "minimum_observation": 0,
+          "maximum_observation": 1
+        },
+        "category_accuracy_when_required": {
+          "observations": 63,
+          "evaluated_base_cases": 21,
+          "base_case_mean": 1,
+          "minimum_observation": 1,
+          "maximum_observation": 1
+        },
+        "ndcg_at_3": {
+          "observations": 42,
+          "evaluated_base_cases": 14,
+          "base_case_mean": 1,
+          "minimum_observation": 1,
+          "maximum_observation": 1
+        },
+        "pairwise_coverage": {
+          "observations": 36,
+          "evaluated_base_cases": 12,
+          "base_case_mean": 1,
+          "minimum_observation": 1,
+          "maximum_observation": 1
+        },
+        "pairwise_satisfaction": {
+          "observations": 36,
+          "evaluated_base_cases": 12,
+          "base_case_mean": 1,
+          "minimum_observation": 1,
+          "maximum_observation": 1
+        },
+        "precision_at_3_relevance_ge_2": {
+          "observations": 42,
+          "evaluated_base_cases": 14,
+          "base_case_mean": 0.5476190476190476,
+          "minimum_observation": 0,
+          "maximum_observation": 1
+        }
+      },
+      "selected_generation": {
+        "responses": 156,
+        "generation_started_between": {
+          "first": "2026-10-24T22:52:40.107345414Z",
+          "last": "2026-10-25T00:09:12.851300851Z"
+        },
+        "resolved_model_counts": {
+          "gemini-3.5-flash-lite": 156
+        },
+        "latency_ms": {
+          "reported_responses": 156,
+          "unknown_responses": 0,
+          "minimum": 905,
+          "maximum": 36875,
+          "mean": 5054.608974358975
+        },
+        "tokens": {
+          "input_tokens": {
+            "reported_responses": 156,
+            "unknown_responses": 0,
+            "sum_reported": 383247
+          },
+          "output_tokens": {
+            "reported_responses": 156,
+            "unknown_responses": 0,
+            "sum_reported": 43661
+          },
+          "thinking_tokens": {
+            "reported_responses": 0,
+            "unknown_responses": 156,
+            "sum_reported": null
+          },
+          "total_tokens": {
+            "reported_responses": 156,
+            "unknown_responses": 0,
+            "sum_reported": 426908
+          },
+          "cached_input_tokens": {
+            "reported_responses": 1,
+            "unknown_responses": 155,
+            "sum_reported": 1722
+          }
+        }
+      },
+      "tasks": {
+        "prediagnosis": {
+          "observations": 102,
+          "base_cases": 34,
+          "execution_status_counts": {
+            "executed": 102
+          },
+          "deterministic_status_counts": {
+            "failed": 5,
+            "passed": 97
+          },
+          "overall_status_counts": {
+            "failed": 30,
+            "semantic_reviewed": 72
+          },
+          "semantic_status_counts": {
+            "assessed": 72,
+            "failed": 30
+          },
+          "criterion_result_counts": {
+            "fail": 42,
+            "not_applicable": 3,
+            "pass": 684
+          },
+          "metrics": {
+            "accepted_outcome_accuracy": {
+              "observations": 102,
+              "evaluated_base_cases": 34,
+              "base_case_mean": 0.9509803921568627,
+              "minimum_observation": 0,
+              "maximum_observation": 1
+            },
+            "category_accuracy_when_required": {
+              "observations": 63,
+              "evaluated_base_cases": 21,
+              "base_case_mean": 1,
+              "minimum_observation": 1,
+              "maximum_observation": 1
+            }
+          },
+          "selected_generation": {
+            "responses": 102,
+            "generation_started_between": {
+              "first": "2026-10-24T22:52:40.107345414Z",
+              "last": "2026-10-25T00:05:31.411088419Z"
+            },
+            "resolved_model_counts": {
+              "gemini-3.5-flash-lite": 102
+            },
+            "latency_ms": {
+              "reported_responses": 102,
+              "unknown_responses": 0,
+              "minimum": 981,
+              "maximum": 36875,
+              "mean": 5551.519607843137
+            },
+            "tokens": {
+              "input_tokens": {
+                "reported_responses": 102,
+                "unknown_responses": 0,
+                "sum_reported": 288030
+              },
+              "output_tokens": {
+                "reported_responses": 102,
+                "unknown_responses": 0,
+                "sum_reported": 35259
+              },
+              "thinking_tokens": {
+                "reported_responses": 0,
+                "unknown_responses": 102,
+                "sum_reported": null
+              },
+              "total_tokens": {
+                "reported_responses": 102,
+                "unknown_responses": 0,
+                "sum_reported": 323289
+              },
+              "cached_input_tokens": {
+                "reported_responses": 1,
+                "unknown_responses": 101,
+                "sum_reported": 1722
+              }
+            }
+          }
+        },
+        "ranking": {
+          "observations": 42,
+          "base_cases": 14,
+          "execution_status_counts": {
+            "executed": 42
+          },
+          "deterministic_status_counts": {
+            "passed": 42
+          },
+          "overall_status_counts": {
+            "failed": 2,
+            "semantic_reviewed": 40
+          },
+          "semantic_status_counts": {
+            "assessed": 40,
+            "failed": 2
+          },
+          "criterion_result_counts": {
+            "fail": 2,
+            "pass": 244
+          },
+          "metrics": {
+            "ndcg_at_3": {
+              "observations": 42,
+              "evaluated_base_cases": 14,
+              "base_case_mean": 1,
+              "minimum_observation": 1,
+              "maximum_observation": 1
+            },
+            "pairwise_coverage": {
+              "observations": 36,
+              "evaluated_base_cases": 12,
+              "base_case_mean": 1,
+              "minimum_observation": 1,
+              "maximum_observation": 1
+            },
+            "pairwise_satisfaction": {
+              "observations": 36,
+              "evaluated_base_cases": 12,
+              "base_case_mean": 1,
+              "minimum_observation": 1,
+              "maximum_observation": 1
+            },
+            "precision_at_3_relevance_ge_2": {
+              "observations": 42,
+              "evaluated_base_cases": 14,
+              "base_case_mean": 0.5476190476190476,
+              "minimum_observation": 0,
+              "maximum_observation": 1
+            }
+          },
+          "selected_generation": {
+            "responses": 42,
+            "generation_started_between": {
+              "first": "2026-10-24T23:01:38.013053205Z",
+              "last": "2026-10-25T00:07:39.152494872Z"
+            },
+            "resolved_model_counts": {
+              "gemini-3.5-flash-lite": 42
+            },
+            "latency_ms": {
+              "reported_responses": 42,
+              "unknown_responses": 0,
+              "minimum": 1180,
+              "maximum": 6341,
+              "mean": 4265.761904761905
+            },
+            "tokens": {
+              "input_tokens": {
+                "reported_responses": 42,
+                "unknown_responses": 0,
+                "sum_reported": 88233
+              },
+              "output_tokens": {
+                "reported_responses": 42,
+                "unknown_responses": 0,
+                "sum_reported": 7219
+              },
+              "thinking_tokens": {
+                "reported_responses": 0,
+                "unknown_responses": 42,
+                "sum_reported": null
+              },
+              "total_tokens": {
+                "reported_responses": 42,
+                "unknown_responses": 0,
+                "sum_reported": 95452
+              },
+              "cached_input_tokens": {
+                "reported_responses": 0,
+                "unknown_responses": 42,
+                "sum_reported": null
+              }
+            }
+          }
+        },
+        "summarization": {
+          "observations": 12,
+          "base_cases": 4,
+          "execution_status_counts": {
+            "executed": 12
+          },
+          "deterministic_status_counts": {
+            "passed": 12
+          },
+          "overall_status_counts": {
+            "failed": 6,
+            "semantic_reviewed": 6
+          },
+          "semantic_status_counts": {
+            "assessed": 6,
+            "failed": 6
+          },
+          "criterion_result_counts": {
+            "fail": 10,
+            "pass": 56
+          },
+          "metrics": {},
+          "selected_generation": {
+            "responses": 12,
+            "generation_started_between": {
+              "first": "2026-10-24T23:05:08.026748215Z",
+              "last": "2026-10-25T00:09:12.851300851Z"
+            },
+            "resolved_model_counts": {
+              "gemini-3.5-flash-lite": 12
+            },
+            "latency_ms": {
+              "reported_responses": 12,
+              "unknown_responses": 0,
+              "minimum": 905,
+              "maximum": 8024,
+              "mean": 3591.8333333333335
+            },
+            "tokens": {
+              "input_tokens": {
+                "reported_responses": 12,
+                "unknown_responses": 0,
+                "sum_reported": 6984
+              },
+              "output_tokens": {
+                "reported_responses": 12,
+                "unknown_responses": 0,
+                "sum_reported": 1183
+              },
+              "thinking_tokens": {
+                "reported_responses": 0,
+                "unknown_responses": 12,
+                "sum_reported": null
+              },
+              "total_tokens": {
+                "reported_responses": 12,
+                "unknown_responses": 0,
+                "sum_reported": 8167
+              },
+              "cached_input_tokens": {
+                "reported_responses": 0,
+                "unknown_responses": 12,
+                "sum_reported": null
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "tasks": {
+    "prediagnosis": {
+      "observations": 204,
+      "base_cases": 34,
+      "execution_status_counts": {
+        "executed": 204
+      },
+      "deterministic_status_counts": {
+        "failed": 6,
+        "passed": 198
+      },
+      "overall_status_counts": {
+        "failed": 83,
+        "semantic_reviewed": 121
+      },
+      "semantic_status_counts": {
+        "assessed": 121,
+        "failed": 83
+      },
+      "criterion_result_counts": {
+        "fail": 122,
+        "not_applicable": 5,
+        "pass": 1331
+      },
+      "metrics": {
+        "accepted_outcome_accuracy": {
+          "observations": 204,
+          "evaluated_base_cases": 34,
+          "base_case_mean": 0.9705882352941176,
+          "minimum_observation": 0,
+          "maximum_observation": 1
+        },
+        "category_accuracy_when_required": {
+          "observations": 126,
+          "evaluated_base_cases": 21,
+          "base_case_mean": 1,
+          "minimum_observation": 1,
+          "maximum_observation": 1
+        }
+      },
+      "selected_generation": {
+        "responses": 204,
+        "generation_started_between": {
+          "first": "2026-10-24T22:39:22.06685182Z",
+          "last": "2026-10-25T00:05:31.411088419Z"
+        },
+        "resolved_model_counts": {
+          "gemini-3.1-flash-lite": 102,
+          "gemini-3.5-flash-lite": 102
+        },
+        "latency_ms": {
+          "reported_responses": 204,
+          "unknown_responses": 0,
+          "minimum": 981,
+          "maximum": 36875,
+          "mean": 5237.485294117647
+        },
+        "tokens": {
+          "input_tokens": {
+            "reported_responses": 204,
+            "unknown_responses": 0,
+            "sum_reported": 576060
+          },
+          "output_tokens": {
+            "reported_responses": 204,
+            "unknown_responses": 0,
+            "sum_reported": 71717
+          },
+          "thinking_tokens": {
+            "reported_responses": 0,
+            "unknown_responses": 204,
+            "sum_reported": null
+          },
+          "total_tokens": {
+            "reported_responses": 204,
+            "unknown_responses": 0,
+            "sum_reported": 647777
+          },
+          "cached_input_tokens": {
+            "reported_responses": 2,
+            "unknown_responses": 202,
+            "sum_reported": 3445
+          }
+        }
+      }
+    },
+    "ranking": {
+      "observations": 84,
+      "base_cases": 14,
+      "execution_status_counts": {
+        "executed": 84
+      },
+      "deterministic_status_counts": {
+        "passed": 84
+      },
+      "overall_status_counts": {
+        "failed": 5,
+        "semantic_reviewed": 79
+      },
+      "semantic_status_counts": {
+        "assessed": 79,
+        "failed": 5
+      },
+      "criterion_result_counts": {
+        "fail": 7,
+        "pass": 485
+      },
+      "metrics": {
+        "ndcg_at_3": {
+          "observations": 84,
+          "evaluated_base_cases": 14,
+          "base_case_mean": 1,
+          "minimum_observation": 1,
+          "maximum_observation": 1
+        },
+        "pairwise_coverage": {
+          "observations": 72,
+          "evaluated_base_cases": 12,
+          "base_case_mean": 1,
+          "minimum_observation": 1,
+          "maximum_observation": 1
+        },
+        "pairwise_satisfaction": {
+          "observations": 72,
+          "evaluated_base_cases": 12,
+          "base_case_mean": 1,
+          "minimum_observation": 1,
+          "maximum_observation": 1
+        },
+        "precision_at_3_relevance_ge_2": {
+          "observations": 84,
+          "evaluated_base_cases": 14,
+          "base_case_mean": 0.5476190476190476,
+          "minimum_observation": 0,
+          "maximum_observation": 1
+        }
+      },
+      "selected_generation": {
+        "responses": 84,
+        "generation_started_between": {
+          "first": "2026-10-24T22:47:52.494920789Z",
+          "last": "2026-10-25T00:07:39.152494872Z"
+        },
+        "resolved_model_counts": {
+          "gemini-3.1-flash-lite": 42,
+          "gemini-3.5-flash-lite": 42
+        },
+        "latency_ms": {
+          "reported_responses": 84,
+          "unknown_responses": 0,
+          "minimum": 1056,
+          "maximum": 18438,
+          "mean": 3734.2619047619046
+        },
+        "tokens": {
+          "input_tokens": {
+            "reported_responses": 84,
+            "unknown_responses": 0,
+            "sum_reported": 176466
+          },
+          "output_tokens": {
+            "reported_responses": 84,
+            "unknown_responses": 0,
+            "sum_reported": 15299
+          },
+          "thinking_tokens": {
+            "reported_responses": 0,
+            "unknown_responses": 84,
+            "sum_reported": null
+          },
+          "total_tokens": {
+            "reported_responses": 84,
+            "unknown_responses": 0,
+            "sum_reported": 191765
+          },
+          "cached_input_tokens": {
+            "reported_responses": 0,
+            "unknown_responses": 84,
+            "sum_reported": null
+          }
+        }
+      }
+    },
+    "summarization": {
+      "observations": 24,
+      "base_cases": 4,
+      "execution_status_counts": {
+        "executed": 24
+      },
+      "deterministic_status_counts": {
+        "failed": 1,
+        "passed": 23
+      },
+      "overall_status_counts": {
+        "failed": 16,
+        "semantic_reviewed": 8
+      },
+      "semantic_status_counts": {
+        "assessed": 8,
+        "failed": 16
+      },
+      "criterion_result_counts": {
+        "fail": 25,
+        "pass": 107
+      },
+      "metrics": {},
+      "selected_generation": {
+        "responses": 24,
+        "generation_started_between": {
+          "first": "2026-10-24T22:51:22.520246566Z",
+          "last": "2026-10-25T00:09:12.851300851Z"
+        },
+        "resolved_model_counts": {
+          "gemini-3.1-flash-lite": 12,
+          "gemini-3.5-flash-lite": 12
+        },
+        "latency_ms": {
+          "reported_responses": 24,
+          "unknown_responses": 0,
+          "minimum": 898,
+          "maximum": 12155,
+          "mean": 3348.8333333333335
+        },
+        "tokens": {
+          "input_tokens": {
+            "reported_responses": 24,
+            "unknown_responses": 0,
+            "sum_reported": 13968
+          },
+          "output_tokens": {
+            "reported_responses": 24,
+            "unknown_responses": 0,
+            "sum_reported": 2193
+          },
+          "thinking_tokens": {
+            "reported_responses": 0,
+            "unknown_responses": 24,
+            "sum_reported": null
+          },
+          "total_tokens": {
+            "reported_responses": 24,
+            "unknown_responses": 0,
+            "sum_reported": 16161
+          },
+          "cached_input_tokens": {
+            "reported_responses": 0,
+            "unknown_responses": 24,
+            "sum_reported": null
+          }
+        }
+      }
+    }
+  },
+  "total": {
+    "observations": 312,
+    "base_cases": 52,
+    "execution_status_counts": {
+      "executed": 312
+    },
+    "deterministic_status_counts": {
+      "failed": 7,
+      "passed": 305
+    },
+    "overall_status_counts": {
+      "failed": 104,
+      "semantic_reviewed": 208
+    },
+    "semantic_status_counts": {
+      "assessed": 208,
+      "failed": 104
+    },
+    "criterion_result_counts": {
+      "fail": 154,
+      "not_applicable": 5,
+      "pass": 1923
+    },
+    "metrics": {
+      "accepted_outcome_accuracy": {
+        "observations": 204,
+        "evaluated_base_cases": 34,
+        "base_case_mean": 0.9705882352941176,
+        "minimum_observation": 0,
+        "maximum_observation": 1
+      },
+      "category_accuracy_when_required": {
+        "observations": 126,
+        "evaluated_base_cases": 21,
+        "base_case_mean": 1,
+        "minimum_observation": 1,
+        "maximum_observation": 1
+      },
+      "ndcg_at_3": {
+        "observations": 84,
+        "evaluated_base_cases": 14,
+        "base_case_mean": 1,
+        "minimum_observation": 1,
+        "maximum_observation": 1
+      },
+      "pairwise_coverage": {
+        "observations": 72,
+        "evaluated_base_cases": 12,
+        "base_case_mean": 1,
+        "minimum_observation": 1,
+        "maximum_observation": 1
+      },
+      "pairwise_satisfaction": {
+        "observations": 72,
+        "evaluated_base_cases": 12,
+        "base_case_mean": 1,
+        "minimum_observation": 1,
+        "maximum_observation": 1
+      },
+      "precision_at_3_relevance_ge_2": {
+        "observations": 84,
+        "evaluated_base_cases": 14,
+        "base_case_mean": 0.5476190476190476,
+        "minimum_observation": 0,
+        "maximum_observation": 1
+      }
+    },
+    "selected_generation": {
+      "responses": 312,
+      "generation_started_between": {
+        "first": "2026-10-24T22:39:22.06685182Z",
+        "last": "2026-10-25T00:09:12.851300851Z"
+      },
+      "resolved_model_counts": {
+        "gemini-3.1-flash-lite": 156,
+        "gemini-3.5-flash-lite": 156
+      },
+      "latency_ms": {
+        "reported_responses": 312,
+        "unknown_responses": 0,
+        "minimum": 898,
+        "maximum": 36875,
+        "mean": 4687.490384615385
+      },
+      "tokens": {
+        "input_tokens": {
+          "reported_responses": 312,
+          "unknown_responses": 0,
+          "sum_reported": 766494
+        },
+        "output_tokens": {
+          "reported_responses": 312,
+          "unknown_responses": 0,
+          "sum_reported": 89209
+        },
+        "thinking_tokens": {
+          "reported_responses": 0,
+          "unknown_responses": 312,
+          "sum_reported": null
+        },
+        "total_tokens": {
+          "reported_responses": 312,
+          "unknown_responses": 0,
+          "sum_reported": 855703
+        },
+        "cached_input_tokens": {
+          "reported_responses": 2,
+          "unknown_responses": 310,
+          "sum_reported": 3445
+        }
+      }
+    }
+  },
+  "reviewed_observations": 312,
+  "release_approved": false,
+  "ranking_baselines": {
+    "base_cases": 14,
+    "model_requests": 0,
+    "comparison": "Same 14 development ranking cases; model metrics first average three trials within each case, then average the cases. Baselines evaluate each case once. Pairwise metrics cover the 12 cases with pairwise constraints.",
+    "policies": [
+      {
+        "policy": {
+          "name": "seeded_random",
+          "version": "1",
+          "seed": 601,
+          "prior_count": 5,
+          "prior_mean": 3,
+          "tie_break": "reference_ascending",
+          "lexical_rule": "Jaccard of unique Unicode letter/digit tokens after lowercase and accent folding; query=problem title+description; document=all work descriptions, completion reports and reviews; no stopwords, stemming, weights or relevance labels"
+        },
+        "metrics": {
+          "ndcg_at_3": {
+            "expected_observations": 14,
+            "unassessed_observations": 0,
+            "base_case_mean": 0.7046137538869619,
+            "minimum_observation": 0.33333333333333337,
+            "maximum_observation": 1,
+            "observations": 14,
+            "evaluated_base_cases": 14,
+            "unassessed_base_cases": 0
+          },
+          "pairwise_coverage": {
+            "expected_observations": 14,
+            "unassessed_observations": 2,
+            "base_case_mean": 1,
+            "minimum_observation": 1,
+            "maximum_observation": 1,
+            "observations": 12,
+            "evaluated_base_cases": 12,
+            "unassessed_base_cases": 2
+          },
+          "pairwise_satisfaction": {
+            "expected_observations": 14,
+            "unassessed_observations": 2,
+            "base_case_mean": 0.23611111111111108,
+            "minimum_observation": 0,
+            "maximum_observation": 1,
+            "observations": 12,
+            "evaluated_base_cases": 12,
+            "unassessed_base_cases": 2
+          },
+          "precision_at_3_relevance_ge_2": {
+            "expected_observations": 14,
+            "unassessed_observations": 0,
+            "base_case_mean": 0.40476190476190466,
+            "minimum_observation": 0,
+            "maximum_observation": 1,
+            "observations": 14,
+            "evaluated_base_cases": 14,
+            "unassessed_base_cases": 0
+          }
+        }
+      },
+      {
+        "policy": {
+          "name": "rating_average",
+          "version": "1",
+          "seed": 601,
+          "prior_count": 5,
+          "prior_mean": 3,
+          "tie_break": "reference_ascending",
+          "lexical_rule": "Jaccard of unique Unicode letter/digit tokens after lowercase and accent folding; query=problem title+description; document=all work descriptions, completion reports and reviews; no stopwords, stemming, weights or relevance labels"
+        },
+        "metrics": {
+          "ndcg_at_3": {
+            "expected_observations": 14,
+            "unassessed_observations": 0,
+            "base_case_mean": 0.9356848358309541,
+            "minimum_observation": 0.7276545800191441,
+            "maximum_observation": 1,
+            "observations": 14,
+            "evaluated_base_cases": 14,
+            "unassessed_base_cases": 0
+          },
+          "pairwise_coverage": {
+            "expected_observations": 14,
+            "unassessed_observations": 2,
+            "base_case_mean": 1,
+            "minimum_observation": 1,
+            "maximum_observation": 1,
+            "observations": 12,
+            "evaluated_base_cases": 12,
+            "unassessed_base_cases": 2
+          },
+          "pairwise_satisfaction": {
+            "expected_observations": 14,
+            "unassessed_observations": 2,
+            "base_case_mean": 0.6805555555555555,
+            "minimum_observation": 0,
+            "maximum_observation": 1,
+            "observations": 12,
+            "evaluated_base_cases": 12,
+            "unassessed_base_cases": 2
+          },
+          "precision_at_3_relevance_ge_2": {
+            "expected_observations": 14,
+            "unassessed_observations": 0,
+            "base_case_mean": 0.5476190476190476,
+            "minimum_observation": 0,
+            "maximum_observation": 1,
+            "observations": 14,
+            "evaluated_base_cases": 14,
+            "unassessed_base_cases": 0
+          }
+        }
+      },
+      {
+        "policy": {
+          "name": "bayesian_rating_with_fixed_prior",
+          "version": "1",
+          "seed": 601,
+          "prior_count": 5,
+          "prior_mean": 3,
+          "tie_break": "reference_ascending",
+          "lexical_rule": "Jaccard of unique Unicode letter/digit tokens after lowercase and accent folding; query=problem title+description; document=all work descriptions, completion reports and reviews; no stopwords, stemming, weights or relevance labels"
+        },
+        "metrics": {
+          "ndcg_at_3": {
+            "expected_observations": 14,
+            "unassessed_observations": 0,
+            "base_case_mean": 0.8863909046922025,
+            "minimum_observation": 0.7276545800191441,
+            "maximum_observation": 1,
+            "observations": 14,
+            "evaluated_base_cases": 14,
+            "unassessed_base_cases": 0
+          },
+          "pairwise_coverage": {
+            "expected_observations": 14,
+            "unassessed_observations": 2,
+            "base_case_mean": 1,
+            "minimum_observation": 1,
+            "maximum_observation": 1,
+            "observations": 12,
+            "evaluated_base_cases": 12,
+            "unassessed_base_cases": 2
+          },
+          "pairwise_satisfaction": {
+            "expected_observations": 14,
+            "unassessed_observations": 2,
+            "base_case_mean": 0.6388888888888888,
+            "minimum_observation": 0,
+            "maximum_observation": 1,
+            "observations": 12,
+            "evaluated_base_cases": 12,
+            "unassessed_base_cases": 2
+          },
+          "precision_at_3_relevance_ge_2": {
+            "expected_observations": 14,
+            "unassessed_observations": 0,
+            "base_case_mean": 0.5476190476190476,
+            "minimum_observation": 0,
+            "maximum_observation": 1,
+            "observations": 14,
+            "evaluated_base_cases": 14,
+            "unassessed_base_cases": 0
+          }
+        }
+      },
+      {
+        "policy": {
+          "name": "paid_work_count",
+          "version": "1",
+          "seed": 601,
+          "prior_count": 5,
+          "prior_mean": 3,
+          "tie_break": "reference_ascending",
+          "lexical_rule": "Jaccard of unique Unicode letter/digit tokens after lowercase and accent folding; query=problem title+description; document=all work descriptions, completion reports and reviews; no stopwords, stemming, weights or relevance labels"
+        },
+        "metrics": {
+          "ndcg_at_3": {
+            "expected_observations": 14,
+            "unassessed_observations": 0,
+            "base_case_mean": 0.8609828279924228,
+            "minimum_observation": 0.6442869262030827,
+            "maximum_observation": 1,
+            "observations": 14,
+            "evaluated_base_cases": 14,
+            "unassessed_base_cases": 0
+          },
+          "pairwise_coverage": {
+            "expected_observations": 14,
+            "unassessed_observations": 2,
+            "base_case_mean": 1,
+            "minimum_observation": 1,
+            "maximum_observation": 1,
+            "observations": 12,
+            "evaluated_base_cases": 12,
+            "unassessed_base_cases": 2
+          },
+          "pairwise_satisfaction": {
+            "expected_observations": 14,
+            "unassessed_observations": 2,
+            "base_case_mean": 0.5972222222222222,
+            "minimum_observation": 0,
+            "maximum_observation": 1,
+            "observations": 12,
+            "evaluated_base_cases": 12,
+            "unassessed_base_cases": 2
+          },
+          "precision_at_3_relevance_ge_2": {
+            "expected_observations": 14,
+            "unassessed_observations": 0,
+            "base_case_mean": 0.5476190476190476,
+            "minimum_observation": 0,
+            "maximum_observation": 1,
+            "observations": 14,
+            "evaluated_base_cases": 14,
+            "unassessed_base_cases": 0
+          }
+        }
+      },
+      {
+        "policy": {
+          "name": "frozen_lexical_heuristic",
+          "version": "1",
+          "seed": 601,
+          "prior_count": 5,
+          "prior_mean": 3,
+          "tie_break": "reference_ascending",
+          "lexical_rule": "Jaccard of unique Unicode letter/digit tokens after lowercase and accent folding; query=problem title+description; document=all work descriptions, completion reports and reviews; no stopwords, stemming, weights or relevance labels"
+        },
+        "metrics": {
+          "ndcg_at_3": {
+            "expected_observations": 14,
+            "unassessed_observations": 0,
+            "base_case_mean": 0.9296857132662025,
+            "minimum_observation": 0.6442869262030827,
+            "maximum_observation": 1,
+            "observations": 14,
+            "evaluated_base_cases": 14,
+            "unassessed_base_cases": 0
+          },
+          "pairwise_coverage": {
+            "expected_observations": 14,
+            "unassessed_observations": 2,
+            "base_case_mean": 1,
+            "minimum_observation": 1,
+            "maximum_observation": 1,
+            "observations": 12,
+            "evaluated_base_cases": 12,
+            "unassessed_base_cases": 2
+          },
+          "pairwise_satisfaction": {
+            "expected_observations": 14,
+            "unassessed_observations": 2,
+            "base_case_mean": 0.9583333333333334,
+            "minimum_observation": 0.5,
+            "maximum_observation": 1,
+            "observations": 12,
+            "evaluated_base_cases": 12,
+            "unassessed_base_cases": 2
+          },
+          "precision_at_3_relevance_ge_2": {
+            "expected_observations": 14,
+            "unassessed_observations": 0,
+            "base_case_mean": 0.5476190476190476,
+            "minimum_observation": 0,
+            "maximum_observation": 1,
+            "observations": 14,
+            "evaluated_base_cases": 14,
+            "unassessed_base_cases": 0
+          }
+        }
+      }
+    ]
+  }
+}

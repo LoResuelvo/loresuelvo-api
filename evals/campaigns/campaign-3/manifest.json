@@ -1,0 +1,627 @@
+{
+  "format_version": "campaign-results/1",
+  "campaign_id": "campaign-3",
+  "scope": "development",
+  "dataset": {
+    "path": "evals/datasets/LoResuelvo_US60_evals_v1.0.0",
+    "version": "1.0.0",
+    "manifest_sha256": "c11ffd98fcc6b9bc218b121f87e950c91c070f3e9861e095b2f5fcb1716828ed"
+  },
+  "models": [
+    "gemini-3.1-flash-lite",
+    "gemini-3.5-flash-lite"
+  ],
+  "trials_per_case_and_model": 3,
+  "counts": {
+    "base_cases": 52,
+    "responses": 312,
+    "results": 312,
+    "evaluations": 2082,
+    "assessed_evaluations": 2082,
+    "reviewed_observations": 312
+  },
+  "solution": {
+    "adapter": "GeminiChatbot",
+    "source_path": "internal/adapters/chatbot/gemini_chatbot.go",
+    "source_commits": [
+      "41dfefa65f39e231f5fd6ba5d5038f42d4408d17"
+    ],
+    "source_files_sha256": {
+      "go.mod": "12cfad4e9af502f1fcacb76b42608f3b0280150cf8adba2d6eb96853f9d1525c",
+      "go.sum": "1974d547a6d458965d8a12289c982a1b75e0ef4476e457f78c086af2b51e241c",
+      "internal/adapters/chatbot/gemini_chatbot.go": "e6a217fd32b2878d0ff591e047019936e9ce6fa715d668685fc042f1df9db9b2",
+      "internal/adapters/chatbot/gemini_generation.go": "a542d8078c0058e77ebc72ef2e1ab746610bf71549d67e321f32e02d8e246c0c",
+      "internal/adapters/chatbot/gemini_json.go": "2a59bae9a7997dc6899de99abffc712cf515f810d92bad2026c9e1790a6967c2",
+      "internal/adapters/chatbot/gemini_schema.go": "ce90399783e9d5f683dde4cf00d3cccb33e4bafc1fe49e66532f49a6ca1ce52f",
+      "internal/adapters/chatbot/gemini_token_count.go": "36afc522d6aa244511e259f367367bd6c030ebf6e4dbb1398b9bab9ca278d214"
+    },
+    "response_bindings": {
+      "file": "responses.jsonl",
+      "source_commit_field": "solution_source_commit",
+      "prompt_hash_field": "prompt_sha256",
+      "configuration_hash_field": "generation_config_sha256",
+      "configuration_records": "manifest.json:generation_configurations_by_sha256"
+    }
+  },
+  "generation_configurations_by_sha256": {
+    "b380add9e674531ea22ac35a2a8b3aa9ddfa8d4612f1cea4188f104869772f1f": {
+      "maxOutputTokens": 4096,
+      "responseMimeType": "application/json",
+      "responseJsonSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "assessment": {
+            "additionalProperties": false,
+            "properties": {
+              "action": {
+                "enum": [
+                  "unchanged",
+                  "replace"
+                ],
+                "type": "string"
+              },
+              "outcome": {
+                "enum": [
+                  "",
+                  "collecting_information",
+                  "self_service",
+                  "professional_required"
+                ],
+                "type": "string"
+              },
+              "problem_category_name": {
+                "enum": [
+                  "",
+                  "Plomería",
+                  "Electricidad",
+                  "Gas",
+                  "Humedad",
+                  "Cerraduras",
+                  "Calefacción",
+                  "Estructuras"
+                ],
+                "type": "string"
+              },
+              "problem_description": {
+                "type": "string"
+              },
+              "problem_title": {
+                "type": "string"
+              },
+              "selected_image_refs": {
+                "items": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "maxItems": 3,
+                "type": "array"
+              }
+            },
+            "required": [
+              "action",
+              "outcome",
+              "problem_title",
+              "problem_description",
+              "problem_category_name",
+              "selected_image_refs"
+            ],
+            "type": "object"
+          },
+          "content": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "image_descriptions": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "description": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "image_ref": {
+                  "minLength": 1,
+                  "type": "string"
+                }
+              },
+              "required": [
+                "image_ref",
+                "description"
+              ],
+              "type": "object"
+            },
+            "maxItems": 0,
+            "minItems": 0,
+            "type": "array"
+          },
+          "status": {
+            "enum": [
+              "answered",
+              "out_of_scope"
+            ],
+            "type": "string"
+          },
+          "title": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "title",
+          "content",
+          "image_descriptions",
+          "assessment"
+        ],
+        "type": "object"
+      }
+    },
+    "d9bc8f3768af0c1d6e99e515c248acda5c7a2a25c85cd7425e7ef8ecd142a44d": {
+      "maxOutputTokens": 4096,
+      "responseMimeType": "application/json",
+      "responseJsonSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "assessment": {
+            "additionalProperties": false,
+            "properties": {
+              "action": {
+                "enum": [
+                  "unchanged",
+                  "replace"
+                ],
+                "type": "string"
+              },
+              "outcome": {
+                "enum": [
+                  "",
+                  "collecting_information",
+                  "self_service",
+                  "professional_required"
+                ],
+                "type": "string"
+              },
+              "problem_category_name": {
+                "enum": [
+                  "",
+                  "Plomería",
+                  "Electricidad",
+                  "Gas",
+                  "Humedad",
+                  "Cerraduras",
+                  "Calefacción",
+                  "Estructuras"
+                ],
+                "type": "string"
+              },
+              "problem_description": {
+                "type": "string"
+              },
+              "problem_title": {
+                "type": "string"
+              },
+              "selected_image_refs": {
+                "items": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "maxItems": 3,
+                "type": "array"
+              }
+            },
+            "required": [
+              "action",
+              "outcome",
+              "problem_title",
+              "problem_description",
+              "problem_category_name",
+              "selected_image_refs"
+            ],
+            "type": "object"
+          },
+          "content": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "image_descriptions": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "description": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "image_ref": {
+                  "minLength": 1,
+                  "type": "string"
+                }
+              },
+              "required": [
+                "image_ref",
+                "description"
+              ],
+              "type": "object"
+            },
+            "maxItems": 0,
+            "minItems": 0,
+            "type": "array"
+          },
+          "status": {
+            "enum": [
+              "answered",
+              "out_of_scope"
+            ],
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "title",
+          "content",
+          "image_descriptions",
+          "assessment"
+        ],
+        "type": "object"
+      }
+    },
+    "5cac79c53248b162441b7e9d38994ef29b1b4b04c1344332b8dd08fd3dc1bcb2": {
+      "maxOutputTokens": 4096,
+      "responseMimeType": "application/json",
+      "responseJsonSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "assessment": {
+            "additionalProperties": false,
+            "properties": {
+              "action": {
+                "enum": [
+                  "unchanged",
+                  "replace"
+                ],
+                "type": "string"
+              },
+              "outcome": {
+                "enum": [
+                  "",
+                  "collecting_information",
+                  "self_service",
+                  "professional_required"
+                ],
+                "type": "string"
+              },
+              "problem_category_name": {
+                "enum": [
+                  "",
+                  "Plomería",
+                  "Electricidad",
+                  "Gas",
+                  "Humedad",
+                  "Cerraduras",
+                  "Calefacción",
+                  "Estructuras"
+                ],
+                "type": "string"
+              },
+              "problem_description": {
+                "type": "string"
+              },
+              "problem_title": {
+                "type": "string"
+              },
+              "selected_image_refs": {
+                "items": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "maxItems": 3,
+                "type": "array"
+              }
+            },
+            "required": [
+              "action",
+              "outcome",
+              "problem_title",
+              "problem_description",
+              "problem_category_name",
+              "selected_image_refs"
+            ],
+            "type": "object"
+          },
+          "content": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "image_descriptions": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "description": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "image_ref": {
+                  "minLength": 1,
+                  "type": "string"
+                }
+              },
+              "required": [
+                "image_ref",
+                "description"
+              ],
+              "type": "object"
+            },
+            "maxItems": 1,
+            "minItems": 1,
+            "type": "array"
+          },
+          "status": {
+            "enum": [
+              "answered",
+              "out_of_scope"
+            ],
+            "type": "string"
+          },
+          "title": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "title",
+          "content",
+          "image_descriptions",
+          "assessment"
+        ],
+        "type": "object"
+      }
+    },
+    "94efa52c2be445f061cb760d25a4d1310210073d4c2f83cc5c79d534fec4abfe": {
+      "maxOutputTokens": 4096,
+      "responseMimeType": "application/json",
+      "responseJsonSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "recommendations": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "reason": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "reference": {
+                  "minLength": 1,
+                  "type": "string"
+                }
+              },
+              "required": [
+                "reference",
+                "reason"
+              ],
+              "type": "object"
+            },
+            "maxItems": 3,
+            "type": "array"
+          }
+        },
+        "required": [
+          "recommendations"
+        ],
+        "type": "object"
+      }
+    },
+    "23f78f763594cbeadc46e64c78cd3b6c101a806458c8ba00c0753f6fd5f131d3": {
+      "maxOutputTokens": 4096,
+      "responseMimeType": "application/json",
+      "responseJsonSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "summary": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "summary"
+        ],
+        "type": "object"
+      }
+    },
+    "977d5decf0732c26f1c1b36bad75229a049bbfda6aa64387268f57329970cd52": {
+      "maxOutputTokens": 4096,
+      "responseMimeType": "application/json",
+      "responseJsonSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "assessment": {
+            "additionalProperties": false,
+            "properties": {
+              "action": {
+                "enum": [
+                  "unchanged",
+                  "replace"
+                ],
+                "type": "string"
+              },
+              "outcome": {
+                "enum": [
+                  "",
+                  "collecting_information",
+                  "self_service",
+                  "professional_required"
+                ],
+                "type": "string"
+              },
+              "problem_category_name": {
+                "enum": [
+                  "",
+                  "Plomería",
+                  "Electricidad",
+                  "Gas",
+                  "Humedad",
+                  "Cerraduras",
+                  "Calefacción",
+                  "Estructuras"
+                ],
+                "type": "string"
+              },
+              "problem_description": {
+                "type": "string"
+              },
+              "problem_title": {
+                "type": "string"
+              },
+              "selected_image_refs": {
+                "items": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "maxItems": 3,
+                "type": "array"
+              }
+            },
+            "required": [
+              "action",
+              "outcome",
+              "problem_title",
+              "problem_description",
+              "problem_category_name",
+              "selected_image_refs"
+            ],
+            "type": "object"
+          },
+          "content": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "image_descriptions": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "description": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "image_ref": {
+                  "minLength": 1,
+                  "type": "string"
+                }
+              },
+              "required": [
+                "image_ref",
+                "description"
+              ],
+              "type": "object"
+            },
+            "maxItems": 0,
+            "minItems": 0,
+            "type": "array"
+          },
+          "status": {
+            "enum": [
+              "answered",
+              "out_of_scope"
+            ],
+            "type": "string"
+          },
+          "title": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "title",
+          "content",
+          "image_descriptions",
+          "assessment"
+        ],
+        "type": "object"
+      }
+    },
+    "175e13fcbc43bebb3aa73d19fb3c2cffcc0b5a28b0ed5e14f7d89b4ac7a262fa": {
+      "maxOutputTokens": 4096,
+      "responseMimeType": "application/json",
+      "responseJsonSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "recommendations": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "reason": {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                "reference": {
+                  "minLength": 1,
+                  "type": "string"
+                }
+              },
+              "required": [
+                "reference",
+                "reason"
+              ],
+              "type": "object"
+            },
+            "maxItems": 3,
+            "type": "array"
+          }
+        },
+        "required": [
+          "recommendations"
+        ],
+        "type": "object"
+      }
+    },
+    "2beade12a307942d36afee780dbcaca6b9c68fc2d99c3f7a77d52204696c72a9": {
+      "maxOutputTokens": 4096,
+      "responseMimeType": "application/json",
+      "responseJsonSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "summary": {
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "summary"
+        ],
+        "type": "object"
+      }
+    }
+  },
+  "artifacts": {
+    "README.md": {
+      "sha256": "65cc24f63e08ef8a5482e16c7d98c18a93af0a7ad4d5a1e3e1372a98b2fff988",
+      "bytes": 2519,
+      "records": null
+    },
+    "responses.jsonl": {
+      "sha256": "0134c0e95cab41fae1fa62ec09e029e8f41c03641b15b9ae97fd9a4df8999cf5",
+      "bytes": 1137848,
+      "records": 312
+    },
+    "results.jsonl": {
+      "sha256": "d45c01ea17f527302828ae648e85707d34cc57c213ebdae00008e3ccb9f1517b",
+      "bytes": 1201560,
+      "records": 312
+    },
+    "evaluations.jsonl": {
+      "sha256": "1624f1f3c4afde3b4251532a09ef04e6f49db6e8cbcf556f3880ea1a4a7012ef",
+      "bytes": 2389909,
+      "records": 2082
+    },
+    "summary.json": {
+      "sha256": "bd62d7206426c0d3bfffb20a9b81db2312ebc35dff7bb05a894665cf0018344e",
+      "bytes": 42407,
+      "records": null
+    }
+  },
+  "release_approved": false
+}
